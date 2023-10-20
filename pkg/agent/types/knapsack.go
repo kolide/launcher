@@ -8,6 +8,7 @@ type Knapsack interface {
 	Stores
 	BboltDB
 	Flags
+	Logger
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
 	LatestOsquerydPath(ctx context.Context) string
 }

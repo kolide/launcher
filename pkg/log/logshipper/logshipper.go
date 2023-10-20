@@ -3,6 +3,7 @@ package logshipper
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/url"
 	"sync"
 	"time"
@@ -115,6 +116,10 @@ func (ls *LogShipper) Log(keyvals ...interface{}) error {
 
 	filterResults(keyvals...)
 	return ls.shippingLogger.Log(keyvals...)
+}
+
+func (ls *LogShipper) Writer() io.Writer {
+	return ls.sendBuffer
 }
 
 // filterResults filteres out the osquery results,

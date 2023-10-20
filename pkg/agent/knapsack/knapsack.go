@@ -4,6 +4,10 @@ import (
 	"context"
 	"time"
 
+	"log/slog"
+
+	slogmulti "github.com/samber/slog-multi"
+
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
@@ -26,6 +30,9 @@ type knapsack struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
 
+	logger       *slog.Logger
+	slogHandlers []slog.Handler
+
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
 	// Querier
@@ -36,9 +43,22 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 		db:     db,
 		flags:  flags,
 		stores: stores,
+		logger: slog.New(slogmulti.Fanout()).With("logger", "knapsack_slogger"),
 	}
 
 	return k
+}
+
+// Logging interface methods
+func (k *knapsack) Logger() *slog.Logger {
+	return k.logger
+}
+
+func (k *knapsack) AddLogHandler(handler slog.Handler) {
+	k.slogHandlers = append(k.slogHandlers, handler)
+	k.logger = slog.New(
+		slogmulti.Fanout(k.slogHandlers...),
+	)
 }
 
 // BboltDB interface methods

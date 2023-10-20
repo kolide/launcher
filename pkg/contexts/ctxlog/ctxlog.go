@@ -2,6 +2,7 @@ package ctxlog
 
 import (
 	"context"
+	"io"
 
 	"github.com/go-kit/kit/log"
 	"go.opencensus.io/trace"
@@ -9,10 +10,18 @@ import (
 
 type key int
 
-const loggerKey key = 0
+const (
+	loggerKey key = 0
+	writerKey key = 1
+)
 
 func NewContext(ctx context.Context, logger log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
+}
+
+func NewContextWithLogFileWriter(ctx context.Context, logger log.Logger, writer io.Writer) context.Context {
+	ctx = context.WithValue(ctx, loggerKey, logger)
+	return context.WithValue(ctx, writerKey, writer)
 }
 
 func FromContext(ctx context.Context) log.Logger {
@@ -34,6 +43,16 @@ func FromContext(ctx context.Context) log.Logger {
 		"span_id", span.SpanID.String(),
 		"trace_is_sampled", span.IsSampled(),
 	)
+}
+
+func FromContextWithLogFileWriter(ctx context.Context) (log.Logger, io.Writer) {
+	logger := FromContext(ctx)
+
+	v, ok := ctx.Value(writerKey).(io.Writer)
+	if !ok {
+		return logger, io.Discard
+	}
+	return logger, v
 }
 
 // isTraceUninitialized returns true when a span is is unconfigured.

@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -71,7 +72,8 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+	logger, logFileWriter := ctxlog.FromContextWithLogFileWriter(ctx)
+	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
 
@@ -168,6 +170,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db)
 
+	slogLevel := slog.LevelInfo
+	if k.Debug() {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogHandlerOpts := &slog.HandlerOptions{AddSource: true, Level: slogLevel}
+	k.AddLogHandler(slog.NewJSONHandler(os.Stderr, slogHandlerOpts))
+	k.AddLogHandler(slog.NewJSONHandler(logFileWriter, slogHandlerOpts))
+
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
@@ -175,6 +186,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
+		// consider creating new slog.HandlerOptions so we only ship errors
+		k.AddLogHandler(slog.NewJSONHandler(logShipper.Writer(), slogHandlerOpts))
 	}
 
 	// construct the appropriate http client based on security settings
@@ -260,8 +273,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	level.Info(logger).Log(
-		"msg", "started kolide launcher",
+	k.Logger().Info("started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)

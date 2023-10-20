@@ -2,6 +2,7 @@ package locallogger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -18,7 +19,7 @@ type localLogger struct {
 	logger log.Logger
 }
 
-func NewKitLogger(logFilePath string) log.Logger {
+func NewKitLogger(logFilePath string) (log.Logger, io.Writer) {
 	// This is meant as an always available debug tool. Thus we hardcode these options
 	lj := &lumberjack.Logger{
 		Filename:   logFilePath,
@@ -27,15 +28,17 @@ func NewKitLogger(logFilePath string) log.Logger {
 		MaxBackups: 5,
 	}
 
+	writer := log.NewSyncWriter(lj)
+
 	ll := localLogger{
 		logger: log.With(
-			log.NewJSONLogger(log.NewSyncWriter(lj)),
+			log.NewJSONLogger(writer),
 			"ts", log.DefaultTimestampUTC,
 			"caller", log.DefaultCaller, ///log.Caller(6),
 		),
 	}
 
-	return ll
+	return ll, writer
 }
 
 func (ll localLogger) Log(keyvals ...interface{}) error {

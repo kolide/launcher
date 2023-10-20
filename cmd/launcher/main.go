@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,9 +98,16 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
+	// It's kind of weird exposing the log writers like this, but at this time
+	// were evaluating transitioning to std lib slog and making it accessable
+	// via knapsack. So we have to pass the writer around so multiple loggers
+	// can log to same file.
+	var logFileWriter io.Writer
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		var localLogger log.Logger
+		localLogger, logFileWriter = locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
+		logger = teelogger.New(logger, localLogger)
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
@@ -113,7 +121,7 @@ func main() {
 		}
 	}()
 
-	ctx = ctxlog.NewContext(ctx, logger)
+	ctx = ctxlog.NewContextWithLogFileWriter(ctx, logger, logFileWriter)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
