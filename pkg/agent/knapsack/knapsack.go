@@ -43,7 +43,7 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 		db:     db,
 		flags:  flags,
 		stores: stores,
-		logger: slog.New(slogmulti.Fanout()).With("logger", "knapsack_slogger"),
+		logger: slog.New(slogmulti.Fanout()),
 	}
 
 	return k
@@ -56,9 +56,7 @@ func (k *knapsack) Logger() *slog.Logger {
 
 func (k *knapsack) AddLogHandler(handler slog.Handler) {
 	k.slogHandlers = append(k.slogHandlers, handler)
-	k.logger = slog.New(
-		slogmulti.Fanout(k.slogHandlers...),
-	)
+	k.logger = slog.New(slogmulti.Fanout(k.slogHandlers...)).With("logger", "knapsack")
 }
 
 // BboltDB interface methods
