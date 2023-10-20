@@ -348,7 +348,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
 
-		if metadataWriter := internal.NewMetadataWriter(ctx, logger, k); metadataWriter == nil {
+		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
 			level.Debug(logger).Log(
 				"msg", "unable to set up metadata writer",
 				"err", err,

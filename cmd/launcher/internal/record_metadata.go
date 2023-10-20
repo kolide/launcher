@@ -1,9 +1,9 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,7 +21,6 @@ type (
 	// subsystem. whenever new data is received, it will rewrite the metadata.json
 	// and metadata.plist files to our root install directory
 	metadataWriter struct {
-		ctx    context.Context
 		logger log.Logger
 		k      types.Knapsack
 	}
@@ -34,9 +33,8 @@ type (
 	}
 )
 
-func NewMetadataWriter(ctx context.Context, logger log.Logger, k types.Knapsack) *metadataWriter {
+func NewMetadataWriter(logger log.Logger, k types.Knapsack) *metadataWriter {
 	return &metadataWriter{
-		ctx:    ctx,
 		logger: logger,
 		k:      k,
 	}
@@ -67,32 +65,9 @@ func (mw *metadataWriter) populateLatestServerData(metadata *metadata) error {
 		return errors.New("ServerProvidedDataStore is uninitialized")
 	}
 
-	deviceId, err := store.Get([]byte("device_id"))
-	if err != nil {
-		return err
-	} else if string(deviceId) == "" {
-		return errors.New("device_id is not yet present in ServerProvidedDataStore")
-	}
-
-	metadata.DeviceId = string(deviceId)
-
-	organizationId, err := store.Get([]byte("organization_id"))
-	if err != nil {
-		return err
-	} else if string(organizationId) == "" {
-		return errors.New("organization_id is not yet present in ServerProvidedDataStore")
-	}
-
-	metadata.OrganizationId = string(organizationId)
-
-	munemo, err := store.Get([]byte("munemo"))
-	if err != nil {
-		return err
-	} else if string(munemo) == "" {
-		return errors.New("munemo is not yet present in ServerProvidedDataStore")
-	}
-
-	metadata.OrganizationMunemo = string(munemo)
+	metadata.DeviceId = mw.getServerDataValue(store, "device_id")
+	metadata.OrganizationId = mw.getServerDataValue(store, "organization_id")
+	metadata.OrganizationMunemo = mw.getServerDataValue(store, "munemo")
 
 	return nil
 }
@@ -126,4 +101,27 @@ func (mw *metadataWriter) recordMetadata(metadata *metadata) error {
 	}
 
 	return nil
+}
+
+func (mw *metadataWriter) getServerDataValue(store types.GetterSetterDeleterIteratorUpdater, key string) string {
+	val, err := store.Get([]byte(key))
+	if err != nil {
+		level.Debug(mw.logger).Log(
+			"msg", fmt.Sprintf("unable to collect value for %s from server_data, will re-attempt on next update", key),
+			"err", err,
+		)
+
+		return ""
+	}
+
+	if string(val) == "" {
+		level.Debug(mw.logger).Log(
+			"msg", fmt.Sprintf("server_data was missing value for %s, will re-attempt on next update", key),
+			"err", err,
+		)
+
+		return ""
+	}
+
+	return string(val)
 }
