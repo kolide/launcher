@@ -175,7 +175,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		slogLevel = slog.LevelDebug
 	}
 
-	slogHandlerOpts := &slog.HandlerOptions{AddSource: true, Level: slogLevel, ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+	slogAttrReplacementFunc := func(groups []string, a slog.Attr) slog.Attr {
 		if a.Key != slog.TimeKey {
 			return a
 		}
@@ -184,10 +184,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			Key:   slog.TimeKey,
 			Value: slog.AnyValue(time.Now().UTC()),
 		}
-	}}
+	}
 
-	k.AddLogHandler(slog.NewJSONHandler(os.Stderr, slogHandlerOpts))
-	k.AddLogHandler(slog.NewJSONHandler(logFileWriter, slogHandlerOpts))
+	k.AddLogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource:   true,
+		Level:       slogLevel,
+		ReplaceAttr: slogAttrReplacementFunc,
+	}))
+
+	k.AddLogHandler(slog.NewJSONHandler(logFileWriter, &slog.HandlerOptions{
+		AddSource: true,
+		// always write debug level logs to debug.json
+		Level:       slog.LevelDebug,
+		ReplaceAttr: slogAttrReplacementFunc,
+	}))
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -196,8 +206,13 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
-		// consider creating new slog.HandlerOptions so we only ship errors
-		k.AddLogHandler(slog.NewJSONHandler(logShipper.Writer(), slogHandlerOpts))
+
+		// consider shipping only errors
+		k.AddLogHandler(slog.NewJSONHandler(logShipper.Writer(), &slog.HandlerOptions{
+			AddSource:   true,
+			Level:       slogLevel,
+			ReplaceAttr: slogAttrReplacementFunc,
+		}))
 	}
 
 	// construct the appropriate http client based on security settings
