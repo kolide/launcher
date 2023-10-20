@@ -49,7 +49,7 @@ func (mw *metadataWriter) Ping() {
 	}
 
 	if err := mw.recordMetadata(metadata); err != nil {
-		level.Error(mw.logger).Log("msg", "unable to write out metadata files", "err", err)
+		level.Debug(mw.logger).Log("msg", "unable to write out metadata files", "err", err)
 	}
 }
 
