@@ -45,7 +45,7 @@ func NewMetadataWriter(ctx context.Context, logger log.Logger, k types.Knapsack)
 func (mw *metadataWriter) Ping() {
 	metadata := newMetadataTemplate()
 	if err := mw.populateLatestServerData(metadata); err != nil {
-		level.Error(mw.logger).Log("msg", "unable to collect latest server data, metadata files will be incomplete", "err", err)
+		level.Debug(mw.logger).Log("msg", "unable to collect latest server data, metadata files will be incomplete", "err", err)
 	}
 
 	if err := mw.recordMetadata(metadata); err != nil {
