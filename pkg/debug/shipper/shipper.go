@@ -153,6 +153,7 @@ func (s *shipper) signedUrl() (string, error) {
 	}
 
 	signedUrlRequest.Header.Set(control.HeaderApiVersion, control.ApiVersion)
+	signedUrlRequest.Header.Set("Content-Type", "application/json")
 
 	signHttpRequest(signedUrlRequest, body)
 
