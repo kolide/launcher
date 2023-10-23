@@ -58,7 +58,7 @@ func TestKitLogging(t *testing.T) {
 	// we only need a file path, not the file handle
 	tmpfile.Close()
 
-	logger, _ := NewKitLogger(tmpfile.Name())
+	logger := NewKitLogger(tmpfile.Name())
 
 	logger.Log(data...)
 
