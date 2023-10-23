@@ -562,22 +562,6 @@ func (_m *Knapsack) LogMaxBytesPerBatch() int {
 	return r0
 }
 
-// Logger provides a mock function with given fields:
-func (_m *Knapsack) Logger() *slog.Logger {
-	ret := _m.Called()
-
-	var r0 *slog.Logger
-	if rf, ok := ret.Get(0).(func() *slog.Logger); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*slog.Logger)
-		}
-	}
-
-	return r0
-}
-
 // LoggingInterval provides a mock function with given fields:
 func (_m *Knapsack) LoggingInterval() time.Duration {
 	ret := _m.Called()
@@ -1300,6 +1284,22 @@ func (_m *Knapsack) SetUpdateDirectory(directory string) error {
 		r0 = rf(directory)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Slogger provides a mock function with given fields:
+func (_m *Knapsack) Slogger() *slog.Logger {
+	ret := _m.Called()
+
+	var r0 *slog.Logger
+	if rf, ok := ret.Get(0).(func() *slog.Logger); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*slog.Logger)
+		}
 	}
 
 	return r0
