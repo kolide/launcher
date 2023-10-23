@@ -26,7 +26,7 @@ func runDoctor(args []string) error {
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	logger := log.With(logutil.NewCLILogger(true), "caller", log.DefaultCaller)
 	flagController := flags.NewFlagController(logger, nil, fcOpts...)
-	k := knapsack.New(nil, flagController, nil)
+	k := knapsack.New(nil, flagController, nil, nil)
 
 	w := os.Stdout //tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
 

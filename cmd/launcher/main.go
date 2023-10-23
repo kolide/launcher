@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 )
 
@@ -97,17 +98,19 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
+	var multiSlogger *multislogger.MultiSlogger
 
-	// It's kind of weird exposing the log writers like this, but at this time
-	// were evaluating transitioning to std lib slog and making it accessible
-	// via knapsack. So we have to pass the writer around so multiple loggers
-	// can log to same file.
-	var logFileWriter io.Writer
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		var localLogger log.Logger
-		localLogger, logFileWriter = locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
+		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = teelogger.New(logger, localLogger)
+
+		multiSlogger = multislogger.New(slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+			AddSource:   true,
+			Level:       slog.LevelInfo,
+			ReplaceAttr: slogAttrReplacementFunc,
+		}))
+
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
@@ -121,7 +124,8 @@ func main() {
 		}
 	}()
 
-	ctx = ctxlog.NewContextWithLogFileWriter(ctx, logger, logFileWriter)
+	ctx = ctxlog.NewContext(ctx, logger)
+	ctx = ctxlog.NewContextWithMultislogger(ctx, multiSlogger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
@@ -250,4 +254,15 @@ func runVersion(args []string) error {
 	version.PrintFull()
 	os.Exit(0)
 	return nil
+}
+
+var slogAttrReplacementFunc = func(groups []string, a slog.Attr) slog.Attr {
+	if a.Key != slog.TimeKey {
+		return a
+	}
+
+	return slog.Attr{
+		Key:   slog.TimeKey,
+		Value: slog.AnyValue(time.Now().UTC()),
+	}
 }

@@ -2,26 +2,25 @@ package ctxlog
 
 import (
 	"context"
-	"io"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.opencensus.io/trace"
 )
 
 type key int
 
 const (
-	loggerKey key = 0
-	writerKey key = 1
+	loggerKey  key = 0
+	sloggerKey key = 1
 )
 
 func NewContext(ctx context.Context, logger log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
-func NewContextWithLogFileWriter(ctx context.Context, logger log.Logger, writer io.Writer) context.Context {
-	ctx = context.WithValue(ctx, loggerKey, logger)
-	return context.WithValue(ctx, writerKey, writer)
+func NewContextWithMultislogger(ctx context.Context, slogger *multislogger.MultiSlogger) context.Context {
+	return context.WithValue(ctx, sloggerKey, slogger)
 }
 
 func FromContext(ctx context.Context) log.Logger {
@@ -45,14 +44,12 @@ func FromContext(ctx context.Context) log.Logger {
 	)
 }
 
-func FromContextWithLogFileWriter(ctx context.Context) (log.Logger, io.Writer) {
-	logger := FromContext(ctx)
-
-	v, ok := ctx.Value(writerKey).(io.Writer)
+func FromContextWithSlogger(ctx context.Context) *multislogger.MultiSlogger {
+	v, ok := ctx.Value(sloggerKey).(*multislogger.MultiSlogger)
 	if !ok {
-		return logger, io.Discard
+		return nil
 	}
-	return logger, v
+	return v
 }
 
 // isTraceUninitialized returns true when a span is is unconfigured.

@@ -2,11 +2,10 @@ package knapsack
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"log/slog"
-
-	slogmulti "github.com/samber/slog-multi"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
@@ -14,6 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
 
@@ -30,33 +30,36 @@ type knapsack struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
 
-	logger       *slog.Logger
-	slogHandlers []slog.Handler
+	slogger *multislogger.MultiSlogger
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
 	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB) *knapsack {
+func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger *multislogger.MultiSlogger) *knapsack {
 	k := &knapsack{
-		db:     db,
-		flags:  flags,
-		stores: stores,
-		logger: slog.New(slogmulti.Fanout()),
+		db:      db,
+		flags:   flags,
+		stores:  stores,
+		slogger: slogger,
+	}
+
+	if k.slogger == nil {
+		k.slogger = multislogger.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
 	return k
 }
 
 // Logging interface methods
-func (k *knapsack) Logger() *slog.Logger {
-	return k.logger
+func (k *knapsack) Slogger() *slog.Logger {
+	return k.slogger.Logger
 }
 
 func (k *knapsack) AddLogHandler(handler slog.Handler) {
-	k.slogHandlers = append(k.slogHandlers, handler)
-	k.logger = slog.New(slogmulti.Fanout(k.slogHandlers...)).With("logger", "knapsack")
+	k.slogger = k.slogger.AddHandler(handler)
+	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
 }
 
 // BboltDB interface methods

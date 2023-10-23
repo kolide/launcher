@@ -72,7 +72,7 @@ const (
 func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger, logFileWriter := ctxlog.FromContextWithLogFileWriter(ctx)
+	logger := ctxlog.FromContext(ctx)
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
@@ -168,35 +168,25 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db)
+	slogger := ctxlog.FromContextWithSlogger(ctx)
+	k := knapsack.New(stores, flagController, db, slogger)
 
 	slogLevel := slog.LevelInfo
 	if k.Debug() {
 		slogLevel = slog.LevelDebug
 	}
 
-	slogAttrReplacementFunc := func(groups []string, a slog.Attr) slog.Attr {
-		if a.Key != slog.TimeKey {
-			return a
-		}
-
-		return slog.Attr{
-			Key:   slog.TimeKey,
-			Value: slog.AnyValue(time.Now().UTC()),
-		}
-	}
-
-	k.AddLogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+	// set up stdout log
+	k.AddLogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource:   true,
 		Level:       slogLevel,
 		ReplaceAttr: slogAttrReplacementFunc,
 	}))
 
-	k.AddLogHandler(slog.NewJSONHandler(logFileWriter, &slog.HandlerOptions{
-		AddSource: true,
-		// always write debug level logs to debug.json
-		Level:       slog.LevelDebug,
-		ReplaceAttr: slogAttrReplacementFunc,
+	// set up system log
+	const levelSystem = slog.Level(20)
+	k.AddLogHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: levelSystem,
 	}))
 
 	// Need to set up the log shipper so that we can get the logger early
@@ -298,7 +288,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	k.Logger().Info("started kolide launcher",
+	k.Slogger().Log(ctx, levelSystem, "started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)

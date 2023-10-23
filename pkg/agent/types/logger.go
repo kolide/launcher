@@ -4,8 +4,8 @@ import (
 	"log/slog"
 )
 
-type Logger interface {
+type Slogger interface {
 	// Logging interface methods
-	Logger() *slog.Logger
+	Slogger() *slog.Logger
 	AddLogHandler(handler slog.Handler)
 }
