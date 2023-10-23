@@ -347,6 +347,19 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
+
+		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
+			level.Debug(logger).Log(
+				"msg", "unable to set up metadata writer",
+				"err", err,
+			)
+		} else {
+			controlService.RegisterSubscriber(serverDataSubsystemName, metadataWriter)
+			// explicitly trigger the ping at least once to ensure updated metadata is written
+			// on upgrades, the subscriber will continue to do this automatically when new
+			// information is made available from server_data (e.g. on a fresh install)
+			metadataWriter.Ping()
+		}
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
