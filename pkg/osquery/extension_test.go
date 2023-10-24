@@ -57,6 +57,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
+	m.On("StatusLogStore").Maybe().Return(storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String()))
 	return m
 }
 
@@ -496,16 +497,17 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create the status logs bucket ahead of time
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.Nil(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.Nil(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -533,17 +535,21 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create these buckets ahead of time
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.ResultLogsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.Nil(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.Nil(t, err)
+
+	resultLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ResultLogsStore.String())
+	require.Nil(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -601,17 +607,18 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create the status logs bucket ahead of time
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.Nil(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.Nil(t, err)
 
 	k := mocks.NewKnapsack(t)
-	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
 	k.On("OsquerydPath").Maybe().Return("")
+	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
@@ -647,18 +654,21 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create the status logs bucket ahead of time
-	// agentbbolt.NewStore(log.NewNopLogger(), db, storage.InitialResultsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.ResultLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.NoError(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.NoError(t, err)
+
+	resultLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ResultLogsStore.String())
+	require.NoError(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
 
 	e, err := NewExtension(m, k, ExtensionOpts{
 		EnrollSecret:     "enroll_secret",
@@ -722,18 +732,16 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.Nil(t, err)
 
-	// Create the status logs bucket ahead of time
-	// agentbbolt.NewStore(log.NewNopLogger(), db, storage.InitialResultsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.ResultLogsStore.String())
+	resultLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ResultLogsStore.String())
+	require.Nil(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
 
 	e, err := NewExtension(m, k, ExtensionOpts{
 		EnrollSecret:     "enroll_secret",
@@ -806,18 +814,21 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create the status logs bucket ahead of time
-	// agentbbolt.NewStore(log.NewNopLogger(), db, storage.InitialResultsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.ResultLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.Nil(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.Nil(t, err)
+
+	resultLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ResultLogsStore.String())
+	require.Nil(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
 
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
@@ -938,17 +949,21 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 			return "", "", false, errors.New("server rejected logs")
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
 
-	// Create these buckets ahead of time
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.ResultLogsStore.String())
-	agentbbolt.NewStore(log.NewNopLogger(), db, storage.StatusLogsStore.String())
+	initialResultsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String())
+	require.NoError(t, err)
+
+	statusLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.StatusLogsStore.String())
+	require.NoError(t, err)
+
+	resultLogsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ResultLogsStore.String())
+	require.NoError(t, err)
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	k.On("BboltDB").Return(db)
+	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("StatusLogsStore").Return(statusLogsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
 
 	max := 10
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret", MaxBufferedLogs: max})
@@ -1349,4 +1364,22 @@ func Test_setVerbose_MalformedConfig(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
 
 	require.Equal(t, malformedCfg, modifiedCfg)
+}
+
+// numberOfBufferedLogs returns the number of logs buffered for a given type.
+func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
+	store, err := storeForLogType(e.knapsack, typ)
+	if err != nil {
+		return 0, fmt.Errorf("counting buffered logs: %w", err)
+	}
+
+	var count int
+	if err := store.ForEach(func(_, _ []byte) error {
+		count++
+		return nil
+	}); err != nil {
+		return 0, fmt.Errorf("counting buffered logs: %w", err)
+	}
+
+	return count, nil
 }

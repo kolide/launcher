@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
+	"sort"
 
 	"fmt"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -29,7 +29,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 
-	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -600,18 +599,36 @@ func uint64FromByteKey(k []byte) uint64 {
 	return binary.BigEndian.Uint64(k)
 }
 
-// bucketNameFromLogType returns the Bolt bucket name that stores logs of the
-// provided type.
-func bucketNameFromLogType(typ logger.LogType) (string, error) {
+// storeForLogType returns the store with the logs of the provided type.
+func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) {
 	switch typ {
 	case logger.LogTypeString, logger.LogTypeSnapshot:
-		return storage.ResultLogsStore.String(), nil
+		return s.ResultLogsStore(), nil
 	case logger.LogTypeStatus:
-		return storage.StatusLogsStore.String(), nil
+		return s.StatusLogsStore(), nil
 	default:
-		return "", fmt.Errorf("unknown log type: %v", typ)
+		return nil, fmt.Errorf("unknown log type: %v", typ)
 
 	}
+}
+
+func sortStoreKeys(s types.KVStore) ([][]byte, error) {
+	// create an array of all the keys
+	var keys [][]byte
+	err := s.ForEach(func(k, _ []byte) error {
+		keys = append(keys, k)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("iterating keys: %w", err)
+	}
+
+	// sort the keys
+	sort.Slice(keys, func(i, j int) bool {
+		return bytes.Compare(keys[i], keys[j]) < 0
+	})
+
+	return keys, nil
 }
 
 // writeAndPurgeLogs flushes the log buffers, writing up to
@@ -656,86 +673,59 @@ func (e *Extension) writeLogsLoopRunner() {
 	}
 }
 
-// numberOfBufferedLogs returns the number of logs buffered for a given type.
-func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
-	bucketName, err := bucketNameFromLogType(typ)
-	if err != nil {
-		return 0, err
-	}
-
-	var count int
-	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		count = b.Stats().KeyN
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("counting buffered logs: %w", err)
-	}
-
-	return count, nil
-}
-
 // writeBufferedLogs flushes the log buffers, writing up to
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.
 func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		return err
 	}
 
 	// Collect up logs to be sent
 	var logs []string
-	var logIDs [][]byte
-	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
+	var totalBytes int
 
-		c := b.Cursor()
-		k, v := c.First()
-		for totalBytes := 0; k != nil; {
-			// A somewhat cumbersome if block...
-			//
-			// 1. If the log is too big, skip it and mark for deletion.
-			// 2. If the buffer would be too big with the log, break for
-			// 3. Else append it
-			//
-			// Note that (1) must come first, otherwise (2) will always trigger.
-			if len(v) > e.Opts.MaxBytesPerBatch {
-				// Discard logs that are too big
-				logheadSize := minInt(len(v), 100)
-				level.Info(e.Opts.Logger).Log(
-					"msg", "dropped log",
-					"logID", k,
-					"size", len(v),
-					"limit", e.Opts.MaxBytesPerBatch,
-					"loghead", string(v)[0:logheadSize],
-				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled. Break the loop and come back later.
-				break
-			} else {
-				logs = append(logs, string(v))
-				totalBytes += len(v)
-			}
-
-			// Note the logID for deletion. We do this by
-			// making a copy of k. It is retained in
-			// logIDs after the transaction is closed,
-			// when the goroutine ticks it zeroes out some
-			// of the IDs to delete below, causing logs to
-			// remain in the buffer and be sent again to
-			// the server.
-			logID := make([]byte, len(k))
-			copy(logID, k)
-			logIDs = append(logIDs, logID)
-
-			k, v = c.Next()
-		}
-		return nil
-	})
+	keys, err := sortStoreKeys(store)
 	if err != nil {
-		return fmt.Errorf("reading buffered logs: %w", err)
+		return fmt.Errorf("getting buffered log keys: %w", err)
+	}
+
+	lastKeyIndex := 0
+	for _, k := range keys {
+		lastKeyIndex++
+
+		v, err := store.Get(k)
+		if err != nil {
+			level.Error(e.Opts.Logger).Log(
+				"msg", "error getting buffered log entry",
+				"err", err,
+			)
+			continue
+		}
+
+		if len(v) > e.Opts.MaxBytesPerBatch {
+			// Discard logs that are too big
+			logheadSize := minInt(len(v), 100)
+			level.Info(e.Opts.Logger).Log(
+				"msg", "dropped log",
+				"logID", k,
+				"size", len(v),
+				"limit", e.Opts.MaxBytesPerBatch,
+				"loghead", string(v)[0:logheadSize],
+			)
+			continue
+		}
+
+		if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+			lastKeyIndex--
+			break
+		}
+
+		totalBytes += len(v)
+
+		// add to logs to be sent
+		logs = append(logs, string(v))
 	}
 
 	if len(logs) == 0 {
@@ -743,20 +733,11 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
-	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
-	if err != nil {
+	if err = e.writeLogsWithReenroll(context.Background(), typ, logs, true); err != nil {
 		return fmt.Errorf("writing logs: %w", err)
 	}
 
-	// Delete logs that were successfully sent
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		for _, k := range logIDs {
-			b.Delete(k)
-		}
-		return nil
-	})
-	if err != nil {
+	if err = store.Delete(keys[:lastKeyIndex]...); err != nil {
 		return fmt.Errorf("deleting sent logs: %w", err)
 	}
 
@@ -796,39 +777,33 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
 // ensuring that at most Opts.MaxBufferedLogs logs remain.
 func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		return err
 	}
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
 
-		logCount := b.Stats().KeyN
-		deleteCount := logCount - e.Opts.MaxBufferedLogs
-
-		if deleteCount <= 0 {
-			// Limit not exceeded
-			return nil
-		}
-
-		level.Info(e.Opts.Logger).Log(
-			"msg", "Buffered logs limit exceeded. Purging excess.",
-			"limit", e.Opts.MaxBufferedLogs,
-			"purge_count", deleteCount,
-		)
-
-		c := b.Cursor()
-		k, _ := c.First()
-		for total := 0; k != nil && total < deleteCount; total++ {
-			c.Delete() // Note: This advances the cursor
-			k, _ = c.First()
-		}
-
-		return nil
-	})
+	keys, err := sortStoreKeys(store)
 	if err != nil {
+		return fmt.Errorf("getting buffered log keys: %w", err)
+	}
+
+	deleteCount := len(keys) - e.Opts.MaxBufferedLogs
+
+	if deleteCount <= 0 {
+		// Limit not exceeded
+		return nil
+	}
+
+	level.Info(e.Opts.Logger).Log(
+		"msg", "Buffered logs limit exceeded. Purging excess.",
+		"limit", e.Opts.MaxBufferedLogs,
+		"purge_count", len(keys),
+	)
+
+	if err := store.Delete(keys[:deleteCount]...); err != nil {
 		return fmt.Errorf("deleting overflowed logs: %w", err)
 	}
+
 	return nil
 }
 
@@ -842,7 +817,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return nil
 	}
 
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		level.Info(e.Opts.Logger).Log(
 			"msg", "Received unknown log type",
@@ -851,22 +826,17 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return fmt.Errorf("unknown log type: %w", err)
 	}
 
-	// Buffer the log for sending later in a batch
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-
-		// Log keys are generated with the auto-incrementing sequence
-		// number provided by BoltDB. These must be converted to []byte
-		// (which we do with byteKeyFromUint64 function).
-		key, err := b.NextSequence()
-		if err != nil {
-			return fmt.Errorf("generating key: %w", err)
-		}
-
-		return b.Put(byteKeyFromUint64(key), []byte(logText))
-	})
-
+	keys, err := sortStoreKeys(store)
 	if err != nil {
+		return fmt.Errorf("getting keys for log string: %w", err)
+	}
+
+	uint64Key := uint64(0)
+	if len(keys) > 0 {
+		uint64Key = uint64FromByteKey(keys[len(keys)-1]) + 1
+	}
+
+	if err := store.Set(byteKeyFromUint64(uint64Key), []byte(logText)); err != nil {
 		return fmt.Errorf("buffering log: %w", err)
 	}
 
