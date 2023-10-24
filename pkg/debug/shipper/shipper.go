@@ -45,6 +45,7 @@ type shipper struct {
 	writer   io.WriteCloser
 	knapsack types.Knapsack
 
+	uploadName           string
 	uploadRequestURL     string
 	uploadRequest        *http.Request
 	uploadRequestStarted bool
@@ -89,6 +90,10 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s.uploadRequest = req
 
 	return s, nil
+}
+
+func (s *shipper) Name() string {
+	return s.uploadName
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
@@ -164,7 +169,8 @@ func (s *shipper) signedUrl() (string, error) {
 	defer signedUrlResponse.Body.Close()
 
 	responseData := struct {
-		URL string `json:"URL"`
+		URL  string `json:"URL"`
+		Name string `json:"name"`
 	}{}
 
 	if err := json.NewDecoder(signedUrlResponse.Body).Decode(&responseData); err != nil {
@@ -175,6 +181,7 @@ func (s *shipper) signedUrl() (string, error) {
 		return "", fmt.Errorf("got %s status in signed url response", signedUrlResponse.Status)
 	}
 
+	s.uploadName = responseData.Name
 	return responseData.URL, nil
 }
 

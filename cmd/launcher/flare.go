@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
@@ -50,10 +52,6 @@ func runFlare(args []string) error {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	if *flSave != "local" && *flSave != "upload" {
-		return fmt.Errorf("invalid save option: %s, expected local or upload", *flSave)
-	}
-
 	// were passing an empty array here just to get the default options
 	opts, err := launcher.ParseOptions("flareupload", make([]string, 0))
 	if err != nil {
@@ -67,23 +65,41 @@ func runFlare(args []string) error {
 	k := knapsack.New(nil, flagController, nil)
 	ctx := context.Background()
 
-	if *flSave == "upload" {
+	type flareDestinationTyp interface {
+		io.WriteCloser
+		Name() string
+	}
+	var flareDest flareDestinationTyp
+
+	switch *flSave {
+	case "upload":
 		shipper, err := shipper.New(k, shipper.WithNote(strings.Join(flagset.Args(), " ")), shipper.WithUploadRequestURL(*flUploadRequestURL))
 		if err != nil {
 			return err
 		}
-		return checkups.RunFlare(ctx, k, shipper, checkups.StandaloneEnviroment)
+		flareDest = shipper
+	case "local":
+		reportName := fmt.Sprintf("kolide_agent_flare_report_%s.zip", ulid.New())
+		reportPath := filepath.Join(*flOutputDir, reportName)
+
+		flareFile, err := os.Create(reportPath)
+		if err != nil {
+			return fmt.Errorf("creating flare file (%s): %w", reportPath, err)
+		}
+		defer flareFile.Close()
+		flareDest = flareFile
+	default:
+		return fmt.Errorf(`invalid save option: %s, expected "local" or "upload"`, *flSave)
+
 	}
 
-	// saving flare locally
-	reportName := fmt.Sprintf("kolide_agent_flare_report_%s", ulid.New())
-	reportPath := fmt.Sprintf("%s.zip", filepath.Join(*flOutputDir, reportName))
-
-	flareFile, err := os.Create(reportPath)
-	if err != nil {
-		return fmt.Errorf("creating flare file (%s): %w", reportPath, err)
+	if err := checkups.RunFlare(ctx, k, flareDest, checkups.StandaloneEnviroment); err != nil {
+		return err
 	}
-	defer flareFile.Close()
 
-	return checkups.RunFlare(ctx, k, flareFile, checkups.StandaloneEnviroment)
+	if flareDest.Name() == "" {
+		level.Info(logger).Log("msg", "Flare completed")
+	}
+	level.Info(logger).Log("msg", "Flare completed", "file", flareDest.Name())
+	return nil
 }
