@@ -599,7 +599,12 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		}
 
 		if stderr.Len() > 0 {
-			return errors.New("stderr not empty")
+			// We know this warning is safe to ignore and we expect that it should go away
+			// with a future Golang version.
+			if strings.TrimSpace(stderr.String()) != fmt.Sprintf(`# github.com/kolide/launcher/cmd/%s
+ld: warning: ignoring duplicate libraries: '-lobjc'`, filepath.Base(src)) {
+				return errors.New("stderr not empty")
+			}
 		}
 
 		// Tell github where we're at
