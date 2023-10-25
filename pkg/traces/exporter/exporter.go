@@ -26,7 +26,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-const applicationName = "launcher"
+const (
+	applicationName = "launcher"
+	batchTimeout    = 1 * time.Minute // ensure traces are exported at least once per minute -- otel default is 5 sec
+)
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -251,7 +254,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	parentBasedSampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(t.traceSamplingRate))
 
 	newProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
+		sdktrace.WithBatcher(exp, sdktrace.WithBatchTimeout(batchTimeout)),
 		sdktrace.WithResource(r),
 		sdktrace.WithSampler(parentBasedSampler),
 	)
