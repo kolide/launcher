@@ -2,7 +2,6 @@ package knapsack
 
 import (
 	"context"
-	"io"
 	"time"
 
 	"log/slog"
@@ -46,7 +45,7 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	}
 
 	if k.slogger == nil {
-		k.slogger = multislogger.New(slog.NewTextHandler(io.Discard, nil))
+		k.slogger = multislogger.New()
 	}
 
 	return k
@@ -57,13 +56,12 @@ func (k *knapsack) Slogger() *slog.Logger {
 	return k.slogger.Logger
 }
 
-func (k *knapsack) AddLogHandler(handler slog.Handler) {
-	k.slogger = k.slogger.AddHandler(handler)
+func (k *knapsack) AddReplaceSlogHandler(name string, handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) {
+	k.slogger = k.slogger.AddReplaceHandler(name, handler, matchers...)
 	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
 }
 
 // BboltDB interface methods
-
 func (k *knapsack) BboltDB() *bbolt.DB {
 	return k.db
 }
@@ -419,6 +417,13 @@ func (k *knapsack) SetLogIngestServerURL(url string) error {
 }
 func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
+}
+
+func (k *knapsack) SetLogShippingLevel(level string) error {
+	return k.flags.SetLogShippingLevel(level)
+}
+func (k *knapsack) LogShippingLevel() string {
+	return k.flags.LogShippingLevel()
 }
 
 func (k *knapsack) SetInModernStandby(enabled bool) error {

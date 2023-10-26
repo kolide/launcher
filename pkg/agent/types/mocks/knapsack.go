@@ -23,9 +23,16 @@ type Knapsack struct {
 	mock.Mock
 }
 
-// AddLogHandler provides a mock function with given fields: handler
-func (_m *Knapsack) AddLogHandler(handler slog.Handler) {
-	_m.Called(handler)
+// AddReplaceSlogHandler provides a mock function with given fields: name, handler, matchers
+func (_m *Knapsack) AddReplaceSlogHandler(name string, handler slog.Handler, matchers ...func(context.Context, slog.Record) bool) {
+	_va := make([]interface{}, len(matchers))
+	for _i := range matchers {
+		_va[_i] = matchers[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, name, handler)
+	_ca = append(_ca, _va...)
+	_m.Called(_ca...)
 }
 
 // AgentFlagsStore provides a mock function with given fields:
@@ -557,6 +564,20 @@ func (_m *Knapsack) LogMaxBytesPerBatch() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// LogShippingLevel provides a mock function with given fields:
+func (_m *Knapsack) LogShippingLevel() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
 	}
 
 	return r0
@@ -1128,6 +1149,20 @@ func (_m *Knapsack) SetLogIngestServerURL(url string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetLogShippingLevel provides a mock function with given fields: level
+func (_m *Knapsack) SetLogShippingLevel(level string) error {
+	ret := _m.Called(level)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(level)
 	} else {
 		r0 = ret.Error(0)
 	}

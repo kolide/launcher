@@ -46,6 +46,7 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -172,22 +173,20 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	k := knapsack.New(stores, flagController, db, slogger)
 
 	slogLevel := slog.LevelInfo
+	sysLogMatcher := multislogger.SystemLogMatcher
 	if k.Debug() {
+		// if were in debug mode, we want to log everything including debug messages
+		// to the system log (stderr). When not in debug mode, were only logging logs
+		// with attribute system_log=true to the system log (stderr).
 		slogLevel = slog.LevelDebug
+		sysLogMatcher = nil
 	}
 
-	// set up stdout log
-	k.AddLogHandler(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource:   true,
-		Level:       slogLevel,
-		ReplaceAttr: slogAttrReplacementFunc,
-	}))
-
-	// set up system log
-	const levelSystem = slog.Level(20)
-	k.AddLogHandler(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: levelSystem,
-	}))
+	// system log
+	k.AddReplaceSlogHandler("system", slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slogLevel,
+	}), sysLogMatcher)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -197,12 +196,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 
-		// consider shipping only errors
-		k.AddLogHandler(slog.NewJSONHandler(logShipper.Writer(), &slog.HandlerOptions{
-			AddSource:   true,
-			Level:       slogLevel,
-			ReplaceAttr: slogAttrReplacementFunc,
-		}))
+		// TODO: update make logshipper subscribe to control server updates
+		// and change levels based on config
+		// k.AddReplaceSlogHandler(slog.NewJSONHandler(logShipper.Writer(), &slog.HandlerOptions{
+		// 	AddSource: true,
+		// 	Level:     slogLevel,
+		// }))
 	}
 
 	// construct the appropriate http client based on security settings
@@ -288,7 +287,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	k.Slogger().Log(ctx, levelSystem, "started kolide launcher",
+	level.Info(logger).Log(
+		"msg", "started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)

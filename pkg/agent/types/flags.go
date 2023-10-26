@@ -181,6 +181,10 @@ type Flags interface {
 	SetLogIngestServerURL(url string) error
 	LogIngestServerURL() string
 
+	// LogShippingLevel is the level at which logs should be shipped to the server
+	SetLogShippingLevel(level string) error
+	LogShippingLevel() string
+
 	// TraceIngestServerURL is the URL of the ingest server for traces
 	SetTraceIngestServerURL(url string) error
 	TraceIngestServerURL() string

@@ -105,10 +105,10 @@ func main() {
 		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = teelogger.New(logger, localLogger)
 
-		multiSlogger = multislogger.New(slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
-			AddSource:   true,
-			Level:       slog.LevelInfo,
-			ReplaceAttr: slogAttrReplacementFunc,
+		multiSlogger = multislogger.New()
+		multiSlogger.AddReplaceHandler("debug.json", slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
 		}))
 
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
@@ -256,6 +256,7 @@ func runVersion(args []string) error {
 	return nil
 }
 
+// TODO: remove this
 var slogAttrReplacementFunc = func(groups []string, a slog.Attr) slog.Attr {
 	if a.Key != slog.TimeKey {
 		return a

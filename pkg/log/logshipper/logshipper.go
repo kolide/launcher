@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"sync"
 	"time"
@@ -27,12 +28,13 @@ type LogShipper struct {
 	sendBuffer *sendbuffer.SendBuffer
 	//shippingLogger is the logs that will be shipped
 	shippingLogger log.Logger
-	//baseLogger is for logShipper interal logging
+	//baseLogger is for logShipper internal logging
 	baseLogger        log.Logger
 	knapsack          types.Knapsack
 	stopFunc          context.CancelFunc
 	stopFuncMutex     sync.Mutex
 	isShippingEnabled bool
+	slogHandlerOpts   *slog.HandlerOptions
 }
 
 func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {

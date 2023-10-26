@@ -474,6 +474,16 @@ func (fc *FlagController) LogIngestServerURL() string {
 	).get(fc.getControlServerValue(keys.LogIngestServerURL))
 }
 
+// LogShippingLevel is the level at which logs should be shipped to the server
+func (fc *FlagController) SetLogShippingLevel(level string) error {
+	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
+}
+func (fc *FlagController) LogShippingLevel() string {
+	return NewStringFlagValue(
+		WithDefaultString("info"),
+	).get(fc.getControlServerValue(keys.LogShippingLevel))
+}
+
 func (fc *FlagController) SetTraceIngestServerURL(url string) error {
 	return fc.setControlServerValue(keys.TraceIngestServerURL, []byte(url))
 }
