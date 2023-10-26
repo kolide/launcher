@@ -45,7 +45,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 type airportExecutor struct {
-	ctx    context.Context
+	ctx    context.Context // nolint:containedctx
 	logger log.Logger
 	paths  []string
 }

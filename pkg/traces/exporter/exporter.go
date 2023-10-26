@@ -55,7 +55,7 @@ type TraceExporter struct {
 	disableIngestTLS          bool
 	enabled                   bool
 	traceSamplingRate         float64
-	ctx                       context.Context
+	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
 	interrupted               bool
 }
