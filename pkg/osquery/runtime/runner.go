@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -180,6 +181,9 @@ func (r *Runner) Healthy() error {
 }
 
 func (r *Runner) launchOsqueryInstance() error {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	o := r.instance
 
 	// What binary name to look for
@@ -287,14 +291,14 @@ func (r *Runner) launchOsqueryInstance() error {
 	// FindNewest uses context as a way to get a logger, so we need to
 	// create and pass a ctxlog in.
 	var currentOsquerydBinaryPath string
-	currentOsquerydBinary, err := tuf.CheckOutLatest("osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
+	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
 	if err != nil {
 		level.Debug(o.logger).Log(
 			"msg", "could not get latest version of osqueryd from new autoupdate library, falling back",
 			"err", err,
 		)
 		currentOsquerydBinaryPath = autoupdate.FindNewest(
-			ctxlog.NewContext(context.TODO(), o.logger),
+			ctxlog.NewContext(ctx, o.logger),
 			o.opts.binaryPath,
 			autoupdate.DeleteOldUpdates(),
 		)

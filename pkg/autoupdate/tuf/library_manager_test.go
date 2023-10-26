@@ -542,7 +542,7 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect
@@ -582,7 +582,7 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm we don't have any invalid versions

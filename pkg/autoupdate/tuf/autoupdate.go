@@ -4,6 +4,7 @@ package tuf
 // the legacy `Updater` in pkg/autoupdate that points to Notary.
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
@@ -358,7 +360,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := findRelease(binary, targets, ta.knapsack.UpdateChannel())
+	release, releaseMetadata, err := findRelease(context.Background(), binary, targets, ta.knapsack.UpdateChannel())
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
 	}
@@ -398,7 +400,10 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 // findRelease checks the latest data from TUF (in `targets`) to see whether a new release
 // has been published for the given channel. If it has, it returns the target for that release
 // and its associated metadata.
-func findRelease(binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
+func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// First, find the target that the channel release file is pointing to
 	var releaseTarget string
 	targetReleaseFile := path.Join(string(binary), runtime.GOOS, PlatformArch(), channel, "release.json")
