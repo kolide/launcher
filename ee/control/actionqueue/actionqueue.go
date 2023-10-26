@@ -35,7 +35,7 @@ type action struct {
 }
 
 type actionqueue struct {
-	ctx                   context.Context
+	ctx                   context.Context // nolint:containedctx
 	actors                map[string]actor
 	store                 types.KVStore
 	oldNotificationsStore types.KVStore
