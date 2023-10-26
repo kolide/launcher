@@ -401,7 +401,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 // has been published for the given channel. If it has, it returns the target for that release
 // and its associated metadata.
 func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
-	ctx, span := traces.StartSpan(ctx)
+	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	// First, find the target that the channel release file is pointing to
