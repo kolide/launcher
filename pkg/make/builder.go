@@ -600,13 +600,14 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		// With the Sonoma-era Xcode binaries, we've started seeing a bunch of spurious warnings. They appear to
 		// _mostly_ effect our developer build process. In the interest in not breaking the build, we ignore them.
-		// https://github.com/golang/go/issues/62597#issuecomment-1733893918 is some of them, and some seem related to the zig cross compiling
+		// https://github.com/golang/go/issues/62597#issuecomment-1733893918 is some of them, and some seem related to
+		// the zig cross compiling
 		stderrStr := stderr.String()
 		if os.Getenv("GITHUB_ACTIONS") == "" {
 			stderrStr = strings.ReplaceAll(stderrStr, "ld: warning: ignoring duplicate libraries: '-lobjc'\n", "")
-			stderrStr = strings.ReplaceAll(stderrStr, "# github.com/kolide/launcher/cmd/launcher\n", "")
+			stderrStr = strings.ReplaceAll(stderrStr, fmt.Sprintf("# github.com/kolide/launcher/cmd/%s\n", filepath.Base(src)), "")
 
-			re := regexp.MustCompile(`ld: warning: object file \(.*\) was built for newer 'macOS' version \(14.0\) than being linked \(11.0\)\n`)
+			re := regexp.MustCompile(`ld: warning: object file \(.*\) was built for newer 'macOS' version \(.+\) than being linked \(.+\)\n`)
 			stderrStr = re.ReplaceAllString(stderrStr, "")
 		}
 
