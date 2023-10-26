@@ -70,6 +70,7 @@ func runFlare(args []string) error {
 		Name() string
 	}
 	var flareDest flareDestinationTyp
+	var successMessage string
 
 	switch *flSave {
 	case "upload":
@@ -78,6 +79,7 @@ func runFlare(args []string) error {
 			return err
 		}
 		flareDest = shipper
+		successMessage = "Flare uploaded successfully"
 	case "local":
 		reportName := fmt.Sprintf("kolide_agent_flare_report_%s.zip", ulid.New())
 		reportPath := filepath.Join(*flOutputDir, reportName)
@@ -88,6 +90,7 @@ func runFlare(args []string) error {
 		}
 		defer flareFile.Close()
 		flareDest = flareFile
+		successMessage = "Flare saved locally"
 	default:
 		return fmt.Errorf(`invalid save option: %s, expected "local" or "upload"`, *flSave)
 
@@ -97,9 +100,6 @@ func runFlare(args []string) error {
 		return err
 	}
 
-	if flareDest.Name() == "" {
-		level.Info(logger).Log("msg", "Flare completed")
-	}
-	level.Info(logger).Log("msg", "Flare completed", "file", flareDest.Name())
+	level.Info(logger).Log("msg", successMessage, "file", flareDest.Name())
 	return nil
 }
