@@ -16,12 +16,16 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 const defaultDisplay = ":0"
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)

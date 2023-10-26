@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // defaultBuildTimestamp is used to set the _oldest_ allowed update. Eg, if
@@ -352,6 +353,9 @@ func FindBaseDir(path string) string {
 // CheckExecutable tests whether something is an executable. It
 // examines permissions, mode, and tries to exec it directly.
 func CheckExecutable(ctx context.Context, potentialBinary string, args ...string) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if err := checkExecutablePermissions(potentialBinary); err != nil {
 		return err
 	}

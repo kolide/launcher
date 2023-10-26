@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,7 +45,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -71,7 +72,7 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -91,7 +92,7 @@ func TestCheckOutLatest_NotAvailableOnNonNightlyChannels(t *testing.T) {
 
 				rootDir := t.TempDir()
 
-				_, err := CheckOutLatest(binary, rootDir, "", channel, log.NewNopLogger())
+				_, err := CheckOutLatest(context.TODO(), binary, rootDir, "", channel, log.NewNopLogger())
 				require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
 			})
 		}
@@ -123,7 +124,7 @@ func Test_mostRecentVersion(t *testing.T) {
 			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
-			latest, err := mostRecentVersion(binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, secondVersionPath, latest.Path)
 			require.Equal(t, secondVersion, latest.Version)
@@ -155,7 +156,7 @@ func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			os.WriteFile(secondVersionPath, []byte{}, 0755)
 
-			latest, err := mostRecentVersion(binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, latest.Path)
 			require.Equal(t, firstVersion, latest.Version)
@@ -174,7 +175,7 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 			// Create update directories
 			testBaseDir := t.TempDir()
 
-			_, err := mostRecentVersion(binary, testBaseDir)
+			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
 			require.Error(t, err, "should have returned error when there are no available updates")
 		})
 	}
