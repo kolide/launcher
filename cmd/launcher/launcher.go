@@ -172,21 +172,17 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	slogger := ctxlog.FromContextWithSlogger(ctx)
 	k := knapsack.New(stores, flagController, db, slogger)
 
-	slogLevel := slog.LevelInfo
-	sysLogMatcher := multislogger.SystemLogMatcher
 	if k.Debug() {
-		// if were in debug mode, we want to log everything including debug messages
-		// to the system log (stderr). When not in debug mode, were only logging logs
-		// with attribute system_log=true to the system log (stderr).
-		slogLevel = slog.LevelDebug
-		sysLogMatcher = nil
+		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
+		k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}))
 	}
 
-	// system log
-	k.AddReplaceSlogHandler("system", slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slogLevel,
-	}), sysLogMatcher)
+	// system log, multislogger.SystemLogMatcher only prints to system log when
+	// system_log=true is passed as an attribute
+	k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, nil), multislogger.SystemLogMatcher)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -196,12 +192,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 
-		// TODO: update make logshipper subscribe to control server updates
-		// and change levels based on config
-		// k.AddReplaceSlogHandler(slog.NewJSONHandler(logShipper.Writer(), &slog.HandlerOptions{
-		// 	AddSource: true,
-		// 	Level:     slogLevel,
-		// }))
+		k.AddSlogHandler(logShipper.SlogHandler())
 	}
 
 	// construct the appropriate http client based on security settings

@@ -56,8 +56,8 @@ func (k *knapsack) Slogger() *slog.Logger {
 	return k.slogger.Logger
 }
 
-func (k *knapsack) AddReplaceSlogHandler(name string, handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) {
-	k.slogger = k.slogger.AddReplaceHandler(name, handler, matchers...)
+func (k *knapsack) AddSlogHandler(handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) {
+	k.slogger = k.slogger.AddHandler(handler, matchers...)
 	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
 }
 

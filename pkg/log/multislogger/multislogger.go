@@ -9,26 +9,26 @@ import (
 
 type MultiSlogger struct {
 	*slog.Logger
-	handlers map[string]MultiSloggerHandler
+	handlers []multiSloggerHandler
 }
 
-type MultiSloggerHandler struct {
+type multiSloggerHandler struct {
 	handler  slog.Handler
 	matchers []func(ctx context.Context, r slog.Record) bool
 }
 
 func New() *MultiSlogger {
 	return &MultiSlogger{
-		handlers: make(map[string]MultiSloggerHandler),
-		Logger:   slog.New(slogmulti.Router().Handler()),
+		Logger: slog.New(slogmulti.Router().Handler()),
 	}
 }
 
-func (m *MultiSlogger) AddReplaceHandler(name string, handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) *MultiSlogger {
-	m.handlers[name] = MultiSloggerHandler{
+// AddHandler adds a handler to the multislogger
+func (m *MultiSlogger) AddHandler(handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) *MultiSlogger {
+	m.handlers = append(m.handlers, multiSloggerHandler{
 		handler:  handler,
 		matchers: matchers,
-	}
+	})
 
 	router := slogmulti.Router()
 	for _, handler := range m.handlers {
@@ -41,23 +41,28 @@ func (m *MultiSlogger) AddReplaceHandler(name string, handler slog.Handler, matc
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
 			Handler(router.Handler()),
 	)
+
 	return m
 }
 
+// SystemLogMatcher is a matcher that matches records that have the system_log=true attribute.
 func SystemLogMatcher(ctx context.Context, r slog.Record) bool {
-	ok := false
+	isMatch := false
 	r.Attrs(func(attr slog.Attr) bool {
-		if attr.Key == "system_log" && attr.Value.Kind() == slog.KindBool && attr.Value.Bool() == true {
-			ok = true
-
-			// stop iteration
+		// do the string comparison last since it's more expensive than the kind and bool
+		// comparisons which will short circut the if statement if false
+		// and not do the compare
+		if attr.Value.Kind() == slog.KindBool && attr.Value.Bool() && attr.Key == "system_log" {
+			isMatch = true
+			// end iteration
 			return false
 		}
+
 		// continue iteration
 		return true
 	})
 
-	return ok
+	return isMatch
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {

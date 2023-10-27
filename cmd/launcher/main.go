@@ -98,15 +98,14 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
-	var multiSlogger *multislogger.MultiSlogger
+	slogger := multislogger.New()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
 		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = teelogger.New(logger, localLogger)
 
-		multiSlogger = multislogger.New()
-		multiSlogger.AddReplaceHandler("debug.json", slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+		slogger.AddHandler(slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
 		}))
@@ -125,7 +124,7 @@ func main() {
 	}()
 
 	ctx = ctxlog.NewContext(ctx, logger)
-	ctx = ctxlog.NewContextWithMultislogger(ctx, multiSlogger)
+	ctx = ctxlog.NewContextWithMultislogger(ctx, slogger)
 
 	if err := runLauncher(ctx, cancel, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {

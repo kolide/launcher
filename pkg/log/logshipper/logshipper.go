@@ -12,9 +12,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/sendbuffer"
+	slogmulti "github.com/samber/slog-multi"
 )
 
 const (
@@ -34,7 +36,7 @@ type LogShipper struct {
 	stopFunc          context.CancelFunc
 	stopFuncMutex     sync.Mutex
 	isShippingEnabled bool
-	slogHandlerOpts   *slog.HandlerOptions
+	slogLevel         *slog.LevelVar
 }
 
 func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
@@ -58,6 +60,9 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 		knapsack:       k,
 		stopFuncMutex:  sync.Mutex{},
 	}
+
+	ls.slogLevel = new(slog.LevelVar)
+	ls.slogLevel.Set(slog.LevelError)
 
 	ls.Ping()
 	return ls
@@ -84,6 +89,17 @@ func (ls *LogShipper) Ping() {
 		ls.sender.endpoint = parsedUrl.String()
 	}
 
+	level := slog.LevelError
+	switch ls.knapsack.LogShippingLevel() {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	}
+
+	ls.slogLevel.Set(level)
 	ls.isShippingEnabled = ls.sender.endpoint != ""
 	ls.addDeviceIdentifyingAttributesToLogger()
 
@@ -118,6 +134,25 @@ func (ls *LogShipper) Log(keyvals ...interface{}) error {
 
 	filterResults(keyvals...)
 	return ls.shippingLogger.Log(keyvals...)
+}
+
+func (ls *LogShipper) SlogHandler() slog.Handler {
+	versionInfo := version.Version()
+
+	middleware := slogmulti.NewHandleInlineMiddleware(func(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+		record.AddAttrs(slog.Attr{
+			Key:   "version",
+			Value: slog.StringValue(versionInfo.Version),
+		})
+		return next(ctx, record)
+	})
+
+	jsonHandler := slog.NewJSONHandler(ls.sendBuffer, &slog.HandlerOptions{
+		Level:     ls.slogLevel,
+		AddSource: true,
+	})
+
+	return slogmulti.Pipe(middleware).Handler(jsonHandler)
 }
 
 func (ls *LogShipper) Writer() io.Writer {
