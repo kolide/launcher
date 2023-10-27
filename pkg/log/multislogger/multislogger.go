@@ -50,7 +50,7 @@ func SystemLogMatcher(ctx context.Context, r slog.Record) bool {
 	isMatch := false
 	r.Attrs(func(attr slog.Attr) bool {
 		// do the string comparison last since it's more expensive than the kind and bool
-		// comparisons which will short circut the if statement if false
+		// comparisons which will short circuit the if statement if false
 		// and not do the compare
 		if attr.Value.Kind() == slog.KindBool && attr.Value.Bool() && attr.Key == "system_log" {
 			isMatch = true
