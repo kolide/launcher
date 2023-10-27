@@ -11,9 +11,13 @@ import (
 	"syscall"
 
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)

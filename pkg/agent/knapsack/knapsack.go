@@ -145,7 +145,7 @@ func (k *knapsack) OsquerydPath() string {
 }
 
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
-	latestBin, err := tuf.CheckOutLatest("osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
+	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
 	if err != nil {
 		return autoupdate.FindNewest(ctx, k.OsquerydPath())
 	}

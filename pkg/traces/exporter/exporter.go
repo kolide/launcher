@@ -56,7 +56,7 @@ type TraceExporter struct {
 	enabled                   bool
 	traceSamplingRate         float64
 	batchTimeout              time.Duration
-	ctx                       context.Context
+	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
 	interrupted               bool
 }

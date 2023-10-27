@@ -18,9 +18,12 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -180,6 +183,9 @@ func (r *Runner) Healthy() error {
 }
 
 func (r *Runner) launchOsqueryInstance() error {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	o := r.instance
 
 	// What binary name to look for
@@ -193,6 +199,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	if o.opts.binaryPath == "" {
 		path, err := exec.LookPath(lookFor)
 		if err != nil {
+			traces.SetError(span, fmt.Errorf("osqueryd not supplied and not found: %w", err))
 			return fmt.Errorf("osqueryd not supplied and not found: %w", err)
 		}
 		o.opts.binaryPath = path
@@ -203,6 +210,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	if o.opts.rootDirectory == "" {
 		rootDirectory, rmRootDirectory, err := osqueryTempDir()
 		if err != nil {
+			traces.SetError(span, fmt.Errorf("couldn't create temp directory for osquery instance: %w", err))
 			return fmt.Errorf("couldn't create temp directory for osquery instance: %w", err)
 		}
 		o.opts.rootDirectory = rootDirectory
@@ -214,6 +222,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// required osquery artifact files.
 	paths, err := calculateOsqueryPaths(o.opts)
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
@@ -232,10 +241,12 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Populate augeas lenses, if requested
 	if o.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
+			traces.SetError(span, fmt.Errorf("making augeas lenses directory: %w", err))
 			return fmt.Errorf("making augeas lenses directory: %w", err)
 		}
 
 		if err := o.opts.augeasLensFunc(paths.augeasPath); err != nil {
+			traces.SetError(span, fmt.Errorf("setting up augeas lenses: %w", err))
 			return fmt.Errorf("setting up augeas lenses: %w", err)
 		}
 	}
@@ -287,26 +298,28 @@ func (r *Runner) launchOsqueryInstance() error {
 	// FindNewest uses context as a way to get a logger, so we need to
 	// create and pass a ctxlog in.
 	var currentOsquerydBinaryPath string
-	currentOsquerydBinary, err := tuf.CheckOutLatest("osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
+	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
 	if err != nil {
 		level.Debug(o.logger).Log(
 			"msg", "could not get latest version of osqueryd from new autoupdate library, falling back",
 			"err", err,
 		)
 		currentOsquerydBinaryPath = autoupdate.FindNewest(
-			ctxlog.NewContext(context.TODO(), o.logger),
+			ctxlog.NewContext(ctx, o.logger),
 			o.opts.binaryPath,
 			autoupdate.DeleteOldUpdates(),
 		)
 	} else {
 		currentOsquerydBinaryPath = currentOsquerydBinary.Path
 	}
+	span.AddEvent("got_osqueryd_binary_path", trace.WithAttributes(attribute.String("path", currentOsquerydBinaryPath)))
 
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
 	o.cmd, err = o.opts.createOsquerydCommand(currentOsquerydBinaryPath, paths)
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
 	}
 
@@ -342,9 +355,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		)
 
 		level.Info(o.logger).Log(msgPairs...)
+		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
+	span.AddEvent("launched_osqueryd")
 	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
 
 	// wait for osquery to create the socket before moving on,
@@ -358,8 +373,11 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return err
 	}, 1*time.Minute, 1*time.Second); err != nil {
+		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
 		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
 	}
+
+	span.AddEvent("socket_created")
 
 	stats, err := history.NewInstance()
 	if err != nil {
@@ -423,14 +441,18 @@ func (r *Runner) launchOsqueryInstance() error {
 	// needs for config/log/etc. It's called `kolide_grpc` for mostly historic reasons
 	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
+	span.AddEvent("extension_client_created")
 
 	if len(o.opts.extensionPlugins) > 0 {
 		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.extensionManagerClient, o.opts.extensionPlugins); err != nil {
 			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
+			traces.SetError(span, fmt.Errorf("could not create an extension server: %w", err))
 			return fmt.Errorf("could not create an extension server: %w", err)
 		}
+		span.AddEvent("extension_server_created")
 	}
 
 	if err := o.stats.Connected(o); err != nil {
