@@ -77,15 +77,12 @@ var ctxValueKeysToAdd = []string{
 
 func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
 	for _, key := range ctxValueKeysToAdd {
-		v := ctx.Value(key)
-		if v == nil {
-			continue
+		if v := ctx.Value(key); v != nil {
+			record.AddAttrs(slog.Attr{
+				Key:   key,
+				Value: slog.AnyValue(v),
+			})
 		}
-
-		record.AddAttrs(slog.Attr{
-			Key:   key,
-			Value: slog.AnyValue(v),
-		})
 	}
 	return next(ctx, record)
 }

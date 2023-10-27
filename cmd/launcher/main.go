@@ -254,15 +254,3 @@ func runVersion(args []string) error {
 	os.Exit(0)
 	return nil
 }
-
-// TODO: remove this
-var slogAttrReplacementFunc = func(groups []string, a slog.Attr) slog.Attr {
-	if a.Key != slog.TimeKey {
-		return a
-	}
-
-	return slog.Attr{
-		Key:   slog.TimeKey,
-		Value: slog.AnyValue(time.Now().UTC()),
-	}
-}
