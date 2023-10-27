@@ -122,8 +122,6 @@ type Options struct {
 	ExportTraces bool
 	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
 	TraceSamplingRate float64
-	// TraceBatchTimeout is the maximum amount of time before the trace exporter will export the next batch of spans
-	TraceBatchTimeout time.Duration
 	// LogIngestServerURL is the URL that logs and other observability data will be exported to
 	LogIngestServerURL string
 	// TraceIngestServerURL is the URL that traces will be exported to
@@ -223,7 +221,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flConfigFilePath                 = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces                   = flagset.Bool("export_traces", false, "Whether to export traces")
 		flTraceSamplingRate              = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
-		flTraceBatchTimeout              = flagset.Duration("trace_batch_timeout", 1*time.Minute, "Maximum amount of time before the trace exporter will export the next batch of spans")
 		flLogIngestServerURL             = flagset.String("log_ingest_url", "", "Where to export logs")
 		flTraceIngestServerURL           = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS               = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
@@ -410,7 +407,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		RootDirectory:                      *flRootDirectory,
 		RootPEM:                            *flRootPEM,
 		TraceSamplingRate:                  *flTraceSamplingRate,
-		TraceBatchTimeout:                  *flTraceBatchTimeout,
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
 		UpdateDirectory:                    *flUpdateDirectory,

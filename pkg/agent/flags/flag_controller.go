@@ -470,7 +470,7 @@ func (fc *FlagController) SetTraceBatchTimeout(duration time.Duration) error {
 }
 func (fc *FlagController) TraceBatchTimeout() time.Duration {
 	return NewDurationFlagValue(fc.logger, keys.TraceBatchTimeout,
-		WithDefault(fc.cmdLineOpts.TraceBatchTimeout),
+		WithDefault(1*time.Minute),
 		WithMin(5*time.Second),
 		WithMax(1*time.Hour),
 	).get(fc.getControlServerValue(keys.TraceBatchTimeout))
