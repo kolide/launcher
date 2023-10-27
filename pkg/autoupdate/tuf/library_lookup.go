@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -46,7 +47,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
 	}
 
-	return CheckOutLatest(binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+	return CheckOutLatest(context.Background(), binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
 }
 
 func UsingNewAutoupdater() bool {
@@ -97,9 +98,13 @@ func getAutoupdateConfig() (*autoupdateConfig, error) {
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
+func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
+	ctx, span := traces.StartSpan(ctx, "binary", string(binary))
+	defer span.End()
+
 	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
 	if !ChannelUsesNewAutoupdater(channel) {
+		span.AddEvent("not_using_new_autoupdater")
 		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
 	}
 
@@ -107,8 +112,9 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
-	update, err := findExecutableFromRelease(binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
+	update, err := findExecutableFromRelease(ctx, binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
 	if err == nil {
+		span.AddEvent("found_latest_from_release")
 		level.Info(logger).Log("msg", "found executable matching current release", "path", update.Path, "version", update.Version)
 		return update, nil
 	}
@@ -117,7 +123,7 @@ func CheckOutLatest(binary autoupdatableBinary, rootDirectory string, updateDire
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
-	return mostRecentVersion(binary, updateDirectory)
+	return mostRecentVersion(ctx, binary, updateDirectory)
 }
 
 func ChannelUsesNewAutoupdater(channel string) bool {
@@ -127,7 +133,10 @@ func ChannelUsesNewAutoupdater(channel string) bool {
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
-func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
+func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
@@ -140,13 +149,14 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 		return nil, fmt.Errorf("could not get target: %w", err)
 	}
 
-	targetName, _, err := findRelease(binary, targets, channel)
+	targetName, _, err := findRelease(ctx, binary, targets, channel)
 	if err != nil {
 		return nil, fmt.Errorf("could not find release: %w", err)
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if err := autoupdate.CheckExecutable(context.TODO(), targetPath, "--version"); err != nil {
+	if err := autoupdate.CheckExecutable(ctx, targetPath, "--version"); err != nil {
+		traces.SetError(span, err)
 		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, targetPath, err)
 	}
 
@@ -158,9 +168,12 @@ func findExecutableFromRelease(binary autoupdatableBinary, tufRepositoryLocation
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
+func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Pull all available versions from library
-	validVersionsInLibrary, _, err := sortedVersionsInLibrary(binary, baseUpdateDirectory)
+	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, binary, baseUpdateDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
@@ -169,6 +182,8 @@ func mostRecentVersion(binary autoupdatableBinary, baseUpdateDirectory string) (
 	if len(validVersionsInLibrary) < 1 {
 		return nil, fmt.Errorf("no versions of %s in library at %s", binary, baseUpdateDirectory)
 	}
+
+	span.AddEvent("found_latest_from_library")
 
 	// Versions are sorted in ascending order -- return the last one
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]

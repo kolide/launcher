@@ -45,6 +45,7 @@ const (
 	UpdateDirectory                FlagKey = "update_directory"
 	ExportTraces                   FlagKey = "export_traces"
 	TraceSamplingRate              FlagKey = "trace_sampling_rate"
+	TraceBatchTimeout              FlagKey = "trace_batch_timeout"
 	LogIngestServerURL             FlagKey = "log_ingest_url"
 	LogShippingLevel               FlagKey = "log_shipping_level"
 	TraceIngestServerURL           FlagKey = "trace_ingest_url"

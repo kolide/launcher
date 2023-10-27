@@ -374,6 +374,9 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	logger := log.With(e.logger, "method", "enroll")
 
 	level.Debug(logger).Log("msg", "checking enrollment")
@@ -387,17 +390,20 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
 		level.Debug(logger).Log("msg", "node key exists, skipping enrollment")
+		span.AddEvent("node_key_already_exists")
 		return e.NodeKey, false, nil
 	}
 
 	// Look up a node key cached in the local store
 	key, err := NodeKey(e.knapsack.ConfigStore())
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
 
 	if key != "" {
 		level.Debug(logger).Log("msg", "found stored node key, skipping enrollment")
+		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}

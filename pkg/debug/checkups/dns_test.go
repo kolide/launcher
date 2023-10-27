@@ -26,13 +26,9 @@ func Test_dnsCheckup_Run(t *testing.T) {
 		ips []string
 		err error
 	}
-	type args struct {
-		ctx context.Context
-	}
 	tests := []struct {
 		name                  string
 		fields                fields
-		args                  args
 		knapsackReturns       map[string]any
 		onLookupHostReturns   map[string]resolution
 		expectedStatus        Status
@@ -45,7 +41,6 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			args: args{context.Background()},
 			knapsackReturns: map[string]interface{}{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
@@ -69,7 +64,6 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			args: args{context.Background()},
 			knapsackReturns: map[string]interface{}{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
@@ -93,7 +87,6 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				k:        typesMocks.NewKnapsack(t),
 				resolver: mocks.NewHostResolver(t),
 			},
-			args: args{context.Background()},
 			knapsackReturns: map[string]interface{}{
 				"KolideServerURL":      "https://kolide-server.example.com",
 				"ControlServerURL":     "https://control-server.example.com",
@@ -131,7 +124,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				data:     tt.fields.data,
 				resolver: tt.fields.resolver,
 			}
-			if err := dc.Run(tt.args.ctx, io.Discard); err != nil {
+			if err := dc.Run(context.Background(), io.Discard); err != nil {
 				t.Errorf("dnsCheckup.Run() error = %v", err)
 				return
 			}

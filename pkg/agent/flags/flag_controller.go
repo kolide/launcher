@@ -466,6 +466,17 @@ func (fc *FlagController) TraceSamplingRate() float64 {
 	).get(fc.getControlServerValue(keys.TraceSamplingRate))
 }
 
+func (fc *FlagController) SetTraceBatchTimeout(duration time.Duration) error {
+	return fc.setControlServerValue(keys.TraceBatchTimeout, durationToBytes(duration))
+}
+func (fc *FlagController) TraceBatchTimeout() time.Duration {
+	return NewDurationFlagValue(fc.logger, keys.TraceBatchTimeout,
+		WithDefault(1*time.Minute),
+		WithMin(5*time.Second),
+		WithMax(1*time.Hour),
+	).get(fc.getControlServerValue(keys.TraceBatchTimeout))
+}
+
 func (fc *FlagController) SetLogIngestServerURL(url string) error {
 	return fc.setControlServerValue(keys.LogIngestServerURL, []byte(url))
 }

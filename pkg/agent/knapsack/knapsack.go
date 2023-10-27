@@ -164,7 +164,7 @@ func (k *knapsack) OsquerydPath() string {
 }
 
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
-	latestBin, err := tuf.CheckOutLatest("osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
+	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
 	if err != nil {
 		return autoupdate.FindNewest(ctx, k.OsquerydPath())
 	}
@@ -410,6 +410,13 @@ func (k *knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 }
 func (k *knapsack) DisableTraceIngestTLS() bool {
 	return k.flags.DisableTraceIngestTLS()
+}
+
+func (k *knapsack) SetTraceBatchTimeout(duration time.Duration) error {
+	return k.flags.SetTraceBatchTimeout(duration)
+}
+func (k *knapsack) TraceBatchTimeout() time.Duration {
+	return k.flags.TraceBatchTimeout()
 }
 
 func (k *knapsack) SetLogIngestServerURL(url string) error {

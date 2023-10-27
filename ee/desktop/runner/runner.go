@@ -33,6 +33,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -509,53 +510,73 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 
 		// we've decided to spawn a new desktop user process for this user
-		// make sure any existing user desktop processes stop being
-		// recognized by the runner server
+		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {
+			return fmt.Errorf("spawning new desktop user process for %s: %w", uid, err)
+		}
+	}
+
+	return nil
+}
+
+func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string, executablePath string) error {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
+	// make sure any existing user desktop processes stop being
+	// recognized by the runner server
+	r.runnerServer.DeRegisterClient(uid)
+
+	socketPath, err := r.setupSocketPath(uid)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("getting socket path: %w", err))
+		return fmt.Errorf("getting socket path: %w", err)
+	}
+
+	cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("creating desktop command: %w", err))
+		return fmt.Errorf("creating desktop command: %w", err)
+	}
+
+	if err := r.runAsUser(ctx, uid, cmd); err != nil {
+		traces.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
+		return fmt.Errorf("running desktop command as user: %w", err)
+	}
+
+	span.AddEvent("command_started")
+
+	r.waitOnProcessAsync(uid, cmd.Process)
+
+	client := client.New(r.userServerAuthToken, socketPath)
+	if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		socketPath, err := r.setupSocketPath(uid)
-		if err != nil {
-			return fmt.Errorf("getting socket path: %w", err)
+		if err := cmd.Process.Kill(); err != nil {
+			level.Error(r.logger).Log(
+				"msg", "killing user desktop process after startup ping failed",
+				"uid", uid,
+				"pid", cmd.Process.Pid,
+				"path", cmd.Path,
+				"err", err,
+			)
 		}
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
-		if err != nil {
-			return fmt.Errorf("creating desktop command: %w", err)
-		}
+		traces.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
 
-		if err := r.runAsUser(ctx, uid, cmd); err != nil {
-			return fmt.Errorf("running desktop command as user: %w", err)
-		}
+		return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
+	}
 
-		r.waitOnProcessAsync(uid, cmd.Process)
+	level.Debug(r.logger).Log(
+		"msg", "desktop started",
+		"uid", uid,
+		"pid", cmd.Process.Pid,
+	)
+	span.AddEvent("desktop_started")
 
-		client := client.New(r.userServerAuthToken, socketPath)
-		if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
-			// unregister proc from desktop server so server will not respond to its requests
-			r.runnerServer.DeRegisterClient(uid)
-
-			if err := cmd.Process.Kill(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "killing user desktop process after startup ping failed",
-					"uid", uid,
-					"pid", cmd.Process.Pid,
-					"path", cmd.Path,
-					"err", err,
-				)
-			}
-
-			return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
-		}
-
-		level.Debug(r.logger).Log(
-			"msg", "desktop started",
-			"uid", uid,
-			"pid", cmd.Process.Pid,
-		)
-
-		if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
-			return fmt.Errorf("adding process to internal tracking state: %w", err)
-		}
+	if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
+		traces.SetError(span, fmt.Errorf("adding process to internal tracking state: %w", err))
+		return fmt.Errorf("adding process to internal tracking state: %w", err)
 	}
 
 	return nil

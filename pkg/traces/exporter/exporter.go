@@ -55,7 +55,8 @@ type TraceExporter struct {
 	disableIngestTLS          bool
 	enabled                   bool
 	traceSamplingRate         float64
-	ctx                       context.Context
+	batchTimeout              time.Duration
+	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
 	interrupted               bool
 }
@@ -90,13 +91,14 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		disableIngestTLS:          k.DisableTraceIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
+		batchTimeout:              k.TraceBatchTimeout(),
 		ctx:                       ctx,
 		cancel:                    cancel,
 	}
 
-	// Observe ExportTraces and IngestServerURL changes to know when to start/stop exporting, and where
-	// to export to
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS)
+	// Observe changes to trace configuration to know when to start/stop exporting, and when
+	// to adjust exporting behavior
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout)
 
 	if !t.enabled {
 		return t, nil
@@ -251,7 +253,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	parentBasedSampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(t.traceSamplingRate))
 
 	newProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
+		sdktrace.WithBatcher(exp, sdktrace.WithBatchTimeout(t.batchTimeout)),
 		sdktrace.WithResource(r),
 		sdktrace.WithSampler(parentBasedSampler),
 	)
@@ -353,6 +355,15 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
 			needsNewProvider = true
 			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_trace_ingest_tls", t.disableIngestTLS)
+		}
+	}
+
+	// Handle trace_batch_timeout updates
+	if slices.Contains(flagKeys, keys.TraceBatchTimeout) {
+		if t.batchTimeout != t.knapsack.TraceBatchTimeout() {
+			t.batchTimeout = t.knapsack.TraceBatchTimeout()
+			needsNewProvider = true
+			level.Debug(t.logger).Log("msg", "updating trace batch timeout", "new_batch_timeout", t.batchTimeout)
 		}
 	}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
@@ -244,7 +245,7 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 	const numberOfVersionsToKeep = 3
 
-	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(binary, ulm.baseDir)
+	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), binary, ulm.baseDir)
 	if err != nil {
 		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
 		return
@@ -281,7 +282,10 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
-func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(updatesDirectory(binary, baseUpdateDirectory), "*"))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not glob for updates in library: %w", err)
@@ -298,7 +302,8 @@ func sortedVersionsInLibrary(binary autoupdatableBinary, baseUpdateDirectory str
 		}
 
 		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
-		if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(versionDir, binary), "--version"); err != nil {
+		if err := autoupdate.CheckExecutable(ctx, executableLocation(versionDir, binary), "--version"); err != nil {
+			traces.SetError(span, err)
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
 		}

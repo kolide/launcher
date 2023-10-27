@@ -242,7 +242,7 @@ type OsqueryInstance struct {
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	errgroup                *errgroup.Group
-	doneCtx                 context.Context
+	doneCtx                 context.Context // nolint:containedctx
 	cancel                  context.CancelFunc
 	cmd                     *exec.Cmd
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
