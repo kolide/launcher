@@ -9,60 +9,23 @@ import (
 
 type MultiSlogger struct {
 	*slog.Logger
-	handlers []multiSloggerHandler
-}
-
-type multiSloggerHandler struct {
-	handler  slog.Handler
-	matchers []func(ctx context.Context, r slog.Record) bool
-}
-
-func New() *MultiSlogger {
-	return &MultiSlogger{
-		Logger: slog.New(slogmulti.Router().Handler()),
-	}
+	handlers []slog.Handler
 }
 
 // AddHandler adds a handler to the multislogger
-func (m *MultiSlogger) AddHandler(handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) *MultiSlogger {
-	m.handlers = append(m.handlers, multiSloggerHandler{
-		handler:  handler,
-		matchers: matchers,
-	})
-
-	router := slogmulti.Router()
-	for _, handler := range m.handlers {
-		router = router.Add(handler.handler, handler.matchers...)
-	}
+func (m *MultiSlogger) AddHandler(handler slog.Handler) *MultiSlogger {
+	m.handlers = append(m.handlers, handler)
 
 	m.Logger = slog.New(
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
-			Handler(router.Handler()),
+			// we have to rebuild the handler everytime because the slogmulti package we're
+			// using doesn't support adding handlers after the Fanout handler has been created
+			Handler(slogmulti.Fanout(m.handlers...)),
 	)
 
 	return m
-}
-
-// SystemLogMatcher is a matcher that matches records that have the system_log=true attribute.
-func SystemLogMatcher(ctx context.Context, r slog.Record) bool {
-	isMatch := false
-	r.Attrs(func(attr slog.Attr) bool {
-		// do the string comparison last since it's more expensive than the kind and bool
-		// comparisons which will short circuit the if statement if false
-		// and not do the compare
-		if attr.Value.Kind() == slog.KindBool && attr.Value.Bool() && attr.Key == "system_log" {
-			isMatch = true
-			// end iteration
-			return false
-		}
-
-		// continue iteration
-		return true
-	})
-
-	return isMatch
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {

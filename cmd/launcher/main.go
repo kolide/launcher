@@ -98,7 +98,7 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
-	slogger := multislogger.New()
+	slogger := new(multislogger.MultiSlogger)
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {

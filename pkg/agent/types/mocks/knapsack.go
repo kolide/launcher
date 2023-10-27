@@ -1370,6 +1370,22 @@ func (_m *Knapsack) StatusLogsStore() types.GetterSetterDeleterIteratorUpdater {
 	return r0
 }
 
+// SystemSlogger provides a mock function with given fields:
+func (_m *Knapsack) SystemSlogger() *slog.Logger {
+	ret := _m.Called()
+
+	var r0 *slog.Logger
+	if rf, ok := ret.Get(0).(func() *slog.Logger); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*slog.Logger)
+		}
+	}
+
+	return r0
+}
+
 // TokenStore provides a mock function with given fields:
 func (_m *Knapsack) TokenStore() types.GetterSetterDeleterIteratorUpdater {
 	ret := _m.Called()

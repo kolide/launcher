@@ -46,7 +46,6 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -179,10 +178,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			Level:     slog.LevelDebug,
 		}))
 	}
-
-	// system log, multislogger.SystemLogMatcher only prints to system log when
-	// system_log=true is passed as an attribute
-	k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, nil), multislogger.SystemLogMatcher)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.

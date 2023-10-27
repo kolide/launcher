@@ -2,6 +2,7 @@ package knapsack
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"log/slog"
@@ -29,7 +30,8 @@ type knapsack struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
 
-	slogger *multislogger.MultiSlogger
+	slogger       *multislogger.MultiSlogger
+	systemSlogger *slog.Logger
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
@@ -44,9 +46,10 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 		slogger: slogger,
 	}
 
-	if k.slogger == nil {
-		k.slogger = multislogger.New()
-	}
+	// TODO: figure out windows thang
+	k.systemSlogger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 
 	return k
 }
@@ -56,8 +59,12 @@ func (k *knapsack) Slogger() *slog.Logger {
 	return k.slogger.Logger
 }
 
+func (k *knapsack) SystemSlogger() *slog.Logger {
+	return k.systemSlogger
+}
+
 func (k *knapsack) AddSlogHandler(handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) {
-	k.slogger = k.slogger.AddHandler(handler, matchers...)
+	k.slogger = k.slogger.AddHandler(handler)
 	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
 }
 
