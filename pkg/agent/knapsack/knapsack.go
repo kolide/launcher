@@ -393,6 +393,13 @@ func (k *knapsack) DisableTraceIngestTLS() bool {
 	return k.flags.DisableTraceIngestTLS()
 }
 
+func (k *knapsack) SetTraceBatchTimeout(duration time.Duration) error {
+	return k.flags.SetTraceBatchTimeout(duration)
+}
+func (k *knapsack) TraceBatchTimeout() time.Duration {
+	return k.flags.TraceBatchTimeout()
+}
+
 func (k *knapsack) SetLogIngestServerURL(url string) error {
 	return k.flags.SetLogIngestServerURL(url)
 }

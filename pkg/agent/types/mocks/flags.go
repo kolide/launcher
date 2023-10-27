@@ -1033,6 +1033,20 @@ func (_m *Flags) SetOsqueryVerbose(verbose bool) error {
 	return r0
 }
 
+// SetTraceBatchTimeout provides a mock function with given fields: duration
+func (_m *Flags) SetTraceBatchTimeout(duration time.Duration) error {
+	ret := _m.Called(duration)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(duration)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetTraceIngestServerURL provides a mock function with given fields: url
 func (_m *Flags) SetTraceIngestServerURL(url string) error {
 	ret := _m.Called(url)
@@ -1098,6 +1112,20 @@ func (_m *Flags) SetUpdateDirectory(directory string) error {
 		r0 = rf(directory)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// TraceBatchTimeout provides a mock function with given fields:
+func (_m *Flags) TraceBatchTimeout() time.Duration {
+	ret := _m.Called()
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
 	}
 
 	return r0
