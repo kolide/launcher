@@ -88,7 +88,7 @@ func (ls *LogShipper) Ping() {
 		ls.sender.endpoint = parsedUrl.String()
 	}
 
-	level := slog.LevelError
+	var level slog.Level
 	switch ls.knapsack.LogShippingLevel() {
 	case "debug":
 		level = slog.LevelDebug
