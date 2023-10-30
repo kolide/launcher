@@ -186,8 +186,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
-
 		k.AddSlogHandler(logShipper.SlogHandler())
+		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 	}
 
 	// construct the appropriate http client based on security settings
