@@ -9,9 +9,7 @@ import (
 
 type key int
 
-const (
-	loggerKey key = 0
-)
+const loggerKey key = 0
 
 func NewContext(ctx context.Context, logger log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
