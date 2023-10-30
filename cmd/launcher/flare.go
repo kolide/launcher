@@ -33,7 +33,7 @@ func runFlare(args []string) error {
 		flagset            = flag.NewFlagSet("flare", flag.ExitOnError)
 		flSave             = flagset.String("save", "upload", "local | upload")
 		flOutputDir        = flagset.String("output_dir", ".", "path to directory to save flare output")
-		flUploadRequestURL = flagset.String("upload_request_url", "", "URL to request a signed upload URL")
+		flUploadRequestURL = flagset.String("upload_request_url", "https://api.kolide.com/api/agent/flare", "URL to request a signed upload URL")
 	)
 
 	if err := ff.Parse(flagset, args); err != nil {
