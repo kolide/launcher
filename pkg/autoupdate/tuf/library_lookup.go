@@ -30,6 +30,7 @@ type autoupdateConfig struct {
 var channelsUsingNewAutoupdater = map[string]bool{
 	"nightly": true,
 	"alpha":   true,
+	"beta":    true,
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
