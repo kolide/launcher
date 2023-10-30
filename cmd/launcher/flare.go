@@ -30,22 +30,10 @@ func runFlare(args []string) error {
 	launcher.SetDefaultPaths()
 
 	var (
-		flagset = flag.NewFlagSet("flare", flag.ExitOnError)
-		flSave  = flagset.String(
-			"save",
-			"local",
-			"local | upload",
-		)
-		flOutputDir = flagset.String(
-			"output_dir",
-			".",
-			"path to directory to save flare output",
-		)
-		flUploadRequestURL = flagset.String(
-			"upload_request_url",
-			"",
-			"URL to request a signed upload URL",
-		)
+		flagset            = flag.NewFlagSet("flare", flag.ExitOnError)
+		flSave             = flagset.String("save", "upload", "local | upload")
+		flOutputDir        = flagset.String("output_dir", ".", "path to directory to save flare output")
+		flUploadRequestURL = flagset.String("upload_request_url", "", "URL to request a signed upload URL")
 	)
 
 	if err := ff.Parse(flagset, args); err != nil {
