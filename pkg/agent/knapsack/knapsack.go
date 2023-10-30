@@ -2,7 +2,6 @@ package knapsack
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"log/slog"
@@ -30,26 +29,21 @@ type knapsack struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
 
-	slogger       *multislogger.MultiSlogger
-	systemSlogger *slog.Logger
+	slogger, systemSlogger *multislogger.MultiSlogger
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
 	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger *multislogger.MultiSlogger) *knapsack {
+func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
 	k := &knapsack{
-		db:      db,
-		flags:   flags,
-		stores:  stores,
-		slogger: slogger,
+		db:            db,
+		flags:         flags,
+		stores:        stores,
+		slogger:       slogger,
+		systemSlogger: systemSlogger,
 	}
-
-	// TODO: figure out windows thang
-	k.systemSlogger = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 
 	return k
 }
@@ -60,12 +54,15 @@ func (k *knapsack) Slogger() *slog.Logger {
 }
 
 func (k *knapsack) SystemSlogger() *slog.Logger {
-	return k.systemSlogger
+	return k.systemSlogger.Logger
 }
 
-func (k *knapsack) AddSlogHandler(handler slog.Handler, matchers ...func(ctx context.Context, r slog.Record) bool) {
-	k.slogger = k.slogger.AddHandler(handler)
+func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
+	k.slogger = k.slogger.AddHandler(handler...)
 	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
+
+	// also send system logs to the same handlers
+	k.systemSlogger = k.systemSlogger.AddHandler(handler...)
 }
 
 // BboltDB interface methods

@@ -23,14 +23,13 @@ type Knapsack struct {
 	mock.Mock
 }
 
-// AddSlogHandler provides a mock function with given fields: handler, matchers
-func (_m *Knapsack) AddSlogHandler(handler slog.Handler, matchers ...func(context.Context, slog.Record) bool) {
-	_va := make([]interface{}, len(matchers))
-	for _i := range matchers {
-		_va[_i] = matchers[_i]
+// AddSlogHandler provides a mock function with given fields: handler
+func (_m *Knapsack) AddSlogHandler(handler ...slog.Handler) {
+	_va := make([]interface{}, len(handler))
+	for _i := range handler {
+		_va[_i] = handler[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, handler)
 	_ca = append(_ca, _va...)
 	_m.Called(_ca...)
 }

@@ -64,7 +64,7 @@ func runFlare(args []string) error {
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
 
-	k := knapsack.New(nil, flagController, nil, nil)
+	k := knapsack.New(nil, flagController, nil, nil, nil)
 	ctx := context.Background()
 
 	if *flSave == "upload" {

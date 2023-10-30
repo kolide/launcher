@@ -46,6 +46,7 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -69,7 +70,7 @@ const (
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
-func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := ctxlog.FromContext(ctx)
@@ -168,8 +169,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	slogger := ctxlog.FromContextWithSlogger(ctx)
-	k := knapsack.New(stores, flagController, db, slogger)
+	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
 
 	if k.Debug() {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.

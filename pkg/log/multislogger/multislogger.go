@@ -13,15 +13,15 @@ type MultiSlogger struct {
 }
 
 // AddHandler adds a handler to the multislogger
-func (m *MultiSlogger) AddHandler(handler slog.Handler) *MultiSlogger {
-	m.handlers = append(m.handlers, handler)
+func (m *MultiSlogger) AddHandler(handler ...slog.Handler) *MultiSlogger {
+	m.handlers = append(m.handlers, handler...)
 
+	// we have to rebuild the handler everytime because the slogmulti package we're
+	// using doesn't support adding handlers after the Fanout handler has been created
 	m.Logger = slog.New(
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
-			// we have to rebuild the handler everytime because the slogmulti package we're
-			// using doesn't support adding handlers after the Fanout handler has been created
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
 

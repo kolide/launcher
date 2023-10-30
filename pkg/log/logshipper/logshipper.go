@@ -3,7 +3,6 @@ package logshipper
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/url"
 	"sync"
@@ -153,10 +152,6 @@ func (ls *LogShipper) SlogHandler() slog.Handler {
 	})
 
 	return slogmulti.Pipe(middleware).Handler(jsonHandler)
-}
-
-func (ls *LogShipper) Writer() io.Writer {
-	return ls.sendBuffer
 }
 
 // filterResults filteres out the osquery results,

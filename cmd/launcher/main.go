@@ -98,17 +98,30 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
-	slogger := new(multislogger.MultiSlogger)
+
+	// set up system slogger to write to os logs
+	systemSlogger := new(multislogger.MultiSlogger)
+	systemSlogger.AddHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	// set up local slogger to write to debug.json
+	localSlogger := new(multislogger.MultiSlogger)
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
 		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = teelogger.New(logger, localLogger)
 
-		slogger.AddHandler(slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+		localSloggerHandler := slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
-		}))
+		})
+
+		localSlogger.AddHandler(localSloggerHandler)
+
+		// also send system logs to localSloggerHandler
+		systemSlogger.AddHandler(localSloggerHandler)
 
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
@@ -124,9 +137,8 @@ func main() {
 	}()
 
 	ctx = ctxlog.NewContext(ctx, logger)
-	ctx = ctxlog.NewContextWithMultislogger(ctx, slogger)
 
-	if err := runLauncher(ctx, cancel, opts); err != nil {
+	if err := runLauncher(ctx, cancel, localSlogger, systemSlogger, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
 			runNewerLauncherIfAvailable(ctx, logger)

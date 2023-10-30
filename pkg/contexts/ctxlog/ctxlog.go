@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.opencensus.io/trace"
 )
 
@@ -17,10 +16,6 @@ const (
 
 func NewContext(ctx context.Context, logger log.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
-}
-
-func NewContextWithMultislogger(ctx context.Context, slogger *multislogger.MultiSlogger) context.Context {
-	return context.WithValue(ctx, sloggerKey, slogger)
 }
 
 func FromContext(ctx context.Context) log.Logger {
@@ -42,14 +37,6 @@ func FromContext(ctx context.Context) log.Logger {
 		"span_id", span.SpanID.String(),
 		"trace_is_sampled", span.IsSampled(),
 	)
-}
-
-func FromContextWithSlogger(ctx context.Context) *multislogger.MultiSlogger {
-	v, ok := ctx.Value(sloggerKey).(*multislogger.MultiSlogger)
-	if !ok {
-		return nil
-	}
-	return v
 }
 
 // isTraceUninitialized returns true when a span is is unconfigured.
