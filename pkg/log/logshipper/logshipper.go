@@ -96,6 +96,8 @@ func (ls *LogShipper) Ping() {
 		level = slog.LevelInfo
 	case "warn":
 		level = slog.LevelWarn
+	default:
+		level = slog.LevelError
 	}
 
 	ls.slogLevel.Set(level)
