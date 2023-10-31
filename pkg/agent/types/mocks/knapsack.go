@@ -1212,6 +1212,20 @@ func (_m *Knapsack) SetOsqueryVerbose(verbose bool) error {
 	return r0
 }
 
+// SetTraceBatchTimeout provides a mock function with given fields: duration
+func (_m *Knapsack) SetTraceBatchTimeout(duration time.Duration) error {
+	ret := _m.Called(duration)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(duration)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetTraceIngestServerURL provides a mock function with given fields: url
 func (_m *Knapsack) SetTraceIngestServerURL(url string) error {
 	ret := _m.Called(url)
@@ -1309,6 +1323,20 @@ func (_m *Knapsack) TokenStore() types.GetterSetterDeleterIteratorUpdater {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
 		}
+	}
+
+	return r0
+}
+
+// TraceBatchTimeout provides a mock function with given fields:
+func (_m *Knapsack) TraceBatchTimeout() time.Duration {
+	ret := _m.Called()
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
 	}
 
 	return r0

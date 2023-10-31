@@ -189,6 +189,10 @@ type Flags interface {
 	SetDisableTraceIngestTLS(enabled bool) error
 	DisableTraceIngestTLS() bool
 
+	// TraceBatchTimeout is the maximum amount of time before the trace exporter will export the next batch of spans
+	SetTraceBatchTimeout(duration time.Duration) error
+	TraceBatchTimeout() time.Duration
+
 	// InModernStandby indicates whether a Windows machine is awake or in modern standby
 	SetInModernStandby(enabled bool) error
 	InModernStandby() bool

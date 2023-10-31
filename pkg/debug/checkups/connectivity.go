@@ -44,6 +44,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 	c.data = make(map[string]any)
 
 	failingHosts := make([]string, 0)
+	attemptedHosts := make(map[string]string)
 	for n, v := range hosts {
 		fmt.Fprintf(extraFH, "Response from %s / %s:\n", n, v)
 		if v == "" {
@@ -52,7 +53,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
-		body, err := checkKolideServer(c.k, httpClient, extraFH, v)
+		parsedUrl, err := parseUrl(c.k, v)
 		if err != nil {
 			fmt.Fprintf(extraFH, "error: %s\n", err)
 			c.data[n] = err.Error()
@@ -60,6 +61,24 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
+		versionEndpoint := fmt.Sprintf("%s://%s/version", parsedUrl.Scheme, parsedUrl.Host)
+
+		// prevent duplicate checks if any of our configured endpoints are
+		// shared (e.g. trace and log)
+		if prev, ok := attemptedHosts[versionEndpoint]; ok {
+			c.data[n] = prev
+			continue
+		}
+
+		body, err := checkKolideServer(c.k, httpClient, extraFH, versionEndpoint)
+		if err != nil {
+			fmt.Fprintf(extraFH, "error: %s\n", err)
+			c.data[n] = err.Error()
+			failingHosts = append(failingHosts, fmt.Sprintf("%s(%s)", n, v))
+			continue
+		}
+
+		attemptedHosts[versionEndpoint] = string(body)
 		fmt.Fprintf(extraFH, "%s\n", string(body))
 		c.data[n] = string(body)
 	}
@@ -91,12 +110,7 @@ func (c *Connectivity) Data() any {
 }
 
 func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, server string) ([]byte, error) {
-	parsedUrl, err := parseUrl(k, fmt.Sprintf("%s/version", server))
-	if err != nil {
-		return nil, fmt.Errorf("parsing url(%s): %w", server, err)
-	}
-
-	response, err := client.Get(parsedUrl.String())
+	response, err := client.Get(server)
 	if err != nil {
 		return nil, fmt.Errorf("fetching url: %w", err)
 	}

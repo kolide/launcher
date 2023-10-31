@@ -42,7 +42,8 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
 	osqueryClient := mocks.NewQuerier(t)
 	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
@@ -85,7 +86,8 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
 	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
 	require.NoError(t, err)
@@ -122,7 +124,8 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
 	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
 	require.NoError(t, err)
@@ -593,6 +596,75 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 
 			require.Equal(t, tt.newDisableTraceIngestTLS, traceExporter.disableIngestTLS, "ingest TLS value not updated")
 			require.Equal(t, tt.newDisableTraceIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
+
+			if tt.shouldReplaceProvider {
+				require.NotNil(t, traceExporter.provider)
+			} else {
+				require.Nil(t, traceExporter.provider)
+			}
+		})
+	}
+}
+
+func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
+	tests := []struct {
+		testName              string
+		currentBatchTimeout   time.Duration
+		newBatchTimeout       time.Duration
+		tracingEnabled        bool
+		shouldReplaceProvider bool
+	}{
+		{
+			testName:              "update",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       5 * time.Second,
+			tracingEnabled:        true,
+			shouldReplaceProvider: true,
+		},
+		{
+			testName:              "update but tracing not enabled",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       5 * time.Second,
+			tracingEnabled:        false,
+			shouldReplaceProvider: false,
+		},
+		{
+			testName:              "no update",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       1 * time.Minute,
+			tracingEnabled:        true,
+			shouldReplaceProvider: false,
+		},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("TraceBatchTimeout").Return(tt.newBatchTimeout)
+			osqueryClient := mocks.NewQuerier(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			traceExporter := &TraceExporter{
+				knapsack:                  mockKnapsack,
+				osqueryClient:             osqueryClient,
+				logger:                    log.NewNopLogger(),
+				attrs:                     make([]attribute.KeyValue, 0),
+				attrLock:                  sync.RWMutex{},
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
+				ingestAuthToken:           "test token",
+				ingestUrl:                 "localhost:4317",
+				disableIngestTLS:          false,
+				enabled:                   tt.tracingEnabled,
+				traceSamplingRate:         1.0,
+				batchTimeout:              tt.currentBatchTimeout,
+				ctx:                       ctx,
+				cancel:                    cancel,
+			}
+
+			traceExporter.FlagsChanged(keys.TraceBatchTimeout)
+
+			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 
 			if tt.shouldReplaceProvider {
 				require.NotNil(t, traceExporter.provider)

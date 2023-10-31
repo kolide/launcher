@@ -66,7 +66,7 @@ func NewUpdater(
 
 	updateCmd := &updaterCmd{
 		updater:                 updater,
-		ctx:                     ctx,
+		ctx:                     ctx, // nolint:containedctx
 		cancel:                  cancel,
 		stopChan:                make(chan bool),
 		config:                  config,
@@ -86,7 +86,7 @@ type updater interface {
 
 type updaterCmd struct {
 	updater                 updater
-	ctx                     context.Context
+	ctx                     context.Context // nolint:containedctx
 	cancel                  context.CancelFunc
 	stopChan                chan bool
 	stopExecution           func()

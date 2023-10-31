@@ -6,6 +6,7 @@ run:
 linters:
   enable:
     - bodyclose
+    - containedctx
     - unused
     - gofmt
     - govet
@@ -36,5 +37,5 @@ issues:
   exclude-rules:
     # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
     - linters:
-      - paralleltest
+        - paralleltest
       text: "does not use range value in test Run"
