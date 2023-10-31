@@ -33,15 +33,13 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 		return errors.New("Unable to parse launcher version.")
 	}
 
-	// Windows only supports a W.X.Y.Z packaing string. So we need to format this down
-	if p.target.Platform == Windows {
-		level.Debug(logger).Log("msg", "reformating for windows", "origVersion", version)
-		version, err = formatVersion(version)
-		if err != nil {
-			return fmt.Errorf("formatting version: %w", err)
-		}
-		level.Debug(logger).Log("msg", "reformating for windows", "newVersion", version)
+	level.Debug(logger).Log("msg", "formatting version string for target platform", "origVersion", version, "platform", p.target.Platform)
+	version, err = formatVersion(version, p.target.Platform)
+
+	if err != nil {
+		return fmt.Errorf("formatting version: %w", err)
 	}
+	level.Debug(logger).Log("msg", "successfully formatted version string", "newVersion", version)
 
 	p.PackageVersion = version
 	return nil
@@ -62,12 +60,13 @@ func (p *PackageOptions) launcherLocation(binDir string) string {
 	return filepath.Join(binDir, p.target.PlatformBinaryName("launcher"))
 }
 
-// formatVersion formats the version. This is specific to windows. It
-// may show up elsewhere later.
-//
-// Windows packages must confirm to W.X.Y.Z, so we convert our git
-// format to that.
-func formatVersion(rawVersion string) (string, error) {
+// formatVersion formats the version according to the packaging requirements of the target platform
+// currently, only windows and darwin platforms require modification
+func formatVersion(rawVersion string, platform PlatformFlavor) (string, error) {
+	if platform != Windows && platform != Darwin {
+		return rawVersion, nil
+	}
+
 	versionRegex, err := regexp.Compile(`^v?(\d+)\.(\d+)(?:\.(\d+))(?:-(\d+).*)?`)
 	if err != nil {
 		return "", fmt.Errorf("version regex: %w", err)
@@ -103,6 +102,14 @@ func formatVersion(rawVersion string) (string, error) {
 		commits = "0"
 	}
 
-	version := fmt.Sprintf("%s.%s.%s.%s", major, minor, patch, commits)
-	return version, nil
+	switch platform {
+	case Windows:
+		// Windows expects a <major>.<minor>.<patch>.<commit> packaging string
+		return fmt.Sprintf("%s.%s.%s.%s", major, minor, patch, commits), nil
+	case Darwin:
+		// Darwin expects a <major>.<minor>.<patch> packaging string
+		return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+	}
+
+	return rawVersion, nil
 }
