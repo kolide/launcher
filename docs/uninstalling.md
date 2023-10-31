@@ -43,9 +43,9 @@ Based on the configurations used when the Launcher package was created, the spec
 
 Directories:
 
-- `/usr/local/kolide`
-- `/var/kolide`
-- `/etc/kolide`
+- `/usr/local/kolide-k2`
+- `/var/kolide-k2`
+- `/etc/kolide-k2`
 
 Files:
 - `/Library/LaunchDaemons/com.kolide.launcher.plist`
@@ -53,11 +53,11 @@ Files:
 To remove the binaries and other supporting files, run the following:
 
 ```
-sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
-sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
-sudo rm -r /usr/local/kolide
-sudo rm -r /var/kolide
-sudo rm -r /etc/kolide
+sudo launchctl unload /Library/LaunchDaemons/com.kolide-k2.launcher.plist
+sudo rm /Library/LaunchDaemons/com.kolide-k2.launcher.plist
+sudo rm -r /usr/local/kolide-k2
+sudo rm -r /var/kolide-k2
+sudo rm -r /etc/kolide-k2
 ```
 
 ### App (`kolide-desktop-app.pkg`)
@@ -65,11 +65,11 @@ sudo rm -r /etc/kolide
 Directories:
 - `$HOME/Applications/Kolide.app`
 - `"$HOME/Library/Application Support/Kolide"`
-- `/usr/local/kolide`
+- `/usr/local/kolide-k2`
 
 
 Files:
-- `/Library/LaunchDaemons/com.kolide.launcher.plist`
+- `/Library/LaunchDaemons/com.kolide-k2.launcher.plist`
 
 To remove the `.app` bundle, run the following:
 
