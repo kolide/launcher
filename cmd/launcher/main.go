@@ -105,8 +105,8 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
-	// set up local slogger to write to debug.json
-	localSlogger := new(multislogger.MultiSlogger)
+	// set up slogger for internal launcher logging
+	slogger := new(multislogger.MultiSlogger)
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
@@ -118,7 +118,7 @@ func main() {
 			Level:     slog.LevelDebug,
 		})
 
-		localSlogger.AddHandler(localSloggerHandler)
+		slogger.AddHandler(localSloggerHandler)
 
 		// also send system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
@@ -138,7 +138,7 @@ func main() {
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
-	if err := runLauncher(ctx, cancel, localSlogger, systemSlogger, opts); err != nil {
+	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
 			runNewerLauncherIfAvailable(ctx, logger)

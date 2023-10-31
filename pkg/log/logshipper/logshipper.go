@@ -88,19 +88,22 @@ func (ls *LogShipper) Ping() {
 		ls.sender.endpoint = parsedUrl.String()
 	}
 
-	var level slog.Level
 	switch ls.knapsack.LogShippingLevel() {
 	case "debug":
-		level = slog.LevelDebug
+		ls.slogLevel.Set(slog.LevelDebug)
 	case "info":
-		level = slog.LevelInfo
+		ls.slogLevel.Set(slog.LevelInfo)
 	case "warn":
-		level = slog.LevelWarn
-	default:
-		level = slog.LevelError
+		ls.slogLevel.Set(slog.LevelWarn)
+	case "error":
+		ls.slogLevel.Set(slog.LevelError)
+	case "default":
+		ls.knapsack.Slogger().Error("unrecognized flag value for log shipping level",
+			"flag_value", ls.knapsack.LogShippingLevel(),
+			"current_log_level", ls.slogLevel.String(),
+		)
 	}
 
-	ls.slogLevel.Set(level)
 	ls.isShippingEnabled = ls.sender.endpoint != ""
 	ls.addDeviceIdentifyingAttributesToLogger()
 

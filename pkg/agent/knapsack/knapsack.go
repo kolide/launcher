@@ -59,7 +59,6 @@ func (k *knapsack) SystemSlogger() *slog.Logger {
 
 func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.slogger = k.slogger.AddHandler(handler...)
-	k.slogger.Logger = k.slogger.Logger.With("logger", "knapsack")
 
 	// also send system logs to the same handlers
 	k.systemSlogger = k.systemSlogger.AddHandler(handler...)
