@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 
 	"golang.org/x/sys/windows/svc"
@@ -60,9 +62,28 @@ func runWindowsSvc(args []string) error {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
+	systemSlogger := new(multislogger.MultiSlogger)
+	systemSlogger.AddHandler(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	localSlogger := new(multislogger.MultiSlogger)
+
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
+		logger = teelogger.New(logger, ll)
+
+		localSloggerHandler := slog.NewJSONHandler(ll.Writer(), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})
+
+		localSlogger.AddHandler(localSloggerHandler)
+
+		// also write system logs to localSloggerHandler
+		systemSlogger.AddHandler(localSloggerHandler)
+
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
@@ -99,7 +120,12 @@ func runWindowsSvc(args []string) error {
 		}
 	}()
 
-	if err := svc.Run(serviceName, &winSvc{logger: logger, opts: opts}); err != nil {
+	if err := svc.Run(serviceName, &winSvc{
+		logger:        logger,
+		slogger:       localSlogger,
+		systemSlogger: systemSlogger,
+		opts:          opts,
+	}); err != nil {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
@@ -140,8 +166,9 @@ func runWindowsSvcForeground(args []string) error {
 }
 
 type winSvc struct {
-	logger log.Logger
-	opts   *launcher.Options
+	logger                 log.Logger
+	slogger, systemSlogger *multislogger.MultiSlogger
+	opts                   *launcher.Options
 }
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
@@ -156,7 +183,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
 	go func() {
-		err := runLauncher(ctx, cancel, w.opts)
+		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))

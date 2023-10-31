@@ -4,12 +4,15 @@ import (
 	"context"
 	"time"
 
+	"log/slog"
+
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/autoupdate/tuf"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
 
@@ -26,23 +29,42 @@ type knapsack struct {
 	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
 	db *bbolt.DB
 
+	slogger, systemSlogger *multislogger.MultiSlogger
+
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
 	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB) *knapsack {
+func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
 	k := &knapsack{
-		db:     db,
-		flags:  flags,
-		stores: stores,
+		db:            db,
+		flags:         flags,
+		stores:        stores,
+		slogger:       slogger,
+		systemSlogger: systemSlogger,
 	}
 
 	return k
 }
 
-// BboltDB interface methods
+// Logging interface methods
+func (k *knapsack) Slogger() *slog.Logger {
+	return k.slogger.Logger
+}
 
+func (k *knapsack) SystemSlogger() *slog.Logger {
+	return k.systemSlogger.Logger
+}
+
+func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
+	k.slogger = k.slogger.AddHandler(handler...)
+
+	// also send system logs to the same handlers
+	k.systemSlogger = k.systemSlogger.AddHandler(handler...)
+}
+
+// BboltDB interface methods
 func (k *knapsack) BboltDB() *bbolt.DB {
 	return k.db
 }
@@ -405,6 +427,13 @@ func (k *knapsack) SetLogIngestServerURL(url string) error {
 }
 func (k *knapsack) LogIngestServerURL() string {
 	return k.flags.LogIngestServerURL()
+}
+
+func (k *knapsack) SetLogShippingLevel(level string) error {
+	return k.flags.SetLogShippingLevel(level)
+}
+func (k *knapsack) LogShippingLevel() string {
+	return k.flags.LogShippingLevel()
 }
 
 func (k *knapsack) SetInModernStandby(enabled bool) error {
