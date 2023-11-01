@@ -50,7 +50,7 @@ func runFlare(args []string) error {
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, inmemory.NewStore(), fcOpts...)
 
-	k := knapsack.New(nil, flagController, nil)
+	k := knapsack.New(nil, flagController, nil, nil, nil)
 	ctx := context.Background()
 
 	type flareDestinationTyp interface {

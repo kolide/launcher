@@ -47,6 +47,7 @@ const (
 	TraceSamplingRate              FlagKey = "trace_sampling_rate"
 	TraceBatchTimeout              FlagKey = "trace_batch_timeout"
 	LogIngestServerURL             FlagKey = "log_ingest_url"
+	LogShippingLevel               FlagKey = "log_shipping_level"
 	TraceIngestServerURL           FlagKey = "trace_ingest_url"
 	DisableTraceIngestTLS          FlagKey = "disable_trace_ingest_tls"
 	InModernStandby                FlagKey = "in_modern_standby"
