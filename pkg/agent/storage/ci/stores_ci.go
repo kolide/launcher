@@ -41,7 +41,7 @@ func makeInMemoryStores(t *testing.T, logger log.Logger, storeNames []storage.St
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		stores[storeName] = inmemory.NewStore(logger)
+		stores[storeName] = inmemory.NewStore()
 	}
 
 	return stores

@@ -55,14 +55,12 @@ func (s *inMemoryKeyValueStore) Set(key, value []byte) error {
 
 // setItem sets the item in the backing items map by copying the value to a
 // new slice
-func (s *inMemoryKeyValueStore) setItem(key, value []byte) error {
+func (s *inMemoryKeyValueStore) setItem(key, value []byte) {
 	// Because this takes an array, it is always passed by reference. And, there are some cases where that ends up
 	// causing issues. So we generaet a copy. this is not an issue with bbolt backed
 	// storage, because that inherently does a serialization to disk.
 	s.items[string(key)] = make([]byte, len(value))
 	copy(s.items[string(key)], value)
-
-	return nil
 }
 
 func (s *inMemoryKeyValueStore) Delete(keys ...[]byte) error {

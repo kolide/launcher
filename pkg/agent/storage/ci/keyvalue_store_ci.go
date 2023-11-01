@@ -20,7 +20,7 @@ const (
 
 func NewStore(t *testing.T, logger log.Logger, bucketName string) (types.KVStore, error) {
 	if os.Getenv("CI") == "true" {
-		return inmemory.NewStore(logger), nil
+		return inmemory.NewStore(), nil
 	}
 
 	return agentbbolt.NewStore(logger, SetupDB(t), bucketName)

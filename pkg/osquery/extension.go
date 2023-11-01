@@ -670,8 +670,8 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 	// Collect up logs to be sent
 	var logs []string
-	// Collect keys to delete
-	var keys [][]byte
+	// Collect keysToDelete to delete
+	var keysToDelete [][]byte
 	var totalBytes int
 
 	if err := store.DoCursor(func(c types.Cursor) error {
@@ -687,7 +687,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"loghead", string(v)[0:logheadSize],
 				)
 
-				keys = append(keys, k)
+				keysToDelete = append(keysToDelete, k)
 				continue
 			}
 
@@ -697,7 +697,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 			totalBytes += len(v)
 			logs = append(logs, string(v))
-			keys = append(keys, k)
+			keysToDelete = append(keysToDelete, k)
 		}
 
 		return nil
@@ -714,7 +714,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return fmt.Errorf("writing logs: %w", err)
 	}
 
-	if err = store.Delete(keys...); err != nil {
+	if err = store.Delete(keysToDelete...); err != nil {
 		return fmt.Errorf("deleting sent logs: %w", err)
 	}
 

@@ -1373,13 +1373,5 @@ func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
 		return 0, fmt.Errorf("counting buffered logs: %w", err)
 	}
 
-	var count int
-	if err := store.ForEach(func(_, _ []byte) error {
-		count++
-		return nil
-	}); err != nil {
-		return 0, fmt.Errorf("counting buffered logs: %w", err)
-	}
-
-	return count, nil
+	return store.Len(), nil
 }
