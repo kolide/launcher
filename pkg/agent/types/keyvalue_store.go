@@ -39,6 +39,28 @@ type Updater interface {
 	Update(kvPairs map[string]string) ([]string, error)
 }
 
+// NextSequence returns an autoincrementing integer for key/value store.
+type Sequencer interface {
+	NextSequence() (uint64, error)
+}
+
+type Lener interface {
+	Len() int
+}
+
+// Cursor creates a cursor associated with the key/value store.
+// The cursor is only valid as long as the transaction is open.
+// Do not use a cursor after the transaction is closed.
+type Cursor interface {
+	First() ([]byte, []byte)
+	Next() ([]byte, []byte)
+}
+
+// Cursorer is an interface for iterating data in a key/value store using a cursor.
+type Cursorer interface {
+	DoCursor(fn func(Cursor) error) error
+}
+
 // GetterSetter is an interface that groups the Get and Set methods.
 type GetterSetter interface {
 	Getter
@@ -69,5 +91,17 @@ type GetterSetterDeleterIteratorUpdater interface {
 	Updater
 }
 
-// Convenient alias for a key value store that supports all methods
-type KVStore = GetterSetterDeleterIteratorUpdater
+// GetterSetterDeleterIteratorUpdater is an interface that groups the Get, Set, Delete, ForEach, and Update methods.
+type GetterSetterDeleterIteratorUpdaterCursorerSequencerLener interface {
+	Getter
+	Setter
+	Deleter
+	Iterator
+	Updater
+	Cursorer
+	Sequencer
+	Lener
+}
+
+// Convenient alias for a key value store that supports all methods.
+type KVStore = GetterSetterDeleterIteratorUpdaterCursorerSequencerLener

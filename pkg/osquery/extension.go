@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
-	"sort"
 
 	"fmt"
 	"os"
@@ -618,25 +617,6 @@ func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) 
 	}
 }
 
-func sortStoreKeys(s types.KVStore) ([][]byte, error) {
-	// create an array of all the keys
-	var keys [][]byte
-	err := s.ForEach(func(k, _ []byte) error {
-		keys = append(keys, k)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("iterating keys: %w", err)
-	}
-
-	// sort the keys
-	sort.Slice(keys, func(i, j int) bool {
-		return bytes.Compare(keys[i], keys[j]) < 0
-	})
-
-	return keys, nil
-}
-
 // writeAndPurgeLogs flushes the log buffers, writing up to
 // Opts.MaxBytesPerBatch bytes in one run. If the logs write successfully, they
 // will be deleted from the buffer. After writing (whether success or failure),
@@ -690,48 +670,39 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 	// Collect up logs to be sent
 	var logs []string
+	// Collect keys to delete
+	var keys [][]byte
 	var totalBytes int
 
-	keys, err := sortStoreKeys(store)
-	if err != nil {
-		return fmt.Errorf("getting buffered log keys: %w", err)
-	}
+	if err := store.DoCursor(func(c types.Cursor) error {
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if len(v) > e.Opts.MaxBytesPerBatch {
+				// Discard logs that are too big
+				logheadSize := minInt(len(v), 100)
+				level.Info(e.Opts.Logger).Log(
+					"msg", "dropped log",
+					"logID", k,
+					"size", len(v),
+					"limit", e.Opts.MaxBytesPerBatch,
+					"loghead", string(v)[0:logheadSize],
+				)
 
-	lastKeyIndex := 0
-	for _, k := range keys {
-		lastKeyIndex++
+				keys = append(keys, k)
+				continue
+			}
 
-		v, err := store.Get(k)
-		if err != nil {
-			level.Error(e.Opts.Logger).Log(
-				"msg", "error getting buffered log entry",
-				"err", err,
-			)
-			continue
+			if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+				break
+			}
+
+			totalBytes += len(v)
+			logs = append(logs, string(v))
+			keys = append(keys, k)
 		}
 
-		if len(v) > e.Opts.MaxBytesPerBatch {
-			// Discard logs that are too big
-			logheadSize := minInt(len(v), 100)
-			level.Info(e.Opts.Logger).Log(
-				"msg", "dropped log",
-				"logID", k,
-				"size", len(v),
-				"limit", e.Opts.MaxBytesPerBatch,
-				"loghead", string(v)[0:logheadSize],
-			)
-			continue
-		}
-
-		if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-			lastKeyIndex--
-			break
-		}
-
-		totalBytes += len(v)
-
-		// add to logs to be sent
-		logs = append(logs, string(v))
+		return nil
+	}); err != nil {
+		return fmt.Errorf("iterating logs: %w", err)
 	}
 
 	if len(logs) == 0 {
@@ -743,7 +714,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return fmt.Errorf("writing logs: %w", err)
 	}
 
-	if err = store.Delete(keys[:lastKeyIndex]...); err != nil {
+	if err = store.Delete(keys...); err != nil {
 		return fmt.Errorf("deleting sent logs: %w", err)
 	}
 
@@ -788,12 +759,8 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 		return err
 	}
 
-	keys, err := sortStoreKeys(store)
-	if err != nil {
-		return fmt.Errorf("getting buffered log keys: %w", err)
-	}
-
-	deleteCount := len(keys) - e.Opts.MaxBufferedLogs
+	storeLen := store.Len()
+	deleteCount := storeLen - e.Opts.MaxBufferedLogs
 
 	if deleteCount <= 0 {
 		// Limit not exceeded
@@ -803,10 +770,23 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	level.Info(e.Opts.Logger).Log(
 		"msg", "Buffered logs limit exceeded. Purging excess.",
 		"limit", e.Opts.MaxBufferedLogs,
-		"purge_count", len(keys),
+		"purge_count", storeLen,
 	)
 
-	if err := store.Delete(keys[:deleteCount]...); err != nil {
+	keysToDelete := make([][]byte, deleteCount)
+
+	store.DoCursor(func(c types.Cursor) error {
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			keysToDelete = append(keysToDelete, k)
+			if len(keysToDelete) >= deleteCount {
+				break
+			}
+		}
+
+		return nil
+	})
+
+	if err := store.Delete(keysToDelete...); err != nil {
 		return fmt.Errorf("deleting overflowed logs: %w", err)
 	}
 
@@ -832,14 +812,9 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return fmt.Errorf("unknown log type: %w", err)
 	}
 
-	keys, err := sortStoreKeys(store)
+	uint64Key, err := store.NextSequence()
 	if err != nil {
-		return fmt.Errorf("getting keys for log string: %w", err)
-	}
-
-	uint64Key := uint64(0)
-	if len(keys) > 0 {
-		uint64Key = uint64FromByteKey(keys[len(keys)-1]) + 1
+		return fmt.Errorf("getting next sequence for log string: %w", err)
 	}
 
 	if err := store.Set(byteKeyFromUint64(uint64Key), []byte(logText)); err != nil {

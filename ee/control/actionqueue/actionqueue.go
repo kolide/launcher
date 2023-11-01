@@ -89,7 +89,7 @@ func New(opts ...actionqueueOption) *actionqueue {
 	}
 
 	if aq.store == nil {
-		aq.store = inmemory.NewStore(aq.logger)
+		aq.store = inmemory.NewStore()
 	}
 
 	aq.logger = log.With(aq.logger, "component", "actionqueue")

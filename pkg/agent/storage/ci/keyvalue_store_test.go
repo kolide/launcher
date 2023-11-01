@@ -1,6 +1,7 @@
 package storageci
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sync"
@@ -25,6 +26,82 @@ func getStores(t *testing.T) []types.KVStore {
 		bboltStore,
 	}
 	return stores
+}
+
+// Test_GetSetUnusualByteTricks uses bytes, and tries to test some unusual corners of byte and buffer
+// operations. This is designed around issues encountered in the memory store
+func Test_GetSetUnusualByteTricks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		sets        [][]byte
+		gets        [][]byte
+		expectedErr bool
+	}{
+
+		{
+			name: "overwrite",
+			sets: [][]byte{[]byte("key"), []byte("short"), []byte("key"), []byte("a long value"), []byte("key"), []byte("s")},
+			gets: [][]byte{[]byte("key"), []byte("s")},
+		},
+		{
+			name: "non-stringable",
+			sets: [][]byte{
+				{1}, {1},
+				{2}, {2},
+				{1, 2}, {1, 2},
+				{0, 0, 0}, {0, 0, 0},
+				{1, 0, 0}, {1, 0, 0},
+				{2, 0, 0}, {2, 0, 0},
+			},
+			gets: [][]byte{
+				{1}, {1},
+				{2}, {2},
+				{1, 2}, {1, 2},
+				{0, 0, 0}, {0, 0, 0},
+				{1, 0, 0}, {1, 0, 0},
+				{2, 0, 0}, {2, 0, 0},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, s := range getStores(t) {
+
+				// make sure the test is setup correctly
+				require.True(t, len(tt.sets)%2 == 0, "sets should be even")
+				require.True(t, len(tt.gets)%2 == 0, "gets should be even")
+
+				buf := bytes.NewBuffer(nil)
+
+				for i := 0; i+1 <= len(tt.sets); i = i + 2 {
+					k := tt.sets[i]
+					v := tt.sets[i+1]
+					buf.Reset()
+					buf.Write(v)
+					err := s.Set(k, buf.Bytes())
+					if tt.expectedErr {
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, err)
+				}
+
+				for i := 0; i+1 <= len(tt.gets); i = i + 2 {
+					k := tt.gets[i]
+					expectedV := tt.gets[i+1]
+					actual, err := s.Get(k)
+					require.NoError(t, err)
+					assert.Equal(t, expectedV, actual)
+				}
+			}
+		})
+	}
 }
 
 func Test_GetSet(t *testing.T) {

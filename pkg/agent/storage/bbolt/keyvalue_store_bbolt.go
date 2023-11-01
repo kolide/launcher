@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/agent/types"
 	"go.etcd.io/bbolt"
 )
 
@@ -206,4 +207,68 @@ func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error)
 	}
 
 	return deletedKeys, nil
+}
+
+func (s *bboltKeyValueStore) DoCursor(fn func(types.Cursor) error) error {
+	if s == nil || s.db == nil {
+		return NoDbError{}
+	}
+
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return NewNoBucketError(s.bucketName)
+		}
+
+		return fn(b.Cursor())
+	})
+}
+
+func (s *bboltKeyValueStore) Len() int {
+	len := 0
+
+	if s == nil || s.db == nil {
+		return len
+	}
+
+	if err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return nil
+		}
+
+		len = b.Stats().KeyN
+		return nil
+	}); err != nil {
+		return len
+	}
+
+	return len
+}
+
+func (s *bboltKeyValueStore) NextSequence() (uint64, error) {
+	next := uint64(0)
+
+	if s == nil || s.db == nil {
+		return next, NoDbError{}
+	}
+
+	if err := s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return nil
+		}
+
+		nextSequence, err := b.NextSequence()
+		if err != nil {
+			return err
+		}
+
+		next = nextSequence
+		return nil
+	}); err != nil {
+		return next, err
+	}
+
+	return next, nil
 }

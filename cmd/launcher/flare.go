@@ -48,7 +48,7 @@ func runFlare(args []string) error {
 
 	logger := log.NewLogfmtLogger(os.Stdout)
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, inmemory.NewStore(logger), fcOpts...)
+	flagController := flags.NewFlagController(logger, inmemory.NewStore(), fcOpts...)
 
 	k := knapsack.New(nil, flagController, nil)
 	ctx := context.Background()
