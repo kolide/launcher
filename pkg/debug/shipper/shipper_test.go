@@ -55,7 +55,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		{
 			name: "happy path with signing keys and enroll secret",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
-				configStore := inmemory.NewStore(log.NewNopLogger())
+				configStore := inmemory.NewStore()
 				agent.SetupKeys(log.NewNopLogger(), configStore)
 
 				k := typesMocks.NewKnapsack(t)
