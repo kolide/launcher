@@ -89,7 +89,7 @@ func main() {
 		Level: slogLevel,
 	}))
 
-	k := knapsack.New(stores, f, db, nil, nil)
+	k := knapsack.New(stores, f, db, multiSlogger, nil)
 
 	if err := k.SetKolideServerURL(serverURL); err != nil {
 		logutil.Fatal(logger, "err", fmt.Errorf("setting kolide server url: %w", err), "stack", fmt.Sprintf("%+v", err))
