@@ -6,22 +6,28 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"net"
+	"net/url"
 
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 
-	// we only want the host (no port)
-	host, _, err := net.SplitHostPort(k.KolideServerURL())
-	if err != nil {
-		k.Slogger().Error("splitting host and port", "err", err)
-		return nil
+	hostname := k.KolideServerURL()
+	if k.Transport() == "grpc" {
+		// If we're using gRPC, we need to strip the port from the host
+		u, err := url.Parse(k.KolideServerURL())
+		if err != nil {
+			k.Slogger().Error("failed to parse server URL",
+				"err", err,
+			)
+			return nil
+		}
+		hostname = u.Hostname()
 	}
 
 	conf := &tls.Config{
-		ServerName:         host,
+		ServerName:         hostname,
 		InsecureSkipVerify: k.InsecureTLS(),
 		RootCAs:            rootPool,
 		MinVersion:         tls.VersionTLS12,

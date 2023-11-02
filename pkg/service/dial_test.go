@@ -110,6 +110,7 @@ func TestSwappingCert(t *testing.T) { // nolint:paralleltest
 	knapsack.On("InsecureTransportTLS").Return(false)
 	knapsack.On("InsecureTLS").Return(false)
 	knapsack.On("CertPins").Return([][]byte{})
+	knapsack.On("Transport").Return("grpc")
 
 	slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	knapsack.On("Slogger").Return(slogger)
@@ -161,6 +162,7 @@ func TestCertRemainsBad(t *testing.T) { // nolint:paralleltest
 	knapsack.On("InsecureTransportTLS").Return(false)
 	knapsack.On("InsecureTLS").Return(false)
 	knapsack.On("CertPins").Return([][]byte{})
+	knapsack.On("Transport").Return("grpc")
 
 	slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	knapsack.On("Slogger").Return(slogger)
@@ -237,6 +239,7 @@ func TestCertPinning(t *testing.T) { // nolint:paralleltest
 			knapsack.On("InsecureTransportTLS").Return(false)
 			knapsack.On("InsecureTLS").Return(false)
 			knapsack.On("CertPins").Return(certPins)
+			knapsack.On("Transport").Return("grpc")
 
 			slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 			knapsack.On("Slogger").Return(slogger)
@@ -309,6 +312,7 @@ func TestRootCAs(t *testing.T) { // nolint:paralleltest
 			knapsack.On("InsecureTransportTLS").Return(false)
 			knapsack.On("InsecureTLS").Return(false)
 			knapsack.On("CertPins").Return([][]byte{})
+			knapsack.On("Transport").Return("grpc")
 
 			slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 			knapsack.On("Slogger").Return(slogger)
