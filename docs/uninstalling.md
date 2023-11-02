@@ -1,5 +1,10 @@
 # Uninstalling Osquery Launcher
 
+> [!NOTE]  
+> This documents are for an open source launcher install. If you're looking for official instructions on how to uninstall
+> Kolide Agent, try https://www.kolide.com/docs/using-kolide/agent/removal-instructions
+
+
 ## Linux
 
 ### Debian
@@ -58,30 +63,4 @@ sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 sudo rm -r /usr/local/kolide
 sudo rm -r /var/kolide
 sudo rm -r /etc/kolide
-```
-
-### App (`kolide-desktop-app.pkg`)
-
-Directories:
-- `$HOME/Applications/Kolide.app`
-- `"$HOME/Library/Application Support/Kolide"`
-- `/usr/local/kolide`
-
-
-Files:
-- `/Library/LaunchDaemons/com.kolide.launcher.plist`
-
-To remove the `.app` bundle, run the following:
-
-```
-sudo rm -r /Applications/Kolide.app
-```
-
-To remove the preferences, cache and other supporting files, run the following:
-
-```
-sudo rm -r "$HOME/Library/Application Support/Kolide"
-sudo rm -r /usr/local/kolide
-sudo launchctl unload /Library/LaunchDaemons/com.kolide.launcher.plist
-sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 ```
