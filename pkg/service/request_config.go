@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
@@ -131,12 +130,8 @@ func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest)
 func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		logger := level.Debug(mw.logger)
-		if err != nil {
-			logger = level.Info(mw.logger)
-		}
-		logger.Log(
-			"method", "RequestConfig",
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), "request config",
 			"uuid", uuid,
 			"config_size", len(config),
 			"reauth", reauth,

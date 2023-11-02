@@ -6,12 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	grpcext "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	osquery "github.com/osquery/osquery-go"
@@ -49,13 +50,6 @@ func main() {
 	// allow for osqueryd to create the socket path
 	time.Sleep(2 * time.Second)
 
-	logger := logutil.NewServerLogger(*flVerbose)
-
-	client, err := osquery.NewClient(*flSocketPath, timeout, osquery.MaxWaitTime(30*time.Second))
-	if err != nil {
-		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
-	}
-
 	var (
 		enrollSecret  = env.String("KOLIDE_LAUNCHER_ENROLL_SECRET", "")
 		rootDirectory = env.String("KOLIDE_LAUNCHER_ROOT_DIRECTORY", "")
@@ -67,27 +61,11 @@ func main() {
 
 		// TODO(future pr): these values are unset
 		// they'll have to be parsed from a string
-		certPins [][]byte
+		// certPins [][]byte
 		rootPool *x509.CertPool
 	)
-	conn, err := service.DialGRPC(
-		serverURL,
-		insecureTLS,
-		insecureTransport,
-		certPins,
-		rootPool,
-		logger,
-	)
-	if err != nil {
-		logutil.Fatal(logger, "err", err, "failed to connect to grpc host", "stack", fmt.Sprintf("%+v", err))
-	}
-	remote := service.NewGRPCClient(conn, level.Debug(logger))
 
-	extOpts := grpcext.ExtensionOpts{
-		EnrollSecret:    enrollSecret,
-		Logger:          logger,
-		LoggingInterval: loggingInterval,
-	}
+	logger := logutil.NewServerLogger(*flVerbose)
 
 	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, nil)
 	if err != nil {
@@ -100,7 +78,50 @@ func main() {
 		logutil.Fatal(logger, "err", fmt.Errorf("creating stores: %w", err), "stack", fmt.Sprintf("%+v", err))
 	}
 	f := flags.NewFlagController(logger, stores[storage.AgentFlagsStore])
+
+	slogLevel := slog.LevelInfo
+	if *flVerbose {
+		slogLevel = slog.LevelDebug
+	}
+
+	multiSlogger := new(multislogger.MultiSlogger)
+	multiSlogger.AddHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slogLevel,
+	}))
+
 	k := knapsack.New(stores, f, db, nil, nil)
+
+	if err := k.SetKolideServerURL(serverURL); err != nil {
+		logutil.Fatal(logger, "err", fmt.Errorf("setting kolide server url: %w", err), "stack", fmt.Sprintf("%+v", err))
+	}
+
+	if err := k.SetInsecureTLS(insecureTLS); err != nil {
+		logutil.Fatal(logger, "err", fmt.Errorf("setting insecure tls: %w", err), "stack", fmt.Sprintf("%+v", err))
+	}
+
+	if err := k.SetInsecureTransportTLS(insecureTransport); err != nil {
+		logutil.Fatal(logger, "err", fmt.Errorf("setting insecure transport tls: %w", err), "stack", fmt.Sprintf("%+v", err))
+	}
+
+	client, err := osquery.NewClient(*flSocketPath, timeout, osquery.MaxWaitTime(30*time.Second))
+	if err != nil {
+		logutil.Fatal(logger, "err", err, "creating osquery extension client", "stack", fmt.Sprintf("%+v", err))
+	}
+
+	conn, err := service.DialGRPC(
+		k,
+		rootPool,
+	)
+	if err != nil {
+		logutil.Fatal(logger, "err", err, "failed to connect to grpc host", "stack", fmt.Sprintf("%+v", err))
+	}
+	remote := service.NewGRPCClient(k, conn)
+
+	extOpts := grpcext.ExtensionOpts{
+		EnrollSecret:    enrollSecret,
+		Logger:          logger,
+		LoggingInterval: loggingInterval,
+	}
 
 	ext, err := grpcext.NewExtension(remote, k, extOpts)
 	if err != nil {

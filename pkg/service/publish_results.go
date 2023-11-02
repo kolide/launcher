@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -183,12 +182,8 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(results)
 		uuid, _ := uuid.FromContext(ctx)
-		logger := level.Debug(mw.logger)
-		if err != nil {
-			logger = level.Info(mw.logger)
-		}
-		logger.Log(
-			"method", "PublishResults",
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), "publish results",
 			"uuid", uuid,
 			"results", string(resJSON),
 			"message", message,

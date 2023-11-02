@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -156,8 +155,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
 		if err != nil {
-			level.Info(mw.logger).Log(
-				"method", "RequestQueries",
+			mw.knapsack.Slogger().Error("request queries",
 				"uuid", uuid,
 				"res", string(resJSON),
 				"reauth", reauth,
