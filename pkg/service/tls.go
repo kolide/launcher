@@ -6,13 +6,22 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"net"
 
 	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
+
+	// we only want the host (no port)
+	host, _, err := net.SplitHostPort(k.KolideServerURL())
+	if err != nil {
+		k.Slogger().Error("splitting host and port", "err", err)
+		return nil
+	}
+
 	conf := &tls.Config{
-		ServerName:         k.KolideServerURL(),
+		ServerName:         host,
 		InsecureSkipVerify: k.InsecureTLS(),
 		RootCAs:            rootPool,
 		MinVersion:         tls.VersionTLS12,
