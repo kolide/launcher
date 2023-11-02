@@ -2,6 +2,7 @@ package multislogger
 
 import (
 	"context"
+	"io"
 	"log/slog"
 
 	slogmulti "github.com/samber/slog-multi"
@@ -10,6 +11,12 @@ import (
 type MultiSlogger struct {
 	*slog.Logger
 	handlers []slog.Handler
+}
+
+func NewNoop() *MultiSlogger {
+	ms := new(MultiSlogger)
+	ms.AddHandler(slog.NewTextHandler(io.Discard, nil))
+	return ms
 }
 
 // AddHandler adds a handler to the multislogger
