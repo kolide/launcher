@@ -187,7 +187,6 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 			"method", "PublishResults",
 			"uuid", uuid,
 			"results", string(resJSON),
-			"message", message,
 			"errcode", errcode,
 			"reauth", reauth,
 			"err", err,

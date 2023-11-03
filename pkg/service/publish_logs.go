@@ -176,7 +176,6 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			"uuid", uuid,
 			"logType", logType,
 			"log_count", len(logs),
-			"message", message,
 			"errcode", errcode,
 			"reauth", reauth,
 			"err", err,
