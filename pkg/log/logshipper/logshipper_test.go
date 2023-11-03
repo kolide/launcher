@@ -44,7 +44,7 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 			knapsack.On("Debug").Return(true)
 			knapsack.On("LogShippingLevel").Return("debug").Times(2)
-			knapsack.On("Slogger").Return(multislogger.NewNoop().Logger)
+			knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			ls := New(knapsack, log.NewNopLogger())
 
@@ -108,7 +108,7 @@ func TestStop_Multiple(t *testing.T) {
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
-	knapsack.On("Slogger").Return(multislogger.NewNoop().Logger)
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -160,7 +160,7 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
-	knapsack.On("Slogger").Return(multislogger.NewNoop().Logger)
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	ls := New(knapsack, log.NewNopLogger())
 
