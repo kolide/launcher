@@ -58,10 +58,10 @@ func (k *knapsack) SystemSlogger() *slog.Logger {
 }
 
 func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
-	k.slogger = k.slogger.AddHandler(handler...)
+	k.slogger.AddHandler(handler...)
 
 	// also send system logs to the same handlers
-	k.systemSlogger = k.systemSlogger.AddHandler(handler...)
+	k.systemSlogger.AddHandler(handler...)
 }
 
 // BboltDB interface methods

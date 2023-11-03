@@ -26,11 +26,12 @@ func New(h ...slog.Handler) *MultiSlogger {
 		return ms
 	}
 
-	return ms.AddHandler(h...)
+	ms.AddHandler(h...)
+	return ms
 }
 
 // AddHandler adds a handler to the multislogger
-func (m *MultiSlogger) AddHandler(handler ...slog.Handler) *MultiSlogger {
+func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
 
 	// we have to rebuild the handler everytime because the slogmulti package we're
@@ -41,8 +42,6 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) *MultiSlogger {
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
-
-	return m
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
