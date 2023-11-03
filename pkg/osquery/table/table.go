@@ -56,6 +56,7 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		tdebug.LauncherGcInfo(logger),
 		zfs.ZfsPropertiesPlugin(logger),
 		zfs.ZpoolPropertiesPlugin(logger),
+		JWT(logger),
 	}
 
 	// The dataflatten tables
