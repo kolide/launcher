@@ -171,7 +171,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), "publish logs",
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
 			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,

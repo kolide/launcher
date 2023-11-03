@@ -183,7 +183,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 		resJSON, _ := json.Marshal(results)
 		uuid, _ := uuid.FromContext(ctx)
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), "publish results",
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
 			"method", "PublishResults",
 			"uuid", uuid,
 			"results", string(resJSON),
