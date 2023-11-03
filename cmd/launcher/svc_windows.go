@@ -62,12 +62,11 @@ func runWindowsSvc(args []string) error {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
-	systemSlogger := new(multislogger.MultiSlogger)
-	systemSlogger.AddHandler(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
+	systemSlogger := multislogger.New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
-	localSlogger := new(multislogger.MultiSlogger)
+	localSlogger := multislogger.New()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {

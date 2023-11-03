@@ -13,10 +13,20 @@ type MultiSlogger struct {
 	handlers []slog.Handler
 }
 
-func NewNoop() *MultiSlogger {
+// New creates a new multislogger if no handlers are passed in, it will
+// create a logger that discards all logs
+func New(h ...slog.Handler) *MultiSlogger {
 	ms := new(MultiSlogger)
-	ms.AddHandler(slog.NewTextHandler(io.Discard, nil))
-	return ms
+
+	if len(h) == 0 {
+		// if we don't have any handlers passed in, we'll just discard the logs
+		// do not add the discard handler to the handlers so it will not be
+		// included when a handler is added
+		ms.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		return ms
+	}
+
+	return ms.AddHandler(h...)
 }
 
 // AddHandler adds a handler to the multislogger

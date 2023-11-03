@@ -369,8 +369,7 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		}
 		defer conn.Close()
 
-		multislogger := new(multislogger.MultiSlogger)
-		multislogger.AddHandler(slog.NewJSONHandler(os.Stdout, nil))
+		multislogger := multislogger.New(slog.NewJSONHandler(os.Stdout, nil))
 		knapsack := knapsack.New(nil, nil, nil, multislogger, nil)
 		h.state.serviceClient = service.NewGRPCClient(knapsack, conn)
 
