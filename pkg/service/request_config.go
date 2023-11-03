@@ -132,6 +132,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 		uuid, _ := uuid.FromContext(ctx)
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), "request config",
+			"method", "RequestConfig",
 			"uuid", uuid,
 			"config_size", len(config),
 			"reauth", reauth,

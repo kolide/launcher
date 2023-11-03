@@ -193,6 +193,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		uuid, _ := uuid.FromContext(ctx)
 
 		keyvals := []interface{}{
+			"method", "RequestEnrollment",
 			"uuid", uuid,
 			"hostIdentifier", hostIdentifier,
 			"reauth", reauth,

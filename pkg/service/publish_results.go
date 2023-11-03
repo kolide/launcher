@@ -184,6 +184,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 		uuid, _ := uuid.FromContext(ctx)
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), "publish results",
+			"method", "PublishResults",
 			"uuid", uuid,
 			"results", string(resJSON),
 			"message", message,

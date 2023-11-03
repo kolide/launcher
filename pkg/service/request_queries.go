@@ -156,6 +156,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		uuid, _ := uuid.FromContext(ctx)
 		if err != nil {
 			mw.knapsack.Slogger().Error("request queries",
+				"method", "RequestQueries",
 				"uuid", uuid,
 				"res", string(resJSON),
 				"reauth", reauth,

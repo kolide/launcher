@@ -172,6 +172,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 		uuid, _ := uuid.FromContext(ctx)
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), "publish logs",
+			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,
 			"log_count", len(logs),

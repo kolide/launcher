@@ -15,7 +15,7 @@ func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 
 	hostname := k.KolideServerURL()
 	if k.Transport() == "grpc" {
-		// If we're using gRPC, we need to strip the port from the host
+		// gRPC doesn't use the port for TLS verification. So we strip it here.
 		u, err := url.Parse(k.KolideServerURL())
 		if err != nil {
 			k.Slogger().Error("failed to parse server URL",
