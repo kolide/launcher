@@ -23,8 +23,10 @@ func TestMultiSlogger(t *testing.T) {
 		debugLogBuf.Reset()
 	}
 
-	multislogger := new(MultiSlogger)
-	multislogger.AddHandler(slog.NewJSONHandler(&debugLogBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	multislogger := New()
+	multislogger.Logger.Debug("dont panic")
+
+	multislogger = New(slog.NewJSONHandler(&debugLogBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	shipperLogLevel := new(slog.LevelVar)
 	shipperLogLevel.Set(slog.LevelInfo)
