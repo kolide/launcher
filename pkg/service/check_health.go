@@ -106,7 +106,7 @@ func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (
 func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		mw.logger.Log(
+		mw.knapsack.Slogger().Debug("check health",
 			"method", "CheckHealth",
 			"uuid", uuid,
 			"status", status,

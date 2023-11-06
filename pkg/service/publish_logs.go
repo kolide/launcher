@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -171,16 +170,20 @@ func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*p
 func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
-		logger := level.Debug(mw.logger)
-		if err != nil {
-			logger = level.Info(mw.logger)
+
+		if message == "" {
+			if err == nil {
+				message = "success"
+			} else {
+				message = "failure"
+			}
 		}
-		logger.Log(
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
 			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,
 			"log_count", len(logs),
-			"message", message,
 			"errcode", errcode,
 			"reauth", reauth,
 			"err", err,

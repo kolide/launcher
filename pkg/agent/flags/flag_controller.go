@@ -497,10 +497,10 @@ func (fc *FlagController) LogShippingLevel() string {
 			value = strings.ToLower(value)
 
 			switch value {
-			case "debug", "info", "warn":
+			case "debug", "warn", "error":
 				return value
 			default:
-				return "error"
+				return "info"
 			}
 		}),
 	).get(fc.getControlServerValue(keys.LogShippingLevel))
