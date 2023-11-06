@@ -16,7 +16,9 @@ func JWTFile(file string, opts ...FlattenOpts) ([]Row, error) {
 }
 
 func flattenJWT(path string, opts ...FlattenOpts) ([]Row, error) {
-	results := map[string]interface{}{}
+	// for now, make it clear that any data we parse is unverified
+	results := map[string]interface{}{"verified": false}
+
 	jwtFH, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("unable to access file: %w", err)
@@ -41,9 +43,13 @@ func flattenJWT(path string, opts ...FlattenOpts) ([]Row, error) {
 		return nil, fmt.Errorf("JWT has no parseable claims")
 	}
 
+	parsedClaims := map[string]interface{}{}
 	for k, v := range claims {
-		results[k] = v
+		parsedClaims[k] = v
 	}
+
+	results["claims"] = parsedClaims
+	results["header"] = token.Header
 
 	return Flatten(results, opts...)
 }
