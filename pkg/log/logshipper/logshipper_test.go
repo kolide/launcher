@@ -2,6 +2,7 @@ package logshipper
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,7 +43,8 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 			knapsack.On("Debug").Return(true)
-			knapsack.On("LogShippingLevel").Return("debug")
+			knapsack.On("LogShippingLevel").Return("debug").Times(2)
+			knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			ls := New(knapsack, log.NewNopLogger())
 
@@ -58,14 +61,17 @@ func TestLogShipper(t *testing.T) {
 			ls.Ping()
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
 			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
 			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
 
 			endpoint = ""
 			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+			knapsack.On("LogShippingLevel").Return("info")
 			ls.Ping()
 
 			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
 			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
+			require.Equal(t, slog.LevelInfo.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
 			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to empty endpoint")
 
 			endpoint = "http://somenewvalidurl"
@@ -102,6 +108,7 @@ func TestStop_Multiple(t *testing.T) {
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -153,6 +160,7 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	ls := New(knapsack, log.NewNopLogger())
 
