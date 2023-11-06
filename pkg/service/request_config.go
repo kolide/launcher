@@ -131,7 +131,12 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), "request config",
+		message := "success"
+		if err != nil {
+			message = "failure"
+		}
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
 			"method", "RequestConfig",
 			"uuid", uuid,
 			"config_size", len(config),

@@ -192,6 +192,11 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
+		message := "success"
+		if err != nil {
+			message = "failure"
+		}
+
 		keyvals := []interface{}{
 			"method", "RequestEnrollment",
 			"uuid", uuid,
@@ -208,7 +213,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			)
 		}
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), "request enrollment", keyvals...)
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...)
 	}(time.Now())
 
 	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
