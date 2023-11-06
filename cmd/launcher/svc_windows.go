@@ -150,6 +150,17 @@ func runWindowsSvcForeground(args []string) error {
 	logger := logutil.NewCLILogger(true)
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
+	// Use new logger to write logs to stdout
+	systemSlogger := new(multislogger.MultiSlogger)
+	localSlogger := new(multislogger.MultiSlogger)
+
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	})
+	localSlogger.AddHandler(handler)
+	systemSlogger.AddHandler(handler)
+
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
@@ -162,7 +173,7 @@ func runWindowsSvcForeground(args []string) error {
 
 	run := debug.Run
 
-	return run(serviceName, &winSvc{logger: logger, opts: opts})
+	return run(serviceName, &winSvc{logger: logger, slogger: localSlogger, systemSlogger: systemSlogger, opts: opts})
 }
 
 type winSvc struct {
