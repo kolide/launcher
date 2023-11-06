@@ -29,6 +29,13 @@ func attachConsole() error {
 	}
 	os.Stdout = os.NewFile(uintptr(stdout), "stdout")
 
+	// Set stderr for newly attached console
+	stderr, err := syscall.GetStdHandle(syscall.STD_ERROR_HANDLE)
+	if err != nil {
+		return fmt.Errorf("getting stderr handle: %w", err)
+	}
+	os.Stderr = os.NewFile(uintptr(stderr), "stderr")
+
 	// Print an empty line so that our first line of actual output doesn't occur on the same line
 	// as the command prompt
 	fmt.Println("")
