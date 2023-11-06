@@ -145,6 +145,9 @@ func runWindowsSvc(args []string) error {
 }
 
 func runWindowsSvcForeground(args []string) error {
+	attachConsole()
+	defer detachConsole()
+
 	// Foreground mode is inherently a debug mode. So we start the
 	// logger in debugging mode, instead of looking at opts.debug
 	logger := logutil.NewCLILogger(true)
