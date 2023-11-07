@@ -2,7 +2,6 @@ package flags
 
 import (
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
@@ -491,19 +490,21 @@ func (fc *FlagController) SetLogShippingLevel(level string) error {
 	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
 }
 func (fc *FlagController) LogShippingLevel() string {
-	return NewStringFlagValue(
-		WithDefaultString("error"),
-		WithSanitizer(func(value string) string {
-			value = strings.ToLower(value)
 
-			switch value {
-			case "debug", "warn", "error":
-				return value
-			default:
-				return "info"
-			}
-		}),
-	).get(fc.getControlServerValue(keys.LogShippingLevel))
+	return "debug"
+	// return NewStringFlagValue(
+	// 	WithDefaultString("error"),
+	// 	WithSanitizer(func(value string) string {
+	// 		value = strings.ToLower(value)
+
+	// 		switch value {
+	// 		case "debug", "warn", "error":
+	// 			return value
+	// 		default:
+	// 			return "info"
+	// 		}
+	// 	}),
+	// ).get(fc.getControlServerValue(keys.LogShippingLevel))
 }
 
 func (fc *FlagController) SetTraceIngestServerURL(url string) error {

@@ -36,7 +36,7 @@ type v2CmdRequestType struct {
 	CallbackHeaders map[string][]string
 }
 
-func (cmdReq v2CmdRequestType) CallbackReq(ctx context.Context) (*http.Request, error) {
+func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 	if cmdReq.CallbackUrl == "" {
 		return nil, nil
 	}
@@ -46,7 +46,6 @@ func (cmdReq v2CmdRequestType) CallbackReq(ctx context.Context) (*http.Request, 
 		return nil, fmt.Errorf("making http request: %w", err)
 	}
 
-	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
 	// Iterate and deep copy
@@ -199,13 +198,20 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			UserAgent: r.Header.Get("User-Agent"),
 		}
 
-		if callbackReq, err := cmdReq.CallbackReq(r.Context()); err != nil {
+		if callbackReq, err := cmdReq.CallbackReq(); err != nil {
 			e.slogger.Log(r.Context(), slog.LevelError,
 				"unable to create callback req",
 				"err", err,
 			)
 		} else if callbackReq != nil {
-			defer func() { go e.sendCallback(callbackReq, callbackData) }()
+			defer func() {
+				callbackReq = callbackReq.WithContext(
+					// adding the current request context will cause this to be cancelled before it sends
+					// so just add the session id manually
+					context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
+				)
+				go e.sendCallback(callbackReq, callbackData)
+			}()
 		}
 
 		// Check the timestamp, this prevents people from saving a challenge and then
