@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -16,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent/keys"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,11 +35,16 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	challengeId := []byte(ulid.New())
 	challengeData := []byte(ulid.New())
 
+	koldieSessionId := ulid.New()
+	cmdReqCallBackHeaders := map[string][]string{
+		multislogger.KolideSessionIdKey: {koldieSessionId},
+	}
 	cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
 
 	cmdReq := mustMarshal(t, v2CmdRequestType{
-		Path: "whatevs",
-		Body: cmdReqBody,
+		Path:            "whatevs",
+		Body:            cmdReqBody,
+		CallbackHeaders: cmdReqCallBackHeaders,
 	})
 
 	var tests = []struct {
@@ -155,9 +161,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					t.Parallel()
 
 					var logBytes bytes.Buffer
+					slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+						Level: slog.LevelDebug,
+					})).Logger
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(log.NewLogfmtLogger(&logBytes), tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
 					require.NoError(t, err)
 
 					// give our middleware with the test handler to the determiner
@@ -171,6 +180,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 						assert.Contains(t, logBytes.String(), tt.loggedErr)
 						return
 					}
+
+					require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey)
+					require.Contains(t, logBytes.String(), koldieSessionId)
+					require.Contains(t, logBytes.String(), multislogger.SpanIdKey)
 
 					require.Equal(t, http.StatusOK, rr.Code)
 					require.NotEmpty(t, rr.Body.String())

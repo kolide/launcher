@@ -2,21 +2,22 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -60,15 +61,15 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 type kryptoEcMiddleware struct {
 	localDbSigner, hardwareSigner crypto.Signer
 	counterParty                  ecdsa.PublicKey
-	logger                        log.Logger
+	slogger                       *slog.Logger
 }
 
-func newKryptoEcMiddleware(logger log.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:  localDbSigner,
 		hardwareSigner: hardwareSigner,
 		counterParty:   counterParty,
-		logger:         log.With(logger, "keytype", "ec"),
+		slogger:        slogger.With("keytype", "ec"),
 	}
 }
 
@@ -99,9 +100,13 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 	if req == nil {
 		return
 	}
+
 	b, err := json.Marshal(data)
 	if err != nil {
-		level.Debug(e.logger).Log("msg", "unable to marshal callback data", "err", err)
+		e.slogger.Log(req.Context(), slog.LevelDebug,
+			"unable to marshal callback data",
+			"err", err,
+		)
 	}
 
 	req.Body = io.NopCloser(bytes.NewReader(b))
@@ -113,7 +118,10 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	resp, err := client.Do(req)
 	if err != nil {
-		level.Debug(e.logger).Log("msg", "got error in callback", "err", err)
+		e.slogger.Log(req.Context(), slog.LevelDebug,
+			"got error in callback",
+			"err", err,
+		)
 		return
 	}
 
@@ -121,12 +129,16 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 		resp.Body.Close()
 	}
 
-	level.Debug(e.logger).Log("msg", "Finished callback", "response-status", resp.Status)
+	e.slogger.Log(req.Context(), slog.LevelDebug, "finished callback",
+		"response-status", resp.Status,
+	)
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: add trace id to ctx or figure out what otel puts in there
 		ctx, span := traces.StartSpan(r.Context())
+		ctx = context.WithValue(ctx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
 		defer span.End()
 
 		if r.Body != nil {
@@ -136,14 +148,24 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
 			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "failed to extract box from request", "err", err, "path", r.URL.Path, "query_params", r.URL.RawQuery)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"failed to extract box from request",
+				"err", err,
+				"path", r.URL.Path,
+				"query_params", r.URL.RawQuery,
+			)
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
 			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "unable to verify signature", "err", err)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"unable to verify signature",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -153,9 +175,20 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
 			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "unable to unmarshal cmd request", "err", err)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"unable to unmarshal cmd request",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
+		}
+
+		// set the kolide session id if it exists, this also the saml session id
+		kolideSessionId, ok := cmdReq.CallbackHeaders[multislogger.KolideSessionIdKey]
+		if ok && len(kolideSessionId) > 0 {
+			span.SetAttributes(attribute.String(multislogger.KolideSessionIdKey, kolideSessionId[0]))
+			ctx = context.WithValue(ctx, multislogger.KolideSessionIdKey, kolideSessionId[0])
 		}
 
 		// Setup callback URLs and data. This is a pointer, so it can be adjusted before the defer triggers
@@ -164,7 +197,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			UserAgent: r.Header.Get("User-Agent"),
 		}
 		if callbackReq, err := cmdReq.CallbackReq(); err != nil {
-			level.Debug(e.logger).Log("msg", "unable to create callback req", "err", err)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"unable to create callback req",
+				"err", err,
+			)
 		} else if callbackReq != nil {
 			defer func() { go e.sendCallback(callbackReq, callbackData) }()
 		}
@@ -175,8 +211,11 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 			span.SetStatus(codes.Error, "timestamp is out of range")
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"timestamp is out of range",
+				"delta", timestampDelta,
+			)
 
-			level.Debug(e.logger).Log("msg", "timestamp is out of range", "delta", timestampDelta)
 			w.WriteHeader(http.StatusUnauthorized)
 			callbackData.Error = timeOutOfRangeErr
 			return
@@ -197,7 +236,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 		}
 
-		level.Debug(e.logger).Log("msg", "Successful challenge. Proxying")
+		e.slogger.Log(ctx, slog.LevelDebug, "successful challenge, proxying")
 		span.AddEvent("challenge_success")
 
 		// bhr contains the data returned by the request defined above
@@ -216,7 +255,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		if err != nil {
 			traces.SetError(span, err)
-			level.Debug(e.logger).Log("msg", "failed to respond", "err", err)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"failed to respond",
+				"err", err,
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			callbackData.Error = responseFailureErr
 			return

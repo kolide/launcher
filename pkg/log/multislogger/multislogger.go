@@ -8,6 +8,12 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
+const (
+	// KolideSessionIdKey this the also the saml session id
+	KolideSessionIdKey = "X-Kolide-Session"
+	SpanIdKey          = "span_id"
+)
+
 type MultiSlogger struct {
 	*slog.Logger
 	handlers []slog.Handler
@@ -50,8 +56,8 @@ func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(contex
 }
 
 var ctxValueKeysToAdd = []string{
-	"span_id",
-	"saml_session_id",
+	SpanIdKey,
+	KolideSessionIdKey,
 }
 
 func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
