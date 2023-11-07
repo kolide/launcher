@@ -27,6 +27,7 @@ const (
 	timestampValidityRange             = 150
 	kolideKryptoEccHeader20230130Value = "2023-01-30"
 	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
+	kolideSessionIdHeaderKey           = "X-Kolide-Session"
 )
 
 type v2CmdRequestType struct {
@@ -186,9 +187,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		// set the kolide session id if it exists, this also the saml session id
-		kolideSessionId, ok := cmdReq.CallbackHeaders[multislogger.KolideSessionIdKey.String()]
+		kolideSessionId, ok := cmdReq.CallbackHeaders[kolideSessionIdHeaderKey]
 		if ok && len(kolideSessionId) > 0 {
-			span.SetAttributes(attribute.String(multislogger.KolideSessionIdKey.String(), kolideSessionId[0]))
+			span.SetAttributes(attribute.String(kolideSessionIdHeaderKey, kolideSessionId[0]))
 			r = r.WithContext(context.WithValue(r.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]))
 		}
 

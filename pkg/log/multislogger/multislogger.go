@@ -8,16 +8,23 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
-type contextKey string
+type contextKey int
 
 func (c contextKey) String() string {
-	return string(c)
+	switch c {
+	case KolideSessionIdKey:
+		return "kolide_session_id"
+	case SpanIdKey:
+		return "span_id"
+	default:
+		return "unknown"
+	}
 }
 
 const (
 	// KolideSessionIdKey this the also the saml session id
-	KolideSessionIdKey contextKey = "X-Kolide-Session"
-	SpanIdKey          contextKey = "span_id"
+	KolideSessionIdKey contextKey = iota
+	SpanIdKey
 )
 
 type MultiSlogger struct {

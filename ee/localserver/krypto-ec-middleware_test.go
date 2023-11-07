@@ -37,7 +37,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 	koldieSessionId := ulid.New()
 	cmdReqCallBackHeaders := map[string][]string{
-		multislogger.KolideSessionIdKey.String(): {koldieSessionId},
+		kolideSessionIdHeaderKey: {koldieSessionId},
 	}
 	cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
 
