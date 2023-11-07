@@ -6,7 +6,7 @@ package allowedpaths
 var knownPaths = map[string]map[string]bool{
 	"cryptsetup": {
 		"/usr/sbin/cryptsetup": true,
-		"/sbin/cryptsetup", true
+		"/sbin/cryptsetup":     true,
 	},
 	"dpkg": {
 		"/usr/bin/dpkg": true,
@@ -64,7 +64,7 @@ var knownPaths = map[string]map[string]bool{
 	},
 	"zpool": {
 		"/usr/sbin/zpool": true,
-	}
+	},
 }
 
 var knownPathPrefixes = []string{

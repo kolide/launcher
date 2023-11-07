@@ -33,19 +33,12 @@ func removeLauncher(ctx context.Context, identifier string) error {
 		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", string(out), err)
 	}
 
-	fileExists := func(f string) bool {
-		if _, err := os.Stat(f); err == nil {
-			return true
-		}
-		return false
-	}
-
 	// Tell the appropriate package manager to remove launcher
-	if cmd, err := allowedpaths.CommandContextWithLookup("dpkg", []string{"--purge", packageName}...); err == nil {
+	if cmd, err := allowedpaths.CommandContextWithLookup(ctx, "dpkg", []string{"--purge", packageName}...); err == nil {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Printf("error occurred while running dpkg --purge, output %s: err: %s\n", string(out), err)
 		}
-	} else if cmd, err := allowedpaths.CommandContextWithLookup("rpm", []string{"-e", packageName}...); err == nil {
+	} else if cmd, err := allowedpaths.CommandContextWithLookup(ctx, "rpm", []string{"-e", packageName}...); err == nil {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Printf("error occurred while running rpm -e, output %s: err: %s\n", string(out), err)
 		}

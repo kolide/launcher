@@ -37,7 +37,7 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 	// Now run it. This is faking exec, we need to distinguish
 	// between a failure to execute, and a failure in in the called program.
 	// I think https://github.com/golang/go/issues/26539 adds this functionality.
-	err := cmd.Run()
+	err = cmd.Run()
 
 	if cmd.ProcessState.ExitCode() == -1 {
 		if err == nil {

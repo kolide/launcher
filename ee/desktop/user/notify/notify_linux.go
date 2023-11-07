@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/godbus/dbus/v5"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type dbusNotifier struct {
@@ -180,7 +181,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		args = append(args, "-i", d.iconFilepath)
 	}
 
-	cmd, err := allowedpaths.Command("notify-send", args...)
+	cmd, err := allowedpaths.CommandWithLookup("notify-send", args...)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}
