@@ -201,8 +201,8 @@ func signHttpRequest(req *http.Request, body []byte) {
 			return
 		}
 
-		request.Header.Set(control.HeaderKey, string(pub))
-		request.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
+		request.Header.Set(headerKey, string(pub))
+		request.Header.Set(signatureKey, base64.StdEncoding.EncodeToString(sig))
 	}
 
 	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)
