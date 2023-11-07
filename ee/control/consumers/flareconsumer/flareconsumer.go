@@ -79,7 +79,7 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
 
-	fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "Recieved remote flare request",
+	fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "received remote flare request",
 		"note", flareData.Note,
 	)
 
