@@ -4,11 +4,18 @@
 package allowedpaths
 
 var knownPaths = map[string]map[string]bool{
+	"cryptsetup": {
+		"/usr/sbin/cryptsetup": true,
+		"/sbin/cryptsetup", true
+	},
 	"dpkg": {
 		"/usr/bin/dpkg": true,
 	},
 	"lsof": {
 		"/usr/bin/lsof": true,
+	},
+	"falcon-kernel-check": {
+		"/opt/CrowdStrike/falcon-kernel-check": true,
 	},
 	"gnome-extensions": {
 		"/usr/bin/gnome-extensions": true,
@@ -24,6 +31,9 @@ var knownPaths = map[string]map[string]bool{
 	},
 	"loginctl": {
 		"/usr/bin/loginctl": true,
+	},
+	"mdmclient": {
+		"/usr/libexec/mdmclient": true,
 	},
 	"notify-send": {
 		"/usr/bin/notify-send": true,
@@ -49,6 +59,12 @@ var knownPaths = map[string]map[string]bool{
 	"zerotier-cli": {
 		"/usr/local/bin/zerotier-cli": true,
 	},
+	"zfs": {
+		"/usr/sbin/zfs": true,
+	},
+	"zpool": {
+		"/usr/sbin/zpool": true,
+	}
 }
 
 var knownPathPrefixes = []string{

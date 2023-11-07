@@ -4,8 +4,14 @@
 package allowedpaths
 
 var knownPaths = map[string]map[string]bool{
+	"airport": {
+		"/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport": true,
+	},
 	"bioutil": {
 		"/usr/bin/bioutil": true,
+	},
+	"bputil": {
+		"/usr/bin/bputil": true,
 	},
 	"diskutil": {
 		"/usr/sbin/diskutil": true,
@@ -13,11 +19,17 @@ var knownPaths = map[string]map[string]bool{
 	"falconctl": {
 		"/Applications/Falcon.app/Contents/Resources/falconctl": true,
 	},
+	"fdsetup": {
+		"/usr/bin/fdesetup": true,
+	},
 	"firmwarepasswd": {
 		"/usr/sbin/firmwarepasswd": true,
 	},
 	"ifconfig": {
 		"/sbin/ifconfig": true,
+	},
+	"ioreg": {
+		"/usr/sbin/ioreg": true,
 	},
 	"launchctl": {
 		"/bin/launchctl": true,
@@ -27,6 +39,9 @@ var knownPaths = map[string]map[string]bool{
 	},
 	"mdfind": {
 		"/usr/bin/mdfind": true,
+	},
+	"mdmclient": {
+		"/usr/libexec/mdmclient": true,
 	},
 	"netstat": {
 		"/usr/sbin/netstat": true,
