@@ -42,8 +42,8 @@ var knownPaths = map[string]map[string]bool{
 		"/usr/bin/loginctl": true,
 	},
 	"lsblk": {
-		"/bin/lsblk",
-		"/usr/bin/lsblk",
+		"/bin/lsblk":     true,
+		"/usr/bin/lsblk": true,
 	},
 	"mdmclient": {
 		"/usr/libexec/mdmclient": true,
