@@ -42,7 +42,9 @@ func New(h ...slog.Handler) *MultiSlogger {
 	return ms
 }
 
-// AddHandler adds a handler to the multislogger
+// AddHandler adds a handler to the multislogger, this creates a branch new
+// slog.Logger under the the hood, mean any attributes added with
+// Logger.With will be lost
 func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
 
