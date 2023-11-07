@@ -8,6 +8,25 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
+type contextKey int
+
+func (c contextKey) String() string {
+	switch c {
+	case KolideSessionIdKey:
+		return "kolide_session_id"
+	case SpanIdKey:
+		return "span_id"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	// KolideSessionIdKey this the also the saml session id
+	KolideSessionIdKey contextKey = iota
+	SpanIdKey
+)
+
 type MultiSlogger struct {
 	*slog.Logger
 	handlers []slog.Handler
@@ -30,7 +49,9 @@ func New(h ...slog.Handler) *MultiSlogger {
 	return ms
 }
 
-// AddHandler adds a handler to the multislogger
+// AddHandler adds a handler to the multislogger, this creates a branch new
+// slog.Logger under the the hood, mean any attributes added with
+// Logger.With will be lost
 func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
 
@@ -49,19 +70,20 @@ func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(contex
 	return next(ctx, record)
 }
 
-var ctxValueKeysToAdd = []string{
-	"span_id",
-	"saml_session_id",
+var ctxValueKeysToAdd = []contextKey{
+	SpanIdKey,
+	KolideSessionIdKey,
 }
 
 func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
 	for _, key := range ctxValueKeysToAdd {
 		if v := ctx.Value(key); v != nil {
 			record.AddAttrs(slog.Attr{
-				Key:   key,
+				Key:   key.String(),
 				Value: slog.AnyValue(v),
 			})
 		}
 	}
+
 	return next(ctx, record)
 }
