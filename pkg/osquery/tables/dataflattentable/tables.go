@@ -20,6 +20,7 @@ const (
 	PlistType DataSourceType = iota + 1
 	JsonType
 	JsonlType
+	JWTType
 	ExecType
 	XmlType
 	IniType
@@ -47,6 +48,7 @@ func AllTablePlugins(logger log.Logger) []osquery.OsqueryPlugin {
 		TablePlugin(logger, IniType),
 		TablePlugin(logger, PlistType),
 		TablePlugin(logger, JsonlType),
+		TablePlugin(logger, JWTType),
 	}
 }
 
@@ -73,6 +75,9 @@ func TablePlugin(logger log.Logger, dataSourceType DataSourceType) osquery.Osque
 	case IniType:
 		t.flattenFileFunc = dataflatten.IniFile
 		t.tableName = "kolide_ini"
+	case JWTType:
+		t.flattenFileFunc = dataflatten.JWTFile
+		t.tableName = "kolide_jwt"
 	default:
 		panic("Unknown data source type")
 	}
