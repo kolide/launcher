@@ -28,7 +28,7 @@ func CommandWithPath(fullPathToCommand string, arg ...string) (*exec.Cmd, error)
 		return nil, fmt.Errorf("path is not allowed: %w", err)
 	}
 
-	return exec.Command(fullPathToCommand, arg...), nil
+	return exec.Command(fullPathToCommand, arg...), nil //nolint:forbidigo
 }
 
 // CommandContextWithLookup should be used when the full path to the command is not known and it is
@@ -51,7 +51,7 @@ func CommandContextWithPath(ctx context.Context, fullPathToCommand string, arg .
 		return nil, fmt.Errorf("path is not allowed: %w", err)
 	}
 
-	return exec.CommandContext(ctx, fullPathToCommand, arg...), nil
+	return exec.CommandContext(ctx, fullPathToCommand, arg...), nil //nolint:forbidigo
 }
 
 // pathIsAllowed validates the path to the command against our allowlist.

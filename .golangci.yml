@@ -15,6 +15,7 @@ linters:
     - sqlclosecheck
     - unconvert
     - paralleltest
+    - forbidigo
   disable:
     - errcheck
     - gosec
@@ -32,6 +33,10 @@ linters-settings:
     ignore: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
+  forbidigo:
+    forbid:
+      - p: ^exec\.Command.*$
+        msg: use pkg/allowedpaths functions instead
 
 issues:
   exclude-rules:
