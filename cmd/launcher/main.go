@@ -261,7 +261,10 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 }
 
 func runVersion(args []string) error {
+	attachConsole()
 	version.PrintFull()
+	detachConsole()
+
 	os.Exit(0)
 	return nil
 }
