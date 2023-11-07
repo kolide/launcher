@@ -233,7 +233,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			},
 		}
 
-		// setting the newReq context to the current request context context
+		// setting the newReq context to the current request context
 		// allows the trace to continue to the inner request,
 		// maintains the same lifetime as the original request,
 		// allows same ctx values such as session id to be passed to the inner request
