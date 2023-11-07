@@ -139,7 +139,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		spanCtx, span := traces.StartSpan(r.Context())
-		r = r.WithContext(context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String()))
+		r = r.WithContext(spanCtx)
 
 		defer span.End()
 
