@@ -23,6 +23,9 @@ import (
 
 // runFlare is a command that runs the flare checkup and saves the results locally or uploads them to a server.
 func runFlare(args []string) error {
+	attachConsole()
+	defer detachConsole()
+
 	// Flare assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	// TODO this stuff needs some deeper thinking

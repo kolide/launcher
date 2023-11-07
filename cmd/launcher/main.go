@@ -100,13 +100,12 @@ func main() {
 	logger = logutil.NewServerLogger(opts.Debug)
 
 	// set up system slogger to write to os logs
-	systemSlogger := new(multislogger.MultiSlogger)
-	systemSlogger.AddHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+	systemSlogger := multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
 	// set up slogger for internal launcher logging
-	slogger := new(multislogger.MultiSlogger)
+	slogger := multislogger.New()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
@@ -262,7 +261,10 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 }
 
 func runVersion(args []string) error {
+	attachConsole()
 	version.PrintFull()
+	detachConsole()
+
 	os.Exit(0)
 	return nil
 }

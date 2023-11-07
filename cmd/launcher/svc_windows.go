@@ -62,12 +62,11 @@ func runWindowsSvc(args []string) error {
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
 
-	systemSlogger := new(multislogger.MultiSlogger)
-	systemSlogger.AddHandler(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
+	systemSlogger := multislogger.New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
-	localSlogger := new(multislogger.MultiSlogger)
+	localSlogger := multislogger.New()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
@@ -145,10 +144,24 @@ func runWindowsSvc(args []string) error {
 }
 
 func runWindowsSvcForeground(args []string) error {
+	attachConsole()
+	defer detachConsole()
+
 	// Foreground mode is inherently a debug mode. So we start the
 	// logger in debugging mode, instead of looking at opts.debug
 	logger := logutil.NewCLILogger(true)
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
+
+	// Use new logger to write logs to stdout
+	systemSlogger := new(multislogger.MultiSlogger)
+	localSlogger := new(multislogger.MultiSlogger)
+
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	})
+	localSlogger.AddHandler(handler)
+	systemSlogger.AddHandler(handler)
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
@@ -162,7 +175,7 @@ func runWindowsSvcForeground(args []string) error {
 
 	run := debug.Run
 
-	return run(serviceName, &winSvc{logger: logger, opts: opts})
+	return run(serviceName, &winSvc{logger: logger, slogger: localSlogger, systemSlogger: systemSlogger, opts: opts})
 }
 
 type winSvc struct {

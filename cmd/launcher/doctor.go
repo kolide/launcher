@@ -13,6 +13,9 @@ import (
 )
 
 func runDoctor(args []string) error {
+	attachConsole()
+	defer detachConsole()
+
 	// Doctor assumes a launcher installation (at least partially) exists
 	// Overriding some of the default values allows options to be parsed making this assumption
 	launcher.DefaultAutoupdate = true
