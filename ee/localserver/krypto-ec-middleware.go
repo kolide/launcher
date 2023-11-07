@@ -129,8 +129,9 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 		resp.Body.Close()
 	}
 
-	e.slogger.Log(req.Context(), slog.LevelDebug, "finished callback",
-		"response-status", resp.Status,
+	e.slogger.Log(req.Context(), slog.LevelDebug,
+		"finished callback",
+		"response_status", resp.Status,
 	)
 }
 
