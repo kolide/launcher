@@ -37,7 +37,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 	koldieSessionId := ulid.New()
 	cmdReqCallBackHeaders := map[string][]string{
-		multislogger.KolideSessionIdKey: {koldieSessionId},
+		multislogger.KolideSessionIdKey.String(): {koldieSessionId},
 	}
 	cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
 
@@ -181,9 +181,9 @@ func TestKryptoEcMiddleware(t *testing.T) {
 						return
 					}
 
-					require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey)
+					require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey.String())
 					require.Contains(t, logBytes.String(), koldieSessionId)
-					require.Contains(t, logBytes.String(), multislogger.SpanIdKey)
+					require.Contains(t, logBytes.String(), multislogger.SpanIdKey.String())
 
 					require.Equal(t, http.StatusOK, rr.Code)
 					require.NotEmpty(t, rr.Body.String())
