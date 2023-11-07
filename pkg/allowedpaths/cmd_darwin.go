@@ -19,7 +19,7 @@ var knownPaths = map[string]map[string]bool{
 	"falconctl": {
 		"/Applications/Falcon.app/Contents/Resources/falconctl": true,
 	},
-	"fdsetup": {
+	"fdesetup": {
 		"/usr/bin/fdesetup": true,
 	},
 	"firmwarepasswd": {
