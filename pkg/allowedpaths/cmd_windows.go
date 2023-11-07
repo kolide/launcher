@@ -10,6 +10,9 @@ var knownPaths = map[string]map[string]bool{
 	"dism.exe": {
 		`C:\Windows\System32\Dism.exe`: true,
 	},
+	"dsregcmd.exe": {
+		`C:\Windows\System32\dsregcmd.exe`: true,
+	},
 	"ipconfig.exe": {
 		`C:\Windows\System32\ipconfig.exe`: true,
 	},

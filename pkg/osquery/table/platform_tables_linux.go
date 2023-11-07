@@ -12,9 +12,9 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/apt"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dnf"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dpkg"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/group"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/info"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/upgradeable"
+	pacman_group "github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/group"
+	pacman_info "github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/info"
+	pacman_upgradeable "github.com/kolide/launcher/pkg/osquery/tables/execparsers/pacman/upgradeable"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/repcli"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/rpm"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/simple_array"
@@ -40,20 +40,19 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 
 		dataflattentable.TablePluginExec(logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
-			[]string{"/usr/bin/nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
+			[]string{"nmcli", "--mode=multiline", "--fields=all", "device", "wifi", "list"},
 			dataflattentable.WithKVSeparator(":")),
 		dataflattentable.TablePluginExec(logger, "kolide_lsblk", dataflattentable.JsonType,
 			[]string{"lsblk", "-J"},
-			dataflattentable.WithBinDirs("/usr/bin", "/bin"),
 		),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), []string{"/opt/CrowdStrike/falconctl", "-g", "--systags"}),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, []string{"/usr/bin/apt", "list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dnf_upgradeable", dnf.Parser, []string{"/usr/bin/dnf", "check-update"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dpkg_version_info", dpkg.Parser, []string{"/usr/bin/dpkg", "-p"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_group", pacman_group.Parser, []string{"/usr/bin/pacman", "-Qg"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_version_info", pacman_info.Parser, []string{"/usr/bin/pacman", "-Qi"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, []string{"/usr/bin/pacman", "-Qu"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, []string{"/usr/bin/rpm", "-qai"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, []string{"apt", "list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dnf_upgradeable", dnf.Parser, []string{"dnf", "check-update"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dpkg_version_info", dpkg.Parser, []string{"dpkg", "-p"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_group", pacman_group.Parser, []string{"pacman", "-Qg"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_version_info", pacman_info.Parser, []string{"pacman", "-Qi"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, []string{"pacman", "-Qu"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, []string{"rpm", "-qai"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/opt/carbonblack/psc/bin/repcli", "status"}, dataflattentable.WithIncludeStderr()),
 	}
 }

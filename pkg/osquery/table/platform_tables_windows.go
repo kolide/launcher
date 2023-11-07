@@ -25,6 +25,6 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, logger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, logger),
 		wmitable.TablePlugin(logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, []string{`/Windows/System32/dsregcmd.exe`, `/status`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, []string{`dsregcmd.exe`, `/status`}),
 	}
 }
