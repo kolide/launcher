@@ -136,7 +136,6 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		spanCtx, span := traces.StartSpan(r.Context())
 		r = r.WithContext(spanCtx)
 
@@ -205,11 +204,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			)
 		} else if callbackReq != nil {
 			defer func() {
-				callbackReq = callbackReq.WithContext(
-					// adding the current request context will cause this to be cancelled before it sends
-					// so just add the session id manually
-					context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
-				)
+				if kolideSessionId != nil && len(kolideSessionId) > 0 {
+					callbackReq = callbackReq.WithContext(
+						// adding the current request context will cause this to be cancelled before it sends
+						// so just add the session id manually
+						context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
+					)
+				}
 				go e.sendCallback(callbackReq, callbackData)
 			}()
 		}
