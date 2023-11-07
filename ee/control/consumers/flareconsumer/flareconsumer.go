@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/debug/checkups"
@@ -26,7 +24,6 @@ type FlareConsumer struct {
 	lastFlareTime time.Time
 	flarer        flarer
 	knapsack      types.Knapsack
-	logger        log.Logger
 	// newFlareStream is assigned to a field so it can be mocked in tests
 	newFlareStream func(note, uploadRequestURL string) (io.WriteCloser, error)
 }
@@ -41,11 +38,10 @@ func (f *FlareRunner) RunFlare(ctx context.Context, k types.Knapsack, flareStrea
 	return checkups.RunFlare(ctx, k, flareStream, checkups.InSituEnvironment)
 }
 
-func New(logger log.Logger, knapsack types.Knapsack) *FlareConsumer {
+func New(knapsack types.Knapsack) *FlareConsumer {
 	return &FlareConsumer{
 		flarer:   &FlareRunner{},
 		knapsack: knapsack,
-		logger:   logger,
 		newFlareStream: func(note, uploadRequestURL string) (io.WriteCloser, error) {
 			return shipper.New(knapsack, shipper.WithNote(note), shipper.WithUploadRequestURL(uploadRequestURL))
 		},
@@ -53,11 +49,13 @@ func New(logger log.Logger, knapsack types.Knapsack) *FlareConsumer {
 }
 
 func (fc *FlareConsumer) Do(data io.Reader) error {
+	// slog needs a ctx
+	ctx := context.TODO()
+
 	timeSinceLastFlare := time.Since(fc.lastFlareTime)
 
 	if timeSinceLastFlare < minFlareInterval {
-		level.Info(fc.logger).Log(
-			"msg", "skipping flare, run too recently",
+		fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "skipping flare, run too recently",
 			"min_flare_interval", fmt.Sprintf("%v minutes", minFlareInterval.Minutes()),
 			"time_since_last_flare", fmt.Sprintf("%v minutes", timeSinceLastFlare.Minutes()),
 		)
@@ -80,6 +78,10 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	if err := json.NewDecoder(data).Decode(&flareData); err != nil {
 		return fmt.Errorf("failed to decode key-value json: %w", err)
 	}
+
+	fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "Recieved remote flare request",
+		"note", flareData.Note,
+	)
 
 	flareStream, err := fc.newFlareStream(flareData.Note, flareData.UploadRequestURL)
 	if err != nil {
