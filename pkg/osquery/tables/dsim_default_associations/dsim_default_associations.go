@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -84,7 +84,10 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
 
-	cmd := exec.CommandContext(ctx, dismCmd, args...)
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, dismCmd, args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating command: %w", err)
+	}
 	cmd.Dir = dir
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

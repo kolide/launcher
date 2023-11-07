@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -117,7 +118,18 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 
-		cmd := exec.CommandContext(ctx, execPath, t.execArgs[1:]...)
+		var cmd *exec.Cmd
+		var err error
+		if execPath == filepath.Base(execPath) {
+			cmd, err = allowedpaths.CommandContextWithLookup(ctx, execPath, t.execArgs[1:]...)
+		} else {
+			cmd, err = allowedpaths.CommandContextWithPath(ctx, execPath, t.execArgs[1:]...)
+		}
+		if err != nil {
+			// Binary that the binary was not found, try the next one
+			continue
+		}
+
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 

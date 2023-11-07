@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -27,7 +27,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-const seceditCmd = "secedit"
+const seceditCmd = "secedit.exe"
 
 type Table struct {
 	logger log.Logger
@@ -109,7 +109,10 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 		args = append(args, "/mergedpolicy")
 	}
 
-	cmd := exec.CommandContext(ctx, seceditCmd, args...)
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, seceditCmd, args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating secedit command: %w", err)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

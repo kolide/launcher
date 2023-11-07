@@ -8,18 +8,21 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
 func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
-	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
+	cmd, err := allowedpaths.CommandContextWithPath(ctx, argv0, argv[1:]...)
+	if err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
 	cmd.Env = envv
 
 	cmd.Stdin = os.Stdin

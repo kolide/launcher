@@ -6,9 +6,11 @@ package runsimple
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"os/exec"
 	"runtime"
+
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 // osqueryProcess is a very simple osquery runtime manager. It's designed to start and stop osquery. It has
@@ -88,7 +90,10 @@ func (p osqueryProcess) RunSql(ctx context.Context, sql []byte) error {
 
 	p.stdin = bytes.NewReader(sql)
 
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+	cmd, err := allowedpaths.CommandContextWithPath(ctx, p.osquerydPath, args...)
+	if err != nil {
+		return fmt.Errorf("creating osqueryd command: %w", err)
+	}
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin
@@ -103,7 +108,10 @@ func (p osqueryProcess) RunVersion(ctx context.Context) error {
 		"--version",
 	}
 
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+	cmd, err := allowedpaths.CommandContextWithPath(ctx, p.osquerydPath, args...)
+	if err != nil {
+		return fmt.Errorf("creating osqueryd command: %w", err)
+	}
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin

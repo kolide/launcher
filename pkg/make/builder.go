@@ -5,7 +5,7 @@ We used to do this with gnumake rules, but as we added windows
 compatibility, we found make too limiting. Moving this into go allows
 us to write cleaner cross-platform code.
 */
-
+//nolint:forbidigo
 package make
 
 import (

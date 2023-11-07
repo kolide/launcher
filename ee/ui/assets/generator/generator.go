@@ -152,7 +152,7 @@ func generatePng(ctx context.Context, logger log.Logger, name string) error {
 	}
 
 	// Scaling these doesn't seem to be a win for space or resolution. So leave them as is
-	cmd := exec.CommandContext(ctx, "cp", input, output)
+	cmd := exec.CommandContext(ctx, "cp", input, output) //nolint:forbidigo
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
@@ -178,7 +178,7 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 
 	// First, we need to generate all the sizes
 	for _, size := range icoSizes {
-		cmd := exec.CommandContext(
+		cmd := exec.CommandContext( //nolint:forbidigo
 			ctx,
 			"convert",
 			"-resize", fmt.Sprintf("%sx%s", size, size),
@@ -192,7 +192,7 @@ func generateIco(ctx context.Context, logger log.Logger, name string) error {
 	}
 
 	// Now that we have the intermediary sizes, we can stich them into a single ico
-	cmd := exec.CommandContext(ctx, "convert", fmt.Sprintf("%s/%s-*.ico", tmpDir, name), output)
+	cmd := exec.CommandContext(ctx, "convert", fmt.Sprintf("%s/%s-*.ico", tmpDir, name), output) // nolint:forbidigo
 	level.Debug(logger).Log("msg", "Consolodating ico with", "cmd", cmd.String())
 
 	if err := cmd.Run(); err != nil {

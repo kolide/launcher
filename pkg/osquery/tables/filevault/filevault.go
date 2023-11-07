@@ -16,8 +16,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const fdesetupPath = "/usr/bin/fdesetup"
-
 type Table struct {
 	logger log.Logger
 }
@@ -35,7 +33,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{fdesetupPath}, []string{"status"}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 10, []string{"fdsetup"}, []string{"status"}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "fdesetup failed", "err", err)
 

@@ -1,6 +1,7 @@
 //go:build darwin
 // +build darwin
 
+//nolint:forbidigo
 package pwpolicy
 
 import (
@@ -71,8 +72,8 @@ func TestQueries(t *testing.T) {
 
 }
 
-func execFaker(filename string) func(context.Context, string, ...string) *exec.Cmd {
-	return func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "/bin/cat", filename)
+func execFaker(filename string) func(context.Context, string, ...string) (*exec.Cmd, error) {
+	return func(ctx context.Context, _ string, _ ...string) (*exec.Cmd, error) {
+		return exec.CommandContext(ctx, "/bin/cat", filename), nil
 	}
 }

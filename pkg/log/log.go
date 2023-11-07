@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -15,6 +14,7 @@ import (
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -169,7 +169,14 @@ func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error creating command to run ps on osqueryd pidfile",
+			"err", err,
+		)
+		return
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
@@ -196,7 +203,14 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", "-p", pidStr)
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "lsof", "-R", "-n", "-p", pidStr)
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error creating command to run lsof on osqueryd pidfile",
+			"err", err,
+		)
+		return
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(
@@ -226,7 +240,14 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", fullPidfile)
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "lsof", "-R", "-n", fullPidfile)
+	if err != nil {
+		level.Debug(l.logger).Log(
+			"msg", "error creating command to run lsof on osqueryd pidfile",
+			"err", err,
+		)
+		return
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		level.Debug(l.logger).Log(

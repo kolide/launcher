@@ -20,19 +20,19 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const pwpolicyPath = "/usr/bin/pwpolicy"
 const pwpolicyCmd = "getaccountpolicies"
 
 type Table struct {
 	logger    log.Logger
 	tableName string
-	execCC    func(context.Context, string, ...string) *exec.Cmd
+	execCC    func(context.Context, string, ...string) (*exec.Cmd, error)
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
@@ -44,7 +44,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger:    logger,
 		tableName: "kolide_pwpolicy",
-		execCC:    exec.CommandContext,
+		execCC:    allowedpaths.CommandContextWithLookup,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -96,7 +96,10 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd := t.execCC(ctx, pwpolicyPath, args...)
+	cmd, err := t.execCC(ctx, "pwpolicy", args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating command: %w", err)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 

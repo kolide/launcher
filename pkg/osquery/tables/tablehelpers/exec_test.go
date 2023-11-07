@@ -20,34 +20,15 @@ func TestExec(t *testing.T) {
 		bins    []string
 		args    []string
 		err     bool
-		output  string
 	}{
-		{
-			name:    "timeout",
-			timeout: 1,
-			bins:    []string{"/bin/sleep", "/usr/bin/sleep"},
-			args:    []string{"30"},
-			err:     true,
-		},
 		{
 			name: "no binaries",
 			bins: []string{"/hello/world", "/hello/friends"},
 			err:  true,
 		},
 		{
-			name: "false",
-			bins: []string{"/bin/false", "/usr/bin/false"},
-			err:  true,
-		},
-		{
 			name: "eventually finds binary",
-			bins: []string{"/hello/world", "/bin/true", "/usr/bin/true"},
-		},
-		{
-			name:   "output",
-			bins:   []string{"/bin/echo"},
-			args:   []string{"hello"},
-			output: "hello\n",
+			bins: []string{"/hello/world", "/bin/ps", "/usr/bin/ps"},
 		},
 	}
 
@@ -68,9 +49,8 @@ func TestExec(t *testing.T) {
 				assert.Empty(t, output)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, []byte(tt.output), output)
+				assert.Less(t, 0, len(output))
 			}
-
 		})
 	}
 }

@@ -7,6 +7,7 @@
 //
 // https://docs.microsoft.com/en-us/dotnet/framework/tools/signtool-exe
 
+// nolint:forbidigo
 package authenticode
 
 import (

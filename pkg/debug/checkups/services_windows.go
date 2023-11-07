@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os/exec"
 
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -244,7 +244,10 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 		"Format-Table", "-Wrap", "-AutoSize", // ensure output doesn't get truncated
 	}
 
-	getEventLogCmd := exec.CommandContext(ctx, "powershell.exe", cmdletArgs...)
+	getEventLogCmd, err := allowedpaths.CommandContextWithLookup(ctx, "powershell.exe", cmdletArgs...)
+	if err != nil {
+		return fmt.Errorf("creating powershell command: %w", err)
+	}
 	hideWindow(getEventLogCmd)
 	getEventLogCmd.Stdout = eventLogOut // write directly to zip
 	if err := getEventLogCmd.Run(); err != nil {

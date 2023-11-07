@@ -1,3 +1,4 @@
+//nolint:forbidigo
 package runner
 
 import (
@@ -33,7 +34,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	// CPU consumption go way up.
 
 	// To get around the issue mentioned above, build the binary first and set its path as the executable path on the runner.
-	executablePath := filepath.Join(t.TempDir(), "desktop-test")
+	executablePath := filepath.Join(t.TempDir(), "desktop-test", "launcher")
 
 	if runtime.GOOS == "windows" {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)

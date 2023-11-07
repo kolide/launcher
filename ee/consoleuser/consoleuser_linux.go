@@ -7,8 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type listSessionsResult []struct {
@@ -18,7 +19,11 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	output, err := exec.CommandContext(ctx, "loginctl", "list-sessions", "--no-legend", "--no-pager", "--output=json").Output()
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	if err != nil {
+		return nil, fmt.Errorf("creating loginctl command: %w", err)
+	}
+	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
 	}
@@ -42,7 +47,11 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// get the active property of the session, this command does not respect the --output=json flag
-		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active").Output()
+		cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active")
+		if err != nil {
+			return nil, fmt.Errorf("creating loginctl command: %w", err)
+		}
+		output, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("loginctl show-session (for uid %d): %w", s.UID, err)
 		}

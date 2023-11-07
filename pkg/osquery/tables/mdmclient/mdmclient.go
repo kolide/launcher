@@ -24,8 +24,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const mdmclientPath = "/usr/libexec/mdmclient"
-
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 // headerRegex matches the header that may be included at the beginning of the mdmclient response,
@@ -92,7 +90,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{mdmclientPath}, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{"mdmclient"}, []string{mdmclientCommand}, false)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "mdmclient failed", "err", err)
 				continue

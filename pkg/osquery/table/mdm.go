@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -89,7 +89,10 @@ func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "-L", "-o", "stdout-xml")
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "profiles", "-L", "-o", "stdout-xml")
+	if err != nil {
+		return nil, fmt.Errorf("creating profiles command: %w", err)
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("calling /usr/bin/profiles to get MDM profile payload: %w", err)
@@ -132,7 +135,10 @@ func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/profiles", "status", "-type", "enrollment")
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "profiles", "status", "-type", "enrollment")
+	if err != nil {
+		return profileStatus{}, fmt.Errorf("creating profiles command: %w", err)
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return profileStatus{}, fmt.Errorf("calling /usr/bin/profiles to get MDM profile status: %w", err)

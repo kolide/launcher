@@ -7,18 +7,22 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"os/exec"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 func mdfind(args ...string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	path := "/usr/bin/mdfind"
-
-	out, err := exec.CommandContext(ctx, path, args...).Output()
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "mdfind", args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating mdfind command: %w", err)
+	}
+	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}

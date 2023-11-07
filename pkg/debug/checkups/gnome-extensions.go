@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type gnomeExtensions struct {
@@ -94,7 +95,10 @@ func execGnomeExtension(ctx context.Context, extraWriter io.Writer, rundir strin
 	// pkg/osquery/tables/gsettings/gsettings.go probably has appropriate prior art.
 	// But do we really want the forloop?
 
-	cmd := exec.CommandContext(ctx, "/usr/bin/gnome-extensions", args...)
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "gnome-extensions", args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating gnome-extensions command: %w", err)
+	}
 
 	// gnome seems to do things through this env
 	cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=%s", rundir))

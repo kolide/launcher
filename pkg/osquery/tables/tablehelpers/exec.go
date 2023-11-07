@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -21,6 +23,10 @@ import (
 //  3. It moves the stderr into the return error, if needed.
 //
 // This is not suitable for high performance work -- it allocates new buffers each time.
+//
+// `possibleBins` can be either a list of command names, or a list of paths to commands.
+// Where reasonable, `possibleBins` should be command names only, so that we can perform
+// lookup against PATH.
 func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx,
 		"possible_binaries", possibleBins,
@@ -37,7 +43,19 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 		stdout.Reset()
 		stderr.Reset()
 
-		cmd := exec.CommandContext(ctx, bin, args...)
+		var cmd *exec.Cmd
+		var err error
+		// If we only have the binary name and not the path, try to perform lookup
+		if filepath.Base(bin) == bin {
+			cmd, err = allowedpaths.CommandContextWithLookup(ctx, bin, args...)
+		} else {
+			cmd, err = allowedpaths.CommandContextWithPath(ctx, bin, args...)
+		}
+		if err != nil {
+			// Likely that binary was not found -- try the next
+			continue
+		}
+
 		cmd.Stdout = &stdout
 		if includeStderr {
 			cmd.Stderr = &stdout

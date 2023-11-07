@@ -1,6 +1,7 @@
 //go:build windows
 // +build windows
 
+// nolint:forbidigo
 package authenticode
 
 import (

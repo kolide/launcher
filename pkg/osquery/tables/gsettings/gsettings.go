@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/user"
 	"strconv"
 	"strings"
@@ -21,11 +20,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-const gsettingsPath = "/usr/bin/gsettings"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
@@ -92,7 +90,10 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd := exec.CommandContext(ctx, gsettingsPath, "list-recursively")
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "gsettings", "list-recursively")
+	if err != nil {
+		return fmt.Errorf("creating gsettings command: %w", err)
+	}
 
 	// set the HOME for the the cmd so that gsettings is exec'd properly as the
 	// new user.

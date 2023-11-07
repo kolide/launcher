@@ -6,18 +6,21 @@ package ptycmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"syscall"
 	"time"
 	"unsafe"
 
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kr/pty"
 )
 
 // NewCmd creates a new command attached to a pty
 func NewCmd(command string, argv []string, options ...Option) (*Cmd, error) {
 	// create the command
-	cmd := exec.Command(command, argv...)
+	cmd, err := allowedpaths.CommandWithLookup(command, argv...)
+	if err != nil {
+		return nil, fmt.Errorf("creating command: %w", err)
+	}
 
 	// open a pty
 	pty, tty, err := pty.Open()

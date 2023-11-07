@@ -16,7 +16,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const bootPolicyUtilPath = "/usr/bin/bputil"
 const bootPolicyUtilArgs = "--display-all-policies"
 
 type Table struct {
@@ -38,7 +37,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{bootPolicyUtilPath}, []string{bootPolicyUtilArgs}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{"bputil"}, []string{bootPolicyUtilArgs}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "bputil failed", "err", err)
 		return nil, nil

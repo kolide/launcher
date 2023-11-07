@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type powerCheckup struct{}
@@ -25,7 +25,10 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	defer os.Remove(tmpFilePath)
 
 	// See: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options#option_systempowerreport
-	powerCfgCmd := exec.CommandContext(ctx, "powercfg.exe", "/systempowerreport", "/output", tmpFilePath)
+	powerCfgCmd, err := allowedpaths.CommandContextWithLookup(ctx, "powercfg.exe", "/systempowerreport", "/output", tmpFilePath)
+	if err != nil {
+		return fmt.Errorf("creating powercfg command: %w", err)
+	}
 	hideWindow(powerCfgCmd)
 	if out, err := powerCfgCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("running powercfg.exe: error %w, output %s", err, string(out))

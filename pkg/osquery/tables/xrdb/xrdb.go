@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/user"
 	"strconv"
 	"strings"
@@ -21,11 +20,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-var xrdbPath = "/usr/bin/xrdb"
 
 const allowedUsernameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:."
@@ -97,7 +95,10 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd := exec.CommandContext(ctx, xrdbPath, "-display", displayNum, "-global", "-query")
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "xrdb", "-display", displayNum, "-global", "-query")
+	if err != nil {
+		return fmt.Errorf("creating xrdb command: %w", err)
+	}
 
 	// set the HOME cmd so that xrdb is exec'd properly as the new user.
 	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))

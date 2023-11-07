@@ -22,8 +22,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const ioregPath = "/usr/sbin/ioreg"
-
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type Table struct {
@@ -102,7 +100,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 								// Finally, an inner loop
 
-								ioregOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{ioregPath}, ioregArgs, false)
+								ioregOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{"ioreg"}, ioregArgs, false)
 								if err != nil {
 									level.Info(t.logger).Log("msg", "ioreg failed", "err", err)
 									continue

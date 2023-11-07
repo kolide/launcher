@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os/exec"
 	"runtime"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type networkCheckup struct {
@@ -55,7 +56,10 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, commandArr[0], commandArr[1:]...)
+		cmd, err := allowedpaths.CommandContextWithLookup(ctx, commandArr[0], commandArr[1:]...)
+		if err != nil {
+			continue
+		}
 		_ = runCmdMarkdownLogged(cmd, commandOutput)
 	}
 

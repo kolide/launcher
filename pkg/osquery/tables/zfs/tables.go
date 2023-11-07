@@ -15,11 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	zfsPath   = "/usr/sbin/zfs"
-	zpoolPath = "/usr/sbin/zpool"
-)
-
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.@/"
 
 type Table struct {
@@ -39,7 +34,7 @@ func columns() []table.ColumnDefinition {
 func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    zfsPath,
+		cmd:    "zfs",
 	}
 
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
@@ -48,7 +43,7 @@ func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 func ZpoolPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    zpoolPath,
+		cmd:    "zpool",
 	}
 
 	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)

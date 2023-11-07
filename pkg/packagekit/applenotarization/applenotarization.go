@@ -1,3 +1,4 @@
+// nolint:forbidigo
 // Package applenotarization is a wrapper around the apple
 // notarization tools.
 //

@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
@@ -27,7 +27,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
-	cmd := exec.CommandContext(ctx,
+	cmd, err := allowedpaths.CommandContextWithLookup(ctx,
 		"launchctl",
 		"asuser",
 		targetUser.Uid,
@@ -41,6 +41,9 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		"--json",
 		query,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("creating launchctl command: %w", err)
+	}
 
 	dir, err := agent.MkdirTemp("osq-launchctl")
 	if err != nil {
