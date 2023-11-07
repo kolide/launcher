@@ -115,7 +115,7 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		systemprofiler.TablePlugin(logger),
 		munki.ManagedInstalls(logger),
 		munki.MunkiReport(logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`remotectl`, `dumpstate`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, []string{`softwareupdate`, `--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, []string{`softwareupdate`, `--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli", "status"}, dataflattentable.WithIncludeStderr()),
