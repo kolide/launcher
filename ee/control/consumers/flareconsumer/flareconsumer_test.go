@@ -3,6 +3,7 @@ package flareconsumer
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer/mocks"
@@ -35,6 +36,7 @@ func TestFlareConsumer(t *testing.T) {
 			t.Parallel()
 
 			mockSack := knapsackMock.NewKnapsack(t)
+			mockSack.On("Slogger").Return(slog.New(slog.NewJSONHandler(io.Discard, nil))).Maybe()
 			f := New(mockSack)
 			f.flarer = tt.flarer(t)
 			f.newFlareStream = func(note, uploadRequestURL string) (io.WriteCloser, error) {
