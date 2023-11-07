@@ -36,7 +36,7 @@ type v2CmdRequestType struct {
 	CallbackHeaders map[string][]string
 }
 
-func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
+func (cmdReq v2CmdRequestType) CallbackReq(ctx context.Context) (*http.Request, error) {
 	if cmdReq.CallbackUrl == "" {
 		return nil, nil
 	}
@@ -46,6 +46,7 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 		return nil, fmt.Errorf("making http request: %w", err)
 	}
 
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
 	// Iterate and deep copy
@@ -103,7 +104,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	b, err := json.Marshal(data)
 	if err != nil {
-		e.slogger.Log(req.Context(), slog.LevelDebug,
+		e.slogger.Log(req.Context(), slog.LevelError,
 			"unable to marshal callback data",
 			"err", err,
 		)
@@ -118,7 +119,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	resp, err := client.Do(req)
 	if err != nil {
-		e.slogger.Log(req.Context(), slog.LevelDebug,
+		e.slogger.Log(req.Context(), slog.LevelError,
 			"got error in callback",
 			"err", err,
 		)
@@ -136,9 +137,10 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: add trace id to ctx or figure out what otel puts in there
-		ctx, span := traces.StartSpan(r.Context())
-		ctx = context.WithValue(ctx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
+
+		spanCtx, span := traces.StartSpan(r.Context())
+		r = r.WithContext(context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String()))
+
 		defer span.End()
 
 		if r.Body != nil {
@@ -148,7 +150,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
 			traces.SetError(span, err)
-			e.slogger.Log(ctx, slog.LevelDebug,
+			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"failed to extract box from request",
 				"err", err,
 				"path", r.URL.Path,
@@ -161,7 +163,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
 			traces.SetError(span, err)
-			e.slogger.Log(ctx, slog.LevelDebug,
+			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"unable to verify signature",
 				"err", err,
 			)
@@ -175,7 +177,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
 			traces.SetError(span, err)
-			e.slogger.Log(ctx, slog.LevelDebug,
+			e.slogger.Log(r.Context(), slog.LevelError,
 				"unable to unmarshal cmd request",
 				"err", err,
 			)
@@ -188,7 +190,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		kolideSessionId, ok := cmdReq.CallbackHeaders[multislogger.KolideSessionIdKey]
 		if ok && len(kolideSessionId) > 0 {
 			span.SetAttributes(attribute.String(multislogger.KolideSessionIdKey, kolideSessionId[0]))
-			ctx = context.WithValue(ctx, multislogger.KolideSessionIdKey, kolideSessionId[0])
+			r = r.WithContext(context.WithValue(r.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]))
 		}
 
 		// Setup callback URLs and data. This is a pointer, so it can be adjusted before the defer triggers
@@ -196,8 +198,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			Time:      time.Now().Unix(),
 			UserAgent: r.Header.Get("User-Agent"),
 		}
-		if callbackReq, err := cmdReq.CallbackReq(); err != nil {
-			e.slogger.Log(ctx, slog.LevelDebug,
+
+		if callbackReq, err := cmdReq.CallbackReq(r.Context()); err != nil {
+			e.slogger.Log(r.Context(), slog.LevelError,
 				"unable to create callback req",
 				"err", err,
 			)
@@ -211,7 +214,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 			span.SetStatus(codes.Error, "timestamp is out of range")
-			e.slogger.Log(ctx, slog.LevelDebug,
+			e.slogger.Log(r.Context(), slog.LevelError,
 				"timestamp is out of range",
 				"delta", timestampDelta,
 			)
@@ -229,14 +232,19 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				Path:   cmdReq.Path,
 			},
 		}
-		newReq = newReq.WithContext(ctx) // allows the trace to continue to the inner request
+
+		// setting the newReq context to the current request context context
+		// allows the trace to continue to the inner request,
+		// maintains the same lifetime as the original request,
+		// allows same ctx values such as session id to be passed to the inner request
+		newReq = newReq.WithContext(r.Context())
 
 		// the body of the cmdReq become the body of the next http request
 		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
 			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
 		}
 
-		e.slogger.Log(ctx, slog.LevelDebug, "successful challenge, proxying")
+		e.slogger.Log(r.Context(), slog.LevelDebug, "successful challenge, proxying")
 		span.AddEvent("challenge_success")
 
 		// bhr contains the data returned by the request defined above
@@ -255,7 +263,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		if err != nil {
 			traces.SetError(span, err)
-			e.slogger.Log(ctx, slog.LevelDebug,
+			e.slogger.Log(r.Context(), slog.LevelError,
 				"failed to respond",
 				"err", err,
 			)
