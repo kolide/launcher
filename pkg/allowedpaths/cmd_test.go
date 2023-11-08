@@ -1,12 +1,23 @@
 package allowedpaths
 
 import (
+	"context"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestEcho(t *testing.T) {
+	t.Parallel()
+
+	// echo is the only one available on all platforms and likely to be available in CI
+	cmd, err := Echo(context.TODO(), "hello")
+	require.NoError(t, err)
+	require.Contains(t, cmd.Path, "echo")
+	require.Contains(t, cmd.Args, "hello")
+}
 
 func Test_newCmd(t *testing.T) {
 	t.Parallel()
