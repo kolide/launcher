@@ -9,6 +9,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := mocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("ConfigStore").Return(c)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	ls, err := New(k)
 	require.NoError(t, err)

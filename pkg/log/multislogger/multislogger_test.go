@@ -54,14 +54,14 @@ func TestMultiSlogger(t *testing.T) {
 
 	// ensure that span_id gets added as an attribute when present in context
 	spanId := ulid.New()
-	ctx := context.WithValue(context.Background(), "span_id", spanId)
+	ctx := context.WithValue(context.Background(), SpanIdKey, spanId)
 	multislogger.Logger.Log(ctx, slog.LevelDebug, "info_with_interesting_ctx_value")
 
 	require.Contains(t, debugLogBuf.String(), "info_with_interesting_ctx_value", "should be in debug log since it's debug level")
-	requireContainsAttribute(t, &debugLogBuf, "span_id", spanId)
+	requireContainsAttribute(t, &debugLogBuf, SpanIdKey.String(), spanId)
 
 	require.Contains(t, shipperBuf.String(), "info_with_interesting_ctx_value", "should now be in shipper log since it's new handler was set to debug level")
-	requireContainsAttribute(t, &shipperBuf, "span_id", spanId)
+	requireContainsAttribute(t, &shipperBuf, SpanIdKey.String(), spanId)
 	clearBufsFn()
 }
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -48,7 +49,9 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 
 	opts = append(opts, trace.WithAttributes(buildAttributes(callerFile, keyVals...)...))
 
-	return otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
+	spanCtx, span := otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
+	spanCtx = context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
+	return spanCtx, span
 }
 
 // SetError records the error on the span and sets the span's status to error.
