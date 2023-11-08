@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -15,8 +16,6 @@ import (
 )
 
 var (
-	falconctlPaths = []string{"/opt/CrowdStrike/falconctl"}
-
 	// allowedOptions is the list of options this table is allowed to query. Notable exceptions
 	// are `systags` (which is parsed seperatedly) and `provisioning-token` (which is a secret).
 	allowedOptions = []string{
@@ -36,7 +35,7 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, log.Logger, int, []string, []string, bool) ([]byte, error)
+type execFunc func(context.Context, log.Logger, int, allowedpaths.AllowedCommand, []string, bool) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	logger    log.Logger
@@ -87,7 +86,7 @@ OUTER:
 		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
-		output, err := t.execFunc(ctx, t.logger, 30, falconctlPaths, args, false)
+		output, err := t.execFunc(ctx, t.logger, 30, allowedpaths.Falconctl, args, false)
 		if err != nil {
 			level.Info(t.logger).Log("msg", "exec failed", "err", err)
 			synthesizedData := map[string]string{

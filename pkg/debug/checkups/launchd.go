@@ -65,7 +65,7 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	// run launchctl to check status
 	var printOut bytes.Buffer
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "launchctl", "print", launchdServiceName)
+	cmd, err := allowedpaths.Launchctl(ctx, "print", launchdServiceName)
 	if err != nil {
 		c.status = Erroring
 		c.summary = fmt.Sprintf("unable to create launchctl command: %s", err)

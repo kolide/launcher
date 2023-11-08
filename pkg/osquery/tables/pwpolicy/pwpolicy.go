@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -32,7 +31,7 @@ const pwpolicyCmd = "getaccountpolicies"
 type Table struct {
 	logger    log.Logger
 	tableName string
-	execCC    func(context.Context, string, ...string) (*exec.Cmd, error)
+	execCC    allowedpaths.AllowedCommand
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
@@ -44,7 +43,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger:    logger,
 		tableName: "kolide_pwpolicy",
-		execCC:    allowedpaths.CommandContextWithLookup,
+		execCC:    allowedpaths.Pwpolicy,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -96,7 +95,7 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	cmd, err := t.execCC(ctx, "pwpolicy", args...)
+	cmd, err := t.execCC(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating command: %w", err)
 	}

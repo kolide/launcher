@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/allowedpaths"
 )
 
 type osqueryCheckup struct {
@@ -48,10 +48,8 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cmdCancel()
 
-	cmd, err := allowedpaths.CommandContextWithPath(cmdCtx, osquerydPath, "--version")
-	if err != nil {
-		return "", fmt.Errorf("creating osqueryd command: %w", err)
-	}
+	// We trust the autoupdate library to find the correct path
+	cmd := exec.CommandContext(cmdCtx, osquerydPath, "--version") //nolint:forbidigo
 	hideWindow(cmd)
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
@@ -75,10 +73,8 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	cmd, err := allowedpaths.CommandContextWithPath(cmdCtx, launcherPath, "interactive")
-	if err != nil {
-		return fmt.Errorf("creating launcher command: %w", err)
-	}
+	// We trust the autoupdate library to find the correct path
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive") //nolint:forbidigo
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 

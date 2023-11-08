@@ -48,15 +48,11 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("creating zip file: %w", err)
 	}
 
-	for _, commandArr := range listCommands() {
-		if len(commandArr) < 1 {
-			// how did this happen
-			continue
-		}
+	for _, c := range listCommands() {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		cmd, err := allowedpaths.CommandContextWithLookup(ctx, commandArr[0], commandArr[1:]...)
+		cmd, err := c.cmd(ctx, c.args...)
 		if err != nil {
 			continue
 		}
@@ -86,22 +82,45 @@ func (n *networkCheckup) Data() any {
 	return nil
 }
 
-func listCommands() [][]string {
+type networkCommand struct {
+	cmd  allowedpaths.AllowedCommand
+	args []string
+}
+
+func listCommands() []networkCommand {
 	switch runtime.GOOS {
 	case "darwin":
-		return [][]string{
-			{"ifconfig", "-a"},
-			{"netstat", "-nr"},
+		return []networkCommand{
+			{
+				cmd:  allowedpaths.Ifconfig,
+				args: []string{"-a"},
+			},
+			{
+				cmd:  allowedpaths.Netstat,
+				args: []string{"-nr"},
+			},
 		}
 	case "linux":
-		return [][]string{
-			{"ifconfig", "-a"},
-			{"ip", "-N", "-d", "-h", "-a", "address"},
-			{"ip", "-N", "-d", "-h", "-a", "route"},
+		return []networkCommand{
+			{
+				cmd:  allowedpaths.Ifconfig,
+				args: []string{"-a"},
+			},
+			{
+				cmd:  allowedpaths.Ip,
+				args: []string{"-N", "-d", "-h", "-a", "address"},
+			},
+			{
+				cmd:  allowedpaths.Ip,
+				args: []string{"-N", "-d", "-h", "-a", "route"},
+			},
 		}
 	case "windows":
-		return [][]string{
-			{"ipconfig", "/all"},
+		return []networkCommand{
+			{
+				cmd:  allowedpaths.Ipconfig,
+				args: []string{"/all"},
+			},
 		}
 	default:
 		return nil

@@ -4,6 +4,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dsim_default_associations"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dsregcmd"
@@ -25,6 +26,6 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, logger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, logger),
 		wmitable.TablePlugin(logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, []string{`dsregcmd.exe`, `/status`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, allowedpaths.Dsregcmd, []string{`/status`}),
 	}
 }

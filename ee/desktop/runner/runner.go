@@ -32,7 +32,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
@@ -756,10 +755,8 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
-	cmd, err := allowedpaths.CommandWithPath(executablePath, "desktop")
-	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
+	// We trust that launcher executable path is correct, so we don't need to use allowedpaths
+	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo
 
 	cmd.Env = []string{
 		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()

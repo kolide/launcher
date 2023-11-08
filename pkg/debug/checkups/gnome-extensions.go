@@ -95,7 +95,7 @@ func execGnomeExtension(ctx context.Context, extraWriter io.Writer, rundir strin
 	// pkg/osquery/tables/gsettings/gsettings.go probably has appropriate prior art.
 	// But do we really want the forloop?
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "gnome-extensions", args...)
+	cmd, err := allowedpaths.Gnomeextensions(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating gnome-extensions command: %w", err)
 	}

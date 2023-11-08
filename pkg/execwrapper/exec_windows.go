@@ -8,21 +8,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
 func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
-	cmd, err := allowedpaths.CommandContextWithPath(ctx, argv0, argv[1:]...)
-	if err != nil {
-		return fmt.Errorf("creating command: %w", err)
-	}
+	// execwrapper is used exclusively to exec launcher, and we trust the autoupdate
+	// library to find the correct path.
+	cmd := exec.CommandContext(ctx, argv0, argv[1:]...) //nolint:forbidigo
 	cmd.Env = envv
 
 	cmd.Stdin = os.Stdin
@@ -37,7 +36,7 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 	// Now run it. This is faking exec, we need to distinguish
 	// between a failure to execute, and a failure in in the called program.
 	// I think https://github.com/golang/go/issues/26539 adds this functionality.
-	err = cmd.Run()
+	err := cmd.Run()
 
 	if cmd.ProcessState.ExitCode() == -1 {
 		if err == nil {

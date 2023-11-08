@@ -25,7 +25,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	defer os.Remove(tmpFilePath)
 
 	// See: https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options#option_systempowerreport
-	powerCfgCmd, err := allowedpaths.CommandContextWithLookup(ctx, "powercfg.exe", "/systempowerreport", "/output", tmpFilePath)
+	powerCfgCmd, err := allowedpaths.Powercfg(ctx, "/systempowerreport", "/output", tmpFilePath)
 	if err != nil {
 		return fmt.Errorf("creating powercfg command: %w", err)
 	}

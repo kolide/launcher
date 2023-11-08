@@ -92,7 +92,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "firmwarepasswd", subcommand)
+	cmd, err := allowedpaths.Firmwarepasswd(ctx, subcommand)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

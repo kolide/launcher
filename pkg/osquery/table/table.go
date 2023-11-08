@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/desktopprocs"
@@ -48,11 +49,11 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dev_table_tooling.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
+			"kolide_zerotier_info", dataflattentable.JsonType, allowedpaths.Zerotiercli, []string{"info"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
+			"kolide_zerotier_networks", dataflattentable.JsonType, allowedpaths.Zerotiercli, []string{"listnetworks"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
+			"kolide_zerotier_peers", dataflattentable.JsonType, allowedpaths.Zerotiercli, []string{"listpeers"}),
 		tdebug.LauncherGcInfo(logger),
 		zfs.ZfsPropertiesPlugin(logger),
 		zfs.ZpoolPropertiesPlugin(logger),

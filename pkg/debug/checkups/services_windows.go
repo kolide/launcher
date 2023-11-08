@@ -244,7 +244,7 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 		"Format-Table", "-Wrap", "-AutoSize", // ensure output doesn't get truncated
 	}
 
-	getEventLogCmd, err := allowedpaths.CommandContextWithLookup(ctx, "powershell.exe", cmdletArgs...)
+	getEventLogCmd, err := allowedpaths.Powershell(ctx, cmdletArgs...)
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}

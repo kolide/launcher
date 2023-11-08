@@ -91,7 +91,7 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "scutil")
+	cmd, err := allowedpaths.Scutil(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)
 	}

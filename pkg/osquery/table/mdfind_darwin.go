@@ -18,7 +18,7 @@ func mdfind(args ...string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "mdfind", args...)
+	cmd, err := allowedpaths.Mdfind(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating mdfind command: %w", err)
 	}

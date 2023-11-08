@@ -18,13 +18,12 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-const mdmclientPath = "/usr/libexec/mdmclient"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -92,7 +91,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{mdmclientPath}, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedpaths.Mdmclient, []string{mdmclientCommand}, false)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "mdmclient failed", "err", err)
 				continue

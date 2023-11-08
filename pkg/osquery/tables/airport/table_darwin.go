@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -21,7 +22,6 @@ import (
 
 var (
 	allowedOptions = []string{"getinfo", "scan"}
-	airportPaths   = []string{"/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport"}
 )
 
 type Table struct {
@@ -47,11 +47,10 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 type airportExecutor struct {
 	ctx    context.Context // nolint:containedctx
 	logger log.Logger
-	paths  []string
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
-	return tablehelpers.Exec(a.ctx, a.logger, 30, airportPaths, []string{"--" + option}, false)
+	return tablehelpers.Exec(a.ctx, a.logger, 30, allowedpaths.Airport, []string{"--" + option}, false)
 }
 
 type executor interface {
@@ -63,7 +62,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	airportExecutor := &airportExecutor{
 		ctx:    ctx,
 		logger: t.logger,
-		paths:  airportPaths,
 	}
 
 	return generateAirportData(queryContext, airportExecutor, t.logger)

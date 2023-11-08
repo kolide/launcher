@@ -89,7 +89,7 @@ func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "profiles", "-L", "-o", "stdout-xml")
+	cmd, err := allowedpaths.Profiles(ctx, "-L", "-o", "stdout-xml")
 	if err != nil {
 		return nil, fmt.Errorf("creating profiles command: %w", err)
 	}
@@ -135,7 +135,7 @@ func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "profiles", "status", "-type", "enrollment")
+	cmd, err := allowedpaths.Profiles(ctx, "status", "-type", "enrollment")
 	if err != nil {
 		return profileStatus{}, fmt.Errorf("creating profiles command: %w", err)
 	}

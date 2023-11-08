@@ -90,7 +90,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "gsettings", "list-recursively")
+	cmd, err := allowedpaths.Gsettings(ctx, "list-recursively")
 	if err != nil {
 		return fmt.Errorf("creating gsettings command: %w", err)
 	}

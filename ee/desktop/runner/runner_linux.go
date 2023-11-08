@@ -91,7 +91,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions")
+	cmd, err := allowedpaths.Loginctl(ctx, "show-user", uid, "--value", "--property=Sessions")
 	if err != nil {
 		level.Debug(r.logger).Log(
 			"msg", "could not create loginctl command",
@@ -118,7 +118,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	sessionList := strings.Split(sessions, " ")
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
-		cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "show-session", session, "--value", "--property=Type")
+		cmd, err := allowedpaths.Loginctl(ctx, "show-session", session, "--value", "--property=Type")
 		if err != nil {
 			level.Debug(r.logger).Log(
 				"msg", "could not create loginctl command to get session type",
@@ -169,7 +169,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string) string {
 	// We can read $DISPLAY from the session properties
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "show-session", session, "--value", "--property=Display")
+	cmd, err := allowedpaths.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
 	if err != nil {
 		level.Debug(r.logger).Log(
 			"msg", "could not create command to get Display from user session",

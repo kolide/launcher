@@ -7,11 +7,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-const kernelCheckUtilPath = "/opt/CrowdStrike/falcon-kernel-check"
 
 type Table struct {
 	logger log.Logger
@@ -34,7 +33,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 5, []string{kernelCheckUtilPath}, []string{}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 5, allowedpaths.Falconkernelcheck, []string{}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, err

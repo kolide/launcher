@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -27,10 +25,8 @@ import (
 // `possibleBins` can be either a list of command names, or a list of paths to commands.
 // Where reasonable, `possibleBins` should be command names only, so that we can perform
 // lookup against PATH.
-func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBins []string, args []string, includeStderr bool) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx,
-		"possible_binaries", possibleBins,
-		"args", args)
+func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd allowedpaths.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
@@ -39,48 +35,30 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, possibleBi
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	for _, bin := range possibleBins {
-		stdout.Reset()
-		stderr.Reset()
-
-		var cmd *exec.Cmd
-		var err error
-		// If we only have the binary name and not the path, try to perform lookup
-		if filepath.Base(bin) == bin {
-			cmd, err = allowedpaths.CommandContextWithLookup(ctx, bin, args...)
-		} else {
-			cmd, err = allowedpaths.CommandContextWithPath(ctx, bin, args...)
-		}
-		if err != nil {
-			// Likely that binary was not found -- try the next
-			continue
-		}
-
-		cmd.Stdout = &stdout
-		if includeStderr {
-			cmd.Stderr = &stdout
-		} else {
-			cmd.Stderr = &stderr
-		}
-
-		level.Debug(logger).Log(
-			"msg", "execing",
-			"cmd", cmd.String(),
-		)
-
-		switch err := cmd.Run(); {
-		case err == nil:
-			return stdout.Bytes(), nil
-		case os.IsNotExist(err):
-			// try the next binary
-			continue
-		default:
-			// an actual error
-			traces.SetError(span, err)
-			return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
-		}
-
+	cmd, err := execCmd(ctx, args...)
+	if err != nil {
+		return nil, fmt.Errorf("creating command: %w", err)
 	}
-	// Getting here means no binary was found
-	return nil, fmt.Errorf("No binary found in specified paths: %v: %w", possibleBins, os.ErrNotExist)
+
+	cmd.Stdout = &stdout
+	if includeStderr {
+		cmd.Stderr = &stdout
+	} else {
+		cmd.Stderr = &stderr
+	}
+
+	level.Debug(logger).Log(
+		"msg", "execing",
+		"cmd", cmd.String(),
+	)
+
+	switch err := cmd.Run(); {
+	case err == nil:
+		return stdout.Bytes(), nil
+	case os.IsNotExist(err):
+		return nil, fmt.Errorf("could not find %s to run: %w", cmd.Path, err)
+	default:
+		traces.SetError(span, err)
+		return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
+	}
 }

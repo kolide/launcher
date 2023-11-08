@@ -221,7 +221,7 @@ func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, out
 	defer cancel()
 
 	command := args[0]
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "gsettings", args...)
+	cmd, err := allowedpaths.Gsettings(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("creating gsettings command: %w", err)
 	}

@@ -41,7 +41,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 
 	// Read the security chip from system_profiler
 	var stdout bytes.Buffer
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "system_profiler", "SPiBridgeDataType")
+	cmd, err := allowedpaths.Systemprofiler(ctx, "SPiBridgeDataType")
 	if err != nil {
 		return nil, fmt.Errorf("creating system_profiler command: %w", err)
 	}
@@ -60,7 +60,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 
 	// Read the system's bioutil configuration
 	stdout.Reset()
-	cmd, err = allowedpaths.CommandContextWithLookup(ctx, "bioutil", "-r", "-s")
+	cmd, err = allowedpaths.Bioutil(ctx, "-r", "-s")
 	if err != nil {
 		return nil, fmt.Errorf("creating bioutil command: %w", err)
 	}

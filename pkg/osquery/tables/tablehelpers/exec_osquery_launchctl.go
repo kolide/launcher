@@ -27,8 +27,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx,
-		"launchctl",
+	cmd, err := allowedpaths.Launchctl(ctx,
 		"asuser",
 		targetUser.Uid,
 		osqueryPath,

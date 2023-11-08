@@ -19,7 +19,7 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	cmd, err := allowedpaths.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
 	if err != nil {
 		return nil, fmt.Errorf("creating loginctl command: %w", err)
 	}
@@ -47,7 +47,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// get the active property of the session, this command does not respect the --output=json flag
-		cmd, err := allowedpaths.CommandContextWithLookup(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active")
+		cmd, err := allowedpaths.Loginctl(ctx, "show-session", s.Session, "--value", "--property=Active")
 		if err != nil {
 			return nil, fmt.Errorf("creating loginctl command: %w", err)
 		}

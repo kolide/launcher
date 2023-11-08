@@ -169,7 +169,7 @@ func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+	cmd, err := allowedpaths.Ps(ctx, "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run ps on osqueryd pidfile",
@@ -203,7 +203,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "lsof", "-R", "-n", "-p", pidStr)
+	cmd, err := allowedpaths.Lsof(ctx, "-R", "-n", "-p", pidStr)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run lsof on osqueryd pidfile",
@@ -240,7 +240,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "lsof", "-R", "-n", fullPidfile)
+	cmd, err := allowedpaths.Lsof(ctx, "-R", "-n", fullPidfile)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run lsof on osqueryd pidfile",

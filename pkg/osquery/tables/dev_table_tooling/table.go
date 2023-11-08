@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -14,8 +15,19 @@ import (
 // allowedCommand encapsulates the possible binary path(s) of a command allowed to execute
 // along with a strict list of arguments.
 type allowedCommand struct {
-	binPaths []string
-	args     []string
+	bin  allowedpaths.AllowedCommand
+	args []string
+}
+
+var allowedCommands = map[string]allowedCommand{
+	"echo": {
+		bin:  allowedpaths.Echo,
+		args: []string{"hello"},
+	},
+	"cb_repcli": {
+		bin:  allowedpaths.Repcli,
+		args: []string{"status"},
+	},
 }
 
 type Table struct {
@@ -62,7 +74,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			"error":  "",
 		}
 
-		if output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.binPaths, cmd.args, false); err != nil {
+		if output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.bin, cmd.args, false); err != nil {
 			level.Info(t.logger).Log("msg", "execution failed", "name", name, "err", err)
 			result["error"] = err.Error()
 		} else {

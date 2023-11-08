@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,18 +18,16 @@ func TestExec(t *testing.T) {
 	var tests = []struct {
 		name    string
 		timeout int
-		bins    []string
+		bin     allowedpaths.AllowedCommand
 		args    []string
 		err     bool
+		output  string
 	}{
 		{
-			name: "no binaries",
-			bins: []string{"/hello/world", "/hello/friends"},
-			err:  true,
-		},
-		{
-			name: "eventually finds binary",
-			bins: []string{"/hello/world", "/bin/ps", "/usr/bin/ps"},
+			name:   "output",
+			bin:    allowedpaths.Echo,
+			args:   []string{"hello"},
+			output: "hello\n",
 		},
 	}
 
@@ -43,13 +42,13 @@ func TestExec(t *testing.T) {
 			if tt.timeout == 0 {
 				tt.timeout = 30
 			}
-			output, err := Exec(ctx, logger, tt.timeout, tt.bins, tt.args, false)
+			output, err := Exec(ctx, logger, tt.timeout, tt.bin, tt.args, false)
 			if tt.err {
 				assert.Error(t, err)
 				assert.Empty(t, output)
 			} else {
 				assert.NoError(t, err)
-				assert.Less(t, 0, len(output))
+				assert.Equal(t, []byte(tt.output), output)
 			}
 		})
 	}

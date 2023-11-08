@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedpaths"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/traces"
@@ -26,7 +27,7 @@ type execTableV2 struct {
 	timeoutSeconds int
 	tabledebug     bool
 	includeStderr  bool
-	execPaths      []string
+	cmd            allowedpaths.AllowedCommand
 	execArgs       []string
 }
 
@@ -44,26 +45,20 @@ func WithTableDebug() execTableV2Opt {
 	}
 }
 
-func WithAdditionalExecPaths(paths ...string) execTableV2Opt {
-	return func(t *execTableV2) {
-		t.execPaths = append(t.execPaths, paths...)
-	}
-}
-
 func WithIncludeStderr() execTableV2Opt {
 	return func(t *execTableV2) {
 		t.includeStderr = true
 	}
 }
 
-func NewExecAndParseTable(logger log.Logger, tableName string, p parser, execCmd []string, opts ...execTableV2Opt) *table.Plugin {
+func NewExecAndParseTable(logger log.Logger, tableName string, p parser, cmd allowedpaths.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
 		logger:         level.NewFilter(log.With(logger, "table", tableName), level.AllowInfo()),
 		tableName:      tableName,
 		flattener:      flattenerFromParser(p),
 		timeoutSeconds: 30,
-		execPaths:      execCmd[:1],
-		execArgs:       execCmd[1:],
+		cmd:            cmd,
+		execArgs:       execArgs,
 	}
 
 	for _, opt := range opts {
@@ -83,7 +78,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	var results []map[string]string
 
-	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.execPaths, t.execArgs, t.includeStderr)
+	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.cmd, t.execArgs, t.includeStderr)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

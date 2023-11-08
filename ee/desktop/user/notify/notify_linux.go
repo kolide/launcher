@@ -33,7 +33,7 @@ const (
 
 // We default to xdg-open first because, if available, it appears to be better at picking
 // the correct default browser.
-var browserLaunchers = []string{"xdg-open", "x-www-browser"}
+var browserLaunchers = []allowedpaths.AllowedCommand{allowedpaths.Xdgopen, allowedpaths.Xwwwbrowser}
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
@@ -89,7 +89,7 @@ func (d *dbusNotifier) Listen() error {
 			for _, browserLauncher := range browserLaunchers {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
-				cmd, err := allowedpaths.CommandContextWithLookup(ctx, browserLauncher, actionUri)
+				cmd, err := browserLauncher(ctx, actionUri)
 				if err != nil {
 					level.Warn(d.logger).Log("msg", "couldn't create command to start process", "err", err, "browser_launcher", browserLauncher)
 					continue
@@ -181,7 +181,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		args = append(args, "-i", d.iconFilepath)
 	}
 
-	cmd, err := allowedpaths.CommandWithLookup("notify-send", args...)
+	cmd, err := allowedpaths.Notifysend(context.TODO(), args...)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

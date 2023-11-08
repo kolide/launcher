@@ -72,8 +72,8 @@ func TestQueries(t *testing.T) {
 
 }
 
-func execFaker(filename string) func(context.Context, string, ...string) (*exec.Cmd, error) {
-	return func(ctx context.Context, _ string, _ ...string) (*exec.Cmd, error) {
+func execFaker(filename string) func(context.Context, ...string) (*exec.Cmd, error) {
+	return func(ctx context.Context, _ ...string) (*exec.Cmd, error) {
 		return exec.CommandContext(ctx, "/bin/cat", filename), nil
 	}
 }
