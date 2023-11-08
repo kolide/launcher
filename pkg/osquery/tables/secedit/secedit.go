@@ -27,8 +27,6 @@ import (
 	"golang.org/x/text/transform"
 )
 
-const seceditCmd = "secedit.exe"
-
 type Table struct {
 	logger log.Logger
 }
@@ -109,7 +107,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 		args = append(args, "/mergedpolicy")
 	}
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, seceditCmd, args...)
+	cmd, err := allowedpaths.Secedit(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating secedit command: %w", err)
 	}

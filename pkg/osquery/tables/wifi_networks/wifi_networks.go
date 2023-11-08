@@ -91,7 +91,7 @@ func execPwsh(logger log.Logger) execer {
 		}
 
 		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
-		cmd, err := allowedpaths.CommandContextWithLookup(ctx, "powershell.exe", args...)
+		cmd, err := allowedpaths.Powershell(ctx, args...)
 		if err != nil {
 			return fmt.Errorf("creating powershell command: %w", err)
 		}

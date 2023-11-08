@@ -95,7 +95,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, "xrdb", "-display", displayNum, "-global", "-query")
+	cmd, err := allowedpaths.Xrdb(ctx, "-display", displayNum, "-global", "-query")
 	if err != nil {
 		return fmt.Errorf("creating xrdb command: %w", err)
 	}

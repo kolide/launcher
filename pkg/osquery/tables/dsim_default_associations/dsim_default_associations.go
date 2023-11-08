@@ -22,8 +22,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const dismCmd = "dism.exe"
-
 type Table struct {
 	logger log.Logger
 }
@@ -84,7 +82,7 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
 
-	cmd, err := allowedpaths.CommandContextWithLookup(ctx, dismCmd, args...)
+	cmd, err := allowedpaths.Dism(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating command: %w", err)
 	}
