@@ -43,3 +43,17 @@ func Test_validatedPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, cmdPath, p)
 }
+
+func Test_validatedPath_findsCorrectPath(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS != "linux" {
+		t.SkipNow()
+	}
+
+	cmdPath := "/not/the/real/path/to/bash"
+	p, err := validatedPath(cmdPath)
+
+	require.NoError(t, err)
+	require.NotEqual(t, cmdPath, p)
+}
