@@ -23,7 +23,7 @@ func Test_newCmd(t *testing.T) {
 	t.Parallel()
 
 	cmdPath := filepath.Join("some", "path", "to", "a", "command")
-	cmd := newCmd(cmdPath)
+	cmd := newCmd(context.TODO(), cmdPath)
 	require.Equal(t, cmdPath, cmd.Path)
 }
 
