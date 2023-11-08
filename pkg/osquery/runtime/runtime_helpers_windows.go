@@ -4,6 +4,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"syscall"
@@ -22,7 +23,7 @@ func setpgid() *syscall.SysProcAttr {
 func killProcessGroup(cmd *exec.Cmd) error {
 	// some discussion here https://github.com/golang/dep/pull/857
 	// TODO: should we check err?
-	cmd, err := allowedpaths.Taskkill("/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid))
+	cmd, err := allowedpaths.Taskkill(context.TODO(), "/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid))
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}
