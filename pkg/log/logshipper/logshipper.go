@@ -187,34 +187,34 @@ func (ls *LogShipper) addDeviceIdentifyingAttributesToLogger() {
 
 	versionInfo := version.Version()
 	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
-	additionalSlogAttrs = append(additionalSlogAttrs, slog.Attr{Key: "version", Value: slog.StringValue(versionInfo.Version)})
+	additionalSlogAttrs = append(additionalSlogAttrs, slog.String("version", versionInfo.Version))
 
 	if deviceId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get device id", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_device_id", string(deviceId))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.Attr{Key: "k2_device_id", Value: slog.StringValue(string(deviceId))})
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_device_id", string(deviceId)))
 	}
 
 	if munemo, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get munemo", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_munemo", string(munemo))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.Attr{Key: "k2_munemo", Value: slog.StringValue(string(munemo))})
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_munemo", string(munemo)))
 	}
 
 	if orgId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get organization id", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_organization_id", string(orgId))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.Attr{Key: "k2_organization_id", Value: slog.StringValue(string(orgId))})
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_organization_id", string(orgId)))
 	}
 
 	if serialNumber, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get serial number", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "serial_number", string(serialNumber))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.Attr{Key: "serial_number", Value: slog.StringValue(string(serialNumber))})
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("serial_number", string(serialNumber)))
 	}
 
 	ls.additionalSlogAttrs = additionalSlogAttrs
