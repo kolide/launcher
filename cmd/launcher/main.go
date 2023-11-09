@@ -75,9 +75,9 @@ func main() {
 					logutil.Fatal(logger, err, "exec")
 				}
 				panic("how")
-			} else {
-				level.Debug(logger).Log("msg", "Nothing new")
 			}
+
+			level.Debug(logger).Log("msg", "Nothing new")
 		}
 	}
 

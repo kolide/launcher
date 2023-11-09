@@ -16,6 +16,7 @@ linters:
     - unconvert
     - paralleltest
     - sloglint
+    - revive
   disable:
     - errcheck
     - gosec
@@ -38,6 +39,13 @@ linters-settings:
     context-only: true
     key-naming-case: snake
     static-msg: true
+  revive:
+    rules:
+      - name: superfluous-else
+        severity: warning
+        disabled: false
+        arguments:
+          - "preserveScope"
 
 issues:
   exclude-rules:

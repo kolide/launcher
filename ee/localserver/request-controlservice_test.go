@@ -12,6 +12,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		m := mocks.NewKnapsack(t)
 		m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 		m.On("KolideServerURL").Return("localhost")
+		m.On("Slogger").Return(multislogger.New().Logger)
 		return m
 	}
 
@@ -47,6 +49,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 				m.On("KolideServerURL").Return("localhost")
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
+				m.On("Slogger").Return(multislogger.New().Logger)
 				return m
 			},
 		},

@@ -15,6 +15,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	mockKnapsack.On("KolideServerURL").Return("localhost")
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	var logBytes bytes.Buffer
 	server := testServer(t, mockKnapsack, &logBytes)

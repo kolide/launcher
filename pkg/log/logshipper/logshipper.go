@@ -30,12 +30,13 @@ type LogShipper struct {
 	//shippingLogger is the logs that will be shipped
 	shippingLogger log.Logger
 	//baseLogger is for logShipper internal logging
-	baseLogger        log.Logger
-	knapsack          types.Knapsack
-	stopFunc          context.CancelFunc
-	stopFuncMutex     sync.Mutex
-	isShippingEnabled bool
-	slogLevel         *slog.LevelVar
+	baseLogger          log.Logger
+	knapsack            types.Knapsack
+	stopFunc            context.CancelFunc
+	stopFuncMutex       sync.Mutex
+	isShippingEnabled   bool
+	slogLevel           *slog.LevelVar
+	additionalSlogAttrs []slog.Attr
 }
 
 func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
@@ -52,12 +53,13 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	shippingLogger := log.With(log.NewJSONLogger(sendBuffer), "caller", log.Caller(6), "session_ulid", ulid.New())
 
 	ls := &LogShipper{
-		sender:         sender,
-		sendBuffer:     sendBuffer,
-		shippingLogger: shippingLogger,
-		baseLogger:     log.With(baseLogger, "component", "logshipper"),
-		knapsack:       k,
-		stopFuncMutex:  sync.Mutex{},
+		sender:              sender,
+		sendBuffer:          sendBuffer,
+		shippingLogger:      shippingLogger,
+		baseLogger:          log.With(baseLogger, "component", "logshipper"),
+		knapsack:            k,
+		stopFuncMutex:       sync.Mutex{},
+		additionalSlogAttrs: make([]slog.Attr, 0),
 	}
 
 	ls.slogLevel = new(slog.LevelVar)
@@ -149,13 +151,8 @@ func (ls *LogShipper) Log(keyvals ...interface{}) error {
 }
 
 func (ls *LogShipper) SlogHandler() slog.Handler {
-	versionInfo := version.Version()
-
 	middleware := slogmulti.NewHandleInlineMiddleware(func(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-		record.AddAttrs(slog.Attr{
-			Key:   "version",
-			Value: slog.StringValue(versionInfo.Version),
-		})
+		record.AddAttrs(ls.additionalSlogAttrs...)
 		return next(ctx, record)
 	})
 
@@ -186,27 +183,39 @@ func filterResults(keyvals ...interface{}) {
 // addDeviceIdentifyingAttributesToLogger gets device identifiers from the server-provided
 // data and adds them as attributes on the logger.
 func (ls *LogShipper) addDeviceIdentifyingAttributesToLogger() {
+	additionalSlogAttrs := make([]slog.Attr, 0)
+
+	versionInfo := version.Version()
+	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
+	additionalSlogAttrs = append(additionalSlogAttrs, slog.String("version", versionInfo.Version))
+
 	if deviceId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get device id", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_device_id", string(deviceId))
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_device_id", string(deviceId)))
 	}
 
 	if munemo, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get munemo", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_munemo", string(munemo))
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_munemo", string(munemo)))
 	}
 
 	if orgId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get organization id", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "k2_organization_id", string(orgId))
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_organization_id", string(orgId)))
 	}
 
 	if serialNumber, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
 		level.Debug(ls.baseLogger).Log("msg", "could not get serial number", "err", err)
 	} else {
 		ls.shippingLogger = log.With(ls.shippingLogger, "serial_number", string(serialNumber))
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("serial_number", string(serialNumber)))
 	}
+
+	ls.additionalSlogAttrs = additionalSlogAttrs
 }
