@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
 	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
 	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
+	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 	_ "github.com/mattn/go-sqlite3"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -120,5 +121,7 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, allowedpaths.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedpaths.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedpaths.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
+		zfs.ZfsPropertiesPlugin(logger),
+		zfs.ZpoolPropertiesPlugin(logger),
 	}
 }

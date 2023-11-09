@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
 	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
 	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
-	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
@@ -55,8 +54,6 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dataflattentable.TablePluginExec(logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, allowedpaths.Zerotiercli, []string{"listpeers"}),
 		tdebug.LauncherGcInfo(logger),
-		zfs.ZfsPropertiesPlugin(logger),
-		zfs.ZpoolPropertiesPlugin(logger),
 	}
 
 	// The dataflatten tables

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"runtime"
 	"time"
 
 	"github.com/kolide/launcher/pkg/allowedpaths"
@@ -85,64 +84,4 @@ func (n *networkCheckup) Data() any {
 type networkCommand struct {
 	cmd  allowedpaths.AllowedCommand
 	args []string
-}
-
-func listCommands() []networkCommand {
-	switch runtime.GOOS {
-	case "darwin":
-		return []networkCommand{
-			{
-				cmd:  allowedpaths.Ifconfig,
-				args: []string{"-a"},
-			},
-			{
-				cmd:  allowedpaths.Netstat,
-				args: []string{"-nr"},
-			},
-		}
-	case "linux":
-		return []networkCommand{
-			{
-				cmd:  allowedpaths.Ifconfig,
-				args: []string{"-a"},
-			},
-			{
-				cmd:  allowedpaths.Ip,
-				args: []string{"-N", "-d", "-h", "-a", "address"},
-			},
-			{
-				cmd:  allowedpaths.Ip,
-				args: []string{"-N", "-d", "-h", "-a", "route"},
-			},
-		}
-	case "windows":
-		return []networkCommand{
-			{
-				cmd:  allowedpaths.Ipconfig,
-				args: []string{"/all"},
-			},
-		}
-	default:
-		return nil
-	}
-}
-
-func listFiles() []string {
-	switch runtime.GOOS {
-	case "darwin":
-		return []string{
-			"/etc/hosts",
-			"/etc/resolv.conf",
-		}
-	case "linux":
-		return []string{
-			"/etc/nsswitch.conf",
-			"/etc/hosts",
-			"/etc/resolv.conf",
-		}
-	case "windows":
-		return []string{}
-	default:
-		return nil
-	}
 }

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package checkups
 
 import (
@@ -7,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -28,10 +30,6 @@ const (
 )
 
 func (c *gnomeExtensions) Name() string {
-	if runtime.GOOS != "linux" {
-		return ""
-	}
-
 	return "Gnome Extensions"
 }
 

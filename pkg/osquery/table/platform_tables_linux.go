@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/tables/secureboot"
 	"github.com/kolide/launcher/pkg/osquery/tables/xfconf"
 	"github.com/kolide/launcher/pkg/osquery/tables/xrdb"
+	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
 	osquery "github.com/osquery/osquery-go"
 )
 
@@ -56,5 +57,7 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, allowedpaths.Pacman, []string{"-Qu"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, allowedpaths.Rpm, []string{"-qai"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedpaths.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
+		zfs.ZfsPropertiesPlugin(logger),
+		zfs.ZpoolPropertiesPlugin(logger),
 	}
 }
