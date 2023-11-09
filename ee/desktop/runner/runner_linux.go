@@ -145,9 +145,6 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
 
 			break
-		} else {
-			// Not a graphical session
-			continue
 		}
 	}
 

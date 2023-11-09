@@ -16,6 +16,7 @@ linters:
     - unconvert
     - paralleltest
     - forbidigo
+    - revive
   disable:
     - errcheck
     - gosec
@@ -37,6 +38,13 @@ linters-settings:
     forbid:
       - p: ^exec\.Command.*$
         msg: use pkg/allowedpaths functions instead
+  revive:
+    rules:
+      - name: superfluous-else
+        severity: warning
+        disabled: false
+        arguments:
+          - "preserveScope"
 
 issues:
   exclude-rules:
