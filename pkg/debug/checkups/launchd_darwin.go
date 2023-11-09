@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package checkups
 
 import (
@@ -8,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/allowedpaths"
@@ -25,10 +27,6 @@ type launchdCheckup struct {
 }
 
 func (c *launchdCheckup) Name() string {
-	if runtime.GOOS != "darwin" {
-		return ""
-	}
-
 	return "Launchd"
 }
 

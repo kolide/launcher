@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 // firmwarepasswd is a simple wrapper around the
 // `/usr/sbin/firmwarepasswd` tool. This should be considered beta at
 // best. It serves a bit as a pattern for future exec work.

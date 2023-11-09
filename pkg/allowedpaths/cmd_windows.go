@@ -54,5 +54,5 @@ func Taskkill(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 
 func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	// For windows, "-q" should be prepended before all other args
-	return validatedCommand(ctx, path.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), []string{"-q"}, arg...)
+	return validatedCommand(ctx, path.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
 }
