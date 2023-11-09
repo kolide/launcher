@@ -44,7 +44,7 @@ func Test_validatedCommand(t *testing.T) {
 	require.Equal(t, cmdPath, p.Path)
 }
 
-func Test_validatedCommand_findsCorrectPath(t *testing.T) {
+func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {
 	t.Parallel()
 
 	if runtime.GOOS != "linux" {
@@ -52,8 +52,7 @@ func Test_validatedCommand_findsCorrectPath(t *testing.T) {
 	}
 
 	cmdPath := "/not/the/real/path/to/bash"
-	p, err := validatedCommand(context.TODO(), cmdPath)
+	_, err := validatedCommand(context.TODO(), cmdPath)
 
-	require.NoError(t, err)
-	require.NotEqual(t, cmdPath, p.Path)
+	require.Error(t, err)
 }
