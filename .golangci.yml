@@ -16,6 +16,7 @@ linters:
     - unconvert
     - paralleltest
     - forbidigo
+    - sloglint
     - revive
   disable:
     - errcheck
@@ -38,6 +39,11 @@ linters-settings:
     forbid:
       - p: ^exec\.Command.*$
         msg: use pkg/allowedpaths functions instead
+  sloglint:
+    kv-only: true
+    context-only: true
+    key-naming-case: snake
+    static-msg: true
   revive:
     rules:
       - name: superfluous-else
