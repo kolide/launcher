@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 type networkCheckup struct {
@@ -82,6 +82,6 @@ func (n *networkCheckup) Data() any {
 }
 
 type networkCommand struct {
-	cmd  allowedpaths.AllowedCommand
+	cmd  allowedcmd.AllowedCommand
 	args []string
 }

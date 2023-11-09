@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go"
@@ -35,7 +35,7 @@ type Table struct {
 	flattenFileFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	flattenBytesFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 
-	cmd      allowedpaths.AllowedCommand
+	cmd      allowedcmd.AllowedCommand
 	execArgs []string
 
 	keyValueSeparator string

@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 const (
@@ -63,7 +63,7 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	// run launchctl to check status
 	var printOut bytes.Buffer
 
-	cmd, err := allowedpaths.Launchctl(ctx, "print", launchdServiceName)
+	cmd, err := allowedcmd.Launchctl(ctx, "print", launchdServiceName)
 	if err != nil {
 		c.status = Erroring
 		c.summary = fmt.Sprintf("unable to create launchctl command: %s", err)

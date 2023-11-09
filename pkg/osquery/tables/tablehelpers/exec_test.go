@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,14 +18,14 @@ func TestExec(t *testing.T) {
 	var tests = []struct {
 		name    string
 		timeout int
-		bin     allowedpaths.AllowedCommand
+		bin     allowedcmd.AllowedCommand
 		args    []string
 		err     bool
 		output  string
 	}{
 		{
 			name:   "output",
-			bin:    allowedpaths.Echo,
+			bin:    allowedcmd.Echo,
 			args:   []string{"hello"},
 			output: "hello\n",
 		},

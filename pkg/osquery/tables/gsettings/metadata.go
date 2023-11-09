@@ -16,7 +16,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -221,7 +221,7 @@ func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, out
 	defer cancel()
 
 	command := args[0]
-	cmd, err := allowedpaths.Gsettings(ctx, args...)
+	cmd, err := allowedcmd.Gsettings(ctx, args...)
 	if err != nil {
 		return fmt.Errorf("creating gsettings command: %w", err)
 	}

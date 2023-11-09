@@ -20,7 +20,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -95,7 +95,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd, err := allowedpaths.Xrdb(ctx, "-display", displayNum, "-global", "-query")
+	cmd, err := allowedcmd.Xrdb(ctx, "-display", displayNum, "-global", "-query")
 	if err != nil {
 		return fmt.Errorf("creating xrdb command: %w", err)
 	}

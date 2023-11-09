@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 // example scutil output
@@ -91,7 +91,7 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd, err := allowedpaths.Scutil(ctx)
+	cmd, err := allowedcmd.Scutil(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)
 	}

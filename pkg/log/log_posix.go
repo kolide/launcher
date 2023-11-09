@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 // runAndLogPs runs ps filtering on the given PID, and logs the output.
@@ -17,7 +17,7 @@ func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.Ps(ctx, "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
+	cmd, err := allowedcmd.Ps(ctx, "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run ps on osqueryd pidfile",
@@ -47,7 +47,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.Lsof(ctx, "-R", "-n", "-p", pidStr)
+	cmd, err := allowedcmd.Lsof(ctx, "-R", "-n", "-p", pidStr)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run lsof on osqueryd pidfile",
@@ -80,7 +80,7 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.Lsof(ctx, "-R", "-n", fullPidfile)
+	cmd, err := allowedcmd.Lsof(ctx, "-R", "-n", fullPidfile)
 	if err != nil {
 		level.Debug(l.logger).Log(
 			"msg", "error creating command to run lsof on osqueryd pidfile",

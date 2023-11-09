@@ -18,7 +18,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -95,7 +95,7 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.Firmwarepasswd(ctx, subcommand)
+	cmd, err := allowedcmd.Firmwarepasswd(ctx, subcommand)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

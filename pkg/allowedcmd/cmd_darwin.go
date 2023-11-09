@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package allowedpaths
+package allowedcmd
 
 import (
 	"context"

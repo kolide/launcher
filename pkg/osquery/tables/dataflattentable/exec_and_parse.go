@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/traces"
@@ -27,7 +27,7 @@ type execTableV2 struct {
 	timeoutSeconds int
 	tabledebug     bool
 	includeStderr  bool
-	cmd            allowedpaths.AllowedCommand
+	cmd            allowedcmd.AllowedCommand
 	execArgs       []string
 }
 
@@ -51,7 +51,7 @@ func WithIncludeStderr() execTableV2Opt {
 	}
 }
 
-func NewExecAndParseTable(logger log.Logger, tableName string, p parser, cmd allowedpaths.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
+func NewExecAndParseTable(logger log.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
 		logger:         level.NewFilter(log.With(logger, "table", tableName), level.AllowInfo()),
 		tableName:      tableName,

@@ -17,7 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -107,7 +107,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 		args = append(args, "/mergedpolicy")
 	}
 
-	cmd, err := allowedpaths.Secedit(ctx, args...)
+	cmd, err := allowedcmd.Secedit(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating secedit command: %w", err)
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -91,7 +91,7 @@ func execPwsh(logger log.Logger) execer {
 		}
 
 		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
-		cmd, err := allowedpaths.Powershell(ctx, args...)
+		cmd, err := allowedcmd.Powershell(ctx, args...)
 		if err != nil {
 			return fmt.Errorf("creating powershell command: %w", err)
 		}

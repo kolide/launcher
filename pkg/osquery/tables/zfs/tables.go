@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -23,7 +23,7 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 
 type Table struct {
 	logger log.Logger
-	cmd    allowedpaths.AllowedCommand
+	cmd    allowedcmd.AllowedCommand
 }
 
 func columns() []table.ColumnDefinition {
@@ -38,7 +38,7 @@ func columns() []table.ColumnDefinition {
 func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    allowedpaths.Zfs,
+		cmd:    allowedcmd.Zfs,
 	}
 
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
@@ -47,7 +47,7 @@ func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 func ZpoolPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    allowedpaths.Zpool,
+		cmd:    allowedcmd.Zpool,
 	}
 
 	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)

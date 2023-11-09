@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -25,7 +25,7 @@ import (
 // `possibleBins` can be either a list of command names, or a list of paths to commands.
 // Where reasonable, `possibleBins` should be command names only, so that we can perform
 // lookup against PATH.
-func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd allowedpaths.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
+func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 

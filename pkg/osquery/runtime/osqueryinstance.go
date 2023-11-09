@@ -481,7 +481,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		args = append(args, "--disable_watchdog")
 	}
 	// Since we trust the autoupdate library to find binaries in the correct location,
-	// we don't require the use of allowedpaths here.
+	// we don't require the use of allowedcmd here.
 	cmd := exec.Command( //nolint:forbidigo
 		osquerydBinary,
 		args...,

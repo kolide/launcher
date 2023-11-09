@@ -15,7 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
@@ -28,7 +28,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
-	cmd, err := allowedpaths.Launchctl(ctx,
+	cmd, err := allowedcmd.Launchctl(ctx,
 		"asuser",
 		targetUser.Uid,
 		osqueryPath,

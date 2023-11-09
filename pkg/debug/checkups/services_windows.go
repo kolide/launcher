@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
@@ -244,7 +244,7 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 		"Format-Table", "-Wrap", "-AutoSize", // ensure output doesn't get truncated
 	}
 
-	getEventLogCmd, err := allowedpaths.Powershell(ctx, cmdletArgs...)
+	getEventLogCmd, err := allowedcmd.Powershell(ctx, cmdletArgs...)
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}

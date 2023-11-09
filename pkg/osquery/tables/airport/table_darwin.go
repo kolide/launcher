@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -50,7 +50,7 @@ type airportExecutor struct {
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
-	return tablehelpers.Exec(a.ctx, a.logger, 30, allowedpaths.Airport, []string{"--" + option}, false)
+	return tablehelpers.Exec(a.ctx, a.logger, 30, allowedcmd.Airport, []string{"--" + option}, false)
 }
 
 type executor interface {

@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -28,7 +28,7 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmd allowedpaths.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{

@@ -11,14 +11,14 @@ import (
 	"io"
 	"time"
 
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 func mdfind(args ...string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd, err := allowedpaths.Mdfind(ctx, args...)
+	cmd, err := allowedcmd.Mdfind(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating mdfind command: %w", err)
 	}

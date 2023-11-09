@@ -20,7 +20,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -90,7 +90,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd, err := allowedpaths.Gsettings(ctx, "list-recursively")
+	cmd, err := allowedcmd.Gsettings(ctx, "list-recursively")
 	if err != nil {
 		return fmt.Errorf("creating gsettings command: %w", err)
 	}

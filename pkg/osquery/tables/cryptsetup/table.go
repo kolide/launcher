@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -50,7 +50,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, name := range requestedNames {
-		output, err := tablehelpers.Exec(ctx, t.logger, 15, allowedpaths.Cryptsetup, []string{"--readonly", "status", name}, false)
+		output, err := tablehelpers.Exec(ctx, t.logger, 15, allowedcmd.Cryptsetup, []string{"--readonly", "status", name}, false)
 		if err != nil {
 			level.Debug(t.logger).Log("msg", "Error execing for status", "name", name, "err", err)
 			continue

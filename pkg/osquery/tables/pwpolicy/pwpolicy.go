@@ -19,7 +19,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -31,7 +31,7 @@ const pwpolicyCmd = "getaccountpolicies"
 type Table struct {
 	logger    log.Logger
 	tableName string
-	execCC    allowedpaths.AllowedCommand
+	execCC    allowedcmd.AllowedCommand
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
@@ -43,7 +43,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger:    logger,
 		tableName: "kolide_pwpolicy",
-		execCC:    allowedpaths.Pwpolicy,
+		execCC:    allowedcmd.Pwpolicy,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)

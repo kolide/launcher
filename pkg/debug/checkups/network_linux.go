@@ -3,20 +3,20 @@
 
 package checkups
 
-import "github.com/kolide/launcher/pkg/allowedpaths"
+import "github.com/kolide/launcher/pkg/allowedcmd"
 
 func listCommands() []networkCommand {
 	return []networkCommand{
 		{
-			cmd:  allowedpaths.Ifconfig,
+			cmd:  allowedcmd.Ifconfig,
 			args: []string{"-a"},
 		},
 		{
-			cmd:  allowedpaths.Ip,
+			cmd:  allowedcmd.Ip,
 			args: []string{"-N", "-d", "-h", "-a", "address"},
 		},
 		{
-			cmd:  allowedpaths.Ip,
+			cmd:  allowedcmd.Ip,
 			args: []string{"-N", "-d", "-h", "-a", "route"},
 		},
 	}

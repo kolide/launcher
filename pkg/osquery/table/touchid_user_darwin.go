@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -65,7 +65,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		uid, _ := strconv.Atoi(constraint.Expression)
 
 		// Get the user's TouchID config
-		configOutput, err := runCommandContext(ctx, uid, allowedpaths.Bioutil, "-r")
+		configOutput, err := runCommandContext(ctx, uid, allowedcmd.Bioutil, "-r")
 		if err != nil {
 			level.Debug(t.logger).Log(
 				"msg", "could not run bioutil -r",
@@ -95,7 +95,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		}
 
 		// Grab the fingerprint count
-		countOutStr, err := runCommandContext(ctx, uid, allowedpaths.Bioutil, "-c")
+		countOutStr, err := runCommandContext(ctx, uid, allowedcmd.Bioutil, "-c")
 		if err != nil {
 			level.Debug(t.logger).Log(
 				"msg", "could not run bioutil -c",
@@ -129,7 +129,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 }
 
 // runCommand runs a given command and arguments as the supplied user
-func runCommandContext(ctx context.Context, uid int, cmd allowedpaths.AllowedCommand, args ...string) (string, error) {
+func runCommandContext(ctx context.Context, uid int, cmd allowedcmd.AllowedCommand, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

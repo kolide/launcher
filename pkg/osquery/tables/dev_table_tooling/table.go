@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -15,17 +15,17 @@ import (
 // allowedCommand encapsulates the possible binary path(s) of a command allowed to execute
 // along with a strict list of arguments.
 type allowedCommand struct {
-	bin  allowedpaths.AllowedCommand
+	bin  allowedcmd.AllowedCommand
 	args []string
 }
 
 var allowedCommands = map[string]allowedCommand{
 	"echo": {
-		bin:  allowedpaths.Echo,
+		bin:  allowedcmd.Echo,
 		args: []string{"hello"},
 	},
 	"cb_repcli": {
-		bin:  allowedpaths.Repcli,
+		bin:  allowedcmd.Repcli,
 		args: []string{"status"},
 	},
 }

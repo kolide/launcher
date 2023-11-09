@@ -1,4 +1,4 @@
-package allowedpaths
+package allowedcmd
 
 import (
 	"context"

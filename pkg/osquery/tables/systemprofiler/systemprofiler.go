@@ -47,7 +47,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -206,7 +206,7 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 
 	args = append(args, subcommands...)
 
-	cmd, err := allowedpaths.Systemprofiler(ctx, args...)
+	cmd, err := allowedcmd.Systemprofiler(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating system_profiler command: %w", err)
 	}

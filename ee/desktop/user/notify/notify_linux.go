@@ -12,7 +12,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/godbus/dbus/v5"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 type dbusNotifier struct {
@@ -33,7 +33,7 @@ const (
 
 // We default to xdg-open first because, if available, it appears to be better at picking
 // the correct default browser.
-var browserLaunchers = []allowedpaths.AllowedCommand{allowedpaths.Xdgopen, allowedpaths.Xwwwbrowser}
+var browserLaunchers = []allowedcmd.AllowedCommand{allowedcmd.Xdgopen, allowedcmd.Xwwwbrowser}
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
@@ -181,7 +181,7 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		args = append(args, "-i", d.iconFilepath)
 	}
 
-	cmd, err := allowedpaths.Notifysend(context.TODO(), args...)
+	cmd, err := allowedcmd.Notifysend(context.TODO(), args...)
 	if err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}

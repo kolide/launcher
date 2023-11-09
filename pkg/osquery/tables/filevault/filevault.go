@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedpaths"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -34,7 +34,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 10, allowedpaths.Fdesetup, []string{"status"}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 10, allowedcmd.Fdesetup, []string{"status"}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "fdesetup failed", "err", err)
 
