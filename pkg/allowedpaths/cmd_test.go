@@ -38,10 +38,10 @@ func Test_validatedCommand(t *testing.T) {
 		cmdPath = `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
 	}
 
-	p, err := validatedCommand(context.TODO(), cmdPath)
+	cmd, err := validatedCommand(context.TODO(), cmdPath)
 
 	require.NoError(t, err)
-	require.Equal(t, cmdPath, p.Path)
+	require.Equal(t, cmdPath, cmd.Path)
 }
 
 func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {

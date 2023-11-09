@@ -25,7 +25,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 	// Not found at known location -- return error for darwin and windows.
 	// We expect to know the exact location for allowlisted commands on all
 	// OSes except for a few Linux distros.
-	if allowSearchPath() {
+	if !allowSearchPath() {
 		return nil, fmt.Errorf("not found: %s", knownPath)
 	}
 
