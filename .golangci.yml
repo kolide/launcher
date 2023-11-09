@@ -15,6 +15,7 @@ linters:
     - sqlclosecheck
     - unconvert
     - paralleltest
+    - sloglint
     - revive
   disable:
     - errcheck
@@ -33,6 +34,11 @@ linters-settings:
     ignore: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
+  sloglint:
+    kv-only: true
+    context-only: true
+    key-naming-case: snake
+    static-msg: true
   revive:
     rules:
       - name: superfluous-else
