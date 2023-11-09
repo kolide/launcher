@@ -27,7 +27,7 @@ func Test_newCmd(t *testing.T) {
 	require.Equal(t, cmdPath, cmd.Path)
 }
 
-func Test_validatedPath(t *testing.T) {
+func Test_validatedCommand(t *testing.T) {
 	t.Parallel()
 
 	var cmdPath string
@@ -38,13 +38,13 @@ func Test_validatedPath(t *testing.T) {
 		cmdPath = `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
 	}
 
-	p, err := validatedPath(cmdPath)
+	p, err := validatedCommand(context.TODO(), cmdPath)
 
 	require.NoError(t, err)
-	require.Equal(t, cmdPath, p)
+	require.Equal(t, cmdPath, p.Path)
 }
 
-func Test_validatedPath_findsCorrectPath(t *testing.T) {
+func Test_validatedCommand_findsCorrectPath(t *testing.T) {
 	t.Parallel()
 
 	if runtime.GOOS != "linux" {
@@ -52,8 +52,8 @@ func Test_validatedPath_findsCorrectPath(t *testing.T) {
 	}
 
 	cmdPath := "/not/the/real/path/to/bash"
-	p, err := validatedPath(cmdPath)
+	p, err := validatedCommand(context.TODO(), cmdPath)
 
 	require.NoError(t, err)
-	require.NotEqual(t, cmdPath, p)
+	require.NotEqual(t, cmdPath, p.Path)
 }

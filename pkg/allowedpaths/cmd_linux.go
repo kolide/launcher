@@ -6,237 +6,140 @@ package allowedpaths
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 )
 
 func Apt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/apt")
-	if err != nil {
-		return nil, fmt.Errorf("apt not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/apt", arg...)
 }
 
 func Cryptsetup(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	for _, p := range []string{"/usr/sbin/cryptsetup", "/sbin/cryptsetup"} {
-		fullPathToCmdValidated, err := validatedPath(p)
+		validatedCmd, err := validatedCommand(ctx, p, arg...)
 		if err != nil {
 			continue
 		}
 
-		return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+		return validatedCmd, nil
 	}
 
 	return nil, errors.New("cryptsetup not found")
 }
 
 func Dnf(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/dnf")
-	if err != nil {
-		return nil, fmt.Errorf("dnf not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/dnf", arg...)
 }
 
 func Dpkg(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/dpkg")
-	if err != nil {
-		return nil, fmt.Errorf("dpkg not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/dpkg", arg...)
 }
 
 func Echo(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/echo")
-	if err != nil {
-		return nil, fmt.Errorf("echo not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/echo", arg...)
 }
 
 func Falconctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/opt/CrowdStrike/falconctl")
-	if err != nil {
-		return nil, fmt.Errorf("falconctl not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/opt/CrowdStrike/falconctl", arg...)
 }
 
 func Falconkernelcheck(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/opt/CrowdStrike/falcon-kernel-check")
-	if err != nil {
-		return nil, fmt.Errorf("falcon-kernel-check not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/opt/CrowdStrike/falcon-kernel-check", arg...)
 }
 
 func Gnomeextensions(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/gnome-extensions")
-	if err != nil {
-		return nil, fmt.Errorf("gnome-extensions not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/gnome-extensions", arg...)
 }
 
 func Gsettings(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/gsettings")
-	if err != nil {
-		return nil, fmt.Errorf("gsettings not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/gsettings", arg...)
 }
 
 func Ifconfig(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/sbin/ifconfig")
-	if err != nil {
-		return nil, fmt.Errorf("ifconfig not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/sbin/ifconfig", arg...)
 }
 
 func Ip(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/sbin/ip")
-	if err != nil {
-		return nil, fmt.Errorf("ip not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/sbin/ip", arg...)
 }
 
 func Loginctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/loginctl")
-	if err != nil {
-		return nil, fmt.Errorf("loginctl not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/loginctl", arg...)
 }
 
 func Lsblk(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	for _, p := range []string{"/bin/lsblk", "/usr/bin/lsblk"} {
-		fullPathToCmdValidated, err := validatedPath(p)
+		validatedCmd, err := validatedCommand(ctx, p, arg...)
 		if err != nil {
 			continue
 		}
 
-		return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+		return validatedCmd, nil
 	}
 
 	return nil, errors.New("lsblk not found")
 }
 
 func Lsof(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/lsof")
-	if err != nil {
-		return nil, fmt.Errorf("lsof not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/lsof", arg...)
 }
 
 func Nmcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/nmcli")
-	if err != nil {
-		return nil, fmt.Errorf("nmcli not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/nmcli", arg...)
 }
 
 func Notifysend(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/notify-send")
-	if err != nil {
-		return nil, fmt.Errorf("notify-send not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/notify-send", arg...)
 }
 
 func Pacman(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/pacman")
-	if err != nil {
-		return nil, fmt.Errorf("pacman not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/pacman", arg...)
 }
 
 func Ps(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/ps")
-	if err != nil {
-		return nil, fmt.Errorf("ps not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/ps", arg...)
 }
 
 func Repcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/opt/carbonblack/psc/bin/repcli")
-	if err != nil {
-		return nil, fmt.Errorf("repcli not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/opt/carbonblack/psc/bin/repcli", arg...)
 }
 
 func Rpm(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	for _, p := range []string{"/bin/rpm", "/usr/bin/rpm"} {
-		fullPathToCmdValidated, err := validatedPath(p)
+		validatedCmd, err := validatedCommand(ctx, p, arg...)
 		if err != nil {
 			continue
 		}
 
-		return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+		return validatedCmd, nil
 	}
 
 	return nil, errors.New("rpm not found")
 }
 
 func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/systemctl")
-	if err != nil {
-		return nil, fmt.Errorf("systemctl not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
 }
 
 func Xdgopen(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/xdg-open")
-	if err != nil {
-		return nil, fmt.Errorf("xdg-open not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/xdg-open", arg...)
 }
 
 func Xrdb(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/xrdb")
-	if err != nil {
-		return nil, fmt.Errorf("xrdb not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/xrdb", arg...)
 }
 
 func Xwwwbrowser(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/bin/x-www-browser")
-	if err != nil {
-		return nil, fmt.Errorf("x-www-browser not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/bin/x-www-browser", arg...)
 }
 
 func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/local/bin/zerotier-cli")
-	if err != nil {
-		return nil, fmt.Errorf("zerotier-cli not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/local/bin/zerotier-cli", arg...)
 }
 
 func Zfs(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/sbin/zfs")
-	if err != nil {
-		return nil, fmt.Errorf("zfs not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/sbin/zfs", arg...)
 }
 
 func Zpool(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	fullPathToCmdValidated, err := validatedPath("/usr/sbin/zpool")
-	if err != nil {
-		return nil, fmt.Errorf("zpool not found: %w", err)
-	}
-	return newCmd(ctx, fullPathToCmdValidated, arg...), nil
+	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
 }

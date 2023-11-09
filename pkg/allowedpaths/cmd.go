@@ -15,24 +15,24 @@ func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *exec.Cmd 
 	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo
 }
 
-func validatedPath(knownPath string) (string, error) {
+func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*exec.Cmd, error) {
 	knownPath = filepath.Clean(knownPath)
 
 	if _, err := os.Stat(knownPath); err == nil {
-		return knownPath, nil
+		return newCmd(ctx, knownPath, arg...), nil
 	}
 
 	// Not found at known location -- return error for darwin and windows.
 	// We expect to know the exact location for allowlisted commands on all
 	// OSes except for a few Linux distros.
 	if runtime.GOOS != "linux" {
-		return "", fmt.Errorf("not found: %s", knownPath)
+		return nil, fmt.Errorf("not found: %s", knownPath)
 	}
 
 	cmdName := filepath.Base(knownPath)
 	if foundPath, err := exec.LookPath(cmdName); err == nil {
-		return foundPath, nil
+		return newCmd(ctx, foundPath, arg...), nil
 	}
 
-	return "", fmt.Errorf("%s not found at %s and could not be located elsewhere", cmdName, knownPath)
+	return nil, fmt.Errorf("%s not found at %s and could not be located elsewhere", cmdName, knownPath)
 }
