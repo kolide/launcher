@@ -7,20 +7,19 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 )
 
 func Commandprompt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\cmd.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "cmd.exe"), arg...)
 }
 
 func Dism(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\Dism.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "Dism.exe"), arg...)
 }
 
 func Dsregcmd(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\dsregcmd.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "dsregcmd.exe"), arg...)
 }
 
 func Echo(ctx context.Context, arg ...string) (*exec.Cmd, error) {
@@ -29,30 +28,30 @@ func Echo(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Ipconfig(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\ipconfig.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "ipconfig.exe"), arg...)
 }
 
 func Powercfg(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\powercfg.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "powercfg.exe"), arg...)
 }
 
 func Powershell(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "WindowsPowerShell", "v1.0", "powershell.exe"), arg...)
 }
 
 func Repcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, filepath.Join("Program Files", "Confer", "repcli"), arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Confer", "repcli"), arg...)
 }
 
 func Secedit(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\SecEdit.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "SecEdit.exe"), arg...)
 }
 
 func Taskkill(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, `C:\Windows\System32\taskkill.exe`, arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "taskkill.exe"), arg...)
 }
 
 func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	// For windows, "-q" should be prepended before all other args
-	return validatedCommand(ctx, path.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
 }
