@@ -42,11 +42,11 @@ func Falconctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/opt/CrowdStrike/falconctl", arg...)
 }
 
-func Falconkernelcheck(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func FalconKernelCheck(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/opt/CrowdStrike/falcon-kernel-check", arg...)
 }
 
-func Gnomeextensions(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func GnomeExtensions(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/gnome-extensions", arg...)
 }
 
@@ -87,7 +87,7 @@ func Nmcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/nmcli", arg...)
 }
 
-func Notifysend(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func NotifySend(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/notify-send", arg...)
 }
 
@@ -120,7 +120,7 @@ func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
 }
 
-func Xdgopen(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func XdgOpen(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/xdg-open", arg...)
 }
 
@@ -128,11 +128,11 @@ func Xrdb(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/xrdb", arg...)
 }
 
-func Xwwwbrowser(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func XWwwBrowser(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/x-www-browser", arg...)
 }
 
-func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func ZerotierCli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/local/bin/zerotier-cli", arg...)
 }
 

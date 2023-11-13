@@ -108,7 +108,7 @@ func Softwareupdate(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/softwareupdate", arg...)
 }
 
-func Systemprofiler(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func SystemProfiler(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/system_profiler", arg...)
 }
 
@@ -116,7 +116,7 @@ func Tmutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/tmutil", arg...)
 }
 
-func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func ZerotierCli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/local/bin/zerotier-cli", arg...)
 }
 

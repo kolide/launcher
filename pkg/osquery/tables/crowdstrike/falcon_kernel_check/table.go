@@ -36,7 +36,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 5, allowedcmd.Falconkernelcheck, []string{}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 5, allowedcmd.FalconKernelCheck, []string{}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "exec failed", "err", err)
 		return nil, err

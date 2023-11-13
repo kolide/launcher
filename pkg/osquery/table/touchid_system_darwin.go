@@ -42,7 +42,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 
 	// Read the security chip from system_profiler
 	var stdout bytes.Buffer
-	cmd, err := allowedcmd.Systemprofiler(ctx, "SPiBridgeDataType")
+	cmd, err := allowedcmd.SystemProfiler(ctx, "SPiBridgeDataType")
 	if err != nil {
 		level.Debug(t.logger).Log("msg", "could not create system_profiler command", "err", err)
 		return results, nil

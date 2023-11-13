@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-func Commandprompt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func CommandPrompt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "cmd.exe"), arg...)
 }
 
@@ -51,7 +51,7 @@ func Taskkill(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEM32"), "taskkill.exe"), arg...)
 }
 
-func Zerotiercli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+func ZerotierCli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	// For windows, "-q" should be prepended before all other args
 	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
 }

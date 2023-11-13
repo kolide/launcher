@@ -206,7 +206,7 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 
 	args = append(args, subcommands...)
 
-	cmd, err := allowedcmd.Systemprofiler(ctx, args...)
+	cmd, err := allowedcmd.SystemProfiler(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating system_profiler command: %w", err)
 	}

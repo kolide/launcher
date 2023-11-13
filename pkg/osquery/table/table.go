@@ -48,11 +48,11 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dev_table_tooling.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.Zerotiercli, []string{"info"}),
+			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_networks", dataflattentable.JsonType, allowedcmd.Zerotiercli, []string{"listnetworks"}),
+			"kolide_zerotier_networks", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listnetworks"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_peers", dataflattentable.JsonType, allowedcmd.Zerotiercli, []string{"listpeers"}),
+			"kolide_zerotier_peers", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listpeers"}),
 		tdebug.LauncherGcInfo(logger),
 	}
 
