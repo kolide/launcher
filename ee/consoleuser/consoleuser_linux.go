@@ -36,26 +36,30 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		remoteVal, err := sessionProperty(ctx, s.Session, "Remote")
+		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--property=Remote", "--property=Active").Output()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}
+
+		outputStr := strings.Trim(string(output), "\n")
+
+		// to make remote session behave like local session and include systray icons on ubuntu 22.04
+		// had to create a ~/.xsessionrc file with the following content:
+		// export GNOME_SHELL_SESSION_MODE=ubuntu
+		// export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+		// export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
 
 		// don't count ssh users as console users
 		// ssh: remote=yes
 		// local: remote=no
 		// rdp: remote=no
-		if remoteVal == "yes" {
+
+		if strings.Contains(outputStr, "Remote=yes") {
 			continue
 		}
 
-		activeVal, err = sessionProperty(ctx, s.Session, "Active")
-		if err != nil {
-			return nil, err
-		}
-
-		// don't count inactive users as console users
-		if activeVal == "no" {
+		// don't include inactive users
+		if strings.Contains(outputStr, "Active=no") {
 			continue
 		}
 
@@ -63,18 +67,4 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	}
 
 	return uids, nil
-}
-
-func sessionProperty(ctx context.Context, sessionId, property string) (string, error){
-	output, err := exec.CommandContext(ctx,
-		"loginctl",
-		"show-session", sessionId,
-		"--value", fmt.Sprintf("--property=%s", property)
-	).Output()
-
-	if err != nil {
-		return "", fmt.Errorf("loginctl show-session (for sessionId %s): %w", sessionId, err)
-	}
-
-	return strings.Trim(string(output), "\n"), nil
 }
