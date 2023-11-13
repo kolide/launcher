@@ -19,17 +19,6 @@ type allowedCommand struct {
 	args []string
 }
 
-var allowedCommands = map[string]allowedCommand{
-	"echo": {
-		bin:  allowedcmd.Echo,
-		args: []string{"hello"},
-	},
-	"cb_repcli": {
-		bin:  allowedcmd.Repcli,
-		args: []string{"status"},
-	},
-}
-
 type Table struct {
 	logger log.Logger
 }
