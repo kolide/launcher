@@ -491,16 +491,17 @@ func (fc *FlagController) SetLogShippingLevel(level string) error {
 	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
 }
 func (fc *FlagController) LogShippingLevel() string {
+	const defaultLevel = "info"
+
 	return NewStringFlagValue(
-		WithDefaultString("error"),
+		WithDefaultString(defaultLevel),
 		WithSanitizer(func(value string) string {
 			value = strings.ToLower(value)
-
 			switch value {
-			case "debug", "warn", "error":
+			case "debug", "warn", "info", "error":
 				return value
 			default:
-				return "info"
+				return defaultLevel
 			}
 		}),
 	).get(fc.getControlServerValue(keys.LogShippingLevel))
