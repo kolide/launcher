@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -43,7 +44,8 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	var stdout bytes.Buffer
 	cmd, err := allowedcmd.Systemprofiler(ctx, "SPiBridgeDataType")
 	if err != nil {
-		return nil, fmt.Errorf("creating system_profiler command: %w", err)
+		level.Debug(t.logger).Log("msg", "could not create system_profiler command", "err", err)
+		return results, nil
 	}
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
@@ -62,7 +64,8 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	stdout.Reset()
 	cmd, err = allowedcmd.Bioutil(ctx, "-r", "-s")
 	if err != nil {
-		return nil, fmt.Errorf("creating bioutil command: %w", err)
+		level.Debug(t.logger).Log("msg", "could not create bioutil command", "err", err)
+		return results, nil
 	}
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
