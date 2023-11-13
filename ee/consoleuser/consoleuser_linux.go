@@ -53,7 +53,6 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// ssh: remote=yes
 		// local: remote=no
 		// rdp: remote=no
-
 		if strings.Contains(outputStr, "Remote=yes") {
 			continue
 		}
