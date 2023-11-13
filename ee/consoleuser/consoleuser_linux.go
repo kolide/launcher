@@ -36,18 +36,26 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		// if there is no seat, this is not a graphical session
-		if s.Seat == "" {
+		remoteVal, err := sessionProperty(ctx, s.Session, "Remote")
+		if err != nil {
+			return nil, err
+		}
+
+		// don't count ssh users as console users
+		// ssh: remote=yes
+		// local: remote=no
+		// rdp: remote=no
+		if remoteVal == "yes" {
 			continue
 		}
 
-		// get the active property of the session, this command does not respect the --output=json flag
-		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active").Output()
+		activeVal, err = sessionProperty(ctx, s.Session, "Active")
 		if err != nil {
-			return nil, fmt.Errorf("loginctl show-session (for uid %d): %w", s.UID, err)
+			return nil, err
 		}
 
-		if strings.Trim(string(output), "\n") != "yes" {
+		// don't count inactive users as console users
+		if activeVal == "no" {
 			continue
 		}
 
@@ -55,4 +63,18 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	}
 
 	return uids, nil
+}
+
+func sessionProperty(ctx context.Context, sessionId, property string) (string, error){
+	output, err := exec.CommandContext(ctx,
+		"loginctl",
+		"show-session", sessionId,
+		"--value", fmt.Sprintf("--property=%s", property)
+	).Output()
+
+	if err != nil {
+		return "", fmt.Errorf("loginctl show-session (for sessionId %s): %w", sessionId, err)
+	}
+
+	return strings.Trim(string(output), "\n"), nil
 }
