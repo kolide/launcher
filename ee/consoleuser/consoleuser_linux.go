@@ -41,8 +41,6 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}
 
-		outputStr := strings.Trim(string(output), "\n")
-
 		// to make remote session behave like local session and include systray icons on ubuntu 22.04
 		// had to create a ~/.xsessionrc file with the following content:
 		// export GNOME_SHELL_SESSION_MODE=ubuntu
@@ -53,12 +51,12 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// ssh: remote=yes
 		// local: remote=no
 		// rdp: remote=no
-		if strings.Contains(outputStr, "Remote=yes") {
+		if !strings.Contains(string(output), "Remote=no") {
 			continue
 		}
 
 		// don't include inactive users
-		if strings.Contains(outputStr, "Active=no") {
+		if !strings.Contains(string(output), "Active=yes") {
 			continue
 		}
 
