@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -368,21 +369,32 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	// If we get ETXTBSY error when execing, this could be because this
+	// binary is freshly downloaded. Retry a small number of times only
+	// in that circumstance.
+	// See: https://github.com/golang/go/issues/22315
+	for i := 0; i < 3; i += 1 {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
 
-	cmd := exec.CommandContext(ctx, potentialBinary, args...)
+		cmd := exec.CommandContext(ctx, potentialBinary, args...)
 
-	// Set env, this should prevent launcher for fork-bombing
-	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+		// Set env, this should prevent launcher for fork-bombing
+		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 
-	execErr := cmd.Run()
+		execErr := cmd.Run()
+		if execErr != nil && errors.Is(ctx.Err(), syscall.ETXTBSY) {
+			continue
+		}
 
-	if ctx.Err() != nil {
-		return ctx.Err()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		return supressRoutineErrors(execErr)
 	}
 
-	return supressRoutineErrors(execErr)
+	return fmt.Errorf("could not exec %s -- text file busy", potentialBinary)
 }
 
 // supressRoutineErrors attempts to tell whether the error was a
