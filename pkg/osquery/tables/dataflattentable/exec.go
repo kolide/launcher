@@ -28,13 +28,13 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
 		logger:            level.NewFilter(logger, level.AllowInfo()),
 		tableName:         tableName,
-		cmd:               cmd,
+		cmdGen:            cmdGen,
 		execArgs:          execArgs,
 		keyValueSeparator: ":",
 	}
@@ -100,7 +100,7 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	cmd, err := t.cmd(ctx, t.execArgs...)
+	cmd, err := t.cmdGen(ctx, t.execArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("creating command: %w", err)
 	}

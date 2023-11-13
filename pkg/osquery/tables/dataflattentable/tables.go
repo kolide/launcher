@@ -35,7 +35,7 @@ type Table struct {
 	flattenFileFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 	flattenBytesFunc func([]byte, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
 
-	cmd      allowedcmd.AllowedCommand
+	cmdGen   allowedcmd.AllowedCommand
 	execArgs []string
 
 	keyValueSeparator string
