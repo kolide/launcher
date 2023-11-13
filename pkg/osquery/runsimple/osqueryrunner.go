@@ -88,8 +88,7 @@ func (p osqueryProcess) RunSql(ctx context.Context, sql []byte) error {
 
 	p.stdin = bytes.NewReader(sql)
 
-	// We trust the autoupdate library to find the correct path
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct path
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin
@@ -104,8 +103,7 @@ func (p osqueryProcess) RunVersion(ctx context.Context) error {
 		"--version",
 	}
 
-	// We trust the autoupdate library to find the correct path
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct path
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin

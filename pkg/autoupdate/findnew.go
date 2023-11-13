@@ -371,9 +371,7 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// Since we trust the autoupdate library to find binaries in the correct location,
-	// we don't require the use of allowedcmd here.
-	cmd := exec.CommandContext(ctx, potentialBinary, args...) //nolint:forbidigo
+	cmd := exec.CommandContext(ctx, potentialBinary, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct location so we don't need allowedcmd
 
 	// Set env, this should prevent launcher for fork-bombing
 	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")

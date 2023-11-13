@@ -1,7 +1,6 @@
 //go:build windows
 // +build windows
 
-// nolint:forbidigo
 package authenticode
 
 import (
@@ -30,7 +29,7 @@ func TestSign(t *testing.T) {
 
 	// create a signtoolOptions object so we can call the exec method
 	so := &signtoolOptions{
-		execCC: exec.CommandContext,
+		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext in test
 	}
 
 	ctx, ctxCancel := context.WithTimeout(context.Background(), 120*time.Second)

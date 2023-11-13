@@ -12,7 +12,7 @@ import (
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
 
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo
+	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
 }
 
 func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*exec.Cmd, error) {

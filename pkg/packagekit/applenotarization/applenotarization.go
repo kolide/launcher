@@ -1,4 +1,3 @@
-// nolint:forbidigo
 // Package applenotarization is a wrapper around the apple
 // notarization tools.
 //
@@ -107,7 +106,7 @@ func (n *Notarizer) runNotarytool(ctx context.Context, command string, target st
 		return []byte(n.fakeResponse), nil
 	}
 
-	cmd := exec.CommandContext(ctx, "xcrun", baseArgs...)
+	cmd := exec.CommandContext(ctx, "xcrun", baseArgs...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -7,7 +7,6 @@
 //
 // https://docs.microsoft.com/en-us/dotnet/framework/tools/signtool-exe
 
-// nolint:forbidigo
 package authenticode
 
 import (
@@ -47,7 +46,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 		signtoolPath:    "signtool.exe",
 		timestampServer: "http://timestamp.verisign.com/scripts/timstamp.dll",
 		rfc3161Server:   "http://sha256timestamp.ws.symantec.com/sha256/timestamp",
-		execCC:          exec.CommandContext,
+		execCC:          exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	for _, opt := range opts {
