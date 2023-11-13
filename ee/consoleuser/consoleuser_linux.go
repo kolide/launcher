@@ -36,7 +36,13 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--property=Remote", "--property=Active").Output()
+		output, err := exec.CommandContext(ctx,
+			"loginctl",
+			"show-session", s.Session,
+			"--property=Remote",
+			"--property=Active",
+		).Output()
+
 		if err != nil {
 			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}
@@ -47,20 +53,12 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// export XDG_CURRENT_DESKTOP=ubuntu:GNOME
 		// export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
 
-		// don't count ssh users as console users
 		// ssh: remote=yes
 		// local: remote=no
 		// rdp: remote=no
-		if !strings.Contains(string(output), "Remote=no") {
-			continue
+		if strings.Contains(string(output), "Remote=no") && strings.Contains(string(output), "Active=yes") {
+			uids = append(uids, fmt.Sprintf("%d", s.UID))
 		}
-
-		// don't include inactive users
-		if !strings.Contains(string(output), "Active=yes") {
-			continue
-		}
-
-		uids = append(uids, fmt.Sprintf("%d", s.UID))
 	}
 
 	return uids, nil
