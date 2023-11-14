@@ -202,7 +202,7 @@ func TestChannelUsesNewAutoupdater(t *testing.T) {
 		},
 		{
 			channelName:        "beta",
-			usesNewAutoupdater: false,
+			usesNewAutoupdater: true,
 		},
 		{
 			channelName:        "",
