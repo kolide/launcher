@@ -3,6 +3,7 @@ package traces
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"runtime"
 
@@ -19,6 +20,16 @@ const (
 	defaultSpanName           = "launcher/unknown"
 	defaultAttributeNamespace = "unknown"
 )
+
+// StartHttpRequestSpan returns a copy of the request with a new context to include span info and span,
+// including information about the calling function as appropriate.
+// Standardizes the tracer name. The caller is always responsible for
+// ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
+// string representing the attribute key and the second in the pair is the attribute value.
+func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Request, trace.Span) {
+	ctx, span := StartSpan(r.Context(), keyVals...)
+	return r.WithContext(ctx), span
+}
 
 // StartSpan returns a new context and span, including information about the calling function
 // as appropriate. Standardizes the tracer name. The caller is always responsible for

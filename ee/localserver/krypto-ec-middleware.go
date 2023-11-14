@@ -138,8 +138,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		spanCtx, span := traces.StartSpan(r.Context())
-		r = r.WithContext(spanCtx)
+		r, span := traces.StartHttpRequestSpan(r)
 
 		defer span.End()
 

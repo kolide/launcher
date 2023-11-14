@@ -68,8 +68,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, nil).Once()
 			}
 
-			var logBytes bytes.Buffer
-			server := testServer(t, mockKnapsack, &logBytes)
+			server := testServer(t, mockKnapsack)
 			server.querier = mockQuerier
 
 			jsonBytes, err := json.Marshal(map[string]string{
@@ -239,8 +238,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			}
 
 			// set up test server
-			var logBytes bytes.Buffer
-			server := testServer(t, mockKnapsack, &logBytes)
+			server := testServer(t, mockKnapsack)
 			server.querier = mockQuerier
 
 			// make request body
