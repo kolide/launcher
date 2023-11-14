@@ -3,15 +3,15 @@
 
 package dev_table_tooling
 
-import "path/filepath"
+import "github.com/kolide/launcher/pkg/allowedcmd"
 
 var allowedCommands = map[string]allowedCommand{
 	"echo": {
-		binPaths: []string{"echo"},
-		args:     []string{"hello"},
+		bin:  allowedcmd.Echo,
+		args: []string{"hello"},
 	},
 	"cb_repcli": {
-		binPaths: []string{filepath.Join("Program Files", "Confer", "repcli")},
-		args:     []string{"status"},
+		bin:  allowedcmd.Repcli,
+		args: []string{"status"},
 	},
 }

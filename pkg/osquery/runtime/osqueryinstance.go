@@ -480,7 +480,7 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	if !opts.enableWatchdog {
 		args = append(args, "--disable_watchdog")
 	}
-	cmd := exec.Command(
+	cmd := exec.Command( //nolint:forbidigo // We trust the autoupdate library to find the correct path
 		osquerydBinary,
 		args...,
 	)

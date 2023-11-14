@@ -2,16 +2,11 @@ package log
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	kitlog "github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -158,90 +153,6 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
-}
-
-// runAndLogPs runs ps filtering on the given PID, and logs the output.
-func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
-	if runtime.GOOS == "windows" {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "ps", "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running ps on non-osqueryd process using pidfile",
-			"pid", pidStr,
-			"err", err,
-		)
-		return
-	}
-
-	level.Debug(l.logger).Log(
-		"msg", "ran ps on non-osqueryd process using pidfile",
-		"pid", pidStr,
-		"output", string(out),
-	)
-}
-
-// runAndLogLsofByPID runs lsof filtering on the given PID, and logs the output.
-func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
-	if runtime.GOOS == "windows" {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", "-p", pidStr)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running lsof on non-osqueryd process using pidfile",
-			"pid", pidStr,
-			"err", err,
-		)
-		return
-	}
-
-	level.Debug(l.logger).Log(
-		"msg", "ran lsof on non-osqueryd process using pidfile",
-		"pid", pidStr,
-		"output", string(out),
-	)
-}
-
-// runAndLogLsofOnPidfile runs lsof filtering by the osquery pidfile, and logs
-// the output.
-func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
-	if runtime.GOOS == "windows" {
-		return
-	}
-
-	fullPidfile := filepath.Join(l.rootDirectory, "osquery.pid")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "lsof", "-R", "-n", fullPidfile)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running lsof on osqueryd pidfile",
-			"pidfile", fullPidfile,
-			"err", err,
-		)
-		return
-	}
-
-	level.Debug(l.logger).Log(
-		"msg", "ran lsof on osqueryd pidfile",
-		"pidfile", fullPidfile,
-		"output", string(out),
-	)
 }
 
 // getStringStat is a small wrapper around gopsutil/process functions

@@ -6,13 +6,12 @@ import (
 
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -29,18 +28,13 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func WithBinDirs(binDirs ...string) ExecTableOpt {
-	return func(t *Table) {
-		t.binDirs = binDirs
-	}
-}
-
-func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
 		logger:            level.NewFilter(logger, level.AllowInfo()),
 		tableName:         tableName,
+		cmdGen:            cmdGen,
 		execArgs:          execArgs,
 		keyValueSeparator: ":",
 	}
@@ -103,37 +97,25 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 50*time.Second)
 	defer cancel()
 
-	possibleBinaries := []string{}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 
-	if t.binDirs == nil || len(t.binDirs) == 0 {
-		possibleBinaries = []string{t.execArgs[0]}
-	} else {
-		for _, possiblePath := range t.binDirs {
-			possibleBinaries = append(possibleBinaries, filepath.Join(possiblePath, t.execArgs[0]))
-		}
+	cmd, err := t.cmdGen(ctx, t.execArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("creating command: %w", err)
 	}
 
-	for _, execPath := range possibleBinaries {
-		var stdout bytes.Buffer
-		var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 
-		cmd := exec.CommandContext(ctx, execPath, t.execArgs[1:]...)
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+	level.Debug(t.logger).Log("msg", "calling %s", "args", cmd.String())
 
-		level.Debug(t.logger).Log("msg", "calling %s", "args", cmd.String())
-
-		if err := cmd.Run(); os.IsNotExist(err) {
-			// try the next binary
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("calling %s. Got: %s: %w", t.execArgs[0], string(stderr.Bytes()), err)
-		}
-
-		// success!
-		return stdout.Bytes(), nil
+	if err := cmd.Run(); os.IsNotExist(err) {
+		return nil, fmt.Errorf("command %s not found: %w", cmd.Path, err)
+	} else if err != nil {
+		return nil, fmt.Errorf("calling %s. Got: %s: %w", cmd.Path, string(stderr.Bytes()), err)
 	}
 
-	// None of the possible execs were found
-	return nil, fmt.Errorf("Unable to exec '%s'. No binary found is specified paths", t.execArgs[0])
+	// success!
+	return stdout.Bytes(), nil
 }

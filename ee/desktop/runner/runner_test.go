@@ -33,7 +33,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	// CPU consumption go way up.
 
 	// To get around the issue mentioned above, build the binary first and set its path as the executable path on the runner.
-	executablePath := filepath.Join(t.TempDir(), "desktop-test")
+	executablePath := filepath.Join(t.TempDir(), "desktop-test", "launcher")
 
 	if runtime.GOOS == "windows" {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)
@@ -44,7 +44,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher")
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher") //nolint:forbidigo // Fine to use exec.CommandContext in test
 	buildStartTime := time.Now()
 	out, err := cmd.CombinedOutput()
 	if err != nil {

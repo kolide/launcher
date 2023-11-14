@@ -7,9 +7,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {
@@ -19,12 +20,15 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	}
 
 	launchDaemonPList := fmt.Sprintf("/Library/LaunchDaemons/com.%s.launcher.plist", identifier)
-	launchCtlPath := "/bin/launchctl"
 	launchCtlArgs := []string{"unload", launchDaemonPList}
 
 	launchctlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(launchctlCtx, launchCtlPath, launchCtlArgs...)
+	cmd, err := allowedcmd.Launchctl(launchctlCtx, launchCtlArgs...)
+	if err != nil {
+		fmt.Printf("could not find launchctl: %s\n", err)
+		return err
+	}
 	if out, err := cmd.Output(); err != nil {
 		fmt.Printf("error occurred while unloading launcher daemon, launchctl output %s: err: %s\n", out, err)
 		return err
@@ -55,7 +59,11 @@ func removeLauncher(ctx context.Context, identifier string) error {
 
 	pkgutiltCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	pkgUtilcmd := exec.CommandContext(pkgutiltCtx, "/usr/sbin/pkgutil", "--forget", fmt.Sprintf("com.%s.launcher", identifier))
+	pkgUtilcmd, err := allowedcmd.Pkgutil(pkgutiltCtx, "--forget", fmt.Sprintf("com.%s.launcher", identifier))
+	if err != nil {
+		fmt.Printf("could not find pkgutil: %s\n", err)
+		return err
+	}
 
 	if out, err := pkgUtilcmd.Output(); err != nil {
 		fmt.Printf("error occurred while forgetting package: output %s: err: %s\n", out, err)

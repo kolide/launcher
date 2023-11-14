@@ -5,10 +5,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {
@@ -21,33 +23,27 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	packageName := fmt.Sprintf("launcher-%s", identifier)
 
 	// Stop and disable launcher service
-	cmd := exec.CommandContext(ctx, "systemctl", []string{"disable", "--now", serviceName}...)
+	cmd, err := allowedcmd.Systemctl(ctx, []string{"disable", "--now", serviceName}...)
+	if err != nil {
+		fmt.Printf("could not find systemctl: %s\n", err)
+		return err
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		// Don't exit. Log and move on to the next uninstall command
 		fmt.Printf("error occurred while stopping/disabling launcher service, systemctl output %s: err: %s\n", string(out), err)
 	}
 
-	fileExists := func(f string) bool {
-		if _, err := os.Stat(f); err == nil {
-			return true
-		}
-		return false
-	}
-
 	// Tell the appropriate package manager to remove launcher
-	switch {
-	case fileExists("/usr/bin/dpkg"):
-		cmd = exec.CommandContext(ctx, "/usr/bin/dpkg", []string{"--purge", packageName}...)
+	if cmd, err := allowedcmd.Dpkg(ctx, []string{"--purge", packageName}...); err == nil {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Printf("error occurred while running dpkg --purge, output %s: err: %s\n", string(out), err)
 		}
-	case fileExists("/bin/rpm"):
-		cmd = exec.CommandContext(ctx, "/bin/rpm", []string{"-e", packageName}...)
+	} else if cmd, err := allowedcmd.Rpm(ctx, []string{"-e", packageName}...); err == nil {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Printf("error occurred while running rpm -e, output %s: err: %s\n", string(out), err)
 		}
-	default:
-		return fmt.Errorf("unsupported package manager")
+	} else {
+		return errors.New("unsupported package manager")
 	}
 
 	pathsToRemove := []string{

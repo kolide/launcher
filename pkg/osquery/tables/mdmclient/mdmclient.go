@@ -1,7 +1,5 @@
-//go:build !windows
-// +build !windows
-
-// (skip building windows, since the newline replacement doesn't work there)
+//go:build darwin
+// +build darwin
 
 // Package mdmclient provides a table that parses the mdmclient
 // output. Empirically, this seems to be an almost gnustep
@@ -18,13 +16,12 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
-
-const mdmclientPath = "/usr/libexec/mdmclient"
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -92,7 +89,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, []string{mdmclientPath}, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "mdmclient failed", "err", err)
 				continue

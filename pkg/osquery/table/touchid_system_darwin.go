@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -41,7 +42,11 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 
 	// Read the security chip from system_profiler
 	var stdout bytes.Buffer
-	cmd := exec.CommandContext(ctx, "/usr/sbin/system_profiler", "SPiBridgeDataType")
+	cmd, err := allowedcmd.SystemProfiler(ctx, "SPiBridgeDataType")
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not create system_profiler command", "err", err)
+		return results, nil
+	}
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("calling system_profiler: %w", err)
@@ -57,7 +62,11 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 
 	// Read the system's bioutil configuration
 	stdout.Reset()
-	cmd = exec.CommandContext(ctx, "/usr/bin/bioutil", "-r", "-s")
+	cmd, err = allowedcmd.Bioutil(ctx, "-r", "-s")
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not create bioutil command", "err", err)
+		return results, nil
+	}
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("calling bioutil for system configuration: %w", err)
