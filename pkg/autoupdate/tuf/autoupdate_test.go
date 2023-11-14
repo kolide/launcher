@@ -67,7 +67,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
-	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
+	mockKnapsack.On("AutoupdateInterval").Return(500 * time.Millisecond)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
@@ -103,10 +103,12 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
-	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
-	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false).Once()
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(true).Maybe() // On subsequent iterations, no need to download again
+	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false).Once()
+	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(true).Maybe() // On subsequent iterations, no need to download again
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil).Once()
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil).Once()
 
 	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
 	go autoupdater.Execute()
