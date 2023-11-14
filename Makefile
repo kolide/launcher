@@ -68,14 +68,13 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 	cp $@/../launcher $@/Contents/MacOS/
 	mkdir -p $@/Contents/Resources
 	cp tools/images/Kolide.icns $@/Contents/Resources
-	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
+	sed 's/VERSIONPLACEHOLDER/${RELEASE_VERSION_SHORT}/g' tools/packaging/LauncherTemplate_Info.plist > $@/Contents/Info.plist
 	cp tools/packaging/embedded.provisionprofile $@/Contents/
 	cp tools/packaging/entitlements.plist $@/../
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
 tables.ext: build_tables.ext
-grpc.ext: build_grpc.ext
 fake-launcher: fake_launcher
 build/darwin.amd64/%: build_%_darwin_amd64
 build/darwin.arm64/%: build_%_darwin_arm64
@@ -84,7 +83,7 @@ build/darwin.universal/%: lipo_%
 ##
 ## GitHub Action Helpers
 ##
-GITHUB_TARGETS=launcher grpc.ext tables.ext package-builder
+GITHUB_TARGETS=launcher tables.ext package-builder
 GITHUB_ARCHS=amd64 arm64
 github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
@@ -121,6 +120,8 @@ rel-launcherapp: $(foreach arch, $(DARWIN_ARCHES), build/darwin.$(arch)/Kolide.a
 ##
 
 RELEASE_VERSION = $(shell git describe --tags --always --dirty)
+# RELEASE_VERSION_SHORT contains only <major>.<minor>.<patch>
+RELEASE_VERSION_SHORT = $(shell git describe --tags --always --dirty | sed -En 's/v([[:digit:]]+)\.([[:digit:]]+)\.([[:digit:]]+).*/\1.\2.\3/p')
 
 release:
 	@echo "Run 'make release-phase1' on the m1 machine"

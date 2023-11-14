@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -45,6 +46,7 @@ import (
 	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -68,10 +70,11 @@ const (
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
-func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
+	logger := ctxlog.FromContext(ctx)
+	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
 
@@ -166,7 +169,15 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db)
+	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
+
+	if k.Debug() {
+		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
+		k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}))
+	}
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -175,6 +186,8 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
+		k.AddSlogHandler(logShipper.SlogHandler())
+		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 	}
 
 	// construct the appropriate http client based on security settings
@@ -232,14 +245,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	{
 		switch k.Transport() {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
+			grpcConn, err := service.DialGRPC(k, rootPool)
 			if err != nil {
 				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
-			client = service.NewGRPCClient(grpcConn, logger)
+			client = service.NewGRPCClient(k, grpcConn)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
+			client = service.NewJSONRPCClient(k, rootPool)
 		case "osquery":
 			client = service.NewNoopClient(logger)
 		default:
@@ -260,8 +273,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	level.Info(logger).Log(
-		"msg", "started kolide launcher",
+	k.SystemSlogger().Info("started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
@@ -309,7 +321,7 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 
 		// register flare consumer
-		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(logger, k))
+		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(

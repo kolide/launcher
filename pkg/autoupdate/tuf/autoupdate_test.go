@@ -116,7 +116,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	shutdownDeadline := time.Now().Add(5 * time.Second).Unix()
 	for {
 		if time.Now().Unix() > shutdownDeadline {
-			t.Error("autoupdater did not shut down within 5 seconds")
+			t.Error("autoupdater did not shut down within 5 seconds -- logs: ", logBytes.String())
 			t.FailNow()
 		}
 
@@ -341,7 +341,7 @@ func TestExecute_downgrade(t *testing.T) {
 	shutdownDeadline := time.Now().Add(5 * time.Second).Unix()
 	for {
 		if time.Now().Unix() > shutdownDeadline {
-			t.Error("autoupdater did not restart osquery within 5 seconds")
+			t.Error("autoupdater did not restart osquery within 5 seconds -- logs: ", logBytes.String())
 			t.FailNow()
 		}
 

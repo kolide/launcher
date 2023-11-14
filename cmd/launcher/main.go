@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 )
 
@@ -73,9 +75,9 @@ func main() {
 					logutil.Fatal(logger, err, "exec")
 				}
 				panic("how")
-			} else {
-				level.Debug(logger).Log("msg", "Nothing new")
 			}
+
+			level.Debug(logger).Log("msg", "Nothing new")
 		}
 	}
 
@@ -97,9 +99,29 @@ func main() {
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
+	// set up system slogger to write to os logs
+	systemSlogger := multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	// set up slogger for internal launcher logging
+	slogger := multislogger.New()
+
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
-		logger = teelogger.New(logger, locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json")))
+		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
+		logger = teelogger.New(logger, localLogger)
+
+		localSloggerHandler := slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})
+
+		slogger.AddHandler(localSloggerHandler)
+
+		// also send system logs to localSloggerHandler
+		systemSlogger.AddHandler(localSloggerHandler)
+
 		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
@@ -115,7 +137,7 @@ func main() {
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
-	if err := runLauncher(ctx, cancel, opts); err != nil {
+	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
 			runNewerLauncherIfAvailable(ctx, logger)
@@ -239,7 +261,10 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 }
 
 func runVersion(args []string) error {
+	attachConsole()
 	version.PrintFull()
+	detachConsole()
+
 	os.Exit(0)
 	return nil
 }

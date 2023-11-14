@@ -1,0 +1,14 @@
+changelog:
+  categories:
+    - title: Breaking Changes
+      labels:
+        - "breaking-change"
+    - title: Table Changes
+      labels:
+        - "component:table"
+    - title: General
+      labels:
+        - "*"
+    - title: Build and Package
+      labels:
+        - "component:build&packaging"

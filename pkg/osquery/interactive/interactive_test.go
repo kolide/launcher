@@ -113,15 +113,12 @@ func downloadOsquery(dir string) error {
 		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
 	}
 
+	// Binary is already downloaded to osquerydCacheDir -- create a symlink at outputFile,
+	// rather than copying the file, to maybe avoid https://github.com/golang/go/issues/22315
 	outputFile := filepath.Join(dir, "osqueryd")
-
-	path, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
-	if err != nil {
-		return fmt.Errorf("error fetching binary osqueryd binary: %w", err)
-	}
-
-	if err := fsutil.CopyFile(path, outputFile); err != nil {
-		return fmt.Errorf("error copying binary osqueryd binary: %w", err)
+	sourceFile := filepath.Join(osquerydCacheDir, fmt.Sprintf("osqueryd-%s-stable", runtime.GOOS), "osqueryd")
+	if err := os.Symlink(sourceFile, outputFile); err != nil {
+		return fmt.Errorf("creating symlink from %s to %s: %w", sourceFile, outputFile, err)
 	}
 
 	return nil

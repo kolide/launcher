@@ -36,22 +36,29 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		// if there is no seat, this is not a graphical session
-		if s.Seat == "" {
-			continue
-		}
+		output, err := exec.CommandContext(ctx,
+			"loginctl",
+			"show-session", s.Session,
+			"--property=Remote",
+			"--property=Active",
+		).Output()
 
-		// get the active property of the session, this command does not respect the --output=json flag
-		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active").Output()
 		if err != nil {
-			return nil, fmt.Errorf("loginctl show-session (for uid %d): %w", s.UID, err)
+			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}
 
-		if strings.Trim(string(output), "\n") != "yes" {
-			continue
-		}
+		// to make remote session behave like local session and include systray icons on ubuntu 22.04
+		// had to create a ~/.xsessionrc file with the following content:
+		// export GNOME_SHELL_SESSION_MODE=ubuntu
+		// export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+		// export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
 
-		uids = append(uids, fmt.Sprintf("%d", s.UID))
+		// ssh: remote=yes
+		// local: remote=no
+		// rdp: remote=no
+		if strings.Contains(string(output), "Remote=no") && strings.Contains(string(output), "Active=yes") {
+			uids = append(uids, fmt.Sprintf("%d", s.UID))
+		}
 	}
 
 	return uids, nil

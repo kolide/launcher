@@ -45,6 +45,7 @@ type shipper struct {
 	writer   io.WriteCloser
 	knapsack types.Knapsack
 
+	uploadName           string
 	uploadRequestURL     string
 	uploadRequest        *http.Request
 	uploadRequestStarted bool
@@ -89,6 +90,10 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s.uploadRequest = req
 
 	return s, nil
+}
+
+func (s *shipper) Name() string {
+	return s.uploadName
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
@@ -153,6 +158,7 @@ func (s *shipper) signedUrl() (string, error) {
 	}
 
 	signedUrlRequest.Header.Set(control.HeaderApiVersion, control.ApiVersion)
+	signedUrlRequest.Header.Set("Content-Type", "application/json")
 
 	signHttpRequest(signedUrlRequest, body)
 
@@ -163,7 +169,8 @@ func (s *shipper) signedUrl() (string, error) {
 	defer signedUrlResponse.Body.Close()
 
 	responseData := struct {
-		URL string `json:"URL"`
+		URL  string `json:"URL"`
+		Name string `json:"name"`
 	}{}
 
 	if err := json.NewDecoder(signedUrlResponse.Body).Decode(&responseData); err != nil {
@@ -174,6 +181,7 @@ func (s *shipper) signedUrl() (string, error) {
 		return "", fmt.Errorf("got %s status in signed url response", signedUrlResponse.Status)
 	}
 
+	s.uploadName = responseData.Name
 	return responseData.URL, nil
 }
 
@@ -193,8 +201,8 @@ func signHttpRequest(req *http.Request, body []byte) {
 			return
 		}
 
-		request.Header.Set(control.HeaderKey, string(pub))
-		request.Header.Set(control.HeaderSignature, base64.StdEncoding.EncodeToString(sig))
+		request.Header.Set(headerKey, string(pub))
+		request.Header.Set(signatureKey, base64.StdEncoding.EncodeToString(sig))
 	}
 
 	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)

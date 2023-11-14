@@ -3,9 +3,9 @@ package flareconsumer
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer/mocks"
 	knapsackMock "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/stretchr/testify/mock"
@@ -36,7 +36,8 @@ func TestFlareConsumer(t *testing.T) {
 			t.Parallel()
 
 			mockSack := knapsackMock.NewKnapsack(t)
-			f := New(log.NewNopLogger(), mockSack)
+			mockSack.On("Slogger").Return(slog.New(slog.NewJSONHandler(io.Discard, nil))).Maybe()
+			f := New(mockSack)
 			f.flarer = tt.flarer(t)
 			f.newFlareStream = func(note, uploadRequestURL string) (io.WriteCloser, error) {
 				// whatever, it implements write closer
