@@ -383,7 +383,7 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 
 		execErr := cmd.Run()
-		if execErr != nil && errors.Is(ctx.Err(), syscall.ETXTBSY) {
+		if execErr != nil && errors.Is(execErr, syscall.ETXTBSY) {
 			continue
 		}
 
@@ -394,7 +394,7 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 		return supressRoutineErrors(execErr)
 	}
 
-	return fmt.Errorf("could not exec %s -- text file busy", potentialBinary)
+	return fmt.Errorf("could not exec %s despite retries due to text file busy", potentialBinary)
 }
 
 // supressRoutineErrors attempts to tell whether the error was a
