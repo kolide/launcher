@@ -81,7 +81,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	consoleUsers, err := consoleUsers()
 	if err != nil {
 		traces.SetError(span, err)
-		ls.logger.Log(r.Context(), slog.LevelError,
+		ls.slogger.Log(r.Context(), slog.LevelError,
 			"getting console users",
 			"err", err,
 		)
@@ -94,7 +94,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		traces.SetError(span, err)
-		ls.logger.Log(r.Context(), slog.LevelError,
+		ls.slogger.Log(r.Context(), slog.LevelError,
 			"marshaling json",
 			"err", err,
 		)

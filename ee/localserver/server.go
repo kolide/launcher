@@ -39,7 +39,7 @@ type Querier interface {
 }
 
 type localServer struct {
-	logger       *slog.Logger
+	slogger      *slog.Logger
 	knapsack     types.Knapsack
 	srv          *http.Server
 	identifiers  identifiers
@@ -63,7 +63,7 @@ const (
 
 func New(k types.Knapsack) (*localServer, error) {
 	ls := &localServer{
-		logger:                k.Slogger().With("component", "localserver"),
+		slogger:               k.Slogger().With("component", "localserver"),
 		knapsack:              k,
 		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:          k.KolideServerURL(),
@@ -148,21 +148,21 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 
 	switch {
 	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
-		ls.logger.Log(ctx, slogLevel,
+		ls.slogger.Log(ctx, slogLevel,
 			"using developer certificates",
 		)
 
 		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
-		ls.logger.Log(ctx, slogLevel,
+		ls.slogger.Log(ctx, slogLevel,
 			"using review app certificates",
 		)
 
 		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
 	default:
-		ls.logger.Log(ctx, slogLevel,
+		ls.slogger.Log(ctx, slogLevel,
 			"using default/production certificates",
 		)
 	}
@@ -191,19 +191,19 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 	success := true
 
 	ctx := context.TODO()
-	ls.logger.Log(ctx, slog.LevelDebug,
+	ls.slogger.Log(ctx, slog.LevelDebug,
 		"starting async worker run",
 	)
 
 	if err := ls.updateIdFields(); err != nil {
 		success = false
-		ls.logger.Log(ctx, slog.LevelError,
+		ls.slogger.Log(ctx, slog.LevelError,
 			"updating id fields",
 			"err", err,
 		)
 	}
 
-	ls.logger.Log(ctx, slog.LevelDebug,
+	ls.slogger.Log(ctx, slog.LevelDebug,
 		"completed async worker run",
 		"success", success,
 	)
@@ -235,7 +235,7 @@ func (ls *localServer) Start() error {
 			if time.Since(lastRun) > recalculateInterval {
 				lastRun = ls.runAsyncdWorkers()
 				if lastRun.IsZero() {
-					ls.logger.Log(ctx, slog.LevelDebug,
+					ls.slogger.Log(ctx, slog.LevelDebug,
 						"runAsyncdWorkers unsuccessful, will retry in the future",
 					)
 				}
@@ -251,7 +251,7 @@ func (ls *localServer) Start() error {
 	ctx := context.TODO()
 
 	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
-		ls.logger.Log(ctx, slog.LevelDebug,
+		ls.slogger.Log(ctx, slog.LevelDebug,
 			"using TLS",
 		)
 
@@ -259,7 +259,7 @@ func (ls *localServer) Start() error {
 
 		l = tls.NewListener(l, tlsConfig)
 	} else {
-		ls.logger.Log(ctx, slog.LevelDebug,
+		ls.slogger.Log(ctx, slog.LevelDebug,
 			"not using TLS",
 		)
 	}
@@ -269,7 +269,7 @@ func (ls *localServer) Start() error {
 
 func (ls *localServer) Stop() error {
 	ctx := context.TODO()
-	ls.logger.Log(ctx, slog.LevelDebug,
+	ls.slogger.Log(ctx, slog.LevelDebug,
 		"stopping",
 	)
 
@@ -277,7 +277,7 @@ func (ls *localServer) Stop() error {
 	defer cancel()
 
 	if err := ls.srv.Shutdown(ctx); err != nil {
-		ls.logger.Log(ctx, slog.LevelError,
+		ls.slogger.Log(ctx, slog.LevelError,
 			"shutting down",
 			"err", err,
 		)
@@ -291,12 +291,12 @@ func (ls *localServer) Stop() error {
 func (ls *localServer) Interrupt(_ error) {
 	ctx := context.TODO()
 
-	ls.logger.Log(ctx, slog.LevelDebug,
+	ls.slogger.Log(ctx, slog.LevelDebug,
 		"stopping due to interrupt",
 	)
 
 	if err := ls.Stop(); err != nil {
-		ls.logger.Log(ctx, slog.LevelError,
+		ls.slogger.Log(ctx, slog.LevelError,
 			"stopping",
 			"err", err,
 		)
@@ -307,14 +307,14 @@ func (ls *localServer) startListener() (net.Listener, error) {
 	ctx := context.TODO()
 
 	for _, p := range portList {
-		ls.logger.Log(ctx, slog.LevelDebug,
+		ls.slogger.Log(ctx, slog.LevelDebug,
 			"trying port",
 			"port", p,
 		)
 
 		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
 		if err != nil {
-			ls.logger.Log(ctx, slog.LevelDebug,
+			ls.slogger.Log(ctx, slog.LevelDebug,
 				"unable to bind to port, moving on",
 				"port", p,
 				"err", err,
@@ -323,7 +323,7 @@ func (ls *localServer) startListener() (net.Listener, error) {
 			continue
 		}
 
-		ls.logger.Log(ctx, slog.LevelInfo,
+		ls.slogger.Log(ctx, slog.LevelInfo,
 			"got port",
 			"port", p,
 		)
@@ -363,7 +363,7 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 		if ls.limiter.Allow() == false {
 			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
 
-			ls.logger.Log(r.Context(), slog.LevelError,
+			ls.slogger.Log(r.Context(), slog.LevelError,
 				"over rate limit",
 			)
 

@@ -107,7 +107,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 		scheduledQueryResult, err := queryWithRetries(ls.querier, scheduledQuery["query"])
 		if err != nil {
-			ls.logger.Log(r.Context(), slog.LevelError,
+			ls.slogger.Log(r.Context(), slog.LevelError,
 				"running scheduled query on demand",
 				"err", err,
 				"query", scheduledQuery["query"],

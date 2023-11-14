@@ -27,7 +27,7 @@ const (
 // ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
 // string representing the attribute key and the second in the pair is the attribute value.
 func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Request, trace.Span) {
-	ctx, span := StartSpan(r.Context(), keyVals...)
+	ctx, span := startSpan(r.Context(), keyVals...)
 	return r.WithContext(ctx), span
 }
 
@@ -36,15 +36,22 @@ func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Reques
 // ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
 // string representing the attribute key and the second in the pair is the attribute value.
 func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
+	return startSpan(ctx, keyVals...)
+}
+
+// startSpan is the internal implementation of StartSpan and StartHttpRequestSpan with runtime.Caller(2)
+// so that the caller of the wrapper function is used.
+func startSpan(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
 	spanName := defaultSpanName
 
 	opts := make([]trace.SpanStartOption, 0)
 
 	// Extract information about the caller to set some standard attributes (code.filepath,
 	// code.lineno, code.function) and to set more specific span and attribute names.
-	// runtime.Caller(0) would return information about `StartSpan` -- calling
-	// runtime.Caller(1) will return information about the function calling `StartSpan`.
-	programCounter, callerFile, callerLine, ok := runtime.Caller(1)
+	// runtime.Caller(0) would return information about `startSpan` -- calling
+	// runtime.Caller(1) will return information about the wrapper function calling `startSpan`.
+	// runtime.Caller(2) will return information about the function calling the wrapper function
+	programCounter, callerFile, callerLine, ok := runtime.Caller(2)
 	if ok {
 		opts = append(opts, trace.WithAttributes(
 			semconv.CodeFilepath(callerFile),
@@ -62,6 +69,8 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 
 	spanCtx, span := otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
 	spanCtx = context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
+	spanCtx = context.WithValue(spanCtx, multislogger.TraceIdKey, span.SpanContext().TraceID().String())
+
 	return spanCtx, span
 }
 

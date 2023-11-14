@@ -21,7 +21,7 @@ func (ls *localServer) requestLoggingHandler(next http.Handler) http.Handler {
 		recorder := &statusRecorder{ResponseWriter: w, Status: 200}
 
 		defer func(begin time.Time) {
-			ls.logger.Log(r.Context(), slog.LevelDebug,
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
 				"request log",
 				"path", r.URL.Path,
 				"method", r.Method,
