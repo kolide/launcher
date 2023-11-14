@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 package zfs
 
 import (
@@ -10,21 +13,17 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
-)
-
-const (
-	zfsPath   = "/usr/sbin/zfs"
-	zpoolPath = "/usr/sbin/zpool"
 )
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.@/"
 
 type Table struct {
 	logger log.Logger
-	cmd    string
+	cmd    allowedcmd.AllowedCommand
 }
 
 func columns() []table.ColumnDefinition {
@@ -39,7 +38,7 @@ func columns() []table.ColumnDefinition {
 func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    zfsPath,
+		cmd:    allowedcmd.Zfs,
 	}
 
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
@@ -48,7 +47,7 @@ func ZfsPropertiesPlugin(logger log.Logger) *table.Plugin {
 func ZpoolPropertiesPlugin(logger log.Logger) *table.Plugin {
 	t := &Table{
 		logger: logger,
-		cmd:    zpoolPath,
+		cmd:    allowedcmd.Zpool,
 	}
 
 	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)
@@ -75,7 +74,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	args = append(args, names...)
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 15, []string{t.cmd}, args, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 15, t.cmd, args, false)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

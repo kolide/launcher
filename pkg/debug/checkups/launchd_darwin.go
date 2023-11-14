@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package checkups
 
 import (
@@ -7,10 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 const (
@@ -24,10 +27,6 @@ type launchdCheckup struct {
 }
 
 func (c *launchdCheckup) Name() string {
-	if runtime.GOOS != "darwin" {
-		return ""
-	}
-
 	return "Launchd"
 }
 
@@ -59,13 +58,18 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		c.status = Erroring
 		c.summary = fmt.Sprintf("unable to write extra information: %s", err)
 		return nil
-
 	}
 
 	// run launchctl to check status
 	var printOut bytes.Buffer
 
-	cmd := exec.CommandContext(ctx, "/bin/launchctl", "print", launchdServiceName)
+	cmd, err := allowedcmd.Launchctl(ctx, "print", launchdServiceName)
+	if err != nil {
+		c.status = Erroring
+		c.summary = fmt.Sprintf("unable to create launchctl command: %s", err)
+		return nil
+	}
+
 	cmd.Stdout = &printOut
 	cmd.Stderr = &printOut
 	if err := cmd.Run(); err != nil {

@@ -6,13 +6,13 @@ package notify
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/godbus/dbus/v5"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 type dbusNotifier struct {
@@ -33,7 +33,7 @@ const (
 
 // We default to xdg-open first because, if available, it appears to be better at picking
 // the correct default browser.
-var browserLaunchers = []string{"xdg-open", "x-www-browser"}
+var browserLaunchers = []allowedcmd.AllowedCommand{allowedcmd.XdgOpen, allowedcmd.XWwwBrowser}
 
 func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
@@ -89,7 +89,11 @@ func (d *dbusNotifier) Listen() error {
 			for _, browserLauncher := range browserLaunchers {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
-				cmd := exec.CommandContext(ctx, browserLauncher, actionUri)
+				cmd, err := browserLauncher(ctx, actionUri)
+				if err != nil {
+					level.Warn(d.logger).Log("msg", "couldn't create command to start process", "err", err, "browser_launcher", browserLauncher)
+					continue
+				}
 				if err := cmd.Start(); err != nil {
 					level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "browser_launcher", browserLauncher)
 				} else {
@@ -166,12 +170,6 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 }
 
 func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
-	notifySend, err := exec.LookPath("notify-send")
-	if err != nil {
-		level.Debug(d.logger).Log("msg", "notify-send not installed", "err", err)
-		return fmt.Errorf("notify-send not installed: %w", err)
-	}
-
 	// notify-send doesn't support actions, but URLs in notifications are clickable in at least
 	// some desktop environments.
 	if n.ActionUri != "" {
@@ -183,7 +181,10 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		args = append(args, "-i", d.iconFilepath)
 	}
 
-	cmd := exec.Command(notifySend, args...)
+	cmd, err := allowedcmd.NotifySend(context.TODO(), args...)
+	if err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		level.Error(d.logger).Log("msg", "could not send notification via notify-send", "output", string(out), "err", err)
 		return fmt.Errorf("could not send notification via notify-send: %s: %w", string(out), err)

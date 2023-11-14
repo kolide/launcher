@@ -21,6 +21,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
@@ -28,7 +29,6 @@ import (
 )
 
 const (
-	profilesPath          = "/usr/bin/profiles"
 	userAllowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 	typeAllowedCharacters = "abcdefghijklmnopqrstuvwxyz"
 )
@@ -103,7 +103,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, fmt.Errorf("Unknown user argument: %s", user)
 					}
 
-					output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{profilesPath}, profileArgs, false)
+					output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Profiles, profileArgs, false)
 					if err != nil {
 						level.Info(t.logger).Log("msg", "ioreg exec failed", "err", err)
 						continue

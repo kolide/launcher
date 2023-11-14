@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 // firmwarepasswd is a simple wrapper around the
 // `/usr/sbin/firmwarepasswd` tool. This should be considered beta at
 // best. It serves a bit as a pattern for future exec work.
@@ -9,13 +12,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -92,7 +95,10 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/usr/sbin/firmwarepasswd", subcommand)
+	cmd, err := allowedcmd.Firmwarepasswd(ctx, subcommand)
+	if err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
 
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {

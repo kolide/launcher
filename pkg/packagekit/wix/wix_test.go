@@ -62,7 +62,7 @@ func TestWixPackage(t *testing.T) {
 // which can mostly read MSI files.
 func verifyMsi(ctx context.Context, t *testing.T, outMsi string) {
 	// Use the wix struct for its execOut
-	execWix := &wixTool{execCC: exec.CommandContext}
+	execWix := &wixTool{execCC: exec.CommandContext} //nolint:forbidigo // Fine to use exec.CommandContext in test
 
 	fileContents, err := execWix.execOut(ctx, "7z", "x", "-so", outMsi)
 	require.NoError(t, err)

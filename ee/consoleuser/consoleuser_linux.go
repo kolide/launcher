@@ -7,8 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 type listSessionsResult []struct {
@@ -18,7 +19,11 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	output, err := exec.CommandContext(ctx, "loginctl", "list-sessions", "--no-legend", "--no-pager", "--output=json").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	if err != nil {
+		return nil, fmt.Errorf("creating loginctl command: %w", err)
+	}
+	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
 	}
@@ -36,13 +41,16 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		output, err := exec.CommandContext(ctx,
-			"loginctl",
+		cmd, err := allowedcmd.Loginctl(ctx,
 			"show-session", s.Session,
 			"--property=Remote",
 			"--property=Active",
-		).Output()
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating loginctl command: %w", err)
+		}
 
+		output, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}

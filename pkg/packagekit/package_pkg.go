@@ -104,7 +104,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 
 	// Run analyze to generate our component plist
 	componentPlist := "./launcher.plist"
-	analyzeCmd := exec.CommandContext(ctx, "pkgbuild", "--analyze", "--root", po.Root, componentPlist)
+	analyzeCmd := exec.CommandContext(ctx, "pkgbuild", "--analyze", "--root", po.Root, componentPlist) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	if err := analyzeCmd.Run(); err != nil {
 		return fmt.Errorf("running analyze: %w", err)
 	}
@@ -121,7 +121,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 
 	// Set BundleIsRelocatable in the component plist to false -- this makes sure that the installer
 	// will install Kolide.app to the location that we expect
-	replaceCmd := exec.CommandContext(ctx, "plutil", "-replace", "BundleIsRelocatable", "-bool", "false", componentPlist)
+	replaceCmd := exec.CommandContext(ctx, "plutil", "-replace", "BundleIsRelocatable", "-bool", "false", componentPlist) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	if err := replaceCmd.Run(); err != nil {
 		return fmt.Errorf("running plutil -replace: %w", err)
 	}
@@ -148,7 +148,7 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 		"args", fmt.Sprintf("%v", args),
 	)
 
-	cmd := exec.CommandContext(ctx, "pkgbuild", args...)
+	cmd := exec.CommandContext(ctx, "pkgbuild", args...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr
@@ -227,7 +227,7 @@ func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath strin
 		"args", fmt.Sprintf("%v", args),
 	)
 
-	cmd := exec.CommandContext(ctx, "productbuild", args...)
+	cmd := exec.CommandContext(ctx, "productbuild", args...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	stderr := new(bytes.Buffer)
 	cmd.Stderr = stderr

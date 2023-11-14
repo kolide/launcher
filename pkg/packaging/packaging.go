@@ -752,7 +752,7 @@ func (p *PackageOptions) setupDirectories() error {
 func (p *PackageOptions) execOut(ctx context.Context, argv0 string, args ...string) (string, error) {
 	// Since PackageOptions is sometimes instantiated directly, set execCC if it's nil.
 	if p.execCC == nil {
-		p.execCC = exec.CommandContext
+		p.execCC = exec.CommandContext //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	cmd := p.execCC(ctx, argv0, args...)

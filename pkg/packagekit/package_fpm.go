@@ -143,7 +143,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		"kolide/fpm:latest",
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...)
+	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	stderr := new(bytes.Buffer)
 	stdout := new(bytes.Buffer)

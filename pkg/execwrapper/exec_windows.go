@@ -19,7 +19,7 @@ import (
 func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 
-	cmd := exec.CommandContext(ctx, argv0, argv[1:]...)
+	cmd := exec.CommandContext(ctx, argv0, argv[1:]...) //nolint:forbidigo // execwrapper is used exclusively to exec launcher, and we trust the autoupdate library to find the correct path.
 	cmd.Env = envv
 
 	cmd.Stdin = os.Stdin

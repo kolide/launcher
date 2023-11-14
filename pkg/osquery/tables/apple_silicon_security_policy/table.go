@@ -10,13 +10,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const bootPolicyUtilPath = "/usr/bin/bputil"
 const bootPolicyUtilArgs = "--display-all-policies"
 
 type Table struct {
@@ -38,7 +38,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 30, []string{bootPolicyUtilPath}, []string{bootPolicyUtilArgs}, false)
+	output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs}, false)
 	if err != nil {
 		level.Info(t.logger).Log("msg", "bputil failed", "err", err)
 		return nil, nil

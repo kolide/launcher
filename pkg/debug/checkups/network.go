@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os/exec"
-	"runtime"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 type networkCheckup struct {
@@ -47,15 +47,14 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("creating zip file: %w", err)
 	}
 
-	for _, commandArr := range listCommands() {
-		if len(commandArr) < 1 {
-			// how did this happen
-			continue
-		}
+	for _, c := range listCommands() {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, commandArr[0], commandArr[1:]...)
+		cmd, err := c.cmd(ctx, c.args...)
+		if err != nil {
+			continue
+		}
 		_ = runCmdMarkdownLogged(cmd, commandOutput)
 	}
 
@@ -82,44 +81,7 @@ func (n *networkCheckup) Data() any {
 	return nil
 }
 
-func listCommands() [][]string {
-	switch runtime.GOOS {
-	case "darwin":
-		return [][]string{
-			{"ifconfig", "-a"},
-			{"netstat", "-nr"},
-		}
-	case "linux":
-		return [][]string{
-			{"ifconfig", "-a"},
-			{"ip", "-N", "-d", "-h", "-a", "address"},
-			{"ip", "-N", "-d", "-h", "-a", "route"},
-		}
-	case "windows":
-		return [][]string{
-			{"ipconfig", "/all"},
-		}
-	default:
-		return nil
-	}
-}
-
-func listFiles() []string {
-	switch runtime.GOOS {
-	case "darwin":
-		return []string{
-			"/etc/hosts",
-			"/etc/resolv.conf",
-		}
-	case "linux":
-		return []string{
-			"/etc/nsswitch.conf",
-			"/etc/hosts",
-			"/etc/resolv.conf",
-		}
-	case "windows":
-		return []string{}
-	default:
-		return nil
-	}
+type networkCommand struct {
+	cmd  allowedcmd.AllowedCommand
+	args []string
 }

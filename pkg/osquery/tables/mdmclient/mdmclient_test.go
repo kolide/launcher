@@ -1,7 +1,5 @@
-//go:build !windows
-// +build !windows
-
-// (skip building windows, since the newline replacement doesn't work there)
+//go:build darwin
+// +build darwin
 
 package mdmclient
 

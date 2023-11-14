@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -90,7 +91,16 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
-	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "show-user", uid, "--value", "--property=Sessions")
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not create loginctl command",
+			"uid", uid,
+			"err", err,
+		)
+		return envVars
+	}
+	sessionOutput, err := cmd.Output()
 	if err != nil {
 		level.Debug(r.logger).Log(
 			"msg", "could not get user session",
@@ -108,7 +118,16 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	sessionList := strings.Split(sessions, " ")
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
-		typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+		cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Type")
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not create loginctl command to get session type",
+				"uid", uid,
+				"err", err,
+			)
+			continue
+		}
+		typeOutput, err := cmd.Output()
 		if err != nil {
 			level.Debug(r.logger).Log(
 				"msg", "could not get session type",
@@ -147,7 +166,15 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string) string {
 	// We can read $DISPLAY from the session properties
-	xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not create command to get Display from user session",
+			"err", err,
+		)
+		return defaultDisplay
+	}
+	xDisplayOutput, err := cmd.Output()
 	if err != nil {
 		level.Debug(r.logger).Log(
 			"msg", "could not get Display from user session",
