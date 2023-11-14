@@ -70,6 +70,7 @@ func startSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 	spanCtx, span := otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
 	spanCtx = context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
 	spanCtx = context.WithValue(spanCtx, multislogger.TraceIdKey, span.SpanContext().TraceID().String())
+	spanCtx = context.WithValue(spanCtx, multislogger.TraceSampledKey, span.SpanContext().IsSampled())
 
 	return spanCtx, span
 }

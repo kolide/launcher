@@ -19,6 +19,7 @@ const (
 	KolideSessionIdKey contextKey = "kolide_session_id"
 	SpanIdKey          contextKey = "span_id"
 	TraceIdKey         contextKey = "trace_id"
+	TraceSampledKey    contextKey = "trace_sampled"
 )
 
 // ctxValueKeysToAdd is a list of context keys that will be
@@ -27,6 +28,7 @@ var ctxValueKeysToAdd = []contextKey{
 	SpanIdKey,
 	TraceIdKey,
 	KolideSessionIdKey,
+	TraceSampledKey,
 }
 
 type MultiSlogger struct {
