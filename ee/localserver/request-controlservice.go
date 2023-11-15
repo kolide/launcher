@@ -15,7 +15,7 @@ func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 }
 
 func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {
