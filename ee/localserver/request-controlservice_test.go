@@ -130,7 +130,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			}
 
 			var logBytes bytes.Buffer
-			server := testServer(t, k, &logBytes)
+			server := testServer(t, k)
 
 			req, err := http.NewRequest("", "", nil)
 			if tt.body != nil {

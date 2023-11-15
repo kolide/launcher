@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -19,7 +19,7 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {
@@ -61,7 +61,7 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	_, span := traces.StartSpan(r.Context(), "path", r.URL.Path)
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.
@@ -107,8 +107,8 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 		scheduledQueryResult, err := queryWithRetries(ls.querier, scheduledQuery["query"])
 		if err != nil {
-			level.Error(ls.logger).Log(
-				"msg", "running scheduled query on demand",
+			ls.slogger.Log(r.Context(), slog.LevelError,
+				"running scheduled query on demand",
 				"err", err,
 				"query", scheduledQuery["query"],
 				"query_name", scheduledQuery["name"],

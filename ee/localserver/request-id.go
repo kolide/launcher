@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os/user"
 	"runtime"
 	"time"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -68,8 +68,8 @@ func (ls *localServer) requestIdHandler() http.Handler {
 	return http.HandlerFunc(ls.requestIdHandlerFunc)
 }
 
-func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.Request) {
-	_, span := traces.StartSpan(req.Context(), "path", req.URL.Path)
+func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	response := requestIdsResponse{
@@ -81,10 +81,11 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 	consoleUsers, err := consoleUsers()
 	if err != nil {
 		traces.SetError(span, err)
-		level.Error(ls.logger).Log(
-			"msg", "getting console users",
+		ls.slogger.Log(r.Context(), slog.LevelError,
+			"getting console users",
 			"err", err,
 		)
+
 		response.ConsoleUsers = []*user.User{}
 	} else {
 		response.ConsoleUsers = consoleUsers
@@ -93,11 +94,15 @@ func (ls *localServer) requestIdHandlerFunc(res http.ResponseWriter, req *http.R
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		traces.SetError(span, err)
-		level.Info(ls.logger).Log("msg", "unable to marshal json", "err", err)
+		ls.slogger.Log(r.Context(), slog.LevelError,
+			"marshaling json",
+			"err", err,
+		)
+
 		jsonBytes = []byte(fmt.Sprintf("unable to marshal json: %v", err))
 	}
 
-	res.Write(jsonBytes)
+	w.Write(jsonBytes)
 }
 
 func consoleUsers() ([]*user.User, error) {

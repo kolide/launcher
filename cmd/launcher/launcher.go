@@ -381,7 +381,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	if runLocalServer {
 		ls, err := localserver.New(
 			k,
-			localserver.WithLogger(logger),
 		)
 
 		if err != nil {
