@@ -8,24 +8,28 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
-type contextKey int
+type contextKey string
 
 func (c contextKey) String() string {
-	switch c {
-	case KolideSessionIdKey:
-		return "kolide_session_id"
-	case SpanIdKey:
-		return "span_id"
-	default:
-		return "unknown"
-	}
+	return string(c)
 }
 
 const (
 	// KolideSessionIdKey this the also the saml session id
-	KolideSessionIdKey contextKey = iota
-	SpanIdKey
+	KolideSessionIdKey contextKey = "kolide_session_id"
+	SpanIdKey          contextKey = "span_id"
+	TraceIdKey         contextKey = "trace_id"
+	TraceSampledKey    contextKey = "trace_sampled"
 )
+
+// ctxValueKeysToAdd is a list of context keys that will be
+// added as log attributes
+var ctxValueKeysToAdd = []contextKey{
+	SpanIdKey,
+	TraceIdKey,
+	KolideSessionIdKey,
+	TraceSampledKey,
+}
 
 type MultiSlogger struct {
 	*slog.Logger
@@ -68,11 +72,6 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
 	record.Time = record.Time.UTC()
 	return next(ctx, record)
-}
-
-var ctxValueKeysToAdd = []contextKey{
-	SpanIdKey,
-	KolideSessionIdKey,
 }
 
 func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {

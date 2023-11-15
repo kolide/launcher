@@ -1,10 +1,9 @@
 package localserver
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/go-kit/kit/log/level"
 )
 
 type statusRecorder struct {
@@ -22,7 +21,8 @@ func (ls *localServer) requestLoggingHandler(next http.Handler) http.Handler {
 		recorder := &statusRecorder{ResponseWriter: w, Status: 200}
 
 		defer func(begin time.Time) {
-			level.Debug(ls.logger).Log(
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"request log",
 				"path", r.URL.Path,
 				"method", r.Method,
 				"status", recorder.Status,
