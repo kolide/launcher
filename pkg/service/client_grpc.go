@@ -93,6 +93,7 @@ func NewGRPCClient(k types.Knapsack, conn *grpc.ClientConn) KolideService {
 	// Wrap with UUID middleware after logger so that UUID is available in
 	// the logger context.
 	client = uuidMiddleware(client)
+	client = extractingMiddleware(k, client)
 
 	return client
 }

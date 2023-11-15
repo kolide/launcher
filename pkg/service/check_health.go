@@ -122,3 +122,8 @@ func (mw uuidmw) CheckHealth(ctx context.Context) (status int32, err error) {
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.CheckHealth(ctx)
 }
+
+func (mw extractingmw) CheckHealth(ctx context.Context) (status int32, err error) {
+	// Nothing to extract here
+	return mw.next.CheckHealth(ctx)
+}

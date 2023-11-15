@@ -174,3 +174,8 @@ func (mw uuidmw) RequestQueries(ctx context.Context, nodeKey string) (res *distr
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.RequestQueries(ctx, nodeKey)
 }
+
+func (mw extractingmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
+	// Nothing to extract here
+	return mw.next.RequestQueries(ctx, nodeKey)
+}

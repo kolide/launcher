@@ -91,6 +91,10 @@ func (k *knapsack) ControlStore() types.KVStore {
 	return k.getKVStore(storage.ControlStore)
 }
 
+func (k *knapsack) DenylistedQueryAttemptsStore() types.KVStore {
+	return k.getKVStore(storage.DenylistedQueryAttemptsStore)
+}
+
 func (k *knapsack) InitialResultsStore() types.KVStore {
 	return k.getKVStore(storage.InitialResultsStore)
 }

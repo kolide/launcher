@@ -5,6 +5,7 @@ type Stores interface {
 	AutoupdateErrorsStore() KVStore
 	ConfigStore() KVStore
 	ControlStore() KVStore
+	DenylistedQueryAttemptsStore() KVStore
 	InitialResultsStore() KVStore
 	ResultLogsStore() KVStore
 	OsqueryHistoryInstanceStore() KVStore

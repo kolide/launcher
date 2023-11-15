@@ -31,6 +31,7 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 		tufinfo.TufReleaseVersionTable(k),
 		launcher_db.TablePlugin("kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
 		desktopprocs.TablePlugin(),
+		launcher_db.TablePlugin("kolide_denylisted_query_attempts", k.DenylistedQueryAttemptsStore()),
 	}
 }
 

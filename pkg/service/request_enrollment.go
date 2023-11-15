@@ -224,3 +224,8 @@ func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdenti
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
 }
+
+func (mw extractingmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, err error) {
+	// Nothing to extract here
+	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
+}

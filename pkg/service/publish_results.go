@@ -210,3 +210,8 @@ func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []d
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.PublishResults(ctx, nodeKey, results)
 }
+
+func (mw extractingmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
+	go mw.extractDenylisted(ctx, results)
+	return mw.next.PublishResults(ctx, nodeKey, results)
+}

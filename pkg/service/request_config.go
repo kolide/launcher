@@ -154,3 +154,8 @@ func (mw uuidmw) RequestConfig(ctx context.Context, nodeKey string) (errcode str
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.RequestConfig(ctx, nodeKey)
 }
+
+func (mw extractingmw) RequestConfig(ctx context.Context, nodeKey string) (errcode string, reauth bool, err error) {
+	// Nothing to extract here
+	return mw.next.RequestConfig(ctx, nodeKey)
+}

@@ -199,3 +199,8 @@ func (mw uuidmw) PublishLogs(ctx context.Context, nodeKey string, logType logger
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.PublishLogs(ctx, nodeKey, logType, logs)
 }
+
+func (mw extractingmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {
+	// Nothing to extract here
+	return mw.next.PublishLogs(ctx, nodeKey, logType, logs)
+}
