@@ -187,6 +187,9 @@ func (sb *SendBuffer) sendAndPurge() error {
 	return nil
 }
 
+// copyLogs writes to the provided writer until adding another log would exceed
+// the provided max size and returns the index of the last log written
+// leaving it up to the caller to delete the logs
 func (sb *SendBuffer) copyLogs(w io.Writer, maxSize int) (int, error) {
 	sb.writeMutex.Lock()
 	defer sb.writeMutex.Unlock()
