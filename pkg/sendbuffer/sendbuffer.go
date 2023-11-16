@@ -16,7 +16,7 @@ type sender interface {
 }
 
 var (
-	defaultMaxSize     = 128 * 1024
+	defaultMaxSize     = 512 * 1024
 	defaultMaxSendSize = 8 * 1024
 )
 
@@ -161,7 +161,8 @@ func (sb *SendBuffer) sendAndPurge() error {
 	defer sb.sendMutex.Unlock()
 
 	toSendBuff := &bytes.Buffer{}
-	if err := sb.flushToWriter(toSendBuff); err != nil {
+	lastKey, err := sb.copyLogs(toSendBuff, sb.maxSendSize)
+	if err != nil {
 		return err
 	}
 
@@ -170,34 +171,43 @@ func (sb *SendBuffer) sendAndPurge() error {
 	}
 
 	if err := sb.sender.Send(toSendBuff); err != nil {
-		sb.logger.Log("msg", "failed to send, dropping data", "err", err)
+		sb.logger.Log("msg", "failed to send, will retry", "err", err)
+		return nil
 	}
+	// TODO: populate logs with device data (id, serial, munemo, orgid) when we
+	// get first set of control data with device info before shipping
+
+	// testing on a new enrollment in debug mode, log size hit 130K bytes
+	// before enrollment completed and was able to ship logs
+	// 2023-11-16
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
+	sb.deleteLogs(lastKey)
 
 	return nil
 }
 
-func (sb *SendBuffer) flushToWriter(w io.Writer) error {
+func (sb *SendBuffer) copyLogs(w io.Writer, maxSize int) (int, error) {
 	sb.writeMutex.Lock()
 	defer sb.writeMutex.Unlock()
 
 	size := 0
-	removeDataKeysToIndex := 0
+	lastLogIndex := 0
 
 	for i := 0; i < len(sb.logs); i++ {
-		if len(sb.logs[i])+size > sb.maxSendSize {
+		if len(sb.logs[i])+size > maxSize {
 			break
 		}
 
 		if _, err := w.Write(sb.logs[i]); err != nil {
-			return err
+			return 0, err
 		}
 
 		size += len(sb.logs[i])
-		removeDataKeysToIndex++
+		lastLogIndex++
 	}
 
-	sb.deleteLogs(removeDataKeysToIndex)
-	return nil
+	return lastLogIndex, nil
 }
 
 func (sb *SendBuffer) deleteLogs(toIndex int) {
