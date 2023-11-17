@@ -6,7 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
+
+	"github.com/kolide/launcher/pkg/nixos"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
@@ -38,14 +39,5 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 }
 
 func allowSearchPath() bool {
-	if runtime.GOOS != "linux" {
-		return false
-	}
-
-	// We only allow searching for binaries in PATH on NixOS
-	if _, err := os.Stat("/etc/NIXOS"); err == nil {
-		return true
-	}
-
-	return false
+	return nixos.IsNixOS()
 }
