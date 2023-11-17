@@ -8,8 +8,8 @@ import (
 
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
