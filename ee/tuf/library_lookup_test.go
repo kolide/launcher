@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
+	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
 

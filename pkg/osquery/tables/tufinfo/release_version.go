@@ -12,8 +12,8 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/theupdateframework/go-tuf/data"
 
+	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 )
 
 const tufReleaseVersionTableName = "kolide_tuf_release_version"
