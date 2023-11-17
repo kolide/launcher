@@ -16,32 +16,32 @@ type sender interface {
 }
 
 var (
-	defaultMaxSize     = 512 * 1024
-	defaultMaxSendSize = 8 * 1024
+	defaultMaxSizeBytes  = 512 * 1024
+	defaultSendSizeBytes = 8 * 1024
 )
 
 type SendBuffer struct {
-	logs                              [][]byte
-	size, maxStorageSize, maxSendSize int
-	sendMutex                         sync.Mutex
-	writeMutex                        sync.RWMutex
-	logger                            log.Logger
-	sender                            sender
-	sendInterval                      time.Duration
-	isSending                         bool
+	logs                                        [][]byte
+	size, maxStorageSizeBytes, maxSendSizeBytes int
+	sendMutex                                   sync.Mutex
+	writeMutex                                  sync.RWMutex
+	logger                                      log.Logger
+	sender                                      sender
+	sendInterval                                time.Duration
+	isSending                                   bool
 }
 
 type option func(*SendBuffer)
 
-func WithMaxStorageSize(maxSize int) option {
+func WithMaxStorageSizeBytes(maxSize int) option {
 	return func(sb *SendBuffer) {
-		sb.maxStorageSize = maxSize
+		sb.maxStorageSizeBytes = maxSize
 	}
 }
 
-func WithMaxSendSize(sendSize int) option {
+func WithMaxSendSizeBytes(sendSize int) option {
 	return func(sb *SendBuffer) {
-		sb.maxSendSize = sendSize
+		sb.maxSendSizeBytes = sendSize
 	}
 }
 
@@ -60,12 +60,12 @@ func WithSendInterval(sendInterval time.Duration) option {
 
 func New(sender sender, opts ...option) *SendBuffer {
 	sb := &SendBuffer{
-		maxStorageSize: defaultMaxSize,
-		maxSendSize:    defaultMaxSendSize,
-		sender:         sender,
-		sendInterval:   1 * time.Minute,
-		logger:         log.NewNopLogger(),
-		isSending:      false,
+		maxStorageSizeBytes: defaultMaxSizeBytes,
+		maxSendSizeBytes:    defaultSendSizeBytes,
+		sender:              sender,
+		sendInterval:        1 * time.Minute,
+		logger:              log.NewNopLogger(),
+		isSending:           false,
 	}
 
 	for _, opt := range opts {
@@ -86,11 +86,11 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 	}
 
 	// if the single data piece is larger than the max send size, drop it and log
-	if len(in) > sb.maxSendSize {
+	if len(in) > sb.maxSendSizeBytes {
 		sb.logger.Log(
 			"msg", "dropped data because element greater than max send size",
-			"size_of_data", len(in),
-			"max_send_size", sb.maxSendSize,
+			"size_of_data_bytes", len(in),
+			"max_send_size_bytes", sb.maxSendSizeBytes,
 			"head", string(in)[0:minInt(len(in), 100)],
 		)
 		return len(in), nil
@@ -98,15 +98,15 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(in)+sb.size > sb.maxStorageSize {
+	if len(in)+sb.size > sb.maxStorageSizeBytes {
 		sb.deleteLogs(len(sb.logs))
 
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
-			"size_of_data", len(in),
-			"buffer_size", sb.size,
-			"size_plus_data", sb.size+len(in),
-			"max_size", sb.maxStorageSize,
+			"size_of_data_bytes", len(in),
+			"buffer_size_bytes", sb.size,
+			"size_plus_data_bytes", sb.size+len(in),
+			"max_size", sb.maxStorageSizeBytes,
 		)
 	}
 
@@ -162,7 +162,7 @@ func (sb *SendBuffer) sendAndPurge() error {
 	defer sb.sendMutex.Unlock()
 
 	toSendBuff := &bytes.Buffer{}
-	lastKey, err := sb.copyLogs(toSendBuff, sb.maxSendSize)
+	lastKey, err := sb.copyLogs(toSendBuff, sb.maxSendSizeBytes)
 	if err != nil {
 		return err
 	}
@@ -188,10 +188,10 @@ func (sb *SendBuffer) sendAndPurge() error {
 	return nil
 }
 
-// copyLogs writes to the provided writer until adding another log would exceed
-// the provided max size and returns the index of the last log written
-// leaving it up to the caller to delete the logs
-func (sb *SendBuffer) copyLogs(w io.Writer, maxSize int) (int, error) {
+// copyLogs writes to the provided writer, peeking at the size of each log
+// before for copying and returning when the next log would exceed the maxSize,
+// it's up to the caller to delete any copied logs
+func (sb *SendBuffer) copyLogs(w io.Writer, maxSizeBytes int) (int, error) {
 	sb.writeMutex.RLock()
 	defer sb.writeMutex.RUnlock()
 
@@ -199,7 +199,7 @@ func (sb *SendBuffer) copyLogs(w io.Writer, maxSize int) (int, error) {
 	lastLogIndex := 0
 
 	for i := 0; i < len(sb.logs); i++ {
-		if len(sb.logs[i])+size > maxSize {
+		if len(sb.logs[i])+size > maxSizeBytes {
 			break
 		}
 
