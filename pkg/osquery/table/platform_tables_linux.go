@@ -5,7 +5,6 @@ package table
 
 import (
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/crowdstrike/falcon_kernel_check"
 	"github.com/kolide/launcher/ee/tables/crowdstrike/falconctl"
 	"github.com/kolide/launcher/ee/tables/cryptsetup"
@@ -25,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/xfconf"
 	"github.com/kolide/launcher/ee/tables/xrdb"
 	"github.com/kolide/launcher/ee/tables/zfs"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	osquery "github.com/osquery/osquery-go"
 )
 

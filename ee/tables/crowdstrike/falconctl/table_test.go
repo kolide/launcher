@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/allowedcmd"
 	"github.com/stretchr/testify/require"
 )
 
