@@ -1,7 +1,7 @@
 package dataflattentable
 
 import (
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/wmi"

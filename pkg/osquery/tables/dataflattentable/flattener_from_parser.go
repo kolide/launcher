@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 )
 
 type parser interface {

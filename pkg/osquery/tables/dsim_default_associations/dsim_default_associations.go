@@ -16,7 +16,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/allowedcmd"
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"

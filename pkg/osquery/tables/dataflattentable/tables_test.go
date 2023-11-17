@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/tablehelpers"
 	"github.com/stretchr/testify/require"
 )

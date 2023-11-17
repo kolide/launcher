@@ -10,7 +10,7 @@
 //
 // As the returned data is a complex nested plist, this uses the
 // dataflatten tooling. (See
-// https://godoc.org/github.com/kolide/launcher/pkg/dataflatten)
+// https://godoc.org/github.com/kolide/launcher/ee/dataflatten)
 //
 // Everything, minimal details:
 //
@@ -48,7 +48,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/pkg/allowedcmd"
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/osquery/osquery-go/plugin/table"
 )

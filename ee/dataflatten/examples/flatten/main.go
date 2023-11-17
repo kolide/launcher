@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/pkg/dataflatten"
+	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/peterbourgon/ff/v3"
 )
 
