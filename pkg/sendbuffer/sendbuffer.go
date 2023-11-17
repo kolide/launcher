@@ -23,7 +23,8 @@ var (
 type SendBuffer struct {
 	logs                              [][]byte
 	size, maxStorageSize, maxSendSize int
-	writeMutex, sendMutex             sync.Mutex
+	sendMutex                         sync.Mutex
+	writeMutex                        sync.RWMutex
 	logger                            log.Logger
 	sender                            sender
 	sendInterval                      time.Duration
@@ -191,8 +192,8 @@ func (sb *SendBuffer) sendAndPurge() error {
 // the provided max size and returns the index of the last log written
 // leaving it up to the caller to delete the logs
 func (sb *SendBuffer) copyLogs(w io.Writer, maxSize int) (int, error) {
-	sb.writeMutex.Lock()
-	defer sb.writeMutex.Unlock()
+	sb.writeMutex.RLock()
+	defer sb.writeMutex.RUnlock()
 
 	size := 0
 	lastLogIndex := 0
