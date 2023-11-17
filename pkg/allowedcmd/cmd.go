@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/kolide/launcher/pkg/nixos"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
@@ -39,5 +37,25 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 }
 
 func allowSearchPath() bool {
-	return nixos.IsNixOS()
+	return IsNixOS()
+}
+
+// Save results of lookup so we don't have to stat for /etc/NIXOS every time
+// we want to know.
+var (
+	checkedIsNixOS = false
+	isNixOS        = false
+)
+
+func IsNixOS() bool {
+	if checkedIsNixOS {
+		return isNixOS
+	}
+
+	if _, err := os.Stat("/etc/NIXOS"); err == nil {
+		isNixOS = true
+	}
+
+	checkedIsNixOS = true
+	return isNixOS
 }
