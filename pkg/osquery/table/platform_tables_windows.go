@@ -4,7 +4,7 @@
 package table
 
 import (
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
 	"github.com/kolide/launcher/pkg/osquery/tables/dsim_default_associations"
 	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/dsregcmd"

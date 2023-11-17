@@ -16,7 +16,7 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 )

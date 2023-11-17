@@ -7,7 +7,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/osquery/tables/airport"
 	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
 	"github.com/kolide/launcher/pkg/osquery/tables/apple_silicon_security_policy"

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 // runAndLogPs runs ps filtering on the given PID, and logs the output.

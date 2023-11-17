@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type powerCheckup struct{}
