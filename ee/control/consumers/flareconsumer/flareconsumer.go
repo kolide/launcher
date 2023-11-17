@@ -3,7 +3,6 @@ package flareconsumer
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,6 +25,7 @@ type FlareConsumer struct {
 	knapsack      types.Knapsack
 	// newFlareStream is assigned to a field so it can be mocked in tests
 	newFlareStream func(note, uploadRequestURL string) (io.WriteCloser, error)
+	slogger        *slog.Logger
 }
 
 type flarer interface {
@@ -45,6 +45,7 @@ func New(knapsack types.Knapsack) *FlareConsumer {
 		newFlareStream: func(note, uploadRequestURL string) (io.WriteCloser, error) {
 			return shipper.New(knapsack, shipper.WithNote(note), shipper.WithUploadRequestURL(uploadRequestURL))
 		},
+		slogger: knapsack.Slogger().With("component", FlareSubsystem),
 	}
 }
 
@@ -55,7 +56,7 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	timeSinceLastFlare := time.Since(fc.lastFlareTime)
 
 	if timeSinceLastFlare < minFlareInterval {
-		fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "skipping flare, run too recently",
+		fc.slogger.Log(ctx, slog.LevelInfo, "skipping flare, run too recently, not retrying",
 			"min_flare_interval", fmt.Sprintf("%v minutes", minFlareInterval.Minutes()),
 			"time_since_last_flare", fmt.Sprintf("%v minutes", timeSinceLastFlare.Minutes()),
 		)
@@ -67,7 +68,10 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	}()
 
 	if fc.flarer == nil {
-		return errors.New("flarer is nil")
+		fc.slogger.Log(ctx, slog.LevelError,
+			"flarer is nil, not retrying",
+		)
+		return nil
 	}
 
 	flareData := struct {
@@ -76,16 +80,35 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	}{}
 
 	if err := json.NewDecoder(data).Decode(&flareData); err != nil {
-		return fmt.Errorf("failed to decode key-value json: %w", err)
+		fc.slogger.Log(ctx, slog.LevelError,
+			"failed to decode key-value json, not retrying",
+			"err", err,
+		)
+		return nil
 	}
 
-	fc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "received remote flare request",
+	fc.slogger.Log(ctx, slog.LevelInfo, "received remote flare request",
 		"note", flareData.Note,
 	)
 
 	flareStream, err := fc.newFlareStream(flareData.Note, flareData.UploadRequestURL)
 	if err != nil {
-		return fmt.Errorf("failed to create flare stream: %w", err)
+		fc.slogger.Log(ctx, slog.LevelError,
+			"failed to create flare stream, not retrying",
+			"err", err,
+			"note", flareData.Note,
+		)
+		return nil
 	}
-	return fc.flarer.RunFlare(context.Background(), fc.knapsack, flareStream)
+
+	if err := fc.flarer.RunFlare(context.Background(), fc.knapsack, flareStream); err != nil {
+		fc.slogger.Log(ctx, slog.LevelError,
+			"failed to run flare, not retrying",
+			"err", err,
+			"note", flareData.Note,
+		)
+		return nil
+	}
+
+	return nil
 }
