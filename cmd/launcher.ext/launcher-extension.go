@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -13,6 +14,12 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
 )
+
+var licenseNote = `
+This Kolide Agent extension is provided as a convinience to customers. It includes components that are only
+licensed for use with a Kolide Subscription. Refer to the software licensing for details.
+https://github.com/kolide/launcher/blob/main/ee/LICENSE
+`
 
 func main() {
 	var (
@@ -32,6 +39,8 @@ func main() {
 	logger := logutil.NewServerLogger(*flVerbose)
 
 	timeout := time.Duration(*flTimeout) * time.Second
+
+	level.Info(logger).Log("msg", strings.ReplaceAll(licenseNote, "\n", ""))
 
 	// allow for osqueryd to create the socket path
 	time.Sleep(2 * time.Second)
