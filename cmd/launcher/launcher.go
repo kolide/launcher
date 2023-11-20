@@ -361,7 +361,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		if logShipper != nil {
 			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
-			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {

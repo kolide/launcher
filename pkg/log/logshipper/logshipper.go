@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/sendbuffer"
@@ -61,8 +62,16 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	ls.slogLevel = new(slog.LevelVar)
 	ls.slogLevel.Set(slog.LevelInfo)
 
+	ls.knapsack.RegisterChangeObserver(ls, keys.LogShippingLevel, keys.LogIngestServerURL)
+
 	ls.Ping()
 	return ls
+}
+
+func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
+	// TODO: only make updates that are relevant to flag key changes
+	// calling ping does more work than needed
+	ls.Ping()
 }
 
 // Ping gets the latest token and endpoint from knapsack and updates the sender

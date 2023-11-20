@@ -8,11 +8,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,9 +44,9 @@ func TestLogShipper(t *testing.T) {
 			endpoint := "https://someurl"
 			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-			knapsack.On("Debug").Return(true)
 			knapsack.On("LogShippingLevel").Return("debug").Times(2)
 			knapsack.On("Slogger").Return(multislogger.New().Logger)
+			knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 			ls := New(knapsack, log.NewNopLogger())
 
@@ -106,9 +108,9 @@ func TestStop_Multiple(t *testing.T) {
 	endpoint := "https://someurl"
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
 	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -158,9 +160,9 @@ func TestStopWithoutRun(t *testing.T) {
 	endpoint := "https://someurl"
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-	knapsack.On("Debug").Return(true)
 	knapsack.On("LogShippingLevel").Return("debug")
 	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
 
