@@ -734,9 +734,9 @@ func (_m *Flags) SetControlRequestInterval(interval time.Duration) error {
 	return r0
 }
 
-// SetControlRequestIntervalOverride provides a mock function with given fields: interval, duration
-func (_m *Flags) SetControlRequestIntervalOverride(interval time.Duration, duration time.Duration) {
-	_m.Called(interval, duration)
+// SetControlRequestIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetControlRequestIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetControlServerURL provides a mock function with given fields: url
@@ -975,6 +975,11 @@ func (_m *Flags) SetLogShippingLevel(level string) error {
 	}
 
 	return r0
+}
+
+// SetLogShippingLevelOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetLogShippingLevelOverride(value string, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetLoggingInterval provides a mock function with given fields: interval
