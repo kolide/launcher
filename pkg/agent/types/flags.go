@@ -89,7 +89,7 @@ type Flags interface {
 	// ControlRequestInterval is the interval at which control client will check for updates from the control server.
 	SetControlRequestInterval(interval time.Duration) error
 	// SetControlRequestIntervalOverride stores an interval to be temporarily used as an override of any other interval, until the duration has elapased.
-	SetControlRequestIntervalOverride(interval, duration time.Duration)
+	SetControlRequestIntervalOverride(value time.Duration, duration time.Duration)
 	ControlRequestInterval() time.Duration
 
 	// DisableControlTLS disables TLS transport with the control server.
@@ -183,6 +183,7 @@ type Flags interface {
 
 	// LogShippingLevel is the level at which logs should be shipped to the server
 	SetLogShippingLevel(level string) error
+	SetLogShippingLevelOverride(value string, duration time.Duration)
 	LogShippingLevel() string
 
 	// TraceIngestServerURL is the URL of the ingest server for traces

@@ -179,6 +179,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}))
 	}
 
+	// Run launcher in debug mode for first 10 minutes. Intentionally doing this after setting up
+	// stderr debug logger becaues we don't want to write evertyhing to stderr.
+	k.SetLogShippingLevelOverride("debug", 10*time.Minute)
+
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper

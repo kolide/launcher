@@ -436,6 +436,9 @@ func (k *knapsack) LogIngestServerURL() string {
 func (k *knapsack) SetLogShippingLevel(level string) error {
 	return k.flags.SetLogShippingLevel(level)
 }
+func (k *knapsack) SetLogShippingLevelOverride(value string, duration time.Duration) {
+	k.flags.SetLogShippingLevelOverride(value, duration)
+}
 func (k *knapsack) LogShippingLevel() string {
 	return k.flags.LogShippingLevel()
 }
