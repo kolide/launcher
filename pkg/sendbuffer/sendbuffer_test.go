@@ -67,8 +67,8 @@ func TestSendBuffer(t *testing.T) {
 
 			sb := New(
 				&testSender{lastReceived: lastReceivedData, t: t},
-				WithMaxStorageSize(tt.maxStorageSize),
-				WithMaxSendSize(tt.maxSendSize),
+				WithMaxStorageSizeBytes(tt.maxStorageSize),
+				WithMaxSendSizeBytes(tt.maxSendSize),
 			)
 
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
@@ -141,7 +141,7 @@ func TestSendBufferConcurrent(t *testing.T) {
 			testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
 			sb := New(
 				testSender,
-				WithMaxSendSize(tt.maxSendSize),
+				WithMaxSendSizeBytes(tt.maxSendSize),
 				// run interval in background quickly
 				WithSendInterval(1*time.Millisecond),
 			)
