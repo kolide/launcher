@@ -132,7 +132,7 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 
 	override, ok := fc.overrides[key]
 	if !ok || override.Value() == nil {
-		// Creating the override implicitly causes future ControlRequestInterval retrievals to use the override until expiration
+		// Creating the override implicitly causes future flag value retrievals to use the override until expiration
 		override = &Override{}
 		fc.overrides[key] = override
 	}
@@ -149,7 +149,7 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 		delete(fc.overrides, key)
 	}
 
-	// start the override
+	// Start a new override, or re-start an existing one with a new value, duration, and expiration
 	fc.overrides[key].Start(key, value, duration, overrideExpired)
 }
 
