@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
-	tufci "github.com/kolide/launcher/pkg/autoupdate/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
 
