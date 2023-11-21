@@ -12,6 +12,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/sendbuffer"
@@ -21,7 +22,7 @@ import (
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
 	defaultSendInterval   = 1 * time.Minute
-	debugSendInterval     = 1 * time.Second
+	debugSendInterval     = 5 * time.Second
 )
 
 type LogShipper struct {
@@ -43,10 +44,6 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	sender := newAuthHttpSender()
 
 	sendInterval := defaultSendInterval
-	if k.Debug() {
-		sendInterval = debugSendInterval
-	}
-
 	sendBuffer := sendbuffer.New(sender, sendbuffer.WithSendInterval(sendInterval))
 
 	// setting a ulid as session_ulid allows us to follow a single run of launcher
@@ -63,10 +60,18 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	}
 
 	ls.slogLevel = new(slog.LevelVar)
-	ls.slogLevel.Set(slog.LevelError)
+	ls.slogLevel.Set(slog.LevelInfo)
+
+	ls.knapsack.RegisterChangeObserver(ls, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls.Ping()
 	return ls
+}
+
+func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
+	// TODO: only make updates that are relevant to flag key changes
+	// calling ping does more work than needed
+	ls.Ping()
 }
 
 // Ping gets the latest token and endpoint from knapsack and updates the sender
@@ -91,9 +96,13 @@ func (ls *LogShipper) Ping() {
 	}
 
 	startingLevel := ls.slogLevel.Level()
+	sendInterval := defaultSendInterval
+
 	switch ls.knapsack.LogShippingLevel() {
 	case "debug":
 		ls.slogLevel.Set(slog.LevelDebug)
+		// if we using debug level logging, send logs more frequently
+		sendInterval = debugSendInterval
 	case "info":
 		ls.slogLevel.Set(slog.LevelInfo)
 	case "warn":
@@ -111,8 +120,11 @@ func (ls *LogShipper) Ping() {
 		ls.knapsack.Slogger().Info("log shipping level changed",
 			"old_log_level", startingLevel.String(),
 			"new_log_level", ls.slogLevel.Level().String(),
+			"send_interval", sendInterval.String(),
 		)
 	}
+
+	ls.sendBuffer.SetSendInterval(sendInterval)
 
 	ls.isShippingEnabled = ls.sender.endpoint != ""
 	ls.addDeviceIdentifyingAttributesToLogger()

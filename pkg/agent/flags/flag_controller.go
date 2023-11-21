@@ -18,21 +18,22 @@ import (
 // FlagController is responsible for retrieving flag values from the appropriate sources,
 // determining precedence, sanitizing flag values, and notifying observers of changes.
 type FlagController struct {
-	logger                 log.Logger
-	cmdLineOpts            *launcher.Options
-	agentFlagsStore        types.KVStore
-	overrideMutex          sync.RWMutex
-	controlRequestOverride FlagValueOverride
-	observers              map[types.FlagsChangeObserver][]keys.FlagKey
-	observersMutex         sync.RWMutex
+	logger          log.Logger
+	cmdLineOpts     *launcher.Options
+	agentFlagsStore types.KVStore
+	overrideMutex   sync.RWMutex
+	overrides       map[keys.FlagKey]*Override
+	observers       map[types.FlagsChangeObserver][]keys.FlagKey
+	observersMutex  sync.RWMutex
 }
 
 func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
 	fc := &FlagController{
-		logger:          logger,
+		logger:          log.With(logger, "component", "flag_controller"),
 		cmdLineOpts:     &launcher.Options{},
 		agentFlagsStore: agentFlagsStore,
 		observers:       make(map[types.FlagsChangeObserver][]keys.FlagKey),
+		overrides:       make(map[keys.FlagKey]*Override),
 	}
 
 	for _, opt := range opts {
@@ -112,6 +113,44 @@ func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
 			observer.FlagsChanged(changedKeys...)
 		}
 	}
+}
+
+func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration, value any) {
+	// Always notify observers when overrides start, so they know to refresh.
+	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
+	defer fc.notifyObservers(key)
+
+	fc.overrideMutex.Lock()
+	defer fc.overrideMutex.Unlock()
+
+	level.Info(fc.logger).Log(
+		"msg", "overriding flag",
+		"key", key,
+		"value", value,
+		"duration", duration,
+	)
+
+	override, ok := fc.overrides[key]
+	if !ok || override.Value() == nil {
+		// Creating the override implicitly causes future flag value retrievals to use the override until expiration
+		override = &Override{}
+		fc.overrides[key] = override
+	}
+
+	overrideExpired := func(key keys.FlagKey) {
+		// Always notify observers when overrides expire, so they know to refresh.
+		// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
+		defer fc.notifyObservers(key)
+
+		fc.overrideMutex.Lock()
+		defer fc.overrideMutex.Unlock()
+
+		// Deleting the override implictly allows the next value to take precedence
+		delete(fc.overrides, key)
+	}
+
+	// Start a new override, or re-start an existing one with a new value, duration, and expiration
+	fc.overrides[key].Start(key, value, duration, overrideExpired)
 }
 
 func (fc *FlagController) AutoloadedExtensions() []string {
@@ -250,40 +289,15 @@ func (fc *FlagController) ControlServerURL() string {
 func (fc *FlagController) SetControlRequestInterval(interval time.Duration) error {
 	return fc.setControlServerValue(keys.ControlRequestInterval, durationToBytes(interval))
 }
-func (fc *FlagController) SetControlRequestIntervalOverride(interval, duration time.Duration) {
-	// Always notify observers when overrides start, so they know to refresh.
-	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-	defer fc.notifyObservers(keys.ControlRequestInterval)
-
-	fc.overrideMutex.Lock()
-	defer fc.overrideMutex.Unlock()
-
-	if fc.controlRequestOverride == nil || fc.controlRequestOverride.Value() == nil {
-		// Creating the override implicitly causes future ControlRequestInterval retrievals to use the override until expiration
-		fc.controlRequestOverride = &Override{}
-	}
-
-	overrideExpired := func(key keys.FlagKey) {
-		// Always notify observers when overrides expire, so they know to refresh.
-		// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-		defer fc.notifyObservers(key)
-
-		fc.overrideMutex.Lock()
-		defer fc.overrideMutex.Unlock()
-
-		// Deleting the override implictly allows the next value to take precedence
-		fc.controlRequestOverride = nil
-	}
-
-	// Start a new override, or re-start an existing one with a new value, duration, and expiration
-	fc.controlRequestOverride.Start(keys.ControlRequestInterval, interval, duration, overrideExpired)
+func (fc *FlagController) SetControlRequestIntervalOverride(value time.Duration, duration time.Duration) {
+	fc.overrideFlag(keys.ControlRequestInterval, duration, value)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
 	fc.overrideMutex.RLock()
 	defer fc.overrideMutex.RUnlock()
 
 	return NewDurationFlagValue(fc.logger, keys.ControlRequestInterval,
-		WithOverride(fc.controlRequestOverride),
+		WithOverride(fc.overrides[keys.ControlRequestInterval]),
 		WithDefault(fc.cmdLineOpts.ControlRequestInterval),
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),
@@ -490,10 +504,17 @@ func (fc *FlagController) LogIngestServerURL() string {
 func (fc *FlagController) SetLogShippingLevel(level string) error {
 	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
 }
+func (fc *FlagController) SetLogShippingLevelOverride(value string, duration time.Duration) {
+	fc.overrideFlag(keys.LogShippingLevel, duration, value)
+}
 func (fc *FlagController) LogShippingLevel() string {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	const defaultLevel = "info"
 
 	return NewStringFlagValue(
+		WithOverrideString(fc.overrides[keys.LogShippingLevel]),
 		WithDefaultString(defaultLevel),
 		WithSanitizer(func(value string) string {
 			value = strings.ToLower(value)

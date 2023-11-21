@@ -183,6 +183,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
 	if k.ControlServerURL() != "" {
+		// Set log shipping level to debug for the first X minutes of
+		// run time. This will also increase the sending frequency.
+		k.SetLogShippingLevelOverride("debug", 10*time.Minute)
+
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
@@ -357,7 +361,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		if logShipper != nil {
 			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
-			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
