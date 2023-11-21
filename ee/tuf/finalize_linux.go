@@ -4,6 +4,7 @@
 package tuf
 
 import (
+	"bytes"
 	"context"
 	"debug/elf"
 	"errors"
@@ -14,6 +15,9 @@ import (
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
+// On NixOS, we have to set the interpreter for any non-NixOS executable we want to
+// run. This means the binaries that our updater downloads.
+// See: https://unix.stackexchange.com/a/522823
 func patchExecutable(executableLocation string) error {
 	if !allowedcmd.IsNixOS() {
 		return nil
@@ -60,8 +64,10 @@ func getInterpreter(executableLocation string) (string, error) {
 		return "", fmt.Errorf("reading .interp section: %w", err)
 	}
 
-	// interpData should look something like "/lib64/ld-linux-x86-64.so.2"
-	return filepath.Base(string(interpData)), nil
+	trimmedInterpData := bytes.TrimRight(interpData, "\x00")
+
+	// interpData should look something like "/lib64/ld-linux-x86-64.so.2" -- grab just the filename
+	return filepath.Base(string(trimmedInterpData)), nil
 }
 
 func findInterpreterInNixStore(interpreter string) (string, error) {
