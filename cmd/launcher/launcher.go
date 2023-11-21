@@ -179,14 +179,14 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}))
 	}
 
-	// Run launcher in debug mode for first 10 minutes. Intentionally doing this after setting up
-	// stderr debug logger becaues we don't want to write evertyhing to stderr.
-	k.SetLogShippingLevelOverride("debug", 10*time.Minute)
-
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
 	if k.ControlServerURL() != "" {
+		// Set log shipping level to debug for the first X minutes of
+		// run time. This will also increase the sending frequency.
+		k.SetLogShippingLevelOverride("debug", 10*time.Minute)
+
 		logShipper = logshipper.New(k, logger)
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
