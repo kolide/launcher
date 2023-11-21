@@ -64,15 +64,10 @@ func getInterpreter(executableLocation string) (string, error) {
 		return "", fmt.Errorf("reading .interp section: %w", err)
 	}
 
-<<<<<<< HEAD
-	// interpData should look something like "/lib64/ld-linux-x86-64.so.2"
-	return filepath.Base(string(interpData)), nil
-=======
 	trimmedInterpData := bytes.TrimRight(interpData, "\x00")
 
 	// interpData should look something like "/lib64/ld-linux-x86-64.so.2" -- grab just the filename
 	return filepath.Base(string(trimmedInterpData)), nil
->>>>>>> 2741611e2760c9376e13a42d3ca8613bfe5253fb
 }
 
 func findInterpreterInNixStore(interpreter string) (string, error) {
