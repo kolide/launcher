@@ -4,6 +4,7 @@
 package tuf
 
 import (
+	"bytes"
 	"context"
 	"debug/elf"
 	"errors"
@@ -14,6 +15,9 @@ import (
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
+// On NixOS, we have to set the interpreter for any non-NixOS executable we want to
+// run. This means the binaries that our updater downloads.
+// See: https://unix.stackexchange.com/a/522823
 func patchExecutable(executableLocation string) error {
 	if !allowedcmd.IsNixOS() {
 		return nil
@@ -31,7 +35,11 @@ func patchExecutable(executableLocation string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreterLocation, executableLocation)
+	cmd, err := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreterLocation, executableLocation)
+	if err != nil {
+		return fmt.Errorf("creating patchelf command: %w", err)
+	}
+
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("running patchelf: output `%s`, error `%w`", string(out), err)
 	}
@@ -56,8 +64,15 @@ func getInterpreter(executableLocation string) (string, error) {
 		return "", fmt.Errorf("reading .interp section: %w", err)
 	}
 
+<<<<<<< HEAD
 	// interpData should look something like "/lib64/ld-linux-x86-64.so.2"
 	return filepath.Base(string(interpData)), nil
+=======
+	trimmedInterpData := bytes.TrimRight(interpData, "\x00")
+
+	// interpData should look something like "/lib64/ld-linux-x86-64.so.2" -- grab just the filename
+	return filepath.Base(string(trimmedInterpData)), nil
+>>>>>>> 2741611e2760c9376e13a42d3ca8613bfe5253fb
 }
 
 func findInterpreterInNixStore(interpreter string) (string, error) {
