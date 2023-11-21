@@ -1,10 +1,17 @@
+//go:build linux
+// +build linux
+
 package tuf
 
 import (
 	"context"
+	"debug/elf"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
+
+	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
 func patchExecutable(executableLocation string) error {
@@ -12,15 +19,23 @@ func patchExecutable(executableLocation string) error {
 		return nil
 	}
 
-	interpreter, err := getLoader(executableLocation)
+	interpreter, err := getInterpreter(executableLocation)
 	if err != nil {
-		return fmt.Errorf("getting loader for %s: %w", executableLocation, err)
+		return fmt.Errorf("getting interpreter for %s: %w", executableLocation, err)
+	}
+	interpreterLocation, err := findInterpreterInNixStore(interpreter)
+	if err != nil {
+		return fmt.Errorf("finding interpreter %s in nix store: %w", interpreter, err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreter, executableLocation)
+	cmd, err := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreterLocation, executableLocation)
+	if err != nil {
+		return fmt.Errorf("creating patchelf command: %w", err)
+	}
+
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("running patchelf: output `%s`, error `%w`", string(out), err)
 	}
@@ -28,10 +43,33 @@ func patchExecutable(executableLocation string) error {
 	return nil
 }
 
-func getLoader(_ string) (string, error) {
-	matches, err := filepath.Glob("/nix/store/*glibc*/lib/ld-linux-x86-64.so.2")
+func getInterpreter(executableLocation string) (string, error) {
+	f, err := elf.Open(executableLocation)
 	if err != nil {
-		return "", fmt.Errorf("globbing for loader: %w", err)
+		return "", fmt.Errorf("opening ELF file: %w", err)
+	}
+	defer f.Close()
+
+	interpSection := f.Section(".interp")
+	if interpSection == nil {
+		return "", errors.New("no .interp section")
+	}
+
+	interpData, err := interpSection.Data()
+	if err != nil {
+		return "", fmt.Errorf("reading .interp section: %w", err)
+	}
+
+	// interpData should look something like "/lib64/ld-linux-x86-64.so.2"
+	return filepath.Base(string(interpData)), nil
+}
+
+func findInterpreterInNixStore(interpreter string) (string, error) {
+	storeLocationPattern := filepath.Join("/nix/store/*glibc*/lib", interpreter)
+
+	matches, err := filepath.Glob(storeLocationPattern)
+	if err != nil {
+		return "", fmt.Errorf("globbing for interpreter %s at %s: %w", interpreter, storeLocationPattern, err)
 	}
 
 	return matches[0], nil
