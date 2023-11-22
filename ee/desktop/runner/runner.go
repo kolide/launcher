@@ -485,13 +485,11 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
-	/*
-		if !r.processSpawningEnabled {
-			// Desktop is disabled, kill any existing desktop user processes
-			r.killDesktopProcesses()
-			return nil
-		}
-	*/
+	if !r.processSpawningEnabled {
+		// Desktop is disabled, kill any existing desktop user processes
+		r.killDesktopProcesses()
+		return nil
+	}
 
 	executablePath, err := r.determineExecutablePath()
 	if err != nil {
