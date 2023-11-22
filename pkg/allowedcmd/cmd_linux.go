@@ -95,6 +95,10 @@ func Pacman(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/pacman", arg...)
 }
 
+func Patchelf(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/run/current-system/sw/bin/patchelf", arg...)
+}
+
 func Ps(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/ps", arg...)
 }

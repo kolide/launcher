@@ -328,9 +328,12 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// If launcher was updated, we want to exit and reload
 	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
-		level.Debug(ta.logger).Log("msg", "launcher updated -- exiting to load new version", "new_binary_version", updatedVersion)
-		ta.signalRestart <- NewLauncherReloadNeededErr(updatedVersion)
-		return nil
+		// Only reload if we're not using a localdev path
+		if ta.knapsack.LocalDevelopmentPath() == "" {
+			level.Debug(ta.logger).Log("msg", "launcher updated -- exiting to load new version", "new_binary_version", updatedVersion)
+			ta.signalRestart <- NewLauncherReloadNeededErr(updatedVersion)
+			return nil
+		}
 	}
 
 	// For non-launcher binaries (i.e. osqueryd), call any reload functions we have saved

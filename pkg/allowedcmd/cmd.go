@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
@@ -38,14 +37,25 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 }
 
 func allowSearchPath() bool {
-	if runtime.GOOS != "linux" {
-		return false
+	return IsNixOS()
+}
+
+// Save results of lookup so we don't have to stat for /etc/NIXOS every time
+// we want to know.
+var (
+	checkedIsNixOS = false
+	isNixOS        = false
+)
+
+func IsNixOS() bool {
+	if checkedIsNixOS {
+		return isNixOS
 	}
 
-	// We only allow searching for binaries in PATH on NixOS
 	if _, err := os.Stat("/etc/NIXOS"); err == nil {
-		return true
+		isNixOS = true
 	}
 
-	return false
+	checkedIsNixOS = true
+	return isNixOS
 }
