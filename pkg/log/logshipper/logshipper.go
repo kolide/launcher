@@ -120,6 +120,10 @@ func (ls *LogShipper) Ping() {
 func (ls *LogShipper) Run() error {
 	<-ls.startShippingChan
 
+	ls.knapsack.Slogger().Log(context.Background(), slog.LevelInfo,
+		"starting log shipping",
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ls.stopFuncMutex.Lock()
