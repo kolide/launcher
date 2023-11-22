@@ -499,7 +499,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	consoleUsers, err := consoleuser.CurrentUids(ctx)
+	consoleUsers, err := consoleuser.CurrentUids(ctx, r.logger)
 	if err != nil {
 		return fmt.Errorf("getting console users: %w", err)
 	}

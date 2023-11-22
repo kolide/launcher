@@ -6,13 +6,14 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCurrentUids(t *testing.T) {
 	t.Parallel()
 
-	uids, err := CurrentUids(context.Background())
+	uids, err := CurrentUids(context.Background(), log.NewNopLogger())
 	assert.NoError(t, err)
 
 	// in the current CI environment (GitHub Actions) the linux runner

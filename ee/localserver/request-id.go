@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -113,7 +114,7 @@ func consoleUsers() ([]*user.User, error) {
 	var users []*user.User
 
 	return users, backoff.WaitFor(func() error {
-		uids, err := consoleuser.CurrentUids(context)
+		uids, err := consoleuser.CurrentUids(context, log.NewNopLogger())
 		if err != nil {
 			return err
 		}

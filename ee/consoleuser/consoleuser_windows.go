@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/go-kit/kit/log"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-func CurrentUids(ctx context.Context) ([]string, error) {
+func CurrentUids(ctx context.Context, _ log.Logger) ([]string, error) {
 	explorerProcs, err := explorerProcesses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer processes: %w", err)

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
@@ -90,7 +91,7 @@ const (
 	minConsoleUserUid = 501
 )
 
-func CurrentUids(ctx context.Context) ([]string, error) {
+func CurrentUids(ctx context.Context, _ log.Logger) ([]string, error) {
 	cmd, err := allowedcmd.Scutil(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)
