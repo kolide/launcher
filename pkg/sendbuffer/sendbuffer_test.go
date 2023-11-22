@@ -234,6 +234,8 @@ func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, sb *SendBuffer) 
 }
 
 func TestUpdateData(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		maxStorageSize   int
@@ -343,7 +345,6 @@ func TestUpdateData(t *testing.T) {
 				[]byte("5"),
 			},
 			updateFunction: func(in io.Reader, out io.Writer) error {
-				// add 10 to the even numbers
 				data, err := io.ReadAll(in)
 				require.NoError(t, err)
 
@@ -376,7 +377,10 @@ func TestUpdateData(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require := require.New(t)
 
 			testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
@@ -399,15 +403,6 @@ func TestUpdateData(t *testing.T) {
 			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 		})
 	}
-}
-
-// Helper function to calculate the total length of logs
-func lenLogs(logs [][]byte) int {
-	totalLen := 0
-	for _, log := range logs {
-		totalLen += len(log)
-	}
-	return totalLen
 }
 
 type testSender struct {
