@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -230,6 +231,183 @@ func requireStoreSizeEqualsHttpBufferReportedSize(t *testing.T, sb *SendBuffer) 
 	}
 
 	require.Equal(t, sb.size, storeSize, "actual store size should match buffer size")
+}
+
+func TestUpdateData(t *testing.T) {
+	tests := []struct {
+		name             string
+		maxStorageSize   int
+		maxSendSize      int
+		initialLogs      [][]byte
+		updateFunction   func(in io.Reader, out io.Writer) error
+		expectedLogs     [][]byte
+		expectedSize     int
+		expectedLogCount int
+	}{
+		{
+			name:           "happy path",
+			maxSendSize:    5,
+			maxStorageSize: 10,
+			initialLogs: [][]byte{
+				[]byte("abcde"),
+				[]byte("fghij"),
+			},
+			updateFunction: func(in io.Reader, out io.Writer) error {
+				data, err := io.ReadAll(in)
+				require.NoError(t, err)
+				_, err = out.Write(bytes.ToUpper(data))
+				require.NoError(t, err)
+				return err
+			},
+			expectedLogs: [][]byte{
+				[]byte("ABCDE"),
+				[]byte("FGHIJ"),
+			},
+			expectedSize:     10,
+			expectedLogCount: 2,
+		},
+		{
+			name:           "exceeds max send size",
+			maxSendSize:    1,
+			maxStorageSize: 10,
+			initialLogs: [][]byte{
+				[]byte("0"),
+				[]byte("1"),
+				[]byte("2"),
+				[]byte("3"),
+				[]byte("4"),
+				[]byte("5"),
+			},
+			updateFunction: func(in io.Reader, out io.Writer) error {
+				// add 10 to the even numbers
+				data, err := io.ReadAll(in)
+				require.NoError(t, err)
+
+				// convert data to int
+				numStr := string(data)
+
+				// convert to int
+				num, err := strconv.Atoi(numStr)
+				require.NoError(t, err)
+
+				// if even, make it exceed max send size
+				if num%2 == 0 {
+					_, err := out.Write([]byte("TOO_BIG"))
+					require.NoError(t, err)
+					return err
+				}
+
+				_, err = out.Write([]byte(fmt.Sprint(num)))
+				require.NoError(t, err)
+				return err
+			},
+			expectedLogs: [][]byte{
+				[]byte("1"),
+				[]byte("3"),
+				[]byte("5"),
+			},
+			expectedSize:     3,
+			expectedLogCount: 3,
+		},
+		{
+			name:           "exceeds max storage size",
+			maxSendSize:    10,
+			maxStorageSize: 10,
+			initialLogs: [][]byte{
+				[]byte("01234"),
+				[]byte("01234"),
+			},
+			updateFunction: func(in io.Reader, out io.Writer) error {
+				// this should cause second log to be deleted since the first update
+				// will put it over the threshold
+				_, err := out.Write([]byte("0123456789"))
+				require.NoError(t, err)
+				return err
+			},
+			expectedLogs: [][]byte{
+				[]byte("0123456789"),
+			},
+			expectedSize:     10,
+			expectedLogCount: 1,
+		},
+		{
+			name:           "zero lengths",
+			maxSendSize:    1,
+			maxStorageSize: 10,
+			initialLogs: [][]byte{
+				[]byte("0"),
+				[]byte("1"),
+				[]byte("2"),
+				[]byte("3"),
+				[]byte("4"),
+				[]byte("5"),
+			},
+			updateFunction: func(in io.Reader, out io.Writer) error {
+				// add 10 to the even numbers
+				data, err := io.ReadAll(in)
+				require.NoError(t, err)
+
+				// convert data to int
+				numStr := string(data)
+
+				// convert to int
+				num, err := strconv.Atoi(numStr)
+				require.NoError(t, err)
+
+				// if odd, set it to zero
+				if num%2 != 0 {
+					_, err := out.Write(make([]byte, 0))
+					require.NoError(t, err)
+					return err
+				}
+
+				_, err = out.Write([]byte(fmt.Sprint(num)))
+				require.NoError(t, err)
+				return err
+			},
+			expectedLogs: [][]byte{
+				[]byte("0"),
+				[]byte("2"),
+				[]byte("4"),
+			},
+			expectedSize:     3,
+			expectedLogCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			testSender := &testSender{lastReceived: &bytes.Buffer{}, t: t}
+			sb := New(
+				testSender,
+				WithMaxSendSizeBytes(tt.maxSendSize),
+				WithMaxStorageSizeBytes(tt.maxStorageSize),
+			)
+
+			for _, log := range tt.initialLogs {
+				_, err := sb.Write(log)
+				require.NoError(err)
+			}
+
+			sb.UpdateData(tt.updateFunction)
+
+			require.Equal(tt.expectedLogs, sb.logs, "logs not as expected")
+			require.Equal(tt.expectedSize, sb.size, "size not as expected")
+			require.Equal(tt.expectedLogCount, len(sb.logs), "log count not as expected")
+			requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
+		})
+	}
+}
+
+// Helper function to calculate the total length of logs
+func lenLogs(logs [][]byte) int {
+	totalLen := 0
+	for _, log := range logs {
+		totalLen += len(log)
+	}
+	return totalLen
 }
 
 type testSender struct {
