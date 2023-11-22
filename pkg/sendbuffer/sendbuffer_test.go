@@ -281,7 +281,6 @@ func TestUpdateData(t *testing.T) {
 				[]byte("5"),
 			},
 			updateFunction: func(in io.Reader, out io.Writer) error {
-				// add 10 to the even numbers
 				data, err := io.ReadAll(in)
 				require.NoError(t, err)
 
@@ -348,10 +347,7 @@ func TestUpdateData(t *testing.T) {
 				data, err := io.ReadAll(in)
 				require.NoError(t, err)
 
-				// convert data to int
 				numStr := string(data)
-
-				// convert to int
 				num, err := strconv.Atoi(numStr)
 				require.NoError(t, err)
 
