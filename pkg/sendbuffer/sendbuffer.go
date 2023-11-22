@@ -27,7 +27,7 @@ type SendBuffer struct {
 	writeMutex                                  sync.RWMutex
 	logger                                      log.Logger
 	sender                                      sender
-	sendInterval                                time.Duration
+	sendTicker                                  *time.Ticker
 	isSending                                   bool
 }
 
@@ -54,7 +54,7 @@ func WithLogger(logger log.Logger) option {
 // WithSendInterval sets the interval at which the buffer will send data.
 func WithSendInterval(sendInterval time.Duration) option {
 	return func(sb *SendBuffer) {
-		sb.sendInterval = sendInterval
+		sb.sendTicker.Reset(sendInterval)
 	}
 }
 
@@ -63,7 +63,7 @@ func New(sender sender, opts ...option) *SendBuffer {
 		maxStorageSizeBytes: defaultMaxSizeBytes,
 		maxSendSizeBytes:    defaultSendSizeBytes,
 		sender:              sender,
-		sendInterval:        1 * time.Minute,
+		sendTicker:          time.NewTicker(1 * time.Minute),
 		logger:              log.NewNopLogger(),
 		isSending:           false,
 	}
@@ -130,21 +130,22 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		sb.isSending = false
 	}()
 
-	ticker := time.NewTicker(sb.sendInterval)
-	defer ticker.Stop()
-
 	for {
 		if err := sb.sendAndPurge(); err != nil {
 			sb.logger.Log("msg", "failed to send and purge", "err", err)
 		}
 
 		select {
-		case <-ticker.C:
+		case <-sb.sendTicker.C:
 			continue
 		case <-ctx.Done():
 			return nil
 		}
 	}
+}
+
+func (sb *SendBuffer) SetSendInterval(sendInterval time.Duration) {
+	sb.sendTicker.Reset(sendInterval)
 }
 
 func (sb *SendBuffer) DeleteAllData() {

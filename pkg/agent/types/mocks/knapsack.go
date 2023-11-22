@@ -926,9 +926,9 @@ func (_m *Knapsack) SetControlRequestInterval(interval time.Duration) error {
 	return r0
 }
 
-// SetControlRequestIntervalOverride provides a mock function with given fields: interval, duration
-func (_m *Knapsack) SetControlRequestIntervalOverride(interval time.Duration, duration time.Duration) {
-	_m.Called(interval, duration)
+// SetControlRequestIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetControlRequestIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetControlServerURL provides a mock function with given fields: url
@@ -1167,6 +1167,11 @@ func (_m *Knapsack) SetLogShippingLevel(level string) error {
 	}
 
 	return r0
+}
+
+// SetLogShippingLevelOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetLogShippingLevelOverride(value string, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetLoggingInterval provides a mock function with given fields: interval
