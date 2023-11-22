@@ -4,19 +4,18 @@
 package tuf
 
 import (
-	"bytes"
 	"context"
-	"debug/elf"
-	"errors"
 	"fmt"
-	"path/filepath"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
-// On NixOS, we have to set the interpreter for any non-NixOS executable we want to
-// run. This means the binaries that our updater downloads.
+// patchExecutable updates the downloaded binary as necessary for it to be able to
+// run on this system. On NixOS, we have to set the interpreter for any non-NixOS
+// executable we want to run.
 // See: https://unix.stackexchange.com/a/522823
 func patchExecutable(executableLocation string) error {
 	if !allowedcmd.IsNixOS() {
@@ -27,15 +26,11 @@ func patchExecutable(executableLocation string) error {
 	if err != nil {
 		return fmt.Errorf("getting interpreter for %s: %w", executableLocation, err)
 	}
-	interpreterLocation, err := findInterpreterInNixStore(interpreter)
-	if err != nil {
-		return fmt.Errorf("finding interpreter %s in nix store: %w", interpreter, err)
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd, err := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreterLocation, executableLocation)
+	cmd, err := allowedcmd.Patchelf(ctx, "--set-interpreter", interpreter, executableLocation)
 	if err != nil {
 		return fmt.Errorf("creating patchelf command: %w", err)
 	}
@@ -47,36 +42,28 @@ func patchExecutable(executableLocation string) error {
 	return nil
 }
 
+// getInterpreter asks patchelf what the interpreter is for the current running
+// executable, assuming that's a reasonable choice given that the current executable
+// is able to run.
 func getInterpreter(executableLocation string) (string, error) {
-	f, err := elf.Open(executableLocation)
+	currentExecutable, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("opening ELF file: %w", err)
-	}
-	defer f.Close()
-
-	interpSection := f.Section(".interp")
-	if interpSection == nil {
-		return "", errors.New("no .interp section")
+		return "", fmt.Errorf("getting current running executable: %w", err)
 	}
 
-	interpData, err := interpSection.Data()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd, err := allowedcmd.Patchelf(ctx, "--print-interpreter", currentExecutable)
 	if err != nil {
-		return "", fmt.Errorf("reading .interp section: %w", err)
+		return "", fmt.Errorf("creating patchelf command: %w", err)
 	}
 
-	trimmedInterpData := bytes.TrimRight(interpData, "\x00")
-
-	// interpData should look something like "/lib64/ld-linux-x86-64.so.2" -- grab just the filename
-	return filepath.Base(string(trimmedInterpData)), nil
-}
-
-func findInterpreterInNixStore(interpreter string) (string, error) {
-	storeLocationPattern := filepath.Join("/nix/store/*glibc*/lib", interpreter)
-
-	matches, err := filepath.Glob(storeLocationPattern)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("globbing for interpreter %s at %s: %w", interpreter, storeLocationPattern, err)
+		return "", fmt.Errorf("running patchelf: output `%s`, error `%w`", string(out), err)
+
 	}
 
-	return matches[0], nil
+	return strings.TrimSpace(string(out)), nil
 }
