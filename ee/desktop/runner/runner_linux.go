@@ -139,7 +139,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 		sessionType := strings.Trim(string(typeOutput), "\n")
 		if sessionType == "x11" {
-			envVars["DISPLAY"] = r.displayFromX11(ctx, session)
+			envVars["DISPLAY"] = r.displayFromX11(ctx, session, int32(uidInt))
 			break
 		} else if sessionType == "wayland" {
 			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
@@ -164,7 +164,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	return envVars
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string) string {
+func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
 	// We can read $DISPLAY from the session properties
 	cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
 	if err != nil {
@@ -172,7 +172,7 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"msg", "could not create command to get Display from user session",
 			"err", err,
 		)
-		return defaultDisplay
+		return r.displayFromXorgProcess(ctx, uid)
 	}
 	xDisplayOutput, err := cmd.Output()
 	if err != nil {
@@ -180,15 +180,72 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"msg", "could not get Display from user session",
 			"err", err,
 		)
-		return defaultDisplay
+		return r.displayFromXorgProcess(ctx, uid)
 	}
 
 	display := strings.Trim(string(xDisplayOutput), "\n")
 	if display == "" {
-		return defaultDisplay
+		return r.displayFromXorgProcess(ctx, uid)
 	}
 
 	return display
+}
+
+func (r *DesktopUsersProcessesRunner) displayFromXorgProcess(ctx context.Context, uid int32) string {
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		level.Debug(r.logger).Log(
+			"msg", "could not query processes to find Xorg process",
+			"err", err,
+		)
+		return defaultDisplay
+	}
+
+	for _, p := range processes {
+		cmdline, err := p.CmdlineWithContext(ctx)
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not get cmdline slice for process",
+				"err", err,
+			)
+			continue
+		}
+
+		if !strings.Contains(cmdline, "Xorg") {
+			continue
+		}
+
+		// We have an Xorg process -- check to make sure it's for our running user
+		uids, err := p.UidsWithContext(ctx)
+		if err != nil {
+			level.Debug(r.logger).Log(
+				"msg", "could not get uids for process",
+				"err", err,
+			)
+			continue
+		}
+		uidMatch := false
+		for _, procUid := range uids {
+			if procUid == uid {
+				uidMatch = true
+				break
+			}
+		}
+
+		if uidMatch {
+			// We have a match! Grab the display value. The Xorg process looks like:
+			// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
+			cmdlineArgs := strings.Split(cmdline, " ")
+			if len(cmdlineArgs) < 2 {
+				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
+				continue
+			}
+
+			return cmdlineArgs[1]
+		}
+	}
+
+	return defaultDisplay
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
