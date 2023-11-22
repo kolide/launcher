@@ -172,7 +172,7 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"msg", "could not create command to get Display from user session",
 			"err", err,
 		)
-		return r.displayFromXorgProcess(ctx, uid)
+		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 	xDisplayOutput, err := cmd.Output()
 	if err != nil {
@@ -180,22 +180,22 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"msg", "could not get Display from user session",
 			"err", err,
 		)
-		return r.displayFromXorgProcess(ctx, uid)
+		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 
 	display := strings.Trim(string(xDisplayOutput), "\n")
 	if display == "" {
-		return r.displayFromXorgProcess(ctx, uid)
+		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 
 	return display
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXorgProcess(ctx context.Context, uid int32) string {
+func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx context.Context, uid int32) string {
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		level.Debug(r.logger).Log(
-			"msg", "could not query processes to find Xorg process",
+			"msg", "could not query processes to find display server process",
 			"err", err,
 		)
 		return defaultDisplay
@@ -211,11 +211,11 @@ func (r *DesktopUsersProcessesRunner) displayFromXorgProcess(ctx context.Context
 			continue
 		}
 
-		if !strings.Contains(cmdline, "Xorg") {
+		if !strings.Contains(cmdline, "Xorg") && !strings.Contains(cmdline, "Xvfb") {
 			continue
 		}
 
-		// We have an Xorg process -- check to make sure it's for our running user
+		// We have an Xorg or Xvfb process -- check to make sure it's for our running user
 		uids, err := p.UidsWithContext(ctx)
 		if err != nil {
 			level.Debug(r.logger).Log(
@@ -233,8 +233,11 @@ func (r *DesktopUsersProcessesRunner) displayFromXorgProcess(ctx context.Context
 		}
 
 		if uidMatch {
-			// We have a match! Grab the display value. The Xorg process looks like:
+			// We have a match! Grab the display value.
+			// The Xorg process looks like:
 			// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
+			// The Xvfb process looks like:
+			// Xvfb :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -screen 0 3840x2560x24
 			cmdlineArgs := strings.Split(cmdline, " ")
 			if len(cmdlineArgs) < 2 {
 				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
