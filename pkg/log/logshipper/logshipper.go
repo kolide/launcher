@@ -194,9 +194,13 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
 
 	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
-		v, err := ls.fetchServerProvidedData(key)
+		v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get %s from server provided data: %w", key, err)
+		}
+
+		if len(v) == 0 {
+			return fmt.Errorf("no value for %s in server provided data", key)
 		}
 
 		ls.shippingLogger = log.With(ls.shippingLogger, key, string(v))
@@ -246,19 +250,6 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	})
 
 	return nil
-}
-
-func (ls *LogShipper) fetchServerProvidedData(key string) ([]byte, error) {
-	v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))
-	if err != nil {
-		return nil, fmt.Errorf("could not get %s from server provided data: %w", key, err)
-	}
-
-	if len(v) == 0 {
-		return nil, fmt.Errorf("no value for %s in server provided data", key)
-	}
-
-	return v, nil
 }
 
 func (ls *LogShipper) updateSenderAuthToken() error {

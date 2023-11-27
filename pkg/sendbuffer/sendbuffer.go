@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 type sender interface {
@@ -167,16 +168,12 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 		in := bytes.NewReader(sb.logs[i])
 		out := &bytes.Buffer{}
 
-		// subtract original size
-		sb.size -= in.Len()
-		sb.logs[i] = nil
+		inSize := in.Len()
 
-		// do the update
+		// do the update, if it fails, preserve data
 		if err := f(in, out); err != nil {
-			indexesToDelete = append(indexesToDelete, i)
-
-			sb.logger.Log(
-				"msg", "dropped data because update function failed",
+			level.Debug(sb.logger).Log(
+				"msg", "update function failed, preserving original data",
 				"method", "UpdateData",
 				"err", err,
 			)
@@ -184,13 +181,18 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 			continue
 		}
 
+		// subtract original size, wait until after update func is called
+		// incase it fails, we don't want to modify size
+		sb.size -= inSize
+		sb.logs[i] = nil
+
 		outLen := out.Len()
 
 		// if the new length is 0, mark for deletion
 		if outLen == 0 {
 			indexesToDelete = append(indexesToDelete, i)
 
-			sb.logger.Log(
+			level.Debug(sb.logger).Log(
 				"msg", "dropped data because element was empty",
 				"method", "UpdateData",
 			)
@@ -202,8 +204,7 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 		if outLen > sb.maxSendSizeBytes {
 			indexesToDelete = append(indexesToDelete, i)
 
-			// log it
-			sb.logger.Log(
+			level.Debug(sb.logger).Log(
 				"msg", "dropped data because element greater than max send size",
 				"method", "UpdateData",
 				"size_of_data_bytes", out.Len(),
@@ -240,8 +241,8 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 	// remove indexes marked for deletion
 	for i := 0; i < len(indexesToDelete); i++ {
 		// shift left by i each time we delete an element to accout for decreased length
-		indexesToDelete := indexesToDelete[i] - i
-		sb.logs = append(sb.logs[:indexesToDelete], sb.logs[indexesToDelete+1:]...)
+		indexToDelete := indexesToDelete[i] - i
+		sb.logs = append(sb.logs[:indexToDelete], sb.logs[indexToDelete+1:]...)
 	}
 }
 

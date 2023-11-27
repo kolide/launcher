@@ -409,11 +409,14 @@ func TestUpdateData(t *testing.T) {
 			},
 			expectedLogs: [][]byte{
 				[]byte("0"),
+				[]byte("1"),
 				[]byte("2"),
+				[]byte("3"),
 				[]byte("4"),
+				[]byte("5"),
 			},
-			expectedSize:     3,
-			expectedLogCount: 3,
+			expectedSize:     6,
+			expectedLogCount: 6,
 		},
 	}
 
