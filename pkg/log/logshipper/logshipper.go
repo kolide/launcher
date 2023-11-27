@@ -79,7 +79,8 @@ func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
 	ls.Ping()
 }
 
-// Ping gets the latest token and endpoint from knapsack and updates the sender
+// Ping collects all data required to be able to start shipping logs,
+// and starts the shipping process once all data has been collected.
 func (ls *LogShipper) Ping() {
 	ls.updateLogShippingLevel()
 
@@ -178,7 +179,9 @@ func filterResults(keyvals ...interface{}) {
 }
 
 // updateDevideIdentifyingAttributes gets device identifiers from the server-provided
-// data and adds them as attributes on the logger.
+// data and adds them as attributes on the logger. If shipping has not yet started and
+// there are logs in the buffer, the device identifiers are added to the logs in the
+// buffer.
 func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	deviceInfo := make(map[string]string)
 

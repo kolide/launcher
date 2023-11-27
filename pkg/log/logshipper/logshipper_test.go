@@ -1,7 +1,9 @@
 package logshipper
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -63,11 +65,34 @@ func TestLogShipper(t *testing.T) {
 			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 
 			// happy path
+
+			// put some stuff in the send buffer
+			_, err := ls.sendBuffer.Write([]byte(`{"a":"b"}`))
+			require.NoError(t, err)
+			_, err = ls.sendBuffer.Write([]byte(`{"c":"d"}`))
+			require.NoError(t, err)
+
 			knapsack.On("ServerProvidedDataStore").Return(testKVStore(t, storage.ServerProvidedDataStore.String()))
 			ls.Ping()
 			require.True(t, ls.isShippingStarted, "shipping should now be enabled")
 			require.Equal(t, authToken, ls.sender.authtoken)
 			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+
+			// make sure attributes are added to logs in send buffer
+			ls.sendBuffer.UpdateData(func(in io.Reader, out io.Writer) error {
+				var data map[string]string
+				err := json.NewDecoder(in).Decode(&data)
+				require.NoError(t, err)
+
+				for k, v := range deviceIdentifyingAttributes {
+					require.Equal(t, v, data[k], "device identifying attributes should be in the send buffer")
+				}
+
+				// write data back to out
+				err = json.NewEncoder(out).Encode(data)
+				require.NoError(t, err)
+				return nil
+			})
 
 			// update auth token
 			authToken = ulid.New()
@@ -175,11 +200,18 @@ func TestStopWithoutRun(t *testing.T) {
 	ls.Stop(errors.New("test error"))
 }
 
+var deviceIdentifyingAttributes = map[string]string{
+	"device_id":       ulid.New(),
+	"munemo":          ulid.New(),
+	"organization_id": ulid.New(),
+	"serial_number":   ulid.New(),
+}
+
 func testKVStore(t *testing.T, name string) types.KVStore {
 	s, err := storageci.NewStore(t, log.NewNopLogger(), name)
 
-	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
-		s.Set([]byte(key), []byte(ulid.New()))
+	for k, v := range deviceIdentifyingAttributes {
+		s.Set([]byte(k), []byte(v))
 	}
 
 	require.NoError(t, err)
