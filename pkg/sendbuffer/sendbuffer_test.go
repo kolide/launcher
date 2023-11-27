@@ -3,6 +3,7 @@ package sendbuffer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -54,6 +55,13 @@ func TestSendBuffer(t *testing.T) {
 			maxStorageSize:   1000,
 			maxSendSize:      4,
 			writes:           []string{"hello"},
+			expectedReceives: nil,
+		},
+		{
+			name:             "drops empty",
+			maxStorageSize:   1000,
+			maxSendSize:      4,
+			writes:           []string{""},
 			expectedReceives: nil,
 		},
 	}
@@ -356,6 +364,43 @@ func TestUpdateData(t *testing.T) {
 					_, err := out.Write(make([]byte, 0))
 					require.NoError(t, err)
 					return err
+				}
+
+				_, err = out.Write([]byte(fmt.Sprint(num)))
+				require.NoError(t, err)
+				return err
+			},
+			expectedLogs: [][]byte{
+				[]byte("0"),
+				[]byte("2"),
+				[]byte("4"),
+			},
+			expectedSize:     3,
+			expectedLogCount: 3,
+		},
+		{
+			name:           "handles update errors",
+			maxSendSize:    1,
+			maxStorageSize: 10,
+			initialLogs: [][]byte{
+				[]byte("0"),
+				[]byte("1"),
+				[]byte("2"),
+				[]byte("3"),
+				[]byte("4"),
+				[]byte("5"),
+			},
+			updateFunction: func(in io.Reader, out io.Writer) error {
+				data, err := io.ReadAll(in)
+				require.NoError(t, err)
+
+				numStr := string(data)
+				num, err := strconv.Atoi(numStr)
+				require.NoError(t, err)
+
+				// if odd, return error
+				if num%2 != 0 {
+					return errors.New("some error")
 				}
 
 				_, err = out.Write([]byte(fmt.Sprint(num)))
