@@ -119,6 +119,10 @@ func (ls *LogShipper) Ping() {
 }
 
 func (ls *LogShipper) Run() error {
+	ls.knapsack.Slogger().Log(context.Background(), slog.LevelInfo,
+		"log shipper set up, waiting for required data to start shipping",
+	)
+
 	<-ls.startShippingChan
 
 	ls.knapsack.Slogger().Log(context.Background(), slog.LevelInfo,
