@@ -203,9 +203,10 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 			return fmt.Errorf("no value for %s in server provided data", key)
 		}
 
-		ls.shippingLogger = log.With(ls.shippingLogger, key, string(v))
 		deviceInfo[key] = string(v)
 	}
+
+	ls.shippingLogger = log.With(ls.shippingLogger, deviceInfo)
 
 	var additionalSlogAttrs []slog.Attr
 	for k, v := range deviceInfo {
