@@ -73,6 +73,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater

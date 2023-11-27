@@ -201,6 +201,11 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		return fmt.Errorf("could not set +x permissions on executable: %w", err)
 	}
 
+	// If necessary, patch the executable (NixOS only)
+	if err := patchExecutable(executableLocation(stagedVersionedDirectory, binary)); err != nil {
+		return fmt.Errorf("could not patch executable: %w", err)
+	}
+
 	// Validate the executable
 	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
 		return fmt.Errorf("could not verify executable: %w", err)
