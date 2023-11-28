@@ -37,7 +37,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 
-	_, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
+	_, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -74,10 +74,9 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -100,7 +99,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	autoupdater.libraryManager = mockLibraryManager
 	currentLauncherVersion := "" // cannot determine using version package in test
 	currentOsqueryVersion := "1.1.1"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
@@ -163,10 +162,9 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -189,7 +187,7 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 	autoupdater.libraryManager = mockLibraryManager
 	currentLauncherVersion := "" // cannot determine using version package in test
 	currentOsqueryVersion := "1.1.1"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
@@ -235,10 +233,9 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -258,7 +255,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	currentOsqueryVersion := "1.1.1"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we attempt to update the library
@@ -308,10 +305,9 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -329,7 +325,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	currentOsqueryVersion := "4.0.0"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Expect that we do not attempt to update the library (i.e. the osquery update was previously downloaded)
@@ -392,11 +388,10 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
-		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+		WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set logger so that we can capture output
@@ -455,11 +450,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
-		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+		WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set logger so that we can capture output
@@ -470,7 +464,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil)
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
@@ -512,10 +506,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
 	t.Parallel()
 
-	mockQuerier := newMockQuerier(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
 	autoupdater := &TufAutoupdater{
-		logger:    log.NewNopLogger(),
-		osquerier: mockQuerier,
+		logger:   log.NewNopLogger(),
+		knapsack: mockKnapsack,
 	}
 
 	// In test, version.Version() returns `unknown` for everything, which is not something
@@ -523,43 +517,49 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 	launcherVersion, err := autoupdater.currentRunningVersion("launcher")
 	require.Error(t, err, "expected an error fetching current running version of launcher")
 	require.Equal(t, "", launcherVersion)
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	t.Parallel()
 
-	mockQuerier := newMockQuerier(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
 	autoupdater := &TufAutoupdater{
-		logger:    log.NewNopLogger(),
-		osquerier: mockQuerier,
+		logger:   log.NewNopLogger(),
+		knapsack: mockKnapsack,
 	}
 
 	// Expect to return one row containing the version
 	expectedOsqueryVersion, err := semver.NewVersion("5.10.12")
 	require.NoError(t, err)
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": expectedOsqueryVersion.Original()}}, nil).Once()
 
 	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.NoError(t, err, "expected no error fetching current running version of osqueryd")
 	require.Equal(t, expectedOsqueryVersion.Original(), osqueryVersion)
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	t.Parallel()
 
-	mockQuerier := newMockQuerier(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
 	autoupdater := &TufAutoupdater{
 		logger:                 log.NewNopLogger(),
-		osquerier:              mockQuerier,
+		knapsack:               mockKnapsack,
 		osquerierRetryInterval: 1 * time.Millisecond,
 	}
 
 	// Expect to return an error (five times, since we perform retries)
-	mockQuerier.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error"))
+	mockKnapsack.On("Query", mock.Anything).Return(make([]map[string]string, 0), errors.New("test osqueryd querying error"))
 
 	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
 	require.Equal(t, "", osqueryVersion)
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_storeError(t *testing.T) {
@@ -579,14 +579,13 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
 
-	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
+	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
+	mockKnapsack.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
 
 	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
 	// for launcher in tests.
@@ -616,7 +615,6 @@ func Test_storeError(t *testing.T) {
 	require.Greater(t, errorCount, 0, "TUF autoupdater did not record error counts")
 
 	mockLibraryManager.AssertExpectations(t)
-	mockQuerier.AssertExpectations(t)
 	mockKnapsack.AssertExpectations(t)
 }
 

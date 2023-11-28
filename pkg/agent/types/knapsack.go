@@ -11,4 +11,6 @@ type Knapsack interface {
 	Slogger
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
 	LatestOsquerydPath(ctx context.Context) string
+	// Query allows for querying via the running osquery client
+	Query(query string) ([]map[string]string, error)
 }

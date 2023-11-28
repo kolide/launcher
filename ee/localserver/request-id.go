@@ -36,11 +36,7 @@ const (
 )
 
 func (ls *localServer) updateIdFields() error {
-	if ls.querier == nil {
-		return errors.New("no querier set")
-	}
-
-	results, err := ls.querier.Query(idSQL)
+	results, err := ls.knapsack.Query(idSQL)
 	if err != nil {
 		return fmt.Errorf("id query failed: %w", err)
 	}

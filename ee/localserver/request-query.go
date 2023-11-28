@@ -39,7 +39,7 @@ func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	results, err := queryWithRetries(ls.querier, query)
+	results, err := queryWithRetries(ls.knapsack, query)
 	if err != nil {
 		sendClientError(w, span, fmt.Errorf("error executing query: %s", err))
 		return
@@ -92,7 +92,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 
 	scheduledQueryQuery := fmt.Sprintf("select name, query from osquery_schedule where name like '%s'", name)
 
-	scheduledQueriesQueryResults, err := queryWithRetries(ls.querier, scheduledQueryQuery)
+	scheduledQueriesQueryResults, err := queryWithRetries(ls.knapsack, scheduledQueryQuery)
 	if err != nil {
 		sendClientError(w, span, fmt.Errorf("error executing query for scheduled queries using \"%s\": %s", scheduledQueryQuery, err))
 		return
@@ -105,7 +105,7 @@ func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r
 			QueryName: scheduledQuery["name"],
 		}
 
-		scheduledQueryResult, err := queryWithRetries(ls.querier, scheduledQuery["query"])
+		scheduledQueryResult, err := queryWithRetries(ls.knapsack, scheduledQuery["query"])
 		if err != nil {
 			ls.slogger.Log(r.Context(), slog.LevelError,
 				"running scheduled query on demand",

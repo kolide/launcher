@@ -275,6 +275,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
+	k.SetQuerier(extension)
 
 	versionInfo := version.Version()
 	k.SystemSlogger().Info("started kolide launcher",
@@ -346,7 +347,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			return fmt.Errorf("failed to register auth token consumer: %w", err)
 		}
 
-		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
+		if exp, err := exporter.NewTraceExporter(ctx, k, logger); err != nil {
 			level.Debug(logger).Log(
 				"msg", "could not set up trace exporter",
 				"err", err,
@@ -391,7 +392,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
 		}
 
-		ls.SetQuerier(extension)
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
@@ -406,7 +406,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			k,
 			metadataClient,
 			mirrorClient,
-			extension,
 			tuf.WithLogger(logger),
 			tuf.WithOsqueryRestart(runnerRestart),
 		)

@@ -13,7 +13,6 @@ import (
 	"github.com/kolide/launcher/pkg/agent/flags/keys"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -45,7 +44,6 @@ type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
 	knapsack                  types.Knapsack
-	osqueryClient             querier
 	logger                    log.Logger
 	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
 	attrLock                  sync.RWMutex
@@ -63,7 +61,7 @@ type TraceExporter struct {
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Querier, logger log.Logger) (*TraceExporter, error) {
+func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) (*TraceExporter, error) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(applicationName),
@@ -81,7 +79,6 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	t := &TraceExporter{
 		providerLock:              sync.Mutex{},
 		knapsack:                  k,
-		osqueryClient:             client,
 		logger:                    log.With(logger, "component", "trace_exporter"),
 		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
@@ -186,7 +183,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 			break
 		}
 
-		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
+		resp, err = t.knapsack.Query(osqueryInfoQuery)
 		if err == nil && len(resp) > 0 {
 			break
 		}

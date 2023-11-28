@@ -55,14 +55,9 @@ type librarian interface {
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
 }
 
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
-
 type TufAutoupdater struct {
 	metadataClient         *client.Client
 	libraryManager         librarian
-	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
 	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
@@ -91,13 +86,12 @@ func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 }
 
 func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
-	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+	opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ta := &TufAutoupdater{
 		knapsack:               k,
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
 		store:                  k.AutoupdateErrorsStore(),
-		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
 		logger:                 log.NewNopLogger(),
 		restartFuncs:           make(map[autoupdatableBinary]func() error),
@@ -257,7 +251,7 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		var err error
 		for i := 0; i < osquerydVersionCheckRetries; i += 1 {
 			var resp []map[string]string
-			resp, err = ta.osquerier.Query("SELECT version FROM osquery_info;")
+			resp, err = ta.knapsack.Query("SELECT version FROM osquery_info;")
 			if err == nil && len(resp) > 0 {
 				if osquerydVersion, ok := resp[0]["version"]; ok {
 					return osquerydVersion, nil

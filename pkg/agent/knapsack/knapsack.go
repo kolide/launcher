@@ -2,6 +2,7 @@ package knapsack
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"log/slog"
@@ -33,9 +34,13 @@ type knapsack struct {
 	slogger, systemSlogger *multislogger.MultiSlogger
 	launcherRunId          string
 
+	q querier
+
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
-	// Some potential future additions include:
-	// Querier
+}
+
+type querier interface {
+	Query(query string) ([]map[string]string, error)
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
@@ -66,6 +71,19 @@ func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 
 	// also send system logs to the same handlers
 	k.systemSlogger.AddHandler(handler...)
+}
+
+// Querier interface methods
+func (k *knapsack) SetQuerier(q querier) {
+	k.q = q
+}
+
+func (k *knapsack) Query(query string) ([]map[string]string, error) {
+	if k.q == nil {
+		return nil, errors.New("querier not set in knapsack")
+	}
+
+	return k.q.Query(query)
 }
 
 // BboltDB interface methods

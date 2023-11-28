@@ -45,7 +45,6 @@ type localServer struct {
 	identifiers  identifiers
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
-	querier      Querier
 	kolideServer string
 
 	myKey                 *rsa.PrivateKey
@@ -129,10 +128,6 @@ func New(k types.Knapsack) (*localServer, error) {
 	ls.srv = srv
 
 	return ls, nil
-}
-
-func (ls *localServer) SetQuerier(querier Querier) {
-	ls.querier = querier
 }
 
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {

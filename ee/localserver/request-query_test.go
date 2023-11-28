@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
@@ -60,16 +59,11 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
-			//go:generate mockery --name Querier
-			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
-			mockQuerier := mocks.NewQuerier(t)
-
 			if tt.mockQueryResult != nil {
-				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, nil).Once()
+				mockKnapsack.On("Query", tt.query).Return(tt.mockQueryResult, nil).Once()
 			}
 
 			server := testServer(t, mockKnapsack)
-			server.querier = mockQuerier
 
 			jsonBytes, err := json.Marshal(map[string]string{
 				"query": tt.query,
@@ -224,22 +218,18 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
-
-			// set up mock querier
-			mockQuerier := mocks.NewQuerier(t)
 			scheduledQueryQuery := fmt.Sprintf("select name, query from osquery_schedule where name like '%s'", tt.scheduledQueriesQueryNamePattern)
 
 			// the query for the scheduled queries
-			mockQuerier.On("Query", scheduledQueryQuery).Return(tt.scheduledQueriesQueryResults, tt.scheduledQueriesQueryError)
+			mockKnapsack.On("Query", scheduledQueryQuery).Return(tt.scheduledQueriesQueryResults, tt.scheduledQueriesQueryError)
 
 			// the results of each scheduled query
 			for i, queryResult := range tt.queryReturns {
-				mockQuerier.On("Query", tt.scheduledQueriesQueryResults[i]["query"]).Return(queryResult.results, queryResult.err)
+				mockKnapsack.On("Query", tt.scheduledQueriesQueryResults[i]["query"]).Return(queryResult.results, queryResult.err)
 			}
 
 			// set up test server
 			server := testServer(t, mockKnapsack)
-			server.querier = mockQuerier
 
 			// make request body
 			body := make(map[string]string)
