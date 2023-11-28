@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/ee/debug/checkups/mocks"
 	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/debug/checkups/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
