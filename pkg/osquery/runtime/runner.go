@@ -122,10 +122,17 @@ func (r *Runner) Start() error {
 			}
 			if err := r.launchOsqueryInstance(); err != nil {
 				level.Info(r.instance.logger).Log(
-					"msg", "fatal error restarting instance",
+					"msg", "fatal error restarting instance, shutting down",
 					"err", err,
 				)
-				os.Exit(1)
+				r.instanceLock.Unlock()
+				if err := r.Shutdown(); err != nil {
+					level.Error(r.instance.logger).Log(
+						"msg", "could not perform shutdown",
+						"err", err,
+					)
+				}
+				return
 			}
 
 			r.instanceLock.Unlock()

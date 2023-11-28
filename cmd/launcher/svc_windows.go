@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -195,13 +196,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
+	runLauncherErrs := make(chan error)
+
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
-			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-			os.Exit(1)
+			runLauncherErrs <- fmt.Errorf("runLauncher exited with error: %w", err)
 		}
 
 		// If we get here, it means runLauncher returned nil. If we do
@@ -209,8 +211,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
 		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
-		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-		os.Exit(0)
+		runLauncherErrs <- errors.New("runLauncher exited cleanly")
 	}()
 
 	for {
@@ -232,6 +233,13 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			default:
 				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
 			}
+		case e := <-runLauncherErrs:
+			level.Info(w.logger).Log("msg", "received notice of runLauncher termination, marking service as stopped", "err", e)
+			changes <- svc.Status{State: svc.StopPending}
+			cancel()
+			time.Sleep(2 * time.Second) // give rungroups enough time to shut down
+			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+			return ssec, errno
 		}
 	}
 }

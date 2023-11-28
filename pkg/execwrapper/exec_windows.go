@@ -5,7 +5,6 @@ package execwrapper
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,24 +31,24 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 	)
 
 	// Now run it. This is faking exec, we need to distinguish
-	// between a failure to execute, and a failure in in the called program.
+	// between a failure to execute, and a failure in the called program.
 	// I think https://github.com/golang/go/issues/26539 adds this functionality.
 	err := cmd.Run()
 
 	if cmd.ProcessState.ExitCode() == -1 {
 		if err == nil {
-			return fmt.Errorf("Unknown error trying to exec %s (and nil err)", strings.Join(cmd.Args, " "))
+			return fmt.Errorf("unknown error trying to exec %s (and nil err)", strings.Join(cmd.Args, " "))
 		}
-		return fmt.Errorf("Unknown error trying to exec %s: %w", strings.Join(cmd.Args, " "), err)
+		return fmt.Errorf("unknown error trying to exec %s: %w", strings.Join(cmd.Args, " "), err)
 	}
 
 	if err != nil {
 		level.Info(logger).Log(
 			"msg", "got error on exec",
 			"err", err,
+			"exit_code", cmd.ProcessState.ExitCode(),
 		)
 	}
-	os.Exit(cmd.ProcessState.ExitCode())
-	return errors.New("Exec shouldn't have gotten here.")
 
+	return fmt.Errorf("error trying to exec %s: exit code %d: %w", strings.Join(cmd.Args, " "), cmd.ProcessState.ExitCode(), err)
 }
