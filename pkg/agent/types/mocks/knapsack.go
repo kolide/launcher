@@ -782,6 +782,20 @@ func (_m *Knapsack) OsquerydPath() string {
 	return r0
 }
 
+// QuerierHealthy provides a mock function with given fields:
+func (_m *Knapsack) QuerierHealthy() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Query provides a mock function with given fields: query
 func (_m *Knapsack) Query(query string) ([]map[string]string, error) {
 	ret := _m.Called(query)

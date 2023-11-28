@@ -41,6 +41,7 @@ type knapsack struct {
 
 type querier interface {
 	Query(query string) ([]map[string]string, error)
+	Healthy() error
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
@@ -84,6 +85,14 @@ func (k *knapsack) Query(query string) ([]map[string]string, error) {
 	}
 
 	return k.q.Query(query)
+}
+
+func (k *knapsack) QuerierHealthy() error {
+	if k.q == nil {
+		return errors.New("querier not set in knapsack")
+	}
+
+	return k.q.Healthy()
 }
 
 // BboltDB interface methods

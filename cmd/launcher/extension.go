@@ -29,11 +29,16 @@ import (
 // going to be pretty extensive work.
 type actorQuerier struct {
 	actor.Actor
-	querier func(query string) ([]map[string]string, error)
+	querier       func(query string) ([]map[string]string, error)
+	healthchecker func() error
 }
 
 func (aq actorQuerier) Query(query string) ([]map[string]string, error) {
 	return aq.querier(query)
+}
+
+func (aq actorQuerier) Healthy() error {
+	return aq.healthchecker()
 }
 
 // TODO: the extension, runtime, and client are all kind of entangled
@@ -169,7 +174,8 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					}
 				},
 			},
-			querier: runner.Query,
+			querier:       runner.Query,
+			healthchecker: runner.Healthy,
 		},
 		restartFunc,
 		runner.Shutdown,
