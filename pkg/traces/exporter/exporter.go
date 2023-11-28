@@ -36,10 +36,6 @@ var archAttributeMap = map[string]attribute.KeyValue{
 
 var osqueryClientRecheckInterval = 30 * time.Second
 
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
-
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
