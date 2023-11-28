@@ -90,7 +90,7 @@ func execGnomeExtension(ctx context.Context, extraWriter io.Writer, rundir strin
 	defer cancel()
 
 	// TODO: Need to figure out how to make this run per user
-	// pkg/osquery/tables/gsettings/gsettings.go probably has appropriate prior art.
+	// ee/tables/gsettings/gsettings.go probably has appropriate prior art.
 	// But do we really want the forloop?
 
 	cmd, err := allowedcmd.GnomeExtensions(ctx, args...)
