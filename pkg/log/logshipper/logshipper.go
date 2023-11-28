@@ -2,7 +2,10 @@ package logshipper
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"sync"
@@ -35,9 +38,10 @@ type LogShipper struct {
 	knapsack            types.Knapsack
 	stopFunc            context.CancelFunc
 	stopFuncMutex       sync.Mutex
-	isShippingEnabled   bool
+	isShippingStarted   bool
 	slogLevel           *slog.LevelVar
 	additionalSlogAttrs []slog.Attr
+	startShippingChan   chan struct{}
 }
 
 func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
@@ -57,6 +61,7 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 		knapsack:            k,
 		stopFuncMutex:       sync.Mutex{},
 		additionalSlogAttrs: make([]slog.Attr, 0),
+		startShippingChan:   make(chan struct{}),
 	}
 
 	ls.slogLevel = new(slog.LevelVar)
@@ -74,67 +79,56 @@ func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
 	ls.Ping()
 }
 
-// Ping gets the latest token and endpoint from knapsack and updates the sender
+// Ping collects all data required to be able to start shipping logs,
+// and starts the shipping process once all data has been collected.
 func (ls *LogShipper) Ping() {
-	// set up new auth token
-	token, _ := ls.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
-	ls.sender.authtoken = string(token)
+	ls.updateLogShippingLevel()
 
-	parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
-	if err != nil {
-		// If we have a bad endpoint, just disable for now.
-		// It will get renabled when control server sends a
-		// valid endpoint.
-		ls.sender.endpoint = ""
+	if err := ls.updateSenderAuthToken(); err != nil {
 		level.Debug(ls.baseLogger).Log(
-			"msg", "error parsing log ingest server url, shipping disabled",
+			"msg", "updating auth token",
 			"err", err,
-			"log_ingest_url", ls.knapsack.LogIngestServerURL(),
 		)
-	} else if parsedUrl != nil {
-		ls.sender.endpoint = parsedUrl.String()
+		return
 	}
 
-	startingLevel := ls.slogLevel.Level()
-	sendInterval := defaultSendInterval
-
-	switch ls.knapsack.LogShippingLevel() {
-	case "debug":
-		ls.slogLevel.Set(slog.LevelDebug)
-		// if we using debug level logging, send logs more frequently
-		sendInterval = debugSendInterval
-	case "info":
-		ls.slogLevel.Set(slog.LevelInfo)
-	case "warn":
-		ls.slogLevel.Set(slog.LevelWarn)
-	case "error":
-		ls.slogLevel.Set(slog.LevelError)
-	case "default":
-		ls.knapsack.Slogger().Error("unrecognized flag value for log shipping level",
-			"flag_value", ls.knapsack.LogShippingLevel(),
-			"current_log_level", ls.slogLevel.String(),
+	if err := ls.updateLogIngestURL(); err != nil {
+		level.Debug(ls.baseLogger).Log(
+			"msg", "updating log ingest url",
+			"err", err,
 		)
+		return
 	}
 
-	if startingLevel != ls.slogLevel.Level() {
-		ls.knapsack.Slogger().Info("log shipping level changed",
-			"old_log_level", startingLevel.String(),
-			"new_log_level", ls.slogLevel.Level().String(),
-			"send_interval", sendInterval.String(),
+	if err := ls.updateDevideIdentifyingAttributes(); err != nil {
+		level.Debug(ls.baseLogger).Log(
+			"msg", "updating device identifying attributes",
+			"err", err,
 		)
+		return
 	}
 
-	ls.sendBuffer.SetSendInterval(sendInterval)
-
-	ls.isShippingEnabled = ls.sender.endpoint != ""
-	ls.addDeviceIdentifyingAttributesToLogger()
-
-	if !ls.isShippingEnabled {
-		ls.sendBuffer.DeleteAllData()
+	if ls.isShippingStarted {
+		return
 	}
+
+	ls.isShippingStarted = true
+	go func() {
+		ls.startShippingChan <- struct{}{}
+	}()
 }
 
 func (ls *LogShipper) Run() error {
+	ls.knapsack.Slogger().Log(context.Background(), slog.LevelInfo,
+		"log shipper set up, waiting for required data to start shipping",
+	)
+
+	<-ls.startShippingChan
+
+	ls.knapsack.Slogger().Log(context.Background(), slog.LevelInfo,
+		"starting log shipping",
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ls.stopFuncMutex.Lock()
@@ -154,10 +148,6 @@ func (ls *LogShipper) Stop(_ error) {
 }
 
 func (ls *LogShipper) Log(keyvals ...interface{}) error {
-	if !ls.isShippingEnabled {
-		return nil
-	}
-
 	filterResults(keyvals...)
 	return ls.shippingLogger.Log(keyvals...)
 }
@@ -192,42 +182,141 @@ func filterResults(keyvals ...interface{}) {
 	}
 }
 
-// addDeviceIdentifyingAttributesToLogger gets device identifiers from the server-provided
-// data and adds them as attributes on the logger.
-func (ls *LogShipper) addDeviceIdentifyingAttributesToLogger() {
-	additionalSlogAttrs := make([]slog.Attr, 0)
+// updateDevideIdentifyingAttributes gets device identifiers from the server-provided
+// data and adds them as attributes on the logger. If shipping has not yet started and
+// there are logs in the buffer, the device identifiers are added to the logs in the
+// buffer.
+func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
+	deviceInfo := make(map[string]string)
 
 	versionInfo := version.Version()
+	deviceInfo["version"] = versionInfo.Version
 	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
-	additionalSlogAttrs = append(additionalSlogAttrs, slog.String("version", versionInfo.Version))
 
-	if deviceId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
-		level.Debug(ls.baseLogger).Log("msg", "could not get device id", "err", err)
-	} else {
-		ls.shippingLogger = log.With(ls.shippingLogger, "k2_device_id", string(deviceId))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_device_id", string(deviceId)))
+	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
+		v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))
+		if err != nil {
+			return fmt.Errorf("could not get %s from server provided data: %w", key, err)
+		}
+
+		if len(v) == 0 {
+			return fmt.Errorf("no value for %s in server provided data", key)
+		}
+
+		deviceInfo[key] = string(v)
 	}
 
-	if munemo, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
-		level.Debug(ls.baseLogger).Log("msg", "could not get munemo", "err", err)
-	} else {
-		ls.shippingLogger = log.With(ls.shippingLogger, "k2_munemo", string(munemo))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_munemo", string(munemo)))
+	var deviceInfoKvps []any
+	for k, v := range deviceInfo {
+		deviceInfoKvps = append(deviceInfoKvps, k, v)
 	}
 
-	if orgId, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
-		level.Debug(ls.baseLogger).Log("msg", "could not get organization id", "err", err)
-	} else {
-		ls.shippingLogger = log.With(ls.shippingLogger, "k2_organization_id", string(orgId))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("k2_organization_id", string(orgId)))
-	}
+	ls.shippingLogger = log.With(ls.shippingLogger, deviceInfoKvps)
 
-	if serialNumber, err := ls.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
-		level.Debug(ls.baseLogger).Log("msg", "could not get serial number", "err", err)
-	} else {
-		ls.shippingLogger = log.With(ls.shippingLogger, "serial_number", string(serialNumber))
-		additionalSlogAttrs = append(additionalSlogAttrs, slog.String("serial_number", string(serialNumber)))
+	var additionalSlogAttrs []slog.Attr
+	for k, v := range deviceInfo {
+		additionalSlogAttrs = append(additionalSlogAttrs, slog.String(k, v))
 	}
 
 	ls.additionalSlogAttrs = additionalSlogAttrs
+
+	// if we are already shipping, dont update send buffer data
+	if ls.isShippingStarted {
+		return nil
+	}
+
+	// if this is the first time we've gotten device data, update the send buffer
+	// logs to include it
+	ls.sendBuffer.UpdateData(func(in io.Reader, out io.Writer) error {
+		var logMap map[string]interface{}
+
+		if err := json.NewDecoder(in).Decode(&logMap); err != nil {
+			ls.shippingLogger.Log(
+				"msg", "failed to decode log data",
+				"err", err,
+			)
+
+			return err
+		}
+
+		for k, v := range deviceInfo {
+			logMap[k] = v
+		}
+
+		if err := json.NewEncoder(out).Encode(logMap); err != nil {
+			ls.shippingLogger.Log(
+				"msg", "failed to encode log data",
+				"err", err,
+			)
+
+			return err
+		}
+
+		return nil
+	})
+
+	return nil
+}
+
+func (ls *LogShipper) updateSenderAuthToken() error {
+	token, err := ls.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
+	if err != nil {
+		return err
+	}
+
+	if len(token) == 0 {
+		return fmt.Errorf("no token found")
+	}
+
+	ls.sender.authtoken = string(token)
+	return nil
+}
+
+func (ls *LogShipper) updateLogIngestURL() error {
+	parsedUrl, err := url.Parse(ls.knapsack.LogIngestServerURL())
+
+	if err != nil {
+		return err
+	}
+
+	if parsedUrl == nil || parsedUrl.String() == "" {
+		ls.sender.endpoint = ""
+		return errors.New("log ingest url is empty")
+	}
+
+	ls.sender.endpoint = parsedUrl.String()
+	return nil
+}
+
+func (ls *LogShipper) updateLogShippingLevel() {
+	startingLevel := ls.slogLevel.Level()
+	sendInterval := defaultSendInterval
+
+	switch ls.knapsack.LogShippingLevel() {
+	case "debug":
+		ls.slogLevel.Set(slog.LevelDebug)
+		// if we using debug level logging, send logs more frequently
+		sendInterval = debugSendInterval
+	case "info":
+		ls.slogLevel.Set(slog.LevelInfo)
+	case "warn":
+		ls.slogLevel.Set(slog.LevelWarn)
+	case "error":
+		ls.slogLevel.Set(slog.LevelError)
+	case "default":
+		ls.knapsack.Slogger().Error("unrecognized flag value for log shipping level",
+			"flag_value", ls.knapsack.LogShippingLevel(),
+			"current_log_level", ls.slogLevel.String(),
+		)
+	}
+
+	if startingLevel != ls.slogLevel.Level() {
+		ls.knapsack.Slogger().Info("log shipping level changed",
+			"old_log_level", startingLevel.String(),
+			"new_log_level", ls.slogLevel.Level().String(),
+			"send_interval", sendInterval.String(),
+		)
+	}
+
+	ls.sendBuffer.SetSendInterval(sendInterval)
 }

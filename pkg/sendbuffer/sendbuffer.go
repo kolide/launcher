@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 type sender interface {
@@ -82,13 +83,19 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 	defer sb.writeMutex.Unlock()
 
 	if len(in) == 0 {
-		return 0, nil
+		sb.logger.Log(
+			"msg", "dropped data because element was empty",
+			"method", "UpdateData",
+		)
+
+		return len(in), nil
 	}
 
 	// if the single data piece is larger than the max send size, drop it and log
 	if len(in) > sb.maxSendSizeBytes {
 		sb.logger.Log(
 			"msg", "dropped data because element greater than max send size",
+			"method", "Write",
 			"size_of_data_bytes", len(in),
 			"max_send_size_bytes", sb.maxSendSizeBytes,
 			"head", string(in)[0:minInt(len(in), 100)],
@@ -103,11 +110,14 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
+			"method", "Write",
 			"size_of_data_bytes", len(in),
 			"buffer_size_bytes", sb.size,
 			"size_plus_data_bytes", sb.size+len(in),
 			"max_size", sb.maxStorageSizeBytes,
 		)
+
+		return len(in), nil
 	}
 
 	// If we don't make a copy of the data, we get data loss in the logs array.
@@ -148,6 +158,94 @@ func (sb *SendBuffer) SetSendInterval(sendInterval time.Duration) {
 	sb.sendTicker.Reset(sendInterval)
 }
 
+func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
+
+	var indexesToDelete []int
+
+	for i := 0; i < len(sb.logs); i++ {
+		in := bytes.NewReader(sb.logs[i])
+		out := &bytes.Buffer{}
+
+		inSize := in.Len()
+
+		// do the update, if it fails, preserve data
+		if err := f(in, out); err != nil {
+			level.Debug(sb.logger).Log(
+				"msg", "update function failed, preserving original data",
+				"method", "UpdateData",
+				"err", err,
+			)
+
+			continue
+		}
+
+		// subtract original size, wait until after update func is called
+		// incase it fails, we don't want to modify size
+		sb.size -= inSize
+		sb.logs[i] = nil
+
+		outLen := out.Len()
+
+		// if the new length is 0, mark for deletion
+		if outLen == 0 {
+			indexesToDelete = append(indexesToDelete, i)
+
+			level.Debug(sb.logger).Log(
+				"msg", "dropped data because element was empty",
+				"method", "UpdateData",
+			)
+
+			continue
+		}
+
+		// if new size excceds max send size, mark for deletion
+		if outLen > sb.maxSendSizeBytes {
+			indexesToDelete = append(indexesToDelete, i)
+
+			level.Debug(sb.logger).Log(
+				"msg", "dropped data because element greater than max send size",
+				"method", "UpdateData",
+				"size_of_data_bytes", out.Len(),
+				"max_send_size_bytes", sb.maxSendSizeBytes,
+				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+			)
+
+			continue
+		}
+
+		// if new size exceeds max storage size, mark for deletion
+		if outLen+sb.size > sb.maxStorageSizeBytes {
+			indexesToDelete = append(indexesToDelete, i)
+
+			// log it
+			sb.logger.Log(
+				"msg", "dropped data because buffer full",
+				"method", "UpdateData",
+				"size_of_data_bytes", outLen,
+				"buffer_size_bytes", sb.size,
+				"size_plus_data_bytes", sb.size+outLen,
+				"max_size", sb.maxStorageSizeBytes,
+				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+			)
+
+			continue
+		}
+
+		// update log and size
+		sb.logs[i] = out.Bytes()
+		sb.size += outLen
+	}
+
+	// remove indexes marked for deletion
+	for i := 0; i < len(indexesToDelete); i++ {
+		// shift left by i each time we delete an element to accout for decreased length
+		indexToDelete := indexesToDelete[i] - i
+		sb.logs = append(sb.logs[:indexToDelete], sb.logs[indexToDelete+1:]...)
+	}
+}
+
 func (sb *SendBuffer) DeleteAllData() {
 	sb.writeMutex.Lock()
 	defer sb.writeMutex.Unlock()
@@ -176,9 +274,6 @@ func (sb *SendBuffer) sendAndPurge() error {
 		sb.logger.Log("msg", "failed to send, will retry", "err", err)
 		return nil
 	}
-	// TODO: populate logs with device data (id, serial, munemo, orgid) when we
-	// get first set of control data with device info before shipping
-
 	// testing on a new enrollment in debug mode, log size hit 130K bytes
 	// before enrollment completed and was able to ship logs
 	// 2023-11-16
