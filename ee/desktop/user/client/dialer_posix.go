@@ -8,7 +8,7 @@ import (
 	"net"
 )
 
-func dialContext(socketPath string) func(_ context.Context, _, _ string) (net.Conn, error) {
+func dialContext(socketPath string) func(ctx context.Context, _, _ string) (net.Conn, error) {
 	return func(ctx context.Context, _, _ string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", socketPath)
