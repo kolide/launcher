@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 )
 
 type osqueryCheckup struct {
-	k              types.Knapsack
-	status         Status
-	executionTimes map[string]any // maps command to how long it took to run, in ms
-	summary        string
+	k       types.Knapsack
+	status  Status
+	data    map[string]any
+	summary string
 }
 
 func (o *osqueryCheckup) Name() string {
@@ -24,8 +25,9 @@ func (o *osqueryCheckup) Name() string {
 }
 
 func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
+	o.data = make(map[string]any)
+
 	// Determine passing status by running osqueryd --version
-	o.executionTimes = make(map[string]any)
 	if osqueryVersion, err := o.version(ctx); err != nil {
 		o.status = Failing
 		return fmt.Errorf("running osqueryd version: %w", err)
@@ -39,11 +41,15 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("running launcher interactive: %w", err)
 	}
 
+	// Retrieve osquery instance history to see if we have an abnormal number of restarts
+	o.instanceHistory(ctx)
+
 	return nil
 }
 
 func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	osquerydPath := o.k.LatestOsquerydPath(ctx)
+	o.data["osqueryd_path"] = osquerydPath
 
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cmdCancel()
@@ -52,12 +58,15 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	hideWindow(cmd)
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
-	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
+	o.data["execution_time_osq_version"] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
 		return "", fmt.Errorf("running %s version: err %w, output %s", osquerydPath, err, string(out))
 	}
 
-	return strings.TrimSpace(string(out)), nil
+	osqVersion := strings.TrimSpace(string(out))
+	o.data["osqueryd_version"] = osqVersion
+
+	return osqVersion, nil
 }
 
 func (o *osqueryCheckup) interactive(ctx context.Context) error {
@@ -79,12 +88,36 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 
 	startTime := time.Now().UnixMilli()
 	out, err := cmd.CombinedOutput()
-	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
+	o.data["execution_time_launcher_interactive"] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
 		return fmt.Errorf("running %s interactive: err %w, output %s", launcherPath, err, string(out))
 	}
 
 	return nil
+}
+
+func (o *osqueryCheckup) instanceHistory(_ context.Context) {
+	mostRecentInstances, err := history.GetHistory()
+	if err != nil {
+		o.data["osquery_instance_history"] = fmt.Errorf("could not get instance history: %+v", err)
+		return
+	}
+
+	mostRecentInstancesFormatted := make([]map[string]string, len(mostRecentInstances))
+	for i, instance := range mostRecentInstances {
+		mostRecentInstancesFormatted[i] = map[string]string{
+			"start_time":   instance.StartTime,
+			"connect_time": instance.ConnectTime,
+			"exit_time":    instance.ExitTime,
+			"hostname":     instance.Hostname,
+			"instance_id":  instance.InstanceId,
+			"version":      instance.Version,
+			"error":        instance.Error,
+		}
+
+	}
+
+	o.data["osquery_instance_history"] = mostRecentInstancesFormatted
 }
 
 func (o *osqueryCheckup) ExtraFileName() string {
@@ -100,5 +133,5 @@ func (o *osqueryCheckup) Summary() string {
 }
 
 func (o *osqueryCheckup) Data() any {
-	return o.executionTimes
+	return o.data
 }
