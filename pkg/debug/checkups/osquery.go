@@ -42,7 +42,10 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 
 	// Retrieve osquery instance history to see if we have an abnormal number of restarts
-	o.instanceHistory(ctx)
+	o.instanceHistory()
+
+	// Check to see if current extension is healthy
+	o.extensionHealth()
 
 	return nil
 }
@@ -96,7 +99,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	return nil
 }
 
-func (o *osqueryCheckup) instanceHistory(_ context.Context) {
+func (o *osqueryCheckup) instanceHistory() {
 	mostRecentInstances, err := history.GetHistory()
 	if err != nil {
 		o.data["osquery_instance_history"] = fmt.Errorf("could not get instance history: %+v", err)
@@ -118,6 +121,15 @@ func (o *osqueryCheckup) instanceHistory(_ context.Context) {
 	}
 
 	o.data["osquery_instance_history"] = mostRecentInstancesFormatted
+}
+
+func (o *osqueryCheckup) extensionHealth() {
+	err := o.k.QuerierHealthy()
+	if err != nil {
+		o.data["osquery_instance_healthcheck_err"] = err.Error()
+	} else {
+		o.data["osquery_instance_healthcheck_err"] = nil
+	}
 }
 
 func (o *osqueryCheckup) ExtraFileName() string {
