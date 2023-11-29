@@ -6,10 +6,13 @@ package rungroup
 // timeout. See: https://github.com/kolide/launcher/issues/1205
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"golang.org/x/sync/semaphore"
 )
 
 type (
@@ -28,6 +31,11 @@ type (
 		errorSourceName string
 		err             error
 	}
+)
+
+const (
+	interruptTimeout     = 5 * time.Second // How long for all actors to return from their `interrupt` function
+	executeReturnTimeout = 5 * time.Second // After interrupted, how long for all actors to exit their `execute` functions
 )
 
 func NewRunGroup(logger log.Logger) *Group {
@@ -65,15 +73,38 @@ func (g *Group) Run() error {
 	level.Debug(g.logger).Log("msg", "received interrupt error from first actor -- shutting down other actors", "err", initialActorErr)
 
 	// Signal all actors to stop.
+	numActors := int64(len(g.actors))
+	interruptWait := semaphore.NewWeighted(numActors)
 	for _, a := range g.actors {
-		level.Debug(g.logger).Log("msg", "interrupting actor", "actor", a.name)
-		a.interrupt(initialActorErr.err)
+		interruptWait.Acquire(context.Background(), 1)
+		go func(a rungroupActor) {
+			defer interruptWait.Release(1)
+			level.Debug(g.logger).Log("msg", "interrupting actor", "actor", a.name)
+			a.interrupt(initialActorErr.err)
+		}(a)
 	}
 
-	// Wait for all actors to stop.
+	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), interruptTimeout)
+	defer interruptCancel()
+
+	// Wait for interrupts to complete, but only until we hit our interruptCtx timeout
+	if err := interruptWait.Acquire(interruptCtx, numActors); err != nil {
+		level.Debug(g.logger).Log("msg", "error waiting for interrupts to complete", "err", err)
+	}
+
+	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
+	timeoutTimer := time.NewTimer(executeReturnTimeout)
+	defer timeoutTimer.Stop()
 	for i := 1; i < cap(errors); i++ {
-		e := <-errors
-		level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName, "index", i)
+		select {
+		case <-timeoutTimer.C:
+			level.Debug(g.logger).Log("msg", "rungroup shutdown deadline exceeded, not waiting for any more actors to return", "index", i)
+
+			// Return the original error so we can proceed with shutdown
+			return initialActorErr.err
+		case e := <-errors:
+			level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName, "index", i)
+		}
 	}
 
 	// Return the original error.
