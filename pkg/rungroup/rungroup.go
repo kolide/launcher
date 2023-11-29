@@ -81,6 +81,7 @@ func (g *Group) Run() error {
 			defer interruptWait.Release(1)
 			level.Debug(g.logger).Log("msg", "interrupting actor", "actor", a.name)
 			a.interrupt(initialActorErr.err)
+			level.Debug(g.logger).Log("msg", "interrupt complete", "actor", a.name)
 		}(a)
 	}
 
@@ -89,7 +90,7 @@ func (g *Group) Run() error {
 
 	// Wait for interrupts to complete, but only until we hit our interruptCtx timeout
 	if err := interruptWait.Acquire(interruptCtx, numActors); err != nil {
-		level.Debug(g.logger).Log("msg", "error waiting for interrupts to complete", "err", err)
+		level.Debug(g.logger).Log("msg", "timeout waiting for interrupts to complete, proceeding with shutdown", "err", err)
 	}
 
 	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
@@ -98,12 +99,12 @@ func (g *Group) Run() error {
 	for i := 1; i < cap(errors); i++ {
 		select {
 		case <-timeoutTimer.C:
-			level.Debug(g.logger).Log("msg", "rungroup shutdown deadline exceeded, not waiting for any more actors to return", "index", i)
+			level.Debug(g.logger).Log("msg", "rungroup shutdown deadline exceeded, not waiting for any more actors to return")
 
 			// Return the original error so we can proceed with shutdown
 			return initialActorErr.err
 		case e := <-errors:
-			level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName, "index", i)
+			level.Debug(g.logger).Log("msg", "execute returned", "actor", e.errorSourceName, "index", i)
 		}
 	}
 
