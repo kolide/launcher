@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -130,7 +129,7 @@ func runWindowsSvc(args []string) error {
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
 		level.Info(logger).Log(
-			"msg", "Error in service run",
+			"msg", "error in service run",
 			"err", err,
 			"version", version.Version().Version,
 		)
@@ -196,14 +195,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
-	runLauncherErrs := make(chan error)
-
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
-			runLauncherErrs <- fmt.Errorf("runLauncher exited with error: %w", err)
+			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+			// Launcher is already shut down -- fully exit so that the service manager can restart the service
+			os.Exit(1)
 		}
 
 		// If we get here, it means runLauncher returned nil. If we do
@@ -211,7 +210,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
 		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
-		runLauncherErrs <- errors.New("runLauncher exited cleanly")
+		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+		os.Exit(0)
 	}()
 
 	for {
@@ -233,13 +233,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			default:
 				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
 			}
-		case e := <-runLauncherErrs:
-			level.Info(w.logger).Log("msg", "received notice of runLauncher termination, marking service as stopped", "err", e)
-			changes <- svc.Status{State: svc.StopPending}
-			cancel()
-			time.Sleep(2 * time.Second) // give rungroups enough time to shut down
-			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-			return ssec, errno
 		}
 	}
 }
