@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -48,7 +49,8 @@ func runSocket(args []string) error {
 		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil)...))
 	}
 
-	runner, err := runtime.LaunchInstance(opts...)
+	_, cancel := context.WithCancel(context.Background())
+	runner, err := runtime.LaunchInstance(cancel, opts...)
 	if err != nil {
 		return fmt.Errorf("creating osquery instance: %w", err)
 	}

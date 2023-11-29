@@ -129,7 +129,7 @@ func runWindowsSvc(args []string) error {
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
 		level.Info(logger).Log(
-			"msg", "Error in service run",
+			"msg", "error in service run",
 			"err", err,
 			"version", version.Version().Version,
 		)
@@ -137,7 +137,7 @@ func runWindowsSvc(args []string) error {
 		return err
 	}
 
-	level.Debug(logger).Log("msg", "Service exited", "version", version.Version().Version)
+	level.Debug(logger).Log("msg", "service exited", "version", version.Version().Version)
 	time.Sleep(time.Second)
 
 	return nil
@@ -201,6 +201,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
 			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+			// Launcher is already shut down -- fully exit so that the service manager can restart the service
 			os.Exit(1)
 		}
 
