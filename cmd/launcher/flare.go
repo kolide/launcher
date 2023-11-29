@@ -12,11 +12,11 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/debug/checkups"
+	"github.com/kolide/launcher/ee/debug/shipper"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
 	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
-	"github.com/kolide/launcher/pkg/debug/checkups"
-	"github.com/kolide/launcher/pkg/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 )

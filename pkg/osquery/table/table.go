@@ -1,17 +1,17 @@
 package table
 
 import (
+	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
+	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/desktopprocs"
+	"github.com/kolide/launcher/ee/tables/dev_table_tooling"
+	"github.com/kolide/launcher/ee/tables/firefox_preferences"
+	"github.com/kolide/launcher/ee/tables/launcher_db"
+	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
+	"github.com/kolide/launcher/ee/tables/tdebug"
+	"github.com/kolide/launcher/ee/tables/tufinfo"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/allowedcmd"
-	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/desktopprocs"
-	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
-	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
-	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
-	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
-	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
-	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"

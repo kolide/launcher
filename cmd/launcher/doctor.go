@@ -6,9 +6,9 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/logutil"
+	"github.com/kolide/launcher/ee/debug/checkups"
 	"github.com/kolide/launcher/pkg/agent/flags"
 	"github.com/kolide/launcher/pkg/agent/knapsack"
-	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
