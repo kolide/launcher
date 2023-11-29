@@ -64,9 +64,9 @@ type Runner struct {
 //			 	 tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate),
 //	    ),
 //	  )
-func LaunchInstance(opts ...OsqueryInstanceOption) (*Runner, error) {
+func LaunchInstance(cancel context.CancelFunc, opts ...OsqueryInstanceOption) (*Runner, error) {
 	runner := newRunner(opts...)
-	if err := runner.Start(); err != nil {
+	if err := runner.Start(cancel); err != nil {
 		return nil, err
 	}
 	return runner, nil
@@ -79,7 +79,7 @@ func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) *Runner {
 	return runner
 }
 
-func (r *Runner) Start() error {
+func (r *Runner) Start(cancel context.CancelFunc) error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return fmt.Errorf("starting instance: %w", err)
 	}
@@ -97,6 +97,7 @@ func (r *Runner) Start() error {
 				if err := r.instance.stats.Exited(nil); err != nil {
 					level.Info(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
 				}
+				cancel() // let the extension know to shut down
 				return
 			default:
 				// Don't block
@@ -132,6 +133,7 @@ func (r *Runner) Start() error {
 						"err", err,
 					)
 				}
+				cancel() // let the extension know to shut down
 				return
 			}
 

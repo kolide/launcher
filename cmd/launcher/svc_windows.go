@@ -138,7 +138,7 @@ func runWindowsSvc(args []string) error {
 		return err
 	}
 
-	level.Debug(logger).Log("msg", "Service exited", "version", version.Version().Version)
+	level.Debug(logger).Log("msg", "service exited", "version", version.Version().Version)
 	time.Sleep(time.Second)
 
 	return nil
