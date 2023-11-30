@@ -1,6 +1,6 @@
 // Package cryptoinfo is designed to examine keys and certificates on
 // disk, and return information about them. It is designed to work
-// with dataflatten, and may eventually it may replace pkg/keyidentifier
+// with dataflatten, and may eventually it may replace ee/keyidentifier
 package cryptoinfo
 
 // identifierSignature is an internal type to denote the identification functions. It's
