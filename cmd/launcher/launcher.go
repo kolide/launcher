@@ -54,7 +54,7 @@ import (
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces/exporter"
-	"github.com/kolide/launcher/pkg/windows/powereventwatcher"
+	"github.com/kolide/launcher/ee/powereventwatcher"
 
 	"go.etcd.io/bbolt"
 )
