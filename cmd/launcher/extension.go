@@ -119,21 +119,24 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 		return runner.Restart()
 	}
 
+	osqCtx, osqCancel := context.WithCancel(ctx)
+
 	return &actorQuerier{
 			Actor: actor.Actor{
 				// and the methods for starting and stopping the extension
 				Execute: func() error {
 					// Attempt to enroll before starting up osquery. If we can't enroll now, don't error out --
 					// we'll attempt again the first time osquery calls launcher plugins.
-					_, invalid, err := ext.Enroll(ctx)
+					_, invalid, err := ext.Enroll(osqCtx)
 					if err != nil {
 						level.Debug(logger).Log("msg", "error performing enrollment", "err", err)
 					} else if invalid {
 						level.Debug(logger).Log("msg", "invalid enroll secret", "err", err)
 					}
 
-					// Start the osqueryd instance
-					if err := runner.Start(); err != nil {
+					// Start the osqueryd instance -- pass in cancel so the osquery runner can let
+					// this function know to stop waiting when the runner shuts down
+					if err := runner.Start(osqCancel); err != nil {
 						return fmt.Errorf("launching osquery instance: %w", err)
 					}
 
@@ -143,7 +146,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 						// TODO: remove when underlying libs are refactored
 						// everything exits right now, so block this actor on the context finishing
-						<-ctx.Done()
+						<-osqCtx.Done()
 						return nil
 					}
 
@@ -157,7 +160,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 					// TODO: remove when underlying libs are refactored
 					// everything exits right now, so block this actor on the context finishing
-					<-ctx.Done()
+					<-osqCtx.Done()
 					return nil
 				},
 				Interrupt: func(_ error) {
@@ -168,6 +171,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 							level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
 						}
 					}
+					osqCancel()
 				},
 			},
 			querier: runner.Query,
