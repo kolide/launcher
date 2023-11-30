@@ -581,7 +581,7 @@ func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
-		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.MaxWaitTime(maxSocketWaitTime))
+		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(maxSocketWaitTime))
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
 		return nil, fmt.Errorf("could not create an extension client: %w", err)
