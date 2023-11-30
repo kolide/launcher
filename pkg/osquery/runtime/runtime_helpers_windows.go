@@ -25,8 +25,8 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	defer cancel()
 
 	// some discussion here https://github.com/golang/dep/pull/857
-	cmd, err := allowedcmd.Taskkill(ctx, "/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid))
-	if err != nil {
+	cmd := exec.CommandContext(ctx, "taskkill", "/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid))
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}
 
