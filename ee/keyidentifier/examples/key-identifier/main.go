@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/kolide/kit/logutil"
-	"github.com/kolide/launcher/pkg/keyidentifier"
+	"github.com/kolide/launcher/ee/keyidentifier"
 )
 
 func main() {
