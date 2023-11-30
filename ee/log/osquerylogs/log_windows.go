@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package log
+package osquerylogs
 
 func (l *OsqueryLogAdapter) runAndLogPs(_ string) {
 	return

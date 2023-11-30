@@ -1,15 +1,15 @@
-package log
+package osquerylogs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
-	kitlog "github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -17,23 +17,16 @@ import (
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
 // to the osquery stdout/stderr
 type OsqueryLogAdapter struct {
-	logger        kitlog.Logger
-	levelFunc     func(kitlog.Logger) kitlog.Logger
-	extraKeyVals  []interface{} // log.With expects an interface, not string
+	slogger       slog.Logger
+	level         slog.Level
 	rootDirectory string
 }
 
 type Option func(*OsqueryLogAdapter)
 
-func WithKeyValue(key, value string) Option {
+func WithLevel(level slog.Level) Option {
 	return func(l *OsqueryLogAdapter) {
-		l.extraKeyVals = append(l.extraKeyVals, key, value)
-	}
-}
-
-func WithLevelFunc(lf func(kitlog.Logger) kitlog.Logger) Option {
-	return func(l *OsqueryLogAdapter) {
-		l.levelFunc = lf
+		l.level = level
 	}
 }
 
@@ -45,11 +38,10 @@ func extractOsqueryCaller(msg string) string {
 	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
 }
 
-func NewOsqueryLogAdapter(logger kitlog.Logger, rootDirectory string, opts ...Option) *OsqueryLogAdapter {
+func NewOsqueryLogAdapter(slogger *slog.Logger, rootDirectory string, opts ...Option) *OsqueryLogAdapter {
 	l := &OsqueryLogAdapter{
-		logger:        logger,
-		levelFunc:     level.Debug,
-		extraKeyVals:  []interface{}{},
+		slogger:       *slogger,
+		level:         slog.LevelInfo,
 		rootDirectory: rootDirectory,
 	}
 
@@ -64,9 +56,9 @@ func NewOsqueryLogAdapter(logger kitlog.Logger, rootDirectory string, opts ...Op
 func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	// Work around osquery being overly verbose with it's logs
 	// see: https://github.com/osquery/osquery/pull/6271
-	lf := l.levelFunc
+	level := l.level
 	if bytes.Contains(p, []byte("Executing scheduled query pack")) {
-		lf = level.Debug
+		level = slog.LevelDebug
 	}
 
 	if bytes.Contains(p, []byte("Accelerating distributed query checkins")) {
@@ -85,9 +77,11 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	if err := lf(l.logger).Log(append(l.extraKeyVals, "msg", msg, "caller", caller)...); err != nil {
-		return 0, err
-	}
+	l.slogger.Log(context.TODO(), level,
+		msg,
+		"caller", caller,
+	)
+
 	return len(p), nil
 }
 
@@ -96,21 +90,23 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []byte) {
 	matches := pidRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
-		level.Debug(l.logger).Log(
-			"msg", "could not extract PID of non-osqueryd process using pidfile from log line",
+		l.slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not extract PID of non-osqueryd process using pidfile from log line",
 			"log_line", string(p),
 		)
+
 		return
 	}
 
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
 	pid, err := strconv.ParseUint(pidStr, 10, 32)
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "could not extract PID of non-osqueryd process using pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not extract PID of non-osqueryd process using pidfile",
 			"pid", pidStr,
 			"err", err,
 		)
+
 		return
 	}
 
@@ -120,11 +116,12 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 
 	unknownProcess, err := process.NewProcess(int32(pid))
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "could not get non-osqueryd process using pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not get non-osqueryd process using pidfile",
 			"pid", pid,
 			"err", err,
 		)
+
 		return
 	}
 
@@ -152,7 +149,10 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 		processInfo = append(processInfo, "system_uptime", uptime)
 	}
 
-	level.Debug(l.logger).Log(append(processInfo, "msg", "detected non-osqueryd process using pidfile")...)
+	l.slogger.Log(context.TODO(), slog.LevelDebug,
+		"detected non-osqueryd process using pidfile",
+		processInfo...,
+	)
 }
 
 // getStringStat is a small wrapper around gopsutil/process functions
