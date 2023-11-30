@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/cryptoinfo"
+	"github.com/kolide/launcher/ee/cryptoinfo"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -85,7 +85,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-// flattenCryptoInfo is a small wrapper over pkg/cryptoinfo that passes it off to dataflatten for table generation
+// flattenCryptoInfo is a small wrapper over ee/cryptoinfo that passes it off to dataflatten for table generation
 func flattenCryptoInfo(filename, passphrase string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
 	filebytes, err := os.ReadFile(filename)
 	if err != nil {
