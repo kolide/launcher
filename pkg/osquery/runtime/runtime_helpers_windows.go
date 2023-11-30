@@ -31,7 +31,20 @@ func killProcessGroup(cmd *exec.Cmd) error {
 		return fmt.Errorf("creating command: %w", err)
 	}
 
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(out) > 0 {
+			return fmt.Errorf("running taskkill: output: %s, err: %w", string(out), err)
+		}
+
+		if ctx.Err() != nil {
+			return fmt.Errorf("running taskkill: context err: %v, err: %w", ctx.Err(), err)
+		}
+
+		return fmt.Errorf("running taskkill: err: %w", err)
+	}
+
+	return nil
 }
 
 func SocketPath(rootDir string) string {
