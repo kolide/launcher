@@ -90,6 +90,7 @@ func (r *Runner) Start(cancel context.CancelFunc) error {
 		for {
 			// Wait for async processes to exit
 			<-r.instance.doneCtx.Done()
+			level.Info(r.instance.logger).Log("msg", "osquery instance exited")
 
 			select {
 			case <-r.shutdown:
@@ -398,6 +399,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "monitor osquery process")
+
 		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
@@ -418,6 +421,8 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Kill osquery process on shutdown
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "kill osquery process on shutdown")
+
 		<-o.doneCtx.Done()
 		level.Debug(o.logger).Log("msg", "Starting osquery shutdown")
 		if o.cmd.Process != nil {
@@ -476,6 +481,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	// TODO: Consider chunking, if we find we can only have so
 	// many tables per extension manager
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "kolide extension manager server launch")
+
 		plugins := table.PlatformTables(o.logger, currentOsquerydBinaryPath)
 
 		if len(plugins) == 0 {
@@ -491,6 +498,8 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "health check on interval")
+
 		if o.knapsack != nil && o.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			level.Debug(o.logger).Log("msg", "entering delay before starting osquery healthchecks")
 			select {
@@ -546,6 +555,8 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Cleanup temp dir
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "cleanup temp dir")
+
 		<-o.doneCtx.Done()
 		if o.usingTempDir && o.rmRootDirectory != nil {
 			o.rmRootDirectory()
