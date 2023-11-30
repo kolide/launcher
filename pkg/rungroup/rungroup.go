@@ -76,6 +76,8 @@ func (g *Group) Run() error {
 		level.Debug(g.logger).Log("msg", "successfully interrupted actor", "actor", e.errorSourceName, "index", i)
 	}
 
+	level.Debug(g.logger).Log("msg", "done shutting own actors", "actor_count", len(g.actors), "initial_err", initialActorErr.err)
+
 	// Return the original error.
 	return initialActorErr.err
 }
