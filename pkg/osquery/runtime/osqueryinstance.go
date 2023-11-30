@@ -581,7 +581,7 @@ func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
-		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.MaxWaitTime(maxSocketWaitTime))
+		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(maxSocketWaitTime))
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
 		return nil, fmt.Errorf("could not create an extension client: %w", err)
@@ -621,8 +621,10 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	// Start!
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "run extension manager server", "extension_name", name)
+
 		if err := extensionManagerServer.Start(); err != nil {
-			level.Info(logger).Log("msg", "Extension manager server startup got error", "err", err)
+			level.Info(logger).Log("msg", "Extension manager server startup got error", "err", err, "extension_name", name)
 			return fmt.Errorf("running extension server: %w", err)
 		}
 		return errors.New("extension manager server exited")
@@ -630,12 +632,15 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	// register a shutdown routine
 	o.errgroup.Go(func() error {
+		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "shut down extension manager server", "extension_name", name)
+
 		<-o.doneCtx.Done()
 		level.Debug(logger).Log("msg", "Starting extension shutdown")
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			level.Info(o.logger).Log(
 				"msg", "Got error while shutting down extension server",
 				"err", err,
+				"extension_name", name,
 			)
 		}
 		return o.doneCtx.Err()

@@ -215,7 +215,9 @@ func TestBadBinaryPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
@@ -232,7 +234,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -260,7 +264,9 @@ func TestSimplePath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -283,7 +289,9 @@ func TestMultipleShutdowns(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -333,7 +341,9 @@ func TestOsqueryDies(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -419,7 +429,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
@@ -452,7 +464,9 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
@@ -496,7 +510,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	_, cancel := context.WithCancel(context.TODO())
 	runner, err = LaunchInstance(
+		cancel,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
