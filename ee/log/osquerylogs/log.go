@@ -72,6 +72,9 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 	// information here about the process locking the pidfile.
 	// See: https://github.com/osquery/osquery/issues/7796
 	if bytes.Contains(p, []byte("Refusing to kill non-osqueryd process")) {
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"detected non-osqueryd process using pidfile, logging info about process",
+		)
 		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
 	}
 
@@ -90,7 +93,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []byte) {
 	matches := pidRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
-		l.slogger.Log(context.TODO(), slog.LevelDebug,
+		l.slogger.Log(context.TODO(), slog.LevelError,
 			"could not extract PID of non-osqueryd process using pidfile from log line",
 			"log_line", string(p),
 		)
@@ -101,7 +104,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
 	pid, err := strconv.ParseUint(pidStr, 10, 32)
 	if err != nil {
-		l.slogger.Log(context.TODO(), slog.LevelDebug,
+		l.slogger.Log(context.TODO(), slog.LevelError,
 			"could not extract PID of non-osqueryd process using pidfile",
 			"pid", pidStr,
 			"err", err,
@@ -116,7 +119,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 
 	unknownProcess, err := process.NewProcess(int32(pid))
 	if err != nil {
-		l.slogger.Log(context.TODO(), slog.LevelDebug,
+		l.slogger.Log(context.TODO(), slog.LevelError,
 			"could not get non-osqueryd process using pidfile",
 			"pid", pid,
 			"err", err,
@@ -149,7 +152,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 		processInfo = append(processInfo, "system_uptime", uptime)
 	}
 
-	l.slogger.Log(context.TODO(), slog.LevelDebug,
+	l.slogger.Log(context.TODO(), slog.LevelInfo,
 		"detected non-osqueryd process using pidfile",
 		processInfo...,
 	)
