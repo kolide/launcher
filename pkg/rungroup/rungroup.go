@@ -63,6 +63,7 @@ func (g *Group) Run() error {
 	// Wait for the first actor to stop.
 	initialActorErr := <-errors
 	level.Debug(g.logger).Log("msg", "received interrupt error from first actor -- shutting down other actors", "err", initialActorErr)
+	defer level.Debug(g.logger).Log("msg", "done shutting down actors", "actor_count", len(g.actors), "initial_err", initialActorErr)
 
 	// Signal all actors to stop.
 	for _, a := range g.actors {
