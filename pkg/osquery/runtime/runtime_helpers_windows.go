@@ -20,12 +20,13 @@ func setpgid() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{}
 }
 
-func killProcessGroup(cmd *exec.Cmd) error {
+func killProcessGroup(origCmd *exec.Cmd) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// some discussion here https://github.com/golang/dep/pull/857
-	cmd := exec.CommandContext(ctx, "taskkill", "/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid))
+
+	cmd := exec.CommandContext(ctx, "taskkill", "/F", "/T", "/PID", fmt.Sprint(origCmd.Process.Pid))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("creating command: %w", err)
 	}
