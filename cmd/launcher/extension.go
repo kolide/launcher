@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -11,10 +12,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/cmd/launcher/internal"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	ktable "github.com/kolide/launcher/pkg/osquery/table"
@@ -184,18 +185,20 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryInstanceOption {
 	// create the logging adapters for osquery
 	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
+		k.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stderr",
+		),
 		k.RootDirectory(),
-		kolidelog.WithLevelFunc(level.Info),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stderr"),
+		kolidelog.WithLevel(slog.LevelInfo),
 	)
 	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
+		k.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stdout",
+		),
 		k.RootDirectory(),
-		kolidelog.WithLevelFunc(level.Debug),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stdout"),
+		kolidelog.WithLevel(slog.LevelDebug),
 	)
 
 	return []runtime.OsqueryInstanceOption{

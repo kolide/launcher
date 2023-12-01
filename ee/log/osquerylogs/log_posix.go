@@ -1,14 +1,14 @@
 //go:build !windows
 // +build !windows
 
-package log
+package osquerylogs
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"time"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 
@@ -19,24 +19,26 @@ func (l *OsqueryLogAdapter) runAndLogPs(pidStr string) {
 
 	cmd, err := allowedcmd.Ps(ctx, "-p", pidStr, "-o", "user,pid,ppid,pgid,stat,time,command")
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error creating command to run ps on osqueryd pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error creating command to run ps on osqueryd pidfile",
 			"err", err,
 		)
+
 		return
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running ps on non-osqueryd process using pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error running ps on non-osqueryd process using pidfile",
 			"pid", pidStr,
 			"err", err,
 		)
+
 		return
 	}
 
-	level.Debug(l.logger).Log(
-		"msg", "ran ps on non-osqueryd process using pidfile",
+	l.slogger.Log(context.TODO(), slog.LevelInfo,
+		"ran ps on non-osqueryd process using pidfile",
 		"pid", pidStr,
 		"output", string(out),
 	)
@@ -49,24 +51,26 @@ func (l *OsqueryLogAdapter) runAndLogLsofByPID(pidStr string) {
 
 	cmd, err := allowedcmd.Lsof(ctx, "-R", "-n", "-p", pidStr)
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error creating command to run lsof on osqueryd pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error creating command to run lsof on osqueryd pidfile",
 			"err", err,
 		)
+
 		return
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running lsof on non-osqueryd process using pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error running lsof on non-osqueryd process using pidfile",
 			"pid", pidStr,
 			"err", err,
 		)
+
 		return
 	}
 
-	level.Debug(l.logger).Log(
-		"msg", "ran lsof on non-osqueryd process using pidfile",
+	l.slogger.Log(context.TODO(), slog.LevelInfo,
+		"ran lsof on non-osqueryd process using pidfile",
 		"pid", pidStr,
 		"output", string(out),
 	)
@@ -82,24 +86,26 @@ func (l *OsqueryLogAdapter) runAndLogLsofOnPidfile() {
 
 	cmd, err := allowedcmd.Lsof(ctx, "-R", "-n", fullPidfile)
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error creating command to run lsof on osqueryd pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error creating command to run lsof on osqueryd pidfile",
 			"err", err,
 		)
+
 		return
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		level.Debug(l.logger).Log(
-			"msg", "error running lsof on osqueryd pidfile",
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"error running lsof on osqueryd pidfile",
 			"pidfile", fullPidfile,
 			"err", err,
 		)
+
 		return
 	}
 
-	level.Debug(l.logger).Log(
-		"msg", "ran lsof on osqueryd pidfile",
+	l.slogger.Log(context.TODO(), slog.LevelInfo,
+		"ran lsof on osqueryd pidfile",
 		"pidfile", fullPidfile,
 		"output", string(out),
 	)

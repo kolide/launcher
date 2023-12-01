@@ -1,4 +1,4 @@
-package log
+package osquerylogs
 
 import (
 	"testing"
