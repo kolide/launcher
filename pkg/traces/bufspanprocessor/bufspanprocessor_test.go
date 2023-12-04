@@ -57,7 +57,7 @@ func TestBufSpanProcessor(t *testing.T) {
 			// require.True(t, firstChildProcessor.onEndCalled, "should have called OnEnd")
 			require.Nil(t, bsp.bufferedSpans, "should have cleared buffered spans")
 
-			// wait for the spans to be transfered to child processor
+			// wait for the spans to be transferred to child processor
 			for len(bsp.bufferedSpans) > 0 {
 				time.Sleep(100 * time.Millisecond)
 			}
