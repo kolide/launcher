@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -44,6 +46,7 @@ type querier interface {
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
+	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
 	osqueryClient             querier
 	logger                    log.Logger
@@ -63,7 +66,7 @@ type TraceExporter struct {
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Querier, logger log.Logger) (*TraceExporter, error) {
+func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) (*TraceExporter, error) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(applicationName),
@@ -79,9 +82,11 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	ctx, cancel := context.WithCancel(ctx)
 
 	t := &TraceExporter{
-		providerLock:              sync.Mutex{},
+		providerLock: sync.Mutex{},
+		bufSpanProcessor: &bufspanprocessor.BufSpanProcessor{
+			MaxBufferedSpans: 500,
+		},
 		knapsack:                  k,
-		osqueryClient:             client,
 		logger:                    log.With(logger, "component", "trace_exporter"),
 		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
@@ -114,6 +119,12 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 	// Set the provider with as many resource attributes as we can get immediately
 	t.setNewGlobalProvider()
 
+	return t, nil
+}
+
+func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
+	t.osqueryClient = client
+
 	// In the background, wait for osquery to be ready so that we can fetch more resource
 	// attributes for our traces, then replace the provider with a new one.
 	go func() {
@@ -121,8 +132,6 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, client osquery.Quer
 		t.setNewGlobalProvider()
 		level.Debug(t.logger).Log("msg", "successfully replaced global provider after adding osquery attributes")
 	}()
-
-	return t, nil
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -219,21 +228,6 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	t.providerLock.Lock()
 	defer t.providerLock.Unlock()
 
-	opts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(t.ingestUrl),
-		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
-	}
-	if t.disableIngestTLS {
-		opts = append(opts, otlptracegrpc.WithInsecure())
-	}
-
-	traceClient := otlptracegrpc.NewClient(opts...)
-	exp, err := otlptrace.New(t.ctx, traceClient)
-	if err != nil {
-		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
-		return
-	}
-
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
@@ -253,7 +247,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	parentBasedSampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(t.traceSamplingRate))
 
 	newProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp, sdktrace.WithBatchTimeout(t.batchTimeout)),
+		sdktrace.WithSpanProcessor(t.bufSpanProcessor),
 		sdktrace.WithResource(r),
 		sdktrace.WithSampler(parentBasedSampler),
 	)
@@ -262,10 +256,48 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	osquerygotraces.SetTracerProvider(newProvider)
 
 	if t.provider != nil {
+		// shutdown still gets called even though the span processor is unregistered
+		// leaving this in because it just feel correct
+		t.provider.UnregisterSpanProcessor(t.bufSpanProcessor)
 		t.provider.Shutdown(t.ctx)
 	}
 
 	t.provider = newProvider
+
+	// now that we have set up new provider, see if we need a new exporter and therefore
+	// a new child processor for the buf span processor
+
+	tisu := t.knapsack.TraceIngestServerURL()
+	fmt.Println(tisu)
+	if t.bufSpanProcessor.HasProcessor() && t.ingestUrl == t.knapsack.TraceIngestServerURL() {
+		// already have processor pointing at the same url, so no need to recreate
+		return
+	}
+
+	// create a trace client with the new ingest url
+	traceClientOpts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(t.knapsack.TraceIngestServerURL()),
+		otlptracegrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
+	}
+	if t.disableIngestTLS {
+		traceClientOpts = append(traceClientOpts, otlptracegrpc.WithInsecure())
+	}
+
+	traceClient := otlptracegrpc.NewClient(traceClientOpts...)
+
+	// create exporter with new trace client
+	exporter, err := otlptrace.New(t.ctx, traceClient)
+	if err != nil {
+		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
+		return
+	}
+
+	// create child processor with new exporter and set it on the bufspanprocessor
+	batchSpanProcessor := sdktrace.NewBatchSpanProcessor(exporter, sdktrace.WithBatchTimeout(t.batchTimeout))
+	t.bufSpanProcessor.SetChildProcessor(batchSpanProcessor)
+
+	// set ingest url after successfully setting up new child processor
+	t.ingestUrl = t.knapsack.TraceIngestServerURL()
 }
 
 // Execute is a no-op -- the exporter is already running in the background. The TraceExporter
@@ -294,7 +326,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 // which amounts to a new bearer auth token being provided.
 func (t *TraceExporter) Ping() {
 	newToken, err := t.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
-	if err != nil {
+	if err != nil || len(newToken) == 0 {
 		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
 		return
 	}
@@ -303,6 +335,12 @@ func (t *TraceExporter) Ping() {
 	// to the new token in place.
 	t.ingestAuthToken = string(newToken)
 	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
+
+	// if the bufspanprocessor doesn't have a child processor
+	// then we don't have an exporter
+	if !t.bufSpanProcessor.HasProcessor() {
+		t.setNewGlobalProvider()
+	}
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
@@ -342,9 +380,8 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	// Handle ingest_url updates
 	if slices.Contains(flagKeys, keys.TraceIngestServerURL) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
-			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
+			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.knapsack.TraceIngestServerURL())
 		}
 	}
 

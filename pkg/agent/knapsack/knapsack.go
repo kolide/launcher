@@ -394,12 +394,18 @@ func (k *knapsack) UpdateDirectory() string {
 func (k *knapsack) SetExportTraces(enabled bool) error {
 	return k.flags.SetExportTraces(enabled)
 }
+func (k *knapsack) SetExportTracesOverride(value bool, duration time.Duration) {
+	k.flags.SetExportTracesOverride(value, duration)
+}
 func (k *knapsack) ExportTraces() bool {
 	return k.flags.ExportTraces()
 }
 
 func (k *knapsack) SetTraceSamplingRate(rate float64) error {
 	return k.flags.SetTraceSamplingRate(rate)
+}
+func (k *knapsack) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
+	k.flags.SetTraceSamplingRateOverride(value, duration)
 }
 func (k *knapsack) TraceSamplingRate() float64 {
 	return k.flags.TraceSamplingRate()

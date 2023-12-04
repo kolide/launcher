@@ -463,8 +463,12 @@ func (fc *FlagController) UpdateDirectory() string {
 func (fc *FlagController) SetExportTraces(enabled bool) error {
 	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
 }
+func (fc *FlagController) SetExportTracesOverride(value bool, duration time.Duration) {
+	fc.overrideFlag(keys.ExportTraces, duration, value)
+}
 func (fc *FlagController) ExportTraces() bool {
 	return NewBoolFlagValue(
+		WithBoolOverride(fc.overrides[keys.ExportTraces]),
 		WithDefaultBool(fc.cmdLineOpts.ExportTraces),
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
@@ -472,8 +476,12 @@ func (fc *FlagController) ExportTraces() bool {
 func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
 	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
 }
+func (fc *FlagController) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
+	fc.overrideFlag(keys.TraceSamplingRate, duration, value)
+}
 func (fc *FlagController) TraceSamplingRate() float64 {
 	return NewFloat64FlagValue(fc.logger, keys.LoggingInterval,
+		WithFloat64ValueOverride(fc.overrides[keys.TraceSamplingRate]),
 		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
 		WithFloat64ValueMin(0.0),
 		WithFloat64ValueMax(1.0),
