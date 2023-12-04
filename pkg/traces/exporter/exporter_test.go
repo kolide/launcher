@@ -286,19 +286,20 @@ func TestPing(t *testing.T) {
 	s := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(s)
+	mockKnapsack.On("TraceIngestServerURL").Return("localhost:4317")
 
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
-		osqueryClient:             mocks.NewQuerier(t),
+		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 		logger:                    log.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: clientAuthenticator,
-		ingestAuthToken:           initialTestToken,
+		ingestAuthToken:           "test token",
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
-		enabled:                   true,
 		traceSamplingRate:         1.0,
+		ctx:                       context.TODO(),
 	}
 
 	// Simulate a new token being set by updating the data store
