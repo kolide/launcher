@@ -23,6 +23,7 @@ import (
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
 	"github.com/mixer/clock"
@@ -57,6 +58,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
+	m.On("Slogger").Return(multislogger.New().Logger).Maybe()
 	return m
 }
 
@@ -613,6 +615,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("BboltDB").Return(db)
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -1016,6 +1019,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
