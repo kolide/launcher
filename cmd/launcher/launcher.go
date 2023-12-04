@@ -238,6 +238,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	signalListener := newSignalListener(sigChannel, cancel, logger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
+	agent.ResetDatabaseIfNeeded(ctx, k)
+
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
 		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
