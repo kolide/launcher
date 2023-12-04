@@ -333,8 +333,9 @@ func (t *TraceExporter) Ping() {
 	t.ingestAuthToken = string(newToken)
 	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
 
-	// if the bufspanprocessor doesn't have a child processor
-	// then we don't have an exporter
+	// we cannot create the child processor until we have a token,
+	// so if we don't have one yet go ahead an call setNewGlobalProvider
+	// so a new one will be created
 	if !t.bufSpanProcessor.HasProcessor() {
 		t.setNewGlobalProvider()
 	}
