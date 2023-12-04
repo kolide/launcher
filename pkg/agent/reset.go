@@ -72,19 +72,7 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 	}
 }
 
-func serialOrHardwareUUIDChanged(ctx context.Context, k types.Knapsack) (bool, bool) {
-	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
-	if err != nil {
-		k.Slogger().Warn("could not get current serial and hardware UUID", "err", err)
-		return false, false
-	}
-
-	serialChanged := valueChanged(k, currentSerial, hostDataKeySerial)
-	hardwareUUIDChanged := valueChanged(k, currentHardwareUUID, hostDataKeyHardwareUuid)
-
-	return serialChanged, hardwareUUIDChanged
-}
-
+// currentSerialAndHardwareUUID queries osquery for the required information.
 func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string, string, error) {
 	osqPath := k.LatestOsquerydPath(ctx)
 	if osqPath == "" {
@@ -138,6 +126,9 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 	return serial, hardwareUUID, nil
 }
 
+// valueChanged checks the knapsack for the given data and compares it to
+// currentValue. A value is considered changed only if the stored value was
+// previously set.
 func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
 	storedValue, err := k.HostDataStore().Get(dataKey)
 	if err != nil {
@@ -161,6 +152,8 @@ func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
 	return false
 }
 
+// currentSecret retrieves the enrollment secret from either the knapsack or the filesystem,
+// depending on launcher configuration.
 func currentSecret(k types.Knapsack) (string, error) {
 	// Do we want to extract (and store) the tenant munemo, instead of storing the enrollment
 	// secret?
