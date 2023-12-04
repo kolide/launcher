@@ -235,7 +235,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			if tt.osquerySuccess {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(context.TODO(), mockKnapsack)
-				require.NoError(t, err)
+				require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
 			} else {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
 				actualSerial = "test-serial"
