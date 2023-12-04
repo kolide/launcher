@@ -3,7 +3,6 @@ package exporter
 import (
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -267,8 +266,6 @@ func (t *TraceExporter) setNewGlobalProvider() {
 	// now that we have set up new provider, see if we need a new exporter and therefore
 	// a new child processor for the buf span processor
 
-	tisu := t.knapsack.TraceIngestServerURL()
-	fmt.Println(tisu)
 	if t.bufSpanProcessor.HasProcessor() && t.ingestUrl == t.knapsack.TraceIngestServerURL() {
 		// already have processor pointing at the same url, so no need to recreate
 		return
