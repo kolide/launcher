@@ -94,7 +94,7 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 		return "", "", fmt.Errorf("could not create osquery process to determine hardware UUID or serial: %w", err)
 	}
 
-	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
+	osqCtx, osqCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer osqCancel()
 
 	if sqlErr := osqProc.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
