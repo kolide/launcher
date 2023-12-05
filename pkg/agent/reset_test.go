@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"os"
@@ -219,7 +220,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 			// Set up dependencies: data store for hardware-identifying data
 			testStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
-			require.NoError(t, err)
+			require.NoError(t, err, "could not create test store")
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("HostDataStore").Return(testStore)
 			mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{storage.HostDataStore: testStore}).Maybe()
@@ -244,17 +245,17 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 			if tt.serialSetInStore {
 				if tt.serialChanged {
-					require.NoError(t, testStore.Set(hostDataKeySerial, []byte("some-old-serial")))
+					require.NoError(t, testStore.Set(hostDataKeySerial, []byte("some-old-serial")), "could not set serial in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeySerial, []byte(actualSerial)))
+					require.NoError(t, testStore.Set(hostDataKeySerial, []byte(actualSerial)), "could not set serial in test store")
 				}
 			}
 
 			if tt.hardwareUUIDSetInStore {
 				if tt.hardwareUUIDChanged {
-					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte("some-old-hardware-uuid")))
+					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte("some-old-hardware-uuid")), "could not set hardware uuid in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)))
+					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)), "could not set hardware uuid in test store")
 				}
 			}
 
@@ -265,7 +266,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			if tt.secretReadable {
 				secretDir := t.TempDir()
 				secretFilepath = filepath.Join(secretDir, "test-secret")
-				require.NoError(t, os.WriteFile(secretFilepath, secretValue, 0644))
+				require.NoError(t, os.WriteFile(secretFilepath, secretValue, 0644), "could not write out test secret")
 			} else {
 				secretFilepath = filepath.Join("not", "a", "real", "enroll", "secret")
 			}
@@ -275,9 +276,9 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 			if tt.secretSetInStore {
 				if tt.secretChanged {
-					require.NoError(t, testStore.Set(hostDataKeySecret, []byte("some-old-secret")))
+					require.NoError(t, testStore.Set(hostDataKeySecret, []byte("some-old-secret")), "could not set secret in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeySecret, secretValue))
+					require.NoError(t, testStore.Set(hostDataKeySecret, secretValue), "could not set secret in test store")
 				}
 			}
 
@@ -291,16 +292,35 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			// is wiped
 			extraKey := []byte("test_key")
 			extraValue := []byte("this is a test value")
-			require.NoError(t, testStore.Set(extraKey, extraValue))
+			require.NoError(t, testStore.Set(extraKey, extraValue), "could not set value in test store")
 
 			// Make test call
 			ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
 
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {
+				// Confirm the zip file exists
 				expectedBackupLocation := filepath.Join(rootDir, "launcher.db.bak.zip")
 				_, err = os.Stat(expectedBackupLocation)
-				require.NoError(t, err)
+				require.NoError(t, err, "expected file to exist at location:", expectedBackupLocation)
+
+				// Confirm the zip is valid/readable
+				zipReader, err := zip.OpenReader(expectedBackupLocation)
+				require.NoError(t, err, "could not open zip reader")
+				defer zipReader.Close()
+
+				// Confirm the zip contains the backup file
+				expectedBackupFile := "launcher.db.bak"
+				backupFound := false
+				for _, f := range zipReader.File {
+					if f.Name != expectedBackupFile {
+						continue
+					}
+
+					backupFound = true
+				}
+
+				require.True(t, backupFound, "backup not found in zip")
 			}
 
 			// Confirm whether the database got wiped
@@ -316,16 +336,16 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			// as long as it was available
 			if tt.osquerySuccess {
 				serial, err := testStore.Get(hostDataKeySerial)
-				require.NoError(t, err)
-				require.Equal(t, actualSerial, string(serial))
+				require.NoError(t, err, "could not get serial from test store")
+				require.Equal(t, actualSerial, string(serial), "serial in test store does not match expected serial")
 				hardwareUUID, err := testStore.Get(hostDataKeyHardwareUuid)
-				require.NoError(t, err)
-				require.Equal(t, actualHardwareUUID, string(hardwareUUID))
+				require.NoError(t, err, "could not get hardware UUID from test store")
+				require.Equal(t, actualHardwareUUID, string(hardwareUUID), "hardware UUID in test store does not match expected hardware UUID")
 			}
 			if tt.secretReadable {
 				secret, err := testStore.Get(hostDataKeySecret)
-				require.NoError(t, err)
-				require.Equal(t, secretValue, secret)
+				require.NoError(t, err, "could not get secret from test store")
+				require.Equal(t, secretValue, secret, "secret in test store does not match expected secret")
 			}
 
 			// Make sure all the functions were called as expected
