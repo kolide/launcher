@@ -182,7 +182,7 @@ func (q *quarantine) checkDirs(extraFh io.Writer, currentDepth, maxDepth int, di
 }
 
 func (q *quarantine) logMeddlesomeProccesses(ctx context.Context, extraFh io.Writer, containsSubStrings []string) error {
-	fmt.Fprint(extraFh, "\npossilby meddlesome processes:\n")
+	fmt.Fprint(extraFh, "\npossibly meddlesome processes:\n")
 	foundMeddlesomeProcesses := false
 
 	ps, err := process.ProcessesWithContext(ctx)
