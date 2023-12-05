@@ -76,6 +76,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 		osquerySuccess         bool
 		secretSetInStore       bool
 		secretChanged          bool
+		secretLivesInFile      bool
 		secretReadable         bool
 		expectDatabaseWipe     bool
 	}{
@@ -88,6 +89,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
@@ -100,6 +102,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
@@ -112,6 +115,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
@@ -124,6 +128,20 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          true,
+			secretLivesInFile:      true,
+			secretReadable:         true,
+			expectDatabaseWipe:     true,
+		},
+		{
+			name:                   "enroll secret changed, enroll secret does not live in file, database wipe",
+			serialSetInStore:       true,
+			serialChanged:          false,
+			hardwareUUIDSetInStore: true,
+			hardwareUUIDChanged:    false,
+			osquerySuccess:         true,
+			secretSetInStore:       true,
+			secretChanged:          true,
+			secretLivesInFile:      false,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
@@ -136,6 +154,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          true,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
@@ -148,6 +167,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         false,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
@@ -160,6 +180,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         false,
 			expectDatabaseWipe:     false,
 		},
@@ -172,6 +193,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
@@ -184,6 +206,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
@@ -196,6 +219,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       false,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
@@ -208,6 +232,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			osquerySuccess:         true,
 			secretSetInStore:       true,
 			secretChanged:          false,
+			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
@@ -262,17 +287,21 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			// Set up dependencies: ensure that retrieved secret matches current data
 			secretValue := []byte("abcd")
 
-			var secretFilepath string
-			if tt.secretReadable {
-				secretDir := t.TempDir()
-				secretFilepath = filepath.Join(secretDir, "test-secret")
-				require.NoError(t, os.WriteFile(secretFilepath, secretValue, 0644), "could not write out test secret")
-			} else {
-				secretFilepath = filepath.Join("not", "a", "real", "enroll", "secret")
-			}
+			if tt.secretLivesInFile {
+				var secretFilepath string
+				if tt.secretReadable {
+					secretDir := t.TempDir()
+					secretFilepath = filepath.Join(secretDir, "test-secret")
+					require.NoError(t, os.WriteFile(secretFilepath, secretValue, 0644), "could not write out test secret")
+				} else {
+					secretFilepath = filepath.Join("not", "a", "real", "enroll", "secret")
+				}
 
-			mockKnapsack.On("EnrollSecret").Return("")
-			mockKnapsack.On("EnrollSecretPath").Return(secretFilepath)
+				mockKnapsack.On("EnrollSecret").Return("")
+				mockKnapsack.On("EnrollSecretPath").Return(secretFilepath)
+			} else {
+				mockKnapsack.On("EnrollSecret").Return(string(secretValue))
+			}
 
 			if tt.secretSetInStore {
 				if tt.secretChanged {
