@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -9,19 +8,32 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/launcher/pkg/agent/storage"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
-	"go.etcd.io/bbolt"
 )
+
+type oldHostData struct {
+	NodeKey        string `json:"node_key"`
+	LocalEccKey    string `json:"local_ecc_key"`
+	Serial         string `json:"serial"`
+	HardwareUUID   string `json:"hardware_uuid"`
+	Munemo         string `json:"munemo"`
+	DeviceID       string `json:"device_id"`
+	RemoteIP       string `json:"remote_ip"`
+	TombstoneID    string `json:"tombstone_id"`
+	ResetTimestamp int64  `json:"reset_timestamp"`
+}
 
 var (
 	hostDataKeySerial       = []byte("serial")
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
 	hostDataKeyMunemo       = []byte("munemo")
+
+	hostDataKeyOldHostData = []byte("old_host_data")
 )
 
 // ResetDatabaseIfNeeded checks to see if the hardware this installation is running on
@@ -201,32 +213,86 @@ func currentMunemo(k types.Knapsack) (string, error) {
 	return munemoStr, nil
 }
 
-// takeDatabaseBackup takes a backup of the current database and compresses it, storing
-// it in the root directory.
+// takeDatabaseBackup retrieves the data we want to preserve from various db stores
+// as a snapshot of this db, appends it to previous snapshots if they exist, and
+// stores the collection to the old_host_data key.
 func takeDatabaseBackup(k types.Knapsack) error {
-	backupFilepath := filepath.Join(k.RootDirectory(), "launcher.db.bak.zip")
-	f, err := os.Create(backupFilepath)
+	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
 	if err != nil {
-		return fmt.Errorf("creating backup database file: %w", err)
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get node key from store", "err", err)
 	}
-	defer f.Close()
 
-	zipWriter := zip.NewWriter(f)
-	defer zipWriter.Close()
-
-	backupF, err := zipWriter.Create("launcher.db.bak")
+	localEccKeyRaw, err := k.ConfigStore().Get([]byte("localEccKey"))
 	if err != nil {
-		return fmt.Errorf("creating backup database inside zip: %w", err)
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get local ecc key from store", "err", err)
 	}
 
-	if err := k.BboltDB().View(func(tx *bbolt.Tx) error {
-		_, err := tx.WriteTo(backupF)
-		return err
-	}); err != nil {
-		return fmt.Errorf("copying db: %w", err)
+	serial, err := k.HostDataStore().Get(hostDataKeySerial)
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get serial from store", "err", err)
 	}
 
-	k.Slogger().Log(context.TODO(), slog.LevelInfo, "took database backup", "backup_filepath", backupFilepath)
+	hardwareUuid, err := k.HostDataStore().Get(hostDataKeyHardwareUuid)
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get hardware uuid from store", "err", err)
+	}
+
+	munemo, err := k.HostDataStore().Get(hostDataKeyMunemo)
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get munemo from store", "err", err)
+	}
+
+	deviceId, err := k.ServerProvidedDataStore().Get([]byte("device_id"))
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get device id from store", "err", err)
+	}
+
+	remoteIp, err := k.ServerProvidedDataStore().Get([]byte("remote_ip"))
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get remote ip from store", "err", err)
+	}
+
+	tombstoneId, err := k.ServerProvidedDataStore().Get([]byte("tombstone_id"))
+	if err != nil {
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get tombstone id from store", "err", err)
+	}
+
+	dataToStore := oldHostData{
+		NodeKey:        string(nodeKey),
+		LocalEccKey:    string(localEccKeyRaw),
+		Serial:         string(serial),
+		HardwareUUID:   string(hardwareUuid),
+		Munemo:         string(munemo),
+		DeviceID:       string(deviceId),
+		RemoteIP:       string(remoteIp),
+		TombstoneID:    string(tombstoneId),
+		ResetTimestamp: time.Now().Unix(),
+	}
+
+	previousHostData, err := k.HostDataStore().Get(hostDataKeyOldHostData)
+	if err != nil {
+		return fmt.Errorf("getting previous host data from store: %w", err)
+	}
+
+	var hostDataCollection []oldHostData
+	if previousHostData == nil {
+		// No previous database resets
+		hostDataCollection = []oldHostData{dataToStore}
+	} else {
+		if err := json.Unmarshal(previousHostData, &hostDataCollection); err != nil {
+			return fmt.Errorf("unmarshalling previous host data: %w", err)
+		}
+		hostDataCollection = append(hostDataCollection, dataToStore)
+	}
+
+	hostDataCollectionRaw, err := json.Marshal(hostDataCollection)
+	if err != nil {
+		return fmt.Errorf("marshalling host data for storage: %w", err)
+	}
+
+	if err := k.HostDataStore().Set(hostDataKeyOldHostData, hostDataCollectionRaw); err != nil {
+		return fmt.Errorf("storing old host data: %w", err)
+	}
 
 	return nil
 }
@@ -237,6 +303,11 @@ func wipeDatabase(k types.Knapsack) {
 	for storeName, store := range k.Stores() {
 		keysToDelete := make([][]byte, 0)
 		if err := store.ForEach(func(k []byte, _ []byte) error {
+			// Preserve the backup data
+			if storeName == storage.HostDataStore && string(k) == string(hostDataKeyOldHostData) {
+				return nil
+			}
+
 			keysToDelete = append(keysToDelete, k)
 			return nil
 		}); err != nil {

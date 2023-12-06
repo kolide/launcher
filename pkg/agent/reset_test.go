@@ -1,8 +1,8 @@
 package agent
 
 import (
-	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -245,13 +245,23 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			t.Parallel()
 
 			// Set up dependencies: data store for hardware-identifying data
-			testStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
-			require.NoError(t, err, "could not create test store")
+			testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
+			require.NoError(t, err, "could not create test host data store")
 			mockKnapsack := typesmocks.NewKnapsack(t)
-			mockKnapsack.On("HostDataStore").Return(testStore)
-			mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{storage.HostDataStore: testStore}).Maybe()
+			mockKnapsack.On("HostDataStore").Return(testHostDataStore)
 			testBboltDB := storageci.SetupDB(t)
 			mockKnapsack.On("BboltDB").Return(testBboltDB).Maybe()
+			testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err, "could not create test config store")
+			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
+			testServerProvidedDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+			require.NoError(t, err, "could not create test server provided data store")
+			mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore).Maybe()
+			mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
+				storage.HostDataStore:           testHostDataStore,
+				storage.ConfigStore:             testConfigStore,
+				storage.ServerProvidedDataStore: testServerProvidedDataStore,
+			}).Maybe()
 
 			// Set up logger
 			slogger := multislogger.New().Logger
@@ -271,17 +281,17 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 			if tt.serialSetInStore {
 				if tt.serialChanged {
-					require.NoError(t, testStore.Set(hostDataKeySerial, []byte("some-old-serial")), "could not set serial in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("some-old-serial")), "could not set serial in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeySerial, []byte(actualSerial)), "could not set serial in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte(actualSerial)), "could not set serial in test store")
 				}
 			}
 
 			if tt.hardwareUUIDSetInStore {
 				if tt.hardwareUUIDChanged {
-					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte("some-old-hardware-uuid")), "could not set hardware uuid in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte("some-old-hardware-uuid")), "could not set hardware uuid in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)), "could not set hardware uuid in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)), "could not set hardware uuid in test store")
 				}
 			}
 
@@ -309,55 +319,61 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 			if tt.munemoSetInStore {
 				if tt.munemoChanged {
-					require.NoError(t, testStore.Set(hostDataKeyMunemo, []byte("some-old-munemo")), "could not set munemo in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeyMunemo, []byte("some-old-munemo")), "could not set munemo in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeyMunemo, munemoValue), "could not set munemo in test store")
+					require.NoError(t, testHostDataStore.Set(hostDataKeyMunemo, munemoValue), "could not set munemo in test store")
 				}
 			}
 
-			// Set up dependencies: make a root directory for the backup to be stored in
-			rootDir := t.TempDir()
-			if tt.expectDatabaseWipe {
-				mockKnapsack.On("RootDirectory").Return(rootDir)
-			}
-
-			// Set up dependencies: set an extra key that we know should be deleted when the store
+			// Set up dependencies: set an extra key that we know should be deleted when the database
 			// is wiped
 			extraKey := []byte("test_key")
 			extraValue := []byte("this is a test value")
-			require.NoError(t, testStore.Set(extraKey, extraValue), "could not set value in test store")
+			require.NoError(t, testHostDataStore.Set(extraKey, extraValue), "could not set value in test store")
+
+			// Set up dependencies: set data that we expect to be backed up
+			testNodeKey := "abcd"
+			require.NoError(t, testConfigStore.Set([]byte("nodeKey"), []byte(testNodeKey)), "could not set value in test store")
+			testDeviceId := "1"
+			require.NoError(t, testServerProvidedDataStore.Set([]byte("device_id"), []byte(testDeviceId)), "could not set value in test store")
+			testRemoteIp := "127.0.0.1"
+			require.NoError(t, testServerProvidedDataStore.Set([]byte("remote_ip"), []byte(testRemoteIp)), "could not set value in test store")
+			testTombstoneId := "100"
+			require.NoError(t, testServerProvidedDataStore.Set([]byte("tombstone_id"), []byte(testTombstoneId)), "could not set value in test store")
 
 			// Make test call
 			ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
 
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {
-				// Confirm the zip file exists
-				expectedBackupLocation := filepath.Join(rootDir, "launcher.db.bak.zip")
-				_, err = os.Stat(expectedBackupLocation)
-				require.NoError(t, err, "expected file to exist at location:", expectedBackupLocation)
+				// Confirm the old_host_data key exists in the data store
+				dataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+				require.NoError(t, err, "could not get old host data from test store")
+				require.NotNil(t, dataRaw, "old host data not set in store")
 
-				// Confirm the zip is valid/readable
-				zipReader, err := zip.OpenReader(expectedBackupLocation)
-				require.NoError(t, err, "could not open zip reader")
-				defer zipReader.Close()
+				// Confirm that it contains reasonable data
+				var d []oldHostData
+				require.NoError(t, json.Unmarshal(dataRaw, &d), "old host data in unexpected format")
 
-				// Confirm the zip contains the backup file
-				expectedBackupFile := "launcher.db.bak"
-				backupFound := false
-				for _, f := range zipReader.File {
-					if f.Name != expectedBackupFile {
-						continue
-					}
+				// We should only have one backup
+				require.Equal(t, 1, len(d), "unexpected number of backups")
 
-					backupFound = true
-				}
+				// The backup data should be correct
+				require.Equal(t, testNodeKey, d[0].NodeKey, "node key does not match")
+				require.Equal(t, testDeviceId, d[0].DeviceID, "device id does not match")
+				require.Equal(t, testRemoteIp, d[0].RemoteIP, "remote ip does not match")
+				require.Equal(t, testTombstoneId, d[0].TombstoneID, "tombstone id does not match")
 
-				require.True(t, backupFound, "backup not found in zip")
+				// The backup timestamp should be in the past
+				require.GreaterOrEqual(t, time.Now().Unix(), d[0].ResetTimestamp)
+
+				// The backup timestamp should be at least kind of close to now -- within the last
+				// five minutes. Not checking too closely to avoid flaky tests.
+				require.LessOrEqual(t, time.Now().Unix()-300, d[0].ResetTimestamp)
 			}
 
 			// Confirm whether the database got wiped
-			v, err := testStore.Get(extraKey)
+			v, err := testHostDataStore.Get(extraKey)
 			require.NoError(t, err)
 			if tt.expectDatabaseWipe {
 				require.Nil(t, v, "database not wiped")
@@ -368,15 +384,15 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			// Confirm hardware-identifying data got set regardless of db wipe,
 			// as long as it was available
 			if tt.osquerySuccess {
-				serial, err := testStore.Get(hostDataKeySerial)
+				serial, err := testHostDataStore.Get(hostDataKeySerial)
 				require.NoError(t, err, "could not get serial from test store")
 				require.Equal(t, actualSerial, string(serial), "serial in test store does not match expected serial")
-				hardwareUUID, err := testStore.Get(hostDataKeyHardwareUuid)
+				hardwareUUID, err := testHostDataStore.Get(hostDataKeyHardwareUuid)
 				require.NoError(t, err, "could not get hardware UUID from test store")
 				require.Equal(t, actualHardwareUUID, string(hardwareUUID), "hardware UUID in test store does not match expected hardware UUID")
 			}
 			if tt.secretReadable {
-				munemo, err := testStore.Get(hostDataKeyMunemo)
+				munemo, err := testHostDataStore.Get(hostDataKeyMunemo)
 				require.NoError(t, err, "could not get munemo from test store")
 				require.Equal(t, munemoValue, munemo, "munemo in test store does not match expected munemo")
 			}
