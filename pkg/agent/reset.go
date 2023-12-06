@@ -89,8 +89,9 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 `
 
 	var respBytes bytes.Buffer
+	var stderrBytes bytes.Buffer
 
-	osqProc, err := runsimple.NewOsqueryProcess(osqPath, runsimple.WithStdout(&respBytes))
+	osqProc, err := runsimple.NewOsqueryProcess(osqPath, runsimple.WithStdout(&respBytes), runsimple.WithStderr(&stderrBytes))
 	if err != nil {
 		return "", "", fmt.Errorf("could not create osquery process to determine hardware UUID or serial: %w", err)
 	}
@@ -99,9 +100,15 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 	defer osqCancel()
 
 	if sqlErr := osqProc.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
-		return "", "", fmt.Errorf("querying hardware UUID and serial returned ctx error: %w", osqCtx.Err())
+		return "", "", fmt.Errorf(
+			"querying hardware UUID and serial returned ctx error: `%w` with stdout `%s` and stderr `%s`",
+			osqCtx.Err(), respBytes.String(), stderrBytes.String(),
+		)
 	} else if sqlErr != nil {
-		return "", "", fmt.Errorf("querying hardware UUID and serial returned error: %w", sqlErr)
+		return "", "", fmt.Errorf(
+			"querying hardware UUID and serial returned error: `%w` with stdout `%s` and stderr `%s`",
+			sqlErr, respBytes.String(), stderrBytes.String(),
+		)
 	}
 
 	var resp []map[string]string
