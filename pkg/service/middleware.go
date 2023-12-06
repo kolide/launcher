@@ -3,7 +3,7 @@ package service
 import (
 	"log/slog"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type Middleware func(KolideService) KolideService

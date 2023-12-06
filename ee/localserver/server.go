@@ -17,8 +17,8 @@ import (
 
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
@@ -47,6 +47,7 @@ type localServer struct {
 	tlsCerts     []tls.Certificate
 	querier      Querier
 	kolideServer string
+	cancel       context.CancelFunc
 
 	myKey                 *rsa.PrivateKey
 	myLocalDbSigner       crypto.Signer
@@ -214,30 +215,43 @@ func (ls *localServer) runAsyncdWorkers() time.Time {
 	return time.Now()
 }
 
+var (
+	pollInterval        = 15 * time.Minute
+	recalculateInterval = 24 * time.Hour
+)
+
 func (ls *localServer) Start() error {
 	// Spawn background workers. The information gathered here is not critical for DT flow- so to reduce early osquery contention
 	// we wait for <pollInterval> and before starting and then only rerun if the previous run was unsuccessful,
 	// or has been greater than <recalculateInterval>. Note that this polling is merely a check against time,
 	// we don't repopulate this data nearly so often. (But we poll frequently to account for the difference between
 	// wall clock time, and sleep time)
-	const (
-		pollInterval        = 15 * time.Minute
-		recalculateInterval = 24 * time.Hour
-	)
+
+	var ctx context.Context
+	ctx, ls.cancel = context.WithCancel(context.Background())
 
 	go func() {
 		var lastRun time.Time
 
-		ctx := context.TODO()
+		ticker := time.NewTicker(pollInterval)
+		defer ticker.Stop()
 
 		// note that this will trigger the check for the first time after pollInterval (not immediately)
-		for range time.Tick(pollInterval) {
-			if time.Since(lastRun) > recalculateInterval {
-				lastRun = ls.runAsyncdWorkers()
-				if lastRun.IsZero() {
-					ls.slogger.Log(ctx, slog.LevelDebug,
-						"runAsyncdWorkers unsuccessful, will retry in the future",
-					)
+		for {
+			select {
+			case <-ctx.Done():
+				ls.slogger.Log(ctx, slog.LevelDebug,
+					"runAsyncdWorkers received shutdown signal",
+				)
+				return
+			case <-ticker.C:
+				if time.Since(lastRun) > recalculateInterval {
+					lastRun = ls.runAsyncdWorkers()
+					if lastRun.IsZero() {
+						ls.slogger.Log(ctx, slog.LevelDebug,
+							"runAsyncdWorkers unsuccessful, will retry in the future",
+						)
+					}
 				}
 			}
 		}
@@ -247,8 +261,6 @@ func (ls *localServer) Start() error {
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
 	}
-
-	ctx := context.TODO()
 
 	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
 		ls.slogger.Log(ctx, slog.LevelDebug,
@@ -301,6 +313,8 @@ func (ls *localServer) Interrupt(_ error) {
 			"err", err,
 		)
 	}
+
+	ls.cancel()
 }
 
 func (ls *localServer) startListener() (net.Listener, error) {
@@ -360,8 +374,8 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ls.limiter.Allow() == false {
-			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+		if !ls.limiter.Allow() {
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 
 			ls.slogger.Log(r.Context(), slog.LevelError,
 				"over rate limit",

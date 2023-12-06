@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type RootDirectory struct {

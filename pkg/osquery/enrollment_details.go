@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/pkg/errors"
