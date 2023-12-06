@@ -11,7 +11,7 @@ import (
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )

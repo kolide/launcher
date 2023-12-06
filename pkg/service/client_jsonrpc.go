@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/transport/http/jsonrpc"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 // forceNoChunkedEncoding forces the connection not to use chunked

@@ -9,7 +9,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 

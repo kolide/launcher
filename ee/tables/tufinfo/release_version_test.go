@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/tuf"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/osquery/osquery-go/gen/osquery"
 
 	"github.com/stretchr/testify/require"

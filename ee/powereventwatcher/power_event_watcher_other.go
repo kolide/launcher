@@ -5,7 +5,7 @@ package powereventwatcher
 
 import (
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type noOpPowerEventWatcher struct {
