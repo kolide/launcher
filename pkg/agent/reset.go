@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,13 +28,13 @@ var (
 // in the HostDataStore. If the hardware-identifying information has changed, it performs
 // a backup of the database, and then clears all data from it.
 func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
-	k.Slogger().Info("checking to see if database should be reset...")
+	k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...")
 
 	serialChanged := false
 	hardwareUUIDChanged := false
 	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
 	if err != nil {
-		k.Slogger().Warn("could not get current serial and hardware UUID", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current serial and hardware UUID", "err", err)
 	} else {
 		serialChanged = valueChanged(k, currentSerial, hostDataKeySerial)
 		hardwareUUIDChanged = valueChanged(k, currentHardwareUUID, hostDataKeyHardwareUuid)
@@ -42,32 +43,32 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 	enrollSecretChanged := false
 	currentEnrollSecret, err := currentSecret(k)
 	if err != nil {
-		k.Slogger().Warn("could not get current enroll secret", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current enroll secret", "err", err)
 	} else {
 		enrollSecretChanged = valueChanged(k, currentEnrollSecret, hostDataKeySecret)
 	}
 
 	if serialChanged || hardwareUUIDChanged || enrollSecretChanged {
-		k.Slogger().Warn("detected new hardware or rollout, backing up and resetting database",
+		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or rollout, backing up and resetting database",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"enroll_secret_changed", enrollSecretChanged)
 
 		if err := takeDatabaseBackup(k); err != nil {
-			k.Slogger().Warn("could not take database backup", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
 		}
 
 		wipeDatabase(k)
 
 		// Cache data for future checks
 		if err := k.HostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
-			k.Slogger().Warn("could not set serial in host data store", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
 		if err := k.HostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
-			k.Slogger().Warn("could not set hardware UUID in host data store", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
 		if err := k.HostDataStore().Set(hostDataKeySecret, []byte(currentEnrollSecret)); err != nil {
-			k.Slogger().Warn("could not set secret in host data store", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not set secret in host data store", "err", err)
 		}
 	}
 }
@@ -98,7 +99,6 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 	defer osqCancel()
 
 	if sqlErr := osqProc.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
-		k.Slogger().Warn("query hardware UUID and serial context error", "err", osqCtx.Err())
 		return "", "", fmt.Errorf("querying hardware UUID and serial returned ctx error: %w", osqCtx.Err())
 	} else if sqlErr != nil {
 		return "", "", fmt.Errorf("querying hardware UUID and serial returned error: %w", sqlErr)
@@ -132,20 +132,20 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
 	storedValue, err := k.HostDataStore().Get(dataKey)
 	if err != nil {
-		k.Slogger().Error("could not get stored value", "err", err, "key", string(dataKey))
+		k.Slogger().Log(context.TODO(), slog.LevelError, "could not get stored value", "err", err, "key", string(dataKey))
 		return false // assume no change
 	}
 
 	if storedValue == nil {
-		k.Slogger().Debug("value not previously stored, storing now", "key", string(dataKey))
+		k.Slogger().Log(context.TODO(), slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
 		if err := k.HostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
-			k.Slogger().Error("could not store value", "err", err, "key", string(dataKey))
+			k.Slogger().Log(context.TODO(), slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
 		}
 		return false
 	}
 
 	if storedValue != nil && currentValue != string(storedValue) {
-		k.Slogger().Info("hardware-identifying value has changed", "key", string(dataKey))
+		k.Slogger().Log(context.TODO(), slog.LevelInfo, "hardware-identifying value has changed", "key", string(dataKey))
 		return true
 	}
 
@@ -198,7 +198,7 @@ func takeDatabaseBackup(k types.Knapsack) error {
 		return fmt.Errorf("copying db: %w", err)
 	}
 
-	k.Slogger().Info("took database backup", "backup_filepath", backupFilepath)
+	k.Slogger().Log(context.TODO(), slog.LevelInfo, "took database backup", "backup_filepath", backupFilepath)
 
 	return nil
 }
@@ -212,12 +212,12 @@ func wipeDatabase(k types.Knapsack) {
 			keysToDelete = append(keysToDelete, k)
 			return nil
 		}); err != nil {
-			k.Slogger().Warn("iterating over keys in store", "store_name", storeName, "err", err)
+			k.Slogger().Log(context.TODO(), slog.LevelWarn, "iterating over keys in store", "store_name", storeName, "err", err)
 			continue
 		}
 
 		if err := store.Delete(keysToDelete...); err != nil {
-			k.Slogger().Warn("deleting keys in store", "store_name", storeName, "err", err)
+			k.Slogger().Log(context.TODO(), slog.LevelWarn, "deleting keys in store", "store_name", storeName, "err", err)
 		}
 	}
 }
