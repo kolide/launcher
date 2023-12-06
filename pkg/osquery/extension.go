@@ -406,7 +406,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	if key != "" {
-		slogger.Log(ctx, slog.LevelInfo,
+		slogger.Log(ctx, slog.LevelDebug,
 			"found stored node key, skipping enrollment",
 		)
 		span.AddEvent("found_stored_node_key")
