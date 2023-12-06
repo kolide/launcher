@@ -11,7 +11,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 func mdfind(args ...string) ([]string, error) {

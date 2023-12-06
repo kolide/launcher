@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/pkg/errors"
 )
 

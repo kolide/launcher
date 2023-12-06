@@ -4,6 +4,7 @@
 package table
 
 import (
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/dsim_default_associations"
 	"github.com/kolide/launcher/ee/tables/execparsers/dsregcmd"
@@ -11,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/tables/wifi_networks"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tables/wmitable"
-	"github.com/kolide/launcher/pkg/allowedcmd"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
