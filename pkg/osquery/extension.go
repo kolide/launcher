@@ -391,7 +391,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
-		slogger.Log(ctx, slog.LevelInfo,
+		slogger.Log(ctx, slog.LevelDebug,
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
@@ -429,7 +429,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	var enrollDetails service.EnrollmentDetails
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
 		slogger.Log(ctx, slog.LevelInfo,
-			"sipping enrollment details, no osqueryd path, this is probably CI",
+			"skipping enrollment details, no osqueryd path, this is probably CI",
 		)
 		span.AddEvent("skipping_enrollment_details")
 	} else {
