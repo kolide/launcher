@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 )
@@ -69,13 +68,19 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 			"tenant_munemo_changed", munemoChanged,
 		)
 
-		if err := takeDatabaseBackup(k); err != nil {
+		backup, err := takeDatabaseBackup(k)
+		if err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
 		}
 
 		wipeDatabase(k)
 
-		// Cache data for future checks
+		// Store the backup data
+		if err := k.HostDataStore().Set(hostDataKeyOldHostData, backup); err != nil {
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not store database backup", "err", err)
+		}
+
+		// Cache hardware and rollout data for future checks
 		if err := k.HostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
@@ -217,8 +222,8 @@ func currentMunemo(k types.Knapsack) (string, error) {
 
 // takeDatabaseBackup retrieves the data we want to preserve from various db stores
 // as a snapshot of this db, appends it to previous snapshots if they exist, and
-// stores the collection to the old_host_data key.
-func takeDatabaseBackup(k types.Knapsack) error {
+// returns the collection of backup data.
+func takeDatabaseBackup(k types.Knapsack) ([]byte, error) {
 	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
 	if err != nil {
 		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get node key from store", "err", err)
@@ -273,7 +278,7 @@ func takeDatabaseBackup(k types.Knapsack) error {
 
 	previousHostData, err := k.HostDataStore().Get(hostDataKeyOldHostData)
 	if err != nil {
-		return fmt.Errorf("getting previous host data from store: %w", err)
+		return nil, fmt.Errorf("getting previous host data from store: %w", err)
 	}
 
 	var hostDataCollection []oldHostData
@@ -282,21 +287,17 @@ func takeDatabaseBackup(k types.Knapsack) error {
 		hostDataCollection = []oldHostData{dataToStore}
 	} else {
 		if err := json.Unmarshal(previousHostData, &hostDataCollection); err != nil {
-			return fmt.Errorf("unmarshalling previous host data: %w", err)
+			return nil, fmt.Errorf("unmarshalling previous host data: %w", err)
 		}
 		hostDataCollection = append(hostDataCollection, dataToStore)
 	}
 
 	hostDataCollectionRaw, err := json.Marshal(hostDataCollection)
 	if err != nil {
-		return fmt.Errorf("marshalling host data for storage: %w", err)
+		return nil, fmt.Errorf("marshalling host data for storage: %w", err)
 	}
 
-	if err := k.HostDataStore().Set(hostDataKeyOldHostData, hostDataCollectionRaw); err != nil {
-		return fmt.Errorf("storing old host data: %w", err)
-	}
-
-	return nil
+	return hostDataCollectionRaw, nil
 }
 
 // getLocalPubKey retrieves the local database key, parses it, and returns
@@ -324,21 +325,7 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) {
 // each one.
 func wipeDatabase(k types.Knapsack) {
 	for storeName, store := range k.Stores() {
-		keysToDelete := make([][]byte, 0)
-		if err := store.ForEach(func(k []byte, _ []byte) error {
-			// Preserve the backup data
-			if storeName == storage.HostDataStore && string(k) == string(hostDataKeyOldHostData) {
-				return nil
-			}
-
-			keysToDelete = append(keysToDelete, k)
-			return nil
-		}); err != nil {
-			k.Slogger().Log(context.TODO(), slog.LevelWarn, "iterating over keys in store", "store_name", storeName, "err", err)
-			continue
-		}
-
-		if err := store.Delete(keysToDelete...); err != nil {
+		if err := store.DeleteAll(); err != nil {
 			k.Slogger().Log(context.TODO(), slog.LevelWarn, "deleting keys in store", "store_name", storeName, "err", err)
 		}
 	}
