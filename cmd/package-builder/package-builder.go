@@ -44,6 +44,11 @@ var defaultWixPath = wix.FindWixInstall()
 func runMake(args []string) error {
 	flagset := flag.NewFlagSet("macos", flag.ExitOnError)
 	var (
+		flKolideUsage = flagset.Bool(
+			"i-am-a-kolide-customer",
+			false,
+			"Certify that I am a Kolide customer and in compliance with the terms of the EE license",
+		)
 		flDebug = flagset.Bool(
 			"debug",
 			false,
@@ -181,6 +186,12 @@ func runMake(args []string) error {
 	flagset.Usage = usageFor(flagset, "package-builder make [flags]")
 	if err := flagset.Parse(args); err != nil {
 		return err
+	}
+
+	if !*flKolideUsage {
+		fmt.Fprintf(os.Stderr, "\nThe Kolide Agent is for use with the Kolide Service.\n")
+		fmt.Fprintf(os.Stderr, "See https://github.com/kolide/launcher/blob/main/ee/LICENSE\n")
+		return errors.New("")
 	}
 
 	logger := log.NewJSONLogger(os.Stderr)
