@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type (

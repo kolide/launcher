@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/require"
 )
 

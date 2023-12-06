@@ -15,9 +15,9 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/agent/flags/keys"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/sendbuffer"
 	slogmulti "github.com/samber/slog-multi"
 )

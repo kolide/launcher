@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 )
 
 // HTTPClient handles retrieving control data via HTTP

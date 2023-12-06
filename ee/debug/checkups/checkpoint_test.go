@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/require"
 )
 

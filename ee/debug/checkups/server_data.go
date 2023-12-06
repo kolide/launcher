@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 var serverProvidedDataKeys = []string{
