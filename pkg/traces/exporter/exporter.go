@@ -116,7 +116,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) 
 	t.addDeviceIdentifyingAttributes()
 
 	// Set the provider with as many resource attributes as we can get immediately
-	t.setNewGlobalProvider(false)
+	t.setNewGlobalProvider(true)
 
 	return t, nil
 }
@@ -131,7 +131,7 @@ func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
 
 		// we don't want to rebuild the exporter here because we may drop
 		// buffered spans, so we just replace the provider
-		t.setNewGlobalProvider(true)
+		t.setNewGlobalProvider(false)
 		level.Debug(t.logger).Log("msg", "successfully replaced global provider after adding osquery attributes")
 	}()
 }
@@ -226,7 +226,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider(retainExporter bool) {
+func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.providerLock.Lock()
 	defer t.providerLock.Unlock()
 
@@ -266,7 +266,7 @@ func (t *TraceExporter) setNewGlobalProvider(retainExporter bool) {
 
 	t.provider = newProvider
 
-	if retainExporter {
+	if !rebuildExporter {
 		return
 	}
 
@@ -399,5 +399,5 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		return
 	}
 
-	t.setNewGlobalProvider(false)
+	t.setNewGlobalProvider(true)
 }
