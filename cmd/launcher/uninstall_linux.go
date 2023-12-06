@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 func removeLauncher(ctx context.Context, identifier string) error {

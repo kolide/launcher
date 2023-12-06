@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type networkCheckup struct {

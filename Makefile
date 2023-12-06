@@ -74,7 +74,6 @@ build/darwin.%/Kolide.app: build/darwin.%/launcher
 
 # pointers, mostly for convenience reasons
 launcher: build_launcher
-tables.ext: build_tables.ext
 fake-launcher: fake_launcher
 build/darwin.amd64/%: build_%_darwin_amd64
 build/darwin.arm64/%: build_%_darwin_arm64
@@ -83,7 +82,7 @@ build/darwin.universal/%: lipo_%
 ##
 ## GitHub Action Helpers
 ##
-GITHUB_TARGETS=launcher tables.ext package-builder
+GITHUB_TARGETS=launcher package-builder
 GITHUB_ARCHS=amd64 arm64
 github-build: $(foreach t, $(GITHUB_TARGETS), $(foreach a, $(GITHUB_ARCHS), build_$(t)_noop_$(a)))
 github-lipo: $(foreach t, $(GITHUB_TARGETS), lipo_$(t))
@@ -160,14 +159,12 @@ build/binary-bundles/%:
 ## Handy osqueryi command line
 ##
 
-osqueryi-tables: build_tables.ext
-	osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
-osqueryi-tables-windows: build_tables.ext
-	osqueryd.exe -S --allow-unsafe --verbose --extension .\build\tables.exe
-sudo-osqueryi-tables: build_tables.ext
-	sudo osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
-launchas-osqueryi-tables: build_tables.ext
-	sudo launchctl asuser 0 osqueryd -S --allow-unsafe --verbose --extension ./build/tables.ext
+osqueryi-tables: build_launcher
+	./build/launcher interactive
+sudo-osqueryi-tables: build_launcher
+	sudo ./build/launcher interactive
+launchas-osqueryi-tables: build_launcher
+	sudo launchctl asuser 0 ./build/launcher interactive
 
 install-local-fake-update: D = $(shell date +%s)
 install-local-fake-update: build_launcher

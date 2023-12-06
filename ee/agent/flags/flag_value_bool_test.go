@@ -3,12 +3,16 @@ package flags
 import (
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/flags/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFlagValueBool(t *testing.T) {
 	t.Parallel()
+
+	mockOverride := mocks.NewFlagValueOverride(t)
+	mockOverride.On("Value").Return(true)
 
 	tests := []struct {
 		name               string
@@ -44,6 +48,12 @@ func TestFlagValueBool(t *testing.T) {
 			options:            []boolOption{WithDefaultBool(true)},
 			controlServerValue: []byte(""),
 			expectedValue:      false,
+		},
+		{
+			name:               "control server with override",
+			options:            []boolOption{WithDefaultBool(false), WithBoolOverride(mockOverride)},
+			controlServerValue: []byte("enabled"),
+			expectedValue:      mockOverride.Value().(bool),
 		},
 	}
 	for _, tt := range tests {

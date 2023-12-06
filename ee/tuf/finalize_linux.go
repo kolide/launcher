@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 // patchExecutable updates the downloaded binary as necessary for it to be able to

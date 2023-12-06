@@ -179,19 +179,41 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}))
 	}
 
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	runGroup := rungroup.NewRunGroup(logger)
+
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
+	var traceExporter *exporter.TraceExporter
 	if k.ControlServerURL() != "" {
+
+		initialDebugDuration := 10 * time.Minute
+
 		// Set log shipping level to debug for the first X minutes of
 		// run time. This will also increase the sending frequency.
-		k.SetLogShippingLevelOverride("debug", 10*time.Minute)
+		k.SetLogShippingLevelOverride("debug", initialDebugDuration)
 
 		logShipper = logshipper.New(k, logger)
+		runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
+
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 		k.AddSlogHandler(logShipper.SlogHandler())
 		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
+
+		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
+		k.SetExportTracesOverride(true, initialDebugDuration)
+
+		traceExporter, err = exporter.NewTraceExporter(ctx, k, logger)
+		if err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
+		}
 	}
 
 	// construct the appropriate http client based on security settings
@@ -223,8 +245,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
 		}
 	}
-	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(logger)
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	checkpointer := checkups.NewCheckupLogger(logger, k)
@@ -283,6 +303,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
+
+	if traceExporter != nil {
+		traceExporter.SetOsqueryClient(extension)
+	}
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
@@ -348,21 +372,14 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			return fmt.Errorf("failed to register auth token consumer: %w", err)
 		}
 
-		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
-			level.Debug(logger).Log(
-				"msg", "could not set up trace exporter",
-				"err", err,
-			)
-		} else {
-			runGroup.Add("traceExporter", exp.Execute, exp.Interrupt)
-			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
-		}
-
 		// begin log shipping and subsribe to token updates
 		// nil check incase it failed to create for some reason
 		if logShipper != nil {
-			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
+		}
+
+		if traceExporter != nil {
+			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {

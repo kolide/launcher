@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
+	"log/slog"
 
 	"fmt"
 	"os"
@@ -375,9 +376,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	logger := log.With(e.logger, "method", "enroll")
+	slogger := e.knapsack.Slogger().With("method", "enroll")
 
-	level.Debug(logger).Log("msg", "checking enrollment")
+	slogger.Log(ctx, slog.LevelInfo,
+		"checking enrollment",
+	)
+	span.AddEvent("checking_enrollment")
 
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
@@ -387,7 +391,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
-		level.Debug(logger).Log("msg", "node key exists, skipping enrollment")
+		slogger.Log(ctx, slog.LevelDebug,
+			"node key exists, skipping enrollment",
+		)
 		span.AddEvent("node_key_already_exists")
 		return e.NodeKey, false, nil
 	}
@@ -400,13 +406,18 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	if key != "" {
-		level.Debug(logger).Log("msg", "found stored node key, skipping enrollment")
+		slogger.Log(ctx, slog.LevelDebug,
+			"found stored node key, skipping enrollment",
+		)
 		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
 
-	level.Debug(logger).Log("msg", "starting enrollment")
+	slogger.Log(ctx, slog.LevelInfo,
+		"no node key found, starting enrollment",
+	)
+	span.AddEvent("starting_enrollment")
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
@@ -417,12 +428,18 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// it seems less likely. Try a couple times, but backoff fast.
 	var enrollDetails service.EnrollmentDetails
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		level.Info(logger).Log("msg", "Cannot get additional enrollment details without an osqueryd path. This is probably CI")
+		slogger.Log(ctx, slog.LevelInfo,
+			"skipping enrollment details, no osqueryd path, this is probably CI",
+		)
+		span.AddEvent("skipping_enrollment_details")
 	} else {
 		if err := backoff.WaitFor(func() error {
 			enrollDetails, err = getEnrollDetails(ctx, osqPath)
 			if err != nil {
-				level.Debug(logger).Log("msg", "getEnrollDetails failed in backoff", "err", err)
+				slogger.Log(ctx, slog.LevelDebug,
+					"getEnrollDetails failed in backoff",
+					"err", err,
+				)
 			}
 			return err
 		}, 30*time.Second, 5*time.Second); err != nil {
@@ -430,7 +447,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				return "", true, fmt.Errorf("query enrollment details: %w", err)
 			}
 
-			level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
+			slogger.Log(ctx, slog.LevelError,
+				"failed to get enrollment details with retries, moving on",
+				"err", err,
+			)
+			traces.SetError(span, fmt.Errorf("query enrollment details: %w", err))
+		} else {
+			span.AddEvent("got_enrollment_details")
 		}
 	}
 	// If no cached node key, enroll for new node key
@@ -439,13 +462,17 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return "", true, fmt.Errorf("transport error in enrollment: %w", err)
+		err := fmt.Errorf("transport error in enrollment: %w", err)
+		traces.SetError(span, err)
+		return "", true, err
 	}
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
 		}
-		return "", true, fmt.Errorf("enrollment invalid: %w", err)
+		err = fmt.Errorf("enrollment invalid: %w", err)
+		traces.SetError(span, err)
+		return "", true, err
 	}
 
 	// Save newly acquired node key if successful
@@ -456,7 +483,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	e.NodeKey = keyString
 
-	level.Debug(logger).Log("msg", "completed enrollment")
+	slogger.Log(ctx, slog.LevelInfo,
+		"completed enrollment",
+	)
+	span.AddEvent("completed_enrollment")
 
 	return e.NodeKey, false, nil
 }

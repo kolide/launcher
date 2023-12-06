@@ -38,7 +38,7 @@ linters-settings:
   forbidigo:
     forbid:
       - p: ^exec\.Command.*$
-        msg: use pkg/allowedcmd functions instead
+        msg: use ee/allowedcmd functions instead
   sloglint:
     kv-only: true
     context-only: true

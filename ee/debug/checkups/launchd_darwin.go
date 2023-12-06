@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 const (
