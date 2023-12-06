@@ -3,7 +3,7 @@
 
 package checkups
 
-import "github.com/kolide/launcher/pkg/allowedcmd"
+import "github.com/kolide/launcher/ee/allowedcmd"
 
 func listCommands() []networkCommand {
 	return []networkCommand{
