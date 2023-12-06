@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
-	"github.com/kolide/launcher/pkg/allowedcmd"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 

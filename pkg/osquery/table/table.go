@@ -2,6 +2,7 @@ package table
 
 import (
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/desktopprocs"
@@ -11,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
-	"github.com/kolide/launcher/pkg/allowedcmd"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"

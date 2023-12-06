@@ -3,7 +3,7 @@
 
 package dev_table_tooling
 
-import "github.com/kolide/launcher/pkg/allowedcmd"
+import "github.com/kolide/launcher/ee/allowedcmd"
 
 var allowedCommands = map[string]allowedCommand{
 	"echo": {
