@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
@@ -74,8 +75,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 		hardwareUUIDSetInStore bool
 		hardwareUUIDChanged    bool
 		osquerySuccess         bool
-		secretSetInStore       bool
-		secretChanged          bool
+		munemoSetInStore       bool
+		munemoChanged          bool
 		secretLivesInFile      bool
 		secretReadable         bool
 		expectDatabaseWipe     bool
@@ -87,8 +88,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
@@ -100,8 +101,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
@@ -113,34 +114,34 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
 		{
-			name:                   "enroll secret changed, database wipe",
+			name:                   "munemo changed, database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          true,
+			munemoSetInStore:       true,
+			munemoChanged:          true,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
 		},
 		{
-			name:                   "enroll secret changed, enroll secret does not live in file, database wipe",
+			name:                   "munemo changed, enroll secret does not live in file, database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          true,
+			munemoSetInStore:       true,
+			munemoChanged:          true,
 			secretLivesInFile:      false,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
@@ -152,8 +153,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          true,
+			munemoSetInStore:       true,
+			munemoChanged:          true,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
@@ -165,8 +166,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         false,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
@@ -178,8 +179,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         false,
 			expectDatabaseWipe:     false,
@@ -191,8 +192,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
@@ -204,21 +205,21 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: false,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "secret not previously stored, other data unchanged, no database wipe",
+			name:                   "munemo not previously stored, other data unchanged, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
 			osquerySuccess:         true,
-			secretSetInStore:       false,
-			secretChanged:          false,
+			munemoSetInStore:       false,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     false,
@@ -230,8 +231,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
 			osquerySuccess:         true,
-			secretSetInStore:       true,
-			secretChanged:          false,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
 			secretLivesInFile:      true,
 			secretReadable:         true,
 			expectDatabaseWipe:     true,
@@ -284,15 +285,18 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 				}
 			}
 
-			// Set up dependencies: ensure that retrieved secret matches current data
-			secretValue := []byte("abcd")
+			// Set up dependencies: ensure that retrieved tenant matches current data
+			munemoValue := []byte("test-munemo")
+			secretJwt := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{"organization": string(munemoValue)})
+			secretValue, err := secretJwt.SignedString(jwt.UnsafeAllowNoneSignatureType)
+			require.NoError(t, err, "could not create test enroll secret")
 
 			if tt.secretLivesInFile {
 				var secretFilepath string
 				if tt.secretReadable {
 					secretDir := t.TempDir()
 					secretFilepath = filepath.Join(secretDir, "test-secret")
-					require.NoError(t, os.WriteFile(secretFilepath, secretValue, 0644), "could not write out test secret")
+					require.NoError(t, os.WriteFile(secretFilepath, []byte(secretValue), 0644), "could not write out test secret")
 				} else {
 					secretFilepath = filepath.Join("not", "a", "real", "enroll", "secret")
 				}
@@ -300,14 +304,14 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 				mockKnapsack.On("EnrollSecret").Return("")
 				mockKnapsack.On("EnrollSecretPath").Return(secretFilepath)
 			} else {
-				mockKnapsack.On("EnrollSecret").Return(string(secretValue))
+				mockKnapsack.On("EnrollSecret").Return(secretValue)
 			}
 
-			if tt.secretSetInStore {
-				if tt.secretChanged {
-					require.NoError(t, testStore.Set(hostDataKeySecret, []byte("some-old-secret")), "could not set secret in test store")
+			if tt.munemoSetInStore {
+				if tt.munemoChanged {
+					require.NoError(t, testStore.Set(hostDataKeyMunemo, []byte("some-old-munemo")), "could not set munemo in test store")
 				} else {
-					require.NoError(t, testStore.Set(hostDataKeySecret, secretValue), "could not set secret in test store")
+					require.NoError(t, testStore.Set(hostDataKeyMunemo, munemoValue), "could not set munemo in test store")
 				}
 			}
 
@@ -372,9 +376,9 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 				require.Equal(t, actualHardwareUUID, string(hardwareUUID), "hardware UUID in test store does not match expected hardware UUID")
 			}
 			if tt.secretReadable {
-				secret, err := testStore.Get(hostDataKeySecret)
-				require.NoError(t, err, "could not get secret from test store")
-				require.Equal(t, secretValue, secret, "secret in test store does not match expected secret")
+				munemo, err := testStore.Get(hostDataKeyMunemo)
+				require.NoError(t, err, "could not get munemo from test store")
+				require.Equal(t, munemoValue, munemo, "munemo in test store does not match expected munemo")
 			}
 
 			// Make sure all the functions were called as expected

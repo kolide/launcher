@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"go.etcd.io/bbolt"
@@ -20,7 +21,7 @@ import (
 var (
 	hostDataKeySerial       = []byte("serial")
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
-	hostDataKeySecret       = []byte("secret")
+	hostDataKeyMunemo       = []byte("munemo")
 )
 
 // ResetDatabaseIfNeeded checks to see if the hardware this installation is running on
@@ -40,19 +41,19 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 		hardwareUUIDChanged = valueChanged(k, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
-	enrollSecretChanged := false
-	currentEnrollSecret, err := currentSecret(k)
+	munemoChanged := false
+	currentTenantMunemo, err := currentMunemo(k)
 	if err != nil {
-		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current enroll secret", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current munemo", "err", err)
 	} else {
-		enrollSecretChanged = valueChanged(k, currentEnrollSecret, hostDataKeySecret)
+		munemoChanged = valueChanged(k, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	if serialChanged || hardwareUUIDChanged || enrollSecretChanged {
+	if serialChanged || hardwareUUIDChanged || munemoChanged {
 		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or rollout, backing up and resetting database",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
-			"enroll_secret_changed", enrollSecretChanged)
+			"tenant_munemo_changed", munemoChanged)
 
 		if err := takeDatabaseBackup(k); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
@@ -67,8 +68,8 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 		if err := k.HostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
-		if err := k.HostDataStore().Set(hostDataKeySecret, []byte(currentEnrollSecret)); err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "could not set secret in host data store", "err", err)
+		if err := k.HostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
 	}
 }
@@ -159,25 +160,45 @@ func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
 	return false
 }
 
-// currentSecret retrieves the enrollment secret from either the knapsack or the filesystem,
-// depending on launcher configuration.
-func currentSecret(k types.Knapsack) (string, error) {
-	// Do we want to extract (and store) the tenant munemo, instead of storing the enrollment
-	// secret?
+// currentMunemo retrieves the enrollment secret from either the knapsack or the filesystem,
+// depending on launcher configuration, and then parses the tenant munemo from it.
+func currentMunemo(k types.Knapsack) (string, error) {
+	var enrollSecret string
 	if k.EnrollSecret() != "" {
-		return k.EnrollSecret(), nil
-	}
-
-	if k.EnrollSecretPath() != "" {
+		enrollSecret = k.EnrollSecret()
+	} else if k.EnrollSecretPath() != "" {
 		content, err := os.ReadFile(k.EnrollSecretPath())
-		if err == nil {
-			return string(bytes.TrimSpace(content)), nil
-		}
+		if err != nil {
+			return "", fmt.Errorf("could not read secret at enroll_secret_path %s: %w", k.EnrollSecretPath(), err)
 
-		return "", fmt.Errorf("could not read secret at enroll_secret_path %s: %w", k.EnrollSecretPath(), err)
+		}
+		enrollSecret = string(bytes.TrimSpace(content))
+	} else {
+		return "", errors.New("enroll secret and secret path both unset")
 	}
 
-	return "", errors.New("enroll secret and secret path both unset")
+	// We cannot verify since we don't have the key, so we use ParseUnverified
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
+	if err != nil {
+		return "", fmt.Errorf("parsing enroll secret jwt: %w", err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("enroll secret has no claims")
+	}
+
+	munemo, ok := claims["organization"]
+	if !ok {
+		return "", errors.New("enroll secret claims missing organization claim")
+	}
+
+	munemoStr, ok := munemo.(string)
+	if !ok {
+		return "", errors.New("munemo is unsupported type")
+	}
+
+	return munemoStr, nil
 }
 
 // takeDatabaseBackup takes a backup of the current database and compresses it, storing
