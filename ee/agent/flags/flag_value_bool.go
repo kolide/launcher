@@ -8,8 +8,15 @@ func WithDefaultBool(defaultVal bool) boolOption {
 	}
 }
 
+func WithBoolOverride(override FlagValueOverride) boolOption {
+	return func(f *boolFlagValue) {
+		f.override = override
+	}
+}
+
 type boolFlagValue struct {
 	defaultVal bool
+	override   FlagValueOverride
 }
 
 func NewBoolFlagValue(opts ...boolOption) *boolFlagValue {
@@ -26,6 +33,14 @@ func (b *boolFlagValue) get(controlServerValue []byte) bool {
 	boolValue := b.defaultVal
 	if controlServerValue != nil {
 		boolValue = bytesToBool(controlServerValue)
+	}
+
+	if b.override != nil && b.override.Value() != nil {
+		// An override was provided, if it's valid let it take precedence
+		value, ok := b.override.Value().(bool)
+		if ok {
+			boolValue = value
+		}
 	}
 
 	return boolValue

@@ -865,6 +865,11 @@ func (_m *Flags) SetExportTraces(enabled bool) error {
 	return r0
 }
 
+// SetExportTracesOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetExportTracesOverride(value bool, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetForceControlSubsystems provides a mock function with given fields: force
 func (_m *Flags) SetForceControlSubsystems(force bool) error {
 	ret := _m.Called(force)
@@ -1106,6 +1111,11 @@ func (_m *Flags) SetTraceSamplingRate(rate float64) error {
 	}
 
 	return r0
+}
+
+// SetTraceSamplingRateOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetTufServerURL provides a mock function with given fields: url
