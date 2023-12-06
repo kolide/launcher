@@ -252,8 +252,6 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			require.NoError(t, err, "could not create test host data store")
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("HostDataStore").Return(testHostDataStore)
-			testBboltDB := storageci.SetupDB(t)
-			mockKnapsack.On("BboltDB").Return(testBboltDB).Maybe()
 			testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
@@ -418,4 +416,127 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			mockKnapsack.AssertExpectations(t)
 		})
 	}
+}
+
+func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
+	t.Parallel()
+
+	// Set up dependencies: data store for hardware-identifying data
+	testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
+	require.NoError(t, err, "could not create test host data store")
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("HostDataStore").Return(testHostDataStore)
+	testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	mockKnapsack.On("ConfigStore").Return(testConfigStore)
+	testServerProvidedDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	require.NoError(t, err, "could not create test server provided data store")
+	mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore)
+	mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
+		storage.HostDataStore:           testHostDataStore,
+		storage.ConfigStore:             testConfigStore,
+		storage.ServerProvidedDataStore: testServerProvidedDataStore,
+	})
+
+	// Set up logger
+	slogger := multislogger.New().Logger
+	mockKnapsack.On("Slogger").Return(slogger)
+
+	// Set up dependencies: ensure that retrieved hardware data matches expectations
+	var actualSerial, actualHardwareUUID string
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(context.TODO(), mockKnapsack)
+	require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
+	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte(actualSerial)), "could not set serial in test store")
+	require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)), "could not set hardware uuid in test store")
+
+	// Set up dependencies: ensure that retrieved tenant has changed from test-munemo-1 (stored)
+	// to test-munemo-2 (new file)
+	firstMunemoValue := []byte("test-munemo-1")
+	secondMunemoValue := []byte("test-munemo-2")
+	secretJwt := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{"organization": string(secondMunemoValue)})
+	secretValue, err := secretJwt.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err, "could not create test enroll secret")
+
+	secretDir := t.TempDir()
+	secretFilepath := filepath.Join(secretDir, "test-secret")
+	require.NoError(t, os.WriteFile(secretFilepath, []byte(secretValue), 0644), "could not write out test secret")
+	mockKnapsack.On("EnrollSecret").Return("")
+	mockKnapsack.On("EnrollSecretPath").Return(secretFilepath)
+	require.NoError(t, testHostDataStore.Set(hostDataKeyMunemo, firstMunemoValue), "could not set munemo in test store")
+
+	// Set up dependencies: set data that we expect to be backed up
+	testNodeKey := "abcd"
+	require.NoError(t, testConfigStore.Set([]byte("nodeKey"), []byte(testNodeKey)), "could not set value in test store")
+	testDeviceId := "1"
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("device_id"), []byte(testDeviceId)), "could not set value in test store")
+	testRemoteIp := "127.0.0.1"
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("remote_ip"), []byte(testRemoteIp)), "could not set value in test store")
+	testTombstoneId := "100"
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("tombstone_id"), []byte(testTombstoneId)), "could not set value in test store")
+
+	testLocalEccKey, err := echelper.GenerateEcdsaKey()
+	require.NoError(t, err, "generating test key for backup")
+	testLocalEccKeyRaw, err := x509.MarshalECPrivateKey(testLocalEccKey)
+	require.NoError(t, err, "marshalling test key")
+	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
+
+	// Make first test call
+	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
+
+	// Confirm the old_host_data key exists in the data store
+	dataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+	require.NoError(t, err, "could not get old host data from test store")
+	require.NotNil(t, dataRaw, "old host data not set in store")
+
+	// Confirm that it contains reasonable data: we should have one backup
+	// with the first munemo in it
+	var d []oldHostData
+	require.NoError(t, json.Unmarshal(dataRaw, &d), "old host data in unexpected format")
+	require.Equal(t, 1, len(d), "unexpected number of backups")
+	require.Equal(t, string(firstMunemoValue), d[0].Munemo, "munemo does not match")
+
+	// The current saved munemo should equal the second munemo
+	munemo, err := testHostDataStore.Get(hostDataKeyMunemo)
+	require.NoError(t, err, "could not get munemo from test store")
+	require.Equal(t, secondMunemoValue, munemo, "munemo in test store does not match expected munemo")
+
+	// Now, perform secret setup again, setting the munemo to a new third value.
+	thirdMunemoValue := []byte("test-munemo-3")
+	newJwt := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{"organization": string(thirdMunemoValue)})
+	newSecretValue, err := newJwt.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err, "could not create test enroll secret")
+	require.NoError(t, os.WriteFile(secretFilepath, []byte(newSecretValue), 0644), "could not write out test secret")
+
+	// Set backup data again
+	require.NoError(t, testConfigStore.Set([]byte("nodeKey"), []byte(testNodeKey)), "could not set value in test store")
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("device_id"), []byte(testDeviceId)), "could not set value in test store")
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("remote_ip"), []byte(testRemoteIp)), "could not set value in test store")
+	require.NoError(t, testServerProvidedDataStore.Set([]byte("tombstone_id"), []byte(testTombstoneId)), "could not set value in test store")
+	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
+
+	// Make second test call
+	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
+
+	// Confirm the old_host_data key exists in the data store
+	newDataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+	require.NoError(t, err, "could not get old host data from test store")
+	require.NotNil(t, dataRaw, "old host data not set in store")
+
+	// Confirm that it contains reasonable data: we should have two backups
+	// now -- the first should have the first munemo in it, and the second
+	// should have the second.
+	var dNew []oldHostData
+	require.NoError(t, json.Unmarshal(newDataRaw, &dNew), "old host data in unexpected format")
+	require.Equal(t, 2, len(dNew), "unexpected number of backups")
+	require.Equal(t, string(firstMunemoValue), dNew[0].Munemo, "first backup munemo does not match")
+	require.Equal(t, string(secondMunemoValue), dNew[1].Munemo, "second backup munemo does not match")
+
+	// The current saved munemo should equal the third
+	currentMunemo, err := testHostDataStore.Get(hostDataKeyMunemo)
+	require.NoError(t, err, "could not get munemo from test store")
+	require.Equal(t, thirdMunemoValue, currentMunemo, "munemo in test store does not match expected munemo")
+
+	// Make sure all the functions were called as expected
+	mockKnapsack.AssertExpectations(t)
 }
