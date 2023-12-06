@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/cmd/launcher/internal"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/agent"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/interactive"

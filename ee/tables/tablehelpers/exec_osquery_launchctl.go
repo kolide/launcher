@@ -14,7 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/allowedcmd"
 )
 

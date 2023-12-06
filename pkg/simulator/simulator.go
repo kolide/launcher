@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"

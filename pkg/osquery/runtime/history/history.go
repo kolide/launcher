@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 const maxInstances = 10

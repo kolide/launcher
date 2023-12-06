@@ -12,8 +12,8 @@ import (
 	"runtime"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 type (

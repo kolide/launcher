@@ -18,10 +18,10 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 

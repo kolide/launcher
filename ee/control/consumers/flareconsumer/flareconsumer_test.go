@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"testing"
 
+	knapsackMock "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer/mocks"
-	knapsackMock "github.com/kolide/launcher/pkg/agent/types/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/pkg/errors"
 )
 

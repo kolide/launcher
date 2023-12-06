@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/require"
 )
 

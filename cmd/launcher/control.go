@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/pkg/agent/types"
 )
 
 func createHTTPClient(ctx context.Context, logger log.Logger, k types.Knapsack) (*control.HTTPClient, error) {

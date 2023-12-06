@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type Version struct {

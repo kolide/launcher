@@ -20,7 +20,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/pkg/agent/keys"
+	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

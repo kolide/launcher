@@ -8,7 +8,7 @@ import (
 	"errors"
 	"net/url"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
