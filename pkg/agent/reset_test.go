@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/agent/storage"
 	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
 	"github.com/kolide/launcher/pkg/agent/types"
@@ -341,6 +344,12 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			testTombstoneId := "100"
 			require.NoError(t, testServerProvidedDataStore.Set([]byte("tombstone_id"), []byte(testTombstoneId)), "could not set value in test store")
 
+			testLocalEccKey, err := echelper.GenerateEcdsaKey()
+			require.NoError(t, err, "generating test key for backup")
+			testLocalEccKeyRaw, err := x509.MarshalECPrivateKey(testLocalEccKey)
+			require.NoError(t, err, "marshalling test key")
+			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
+
 			// Make test call
 			ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
 
@@ -363,6 +372,14 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 				require.Equal(t, testDeviceId, d[0].DeviceID, "device id does not match")
 				require.Equal(t, testRemoteIp, d[0].RemoteIP, "remote ip does not match")
 				require.Equal(t, testTombstoneId, d[0].TombstoneID, "tombstone id does not match")
+
+				// The pubkey should match the test pubkey
+				require.Equal(t, 1, len(d[0].PubKeys))
+				p, err := x509.ParsePKIXPublicKey(d[0].PubKeys[0])
+				require.NoError(t, err, "could not parse stored pubkey")
+				eccPubKey, ok := p.(*ecdsa.PublicKey)
+				require.True(t, ok, "unexpected pubkey format", fmt.Sprintf("%T", p))
+				require.True(t, eccPubKey.Equal(testLocalEccKey.Public()), "pubkey mismatch")
 
 				// The backup timestamp should be in the past
 				require.GreaterOrEqual(t, time.Now().Unix(), d[0].ResetTimestamp)

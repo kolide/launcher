@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,15 +18,15 @@ import (
 )
 
 type oldHostData struct {
-	NodeKey        string `json:"node_key"`
-	LocalEccKey    string `json:"local_ecc_key"`
-	Serial         string `json:"serial"`
-	HardwareUUID   string `json:"hardware_uuid"`
-	Munemo         string `json:"munemo"`
-	DeviceID       string `json:"device_id"`
-	RemoteIP       string `json:"remote_ip"`
-	TombstoneID    string `json:"tombstone_id"`
-	ResetTimestamp int64  `json:"reset_timestamp"`
+	NodeKey        string   `json:"node_key"`
+	PubKeys        [][]byte `json:"pub_keys"`
+	Serial         string   `json:"serial"`
+	HardwareUUID   string   `json:"hardware_uuid"`
+	Munemo         string   `json:"munemo"`
+	DeviceID       string   `json:"device_id"`
+	RemoteIP       string   `json:"remote_ip"`
+	TombstoneID    string   `json:"tombstone_id"`
+	ResetTimestamp int64    `json:"reset_timestamp"`
 }
 
 var (
@@ -222,9 +223,9 @@ func takeDatabaseBackup(k types.Knapsack) error {
 		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get node key from store", "err", err)
 	}
 
-	localEccKeyRaw, err := k.ConfigStore().Get([]byte("localEccKey"))
+	localPubKey, err := getLocalPubKey(k)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get local ecc key from store", "err", err)
+		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get local pubkey from store", "err", err)
 	}
 
 	serial, err := k.HostDataStore().Get(hostDataKeySerial)
@@ -259,7 +260,7 @@ func takeDatabaseBackup(k types.Knapsack) error {
 
 	dataToStore := oldHostData{
 		NodeKey:        string(nodeKey),
-		LocalEccKey:    string(localEccKeyRaw),
+		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
 		HardwareUUID:   string(hardwareUuid),
 		Munemo:         string(munemo),
@@ -295,6 +296,27 @@ func takeDatabaseBackup(k types.Knapsack) error {
 	}
 
 	return nil
+}
+
+// getLocalPubKey retrieves the local database key, parses it, and returns
+// the pubkey.
+func getLocalPubKey(k types.Knapsack) ([]byte, error) {
+	localEccKeyRaw, err := k.ConfigStore().Get([]byte("localEccKey"))
+	if err != nil {
+		return nil, fmt.Errorf("getting raw key from config store: %w", err)
+	}
+
+	localEccKey, err := x509.ParseECPrivateKey(localEccKeyRaw)
+	if err != nil {
+		return nil, fmt.Errorf("parsing key: %w", err)
+	}
+
+	pubKeyBytes, err := x509.MarshalPKIXPublicKey(localEccKey.Public())
+	if err != nil {
+		return nil, fmt.Errorf("marshalling pubkey: %w", err)
+	}
+
+	return pubKeyBytes, nil
 }
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
