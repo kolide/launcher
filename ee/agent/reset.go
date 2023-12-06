@@ -66,7 +66,8 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or rollout, backing up and resetting database",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
-			"tenant_munemo_changed", munemoChanged)
+			"tenant_munemo_changed", munemoChanged,
+		)
 
 		if err := takeDatabaseBackup(k); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
@@ -157,7 +158,7 @@ func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
 		return false // assume no change
 	}
 
-	if storedValue == nil {
+	if len(storedValue) == 0 {
 		k.Slogger().Log(context.TODO(), slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
 		if err := k.HostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
 			k.Slogger().Log(context.TODO(), slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
@@ -276,7 +277,7 @@ func takeDatabaseBackup(k types.Knapsack) error {
 	}
 
 	var hostDataCollection []oldHostData
-	if previousHostData == nil {
+	if len(previousHostData) == 0 {
 		// No previous database resets
 		hostDataCollection = []oldHostData{dataToStore}
 	} else {
