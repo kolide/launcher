@@ -116,7 +116,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) 
 	t.addDeviceIdentifyingAttributes()
 
 	// Set the provider with as many resource attributes as we can get immediately
-	t.setNewGlobalProvider()
+	t.setNewGlobalProvider(false)
 
 	return t, nil
 }
@@ -128,7 +128,10 @@ func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
 	// attributes for our traces, then replace the provider with a new one.
 	go func() {
 		t.addAttributesFromOsquery()
-		t.setNewGlobalProvider()
+
+		// we don't want to rebuild the exporter here because we may drop
+		// buffered spans, so we just replace the provider
+		t.setNewGlobalProvider(true)
 		level.Debug(t.logger).Log("msg", "successfully replaced global provider after adding osquery attributes")
 	}()
 }
@@ -223,7 +226,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider() {
+func (t *TraceExporter) setNewGlobalProvider(retainExporter bool) {
 	t.providerLock.Lock()
 	defer t.providerLock.Unlock()
 
@@ -263,11 +266,7 @@ func (t *TraceExporter) setNewGlobalProvider() {
 
 	t.provider = newProvider
 
-	// now that we have set up new provider, see if we need a new exporter and therefore
-	// a new child processor for the buf span processor
-
-	if t.bufSpanProcessor.HasProcessor() && t.ingestUrl == t.knapsack.TraceIngestServerURL() {
-		// already have processor pointing at the same url, so no need to recreate
+	if retainExporter {
 		return
 	}
 
@@ -332,13 +331,6 @@ func (t *TraceExporter) Ping() {
 	// to the new token in place.
 	t.ingestAuthToken = string(newToken)
 	t.ingestClientAuthenticator.setToken(t.ingestAuthToken)
-
-	// we cannot create the child processor until we have a token,
-	// so if we don't have one yet go ahead an call setNewGlobalProvider
-	// so a new one will be created
-	if !t.bufSpanProcessor.HasProcessor() {
-		t.setNewGlobalProvider()
-	}
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
@@ -378,8 +370,9 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	// Handle ingest_url updates
 	if slices.Contains(flagKeys, keys.TraceIngestServerURL) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
+			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.knapsack.TraceIngestServerURL())
+			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
 		}
 	}
 
@@ -406,5 +399,5 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		return
 	}
 
-	t.setNewGlobalProvider()
+	t.setNewGlobalProvider(false)
 }

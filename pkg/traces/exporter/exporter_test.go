@@ -286,7 +286,6 @@ func TestPing(t *testing.T) {
 	s := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(s)
-	mockKnapsack.On("TraceIngestServerURL").Return("localhost:4317")
 
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
