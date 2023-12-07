@@ -78,7 +78,10 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
 		}
 
-		wipeDatabase(ctx, k)
+		if err := wipeDatabase(ctx, k); err != nil {
+			k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
+			return
+		}
 
 		// Store the backup data
 		if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
@@ -332,10 +335,11 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) {
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(ctx context.Context, k types.Knapsack) {
+func wipeDatabase(ctx context.Context, k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "deleting keys in store", "store_name", storeName, "err", err)
+			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
 		}
 	}
+	return nil
 }
