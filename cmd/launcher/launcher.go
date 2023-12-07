@@ -76,8 +76,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	logger := ctxlog.FromContext(ctx)
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
-	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
-
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
 		level.Debug(logger).Log(
@@ -170,6 +168,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
+
+	go runOsqueryVersionCheck(ctx, logger, k.LatestOsquerydPath(ctx))
 
 	if k.Debug() {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
@@ -540,9 +540,18 @@ func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath
 	outTrimmed := strings.TrimSpace(output.String())
 
 	if osqErr != nil {
-		level.Error(logger).Log("msg", "could not check osqueryd version", "output", outTrimmed, "err", err, "execution_time_ms", executionTimeMs)
+		level.Error(logger).Log("msg", "could not check osqueryd version",
+			"output", outTrimmed,
+			"err", err,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
 		return
 	}
 
-	level.Debug(logger).Log("msg", "checked osqueryd version", "version", outTrimmed, "execution_time_ms", executionTimeMs)
+	level.Debug(logger).Log("msg", "checked osqueryd version",
+		"version", outTrimmed,
+		"execution_time_ms", executionTimeMs,
+		"osqueryd_path", osquerydPath,
+	)
 }
