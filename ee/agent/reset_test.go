@@ -354,12 +354,12 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {
 				// Confirm the old_host_data key exists in the data store
-				dataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+				dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 				require.NoError(t, err, "could not get old host data from test store")
 				require.NotNil(t, dataRaw, "old host data not set in store")
 
 				// Confirm that it contains reasonable data
-				var d []oldHostData
+				var d []dbResetRecord
 				require.NoError(t, json.Unmarshal(dataRaw, &d), "old host data in unexpected format")
 
 				// We should only have one backup
@@ -385,6 +385,9 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 				// The backup timestamp should be at least kind of close to now -- within the last
 				// five minutes. Not checking too closely to avoid flaky tests.
 				require.LessOrEqual(t, time.Now().Unix()-300, d[0].ResetTimestamp)
+
+				// The reset reason should be correct
+				require.Equal(t, resetReasonNewHardwareOrEnrollmentDetected, d[0].ResetReason)
 			}
 
 			// Confirm whether the database got wiped
@@ -485,13 +488,13 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
-	dataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 	require.NoError(t, err, "could not get old host data from test store")
 	require.NotNil(t, dataRaw, "old host data not set in store")
 
 	// Confirm that it contains reasonable data: we should have one backup
 	// with the first munemo in it
-	var d []oldHostData
+	var d []dbResetRecord
 	require.NoError(t, json.Unmarshal(dataRaw, &d), "old host data in unexpected format")
 	require.Equal(t, 1, len(d), "unexpected number of backups")
 	require.Equal(t, string(firstMunemoValue), d[0].Munemo, "munemo does not match")
@@ -519,14 +522,14 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
-	newDataRaw, err := testHostDataStore.Get(hostDataKeyOldHostData)
+	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 	require.NoError(t, err, "could not get old host data from test store")
 	require.NotNil(t, dataRaw, "old host data not set in store")
 
 	// Confirm that it contains reasonable data: we should have two backups
 	// now -- the first should have the first munemo in it, and the second
 	// should have the second.
-	var dNew []oldHostData
+	var dNew []dbResetRecord
 	require.NoError(t, json.Unmarshal(newDataRaw, &dNew), "old host data in unexpected format")
 	require.Equal(t, 2, len(dNew), "unexpected number of backups")
 	require.Equal(t, string(firstMunemoValue), dNew[0].Munemo, "first backup munemo does not match")

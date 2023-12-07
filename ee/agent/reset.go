@@ -16,7 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 )
 
-type oldHostData struct {
+type dbResetRecord struct {
 	NodeKey        string   `json:"node_key"`
 	PubKeys        [][]byte `json:"pub_keys"`
 	Serial         string   `json:"serial"`
@@ -26,6 +26,7 @@ type oldHostData struct {
 	RemoteIP       string   `json:"remote_ip"`
 	TombstoneID    string   `json:"tombstone_id"`
 	ResetTimestamp int64    `json:"reset_timestamp"`
+	ResetReason    string   `json:"reset_reason"`
 }
 
 var (
@@ -33,7 +34,11 @@ var (
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
 	hostDataKeyMunemo       = []byte("munemo")
 
-	hostDataKeyOldHostData = []byte("old_host_data")
+	hostDataKeyResetRecords = []byte("reset_records")
+)
+
+const (
+	resetReasonNewHardwareOrEnrollmentDetected = "launcher detected new hardware or enrollment"
 )
 
 // ResetDatabaseIfNeeded checks to see if the hardware this installation is running on
@@ -49,8 +54,8 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current serial and hardware UUID", "err", err)
 	} else {
-		serialChanged = valueChanged(k, currentSerial, hostDataKeySerial)
-		hardwareUUIDChanged = valueChanged(k, currentHardwareUUID, hostDataKeyHardwareUuid)
+		serialChanged = valueChanged(ctx, k, currentSerial, hostDataKeySerial)
+		hardwareUUIDChanged = valueChanged(ctx, k, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
 	munemoChanged := false
@@ -58,25 +63,25 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current munemo", "err", err)
 	} else {
-		munemoChanged = valueChanged(k, currentTenantMunemo, hostDataKeyMunemo)
+		munemoChanged = valueChanged(ctx, k, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
 	if serialChanged || hardwareUUIDChanged || munemoChanged {
-		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or rollout, backing up and resetting database",
+		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or enrollment, backing up and resetting database",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"tenant_munemo_changed", munemoChanged,
 		)
 
-		backup, err := takeDatabaseBackup(k)
+		backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
 		if err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
 		}
 
-		wipeDatabase(k)
+		wipeDatabase(ctx, k)
 
 		// Store the backup data
-		if err := k.HostDataStore().Set(hostDataKeyOldHostData, backup); err != nil {
+		if err := k.HostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not store database backup", "err", err)
 		}
 
@@ -156,23 +161,27 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 // valueChanged checks the knapsack for the given data and compares it to
 // currentValue. A value is considered changed only if the stored value was
 // previously set.
-func valueChanged(k types.Knapsack, currentValue string, dataKey []byte) bool {
+func valueChanged(ctx context.Context, k types.Knapsack, currentValue string, dataKey []byte) bool {
 	storedValue, err := k.HostDataStore().Get(dataKey)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelError, "could not get stored value", "err", err, "key", string(dataKey))
+		k.Slogger().Log(ctx, slog.LevelError, "could not get stored value", "err", err, "key", string(dataKey))
 		return false // assume no change
 	}
 
 	if len(storedValue) == 0 {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
+		k.Slogger().Log(ctx, slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
 		if err := k.HostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
-			k.Slogger().Log(context.TODO(), slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
+			k.Slogger().Log(ctx, slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
 		}
 		return false
 	}
 
 	if storedValue != nil && currentValue != string(storedValue) {
-		k.Slogger().Log(context.TODO(), slog.LevelInfo, "hardware-identifying value has changed", "key", string(dataKey))
+		k.Slogger().Log(ctx, slog.LevelInfo, "hardware- or enrollment-identifying value has changed",
+			"key", string(dataKey),
+			"old_value", string(storedValue),
+			"new_value", currentValue,
+		)
 		return true
 	}
 
@@ -189,7 +198,6 @@ func currentMunemo(k types.Knapsack) (string, error) {
 		content, err := os.ReadFile(k.EnrollSecretPath())
 		if err != nil {
 			return "", fmt.Errorf("could not read secret at enroll_secret_path %s: %w", k.EnrollSecretPath(), err)
-
 		}
 		enrollSecret = string(bytes.TrimSpace(content))
 	} else {
@@ -220,51 +228,51 @@ func currentMunemo(k types.Knapsack) (string, error) {
 	return munemoStr, nil
 }
 
-// takeDatabaseBackup retrieves the data we want to preserve from various db stores
-// as a snapshot of this db, appends it to previous snapshots if they exist, and
-// returns the collection of backup data.
-func takeDatabaseBackup(k types.Knapsack) ([]byte, error) {
+// prepareDatabaseResetRecords retrieves the data we want to preserve from various db stores
+// as a record of the current state of this database before reset. It appends this record
+// to previous records if they exist, and returns the collection ready for storage.
+func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetReason string) ([]byte, error) {
 	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get node key from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get node key from store", "err", err)
 	}
 
 	localPubKey, err := getLocalPubKey(k)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get local pubkey from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get local pubkey from store", "err", err)
 	}
 
 	serial, err := k.HostDataStore().Get(hostDataKeySerial)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get serial from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get serial from store", "err", err)
 	}
 
 	hardwareUuid, err := k.HostDataStore().Get(hostDataKeyHardwareUuid)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get hardware uuid from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get hardware uuid from store", "err", err)
 	}
 
 	munemo, err := k.HostDataStore().Get(hostDataKeyMunemo)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get munemo from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get munemo from store", "err", err)
 	}
 
 	deviceId, err := k.ServerProvidedDataStore().Get([]byte("device_id"))
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get device id from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get device id from store", "err", err)
 	}
 
 	remoteIp, err := k.ServerProvidedDataStore().Get([]byte("remote_ip"))
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get remote ip from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get remote ip from store", "err", err)
 	}
 
 	tombstoneId, err := k.ServerProvidedDataStore().Get([]byte("tombstone_id"))
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelWarn, "could not get tombstone id from store", "err", err)
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get tombstone id from store", "err", err)
 	}
 
-	dataToStore := oldHostData{
+	dataToStore := dbResetRecord{
 		NodeKey:        string(nodeKey),
 		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
@@ -274,17 +282,18 @@ func takeDatabaseBackup(k types.Knapsack) ([]byte, error) {
 		RemoteIP:       string(remoteIp),
 		TombstoneID:    string(tombstoneId),
 		ResetTimestamp: time.Now().Unix(),
+		ResetReason:    resetReason,
 	}
 
-	previousHostData, err := k.HostDataStore().Get(hostDataKeyOldHostData)
+	previousHostData, err := k.HostDataStore().Get(hostDataKeyResetRecords)
 	if err != nil {
 		return nil, fmt.Errorf("getting previous host data from store: %w", err)
 	}
 
-	var hostDataCollection []oldHostData
+	var hostDataCollection []dbResetRecord
 	if len(previousHostData) == 0 {
 		// No previous database resets
-		hostDataCollection = []oldHostData{dataToStore}
+		hostDataCollection = []dbResetRecord{dataToStore}
 	} else {
 		if err := json.Unmarshal(previousHostData, &hostDataCollection); err != nil {
 			return nil, fmt.Errorf("unmarshalling previous host data: %w", err)
@@ -323,10 +332,10 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) {
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(k types.Knapsack) {
+func wipeDatabase(ctx context.Context, k types.Knapsack) {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
-			k.Slogger().Log(context.TODO(), slog.LevelWarn, "deleting keys in store", "store_name", storeName, "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "deleting keys in store", "store_name", storeName, "err", err)
 		}
 	}
 }
