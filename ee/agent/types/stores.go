@@ -8,7 +8,7 @@ type Stores interface {
 	AutoupdateErrorsStore() KVStore
 	ConfigStore() KVStore
 	ControlStore() KVStore
-	HostDataStore() KVStore
+	PersistentHostDataStore() KVStore
 	InitialResultsStore() KVStore
 	ResultLogsStore() KVStore
 	OsqueryHistoryInstanceStore() KVStore

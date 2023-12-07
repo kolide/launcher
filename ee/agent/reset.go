@@ -81,18 +81,18 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 		wipeDatabase(ctx, k)
 
 		// Store the backup data
-		if err := k.HostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
+		if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not store database backup", "err", err)
 		}
 
 		// Cache hardware and rollout data for future checks
-		if err := k.HostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
+		if err := k.PersistentHostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
-		if err := k.HostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
+		if err := k.PersistentHostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
-		if err := k.HostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
+		if err := k.PersistentHostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
 	}
@@ -162,7 +162,7 @@ func currentSerialAndHardwareUUID(ctx context.Context, k types.Knapsack) (string
 // currentValue. A value is considered changed only if the stored value was
 // previously set.
 func valueChanged(ctx context.Context, k types.Knapsack, currentValue string, dataKey []byte) bool {
-	storedValue, err := k.HostDataStore().Get(dataKey)
+	storedValue, err := k.PersistentHostDataStore().Get(dataKey)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelError, "could not get stored value", "err", err, "key", string(dataKey))
 		return false // assume no change
@@ -170,7 +170,7 @@ func valueChanged(ctx context.Context, k types.Knapsack, currentValue string, da
 
 	if len(storedValue) == 0 {
 		k.Slogger().Log(ctx, slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
-		if err := k.HostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
+		if err := k.PersistentHostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
 			k.Slogger().Log(ctx, slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
 		}
 		return false
@@ -242,17 +242,17 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get local pubkey from store", "err", err)
 	}
 
-	serial, err := k.HostDataStore().Get(hostDataKeySerial)
+	serial, err := k.PersistentHostDataStore().Get(hostDataKeySerial)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get serial from store", "err", err)
 	}
 
-	hardwareUuid, err := k.HostDataStore().Get(hostDataKeyHardwareUuid)
+	hardwareUuid, err := k.PersistentHostDataStore().Get(hostDataKeyHardwareUuid)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get hardware uuid from store", "err", err)
 	}
 
-	munemo, err := k.HostDataStore().Get(hostDataKeyMunemo)
+	munemo, err := k.PersistentHostDataStore().Get(hostDataKeyMunemo)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get munemo from store", "err", err)
 	}
@@ -285,7 +285,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		ResetReason:    resetReason,
 	}
 
-	previousHostData, err := k.HostDataStore().Get(hostDataKeyResetRecords)
+	previousHostData, err := k.PersistentHostDataStore().Get(hostDataKeyResetRecords)
 	if err != nil {
 		return nil, fmt.Errorf("getting previous host data from store: %w", err)
 	}

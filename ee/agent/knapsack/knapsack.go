@@ -95,8 +95,8 @@ func (k *knapsack) ControlStore() types.KVStore {
 	return k.getKVStore(storage.ControlStore)
 }
 
-func (k *knapsack) HostDataStore() types.KVStore {
-	return k.getKVStore(storage.HostDataStore)
+func (k *knapsack) PersistentHostDataStore() types.KVStore {
+	return k.getKVStore(storage.PersistentHostDataStore)
 }
 
 func (k *knapsack) InitialResultsStore() types.KVStore {

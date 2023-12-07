@@ -248,10 +248,10 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			t.Parallel()
 
 			// Set up dependencies: data store for hardware-identifying data
-			testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
+			testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
 			require.NoError(t, err, "could not create test host data store")
 			mockKnapsack := typesmocks.NewKnapsack(t)
-			mockKnapsack.On("HostDataStore").Return(testHostDataStore)
+			mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
 			testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
@@ -259,7 +259,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			require.NoError(t, err, "could not create test server provided data store")
 			mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore).Maybe()
 			mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
-				storage.HostDataStore:           testHostDataStore,
+				storage.PersistentHostDataStore: testHostDataStore,
 				storage.ConfigStore:             testConfigStore,
 				storage.ServerProvidedDataStore: testServerProvidedDataStore,
 			}).Maybe()
@@ -425,10 +425,10 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies: data store for hardware-identifying data
-	testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.HostDataStore.String())
+	testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("HostDataStore").Return(testHostDataStore)
+	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
 	testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	mockKnapsack.On("ConfigStore").Return(testConfigStore)
@@ -436,7 +436,7 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	require.NoError(t, err, "could not create test server provided data store")
 	mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore)
 	mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
-		storage.HostDataStore:           testHostDataStore,
+		storage.PersistentHostDataStore: testHostDataStore,
 		storage.ConfigStore:             testConfigStore,
 		storage.ServerProvidedDataStore: testServerProvidedDataStore,
 	})

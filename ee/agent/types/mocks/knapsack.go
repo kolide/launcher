@@ -400,22 +400,6 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
-// HostDataStore provides a mock function with given fields:
-func (_m *Knapsack) HostDataStore() types.GetterSetterDeleterIteratorUpdater {
-	ret := _m.Called()
-
-	var r0 types.GetterSetterDeleterIteratorUpdater
-	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdater); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
-		}
-	}
-
-	return r0
-}
-
 // IAmBreakingEELicense provides a mock function with given fields:
 func (_m *Knapsack) IAmBreakingEELicense() bool {
 	ret := _m.Called()
@@ -795,6 +779,22 @@ func (_m *Knapsack) OsquerydPath() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// PersistentHostDataStore provides a mock function with given fields:
+func (_m *Knapsack) PersistentHostDataStore() types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
 	}
 
 	return r0

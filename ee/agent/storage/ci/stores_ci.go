@@ -21,7 +21,7 @@ func MakeStores(t *testing.T, logger log.Logger, db *bbolt.DB) (map[storage.Stor
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
-		storage.HostDataStore,
+		storage.PersistentHostDataStore,
 		storage.InitialResultsStore,
 		storage.ResultLogsStore,
 		storage.OsqueryHistoryInstanceStore,
