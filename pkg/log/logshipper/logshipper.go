@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
+	"runtime"
 	"sync"
 	"time"
 
@@ -191,6 +192,8 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 
 	versionInfo := version.Version()
 	deviceInfo["version"] = versionInfo.Version
+	deviceInfo["os"] = runtime.GOOS
+
 	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
 
 	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
@@ -204,14 +207,8 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 		}
 
 		deviceInfo[key] = string(v)
+		ls.shippingLogger = log.With(ls.shippingLogger, key, string(v))
 	}
-
-	var deviceInfoKvps []any
-	for k, v := range deviceInfo {
-		deviceInfoKvps = append(deviceInfoKvps, k, v)
-	}
-
-	ls.shippingLogger = log.With(ls.shippingLogger, deviceInfoKvps)
 
 	var additionalSlogAttrs []slog.Attr
 	for k, v := range deviceInfo {
