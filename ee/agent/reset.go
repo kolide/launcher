@@ -75,7 +75,7 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 
 		backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
 		if err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "could not take database backup", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
 		}
 
 		if err := wipeDatabase(ctx, k); err != nil {
@@ -85,7 +85,7 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 
 		// Store the backup data
 		if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "could not store database backup", "err", err)
+			k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
 		}
 
 		// Cache hardware and rollout data for future checks
