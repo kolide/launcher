@@ -11,9 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type intuneCheckup struct {
@@ -38,10 +35,6 @@ func (i *intuneCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		i.summary += fmt.Sprintf("Failed to collect Intune install logs: %v. ", err)
 	}
 
-	if err := diagnostics(ctx, zipWriter); err != nil {
-		i.summary += fmt.Sprintf("Failed to collect Intune diagnostics: %v. ", err)
-	}
-
 	i.summary = strings.TrimSpace(i.summary)
 
 	return nil
@@ -52,6 +45,9 @@ func agentLogs(zipWriter *zip.Writer) error {
 	matches, err := filepath.Glob(agentLogsPathPattern)
 	if err != nil {
 		return fmt.Errorf("globbing for agent logs at %s: %w", agentLogsPathPattern, err)
+	}
+	if len(matches) == 0 {
+		return fmt.Errorf("no intune agent logs found at %s", agentLogsPathPattern)
 	}
 
 	for _, match := range matches {
@@ -69,34 +65,14 @@ func installLogs(zipWriter *zip.Writer) error {
 	if err != nil {
 		return fmt.Errorf("globbing for install logs at %s: %w", installLogsPathPattern, err)
 	}
+	if len(matches) == 0 {
+		return fmt.Errorf("no intune install logs found at %s", installLogsPathPattern)
+	}
 
 	for _, match := range matches {
 		if err := addFileToZip(zipWriter, match); err != nil {
 			return fmt.Errorf("adding %s to zip: %w", match, err)
 		}
-	}
-
-	return nil
-}
-
-func diagnostics(ctx context.Context, zipWriter *zip.Writer) error {
-	tempDir, err := agent.MkdirTemp("mdm-diagnostics")
-	if err != nil {
-		return fmt.Errorf("creating temp dir: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	tempOutfile := filepath.Join(tempDir, "MdmDiagnosticReport.zip")
-
-	cmd, err := allowedcmd.MdmDiagnosticsTool(ctx, "-zip", tempOutfile)
-	if cmd == nil {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("creating diagnostics command: %w", err)
-	}
-
-	if err := addFileToZip(zipWriter, tempOutfile); err != nil {
-		return fmt.Errorf("adding diagnostic report to zip: %w", err)
 	}
 
 	return nil
