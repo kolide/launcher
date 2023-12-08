@@ -31,6 +31,10 @@ func Ipconfig(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "ipconfig.exe"), arg...)
 }
 
+func MdmDiagnosticsTool(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "mdmdiagnosticstool.exe"), arg...)
+}
+
 func Powercfg(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "powercfg.exe"), arg...)
 }

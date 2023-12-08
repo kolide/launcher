@@ -119,6 +119,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&osqConfigConflictCheckup{}, doctorSupported | flareSupported},
 		{&serverDataCheckup{k: k}, doctorSupported | flareSupported | logSupported},
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
+		{&intuneCheckup{}, flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
