@@ -209,9 +209,15 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 		deviceInfo[key] = string(v)
 	}
 
+	var deviceInfoKvps []any
+	for k, v := range deviceInfo {
+		deviceInfoKvps = append(deviceInfoKvps, k, v)
+	}
+
+	ls.shippingLogger = log.With(ls.shippingLogger, deviceInfoKvps...)
+
 	var additionalSlogAttrs []slog.Attr
 	for k, v := range deviceInfo {
-		ls.shippingLogger = log.With(ls.shippingLogger, k, v)
 		additionalSlogAttrs = append(additionalSlogAttrs, slog.String(k, v))
 	}
 
