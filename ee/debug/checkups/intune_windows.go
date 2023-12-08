@@ -95,7 +95,11 @@ func diagnostics(ctx context.Context, zipWriter *zip.Writer) error {
 		return fmt.Errorf("creating diagnostics command: %w", err)
 	}
 
-	return addFileToZip(zipWriter, tempOutfile)
+	if err := addFileToZip(zipWriter, tempOutfile); err != nil {
+		return fmt.Errorf("adding diagnostic report to zip: %w", err)
+	}
+
+	return nil
 }
 
 func (i *intuneCheckup) ExtraFileName() string {
