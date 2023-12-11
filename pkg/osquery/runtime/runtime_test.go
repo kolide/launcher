@@ -19,6 +19,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -28,6 +29,7 @@ import (
 	osquery "github.com/osquery/osquery-go"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,10 +158,22 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		stdout:                os.Stdout,
 		stderr:                os.Stderr,
 	}
-	cmd, err := osqOpts.createOsquerydCommand(osquerydPath, paths)
+	k := typesMocks.NewKnapsack(t)
+	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+
+	i := newInstance()
+	i.opts = *osqOpts
+	i.knapsack = k
+
+	cmd, err := i.createOsquerydCommand(osquerydPath, paths)
 	require.NoError(t, err)
 	require.Equal(t, os.Stderr, cmd.Stderr)
 	require.Equal(t, os.Stdout, cmd.Stdout)
+
+	k.AssertExpectations(t)
 }
 
 func TestCreateOsqueryCommandWithFlags(t *testing.T) {
@@ -167,7 +181,17 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	osqOpts := &osqueryOptions{
 		osqueryFlags: []string{"verbose=false", "windows_event_channels=foo,bar"},
 	}
-	cmd, err := osqOpts.createOsquerydCommand(
+	k := typesMocks.NewKnapsack(t)
+	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+
+	i := newInstance()
+	i.opts = *osqOpts
+	i.knapsack = k
+
+	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinaryDirectory,
 		&osqueryFilePaths{},
 	)
@@ -182,6 +206,104 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 		[]string{"--verbose=false", "--windows_event_channels=foo,bar"},
 		cmd.Args[len(cmd.Args)-2-nonOverridableFlagsCount:len(cmd.Args)-nonOverridableFlagsCount],
 	)
+
+	k.AssertExpectations(t)
+}
+
+func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testing.T) {
+	t.Parallel()
+
+	osqOpts := &osqueryOptions{}
+	k := typesMocks.NewKnapsack(t)
+	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+
+	i := newInstance()
+	i.opts = *osqOpts
+	i.knapsack = k
+
+	cmd, err := i.createOsquerydCommand(
+		testOsqueryBinaryDirectory,
+		&osqueryFilePaths{},
+	)
+	require.NoError(t, err)
+
+	watchdogMemoryLimitMBFound := false
+	watchdogUtilizationLimitPercentFound := false
+	watchdogDelaySecFound := false
+	for _, a := range cmd.Args {
+		if strings.Contains(a, "disable_watchdog") {
+			t.Error("disable_watchdog flag set")
+			t.FailNow()
+		}
+
+		if a == "--watchdog_memory_limit=150" {
+			watchdogMemoryLimitMBFound = true
+			continue
+		}
+
+		if a == "--watchdog_utilization_limit=20" {
+			watchdogUtilizationLimitPercentFound = true
+			continue
+		}
+
+		if a == "--watchdog_delay=120" {
+			watchdogDelaySecFound = true
+			continue
+		}
+	}
+
+	require.True(t, watchdogMemoryLimitMBFound, "watchdog memory limit not set")
+	require.True(t, watchdogUtilizationLimitPercentFound, "watchdog CPU limit not set")
+	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
+
+	k.AssertExpectations(t)
+}
+
+func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testing.T) {
+	t.Parallel()
+
+	osqOpts := &osqueryOptions{}
+	k := typesMocks.NewKnapsack(t)
+	k.On("EnableWatchdog").Return(false)
+
+	i := newInstance()
+	i.opts = *osqOpts
+	i.knapsack = k
+
+	cmd, err := i.createOsquerydCommand(
+		testOsqueryBinaryDirectory,
+		&osqueryFilePaths{},
+	)
+	require.NoError(t, err)
+
+	disableWatchdogFound := false
+	for _, a := range cmd.Args {
+		if strings.Contains(a, "watchdog_memory_limit") {
+			t.Error("watchdog_memory_limit flag set")
+			t.FailNow()
+		}
+
+		if strings.Contains(a, "watchdog_utilization_limit") {
+			t.Error("watchdog_utilization_limit flag set")
+			t.FailNow()
+		}
+
+		if strings.Contains(a, "watchdog_delay") {
+			t.Error("watchdog_delay flag set")
+			t.FailNow()
+		}
+
+		if strings.Contains(a, "disable_watchdog") {
+			disableWatchdogFound = true
+		}
+	}
+
+	require.True(t, disableWatchdogFound, "watchdog disabled not set")
+
+	k.AssertExpectations(t)
 }
 
 // downloadOsqueryInBinDir downloads osqueryd. This allows the test
@@ -192,7 +314,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
 	}
 
-	outputFile := filepath.Join(binDirectory, "osqueryd") //, target.PlatformBinaryName("osqueryd"))
+	outputFile := filepath.Join(binDirectory, "osqueryd")
 	cacheDir := "/tmp"
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
@@ -215,6 +337,7 @@ func TestBadBinaryPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -224,6 +347,8 @@ func TestBadBinaryPath(t *testing.T) {
 	)
 	assert.Error(t, err)
 	assert.Nil(t, runner)
+
+	k.AssertExpectations(t)
 }
 
 func TestWithOsqueryFlags(t *testing.T) {
@@ -234,6 +359,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -244,6 +372,87 @@ func TestWithOsqueryFlags(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
+}
+
+func TestFlagsChanged(t *testing.T) {
+	t.Parallel()
+
+	rootDirectory, rmRootDirectory, err := osqueryTempDir()
+	require.NoError(t, err)
+	defer rmRootDirectory()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	// First, it should return false, then on the next call, it should return true
+	k.On("EnableWatchdog").Return(false).Once()
+	k.On("EnableWatchdog").Return(true).Once()
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	_, cancel := context.WithCancel(context.TODO())
+	runner, err := LaunchInstance(
+		cancel,
+		WithKnapsack(k),
+		WithRootDirectory(rootDirectory),
+		WithOsquerydBinary(testOsqueryBinaryDirectory),
+		WithOsqueryFlags([]string{"verbose=false"}),
+	)
+	require.NoError(t, err)
+
+	// Confirm watchdog is disabled
+	watchdogDisabled := false
+	for _, a := range runner.instance.cmd.Args {
+		if strings.Contains(a, "disable_watchdog") {
+			watchdogDisabled = true
+			break
+		}
+	}
+	require.True(t, watchdogDisabled, "instance not set up with watchdog disabled")
+
+	startingInstance := runner.instance
+
+	runner.FlagsChanged(keys.EnableWatchdog)
+
+	// Wait for the instance to restart
+	time.Sleep(2 * time.Second)
+	waitHealthy(t, runner)
+
+	// Now confirm that the instance is new
+	require.NotEqual(t, startingInstance, runner.instance, "instance not replaced")
+
+	// Confirm osquery watchdog is now enabled
+	watchdogMemoryLimitMBFound := false
+	watchdogUtilizationLimitPercentFound := false
+	watchdogDelaySecFound := false
+	for _, a := range runner.instance.cmd.Args {
+		if strings.Contains(a, "disable_watchdog") {
+			t.Error("disable_watchdog flag set")
+			t.FailNow()
+		}
+
+		if a == "--watchdog_memory_limit=150" {
+			watchdogMemoryLimitMBFound = true
+			continue
+		}
+
+		if a == "--watchdog_utilization_limit=20" {
+			watchdogUtilizationLimitPercentFound = true
+			continue
+		}
+
+		if a == "--watchdog_delay=120" {
+			watchdogDelaySecFound = true
+			continue
+		}
+	}
+
+	require.True(t, watchdogMemoryLimitMBFound, "watchdog memory limit not set")
+	require.True(t, watchdogUtilizationLimitPercentFound, "watchdog CPU limit not set")
+	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
+
+	k.AssertExpectations(t)
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
@@ -264,6 +473,9 @@ func TestSimplePath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -289,6 +501,9 @@ func TestMultipleShutdowns(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -341,6 +556,9 @@ func TestOsqueryDies(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -428,6 +646,9 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
@@ -464,6 +685,9 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -510,6 +734,12 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err = LaunchInstance(
 		cancel,

@@ -76,12 +76,6 @@ func WithUpdateChannel(channel string) OsqueryInstanceOption {
 	}
 }
 
-func WithEnableWatchdog(enableWatchdog bool) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.enableWatchdog = enableWatchdog
-	}
-}
-
 // WithExtensionSocketPath is a functional option which allows the user to
 // define the path of the extension socket path that osqueryd will open to
 // communicate with other processes.
@@ -324,7 +318,6 @@ type osqueryOptions struct {
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
 	autoloadedExtensions  []string
-	enableWatchdog        bool
 	extensionSocketPath   string
 	enrollSecretPath      string
 	loggerPluginFlag      string
@@ -465,11 +458,11 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
-func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
+func (o *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	args := []string{
-		fmt.Sprintf("--logger_plugin=%s", opts.loggerPluginFlag),
-		fmt.Sprintf("--distributed_plugin=%s", opts.distributedPluginFlag),
+		fmt.Sprintf("--logger_plugin=%s", o.opts.loggerPluginFlag),
+		fmt.Sprintf("--distributed_plugin=%s", o.opts.distributedPluginFlag),
 		"--disable_distributed=false",
 		"--distributed_interval=5",
 		"--pack_delimiter=:",
@@ -477,49 +470,54 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		"--force=true",
 		"--utc",
 	}
-	if !opts.enableWatchdog {
+
+	if o.knapsack != nil && o.knapsack.EnableWatchdog() {
+		args = append(args, fmt.Sprintf("--watchdog_memory_limit=%d", o.knapsack.WatchdogMemoryLimitMB()))
+		args = append(args, fmt.Sprintf("--watchdog_utilization_limit=%d", o.knapsack.WatchdogUtilizationLimitPercent()))
+		args = append(args, fmt.Sprintf("--watchdog_delay=%d", o.knapsack.WatchdogDelaySec()))
+	} else {
 		args = append(args, "--disable_watchdog")
 	}
+
 	cmd := exec.Command( //nolint:forbidigo // We trust the autoupdate library to find the correct path
 		osquerydBinary,
 		args...,
 	)
 
-	if opts.verbose {
+	if o.opts.verbose {
 		cmd.Args = append(cmd.Args, "--verbose")
 	}
 
-	if opts.tlsHostname != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", opts.tlsHostname))
+	if o.opts.tlsHostname != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", o.opts.tlsHostname))
 	}
 
-	if opts.tlsConfigEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--config_tls_endpoint=%s", opts.tlsConfigEndpoint))
-
+	if o.opts.tlsConfigEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--config_tls_endpoint=%s", o.opts.tlsConfigEndpoint))
 	}
 
-	if opts.tlsEnrollEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", opts.tlsEnrollEndpoint))
+	if o.opts.tlsEnrollEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", o.opts.tlsEnrollEndpoint))
 	}
 
-	if opts.tlsLoggerEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", opts.tlsLoggerEndpoint))
+	if o.opts.tlsLoggerEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", o.opts.tlsLoggerEndpoint))
 	}
 
-	if opts.tlsDistReadEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", opts.tlsDistReadEndpoint))
+	if o.opts.tlsDistReadEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", o.opts.tlsDistReadEndpoint))
 	}
 
-	if opts.tlsDistWriteEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", opts.tlsDistWriteEndpoint))
+	if o.opts.tlsDistWriteEndpoint != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", o.opts.tlsDistWriteEndpoint))
 	}
 
-	if opts.tlsServerCerts != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", opts.tlsServerCerts))
+	if o.opts.tlsServerCerts != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", o.opts.tlsServerCerts))
 	}
 
-	if opts.enrollSecretPath != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", opts.enrollSecretPath))
+	if o.opts.enrollSecretPath != "" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", o.opts.enrollSecretPath))
 	}
 
 	// Configs aren't expected to change often, so refresh configs
@@ -536,16 +534,16 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 	}
 
 	cmd.Args = append(cmd.Args, platformArgs()...)
-	if opts.stdout != nil {
-		cmd.Stdout = opts.stdout
+	if o.opts.stdout != nil {
+		cmd.Stdout = o.opts.stdout
 	}
-	if opts.stderr != nil {
-		cmd.Stderr = opts.stderr
+	if o.opts.stderr != nil {
+		cmd.Stderr = o.opts.stderr
 	}
 
 	// Apply user-provided flags last so that they can override other flags set
 	// by Launcher (besides the flags below)
-	for _, flag := range opts.osqueryFlags {
+	for _, flag := range o.opts.osqueryFlags {
 		cmd.Args = append(cmd.Args, "--"+flag)
 	}
 
@@ -559,8 +557,8 @@ func (opts *osqueryOptions) createOsquerydCommand(osquerydBinary string, paths *
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
-		fmt.Sprintf("--config_plugin=%s", opts.configPluginFlag),
-		fmt.Sprintf("--extensions_require=%s", strings.Join(opts.requiredExtensions(), ",")),
+		fmt.Sprintf("--config_plugin=%s", o.opts.configPluginFlag),
+		fmt.Sprintf("--extensions_require=%s", strings.Join(o.opts.requiredExtensions(), ",")),
 	)
 
 	// On darwin, run osquery using a magic macOS variable to ensure we
