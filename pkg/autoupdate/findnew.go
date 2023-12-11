@@ -234,12 +234,12 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 		return fullBinaryPath
 	}
 
-	if err := CheckExecutable(ctx, fullBinaryPath, "--version"); err == nil {
-		return fullBinaryPath
+	if err := CheckExecutable(ctx, fullBinaryPath, "--version"); err != nil {
+		level.Debug(logger).Log("msg", "fullBinaryPath not executable. Returning nil", "err", err)
+		return ""
 	}
 
-	level.Debug(logger).Log("msg", "fullBinaryPath not executable. Returning nil")
-	return ""
+	return fullBinaryPath
 }
 
 // getUpdateDir returns the expected update path for a given
@@ -382,16 +382,16 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 		// Set env, this should prevent launcher for fork-bombing
 		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 
-		execErr := cmd.Run()
+		out, execErr := cmd.CombinedOutput()
 		if execErr != nil && errors.Is(execErr, syscall.ETXTBSY) {
 			continue
 		}
 
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return fmt.Errorf("timeout when checking executable: %w", ctx.Err())
 		}
 
-		return supressRoutineErrors(execErr)
+		return supressRoutineErrors(execErr, out)
 	}
 
 	return fmt.Errorf("could not exec %s despite retries due to text file busy", potentialBinary)
@@ -401,7 +401,7 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 // program that has executed, and then exited, vs one that's execution
 // was entirely unsuccessful. This differentiation allows us to
 // detect, and recover, from corrupt updates vs something in-app.
-func supressRoutineErrors(err error) error {
+func supressRoutineErrors(err error, combinedOutput []byte) error {
 	if err == nil {
 		return nil
 	}
@@ -415,5 +415,5 @@ func supressRoutineErrors(err error) error {
 			return nil
 		}
 	}
-	return err
+	return fmt.Errorf("exec error: output: `%s`, err: %w", string(combinedOutput), err)
 }
