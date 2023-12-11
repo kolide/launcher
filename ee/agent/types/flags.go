@@ -122,6 +122,22 @@ type Flags interface {
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
 
+	// EnableWatchdog enables the osquery watchdog
+	SetEnableWatchdog(enable bool) error
+	EnableWatchdog() bool
+
+	// WatchdogDelaySec sets the number of seconds the watchdog will delay on startup before running
+	SetWatchdogDelaySec(sec int) error
+	WatchdogDelaySec() int
+
+	// WatchdogMemoryLimitMB sets the memory limit on osquery processes
+	SetWatchdogMemoryLimitMB(limit int) error
+	WatchdogMemoryLimitMB() int
+
+	// WatchdogUtilizationLimitPercent sets the CPU utilization limit on osquery processes
+	SetWatchdogUtilizationLimitPercent(limit int) error
+	WatchdogUtilizationLimitPercent() int
+
 	// OsqueryFlags defines additional flags to pass to osquery (possibly
 	// overriding Launcher defaults)
 	OsqueryFlags() []string
