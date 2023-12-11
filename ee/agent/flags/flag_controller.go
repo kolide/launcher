@@ -356,6 +356,46 @@ func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
 }
 
+func (fc *FlagController) SetEnableWatchdog(enable bool) error {
+	return fc.setControlServerValue(keys.EnableWatchdog, boolToBytes(enable))
+}
+func (fc *FlagController) EnableWatchdog() bool {
+	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.EnableWatchdog)).get(fc.getControlServerValue(keys.EnableWatchdog))
+}
+
+func (fc *FlagController) SetWatchdogDelaySec(sec int) error {
+	return fc.setControlServerValue(keys.WatchdogDelaySec, intToBytes(sec))
+}
+func (fc *FlagController) WatchdogDelaySec() int {
+	return NewIntFlagValue(fc.logger, keys.WatchdogDelaySec,
+		WithIntValueDefault(fc.cmdLineOpts.WatchdogDelaySec),
+		WithIntValueMin(0),
+		WithIntValueMax(600),
+	).get(fc.getControlServerValue(keys.WatchdogDelaySec))
+}
+
+func (fc *FlagController) SetWatchdogMemoryLimitMB(limit int) error {
+	return fc.setControlServerValue(keys.WatchdogMemoryLimitMB, intToBytes(limit))
+}
+func (fc *FlagController) WatchdogMemoryLimitMB() int {
+	return NewIntFlagValue(fc.logger, keys.WatchdogMemoryLimitMB,
+		WithIntValueDefault(fc.cmdLineOpts.WatchdogMemoryLimitMB),
+		WithIntValueMin(100),
+		WithIntValueMax(10000), // 10 GB appears to be the max that osquery will accept
+	).get(fc.getControlServerValue(keys.WatchdogMemoryLimitMB))
+}
+
+func (fc *FlagController) SetWatchdogUtilizationLimitPercent(limit int) error {
+	return fc.setControlServerValue(keys.WatchdogUtilizationLimitPercent, intToBytes(limit))
+}
+func (fc *FlagController) WatchdogUtilizationLimitPercent() int {
+	return NewIntFlagValue(fc.logger, keys.WatchdogUtilizationLimitPercent,
+		WithIntValueDefault(fc.cmdLineOpts.WatchdogUtilizationLimitPercent),
+		WithIntValueMin(5),
+		WithIntValueMax(100),
+	).get(fc.getControlServerValue(keys.WatchdogUtilizationLimitPercent))
+}
+
 func (fc *FlagController) OsqueryFlags() []string {
 	return fc.cmdLineOpts.OsqueryFlags
 }
