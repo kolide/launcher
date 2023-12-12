@@ -368,7 +368,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		insecureControlTLS = true
 		*flKolideHosted = true
 
-	case *flKolideServerURL == "localhost:3000" || *flIAmBreakingEELicense:
+	case *flKolideServerURL == "localhost:3000" || *flKolideServerURL == "app.kolide.test:80" || *flIAmBreakingEELicense:
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
 		*flKolideHosted = true
