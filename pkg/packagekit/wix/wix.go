@@ -28,7 +28,7 @@ type wixTool struct {
 	cleanDirs       []string   // directories to rm on cleanup
 	ui              bool       // whether or not to include a ui
 	extraFiles      []extraFile
-	identifier      string     // the package identifier used for directory path creation (e.g. kolide-k2)
+	identifier      string // the package identifier used for directory path creation (e.g. kolide-k2)
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
