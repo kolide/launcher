@@ -222,9 +222,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
 		flWatchdogEnabled                 = flagset.Bool("watchdog_enabled", false, "Whether to enable the osquery watchdog")
-		flWatchdogDelaySec                = flagset.Int("watchdog_delay_sec", 60, "How many seconds to delay running watchdog after osquery startup")
-		flWatchdogMemoryLimitMB           = flagset.Int("watchdog_memory_limit_mb", 200, "osquery memory utilization limit in MB")
-		flWatchdogUtilizationLimitPercent = flagset.Int("watchdog_utilization_limit_percent", 10, "osquery CPU utilization limit in percent")
+		flWatchdogDelaySec                = flagset.Int("watchdog_delay_sec", 120, "How many seconds to delay running watchdog after osquery startup")
+		flWatchdogMemoryLimitMB           = flagset.Int("watchdog_memory_limit_mb", 600, "osquery memory utilization limit in MB")
+		flWatchdogUtilizationLimitPercent = flagset.Int("watchdog_utilization_limit_percent", 50, "osquery CPU utilization limit in percent")
 		flRootDirectory                   = flagset.String("root_directory", DefaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
 		flRootPEM                         = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
 		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
@@ -368,7 +368,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		insecureControlTLS = true
 		*flKolideHosted = true
 
-	case *flKolideServerURL == "localhost:3000" || *flIAmBreakingEELicense:
+	case *flKolideServerURL == "localhost:3000" || *flKolideServerURL == "app.kolide.test:80" || *flIAmBreakingEELicense:
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
 		*flKolideHosted = true

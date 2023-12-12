@@ -265,9 +265,9 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		AutoloadedExtensions:            []string{"some-extension.ext"},
 		DelayStart:                      0 * time.Second,
 		WatchdogEnabled:                 false,
-		WatchdogDelaySec:                60,
-		WatchdogMemoryLimitMB:           200,
-		WatchdogUtilizationLimitPercent: 10,
+		WatchdogDelaySec:                120,
+		WatchdogMemoryLimitMB:           600,
+		WatchdogUtilizationLimitPercent: 50,
 	}
 
 	return args, opts
