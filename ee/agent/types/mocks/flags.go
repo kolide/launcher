@@ -244,20 +244,6 @@ func (_m *Flags) EnableInitialRunner() bool {
 	return r0
 }
 
-// EnableWatchdog provides a mock function with given fields:
-func (_m *Flags) EnableWatchdog() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // EnrollSecret provides a mock function with given fields:
 func (_m *Flags) EnrollSecret() string {
 	ret := _m.Called()
@@ -865,20 +851,6 @@ func (_m *Flags) SetDisableTraceIngestTLS(enabled bool) error {
 	return r0
 }
 
-// SetEnableWatchdog provides a mock function with given fields: enable
-func (_m *Flags) SetEnableWatchdog(enable bool) error {
-	ret := _m.Called(enable)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enable)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetExportTraces provides a mock function with given fields: enabled
 func (_m *Flags) SetExportTraces(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -1202,6 +1174,20 @@ func (_m *Flags) SetWatchdogDelaySec(sec int) error {
 	return r0
 }
 
+// SetWatchdogEnabled provides a mock function with given fields: enable
+func (_m *Flags) SetWatchdogEnabled(enable bool) error {
+	ret := _m.Called(enable)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enable)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetWatchdogMemoryLimitMB provides a mock function with given fields: limit
 func (_m *Flags) SetWatchdogMemoryLimitMB(limit int) error {
 	ret := _m.Called(limit)
@@ -1337,6 +1323,20 @@ func (_m *Flags) WatchdogDelaySec() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// WatchdogEnabled provides a mock function with given fields:
+func (_m *Flags) WatchdogEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

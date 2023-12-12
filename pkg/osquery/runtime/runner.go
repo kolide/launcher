@@ -85,7 +85,7 @@ func (r *Runner) Start(cancel context.CancelFunc) error {
 		return fmt.Errorf("starting instance: %w", err)
 	}
 	r.instance.knapsack.RegisterChangeObserver(r,
-		keys.EnableWatchdog, keys.WatchdogMemoryLimitMB, keys.WatchdogUtilizationLimitPercent, keys.WatchdogDelaySec,
+		keys.WatchdogEnabled, keys.WatchdogMemoryLimitMB, keys.WatchdogUtilizationLimitPercent, keys.WatchdogDelaySec,
 	)
 
 	go func() {

@@ -471,7 +471,7 @@ func (o *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		"--utc",
 	}
 
-	if o.knapsack != nil && o.knapsack.EnableWatchdog() {
+	if o.knapsack != nil && o.knapsack.WatchdogEnabled() {
 		args = append(args, fmt.Sprintf("--watchdog_memory_limit=%d", o.knapsack.WatchdogMemoryLimitMB()))
 		args = append(args, fmt.Sprintf("--watchdog_utilization_limit=%d", o.knapsack.WatchdogUtilizationLimitPercent()))
 		args = append(args, fmt.Sprintf("--watchdog_delay=%d", o.knapsack.WatchdogDelaySec()))

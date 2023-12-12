@@ -264,7 +264,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		UpdateChannel:                   "stable",
 		AutoloadedExtensions:            []string{"some-extension.ext"},
 		DelayStart:                      0 * time.Second,
-		EnableWatchdog:                  false,
+		WatchdogEnabled:                 false,
 		WatchdogDelaySec:                120,
 		WatchdogMemoryLimitMB:           600,
 		WatchdogUtilizationLimitPercent: 50,

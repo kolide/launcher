@@ -159,7 +159,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		stderr:                os.Stderr,
 	}
 	k := typesMocks.NewKnapsack(t)
-	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -182,7 +182,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 		osqueryFlags: []string{"verbose=false", "windows_event_channels=foo,bar"},
 	}
 	k := typesMocks.NewKnapsack(t)
-	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -215,7 +215,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 
 	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
-	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -267,7 +267,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 
 	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 
 	i := newInstance()
 	i.opts = *osqOpts
@@ -337,7 +337,7 @@ func TestBadBinaryPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	_, cancel := context.WithCancel(context.TODO())
 	runner, err := LaunchInstance(
 		cancel,
@@ -359,7 +359,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	_, cancel := context.WithCancel(context.TODO())
@@ -384,8 +384,8 @@ func TestFlagsChanged(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	// First, it should return false, then on the next call, it should return true
-	k.On("EnableWatchdog").Return(false).Once()
-	k.On("EnableWatchdog").Return(true).Once()
+	k.On("WatchdogEnabled").Return(false).Once()
+	k.On("WatchdogEnabled").Return(true).Once()
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -413,7 +413,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instance
 
-	runner.FlagsChanged(keys.EnableWatchdog)
+	runner.FlagsChanged(keys.WatchdogEnabled)
 
 	// Wait for the instance to restart
 	time.Sleep(2 * time.Second)
@@ -473,7 +473,7 @@ func TestSimplePath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	_, cancel := context.WithCancel(context.TODO())
@@ -501,7 +501,7 @@ func TestMultipleShutdowns(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	_, cancel := context.WithCancel(context.TODO())
@@ -556,7 +556,7 @@ func TestOsqueryDies(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	_, cancel := context.WithCancel(context.TODO())
@@ -646,7 +646,7 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
@@ -685,7 +685,7 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(false)
+	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	_, cancel := context.WithCancel(context.TODO())
@@ -734,7 +734,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("EnableWatchdog").Return(true)
+	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
