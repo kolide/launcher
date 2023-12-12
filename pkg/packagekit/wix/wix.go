@@ -289,7 +289,7 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 		"-out", "AppData.wxs",
 	)
 
-	return nil
+	return err
 }
 
 // heat invokes wix's heat command. This examines a directory and
