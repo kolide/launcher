@@ -28,6 +28,7 @@ type wixTool struct {
 	cleanDirs       []string   // directories to rm on cleanup
 	ui              bool       // whether or not to include a ui
 	extraFiles      []extraFile
+	identifier      string     // the package identifier used for directory path creation (e.g. kolide-k2)
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
@@ -104,12 +105,12 @@ func SkipCleanup() WixOpt {
 // New takes a packageRoot of files, and a wxsContent of xml wix
 // configuration, and will return a struct with methods for building
 // packages with.
-func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
+func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
 	wo := &wixTool{
 		wixPath:     FindWixInstall(),
 		packageRoot: packageRoot,
-
-		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
+		identifier:  identifier,
+		execCC:      exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	for _, opt := range wixOpts {
@@ -255,7 +256,8 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 
 	wo.cleanDirs = append(wo.cleanDirs, wo.packageDataRoot)
 
-	dataFilesPath := filepath.Join(wo.packageDataRoot, "Launcher-kolide-k2", "data")
+	fullIdentifier := fmt.Sprintf("Launcher-%s", wo.identifier)
+	dataFilesPath := filepath.Join(wo.packageDataRoot, fullIdentifier, "data")
 
 	if err := os.MkdirAll(dataFilesPath, fsutil.DirMode); err != nil {
 		return fmt.Errorf("create base data dir error for wix harvest: %w", err)
