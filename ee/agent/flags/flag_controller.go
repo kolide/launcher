@@ -356,11 +356,11 @@ func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
 }
 
-func (fc *FlagController) SetEnableWatchdog(enable bool) error {
-	return fc.setControlServerValue(keys.EnableWatchdog, boolToBytes(enable))
+func (fc *FlagController) SetWatchdogEnabled(enable bool) error {
+	return fc.setControlServerValue(keys.WatchdogEnabled, boolToBytes(enable))
 }
-func (fc *FlagController) EnableWatchdog() bool {
-	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.EnableWatchdog)).get(fc.getControlServerValue(keys.EnableWatchdog))
+func (fc *FlagController) WatchdogEnabled() bool {
+	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.WatchdogEnabled)).get(fc.getControlServerValue(keys.WatchdogEnabled))
 }
 
 func (fc *FlagController) SetWatchdogDelaySec(sec int) error {

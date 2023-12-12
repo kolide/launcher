@@ -101,8 +101,8 @@ type Options struct {
 	DebugLogFile string
 	// OsqueryVerbose puts osquery into verbose mode
 	OsqueryVerbose bool
-	// EnableWatchdog enables the osquery watchdog
-	EnableWatchdog bool
+	// WatchdogEnabled enables the osquery watchdog
+	WatchdogEnabled bool
 	// WatchdogDelaySec sets the number of seconds the watchdog will delay on startup before running
 	WatchdogDelaySec int
 	// WatchdogMemoryLimitMB sets the memory limit on osquery processes
@@ -221,7 +221,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
-		flEnableWatchdog                  = flagset.Bool("enable_watchdog", false, "Whether to enable the osquery watchdog")
+		flWatchdogEnabled                 = flagset.Bool("watchdog_enabled", false, "Whether to enable the osquery watchdog")
 		flWatchdogDelaySec                = flagset.Int("watchdog_delay_sec", 60, "How many seconds to delay running watchdog after osquery startup")
 		flWatchdogMemoryLimitMB           = flagset.Int("watchdog_memory_limit_mb", 200, "osquery memory utilization limit in MB")
 		flWatchdogUtilizationLimitPercent = flagset.Int("watchdog_utilization_limit_percent", 10, "osquery CPU utilization limit in percent")
@@ -389,7 +389,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		DisableControlTLS:                  disableControlTLS,
 		InsecureControlTLS:                 insecureControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
-		EnableWatchdog:                     *flEnableWatchdog,
+		WatchdogEnabled:                    *flWatchdogEnabled,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
