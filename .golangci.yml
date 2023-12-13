@@ -53,6 +53,8 @@ linters-settings:
           - "preserveScope"
       - name: package-comments
         disabled: false
+      - name: context-as-argument
+        disabled: false
 
 issues:
   exclude-rules:
