@@ -101,6 +101,15 @@ type Options struct {
 	DebugLogFile string
 	// OsqueryVerbose puts osquery into verbose mode
 	OsqueryVerbose bool
+	// WatchdogEnabled enables the osquery watchdog
+	WatchdogEnabled bool
+	// WatchdogDelaySec sets the number of seconds the watchdog will delay on startup before running
+	WatchdogDelaySec int
+	// WatchdogMemoryLimitMB sets the memory limit on osquery processes
+	WatchdogMemoryLimitMB int
+	// WatchdogUtilizationLimitPercent sets the CPU utilization limit on osquery processes
+	WatchdogUtilizationLimitPercent int
+
 	// OsqueryFlags defines additional flags to pass to osquery (possibly
 	// overriding Launcher defaults)
 	OsqueryFlags []string
@@ -200,30 +209,34 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 	var (
 		// Primary options
-		flAutoloadedExtensions           ArrayFlags
-		flCertPins                       = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
-		flControlRequestInterval         = flagset.Duration("control_request_interval", 60*time.Second, "The interval at which the control server requests will be made")
-		flEnrollSecret                   = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
-		flEnrollSecretPath               = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
-		flInitialRunner                  = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
-		flKolideServerURL                = flagset.String("hostname", "", "The hostname of the gRPC server")
-		flKolideHosted                   = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport                      = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
-		flLoggingInterval                = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
-		flOsquerydPath                   = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
-		flOsqueryHealthcheckStartupDelay = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
-		flRootDirectory                  = flagset.String("root_directory", DefaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
-		flRootPEM                        = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
-		flVersion                        = flagset.Bool("version", false, "Print Launcher version and exit")
-		flLogMaxBytesPerBatch            = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
-		flOsqueryFlags                   ArrayFlags // set below with flagset.Var
-		flCompactDbMaxTx                 = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
-		flConfigFilePath                 = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
-		flExportTraces                   = flagset.Bool("export_traces", false, "Whether to export traces")
-		flTraceSamplingRate              = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
-		flLogIngestServerURL             = flagset.String("log_ingest_url", "", "Where to export logs")
-		flTraceIngestServerURL           = flagset.String("trace_ingest_url", "", "Where to export traces")
-		flDisableIngestTLS               = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
+		flAutoloadedExtensions            ArrayFlags
+		flCertPins                        = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
+		flControlRequestInterval          = flagset.Duration("control_request_interval", 60*time.Second, "The interval at which the control server requests will be made")
+		flEnrollSecret                    = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
+		flEnrollSecretPath                = flagset.String("enroll_secret_path", "", "Optionally, the path to your enrollment secret")
+		flInitialRunner                   = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
+		flKolideServerURL                 = flagset.String("hostname", "", "The hostname of the gRPC server")
+		flKolideHosted                    = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
+		flTransport                       = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
+		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
+		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
+		flWatchdogEnabled                 = flagset.Bool("watchdog_enabled", false, "Whether to enable the osquery watchdog")
+		flWatchdogDelaySec                = flagset.Int("watchdog_delay_sec", 120, "How many seconds to delay running watchdog after osquery startup")
+		flWatchdogMemoryLimitMB           = flagset.Int("watchdog_memory_limit_mb", 600, "osquery memory utilization limit in MB")
+		flWatchdogUtilizationLimitPercent = flagset.Int("watchdog_utilization_limit_percent", 50, "osquery CPU utilization limit in percent")
+		flRootDirectory                   = flagset.String("root_directory", DefaultRootDirectoryPath, "The location of the local database, pidfiles, etc.")
+		flRootPEM                         = flagset.String("root_pem", "", "Path to PEM file including root certificates to verify against")
+		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
+		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
+		flOsqueryFlags                    ArrayFlags // set below with flagset.Var
+		flCompactDbMaxTx                  = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
+		flConfigFilePath                  = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
+		flExportTraces                    = flagset.Bool("export_traces", false, "Whether to export traces")
+		flTraceSamplingRate               = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
+		flLogIngestServerURL              = flagset.String("log_ingest_url", "", "Where to export logs")
+		flTraceIngestServerURL            = flagset.String("trace_ingest_url", "", "Where to export traces")
+		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// osquery TLS endpoints
 		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
@@ -355,7 +368,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		insecureControlTLS = true
 		*flKolideHosted = true
 
-	case *flKolideServerURL == "localhost:3000" || *flIAmBreakingEELicense:
+	case *flKolideServerURL == "localhost:3000" || *flKolideServerURL == "app.kolide.test:80" || *flIAmBreakingEELicense:
 		controlServerURL = *flKolideServerURL
 		disableControlTLS = true
 		*flKolideHosted = true
@@ -376,6 +389,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		DisableControlTLS:                  disableControlTLS,
 		InsecureControlTLS:                 insecureControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
+		WatchdogEnabled:                    *flWatchdogEnabled,
 		EnrollSecret:                       *flEnrollSecret,
 		EnrollSecretPath:                   *flEnrollSecretPath,
 		ExportTraces:                       *flExportTraces,
@@ -410,6 +424,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		Transport:                          *flTransport,
 		UpdateChannel:                      updateChannel,
 		UpdateDirectory:                    *flUpdateDirectory,
+		WatchdogDelaySec:                   *flWatchdogDelaySec,
+		WatchdogMemoryLimitMB:              *flWatchdogMemoryLimitMB,
+		WatchdogUtilizationLimitPercent:    *flWatchdogUtilizationLimitPercent,
 	}
 
 	return opts, nil
