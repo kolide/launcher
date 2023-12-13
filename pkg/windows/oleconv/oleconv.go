@@ -3,7 +3,6 @@
 //
 // It is originally from
 // https://github.com/ceshihao/windowsupdate/blob/master/oleconv.go
-
 package oleconv
 
 import (
