@@ -55,6 +55,8 @@ linters-settings:
         disabled: false
       - name: context-as-argument
         disabled: false
+      - name: error-return
+        disabled: false
 
 issues:
   exclude-rules:
