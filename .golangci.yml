@@ -65,6 +65,8 @@ linters-settings:
         disabled: false
       - name: early-return
         disabled: false
+      - name: confusing-naming
+        disabled: false
 
 issues:
   exclude-rules:
