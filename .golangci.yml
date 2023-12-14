@@ -57,6 +57,10 @@ linters-settings:
         disabled: false
       - name: error-return
         disabled: false
+      - name: errorf
+        disabled: false
+      - name: unreachable-code
+        disabled: false
 
 issues:
   exclude-rules:
