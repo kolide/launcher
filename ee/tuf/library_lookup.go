@@ -81,8 +81,12 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
 	}
 
-	// If the config file wasn't set AND the other flags weren't set, fall back
-	// to looking in the default config flag file location
+	// If the config file wasn't set AND the other critical flags weren't set, fall back
+	// to looking in the default config flag file location. (The update directory and local
+	// development path are both optional flags and not critical to library lookup
+	// functionality.) We expect all the flags to be set either via config flag (flConfigFilePath
+	// is set) or via command line (flRootDirectory and flUpdateChannel are set), but do not
+	// support a mix of both for this usage.
 	if flConfigFilePath == "" && flRootDirectory == "" && flUpdateChannel == "" {
 		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(args))
 	}
