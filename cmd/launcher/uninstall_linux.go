@@ -49,6 +49,7 @@ func removeLauncher(ctx context.Context, identifier string) error {
 	pathsToRemove := []string{
 		fmt.Sprintf("/var/%s", identifier),
 		fmt.Sprintf("/etc/%s", identifier),
+		fmt.Sprintf("/usr/local/%s", identifier),
 	}
 
 	// Now remove the paths used for launcher/osquery binaries and app data
