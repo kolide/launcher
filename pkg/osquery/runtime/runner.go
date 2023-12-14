@@ -546,24 +546,22 @@ func (r *Runner) launchOsqueryInstance() error {
 				// better for a Limiter
 				maxHealthChecks := 5
 				for i := 1; i <= maxHealthChecks; i++ {
-					if err := r.Healthy(); err != nil {
-						if i == maxHealthChecks {
-							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
-							return fmt.Errorf("health check failed: %w", err)
-						}
-
-						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
-						time.Sleep(1 * time.Second)
-
-					} else {
-						// err was nil, clear failed
+					err := r.Healthy()
+					if err == nil {
+						// err was nil, clear failed attempts
 						if i > 1 {
 							level.Debug(o.logger).Log("msg", "Health check passed. Clearing error", "attempt", i)
 						}
-
 						break
 					}
 
+					if i == maxHealthChecks {
+						level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
+						return fmt.Errorf("health check failed: %w", err)
+					}
+
+					level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
+					time.Sleep(1 * time.Second)
 				}
 			}
 		}

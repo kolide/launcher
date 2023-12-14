@@ -1,6 +1,5 @@
 // Package runsimple is meant as a simple runner for osquery. It is initial just handling one off executions, but may
 // perhaps, expand to also handling daemonization
-
 package runsimple
 
 import (
