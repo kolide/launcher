@@ -63,6 +63,8 @@ linters-settings:
         disabled: false
       - name: unreachable-code
         disabled: false
+      - name: early-return
+        disabled: false
 
 issues:
   exclude-rules:
