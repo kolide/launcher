@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package main
 
 import (
@@ -31,7 +34,7 @@ func runSecureEnclave(args []string) error {
 	}
 }
 
-func createSecureEnclaveKey(challenge string) error {
+func createSecureEnclaveKey(kryptoChallengeB64 string) error {
 	// TODO: verify challenge
 
 	pubKey, err := secureenclave.CreateKey()
