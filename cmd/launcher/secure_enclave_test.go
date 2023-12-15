@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,13 +14,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 const (
 	testWrappedEnvVarKey = "SECURE_ENCLAVE_TEST_WRAPPED"
-	macOsAppResourceDir  = "./test_app_resources"
+	macOsAppResourceDir  = "../../ee/secureenclavesigner/test_app_resources"
 )
 
 // TestSecureEnclaveTestRunner creates a MacOS app with the binary of this packages tests, then signs the app with entitlements and runs the tests.
@@ -67,12 +71,12 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 	require.NoError(t, err, string(out))
 
 	// ensure the test ran
-	require.Contains(t, string(out), "PASS: TestSecureEnclaveCreateKey")
+	require.Contains(t, string(out), "PASS: TestSecureEnclaveCmd")
 	require.NotContains(t, string(out), "FAIL")
 	t.Log(string(out))
 }
 
-func TestSecureEnclaveCreateKey(t *testing.T) {
+func TestSecureEnclaveCmd(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv(testWrappedEnvVarKey) == "" {
@@ -87,21 +91,54 @@ func TestSecureEnclaveCreateKey(t *testing.T) {
 	}()
 
 	// create a pipe to capture stdout
-	r, w, err := os.Pipe()
+	pipeReader, pipeWriter, err := os.Pipe()
 	require.NoError(t, err)
 
-	os.Stdout = w
+	os.Stdout = pipeWriter
 
-	require.NoError(t, runSecureEnclave([]string{"create-key"}))
-	require.NoError(t, w.Close())
+	require.NoError(t, runSecureEnclave([]string{"create-key", "TODO:challenge"}))
+	require.NoError(t, pipeWriter.Close())
 
 	var buf bytes.Buffer
-	_, err = buf.ReadFrom(r)
+	_, err = buf.ReadFrom(pipeReader)
 	require.NoError(t, err)
 
-	// ensure the output is a valid public key
-	_, err = echelper.PublicB64DerToEcdsaKey(buf.Bytes())
-	require.NoError(t, err, "should be able to convert create-key results to a public key")
+	createKeyResponse := buf.Bytes()
+
+	pubKey, err := echelper.PublicB64DerToEcdsaKey(createKeyResponse)
+	require.NoError(t, err)
+	require.NotNil(t, pubKey, "should be able to get public key")
+
+	dataToSign := []byte(ulid.New())
+	digest, err := echelper.HashForSignature(dataToSign)
+	require.NoError(t, err)
+
+	signRequest := secureenclavesigner.SignRequest{
+		Challenge: []byte("TODO:challenge"),
+		Digest:    digest,
+		PubKey:    createKeyResponse,
+	}
+
+	signRequestMsgPack, err := msgpack.Marshal(signRequest)
+	require.NoError(t, err)
+
+	signRequestB64 := base64.StdEncoding.EncodeToString(signRequestMsgPack)
+
+	pipeReader, pipeWriter, err = os.Pipe()
+	require.NoError(t, err)
+
+	os.Stdout = pipeWriter
+	require.NoError(t, runSecureEnclave([]string{"sign", signRequestB64}))
+	require.NoError(t, pipeWriter.Close())
+
+	buf = bytes.Buffer{}
+	_, err = buf.ReadFrom(pipeReader)
+	require.NoError(t, err)
+
+	sig, err := base64.StdEncoding.DecodeString(string(buf.Bytes()))
+	require.NoError(t, err)
+
+	require.NoError(t, echelper.VerifySignature(pubKey, dataToSign, sig))
 }
 
 // #nosec G306 -- Need readable files
