@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -83,6 +84,10 @@ func (r *Runner) Start(cancel context.CancelFunc) error {
 	if err := r.launchOsqueryInstance(); err != nil {
 		return fmt.Errorf("starting instance: %w", err)
 	}
+	r.instance.knapsack.RegisterChangeObserver(r,
+		keys.WatchdogEnabled, keys.WatchdogMemoryLimitMB, keys.WatchdogUtilizationLimitPercent, keys.WatchdogDelaySec,
+	)
+
 	go func() {
 		// This loop waits for the completion of the async routines,
 		// and either restarts the instance (if Shutdown was not
@@ -168,6 +173,17 @@ func (r *Runner) Shutdown() error {
 		return fmt.Errorf("while shutting down instance: %w", err)
 	}
 	return nil
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb,
+// and watchdog_utilization_limit_percent.
+func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
+	level.Debug(r.instance.logger).Log("msg", "control server flags changed, restarting instance to apply", "flags", fmt.Sprintf("%+v", flagKeys))
+
+	if err := r.Restart(); err != nil {
+		level.Error(r.instance.logger).Log("msg", "could not restart osquery instance after flag change")
+	}
 }
 
 // Restart allows you to cleanly shutdown the current instance and launch a new
@@ -327,7 +343,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	o.cmd, err = o.opts.createOsquerydCommand(currentOsquerydBinaryPath, paths)
+	o.cmd, err = o.createOsquerydCommand(currentOsquerydBinaryPath, paths)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
@@ -530,24 +546,22 @@ func (r *Runner) launchOsqueryInstance() error {
 				// better for a Limiter
 				maxHealthChecks := 5
 				for i := 1; i <= maxHealthChecks; i++ {
-					if err := r.Healthy(); err != nil {
-						if i == maxHealthChecks {
-							level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
-							return fmt.Errorf("health check failed: %w", err)
-						}
-
-						level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
-						time.Sleep(1 * time.Second)
-
-					} else {
-						// err was nil, clear failed
+					err := r.Healthy()
+					if err == nil {
+						// err was nil, clear failed attempts
 						if i > 1 {
 							level.Debug(o.logger).Log("msg", "Health check passed. Clearing error", "attempt", i)
 						}
-
 						break
 					}
 
+					if i == maxHealthChecks {
+						level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
+						return fmt.Errorf("health check failed: %w", err)
+					}
+
+					level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
+					time.Sleep(1 * time.Second)
 				}
 			}
 		}

@@ -27,7 +27,7 @@ const (
 // ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
 // string representing the attribute key and the second in the pair is the attribute value.
 func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Request, trace.Span) {
-	ctx, span := startSpan(r.Context(), keyVals...)
+	ctx, span := startSpanWithExtractedAttributes(r.Context(), keyVals...)
 	return r.WithContext(ctx), span
 }
 
@@ -36,12 +36,12 @@ func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Reques
 // ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
 // string representing the attribute key and the second in the pair is the attribute value.
 func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
-	return startSpan(ctx, keyVals...)
+	return startSpanWithExtractedAttributes(ctx, keyVals...)
 }
 
-// startSpan is the internal implementation of StartSpan and StartHttpRequestSpan with runtime.Caller(2)
-// so that the caller of the wrapper function is used.
-func startSpan(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
+// startSpanWithExtractedAttributes is the internal implementation of StartSpan and StartHttpRequestSpan
+// with runtime.Caller(2) so that the caller of the wrapper function is used.
+func startSpanWithExtractedAttributes(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
 	spanName := defaultSpanName
 
 	opts := make([]trace.SpanStartOption, 0)

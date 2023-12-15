@@ -19,12 +19,11 @@ func (h *History) load() error {
 
 	var instances []*Instance
 
-	if instancesBytes != nil {
-		if err := json.Unmarshal(instancesBytes, &instances); err != nil {
-			return fmt.Errorf("error unmarshalling osquery_instance_history: %w", err)
-		}
-	} else {
+	if instancesBytes == nil {
 		return nil
+	}
+	if err := json.Unmarshal(instancesBytes, &instances); err != nil {
+		return fmt.Errorf("error unmarshalling osquery_instance_history: %w", err)
 	}
 
 	h.instances = instances

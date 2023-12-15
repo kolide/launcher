@@ -308,11 +308,11 @@ func (k *knapsack) OsqueryVerbose() bool {
 	return k.flags.OsqueryVerbose()
 }
 
-func (k *knapsack) SetEnableWatchdog(enable bool) error {
-	return k.flags.SetEnableWatchdog(enable)
+func (k *knapsack) SetWatchdogEnabled(enable bool) error {
+	return k.flags.SetWatchdogEnabled(enable)
 }
-func (k *knapsack) EnableWatchdog() bool {
-	return k.flags.EnableWatchdog()
+func (k *knapsack) WatchdogEnabled() bool {
+	return k.flags.WatchdogEnabled()
 }
 
 func (k *knapsack) SetWatchdogDelaySec(sec int) error {
