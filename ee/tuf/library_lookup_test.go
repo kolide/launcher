@@ -214,3 +214,62 @@ func TestChannelUsesNewAutoupdater(t *testing.T) {
 		require.Equal(t, channel.usesNewAutoupdater, ChannelUsesNewAutoupdater(channel.channelName))
 	}
 }
+
+func Test_getAutoupdateConfig_ConfigFlagSet(t *testing.T) {
+	t.Parallel()
+
+	tempConfDir := t.TempDir()
+	configFilepath := filepath.Join(tempConfDir, "launcher.flags")
+
+	testRootDir := t.TempDir()
+	testChannel := "nightly"
+
+	fileContents := fmt.Sprintf(`
+with_initial_runner
+autoupdate
+hostname localhost
+root_directory %s
+update_channel %s
+transport jsonrpc
+`,
+		testRootDir,
+		testChannel,
+	)
+
+	require.NoError(t, os.WriteFile(configFilepath, []byte(fileContents), 0755), "expected to set up test config file")
+
+	cfg, err := getAutoupdateConfig([]string{"--config", configFilepath})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
+	require.Equal(t, "", cfg.updateDirectory, "update directory should not have been set")
+	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
+	require.Equal(t, "", cfg.localDevelopmentPath, "local development path should not have been set")
+}
+
+func Test_getAutoupdateConfig_ConfigFlagNotSet(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testUpdateDir := t.TempDir()
+	testChannel := "nightly"
+	testLocaldevPath := filepath.Join("some", "path", "to", "a", "local", "build")
+
+	cfg, err := getAutoupdateConfig([]string{
+		"--root_directory", testRootDir,
+		"--osquery_flag", "enable_watchdog_debug=true",
+		"--update_directory", testUpdateDir,
+		"--autoupdate",
+		"--update_channel", testChannel,
+		"--localdev_path", testLocaldevPath,
+		"--transport", "jsonrpc",
+	})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
+	require.Equal(t, testUpdateDir, cfg.updateDirectory, "update directory is incorrect")
+	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
+	require.Equal(t, testLocaldevPath, cfg.localDevelopmentPath, "local development path is incorrect")
+}
