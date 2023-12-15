@@ -74,4 +74,5 @@ sudo rm /Library/LaunchDaemons/com.kolide.launcher.plist
 sudo rm -r /usr/local/kolide
 sudo rm -r /var/kolide
 sudo rm -r /etc/kolide
+sudo pkgutil --forget com.kolide.launcher
 ```
