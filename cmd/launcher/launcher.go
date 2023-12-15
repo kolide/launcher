@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/startup"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/control/actionqueue"
@@ -214,6 +215,13 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		} else {
 			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
 		}
+	}
+
+	s, err := startup.NewStartupDatabase(ctx, k)
+	if err != nil {
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not create startup db", "err", err)
+	} else {
+		defer s.Close()
 	}
 
 	// construct the appropriate http client based on security settings
