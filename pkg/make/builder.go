@@ -1,6 +1,5 @@
 /*
-	Package make provides some simple functions to handle build and go
-
+Package make provides some simple functions to handle build and go
 dependencies.
 
 We used to do this with gnumake rules, but as we added windows

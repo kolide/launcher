@@ -60,7 +60,7 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 	tables = append(tables, dataflattentable.AllTablePlugins(logger)...)
 
 	// add in the platform specific ones (as denoted by build tags)
-	tables = append(tables, platformTables(logger, currentOsquerydBinaryPath)...)
+	tables = append(tables, platformSpecificTables(logger, currentOsquerydBinaryPath)...)
 
 	return tables
 }

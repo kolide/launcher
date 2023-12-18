@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/peterbourgon/ff/v3"
+	"github.com/spf13/pflag"
 )
 
 type BinaryUpdateInfo struct {
@@ -38,7 +39,7 @@ var channelsUsingNewAutoupdater = map[string]bool{
 // For now, it is only available when launcher is on the nightly update channel.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
 	logger = log.With(logger, "component", "tuf_library_lookup")
-	cfg, err := getAutoupdateConfig()
+	cfg, err := getAutoupdateConfig(os.Args[1:])
 	if err != nil {
 		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
 	}
@@ -52,7 +53,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 }
 
 func UsingNewAutoupdater() bool {
-	cfg, err := getAutoupdateConfig()
+	cfg, err := getAutoupdateConfig(os.Args[1:])
 	if err != nil {
 		return false
 	}
@@ -60,13 +61,53 @@ func UsingNewAutoupdater() bool {
 	return ChannelUsesNewAutoupdater(cfg.channel)
 }
 
-// getAutoupdateConfig reads launcher's config file to determine the configuration values
-// needed to work with the autoupdate library.
-func getAutoupdateConfig() (*autoupdateConfig, error) {
-	configFilePath := launcher.ConfigFilePath(os.Args[1:])
-	if configFilePath == "" {
-		return nil, errors.New("could not get config file path")
+// getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library
+// from either the given args or from the config file.
+func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
+	// Create a flagset with options that are relevant to autoupdate only.
+	// Ensure that we won't fail out when we see other command-line options.
+	pflagSet := pflag.NewFlagSet("autoupdate options", pflag.ContinueOnError)
+	pflagSet.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
+
+	// Extract the config flag plus the autoupdate flags
+	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath string
+	pflagSet.StringVar(&flConfigFilePath, "config", "", "")
+	pflagSet.StringVar(&flRootDirectory, "root_directory", "", "")
+	pflagSet.StringVar(&flUpdateDirectory, "update_directory", "", "")
+	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
+	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
+
+	if err := pflagSet.Parse(args); err != nil {
+		return nil, fmt.Errorf("parsing command-line flags: %w", err)
 	}
+
+	// If the config file wasn't set AND the other critical flags weren't set, fall back
+	// to looking in the default config flag file location. (The update directory and local
+	// development path are both optional flags and not critical to library lookup
+	// functionality.) We expect all the flags to be set either via config flag (flConfigFilePath
+	// is set) or via command line (flRootDirectory and flUpdateChannel are set), but do not
+	// support a mix of both for this usage.
+	if flConfigFilePath == "" && flRootDirectory == "" && flUpdateChannel == "" {
+		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(args))
+	}
+
+	if flConfigFilePath != "" {
+		return getAutoupdateConfigFromFile(flConfigFilePath)
+	}
+
+	cfg := &autoupdateConfig{
+		rootDirectory:        flRootDirectory,
+		updateDirectory:      flUpdateDirectory,
+		channel:              flUpdateChannel,
+		localDevelopmentPath: flLocalDevelopmentPath,
+	}
+
+	return cfg, nil
+}
+
+// getAutoupdateConfigFromFile reads launcher's config file to determine the configuration values
+// needed to work with the autoupdate library.
+func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, error) {
 	if _, err := os.Stat(configFilePath); err != nil && os.IsNotExist(err) {
 		return nil, fmt.Errorf("could not read config file because it does not exist at %s: %w", configFilePath, err)
 	}

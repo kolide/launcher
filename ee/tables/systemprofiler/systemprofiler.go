@@ -14,27 +14,26 @@
 //
 // Everything, minimal details:
 //
-//    osquery> select count(*) from kolide_system_profiler where datatype like "%" and detaillevel = "mini";
-//    +----------+
-//    | count(*) |
-//    +----------+
-//    | 1270     |
-//    +----------+
+//	osquery> select count(*) from kolide_system_profiler where datatype like "%" and detaillevel = "mini";
+//	+----------+
+//	| count(*) |
+//	+----------+
+//	| 1270     |
+//	+----------+
 //
 // Multiple data types (slightly redacted):
 //
-//    osquery> select fullkey, key, value, datatype from kolide_system_profiler where datatype in ("SPCameraDataType", "SPiBridgeDataType");
-//    +----------------------+--------------------+------------------------------------------+-------------------+
-//    | fullkey              | key                | value                                    | datatype          |
-//    +----------------------+--------------------+------------------------------------------+-------------------+
-//    | 0/spcamera_unique-id | spcamera_unique-id | 0x1111111111111111                       | SPCameraDataType  |
-//    | 0/_name              | _name              | FaceTime HD Camera                       | SPCameraDataType  |
-//    | 0/spcamera_model-id  | spcamera_model-id  | UVC Camera VendorID_1452 ProductID_30000 | SPCameraDataType  |
-//    | 0/_name              | _name              | Controller Information                   | SPiBridgeDataType |
-//    | 0/ibridge_build      | ibridge_build      | 14Y000                                   | SPiBridgeDataType |
-//    | 0/ibridge_model_name | ibridge_model_name | Apple T1 Security Chip                   | SPiBridgeDataType |
-//    +----------------------+--------------------+------------------------------------------+-------------------+
-
+//	osquery> select fullkey, key, value, datatype from kolide_system_profiler where datatype in ("SPCameraDataType", "SPiBridgeDataType");
+//	+----------------------+--------------------+------------------------------------------+-------------------+
+//	| fullkey              | key                | value                                    | datatype          |
+//	+----------------------+--------------------+------------------------------------------+-------------------+
+//	| 0/spcamera_unique-id | spcamera_unique-id | 0x1111111111111111                       | SPCameraDataType  |
+//	| 0/_name              | _name              | FaceTime HD Camera                       | SPCameraDataType  |
+//	| 0/spcamera_model-id  | spcamera_model-id  | UVC Camera VendorID_1452 ProductID_30000 | SPCameraDataType  |
+//	| 0/_name              | _name              | Controller Information                   | SPiBridgeDataType |
+//	| 0/ibridge_build      | ibridge_build      | 14Y000                                   | SPiBridgeDataType |
+//	| 0/ibridge_model_name | ibridge_model_name | Apple T1 Security Chip                   | SPiBridgeDataType |
+//	+----------------------+--------------------+------------------------------------------+-------------------+
 package systemprofiler
 
 import (

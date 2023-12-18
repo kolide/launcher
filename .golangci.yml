@@ -51,6 +51,22 @@ linters-settings:
         disabled: false
         arguments:
           - "preserveScope"
+      - name: package-comments
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: context-keys-type
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: errorf
+        disabled: false
+      - name: unreachable-code
+        disabled: false
+      - name: early-return
+        disabled: false
+      - name: confusing-naming
+        disabled: false
 
 issues:
   exclude-rules:
