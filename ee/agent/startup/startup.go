@@ -6,16 +6,24 @@ package startup
 import (
 	"context"
 	"database/sql"
+	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed migrations/*.sqlite3
+var migrations embed.FS
 
 // GetStartupValue retrieves the value for the given flagKey from the startup database
 // located in the given rootDirectory.
@@ -88,8 +96,8 @@ func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupD
 		},
 	}
 
-	if err := s.ensureTables(ctx); err != nil {
-		return nil, fmt.Errorf("ensuring expected tables exist: %w", err)
+	if err := s.migrate(ctx); err != nil {
+		return nil, fmt.Errorf("migrating the database: %w", err)
 	}
 
 	// Attempt to ensure flags are up-to-date
@@ -102,16 +110,20 @@ func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupD
 	return s, nil
 }
 
-// ensureTables makes sure that the expected tables exist in the database.
-func (s *startupDatabase) ensureTables(ctx context.Context) error {
-	// Ensure expected tables exist
-	if _, err := s.conn.ExecContext(ctx, `
-CREATE TABLE IF NOT EXISTS startup_flag (
-	flag_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-	flag_name TEXT NOT NULL UNIQUE,
-	flag_value TEXT
-);`); err != nil {
-		return fmt.Errorf("preparing to create startup_flag table: %w", err)
+// migrate makes sure that the database schema is correct.
+func (s *startupDatabase) migrate(ctx context.Context) error {
+	d, err := iofs.New(migrations, "migrations")
+	if err != nil {
+		return fmt.Errorf("loading migration files: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s", dbLocation(s.knapsack.RootDirectory())))
+	if err != nil {
+		return fmt.Errorf("creating migrate instance: %w", err)
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return fmt.Errorf("running migrations: %w", err)
 	}
 
 	return nil

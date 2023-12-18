@@ -2,14 +2,16 @@ package startup
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -50,17 +52,12 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	testRootDir := t.TempDir()
 	k := typesmocks.NewKnapsack(t)
 	k.On("RootDirectory").Return(testRootDir)
-	agentFlagsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
-	require.NoError(t, err, "setting up agent flags store")
-	k.On("AgentFlagsStore").Return(agentFlagsStore)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
-
-	// Set up flags in agent flags store -- setting each value equal to the key name
-	// for easy checking later
-	require.NoError(t, agentFlagsStore.Set([]byte(keys.UpdateChannel.String()), []byte(keys.UpdateChannel.String())), "setting flag in store")
+	updateChannelVal := "stable"
+	k.On("UpdateChannel").Return(updateChannelVal)
 
 	// Set up storage db, which should create the database and set all flags
-	_, err = NewStartupDatabase(context.TODO(), k)
+	_, err := NewStartupDatabase(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	// Confirm the database exists
@@ -70,7 +67,7 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	// Now check that all values were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, keys.UpdateChannel.String(), v, "incorrect flag value")
+	require.Equal(t, updateChannelVal, v, "incorrect flag value")
 }
 
 func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
@@ -94,14 +91,11 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	// Set up dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("RootDirectory").Return(testRootDir)
-	agentFlagsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
-	require.NoError(t, err, "setting up agent flags store")
-	k.On("AgentFlagsStore").Return(agentFlagsStore)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 
-	// Set up flags in agent flags store -- setting each value equal to the key name
-	// for easy checking later
-	require.NoError(t, agentFlagsStore.Set([]byte(keys.UpdateChannel.String()), []byte(keys.UpdateChannel.String())), "setting flag in store")
+	// Set up flag
+	updateChannelVal := "alpha"
+	k.On("UpdateChannel").Return(updateChannelVal)
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := NewStartupDatabase(context.TODO(), k)
@@ -113,7 +107,7 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	// Now check that all values were updated
 	v, err = GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, keys.UpdateChannel.String(), v, "incorrect flag value")
+	require.Equal(t, updateChannelVal, v, "incorrect flag value")
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -123,14 +117,9 @@ func TestFlagsChanged(t *testing.T) {
 	testRootDir := t.TempDir()
 	k := typesmocks.NewKnapsack(t)
 	k.On("RootDirectory").Return(testRootDir)
-	agentFlagsStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
-	require.NoError(t, err, "setting up agent flags store")
-	k.On("AgentFlagsStore").Return(agentFlagsStore)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
-
-	// Set up flags in agent flags store -- setting each value equal to the key name
-	// for easy checking later
-	require.NoError(t, agentFlagsStore.Set([]byte(keys.UpdateChannel.String()), []byte(keys.UpdateChannel.String())), "setting flag in store")
+	updateChannelVal := "beta"
+	k.On("UpdateChannel").Return(updateChannelVal).Once()
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := NewStartupDatabase(context.TODO(), k)
@@ -143,11 +132,11 @@ func TestFlagsChanged(t *testing.T) {
 	// Now check that all values were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, keys.UpdateChannel.String(), v, "incorrect flag value")
+	require.Equal(t, updateChannelVal, v, "incorrect flag value")
 
 	// Now, prepare for flag changes
-	newFlagValue := "new_channel_val"
-	require.NoError(t, agentFlagsStore.Set([]byte(keys.UpdateChannel.String()), []byte(newFlagValue)), "setting flag in store")
+	newFlagValue := "alpha"
+	k.On("UpdateChannel").Return(newFlagValue).Once()
 
 	// Call FlagsChanged and expect that all flag values are updated
 	s.FlagsChanged(keys.UpdateChannel)
@@ -156,21 +145,42 @@ func TestFlagsChanged(t *testing.T) {
 	require.Equal(t, newFlagValue, v, "incorrect flag value")
 }
 
+// Test_Migrations runs all of the migrations in the migrations/ subdirectory
+// in both directions, ensuring that all up and down migrations are valid.
+func Test_Migrations(t *testing.T) {
+	t.Parallel()
+
+	tempRootDir := t.TempDir()
+
+	conn, err := dbConn(context.TODO(), tempRootDir)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, conn.Close(), "closing test db")
+
+	d, err := iofs.New(migrations, "migrations")
+	require.NoError(t, err, "loading migration files")
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s?query", dbLocation(tempRootDir)))
+	require.NoError(t, err, "creating migrate instance")
+
+	require.NoError(t, m.Up(), "expected no error running all migrations")
+
+	require.NoError(t, m.Down(), "expected no error rolling back all migrations")
+}
+
 func setupTestDb(t *testing.T) string {
 	tempRootDir := t.TempDir()
 
 	conn, err := dbConn(context.TODO(), tempRootDir)
 	require.NoError(t, err, "setting up db connection")
-
-	_, err = conn.Exec(`
-	CREATE TABLE IF NOT EXISTS startup_flag (
-		flag_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-		flag_name TEXT NOT NULL UNIQUE,
-		flag_value TEXT
-	);`)
-	require.NoError(t, err, "creating table")
-
 	require.NoError(t, conn.Close(), "closing test db")
+
+	d, err := iofs.New(migrations, "migrations")
+	require.NoError(t, err, "loading migration files")
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s?query", dbLocation(tempRootDir)))
+	require.NoError(t, err, "creating migrate instance")
+
+	require.NoError(t, m.Up(), "migrating")
 
 	return tempRootDir
 }
