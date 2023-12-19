@@ -18,7 +18,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.1.0
+	github.com/kolide/krypto v0.1.1-0.20231219012048-5859599c50aa
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
@@ -37,7 +37,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.24.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 	golang.org/x/image v0.10.0
 	golang.org/x/net v0.19.0
