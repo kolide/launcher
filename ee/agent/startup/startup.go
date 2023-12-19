@@ -15,14 +15,14 @@ import (
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
-//go:embed migrations/*.sqlite3
+//go:embed migrations/*.sqlite
 var migrations embed.FS
 
 // GetStartupValue retrieves the value for the given flagKey from the startup database
@@ -56,7 +56,7 @@ func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
 	}
 
 	// Open and validate connection
-	conn, err := sql.Open("sqlite3", dbLocation(rootDirectory))
+	conn, err := sql.Open("sqlite", dbLocation(rootDirectory))
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -117,7 +117,7 @@ func (s *startupDatabase) migrate(ctx context.Context) error {
 		return fmt.Errorf("loading migration files: %w", err)
 	}
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s", dbLocation(s.knapsack.RootDirectory())))
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s", dbLocation(s.knapsack.RootDirectory())))
 	if err != nil {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}

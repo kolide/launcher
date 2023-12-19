@@ -3,7 +3,7 @@
 Inside this directory (ee/agent/startup), run the command to create a migration as follows:
 
 ```
-migrate create -ext sqlite3 -dir migrations -seq <migration name>
+migrate create -ext sqlite -dir migrations -seq <migration name>
 ```
 
 The migration name is only used to name the file.

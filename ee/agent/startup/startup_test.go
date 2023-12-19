@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 func TestGetStartupValue(t *testing.T) {
@@ -159,7 +159,7 @@ func Test_Migrations(t *testing.T) {
 	d, err := iofs.New(migrations, "migrations")
 	require.NoError(t, err, "loading migration files")
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s?query", dbLocation(tempRootDir)))
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
 	require.NoError(t, err, "creating migrate instance")
 
 	require.NoError(t, m.Up(), "expected no error running all migrations")
@@ -177,7 +177,7 @@ func setupTestDb(t *testing.T) string {
 	d, err := iofs.New(migrations, "migrations")
 	require.NoError(t, err, "loading migration files")
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite3://%s?query", dbLocation(tempRootDir)))
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
 	require.NoError(t, err, "creating migrate instance")
 
 	require.NoError(t, m.Up(), "migrating")
