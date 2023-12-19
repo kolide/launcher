@@ -102,7 +102,7 @@ func (l *OsqueryLogAdapter) logInfoAboutUnrecognizedProcessLockingPidfile(p []by
 	}
 
 	pidStr := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
-	pid, err := strconv.ParseUint(pidStr, 10, 32)
+	pid, err := strconv.ParseInt(pidStr, 10, 32)
 	if err != nil {
 		l.slogger.Log(context.TODO(), slog.LevelError,
 			"could not extract PID of non-osqueryd process using pidfile",
