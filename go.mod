@@ -5,7 +5,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/clbanning/mxj v1.8.4
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.9.0
 	github.com/go-ole/go-ole v1.2.6
@@ -20,7 +19,6 @@ require (
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
 	github.com/kolide/krypto v0.1.0
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
-	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
@@ -38,7 +36,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/image v0.10.0
 	golang.org/x/net v0.19.0
@@ -58,6 +56,7 @@ require (
 	github.com/kolide/systray v1.10.4
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
+	github.com/spf13/pflag v1.0.5
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.19.0
 )
@@ -67,7 +66,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
