@@ -73,7 +73,7 @@ func dbLocation(rootDirectory string) string {
 	// Note that the migration framework expects a net/url style path,
 	// so we adjust the rootDirectory with filepath.ToSlash and then
 	// use path.Join instead of filepath.Join here.
-	return path.Join(filepath.ToSlash(rootDirectory), "startup.db")
+	return path.Join(filepath.ToSlash(rootDirectory), "kv.sqlite")
 }
 
 // migrate makes sure that the database schema is correct.
