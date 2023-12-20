@@ -1,6 +1,6 @@
 # Creating a migration
 
-Inside this directory (ee/agent/startup), run the command to create a migration as follows:
+Inside this directory (ee/agent/storage/sqlite), run the command to create a migration as follows:
 
 ```
 migrate create -ext sqlite -dir migrations -seq <migration name>

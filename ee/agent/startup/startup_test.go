@@ -2,14 +2,11 @@ package startup
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"testing"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,13 +19,12 @@ func TestGetStartupValue(t *testing.T) {
 	testRootDir := setupTestDb(t)
 
 	// Set flag value
-	conn, err := dbConn(context.TODO(), testRootDir)
-	require.NoError(t, err, "getting connection to test db")
 	flagKey := keys.UpdateChannel.String()
 	flagVal := "test value"
-	_, err = conn.Exec(`INSERT INTO startup_flag (flag_name, flag_value) VALUES (?, ?);`, flagKey, flagVal)
-	require.NoError(t, err, "inserting flag value")
-	require.NoError(t, conn.Close(), "closing db connection")
+	store, err := agentsqlite.NewStore(context.TODO(), testRootDir)
+	require.NoError(t, err, "getting connection to test db")
+	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
+	require.NoError(t, store.Close(), "closing setup connection")
 
 	returnedVal, err := GetStartupValue(context.TODO(), testRootDir, flagKey)
 	require.NoError(t, err, "expected no error getting startup value")
@@ -62,11 +58,7 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 
 	require.NoError(t, s.Close(), "closing startup db")
 
-	// Confirm the database exists
-	_, err = os.Stat(dbLocation(testRootDir))
-	require.NoError(t, err, "database not created")
-
-	// Now check that all values were set
+	// Check that all values were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, updateChannelVal, v, "incorrect flag value")
@@ -77,13 +69,10 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 
 	// Set up preexisting database
 	testRootDir := setupTestDb(t)
-	_, err := os.Stat(dbLocation(testRootDir))
-	require.NoError(t, err, "database not created")
-	conn, err := dbConn(context.TODO(), testRootDir)
+	store, err := agentsqlite.NewStore(context.TODO(), testRootDir)
 	require.NoError(t, err, "getting connection to test db")
-	_, err = conn.Exec(`INSERT INTO startup_flag (flag_name, flag_value) VALUES (?, "some_old_value");`, keys.UpdateChannel.String())
-	require.NoError(t, err, "setting old value in database")
-	require.NoError(t, conn.Close(), "closing setup connection")
+	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
+	require.NoError(t, store.Close(), "closing setup connection")
 
 	// Confirm flags were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
@@ -127,11 +116,7 @@ func TestFlagsChanged(t *testing.T) {
 	s, err := NewStartupDatabase(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
-	// Confirm the database exists
-	_, err = os.Stat(dbLocation(testRootDir))
-	require.NoError(t, err, "database not created")
-
-	// Now check that all values were set
+	// Check that all values were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, updateChannelVal, v, "incorrect flag value")
@@ -149,50 +134,12 @@ func TestFlagsChanged(t *testing.T) {
 	require.NoError(t, s.Close(), "closing startup db")
 }
 
-// Test_Migrations runs all of the migrations in the migrations/ subdirectory
-// in both directions, ensuring that all up and down migrations are valid.
-func Test_Migrations(t *testing.T) {
-	t.Parallel()
-
-	tempRootDir := t.TempDir()
-
-	conn, err := dbConn(context.TODO(), tempRootDir)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, conn.Close(), "closing test db")
-
-	d, err := iofs.New(migrations, "migrations")
-	require.NoError(t, err, "loading migration files")
-
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
-	require.NoError(t, err, "creating migrate instance")
-
-	require.NoError(t, m.Up(), "expected no error running all migrations")
-
-	require.NoError(t, m.Down(), "expected no error rolling back all migrations")
-
-	srcErr, dbErr := m.Close()
-	require.NoError(t, srcErr, "source error closing migration")
-	require.NoError(t, dbErr, "database error closing migration")
-}
-
 func setupTestDb(t *testing.T) string {
 	tempRootDir := t.TempDir()
 
-	conn, err := dbConn(context.TODO(), tempRootDir)
+	store, err := agentsqlite.NewStore(context.TODO(), tempRootDir)
 	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, conn.Close(), "closing test db")
-
-	d, err := iofs.New(migrations, "migrations")
-	require.NoError(t, err, "loading migration files")
-
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
-	require.NoError(t, err, "creating migrate instance")
-
-	require.NoError(t, m.Up(), "migrating")
-
-	srcErr, dbErr := m.Close()
-	require.NoError(t, srcErr, "source error closing migration")
-	require.NoError(t, dbErr, "database error closing migration")
+	require.NoError(t, store.Close(), "closing test db")
 
 	return tempRootDir
 }

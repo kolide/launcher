@@ -1,5 +1,0 @@
-CREATE TABLE IF NOT EXISTS startup_flag (
-    flag_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    flag_name TEXT NOT NULL UNIQUE,
-    flag_value TEXT
-);
