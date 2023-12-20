@@ -126,6 +126,15 @@ func (s *startupDatabase) migrate(ctx context.Context) error {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}
 
+	defer func() {
+		if srcErr, dbErr := m.Close(); srcErr != nil || dbErr != nil {
+			s.knapsack.Slogger().Log(ctx, slog.LevelWarn, "closing migration",
+				"source_err", srcErr,
+				"db_err", dbErr,
+			)
+		}
+	}()
+
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("running migrations: %w", err)
 	}

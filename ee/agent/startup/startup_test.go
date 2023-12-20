@@ -57,8 +57,10 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	k.On("UpdateChannel").Return(updateChannelVal)
 
 	// Set up storage db, which should create the database and set all flags
-	_, err := NewStartupDatabase(context.TODO(), k)
+	s, err := NewStartupDatabase(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
+
+	require.NoError(t, s.Close(), "closing startup db")
 
 	// Confirm the database exists
 	_, err = os.Stat(dbLocation(testRootDir))
@@ -81,7 +83,7 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	require.NoError(t, err, "getting connection to test db")
 	_, err = conn.Exec(`INSERT INTO startup_flag (flag_name, flag_value) VALUES (?, "some_old_value");`, keys.UpdateChannel.String())
 	require.NoError(t, err, "setting old value in database")
-	conn.Close()
+	require.NoError(t, conn.Close(), "closing setup connection")
 
 	// Confirm flags were set
 	v, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
@@ -143,6 +145,8 @@ func TestFlagsChanged(t *testing.T) {
 	v, err = GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, newFlagValue, v, "incorrect flag value")
+
+	require.NoError(t, s.Close(), "closing startup db")
 }
 
 // Test_Migrations runs all of the migrations in the migrations/ subdirectory
@@ -165,6 +169,10 @@ func Test_Migrations(t *testing.T) {
 	require.NoError(t, m.Up(), "expected no error running all migrations")
 
 	require.NoError(t, m.Down(), "expected no error rolling back all migrations")
+
+	srcErr, dbErr := m.Close()
+	require.NoError(t, srcErr, "source error closing migration")
+	require.NoError(t, dbErr, "database error closing migration")
 }
 
 func setupTestDb(t *testing.T) string {
@@ -181,6 +189,10 @@ func setupTestDb(t *testing.T) string {
 	require.NoError(t, err, "creating migrate instance")
 
 	require.NoError(t, m.Up(), "migrating")
+
+	srcErr, dbErr := m.Close()
+	require.NoError(t, srcErr, "source error closing migration")
+	require.NoError(t, dbErr, "database error closing migration")
 
 	return tempRootDir
 }
