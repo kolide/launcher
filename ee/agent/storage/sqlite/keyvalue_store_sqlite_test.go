@@ -3,6 +3,7 @@ package agentsqlite
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -10,6 +11,35 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewStore_EmptyFileExists(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	dbFile := dbLocation(testRootDir)
+
+	// Create empty file
+	f, err := os.OpenFile(dbFile, os.O_RDONLY|os.O_CREATE, 0666)
+	require.NoError(t, err, "creating empty file")
+	require.NoError(t, f.Close(), "closing empty db file")
+
+	s, err := NewStore(context.TODO(), testRootDir)
+	require.NoError(t, err, "creating test store")
+	require.NoError(t, s.Close(), "closing test store")
+}
+
+func TestNewStore_DatabaseIsCorrupt(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	dbFile := dbLocation(testRootDir)
+
+	// Create corrupt db file
+	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
+
+	_, err := NewStore(context.TODO(), testRootDir)
+	require.Error(t, err, "expected error when database is corrupt")
+}
 
 func TestGetSet(t *testing.T) {
 	t.Parallel()

@@ -37,6 +37,7 @@ func NewStore(ctx context.Context, rootDirectory string) (*SqliteStore, error) {
 	}
 
 	if err := s.migrate(ctx); err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("migrating the database: %w", err)
 	}
 
