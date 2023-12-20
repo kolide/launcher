@@ -54,6 +54,8 @@ func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
 			return nil, fmt.Errorf("creating file at %s: %w", startupDbFilepath, err)
 		}
 		f.Close()
+	} else if err != nil {
+		return nil, fmt.Errorf("determining if db exists: %w", err)
 	}
 
 	// Open and validate connection
