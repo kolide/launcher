@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
+	sqlitemigrationdriver "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "modernc.org/sqlite"
 )
@@ -37,7 +37,7 @@ func NewStore(ctx context.Context, rootDirectory string) (*SqliteStore, error) {
 	}
 
 	if err := s.migrate(ctx); err != nil {
-		conn.Close()
+		s.Close()
 		return nil, fmt.Errorf("migrating the database: %w", err)
 	}
 
@@ -85,13 +85,16 @@ func (s *SqliteStore) migrate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("loading migration files: %w", err)
 	}
+	defer d.Close()
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s", dbLocation(s.rootDirectory)))
+	dbInstance, err := sqlitemigrationdriver.WithInstance(s.conn, &sqlitemigrationdriver.Config{})
+	if err != nil {
+		return fmt.Errorf("creating db migration instance: %w", err)
+	}
+	m, err := migrate.NewWithInstance("iofs", d, "sqlite", dbInstance)
 	if err != nil {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}
-
-	defer m.Close()
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("running migrations: %w", err)
