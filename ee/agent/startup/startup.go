@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -69,7 +70,10 @@ func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
 
 // dbLocation standardizes the filepath to the given database.
 func dbLocation(rootDirectory string) string {
-	return filepath.Join(rootDirectory, "startup.db")
+	// Note that the migration framework expects a net/url style path,
+	// so we adjust the rootDirectory with filepath.ToSlash and then
+	// use path.Join instead of filepath.Join here.
+	return path.Join(filepath.ToSlash(rootDirectory), "startup.db")
 }
 
 // startupDatabase records agent flags and their current values,
