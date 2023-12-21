@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/stretchr/testify/require"
 )
@@ -53,9 +55,26 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	serverPrivKey, err := echelper.GenerateEcdsaKey()
+	require.NoError(t, err)
+
+	serverPubKeyDer, err := echelper.PublicEcdsaToB64Der(serverPrivKey.Public().(*ecdsa.PublicKey))
+	require.NoError(t, err)
+
 	// build the executable
 	executablePath := filepath.Join(appRoot, "Contents", "MacOS", "launcher_test")
-	out, err := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../cmd/launcher").CombinedOutput()
+	out, err := exec.CommandContext(ctx,
+		"go",
+		"build",
+		"-ldflags",
+		fmt.Sprintf("-X github.com/kolide/launcher/ee/secureenclavesigner.ServerPubKeyDer=%s", string(serverPubKeyDer)),
+		"-tags",
+		"secure_enclave_test",
+		"-o",
+		executablePath,
+		"../../cmd/launcher",
+	).CombinedOutput()
+
 	require.NoError(t, ctx.Err())
 	require.NoError(t, err, string(out))
 
@@ -65,9 +84,13 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	usr, err := user.Current()
 	require.NoError(t, err)
 
+	someData := []byte(ulid.New())
+	challenge, _, err := challenge.Generate(serverPrivKey, someData, someData, someData)
+	require.NoError(t, err)
+
 	// create brand new signer without existing key
 	// ask for public first to trigger key generation
-	ses, err := New(usr.Uid, []byte("TODO:challenge"), WithBinaryPath(executablePath))
+	ses, err := New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath))
 	require.NoError(t, err)
 
 	pubKey := ses.Public()
@@ -87,7 +110,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	// create brand new signer without existing key
 	// ask to sign first to trigger key generation
-	ses, err = New(usr.Uid, []byte("TODO:challenge"), WithBinaryPath(executablePath))
+	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath))
 	require.NoError(t, err)
 
 	sigB64, err = ses.Sign(rand.Reader, digest, crypto.SHA256)
@@ -99,7 +122,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	require.NoError(t, echelper.VerifySignature(ses.Public().(*ecdsa.PublicKey), dataToSign, sig))
 
 	// create signer with existing key
-	ses, err = New(usr.Uid, []byte("TODO:challenge"), WithBinaryPath(executablePath), WithExistingKey(pubKey.(*ecdsa.PublicKey)))
+	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath), WithExistingKey(pubKey.(*ecdsa.PublicKey)))
 	require.NoError(t, err)
 
 	sigB64, err = ses.Sign(rand.Reader, digest, crypto.SHA256)
