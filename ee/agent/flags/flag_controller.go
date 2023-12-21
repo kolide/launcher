@@ -500,6 +500,15 @@ func (fc *FlagController) UpdateDirectory() string {
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
 }
 
+func (fc *FlagController) SetUseTUFAutoupdater(enabled bool) error {
+	return fc.setControlServerValue(keys.UseTUFAutoupdater, boolToBytes(enabled))
+}
+func (fc *FlagController) UseTUFAutoupdater() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.UseTUFAutoupdater))
+}
+
 func (fc *FlagController) SetExportTraces(enabled bool) error {
 	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
 }
