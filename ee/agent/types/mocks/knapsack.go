@@ -1370,6 +1370,62 @@ func (_m *Knapsack) SetUpdateDirectory(directory string) error {
 	return r0
 }
 
+// SetWatchdogDelaySec provides a mock function with given fields: sec
+func (_m *Knapsack) SetWatchdogDelaySec(sec int) error {
+	ret := _m.Called(sec)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(sec)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetWatchdogEnabled provides a mock function with given fields: enable
+func (_m *Knapsack) SetWatchdogEnabled(enable bool) error {
+	ret := _m.Called(enable)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enable)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetWatchdogMemoryLimitMB provides a mock function with given fields: limit
+func (_m *Knapsack) SetWatchdogMemoryLimitMB(limit int) error {
+	ret := _m.Called(limit)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(limit)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetWatchdogUtilizationLimitPercent provides a mock function with given fields: limit
+func (_m *Knapsack) SetWatchdogUtilizationLimitPercent(limit int) error {
+	ret := _m.Called(limit)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(limit)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Slogger provides a mock function with given fields:
 func (_m *Knapsack) Slogger() *slog.Logger {
 	ret := _m.Called()
@@ -1543,6 +1599,62 @@ func (_m *Knapsack) UpdateDirectory() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// WatchdogDelaySec provides a mock function with given fields:
+func (_m *Knapsack) WatchdogDelaySec() int {
+	ret := _m.Called()
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// WatchdogEnabled provides a mock function with given fields:
+func (_m *Knapsack) WatchdogEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// WatchdogMemoryLimitMB provides a mock function with given fields:
+func (_m *Knapsack) WatchdogMemoryLimitMB() int {
+	ret := _m.Called()
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// WatchdogUtilizationLimitPercent provides a mock function with given fields:
+func (_m *Knapsack) WatchdogUtilizationLimitPercent() int {
+	ret := _m.Called()
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
 	}
 
 	return r0

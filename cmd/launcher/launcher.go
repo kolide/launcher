@@ -355,8 +355,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			runner,
 			ctx,
+			runner,
 			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {

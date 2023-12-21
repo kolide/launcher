@@ -39,7 +39,7 @@ func WithLogger(logger log.Logger) notificationConsumerOption {
 	}
 }
 
-func NewNotifyConsumer(runner *desktopRunner.DesktopUsersProcessesRunner, ctx context.Context, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
+func NewNotifyConsumer(ctx context.Context, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	nc := &NotificationConsumer{
 		runner: runner,
 		logger: log.NewNopLogger(),

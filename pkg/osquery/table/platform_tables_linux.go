@@ -28,7 +28,7 @@ import (
 	osquery "github.com/osquery/osquery-go"
 )
 
-func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		cryptsetup.TablePlugin(logger),
 		gsettings.Settings(logger),
@@ -46,7 +46,7 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 			[]string{"--mode=multiline", "--fields=all", "device", "wifi", "list"},
 			dataflattentable.WithKVSeparator(":")),
 		dataflattentable.TablePluginExec(logger, "kolide_lsblk", dataflattentable.JsonType,
-			allowedcmd.Lsblk, []string{"-J"},
+			allowedcmd.Lsblk, []string{"-fJp"},
 		),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), allowedcmd.Falconctl, []string{"-g", "--systags"}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, allowedcmd.Apt, []string{"list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),

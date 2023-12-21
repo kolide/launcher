@@ -94,11 +94,12 @@ func (d *dbusNotifier) Listen() error {
 					level.Warn(d.logger).Log("msg", "couldn't create command to start process", "err", err, "browser_launcher", browserLauncher)
 					continue
 				}
-				if err := cmd.Start(); err != nil {
-					level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "browser_launcher", browserLauncher)
-				} else {
+
+				err = cmd.Start()
+				if err == nil {
 					break
 				}
+				level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "browser_launcher", browserLauncher)
 			}
 
 		case <-d.interrupt:

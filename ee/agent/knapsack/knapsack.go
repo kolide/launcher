@@ -316,6 +316,34 @@ func (k *knapsack) OsqueryVerbose() bool {
 	return k.flags.OsqueryVerbose()
 }
 
+func (k *knapsack) SetWatchdogEnabled(enable bool) error {
+	return k.flags.SetWatchdogEnabled(enable)
+}
+func (k *knapsack) WatchdogEnabled() bool {
+	return k.flags.WatchdogEnabled()
+}
+
+func (k *knapsack) SetWatchdogDelaySec(sec int) error {
+	return k.flags.SetWatchdogDelaySec(sec)
+}
+func (k *knapsack) WatchdogDelaySec() int {
+	return k.flags.WatchdogDelaySec()
+}
+
+func (k *knapsack) SetWatchdogMemoryLimitMB(limit int) error {
+	return k.flags.SetWatchdogMemoryLimitMB(limit)
+}
+func (k *knapsack) WatchdogMemoryLimitMB() int {
+	return k.flags.WatchdogMemoryLimitMB()
+}
+
+func (k *knapsack) SetWatchdogUtilizationLimitPercent(limit int) error {
+	return k.flags.SetWatchdogUtilizationLimitPercent(limit)
+}
+func (k *knapsack) WatchdogUtilizationLimitPercent() int {
+	return k.flags.WatchdogUtilizationLimitPercent()
+}
+
 func (k *knapsack) OsqueryFlags() []string {
 	return k.flags.OsqueryFlags()
 }
