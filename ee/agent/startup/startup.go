@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -52,7 +53,8 @@ func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupD
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
-			keys.UpdateChannel: func() string { return knapsack.UpdateChannel() },
+			keys.UpdateChannel:     func() string { return knapsack.UpdateChannel() },
+			keys.UseTUFAutoupdater: func() string { return flags.BoolToString(knapsack.UseTUFAutoupdater()) },
 		},
 	}
 
