@@ -185,6 +185,10 @@ type Flags interface {
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
 
+	// UseTUFAutoupdater controls whether launcher uses the new TUF autoupdater instead of the legacy autoupdater
+	SetUseTUFAutoupdater(enabled bool) error
+	UseTUFAutoupdater() bool
+
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error
 	SetExportTracesOverride(value bool, duration time.Duration)
