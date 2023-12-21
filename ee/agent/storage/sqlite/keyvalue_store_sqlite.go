@@ -17,15 +17,29 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	// Supported tables -- all tables should have the same columns
+	TableKeyValuePairs = "keyvalue_pairs"
+)
+
+var supportedTables = map[string]struct{}{
+	TableKeyValuePairs: {},
+}
+
 //go:embed migrations/*.sqlite
 var migrations embed.FS
 
 type SqliteStore struct {
 	conn          *sql.DB
 	rootDirectory string
+	tableName     string
 }
 
-func NewStore(ctx context.Context, rootDirectory string) (*SqliteStore, error) {
+func NewStore(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
+	if _, ok := supportedTables[tableName]; !ok {
+		return nil, fmt.Errorf("unsupported table %s", tableName)
+	}
+
 	conn, err := dbConn(ctx, rootDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
@@ -34,6 +48,7 @@ func NewStore(ctx context.Context, rootDirectory string) (*SqliteStore, error) {
 	s := &SqliteStore{
 		conn:          conn,
 		rootDirectory: rootDirectory,
+		tableName:     tableName,
 	}
 
 	if err := s.migrate(ctx); err != nil {
@@ -112,8 +127,12 @@ func (s *SqliteStore) Get(key []byte) (value []byte, err error) {
 		return nil, errors.New("store is nil")
 	}
 
+	// It's fine to interpolate the table name into the query because
+	// we require the table name to be in our allowlist `supportedTables`
+	query := fmt.Sprintf(`SELECT key_value FROM %s WHERE key_name = ?;`, s.tableName)
+
 	var keyValue string
-	if err := s.conn.QueryRow(`SELECT key_value FROM keyvalue_pairs WHERE key_name = ?;`, string(key)).Scan(&keyValue); err != nil {
+	if err := s.conn.QueryRow(query, string(key)).Scan(&keyValue); err != nil {
 		return nil, fmt.Errorf("querying key `%s`: %w", string(key), err)
 	}
 	return []byte(keyValue), nil
@@ -128,13 +147,17 @@ func (s *SqliteStore) Set(key, value []byte) error {
 		return errors.New("key is blank")
 	}
 
-	upsertSql := `
-INSERT INTO keyvalue_pairs (key_name, key_value)
+	// It's fine to interpolate the table name into the query because
+	// we require the table name to be in our allowlist `supportedTables`
+	upsertSql := fmt.Sprintf(`
+INSERT INTO %s (key_name, key_value)
 VALUES (?, ?)
-ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`
+ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`,
+		s.tableName,
+	)
 
 	if _, err := s.conn.Exec(upsertSql, string(key), string(value)); err != nil {
-		return fmt.Errorf("upserting into keyvalue_pairs: %w", err)
+		return fmt.Errorf("upserting into %s: %w", s.tableName, err)
 	}
 
 	return nil
@@ -157,9 +180,10 @@ func (s *SqliteStore) Update(kvPairs map[string]string) ([]string, error) {
 		return nil, fmt.Errorf("beginning transaction: %w", err)
 	}
 
-	// First, perform upsert to for all new and existing keys
+	// First, perform upsert to for all new and existing keys.
+
 	upsertSql := `
-INSERT INTO keyvalue_pairs (key_name, key_value)
+INSERT INTO %s (key_name, key_value)
 VALUES %s
 ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`
 	valueStr := strings.TrimRight(strings.Repeat("(?, ?),", len(kvPairs)), ",")
@@ -175,18 +199,20 @@ ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`
 		i += 2
 	}
 
-	if _, err := tx.Exec(fmt.Sprintf(upsertSql, valueStr), valueArgs...); err != nil {
+	// It's fine to interpolate the table name into the query because
+	// we require the table name to be in our allowlist `supportedTables`.
+	if _, err := tx.Exec(fmt.Sprintf(upsertSql, s.tableName, valueStr), valueArgs...); err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			return nil, fmt.Errorf("upserting into keyvalue_pairs: %w; rollback error %v", err, rollbackErr)
+			return nil, fmt.Errorf("upserting into %s: %w; rollback error %v", s.tableName, err, rollbackErr)
 		}
-		return nil, fmt.Errorf("upserting into keyvalue_pairs: %w", err)
+		return nil, fmt.Errorf("upserting into %s: %w", s.tableName, err)
 	}
 
 	// Now, prune all keys that must be deleted
-	deleteSql := `DELETE FROM keyvalue_pairs WHERE key_name NOT IN (%s) RETURNING key_name;`
+	deleteSql := `DELETE FROM %s WHERE key_name NOT IN (%s) RETURNING key_name;`
 	inStr := strings.TrimRight(strings.Repeat("?,", len(keyNames)), ",")
 
-	rows, err := tx.Query(fmt.Sprintf(deleteSql, inStr), keyNames...)
+	rows, err := tx.Query(fmt.Sprintf(deleteSql, s.tableName, inStr), keyNames...)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			return nil, fmt.Errorf("deleting keys: %w; rollback error %v", err, rollbackErr)

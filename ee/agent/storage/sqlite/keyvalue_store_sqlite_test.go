@@ -23,7 +23,7 @@ func TestNewStore_EmptyFileExists(t *testing.T) {
 	require.NoError(t, err, "creating empty file")
 	require.NoError(t, f.Close(), "closing empty db file")
 
-	s, err := NewStore(context.TODO(), testRootDir)
+	s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
 	require.NoError(t, err, "creating test store")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -37,8 +37,17 @@ func TestNewStore_DatabaseIsCorrupt(t *testing.T) {
 	// Create corrupt db file
 	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
 
-	_, err := NewStore(context.TODO(), testRootDir)
+	_, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
 	require.Error(t, err, "expected error when database is corrupt")
+}
+
+func TestNewStore_InvalidTable(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+
+	_, err := NewStore(context.TODO(), testRootDir, "some_unknown_table")
+	require.Error(t, err, "expected error when passing in table not on allowlist")
 }
 
 func TestGetSet(t *testing.T) {
@@ -46,7 +55,7 @@ func TestGetSet(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := NewStore(context.TODO(), testRootDir)
+	s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
 	require.NoError(t, err, "creating test store")
 
 	flagKey := []byte(keys.UpdateChannel.String())
@@ -128,7 +137,7 @@ func TestUpdate(t *testing.T) {
 
 			testRootDir := t.TempDir()
 
-			s, err := NewStore(context.TODO(), testRootDir)
+			s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
 			require.NoError(t, err, "creating test store")
 
 			for _, update := range tt.updates {
