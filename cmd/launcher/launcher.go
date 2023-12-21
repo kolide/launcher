@@ -219,10 +219,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 	s, err := startup.NewStartupDatabase(ctx, k)
 	if err != nil {
-		k.Slogger().Log(ctx, slog.LevelWarn, "could not create startup db", "err", err)
-	} else {
-		defer s.Close()
+		return fmt.Errorf("creating startup db: %w", err)
 	}
+	defer s.Close()
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
