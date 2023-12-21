@@ -22,7 +22,7 @@ func TestGetStartupValue(t *testing.T) {
 	// Set flag value
 	flagKey := keys.UpdateChannel.String()
 	flagVal := "test value"
-	store, err := agentsqlite.NewStore(context.TODO(), testRootDir, agentsqlite.TableKeyValuePairs)
+	store, err := agentsqlite.NewStore(context.TODO(), testRootDir, agentsqlite.TableStartupSettings)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
 	require.NoError(t, store.Close(), "closing setup connection")
@@ -75,7 +75,7 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 
 	// Set up preexisting database
 	testRootDir := setupTestDb(t)
-	store, err := agentsqlite.NewStore(context.TODO(), testRootDir, agentsqlite.TableKeyValuePairs)
+	store, err := agentsqlite.NewStore(context.TODO(), testRootDir, agentsqlite.TableStartupSettings)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte(flags.BoolToString(false))), "setting key")
@@ -163,7 +163,7 @@ func TestFlagsChanged(t *testing.T) {
 func setupTestDb(t *testing.T) string {
 	tempRootDir := t.TempDir()
 
-	store, err := agentsqlite.NewStore(context.TODO(), tempRootDir, agentsqlite.TableKeyValuePairs)
+	store, err := agentsqlite.NewStore(context.TODO(), tempRootDir, agentsqlite.TableStartupSettings)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, store.Close(), "closing test db")
 

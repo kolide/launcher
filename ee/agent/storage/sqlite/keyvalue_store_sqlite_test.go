@@ -23,7 +23,7 @@ func TestNewStore_EmptyFileExists(t *testing.T) {
 	require.NoError(t, err, "creating empty file")
 	require.NoError(t, f.Close(), "closing empty db file")
 
-	s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
+	s, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
 	require.NoError(t, err, "creating test store")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -37,7 +37,7 @@ func TestNewStore_DatabaseIsCorrupt(t *testing.T) {
 	// Create corrupt db file
 	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
 
-	_, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
+	_, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
 	require.Error(t, err, "expected error when database is corrupt")
 }
 
@@ -55,7 +55,7 @@ func TestGetSet(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
+	s, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
 	require.NoError(t, err, "creating test store")
 
 	flagKey := []byte(keys.UpdateChannel.String())
@@ -137,7 +137,7 @@ func TestUpdate(t *testing.T) {
 
 			testRootDir := t.TempDir()
 
-			s, err := NewStore(context.TODO(), testRootDir, TableKeyValuePairs)
+			s, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
 			require.NoError(t, err, "creating test store")
 
 			for _, update := range tt.updates {
@@ -145,7 +145,7 @@ func TestUpdate(t *testing.T) {
 				require.NoError(t, err, "expected no error on update")
 			}
 
-			rows, err := s.conn.Query(`SELECT key_name, key_value FROM keyvalue_pairs;`)
+			rows, err := s.conn.Query(`SELECT name, value FROM startup_settings;`)
 			require.NoError(t, err, "querying kv pairs")
 			defer rows.Close()
 

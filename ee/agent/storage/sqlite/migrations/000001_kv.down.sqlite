@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS keyvalue_pairs;
+DROP TABLE IF EXISTS startup_settings;

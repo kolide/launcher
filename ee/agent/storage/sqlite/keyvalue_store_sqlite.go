@@ -18,12 +18,12 @@ import (
 )
 
 const (
-	// Supported tables -- all tables should have the same columns
-	TableKeyValuePairs = "keyvalue_pairs"
+	// Supported tables -- all tables should have the same `name` and `value` columns
+	TableStartupSettings = "startup_settings"
 )
 
 var supportedTables = map[string]struct{}{
-	TableKeyValuePairs: {},
+	TableStartupSettings: {},
 }
 
 //go:embed migrations/*.sqlite
@@ -129,7 +129,7 @@ func (s *SqliteStore) Get(key []byte) (value []byte, err error) {
 
 	// It's fine to interpolate the table name into the query because
 	// we require the table name to be in our allowlist `supportedTables`
-	query := fmt.Sprintf(`SELECT key_value FROM %s WHERE key_name = ?;`, s.tableName)
+	query := fmt.Sprintf(`SELECT value FROM %s WHERE name = ?;`, s.tableName)
 
 	var keyValue string
 	if err := s.conn.QueryRow(query, string(key)).Scan(&keyValue); err != nil {
@@ -150,9 +150,9 @@ func (s *SqliteStore) Set(key, value []byte) error {
 	// It's fine to interpolate the table name into the query because
 	// we require the table name to be in our allowlist `supportedTables`
 	upsertSql := fmt.Sprintf(`
-INSERT INTO %s (key_name, key_value)
+INSERT INTO %s (name, value)
 VALUES (?, ?)
-ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`,
+ON CONFLICT (name) DO UPDATE SET value=excluded.value;`,
 		s.tableName,
 	)
 
@@ -183,9 +183,9 @@ func (s *SqliteStore) Update(kvPairs map[string]string) ([]string, error) {
 	// First, perform upsert to for all new and existing keys.
 
 	upsertSql := `
-INSERT INTO %s (key_name, key_value)
+INSERT INTO %s (name, value)
 VALUES %s
-ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`
+ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	valueStr := strings.TrimRight(strings.Repeat("(?, ?),", len(kvPairs)), ",")
 
 	// Build value args; save key names at the same time to determine which keys to prune later
@@ -209,7 +209,7 @@ ON CONFLICT (key_name) DO UPDATE SET key_value=excluded.key_value;`
 	}
 
 	// Now, prune all keys that must be deleted
-	deleteSql := `DELETE FROM %s WHERE key_name NOT IN (%s) RETURNING key_name;`
+	deleteSql := `DELETE FROM %s WHERE name NOT IN (%s) RETURNING name;`
 	inStr := strings.TrimRight(strings.Repeat("?,", len(keyNames)), ",")
 
 	rows, err := tx.Query(fmt.Sprintf(deleteSql, s.tableName, inStr), keyNames...)
