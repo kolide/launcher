@@ -37,8 +37,9 @@ func TestNewStore_DatabaseIsCorrupt(t *testing.T) {
 	// Create corrupt db file
 	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
 
-	_, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
-	require.Error(t, err, "expected error when database is corrupt")
+	s, err := NewStore(context.TODO(), testRootDir, TableStartupSettings)
+	require.NoError(t, err, "expected database to be deleted and re-created successfully when corrupt")
+	require.NoError(t, s.Close(), "closing test store")
 }
 
 func TestNewStore_InvalidTable(t *testing.T) {

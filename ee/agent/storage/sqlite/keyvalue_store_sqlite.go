@@ -62,20 +62,19 @@ func NewStore(ctx context.Context, rootDirectory string, tableName string) (*Sql
 // dbConn returns a connection to the database in the given rootDirectory.
 // It will create a database there if one does not yet exist.
 func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
-	// Ensure db exists
 	startupDbFilepath := dbLocation(rootDirectory)
-	if _, err := os.Stat(startupDbFilepath); os.IsNotExist(err) {
+	if err := validateDb(ctx, startupDbFilepath); err != nil {
+		// Delete and re-create the database file
+		_ = os.Remove(startupDbFilepath)
 		f, err := os.Create(startupDbFilepath)
 		if err != nil {
 			return nil, fmt.Errorf("creating file at %s: %w", startupDbFilepath, err)
 		}
 		f.Close()
-	} else if err != nil {
-		return nil, fmt.Errorf("determining if db exists: %w", err)
 	}
 
 	// Open and validate connection
-	conn, err := sql.Open("sqlite", dbLocation(rootDirectory))
+	conn, err := sql.Open("sqlite", startupDbFilepath)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -84,6 +83,33 @@ func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
 	}
 
 	return conn, nil
+}
+
+// validateDb ensures that the database file exists and is not corrupt.
+func validateDb(ctx context.Context, dbFilepath string) error {
+	// Make sure the database exists
+	if _, err := os.Stat(dbFilepath); os.IsNotExist(err) {
+		return fmt.Errorf("db does not exist at %s", dbFilepath)
+	} else if err != nil {
+		return fmt.Errorf("determining if db exists: %w", err)
+	}
+
+	conn, err := sql.Open("sqlite", dbFilepath)
+	if err != nil {
+		return fmt.Errorf("creating connection: %w", err)
+	}
+	defer conn.Close()
+
+	// Make sure the database is valid
+	var quickCheckResults string
+	if err := conn.QueryRowContext(ctx, `pragma quick_check;`).Scan(&quickCheckResults); err != nil {
+		return fmt.Errorf("running quick check: %w", err)
+	}
+	if quickCheckResults != "ok" {
+		return fmt.Errorf("quick check did not pass: %s", quickCheckResults)
+	}
+
+	return nil
 }
 
 // dbLocation standardizes the filepath to the given database.
