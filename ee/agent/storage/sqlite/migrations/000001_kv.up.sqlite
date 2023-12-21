@@ -1,5 +1,4 @@
 CREATE TABLE IF NOT EXISTS keyvalue_pairs (
-    pair_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    key_name TEXT NOT NULL UNIQUE,
+    key_name TEXT NOT NULL PRIMARY KEY,
     key_value TEXT
-);
+) WITHOUT ROWID;
