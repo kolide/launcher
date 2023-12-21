@@ -61,7 +61,9 @@ func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupD
 		s.knapsack.Slogger().Log(ctx, slog.LevelWarn, "could not set flags", "err", err)
 	}
 
-	s.knapsack.RegisterChangeObserver(s, keys.UpdateChannel)
+	for k := range s.storedFlags {
+		s.knapsack.RegisterChangeObserver(s, k)
+	}
 
 	return s, nil
 }
@@ -85,7 +87,10 @@ func (s *startupDatabase) setFlags(ctx context.Context) error {
 // stores that updated value.
 func (s *startupDatabase) FlagsChanged(flagKeys ...keys.FlagKey) {
 	if err := s.setFlags(context.Background()); err != nil {
-		s.knapsack.Slogger().Log(context.Background(), slog.LevelError, "could not set flags after change", "err", err)
+		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
+			"could not set flags after change",
+			"err", err,
+		)
 	}
 }
 

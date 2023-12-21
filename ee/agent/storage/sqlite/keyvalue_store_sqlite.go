@@ -114,7 +114,7 @@ func (s *SqliteStore) Get(key []byte) (value []byte, err error) {
 
 	var keyValue string
 	if err := s.conn.QueryRow(`SELECT key_value FROM keyvalue_pairs WHERE key_name = ?;`, string(key)).Scan(&keyValue); err != nil {
-		return nil, fmt.Errorf("querying flag value: %w", err)
+		return nil, fmt.Errorf("querying key `%s`: %w", string(key), err)
 	}
 	return []byte(keyValue), nil
 }
