@@ -204,6 +204,9 @@ func (ses *secureEnclaveSigner) createKey(ctx context.Context) error {
 	return nil
 }
 
+// lastLine returns the last line of the out.
+// This is needed because laucher sets up a logger by default.
+// The last line of the output is the public key or signature.
 func lastLine(out []byte) string {
 	outStr := string(out)
 

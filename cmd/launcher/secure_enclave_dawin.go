@@ -24,7 +24,7 @@ var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
 func runSecureEnclave(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("not enough arguments, expect create_key <challenge> or sign <sign_request>")
+		return fmt.Errorf("not enough arguments, expect create_key <request> or sign <sign_request>")
 	}
 
 	if secureenclavesigner.Undertest {
@@ -37,12 +37,12 @@ func runSecureEnclave(args []string) error {
 	for _, keyStr := range []string{certs.K2EccServerCert, certs.ReviewEccServerCert, certs.LocalhostEccServerCert} {
 		key, err := echelper.PublicPemToEcdsaKey([]byte(keyStr))
 		if err != nil {
-			return fmt.Errorf("parsing server public key: %w", err)
+			return fmt.Errorf("parsing server public key from pem: %w", err)
 		}
 
 		pubB64Der, err := echelper.PublicEcdsaToB64Der(key)
 		if err != nil {
-			return fmt.Errorf("marshalling server public key to der: %w", err)
+			return fmt.Errorf("marshalling server public key to b64 der: %w", err)
 		}
 
 		serverPubKeys[string(pubB64Der)] = key
@@ -71,31 +71,21 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack request: %w", err)
 	}
 
-	c, err := challenge.UnmarshalChallenge(request.Challenge)
-	if err != nil {
-		return fmt.Errorf("unmarshaling challenge: %w", err)
-	}
-
-	serverPubKey, ok := serverPubKeys[string(request.ServerPubKey)]
-	if !ok {
-		return fmt.Errorf("server public key not found")
-	}
-
-	if err := c.Verify(*serverPubKey); err != nil {
+	if err := verifySecureEnclaveChallenge(request); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
-	pubKey, err := secureenclave.CreateKey()
+	secureEnclavePubKey, err := secureenclave.CreateKey()
 	if err != nil {
 		return fmt.Errorf("creating secure enclave key: %w", err)
 	}
 
-	pubDer, err := echelper.PublicEcdsaToB64Der(pubKey)
+	secureEnclavePubDer, err := echelper.PublicEcdsaToB64Der(secureEnclavePubKey)
 	if err != nil {
 		return fmt.Errorf("marshalling public key to der: %w", err)
 	}
 
-	fmt.Println(string(pubDer))
+	fmt.Println(string(secureEnclavePubDer))
 	return nil
 }
 
@@ -110,26 +100,16 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack sign request: %w", err)
 	}
 
-	c, err := challenge.UnmarshalChallenge(signRequest.Challenge)
-	if err != nil {
-		return fmt.Errorf("unmarshaling challenge: %w", err)
-	}
-
-	serverPubKey, ok := serverPubKeys[string(signRequest.ServerPubKey)]
-	if !ok {
-		return fmt.Errorf("server public key not found")
-	}
-
-	if err := c.Verify(*serverPubKey); err != nil {
+	if err := verifySecureEnclaveChallenge(signRequest.Request); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
-	pubKey, err := echelper.PublicB64DerToEcdsaKey(signRequest.SecureEnclavePubKey)
+	secureEnclavePubKey, err := echelper.PublicB64DerToEcdsaKey(signRequest.SecureEnclavePubKey)
 	if err != nil {
 		return fmt.Errorf("marshalling b64 der to public key: %w", err)
 	}
 
-	ses, err := secureenclave.New(pubKey)
+	ses, err := secureenclave.New(secureEnclavePubKey)
 	if err != nil {
 		return fmt.Errorf("creating secure enclave signer: %w", err)
 	}
@@ -144,5 +124,24 @@ func signWithSecureEnclave(signRequestB64 string) error {
 	}
 
 	fmt.Print(base64.StdEncoding.EncodeToString(sig))
+	return nil
+}
+
+func verifySecureEnclaveChallenge(request secureenclavesigner.Request) error {
+	c, err := challenge.UnmarshalChallenge(request.Challenge)
+	if err != nil {
+		return fmt.Errorf("unmarshaling challenge: %w", err)
+	}
+
+	serverPubKey, ok := serverPubKeys[string(request.ServerPubKey)]
+	if !ok {
+		return fmt.Errorf("server public key not found")
+	}
+
+	if err := c.Verify(*serverPubKey); err != nil {
+		return fmt.Errorf("verifying challenge: %w", err)
+	}
+
+	// TODO verify time stamp
 	return nil
 }

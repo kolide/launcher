@@ -161,7 +161,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 			"using review app certificates",
 		)
 
-		serverRsaCertPem = certs.ReviewEccServerCert
+		serverRsaCertPem = certs.ReviewRsaServerCert
 		serverEccCertPem = certs.ReviewEccServerCert
 	default:
 		ls.slogger.Log(ctx, slogLevel,

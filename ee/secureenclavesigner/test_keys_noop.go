@@ -7,6 +7,12 @@ import (
 	"crypto/ecdsa"
 )
 
+const Undertest = false
+
+// ServerPubKeyDer should never be set outside of testing.
+// See test_keys.go.
 var ServerPubKeyDer string
-var Undertest = false
+
+// TestKey should never be set outside of testing.
+// See test_keys.go.
 var TestKey *ecdsa.PublicKey

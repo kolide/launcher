@@ -3,10 +3,8 @@
 
 package main
 
-import (
-	"fmt"
-)
+import "errors"
 
 func runSecureEnclave(args []string) error {
-	return fmt.Errorf("not implemented on non darwin platforms")
+	return errors.New("not implemented on non darwin platforms")
 }
