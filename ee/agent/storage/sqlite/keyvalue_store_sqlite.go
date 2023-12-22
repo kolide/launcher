@@ -29,7 +29,7 @@ var supportedTables = map[string]struct{}{
 //go:embed migrations/*.sqlite
 var migrations embed.FS
 
-type SqliteStore struct {
+type sqliteStore struct {
 	conn          *sql.DB
 	rootDirectory string
 	tableName     string
@@ -37,7 +37,7 @@ type SqliteStore struct {
 
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
+func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*sqliteStore, error) {
 	if _, ok := supportedTables[tableName]; !ok {
 		return nil, fmt.Errorf("unsupported table %s", tableName)
 	}
@@ -47,7 +47,7 @@ func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*Sqlit
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
 
-	return &SqliteStore{
+	return &sqliteStore{
 		conn:          conn,
 		rootDirectory: rootDirectory,
 		tableName:     tableName,
@@ -56,7 +56,7 @@ func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*Sqlit
 
 // OpenRW creates a validated database connection to a validated database, performing
 // migrations if necessary.
-func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
+func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*sqliteStore, error) {
 	if _, ok := supportedTables[tableName]; !ok {
 		return nil, fmt.Errorf("unsupported table %s", tableName)
 	}
@@ -66,7 +66,7 @@ func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*Sqlit
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
 
-	s := &SqliteStore{
+	s := &sqliteStore{
 		conn:          conn,
 		rootDirectory: rootDirectory,
 		tableName:     tableName,
@@ -142,7 +142,7 @@ func dbLocation(rootDirectory string) string {
 }
 
 // migrate makes sure that the database schema is correct.
-func (s *SqliteStore) migrate(ctx context.Context) error {
+func (s *sqliteStore) migrate(ctx context.Context) error {
 	d, err := iofs.New(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("loading migration files: %w", err)
@@ -165,11 +165,11 @@ func (s *SqliteStore) migrate(ctx context.Context) error {
 	return nil
 }
 
-func (s *SqliteStore) Close() error {
+func (s *sqliteStore) Close() error {
 	return s.conn.Close()
 }
 
-func (s *SqliteStore) Get(key []byte) (value []byte, err error) {
+func (s *sqliteStore) Get(key []byte) (value []byte, err error) {
 	if s == nil {
 		return nil, errors.New("store is nil")
 	}
@@ -185,7 +185,7 @@ func (s *SqliteStore) Get(key []byte) (value []byte, err error) {
 	return []byte(keyValue), nil
 }
 
-func (s *SqliteStore) Set(key, value []byte) error {
+func (s *sqliteStore) Set(key, value []byte) error {
 	if s == nil {
 		return errors.New("store is nil")
 	}
@@ -210,7 +210,7 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`,
 	return nil
 }
 
-func (s *SqliteStore) Update(kvPairs map[string]string) ([]string, error) {
+func (s *sqliteStore) Update(kvPairs map[string]string) ([]string, error) {
 	if s == nil {
 		return nil, errors.New("store is nil")
 	}
