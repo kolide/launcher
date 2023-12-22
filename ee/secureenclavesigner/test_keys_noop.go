@@ -3,16 +3,9 @@
 
 package secureenclavesigner
 
-import (
-	"crypto/ecdsa"
-)
-
+// Undertest is true when running secure encalve test build
 const Undertest = false
 
-// ServerPubKeyDer should never be set outside of testing.
+// TestServerPubKey should never be set outside of testing.
 // See test_keys.go.
-var ServerPubKeyDer string
-
-// TestKey should never be set outside of testing.
-// See test_keys.go.
-var TestKey *ecdsa.PublicKey
+const TestServerPubKey = ""

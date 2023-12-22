@@ -67,7 +67,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		"go",
 		"build",
 		"-ldflags",
-		fmt.Sprintf("-X github.com/kolide/launcher/ee/secureenclavesigner.ServerPubKeyDer=%s", string(serverPubKeyDer)),
+		fmt.Sprintf("-X github.com/kolide/launcher/ee/secureenclavesigner.TestServerPubKey=%s", string(serverPubKeyDer)),
 		"-tags",
 		"secure_enclave_test",
 		"-o",

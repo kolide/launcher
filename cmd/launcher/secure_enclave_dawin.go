@@ -28,10 +28,16 @@ func runSecureEnclave(args []string) error {
 	}
 
 	if secureenclavesigner.Undertest {
-		if secureenclavesigner.TestKey == nil {
-			panic("TestKey is nil")
+		if secureenclavesigner.TestServerPubKey == "" {
+			return fmt.Errorf("test server public key not set")
 		}
-		serverPubKeys[string(secureenclavesigner.ServerPubKeyDer)] = secureenclavesigner.TestKey
+
+		k, err := echelper.PublicB64DerToEcdsaKey([]byte(secureenclavesigner.TestServerPubKey))
+		if err != nil {
+			return fmt.Errorf("parsing test server public key: %w", err)
+		}
+
+		serverPubKeys[string(secureenclavesigner.TestServerPubKey)] = k
 	}
 
 	for _, keyStr := range []string{certs.K2EccServerCert, certs.ReviewEccServerCert, certs.LocalhostEccServerCert} {
