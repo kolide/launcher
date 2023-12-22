@@ -14,7 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestNewStartupDatabase_NewDatabase(t *testing.T) {
+func TestOpenWriter_NewDatabase(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies
@@ -28,7 +28,7 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(false)
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewWriter(context.TODO(), k)
+	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	// Check that all values were set
@@ -42,7 +42,7 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	require.NoError(t, s.Close(), "closing startup db")
 }
 
-func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
+func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	t.Parallel()
 
 	// Set up preexisting database
@@ -74,7 +74,7 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(true)
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewWriter(context.TODO(), k)
+	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	// Now check that all values were updated
@@ -103,7 +103,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(useTufAutoupdaterVal).Once()
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewWriter(context.TODO(), k)
+	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	// Check that all values were set

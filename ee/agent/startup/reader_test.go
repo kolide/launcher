@@ -22,7 +22,7 @@ func TestGet(t *testing.T) {
 	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
 	require.NoError(t, store.Close(), "closing setup connection")
 
-	r, err := NewReader(context.TODO(), testRootDir)
+	r, err := OpenReader(context.TODO(), testRootDir)
 	require.NoError(t, err, "creating reader")
 
 	returnedVal, err := r.Get(flagKey)
@@ -38,7 +38,7 @@ func TestGet_DbNotExist(t *testing.T) {
 	testRootDir := t.TempDir()
 	flagKey := keys.UpdateChannel.String()
 
-	r, err := NewReader(context.TODO(), testRootDir)
+	r, err := OpenReader(context.TODO(), testRootDir)
 	require.NoError(t, err, "creating reader")
 	_, err = r.Get(flagKey)
 	require.Error(t, err, "expected error getting startup value when database does not exist")

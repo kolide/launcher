@@ -22,9 +22,9 @@ type startupSettingsWriter struct {
 	storedFlags map[keys.FlagKey]func() string // maps the agent flags to their knapsack getter functions
 }
 
-// NewWriter returns a new startup settings writer, creating and initializing
+// OpenWriter returns a new startup settings writer, creating and initializing
 // the database if necessary.
-func NewWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
+func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
 	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.TableStartupSettings)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", knapsack.RootDirectory(), err)
