@@ -1,9 +1,7 @@
 module github.com/kolide/launcher
 
-replace (
-	// TODO: remove when done developing
-	github.com/kolide/krypto => github.com/James-Pickett/krypto 5ad27a5ce48670082166c2e31dc394b8a120426e
-)
+// TODO: remove when done developing
+replace github.com/kolide/krypto => github.com/James-Pickett/krypto v0.0.0-20231215190126-5ad27a5ce486
 
 require (
 	github.com/Masterminds/semver v1.4.2
@@ -25,7 +23,6 @@ require (
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
 	github.com/kolide/krypto v0.1.1-0.20231219012048-5859599c50aa
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
-	github.com/kr/pty v1.1.2
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
@@ -63,6 +60,7 @@ require (
 	github.com/kolide/systray v1.10.4
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
+	github.com/spf13/pflag v1.0.5
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.19.0
 )
@@ -72,7 +70,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/samber/lo v1.38.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/tools v0.16.0 // indirect
@@ -125,7 +122,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
-	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
+	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.45.0
 	go.opentelemetry.io/otel v1.21.0
