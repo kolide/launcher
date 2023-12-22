@@ -14,7 +14,7 @@ package secureenclavesigner
 // if we're under test by checking the value of the var set by the -ldflag, but
 // that feels more tangly.
 
-// Undertest is true when running secure encalve test build
+// Undertest is true when running secure enclave test build
 const Undertest = true
 
 // TestServerPubKey is the public key of the server in DER format
