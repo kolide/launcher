@@ -1,4 +1,4 @@
-package startup
+package startupsettings
 
 import (
 	"context"

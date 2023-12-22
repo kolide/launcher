@@ -29,7 +29,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
-	"github.com/kolide/launcher/ee/agent/startup"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/control/actionqueue"
@@ -217,7 +217,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}
 	}
 
-	s, err := startup.OpenWriter(ctx, k)
+	s, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}

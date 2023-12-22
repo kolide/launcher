@@ -1,7 +1,7 @@
-// Package startup provides access to and manages storage of startup data:
+// Package startupsettings provides access to and manages storage of startup data:
 // flags/config values/settings that launcher needs during initialization,
 // before the knapsack is available.
-package startup
+package startupsettings
 
 import (
 	"context"
