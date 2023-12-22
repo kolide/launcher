@@ -35,12 +35,33 @@ type SqliteStore struct {
 	tableName     string
 }
 
-func NewStore(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
+// OpenRO opens a connection to the database in the given root directory; it does
+// not perform database creation or migration.
+func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
 	if _, ok := supportedTables[tableName]; !ok {
 		return nil, fmt.Errorf("unsupported table %s", tableName)
 	}
 
-	conn, err := dbConn(ctx, rootDirectory)
+	conn, err := sql.Open("sqlite", dbLocation(rootDirectory))
+	if err != nil {
+		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
+	}
+
+	return &SqliteStore{
+		conn:          conn,
+		rootDirectory: rootDirectory,
+		tableName:     tableName,
+	}, nil
+}
+
+// OpenRW creates a validated database connection to a validated database, performing
+// migrations if necessary.
+func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*SqliteStore, error) {
+	if _, ok := supportedTables[tableName]; !ok {
+		return nil, fmt.Errorf("unsupported table %s", tableName)
+	}
+
+	conn, err := validatedDbConn(ctx, rootDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -59,9 +80,9 @@ func NewStore(ctx context.Context, rootDirectory string, tableName string) (*Sql
 	return s, nil
 }
 
-// dbConn returns a connection to the database in the given rootDirectory.
+// validatedDbConn returns a connection to the database in the given rootDirectory.
 // It will create a database there if one does not yet exist.
-func dbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
+func validatedDbConn(ctx context.Context, rootDirectory string) (*sql.DB, error) {
 	startupDbFilepath := dbLocation(rootDirectory)
 	if err := validateDb(ctx, startupDbFilepath); err != nil {
 		// Delete and re-create the database file

@@ -19,7 +19,7 @@ import (
 // GetStartupValue retrieves the value for the given flagKey from the startup database
 // located in the given rootDirectory. It wraps creation and closing of the sqlite store.
 func GetStartupValue(ctx context.Context, rootDirectory string, flagKey string) (string, error) {
-	store, err := agentsqlite.NewStore(ctx, rootDirectory, agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRO(ctx, rootDirectory, agentsqlite.TableStartupSettings)
 	if err != nil {
 		return "", fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}
@@ -44,7 +44,7 @@ type startupDatabase struct {
 // NewStartupDatabase returns a new startup database, creating and initializing
 // the database if necessary.
 func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupDatabase, error) {
-	store, err := agentsqlite.NewStore(ctx, knapsack.RootDirectory(), agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.TableStartupSettings)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", knapsack.RootDirectory(), err)
 	}
