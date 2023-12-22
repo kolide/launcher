@@ -1,5 +1,10 @@
 module github.com/kolide/launcher
 
+replace (
+	// TODO: remove when done developing
+	github.com/kolide/krypto => github.com/James-Pickett/krypto 5ad27a5ce48670082166c2e31dc394b8a120426e
+)
+
 require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.6.1
