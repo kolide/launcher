@@ -51,6 +51,12 @@ type GetterCloser interface {
 	Close() error
 }
 
+// GetterUpdaterCloser groups the Get, Update, and Close methods.
+type GetterUpdaterCloser interface {
+	Updater
+	GetterCloser
+}
+
 // GetterSetterDeleter is an interface that groups the Get, Set, and Delete methods.
 type GetterSetterDeleter interface {
 	Getter

@@ -17,7 +17,7 @@ import (
 // startupSettingsWriter records agent flags and their current values,
 // responding to updates as a types.FlagsChangeObserver
 type startupSettingsWriter struct {
-	kvStore     *agentsqlite.SqliteStore
+	kvStore     types.GetterUpdaterCloser
 	knapsack    types.Knapsack
 	storedFlags map[keys.FlagKey]func() string // maps the agent flags to their knapsack getter functions
 }
