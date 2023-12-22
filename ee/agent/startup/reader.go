@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type startupSettingsReader struct {
-	kvStore *agentsqlite.SqliteStore
+	kvStore types.GetterCloser
 }
 
 func NewReader(ctx context.Context, rootDirectory string) (*startupSettingsReader, error) {

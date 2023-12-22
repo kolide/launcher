@@ -45,6 +45,12 @@ type GetterSetter interface {
 	Setter
 }
 
+// GetterCloser extends the Getter interface with a Close method.
+type GetterCloser interface {
+	Getter
+	Close() error
+}
+
 // GetterSetterDeleter is an interface that groups the Get, Set, and Delete methods.
 type GetterSetterDeleter interface {
 	Getter
