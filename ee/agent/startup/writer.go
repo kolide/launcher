@@ -16,40 +16,23 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// GetStartupValue retrieves the value for the given flagKey from the startup database
-// located in the given rootDirectory. It wraps creation and closing of the sqlite store.
-func GetStartupValue(ctx context.Context, rootDirectory string, flagKey string) (string, error) {
-	store, err := agentsqlite.OpenRO(ctx, rootDirectory, agentsqlite.TableStartupSettings)
-	if err != nil {
-		return "", fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
-	}
-	defer store.Close()
-
-	flagValue, err := store.Get([]byte(flagKey))
-	if err != nil {
-		return "", fmt.Errorf("getting flag value %s: %w", flagKey, err)
-	}
-
-	return string(flagValue), nil
-}
-
-// startupDatabase records agent flags and their current values,
+// startupSettingsWriter records agent flags and their current values,
 // responding to updates as a types.FlagsChangeObserver
-type startupDatabase struct {
+type startupSettingsWriter struct {
 	kvStore     *agentsqlite.SqliteStore
 	knapsack    types.Knapsack
 	storedFlags map[keys.FlagKey]func() string // maps the agent flags to their knapsack getter functions
 }
 
-// NewStartupDatabase returns a new startup database, creating and initializing
+// NewWriter returns a new startup settings writer, creating and initializing
 // the database if necessary.
-func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupDatabase, error) {
+func NewWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
 	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.TableStartupSettings)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", knapsack.RootDirectory(), err)
 	}
 
-	s := &startupDatabase{
+	s := &startupSettingsWriter{
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
@@ -71,7 +54,7 @@ func NewStartupDatabase(ctx context.Context, knapsack types.Knapsack) (*startupD
 }
 
 // setFlags updates the flags with their values from the agent flag data store.
-func (s *startupDatabase) setFlags(ctx context.Context) error {
+func (s *startupSettingsWriter) setFlags(ctx context.Context) error {
 	updatedFlags := make(map[string]string)
 	for flag, getter := range s.storedFlags {
 		updatedFlags[flag.String()] = getter()
@@ -87,7 +70,7 @@ func (s *startupDatabase) setFlags(ctx context.Context) error {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface. When a flag
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
-func (s *startupDatabase) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
 	if err := s.setFlags(context.Background()); err != nil {
 		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
 			"could not set flags after change",
@@ -96,6 +79,6 @@ func (s *startupDatabase) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 }
 
-func (s *startupDatabase) Close() error {
+func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
 }

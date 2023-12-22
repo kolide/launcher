@@ -14,34 +14,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestGetStartupValue(t *testing.T) {
-	t.Parallel()
-
-	testRootDir := setupTestDb(t)
-
-	// Set flag value
-	flagKey := keys.UpdateChannel.String()
-	flagVal := "test value"
-	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.TableStartupSettings)
-	require.NoError(t, err, "getting connection to test db")
-	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
-	require.NoError(t, store.Close(), "closing setup connection")
-
-	returnedVal, err := GetStartupValue(context.TODO(), testRootDir, flagKey)
-	require.NoError(t, err, "expected no error getting startup value")
-	require.Equal(t, flagVal, returnedVal, "flag value mismatch")
-}
-
-func TestGetStartupValue_DbNotExist(t *testing.T) {
-	t.Parallel()
-
-	testRootDir := t.TempDir()
-	flagKey := keys.UpdateChannel.String()
-
-	_, err := GetStartupValue(context.TODO(), testRootDir, flagKey)
-	require.Error(t, err, "expected error getting startup value when database does not exist")
-}
-
 func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	t.Parallel()
 
@@ -56,18 +28,18 @@ func TestNewStartupDatabase_NewDatabase(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(false)
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewStartupDatabase(context.TODO(), k)
+	s, err := NewWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
-	require.NoError(t, s.Close(), "closing startup db")
-
 	// Check that all values were set
-	v1, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
+	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, updateChannelVal, v1, "incorrect flag value")
-	v2, err := GetStartupValue(context.TODO(), testRootDir, keys.UseTUFAutoupdater.String())
+	require.Equal(t, updateChannelVal, string(v1), "incorrect flag value")
+	v2, err := s.kvStore.Get([]byte(keys.UseTUFAutoupdater.String()))
 	require.NoError(t, err, "getting startup value")
-	require.False(t, flags.StringToBool(v2), "incorrect flag value")
+	require.False(t, flags.StringToBool(string(v2)), "incorrect flag value")
+
+	require.NoError(t, s.Close(), "closing startup db")
 }
 
 func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
@@ -79,15 +51,16 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte(flags.BoolToString(false))), "setting key")
-	require.NoError(t, store.Close(), "closing setup connection")
 
 	// Confirm flags were set
-	v1, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
+	v1, err := store.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, "some_old_value", v1, "incorrect flag value")
-	v2, err := GetStartupValue(context.TODO(), testRootDir, keys.UseTUFAutoupdater.String())
+	require.Equal(t, "some_old_value", string(v1), "incorrect flag value")
+	v2, err := store.Get([]byte(keys.UseTUFAutoupdater.String()))
 	require.NoError(t, err, "getting startup value")
-	require.False(t, flags.StringToBool(v2), "incorrect flag value")
+	require.False(t, flags.StringToBool(string(v2)), "incorrect flag value")
+
+	require.NoError(t, store.Close(), "closing setup connection")
 
 	// Set up dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -101,19 +74,18 @@ func TestNewStartupDatabase_DatabaseAlreadyExists(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(true)
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewStartupDatabase(context.TODO(), k)
+	s, err := NewWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
-	// Close the db to flush changes
-	require.NoError(t, s.Close(), "closing startup db")
-
 	// Now check that all values were updated
-	v1, err = GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
+	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, updateChannelVal, v1, "incorrect flag value")
-	v2, err = GetStartupValue(context.TODO(), testRootDir, keys.UseTUFAutoupdater.String())
+	require.Equal(t, updateChannelVal, string(v1), "incorrect flag value")
+	v2, err = s.kvStore.Get([]byte(keys.UseTUFAutoupdater.String()))
 	require.NoError(t, err, "getting startup value")
-	require.True(t, flags.StringToBool(v2), "incorrect flag value")
+	require.True(t, flags.StringToBool(string(v2)), "incorrect flag value")
+
+	require.NoError(t, s.Close(), "closing startup db")
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -131,16 +103,16 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("UseTUFAutoupdater").Return(useTufAutoupdaterVal).Once()
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := NewStartupDatabase(context.TODO(), k)
+	s, err := NewWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	// Check that all values were set
-	v1, err := GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
+	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, updateChannelVal, v1, "incorrect flag value")
-	v2, err := GetStartupValue(context.TODO(), testRootDir, keys.UseTUFAutoupdater.String())
+	require.Equal(t, updateChannelVal, string(v1), "incorrect flag value")
+	v2, err := s.kvStore.Get([]byte(keys.UseTUFAutoupdater.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, useTufAutoupdaterVal, flags.StringToBool(v2), "incorrect flag value")
+	require.Equal(t, useTufAutoupdaterVal, flags.StringToBool(string(v2)), "incorrect flag value")
 
 	// Now, prepare for flag changes
 	newFlagValue := "alpha"
@@ -150,12 +122,12 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Call FlagsChanged and expect that all flag values are updated
 	s.FlagsChanged(keys.UpdateChannel)
-	v1, err = GetStartupValue(context.TODO(), testRootDir, keys.UpdateChannel.String())
+	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, newFlagValue, v1, "incorrect flag value")
-	v2, err = GetStartupValue(context.TODO(), testRootDir, keys.UseTUFAutoupdater.String())
+	require.Equal(t, newFlagValue, string(v1), "incorrect flag value")
+	v2, err = s.kvStore.Get([]byte(keys.UseTUFAutoupdater.String()))
 	require.NoError(t, err, "getting startup value")
-	require.Equal(t, newUseTufAutoupdaterVal, flags.StringToBool(v2), "incorrect flag value")
+	require.Equal(t, newUseTufAutoupdaterVal, flags.StringToBool(string(v2)), "incorrect flag value")
 
 	require.NoError(t, s.Close(), "closing startup db")
 }

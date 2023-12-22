@@ -217,7 +217,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}
 	}
 
-	s, err := startup.NewStartupDatabase(ctx, k)
+	s, err := startup.NewWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}
