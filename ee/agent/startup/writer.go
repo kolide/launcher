@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
-	_ "modernc.org/sqlite"
 )
 
 // startupSettingsWriter records agent flags and their current values,
