@@ -67,26 +67,32 @@ func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
 	}
 
 	if serialChanged || hardwareUUIDChanged || munemoChanged {
-		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or enrollment, backing up and resetting database",
+		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or enrollment",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"tenant_munemo_changed", munemoChanged,
 		)
 
-		backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
-		if err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
-		}
+		// In the future, we can proceed with backing up and resetting the database.
+		// For now, we are only logging that we detected the change.
+		/*
+			backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
+			if err != nil {
+				k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
+			}
 
-		if err := wipeDatabase(ctx, k); err != nil {
-			k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
-			return
-		}
+			if err := wipeDatabase(ctx, k); err != nil {
+				k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
+				return
+			}
 
-		// Store the backup data
-		if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
-		}
+
+			// Store the backup data
+			if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
+				k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
+			}
+
+		*/
 
 		// Cache hardware and rollout data for future checks
 		if err := k.PersistentHostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
@@ -234,7 +240,7 @@ func currentMunemo(k types.Knapsack) (string, error) {
 // prepareDatabaseResetRecords retrieves the data we want to preserve from various db stores
 // as a record of the current state of this database before reset. It appends this record
 // to previous records if they exist, and returns the collection ready for storage.
-func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetReason string) ([]byte, error) {
+func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetReason string) ([]byte, error) { // nolint:unused
 	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get node key from store", "err", err)
@@ -314,7 +320,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 
 // getLocalPubKey retrieves the local database key, parses it, and returns
 // the pubkey.
-func getLocalPubKey(k types.Knapsack) ([]byte, error) {
+func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 	localEccKeyRaw, err := k.ConfigStore().Get([]byte("localEccKey"))
 	if err != nil {
 		return nil, fmt.Errorf("getting raw key from config store: %w", err)
@@ -335,11 +341,14 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) {
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(ctx context.Context, k types.Knapsack) error {
-	for storeName, store := range k.Stores() {
-		if err := store.DeleteAll(); err != nil {
-			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
+func wipeDatabase(ctx context.Context, k types.Knapsack) error { // nolint:unused
+	return errors.New("currently not supported")
+	/*
+		for storeName, store := range k.Stores() {
+			if err := store.DeleteAll(); err != nil {
+				return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
+			}
 		}
-	}
-	return nil
+		return nil
+	*/
 }

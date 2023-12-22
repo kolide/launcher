@@ -247,6 +247,11 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// For now, we never expect the database to be wiped. In the future, when we
+			// decide to proceed with resetting the database, we can remove this line from
+			// the tests and they will continue to validate expected behavior.
+			tt.expectDatabaseWipe = false
+
 			// Set up dependencies: data store for hardware-identifying data
 			testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
 			require.NoError(t, err, "could not create test host data store")
@@ -423,6 +428,8 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 
 func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
+
+	t.Skip("un-skip test once we decide to reset the database on hardware change")
 
 	// Set up dependencies: data store for hardware-identifying data
 	testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
