@@ -44,6 +44,7 @@ const (
 	MirrorServerURL                 FlagKey = "mirror_url"
 	AutoupdateInterval              FlagKey = "autoupdate_interval"
 	UpdateChannel                   FlagKey = "update_channel"
+	UseTUFAutoupdater               FlagKey = "use_tuf_autoupdater"
 	NotaryPrefix                    FlagKey = "notary_prefix"
 	AutoupdateInitialDelay          FlagKey = "autoupdater_initial_delay"
 	UpdateDirectory                 FlagKey = "update_directory"

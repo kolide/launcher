@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,6 +23,9 @@ import (
 )
 
 const defaultDisplay = ":0"
+
+// Display takes the format host:displaynumber.screen
+var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
 	ctx, span := traces.StartSpan(ctx, "uid", uid)
@@ -234,7 +238,7 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 
 		if uidMatch {
 			// We have a match! Grab the display value.
-			// The Xorg process looks like:
+			// The Xorg process may look like:
 			// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
 			// The Xvfb process looks like:
 			// Xvfb :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -screen 0 3840x2560x24
@@ -244,7 +248,11 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 				continue
 			}
 
-			return cmdlineArgs[1]
+			// Confirm that this is a legitimate display value. (Newer versions of Xorg omit the display value from
+			// the list of arguments, so we need to weed those out.)
+			if displayRegex.MatchString(cmdlineArgs[1]) {
+				return cmdlineArgs[1]
+			}
 		}
 	}
 
