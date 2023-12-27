@@ -57,7 +57,8 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 
 	// build an executable containing the tests into the app bundle
 	executablePath := filepath.Join(appRoot, "Contents", "MacOS", "launcher_test")
-	out, err := exec.CommandContext(ctx,
+	out, err := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowcmd
+		ctx,
 		"go",
 		"test",
 		"-c",
@@ -75,7 +76,7 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 	signApp(t, appRoot)
 
 	// run app bundle executable
-	cmd := exec.CommandContext(ctx, executablePath, "-test.v")
+	cmd := exec.CommandContext(ctx, executablePath, "-test.v") //nolint:forbidigo // Only used in test, don't want as standard allowcmd
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%s", testWrappedEnvVarKey, "true"))
 	out, err = cmd.CombinedOutput()
 	require.NoError(t, ctx.Err())
@@ -186,7 +187,7 @@ func signApp(t *testing.T, appRootDir string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(
+	cmd := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowcmd
 		ctx,
 		"codesign",
 		"--deep",
