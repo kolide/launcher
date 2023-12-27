@@ -20,6 +20,8 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
+const secureEnclaveTimestampValidityRange = 150
+
 var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
 func runSecureEnclave(args []string) error {
@@ -148,6 +150,12 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.Request) error {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
-	// TODO verify time stamp
+	// Check the timestamp, this prevents people from saving a challenge and then
+	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
+	timestampDelta := time.Now().Unix() - c.Timestamp()
+	if timestampDelta > secureEnclaveTimestampValidityRange || timestampDelta < -secureEnclaveTimestampValidityRange {
+		return fmt.Errorf("timestamp delta %d is outside of validity range", timestampDelta)
+	}
+
 	return nil
 }

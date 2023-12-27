@@ -84,13 +84,12 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 
 	// ensure the test ran
 	require.Contains(t, string(out), "PASS: TestSecureEnclaveCmd")
+	require.Contains(t, string(out), "PASS: TestSecureEnclaveCmdValidation")
 	require.NotContains(t, string(out), "FAIL")
 	t.Log(string(out))
 }
 
-func TestSecureEnclaveCmd(t *testing.T) {
-	t.Parallel()
-
+func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	if os.Getenv(testWrappedEnvVarKey) == "" {
 		t.Skipf("\nskipping because %s env var was empty, test not being run from codesigned app with entitlements", testWrappedEnvVarKey)
 	}
@@ -172,6 +171,67 @@ func TestSecureEnclaveCmd(t *testing.T) {
 	require.NoError(t, echelper.VerifySignature(secureEnclavePubKey, dataToSign, sig))
 }
 
+func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
+	if os.Getenv(testWrappedEnvVarKey) == "" {
+		t.Skipf("\nskipping because %s env var was empty, test not being run from codesigned app with entitlements", testWrappedEnvVarKey)
+	}
+
+	t.Log("\nrunning wrapped tests with codesigned app and entitlements")
+
+	// no args
+	require.ErrorContains(t, runSecureEnclave([]string{}), "not enough arguments")
+	require.ErrorContains(t, runSecureEnclave([]string{"unknown", "bad request"}), "unknown command")
+
+	for _, cmd := range []string{"create-key", "sign"} {
+		// bad request
+		require.ErrorContains(t, runSecureEnclave([]string{cmd, "bad request"}), "decoding b64")
+
+		testServerPrivKey, err := echelper.GenerateEcdsaKey()
+		require.NoError(t, err)
+
+		testServerPubKeyB64Der, err := echelper.PublicEcdsaToB64Der(&testServerPrivKey.PublicKey)
+		require.NoError(t, err)
+
+		someData := []byte(ulid.New())
+		challengeBox, _, err := challenge.Generate(testServerPrivKey, someData, someData, someData)
+		require.NoError(t, err)
+
+		// no pub server key
+		require.ErrorContains(t, runSecureEnclave([]string{cmd,
+			base64.StdEncoding.EncodeToString(
+				msgpackMustMarshall(t,
+					secureenclavesigner.Request{
+						Challenge:    challengeBox,
+						ServerPubKey: testServerPubKeyB64Der,
+					},
+				),
+			),
+		}), "server public key not found")
+
+		// add the test server private key to the map of server public keys
+		serverPubKeys[string(testServerPubKeyB64Der)] = &testServerPrivKey.PublicKey
+
+		// sign with wrong server key
+		malloryServerKey, err := echelper.GenerateEcdsaKey()
+		require.NoError(t, err)
+
+		malloryChallengeBox, _, err := challenge.Generate(malloryServerKey, someData, someData, someData)
+		require.NoError(t, err)
+
+		// invalid signature
+		require.ErrorContains(t, runSecureEnclave([]string{cmd,
+			base64.StdEncoding.EncodeToString(
+				msgpackMustMarshall(t,
+					secureenclavesigner.Request{
+						Challenge:    malloryChallengeBox,
+						ServerPubKey: testServerPubKeyB64Der,
+					},
+				),
+			),
+		}), "verifying challenge")
+	}
+}
+
 // #nosec G306 -- Need readable files
 func copyFile(t *testing.T, source, destination string) {
 	bytes, err := os.ReadFile(source)
@@ -202,4 +262,10 @@ func signApp(t *testing.T, appRootDir string) {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, ctx.Err())
 	require.NoError(t, err, string(out))
+}
+
+func msgpackMustMarshall(t *testing.T, v interface{}) []byte {
+	b, err := msgpack.Marshal(v)
+	require.NoError(t, err)
+	return b
 }
