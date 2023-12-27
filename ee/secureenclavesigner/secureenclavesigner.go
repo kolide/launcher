@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/user"
 	"strings"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -133,8 +133,8 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 		return nil, fmt.Errorf("looking up user by uid: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx,
-		"/bin/launchctl",
+	cmd, err := allowedcmd.Launchctl(
+		ctx,
 		"asuser",
 		ses.uid,
 		"sudo",
@@ -146,6 +146,10 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 		"sign",
 		base64.StdEncoding.EncodeToString(signRequestMsgPack),
 	)
+
+	if err != nil {
+		return nil, fmt.Errorf("creating command to sign: %w", err)
+	}
 
 	// skip updates since we have full path of binary
 	cmd.Env = append(cmd.Environ(), fmt.Sprintf("%s=%s", "LAUNCHER_SKIP_UPDATES", "true"))
@@ -174,8 +178,8 @@ func (ses *secureEnclaveSigner) createKey(ctx context.Context) error {
 		return fmt.Errorf("marshalling request to msgpack: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx,
-		"/bin/launchctl",
+	cmd, err := allowedcmd.Launchctl(
+		ctx,
 		"asuser",
 		ses.uid,
 		"sudo",
@@ -187,6 +191,10 @@ func (ses *secureEnclaveSigner) createKey(ctx context.Context) error {
 		"create-key",
 		base64.StdEncoding.EncodeToString(requestMsgPack),
 	)
+
+	if err != nil {
+		return fmt.Errorf("creating command to create key: %w", err)
+	}
 
 	// skip updates since we have full path of binary
 	cmd.Env = append(cmd.Environ(), fmt.Sprintf("%s=%s", "LAUNCHER_SKIP_UPDATES", "true"))

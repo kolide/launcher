@@ -3,7 +3,7 @@
 
 package secureenclavesigner
 
-// Undertest is true when running secure encalve test build
+// Undertest is true when running secure enclave test build
 const Undertest = false
 
 // TestServerPubKey should never be set outside of testing.
