@@ -62,7 +62,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	// build the executable
 	executablePath := filepath.Join(appRoot, "Contents", "MacOS", "launcher_test")
-	out, err := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowedCmd
+	out, err := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowedcmd
 		ctx,
 		"go",
 		"build",
