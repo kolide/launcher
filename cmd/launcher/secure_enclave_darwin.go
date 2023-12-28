@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/ee/agent/certs"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -24,14 +24,18 @@ const secureEnclaveTimestampValidityRange = 150
 
 var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
+// runSecureEnclave performs either a create-key or sign operation using the secure enclave.
+// It's available as a separate command because launcher runs a root by default and since it's
+// not in a user security context it can't use the secure enclave directly. However, this command
+// can be run in the user context using launchctl.
 func runSecureEnclave(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("not enough arguments, expect create_key <request> or sign <sign_request>")
+		return errors.New("not enough arguments, expect create_key <request> or sign <sign_request>")
 	}
 
 	if secureenclavesigner.Undertest {
 		if secureenclavesigner.TestServerPubKey == "" {
-			return fmt.Errorf("test server public key not set")
+			return errors.New("test server public key not set")
 		}
 
 		k, err := echelper.PublicB64DerToEcdsaKey([]byte(secureenclavesigner.TestServerPubKey))
@@ -57,10 +61,10 @@ func runSecureEnclave(args []string) error {
 	}
 
 	switch args[0] {
-	case "create-key":
+	case secureenclavesigner.CreateKeyCmd:
 		return createSecureEnclaveKey(args[1])
 
-	case "sign":
+	case secureenclavesigner.SignCmd:
 		return signWithSecureEnclave(args[1])
 
 	default:
@@ -93,6 +97,7 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("marshalling public key to der: %w", err)
 	}
 
+	// write results to stdout since so that parent process can use
 	fmt.Println(string(secureEnclavePubDer))
 	return nil
 }
@@ -117,20 +122,17 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("marshalling b64 der to public key: %w", err)
 	}
 
-	ses, err := secureenclave.New(secureEnclavePubKey)
+	seSigner, err := secureenclave.New(secureEnclavePubKey)
 	if err != nil {
 		return fmt.Errorf("creating secure enclave signer: %w", err)
 	}
-	var sig []byte
-	backoff.WaitFor(func() error {
-		sig, err = ses.Sign(rand.Reader, signRequest.Digest, crypto.SHA256)
-		return err
-	}, 250*time.Millisecond, 2*time.Second)
 
+	sig, err := seSigner.Sign(rand.Reader, signRequest.Digest, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("signing request: %w", err)
 	}
 
+	// write results to stdout since so that parent process can use
 	fmt.Print(base64.StdEncoding.EncodeToString(sig))
 	return nil
 }
@@ -143,7 +145,7 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.Request) error {
 
 	serverPubKey, ok := serverPubKeys[string(request.ServerPubKey)]
 	if !ok {
-		return fmt.Errorf("server public key not found")
+		return errors.New("server public key not found")
 	}
 
 	if err := c.Verify(*serverPubKey); err != nil {

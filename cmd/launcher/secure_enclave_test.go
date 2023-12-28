@@ -47,7 +47,7 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 	rootDir := t.TempDir()
 	appRoot := filepath.Join(rootDir, "launcher_test.app")
 
-	// make required dirs krypto_test.app/Contents/MacOS and add files
+	// make required dirs launcher_test.app/Contents/MacOS and add files
 	require.NoError(t, os.MkdirAll(filepath.Join(appRoot, "Contents", "MacOS"), 0700))
 	copyFile(t, filepath.Join(macOsAppResourceDir, "Info.plist"), filepath.Join(appRoot, "Contents", "Info.plist"))
 	copyFile(t, filepath.Join(macOsAppResourceDir, "embedded.provisionprofile"), filepath.Join(appRoot, "Contents", "embedded.provisionprofile"))
@@ -57,7 +57,7 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 
 	// build an executable containing the tests into the app bundle
 	executablePath := filepath.Join(appRoot, "Contents", "MacOS", "launcher_test")
-	out, err := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowcmd
+	out, err := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowedCmd
 		ctx,
 		"go",
 		"test",
@@ -76,7 +76,7 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 	signApp(t, appRoot)
 
 	// run app bundle executable
-	cmd := exec.CommandContext(ctx, executablePath, "-test.v") //nolint:forbidigo // Only used in test, don't want as standard allowcmd
+	cmd := exec.CommandContext(ctx, executablePath, "-test.v") //nolint:forbidigo // Only used in test, don't want as standard allowedCmd
 	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%s", testWrappedEnvVarKey, "true"))
 	out, err = cmd.CombinedOutput()
 	require.NoError(t, ctx.Err())
@@ -127,7 +127,7 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 
 	os.Stdout = pipeWriter
 
-	require.NoError(t, runSecureEnclave([]string{"create-key", base64.StdEncoding.EncodeToString(requestBytes)}))
+	require.NoError(t, runSecureEnclave([]string{secureenclavesigner.CreateKeyCmd, base64.StdEncoding.EncodeToString(requestBytes)}))
 	require.NoError(t, pipeWriter.Close())
 
 	var buf bytes.Buffer
@@ -158,7 +158,7 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 
 	os.Stdout = pipeWriter
-	require.NoError(t, runSecureEnclave([]string{"sign", base64.StdEncoding.EncodeToString(signRequestBytes)}))
+	require.NoError(t, runSecureEnclave([]string{secureenclavesigner.SignCmd, base64.StdEncoding.EncodeToString(signRequestBytes)}))
 	require.NoError(t, pipeWriter.Close())
 
 	buf = bytes.Buffer{}
@@ -182,7 +182,7 @@ func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
 	require.ErrorContains(t, runSecureEnclave([]string{}), "not enough arguments")
 	require.ErrorContains(t, runSecureEnclave([]string{"unknown", "bad request"}), "unknown command")
 
-	for _, cmd := range []string{"create-key", "sign"} {
+	for _, cmd := range []string{secureenclavesigner.CreateKeyCmd, secureenclavesigner.SignCmd} {
 		// bad request
 		require.ErrorContains(t, runSecureEnclave([]string{cmd, "bad request"}), "decoding b64")
 
@@ -223,7 +223,8 @@ func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
 			base64.StdEncoding.EncodeToString(
 				msgpackMustMarshall(t,
 					secureenclavesigner.Request{
-						Challenge:    malloryChallengeBox,
+						Challenge: malloryChallengeBox,
+						// claim to be signed known key
 						ServerPubKey: testServerPubKeyB64Der,
 					},
 				),
@@ -247,7 +248,7 @@ func signApp(t *testing.T, appRootDir string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowcmd
+	cmd := exec.CommandContext( //nolint:forbidigo // Only used in test, don't want as standard allowedCmd
 		ctx,
 		"codesign",
 		"--deep",

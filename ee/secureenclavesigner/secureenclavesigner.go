@@ -20,6 +20,11 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
+const (
+	CreateKeyCmd = "create-key"
+	SignCmd      = "sign"
+)
+
 type SignRequest struct {
 	Request
 	// Digest is the hash []byte of the data to be signed
@@ -47,16 +52,18 @@ func WithExistingKey(publicKey *ecdsa.PublicKey) opt {
 }
 
 type secureEnclaveSigner struct {
-	uid                  string
+	// uid is the uid of the user to run the secure enclave commands as
+	uid string
+	// username is the username of the user to run the secure enclave commands as
+	username             string
 	serverPubKeyB64Der   []byte
 	challenge            []byte
 	pubKey               *ecdsa.PublicKey
 	pathToLauncherBinary string
 }
 
-func New(uid string, serverPubKeyB64Der []byte, challenge []byte, opts ...opt) (*secureEnclaveSigner, error) {
+func New(signingUid string, serverPubKeyB64Der []byte, challenge []byte, opts ...opt) (*secureEnclaveSigner, error) {
 	ses := &secureEnclaveSigner{
-		uid:                uid,
 		serverPubKeyB64Der: serverPubKeyB64Der,
 		challenge:          challenge,
 	}
@@ -64,6 +71,15 @@ func New(uid string, serverPubKeyB64Der []byte, challenge []byte, opts ...opt) (
 	for _, opt := range opts {
 		opt(ses)
 	}
+
+	// look up user by uid
+	u, err := user.LookupId(signingUid)
+	if err != nil {
+		return nil, fmt.Errorf("looking up user by uid: %w", err)
+	}
+
+	ses.uid = u.Uid
+	ses.username = u.Username
 
 	if ses.pathToLauncherBinary == "" {
 		p, err := os.Executable()
@@ -127,12 +143,6 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 		return nil, fmt.Errorf("marshalling sign request to msgpack: %w", err)
 	}
 
-	// get user name from uid
-	u, err := user.LookupId(ses.uid)
-	if err != nil {
-		return nil, fmt.Errorf("looking up user by uid: %w", err)
-	}
-
 	cmd, err := allowedcmd.Launchctl(
 		ctx,
 		"asuser",
@@ -140,10 +150,10 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 		"sudo",
 		"--preserve-env",
 		"-u",
-		u.Username,
+		ses.username,
 		ses.pathToLauncherBinary,
 		"secure-enclave",
-		"sign",
+		SignCmd,
 		base64.StdEncoding.EncodeToString(signRequestMsgPack),
 	)
 
@@ -162,12 +172,6 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 }
 
 func (ses *secureEnclaveSigner) createKey(ctx context.Context) error {
-	// get user name from uid
-	u, err := user.LookupId(ses.uid)
-	if err != nil {
-		return fmt.Errorf("looking up user by uid: %w", err)
-	}
-
 	request := Request{
 		Challenge:    ses.challenge,
 		ServerPubKey: ses.serverPubKeyB64Der,
@@ -185,10 +189,10 @@ func (ses *secureEnclaveSigner) createKey(ctx context.Context) error {
 		"sudo",
 		"--preserve-env",
 		"-u",
-		u.Username,
+		ses.username,
 		ses.pathToLauncherBinary,
 		"secure-enclave",
-		"create-key",
+		CreateKeyCmd,
 		base64.StdEncoding.EncodeToString(requestMsgPack),
 	)
 
