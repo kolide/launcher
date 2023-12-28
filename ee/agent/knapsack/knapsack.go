@@ -419,6 +419,13 @@ func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
 }
 
+func (k *knapsack) SetUseTUFAutoupdater(enabled bool) error {
+	return k.flags.SetUseTUFAutoupdater(enabled)
+}
+func (k *knapsack) UseTUFAutoupdater() bool {
+	return k.flags.UseTUFAutoupdater()
+}
+
 func (k *knapsack) SetExportTraces(enabled bool) error {
 	return k.flags.SetExportTraces(enabled)
 }
