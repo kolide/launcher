@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 	os.Exit(retCode)
 }
 
-func TestResetDatabaseIfNeeded(t *testing.T) {
+func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -354,7 +354,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
+			DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
 
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {
@@ -426,7 +426,7 @@ func TestResetDatabaseIfNeeded(t *testing.T) {
 	}
 }
 
-func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
+func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
 
 	t.Skip("un-skip test once we decide to reset the database on hardware change")
@@ -492,7 +492,7 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make first test call
-	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
+	DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
 	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -526,7 +526,7 @@ func TestResetDatabaseIfNeeded_SavesDataOverMultipleResets(t *testing.T) {
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make second test call
-	ResetDatabaseIfNeeded(context.TODO(), mockKnapsack)
+	DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
 	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)

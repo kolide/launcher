@@ -41,11 +41,12 @@ const (
 	resetReasonNewHardwareOrEnrollmentDetected = "launcher detected new hardware or enrollment"
 )
 
-// ResetDatabaseIfNeeded checks to see if the hardware this installation is running on
-// has changed, by checking current hardware-identifying information against stored data
-// in the HostDataStore. If the hardware-identifying information has changed, it performs
-// a backup of the database, and then clears all data from it.
-func ResetDatabaseIfNeeded(ctx context.Context, k types.Knapsack) {
+// DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
+// has changed, by checking current hardware- and enrollment- identifying information against
+// stored data in the HostDataStore. If the hardware- or enrollment-identifying information
+// has changed, it logs the change. In the future, it will take a backup of the database, and
+// then clear all data from it.
+func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...")
 
 	serialChanged := false
