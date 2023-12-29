@@ -444,9 +444,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 	}
 
-	// Run the legacy autoupdater only if autoupdating is enabled and the given channel hasn't moved
-	// to the new autoupdater yet.
-	if k.Autoupdate() && !tuf.ChannelUsesNewAutoupdater(k.UpdateChannel()) {
+	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
+	// is not yet in use.
+	if k.Autoupdate() && !k.UseTUFAutoupdater() {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,

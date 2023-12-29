@@ -74,6 +74,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
+	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -163,6 +164,7 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UseTUFAutoupdater").Return(false)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -235,6 +237,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -308,6 +311,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -392,6 +396,7 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -455,6 +460,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater

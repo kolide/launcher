@@ -322,7 +322,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 	// Only perform restarts if we're configured to use this new autoupdate library,
 	// to prevent performing unnecessary restarts.
-	if !ChannelUsesNewAutoupdater(ta.knapsack.UpdateChannel()) {
+	if !ta.knapsack.UseTUFAutoupdater() {
 		return nil
 	}
 
