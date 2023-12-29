@@ -48,9 +48,11 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
 	}
 
-	if rs.slogger != nil {
-		rs.slogger = slogger.With("component", "desktop_runner_root_server")
+	if rs.slogger == nil {
+		return nil, fmt.Errorf("slogger is nil")
 	}
+
+	rs.slogger = slogger.With("component", "desktop_runner_root_server")
 
 	mux := http.NewServeMux()
 
