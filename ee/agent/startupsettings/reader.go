@@ -13,7 +13,7 @@ type startupSettingsReader struct {
 }
 
 func OpenReader(ctx context.Context, rootDirectory string) (*startupSettingsReader, error) {
-	store, err := agentsqlite.OpenRO(ctx, rootDirectory, agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRO(ctx, rootDirectory, agentsqlite.StartupSettingsStore)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}

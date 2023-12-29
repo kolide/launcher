@@ -17,7 +17,7 @@ func TestGet(t *testing.T) {
 	// Set flag value
 	flagKey := keys.UpdateChannel.String()
 	flagVal := "test value"
-	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
 	require.NoError(t, store.Close(), "closing setup connection")

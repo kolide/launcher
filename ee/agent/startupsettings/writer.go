@@ -25,7 +25,7 @@ type startupSettingsWriter struct {
 // OpenWriter returns a new startup settings writer, creating and initializing
 // the database if necessary.
 func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
-	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.StartupSettingsStore)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", knapsack.RootDirectory(), err)
 	}

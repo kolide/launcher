@@ -17,12 +17,12 @@ func TestOpenRO_DatabaseExists(t *testing.T) {
 
 	// Create database
 	testRootDir := t.TempDir()
-	s1, err := OpenRW(context.TODO(), testRootDir, TableStartupSettings)
+	s1, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s1.Close(), "closing database")
 
 	// Create RO-connection to database
-	s2, err := OpenRO(context.TODO(), testRootDir, TableStartupSettings)
+	s2, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s2.Close(), "closing database")
 }
@@ -32,7 +32,7 @@ func TestOpenRO_DatabaseDoesNotExist(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), testRootDir, TableStartupSettings)
+	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "no validation should be performed on RO connection")
 	require.NoFileExists(t, dbLocation(testRootDir), "database should not have been created")
 	require.NoError(t, s.Close(), "closing database")
@@ -49,7 +49,7 @@ func TestOpenRW_EmptyFileExists(t *testing.T) {
 	require.NoError(t, err, "creating empty file")
 	require.NoError(t, f.Close(), "closing empty db file")
 
-	s, err := OpenRW(context.TODO(), testRootDir, TableStartupSettings)
+	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -63,7 +63,7 @@ func TestOpenRW_DatabaseIsCorrupt(t *testing.T) {
 	// Create corrupt db file
 	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
 
-	s, err := OpenRW(context.TODO(), testRootDir, TableStartupSettings)
+	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected database to be deleted and re-created successfully when corrupt")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -73,7 +73,7 @@ func TestOpenRW_InvalidTable(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	_, err := OpenRW(context.TODO(), testRootDir, "some_unknown_table")
+	_, err := OpenRW(context.TODO(), testRootDir, 10001)
 	require.Error(t, err, "expected error when passing in table not on allowlist")
 }
 
@@ -82,7 +82,7 @@ func TestGetSet(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRW(context.TODO(), testRootDir, TableStartupSettings)
+	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 
 	flagKey := []byte(keys.UpdateChannel.String())
@@ -164,7 +164,7 @@ func TestUpdate(t *testing.T) {
 
 			testRootDir := t.TempDir()
 
-			s, err := OpenRW(context.TODO(), testRootDir, TableStartupSettings)
+			s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 			require.NoError(t, err, "creating test store")
 
 			for _, update := range tt.updates {

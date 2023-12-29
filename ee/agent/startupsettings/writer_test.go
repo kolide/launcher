@@ -47,7 +47,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 
 	// Set up preexisting database
 	testRootDir := setupTestDb(t)
-	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte(flags.BoolToString(false))), "setting key")
@@ -135,7 +135,7 @@ func TestFlagsChanged(t *testing.T) {
 func setupTestDb(t *testing.T) string {
 	tempRootDir := t.TempDir()
 
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.TableStartupSettings)
+	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, store.Close(), "closing test db")
 

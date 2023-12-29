@@ -17,13 +17,21 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type storeName int
+
 const (
-	// Supported tables -- all tables should have the same `name` and `value` columns
-	TableStartupSettings = "startup_settings"
+	StartupSettingsStore storeName = iota
 )
 
-var supportedTables = map[string]struct{}{
-	TableStartupSettings: {},
+// String translates the exported int constant to the actual name of the
+// supported table in the sqlite database.
+func (s storeName) String() string {
+	switch s {
+	case StartupSettingsStore:
+		return "startup_settings"
+	}
+
+	return ""
 }
 
 //go:embed migrations/*.sqlite
@@ -37,9 +45,9 @@ type sqliteStore struct {
 
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*sqliteStore, error) {
-	if _, ok := supportedTables[tableName]; !ok {
-		return nil, fmt.Errorf("unsupported table %s", tableName)
+func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+	if name.String() == "" {
+		return nil, fmt.Errorf("unsupported table %d", name)
 	}
 
 	conn, err := sql.Open("sqlite", dbLocation(rootDirectory))
@@ -50,15 +58,15 @@ func OpenRO(ctx context.Context, rootDirectory string, tableName string) (*sqlit
 	return &sqliteStore{
 		conn:          conn,
 		rootDirectory: rootDirectory,
-		tableName:     tableName,
+		tableName:     name.String(),
 	}, nil
 }
 
 // OpenRW creates a validated database connection to a validated database, performing
 // migrations if necessary.
-func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*sqliteStore, error) {
-	if _, ok := supportedTables[tableName]; !ok {
-		return nil, fmt.Errorf("unsupported table %s", tableName)
+func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+	if name.String() == "" {
+		return nil, fmt.Errorf("unsupported table %d", name)
 	}
 
 	conn, err := validatedDbConn(ctx, rootDirectory)
@@ -69,7 +77,7 @@ func OpenRW(ctx context.Context, rootDirectory string, tableName string) (*sqlit
 	s := &sqliteStore{
 		conn:          conn,
 		rootDirectory: rootDirectory,
-		tableName:     tableName,
+		tableName:     name.String(),
 	}
 
 	if err := s.migrate(ctx); err != nil {
