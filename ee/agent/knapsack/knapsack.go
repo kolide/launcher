@@ -75,6 +75,10 @@ func (k *knapsack) BboltDB() *bbolt.DB {
 
 // Stores interface methods
 
+func (k *knapsack) Stores() map[storage.Store]types.KVStore {
+	return k.stores
+}
+
 func (k *knapsack) AgentFlagsStore() types.KVStore {
 	return k.getKVStore(storage.AgentFlagsStore)
 }
@@ -89,6 +93,10 @@ func (k *knapsack) ConfigStore() types.KVStore {
 
 func (k *knapsack) ControlStore() types.KVStore {
 	return k.getKVStore(storage.ControlStore)
+}
+
+func (k *knapsack) PersistentHostDataStore() types.KVStore {
+	return k.getKVStore(storage.PersistentHostDataStore)
 }
 
 func (k *knapsack) InitialResultsStore() types.KVStore {
