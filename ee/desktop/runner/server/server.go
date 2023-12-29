@@ -2,15 +2,15 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 )
 
@@ -19,7 +19,7 @@ import (
 type RunnerServer struct {
 	server                          *http.Server
 	listener                        net.Listener
-	logger                          log.Logger
+	slogger                         *slog.Logger
 	desktopProcAuthTokens           map[string]string
 	mutex                           sync.Mutex
 	controlRequestIntervalOverrider controlRequestIntervalOverrider
@@ -36,7 +36,7 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
+func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
@@ -44,14 +44,16 @@ func New(logger log.Logger, controlRequestIntervalOverrider controlRequestInterv
 
 	rs := &RunnerServer{
 		listener:                        listener,
-		logger:                          logger,
+		slogger:                         slogger,
 		desktopProcAuthTokens:           make(map[string]string),
 		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
 	}
 
-	if rs.logger != nil {
-		rs.logger = log.With(rs.logger, "component", "desktop_runner_root_server")
+	if rs.slogger == nil {
+		return nil, errors.New("slogger cannot be nil")
 	}
+
+	rs.slogger = slogger.With("component", "desktop_runner_root_server")
 
 	mux := http.NewServeMux()
 
@@ -118,13 +120,17 @@ func (ms *RunnerServer) authMiddleware(next http.Handler) http.Handler {
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
 
 		if len(authHeader) != 2 {
-			level.Debug(ms.logger).Log("msg", "malformed authorization header")
+			ms.slogger.Log(r.Context(), slog.LevelDebug,
+				"malformed authorization header",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if !ms.isAuthTokenValid(authHeader[1]) {
-			level.Debug(ms.logger).Log("msg", "invalid desktop auth token")
+			ms.slogger.Log(r.Context(), slog.LevelDebug,
+				"invalid desktop auth token",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
