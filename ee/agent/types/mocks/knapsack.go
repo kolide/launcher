@@ -13,6 +13,8 @@ import (
 
 	slog "log/slog"
 
+	storage "github.com/kolide/launcher/ee/agent/storage"
+
 	time "time"
 
 	types "github.com/kolide/launcher/ee/agent/types"
@@ -782,6 +784,22 @@ func (_m *Knapsack) OsquerydPath() string {
 	return r0
 }
 
+// PersistentHostDataStore provides a mock function with given fields:
+func (_m *Knapsack) PersistentHostDataStore() types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
+	}
+
+	return r0
+}
+
 // RegisterChangeObserver provides a mock function with given fields: observer, flagKeys
 func (_m *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	_va := make([]interface{}, len(flagKeys))
@@ -1448,6 +1466,22 @@ func (_m *Knapsack) StatusLogsStore() types.GetterSetterDeleterIteratorUpdater {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
+	}
+
+	return r0
+}
+
+// Stores provides a mock function with given fields:
+func (_m *Knapsack) Stores() map[storage.Store]types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 map[storage.Store]types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() map[storage.Store]types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[storage.Store]types.GetterSetterDeleterIteratorUpdater)
 		}
 	}
 

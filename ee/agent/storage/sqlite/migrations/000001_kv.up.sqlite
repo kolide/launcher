@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS startup_settings (
+    name TEXT NOT NULL PRIMARY KEY,
+    value TEXT
+) WITHOUT ROWID;

@@ -63,6 +63,17 @@ func (s *inMemoryKeyValueStore) Delete(keys ...[]byte) error {
 	return nil
 }
 
+func (s *inMemoryKeyValueStore) DeleteAll() error {
+	if s == nil {
+		return errors.New("store is nil")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	clear(s.items)
+	return nil
+}
+
 func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil {
 		return errors.New("store is nil")

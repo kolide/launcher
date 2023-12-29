@@ -1,10 +1,14 @@
 package types
 
+import "github.com/kolide/launcher/ee/agent/storage"
+
 type Stores interface {
+	Stores() map[storage.Store]KVStore
 	AgentFlagsStore() KVStore
 	AutoupdateErrorsStore() KVStore
 	ConfigStore() KVStore
 	ControlStore() KVStore
+	PersistentHostDataStore() KVStore
 	InitialResultsStore() KVStore
 	ResultLogsStore() KVStore
 	OsqueryHistoryInstanceStore() KVStore

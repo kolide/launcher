@@ -119,6 +119,24 @@ func (s *bboltKeyValueStore) Delete(keys ...[]byte) error {
 	})
 }
 
+func (s *bboltKeyValueStore) DeleteAll() error {
+	if s == nil || s.db == nil {
+		return NoDbError{}
+	}
+
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		if err := tx.DeleteBucket([]byte(s.bucketName)); err != nil {
+			return fmt.Errorf("deleting bucket: %w", err)
+		}
+
+		if _, err := tx.CreateBucketIfNotExists([]byte(s.bucketName)); err != nil {
+			return fmt.Errorf("re-creating bucket: %w", err)
+		}
+
+		return nil
+	})
+}
+
 func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil || s.db == nil {
 		return NoDbError{}
