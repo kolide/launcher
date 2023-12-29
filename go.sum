@@ -41,8 +41,6 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/toml v1.1.0 h1:ksErzDEI1khOiGPgpwuI7x2ebx/uXQNw7xJpn9Eq1+I=
 github.com/BurntSushi/toml v1.1.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/James-Pickett/krypto v0.0.0-20231215190126-5ad27a5ce486 h1:nL75LwhX45SbVyPhAYZ18KAXv9xCGc7m5/909LM//cA=
-github.com/James-Pickett/krypto v0.0.0-20231215190126-5ad27a5ce486/go.mod h1:Ay0ETAi/xSofd+LXUv09oKjjwCu8et/+QjFBlmdcCmg=
 github.com/Masterminds/semver v1.4.2 h1:WBLTQ37jOCzSLtXNdoo8bNM8876KhNqOKvrlGITgsTc=
 github.com/Masterminds/semver v1.4.2/go.mod h1:MB6lktGJrhw8PrUyiEoblNEGEQ+RzHPF078ddwwvV3Y=
 github.com/Microsoft/go-winio v0.4.9/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
@@ -321,6 +319,10 @@ github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQ
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
 github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab h1:KVR7cs+oPyy85i+8t1ZaNSy1bymCy5FuWyt51pdrXu4=
 github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab/go.mod h1:OYYulo9tUqRadRLwB0+LE914sa1ui2yL7OrcU3Q/1XY=
+github.com/kolide/krypto v0.1.1-0.20231219012048-5859599c50aa h1:3agrIh6HWiEZAvH3ubVpfsaRFsg1Ux+1S5HU+HE5pPI=
+github.com/kolide/krypto v0.1.1-0.20231219012048-5859599c50aa/go.mod h1:/0sxd3OIxciTlMTeZI/9WTaUHsx/K/+3f+NbD5dywTY=
+github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121 h1:f7APX9VNsCkD/tdlAjbU4A22FyfTOCF6QadlvnzZElg=
+github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121/go.mod h1:/0sxd3OIxciTlMTeZI/9WTaUHsx/K/+3f+NbD5dywTY=
 github.com/kolide/systray v1.10.4 h1:eBhnVfhW0fGal1KBkBZC9fzRs4yrxUymgiXuQh5MBSg=
 github.com/kolide/systray v1.10.4/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
 github.com/kolide/toast v1.0.2 h1:BQlIfO3wbKIEWfF0c8v4UkdhSIZYnSWaKkZl+Yarptk=

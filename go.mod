@@ -1,8 +1,5 @@
 module github.com/kolide/launcher
 
-// TODO: remove when done developing
-replace github.com/kolide/krypto => github.com/James-Pickett/krypto v0.0.0-20231215190126-5ad27a5ce486
-
 require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.6.1
@@ -21,7 +18,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20170510131534-ae77be60afb1
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
-	github.com/kolide/krypto v0.1.1-0.20231219012048-5859599c50aa
+	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121
 	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.10.0
