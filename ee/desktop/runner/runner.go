@@ -183,12 +183,10 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		return nil, fmt.Errorf("creating desktop runner server: %w", err)
 	}
 
-	ctx := context.TODO()
-
 	runner.runnerServer = rs
 	go func() {
 		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			runner.slogger.Log(ctx, slog.LevelError,
+			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"running monitor server",
 				"err", err,
 			)
@@ -198,7 +196,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	if runtime.GOOS == "darwin" {
 		osversion, err := osversion()
 		if err != nil {
-			runner.slogger.Log(ctx, slog.LevelError,
+			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"getting os version",
 				"err", err,
 			)
@@ -220,12 +218,10 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	osUpdateCheckTicker := time.NewTicker(1 * time.Minute)
 	defer osUpdateCheckTicker.Stop()
 
-	ctx := context.TODO()
-
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
 		if err := r.runConsoleUserDesktop(); err != nil {
-			r.slogger.Log(ctx, slog.LevelInfo,
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
 				"running console user desktop",
 				"err", err,
 			)
@@ -241,7 +237,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 			r.checkOsUpdate()
 			continue
 		case <-r.interrupt:
-			r.slogger.Log(ctx, slog.LevelDebug,
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupt received, exiting desktop execute loop",
 			)
 			return nil
@@ -284,7 +280,6 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		r.procsWg.Wait()
 	}()
 
-	ctx := context.TODO()
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
 		// unregistering client from runner server so server will not respond to its requests
@@ -292,7 +287,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
-			r.slogger.Log(ctx, slog.LevelError,
+			r.slogger.Log(context.TODO(), slog.LevelError,
 				"sending shutdown command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
@@ -307,7 +302,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	select {
 	case <-wgDone:
 		if shutdownRequestCount > 0 {
-			r.slogger.Log(ctx, slog.LevelDebug,
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
 				"successfully completed desktop process shutdown requests",
 				"count", shutdownRequestCount,
 			)
@@ -316,7 +311,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
-		r.slogger.Log(ctx, slog.LevelError,
+		r.slogger.Log(context.TODO(), slog.LevelError,
 			"timeout waiting for desktop processes to exit, now killing",
 		)
 
@@ -325,7 +320,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				continue
 			}
 			if err := processRecord.Process.Kill(); err != nil {
-				r.slogger.Log(ctx, slog.LevelError,
+				r.slogger.Log(context.TODO(), slog.LevelError,
 					"killing desktop process",
 					"uid", uid,
 					"pid", processRecord.Process.Pid,
@@ -417,10 +412,9 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 
 // refreshMenu updates the menu file and tells desktop processes to refresh their menus
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
-	ctx := context.TODO()
 	if err := r.generateMenuFile(); err != nil {
 		if r.knapsack.DebugServerData() {
-			r.slogger.Log(ctx, slog.LevelError,
+			r.slogger.Log(context.TODO(), slog.LevelError,
 				"failed to generate menu file",
 				"err", err,
 			)
@@ -432,7 +426,7 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
 
-			r.slogger.Log(ctx, slog.LevelError,
+			r.slogger.Log(context.TODO(), slog.LevelError,
 				"sending refresh command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
@@ -815,10 +809,9 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	go func() {
 		combined := io.MultiReader(stdErr, stdOut)
 		scanner := bufio.NewScanner(combined)
-		ctx := context.TODO()
 
 		for scanner.Scan() {
-			r.slogger.Log(ctx, slog.LevelDebug,
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
 				scanner.Text(),
 				"uid", uid,
 				"subprocess", "desktop",
