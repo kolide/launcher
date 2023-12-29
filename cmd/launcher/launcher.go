@@ -334,7 +334,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		runner, err = desktopRunner.New(
 			k,
-			desktopRunner.WithLogger(logger),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 		)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
@@ -87,8 +87,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 	uidInt, err := strconv.ParseInt(uid, 10, 32)
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not convert uid to int32",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not convert uid to int32",
 			"err", err,
 		)
 		return envVars
@@ -97,8 +97,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
 	cmd, err := allowedcmd.Loginctl(ctx, "show-user", uid, "--value", "--property=Sessions")
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not create loginctl command",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not create loginctl command",
 			"uid", uid,
 			"err", err,
 		)
@@ -106,8 +106,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 	sessionOutput, err := cmd.Output()
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not get user session",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get user session",
 			"uid", uid,
 			"err", err,
 		)
@@ -124,8 +124,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 		// Figure out what type of graphical session the user has -- x11, wayland?
 		cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Type")
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not create loginctl command to get session type",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not create loginctl command to get session type",
 				"uid", uid,
 				"err", err,
 			)
@@ -133,8 +133,8 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 		}
 		typeOutput, err := cmd.Output()
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get session type",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get session type",
 				"uid", uid,
 				"err", err,
 			)
@@ -172,16 +172,16 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 	// We can read $DISPLAY from the session properties
 	cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not create command to get Display from user session",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not create command to get Display from user session",
 			"err", err,
 		)
 		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 	xDisplayOutput, err := cmd.Output()
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not get Display from user session",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get Display from user session",
 			"err", err,
 		)
 		return r.displayFromXDisplayServerProcess(ctx, uid)
@@ -198,8 +198,8 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx context.Context, uid int32) string {
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not query processes to find display server process",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not query processes to find display server process",
 			"err", err,
 		)
 		return defaultDisplay
@@ -208,8 +208,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 	for _, p := range processes {
 		cmdline, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get cmdline slice for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get cmdline slice for process",
 				"err", err,
 			)
 			continue
@@ -222,8 +222,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 		// We have an Xorg or Xvfb process -- check to make sure it's for our running user
 		uids, err := p.UidsWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get uids for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get uids for process",
 				"err", err,
 			)
 			continue
@@ -265,8 +265,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	// the Xwayland process and examining its args.
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not query processes to find Xwayland process",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not query processes to find Xwayland process",
 			"err", err,
 		)
 		return defaultDisplay
@@ -275,8 +275,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	for _, p := range processes {
 		cmdline, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get cmdline slice for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get cmdline slice for process",
 				"err", err,
 			)
 			continue
@@ -289,8 +289,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 		// We have an Xwayland process -- check to make sure it's for our running user
 		uids, err := p.UidsWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get uids for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get uids for process",
 				"err", err,
 			)
 			continue
@@ -341,10 +341,12 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 		return homeLocation
 	}
 
-	level.Debug(r.logger).Log("msg", "could not find xauthority in any known location",
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"could not find xauthority in any known location",
 		"wayland", waylandXAuthorityLocationPattern,
 		"x11", x11XauthorityLocation,
-		"default", homeLocation)
+		"default", homeLocation,
+	)
 
 	return ""
 }
