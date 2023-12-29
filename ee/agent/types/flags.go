@@ -122,9 +122,9 @@ type Flags interface {
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
 
-	// EnableWatchdog enables the osquery watchdog
-	SetEnableWatchdog(enable bool) error
-	EnableWatchdog() bool
+	// WatchdogEnabled enables the osquery watchdog
+	SetWatchdogEnabled(enable bool) error
+	WatchdogEnabled() bool
 
 	// WatchdogDelaySec sets the number of seconds the watchdog will delay on startup before running
 	SetWatchdogDelaySec(sec int) error
@@ -184,6 +184,10 @@ type Flags interface {
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
+
+	// UseTUFAutoupdater controls whether launcher uses the new TUF autoupdater instead of the legacy autoupdater
+	SetUseTUFAutoupdater(enabled bool) error
+	UseTUFAutoupdater() bool
 
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error

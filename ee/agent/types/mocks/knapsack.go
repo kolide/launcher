@@ -13,6 +13,8 @@ import (
 
 	slog "log/slog"
 
+	storage "github.com/kolide/launcher/ee/agent/storage"
+
 	time "time"
 
 	types "github.com/kolide/launcher/ee/agent/types"
@@ -330,20 +332,6 @@ func (_m *Knapsack) DisableTraceIngestTLS() bool {
 
 // EnableInitialRunner provides a mock function with given fields:
 func (_m *Knapsack) EnableInitialRunner() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// EnableWatchdog provides a mock function with given fields:
-func (_m *Knapsack) EnableWatchdog() bool {
 	ret := _m.Called()
 
 	var r0 bool
@@ -796,6 +784,22 @@ func (_m *Knapsack) OsquerydPath() string {
 	return r0
 }
 
+// PersistentHostDataStore provides a mock function with given fields:
+func (_m *Knapsack) PersistentHostDataStore() types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
+	}
+
+	return r0
+}
+
 // RegisterChangeObserver provides a mock function with given fields: observer, flagKeys
 func (_m *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	_va := make([]interface{}, len(flagKeys))
@@ -1050,20 +1054,6 @@ func (_m *Knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(enabled)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetEnableWatchdog provides a mock function with given fields: enable
-func (_m *Knapsack) SetEnableWatchdog(enable bool) error {
-	ret := _m.Called(enable)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enable)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1380,6 +1370,20 @@ func (_m *Knapsack) SetUpdateDirectory(directory string) error {
 	return r0
 }
 
+// SetUseTUFAutoupdater provides a mock function with given fields: enabled
+func (_m *Knapsack) SetUseTUFAutoupdater(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetWatchdogDelaySec provides a mock function with given fields: sec
 func (_m *Knapsack) SetWatchdogDelaySec(sec int) error {
 	ret := _m.Called(sec)
@@ -1387,6 +1391,20 @@ func (_m *Knapsack) SetWatchdogDelaySec(sec int) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(int) error); ok {
 		r0 = rf(sec)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetWatchdogEnabled provides a mock function with given fields: enable
+func (_m *Knapsack) SetWatchdogEnabled(enable bool) error {
+	ret := _m.Called(enable)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enable)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1448,6 +1466,22 @@ func (_m *Knapsack) StatusLogsStore() types.GetterSetterDeleterIteratorUpdater {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdater)
+		}
+	}
+
+	return r0
+}
+
+// Stores provides a mock function with given fields:
+func (_m *Knapsack) Stores() map[storage.Store]types.GetterSetterDeleterIteratorUpdater {
+	ret := _m.Called()
+
+	var r0 map[storage.Store]types.GetterSetterDeleterIteratorUpdater
+	if rf, ok := ret.Get(0).(func() map[storage.Store]types.GetterSetterDeleterIteratorUpdater); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[storage.Store]types.GetterSetterDeleterIteratorUpdater)
 		}
 	}
 
@@ -1584,6 +1618,20 @@ func (_m *Knapsack) UpdateDirectory() string {
 	return r0
 }
 
+// UseTUFAutoupdater provides a mock function with given fields:
+func (_m *Knapsack) UseTUFAutoupdater() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // WatchdogDelaySec provides a mock function with given fields:
 func (_m *Knapsack) WatchdogDelaySec() int {
 	ret := _m.Called()
@@ -1593,6 +1641,20 @@ func (_m *Knapsack) WatchdogDelaySec() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// WatchdogEnabled provides a mock function with given fields:
+func (_m *Knapsack) WatchdogEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

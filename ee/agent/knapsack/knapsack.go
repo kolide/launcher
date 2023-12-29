@@ -75,6 +75,10 @@ func (k *knapsack) BboltDB() *bbolt.DB {
 
 // Stores interface methods
 
+func (k *knapsack) Stores() map[storage.Store]types.KVStore {
+	return k.stores
+}
+
 func (k *knapsack) AgentFlagsStore() types.KVStore {
 	return k.getKVStore(storage.AgentFlagsStore)
 }
@@ -89,6 +93,10 @@ func (k *knapsack) ConfigStore() types.KVStore {
 
 func (k *knapsack) ControlStore() types.KVStore {
 	return k.getKVStore(storage.ControlStore)
+}
+
+func (k *knapsack) PersistentHostDataStore() types.KVStore {
+	return k.getKVStore(storage.PersistentHostDataStore)
 }
 
 func (k *knapsack) InitialResultsStore() types.KVStore {
@@ -308,11 +316,11 @@ func (k *knapsack) OsqueryVerbose() bool {
 	return k.flags.OsqueryVerbose()
 }
 
-func (k *knapsack) SetEnableWatchdog(enable bool) error {
-	return k.flags.SetEnableWatchdog(enable)
+func (k *knapsack) SetWatchdogEnabled(enable bool) error {
+	return k.flags.SetWatchdogEnabled(enable)
 }
-func (k *knapsack) EnableWatchdog() bool {
-	return k.flags.EnableWatchdog()
+func (k *knapsack) WatchdogEnabled() bool {
+	return k.flags.WatchdogEnabled()
 }
 
 func (k *knapsack) SetWatchdogDelaySec(sec int) error {
@@ -417,6 +425,13 @@ func (k *knapsack) SetUpdateDirectory(directory string) error {
 }
 func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
+}
+
+func (k *knapsack) SetUseTUFAutoupdater(enabled bool) error {
+	return k.flags.SetUseTUFAutoupdater(enabled)
+}
+func (k *knapsack) UseTUFAutoupdater() bool {
+	return k.flags.UseTUFAutoupdater()
 }
 
 func (k *knapsack) SetExportTraces(enabled bool) error {

@@ -258,6 +258,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	signalListener := newSignalListener(sigChannel, cancel, logger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
+	// For now, remediation is not performed -- we only log the hardware change.
+	agent.DetectAndRemediateHardwareChange(ctx, k)
+
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
 		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
@@ -352,8 +355,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			runner,
 			ctx,
+			runner,
 			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {

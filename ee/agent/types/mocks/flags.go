@@ -244,20 +244,6 @@ func (_m *Flags) EnableInitialRunner() bool {
 	return r0
 }
 
-// EnableWatchdog provides a mock function with given fields:
-func (_m *Flags) EnableWatchdog() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // EnrollSecret provides a mock function with given fields:
 func (_m *Flags) EnrollSecret() string {
 	ret := _m.Called()
@@ -865,20 +851,6 @@ func (_m *Flags) SetDisableTraceIngestTLS(enabled bool) error {
 	return r0
 }
 
-// SetEnableWatchdog provides a mock function with given fields: enable
-func (_m *Flags) SetEnableWatchdog(enable bool) error {
-	ret := _m.Called(enable)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enable)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetExportTraces provides a mock function with given fields: enabled
 func (_m *Flags) SetExportTraces(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -1188,6 +1160,20 @@ func (_m *Flags) SetUpdateDirectory(directory string) error {
 	return r0
 }
 
+// SetUseTUFAutoupdater provides a mock function with given fields: enabled
+func (_m *Flags) SetUseTUFAutoupdater(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetWatchdogDelaySec provides a mock function with given fields: sec
 func (_m *Flags) SetWatchdogDelaySec(sec int) error {
 	ret := _m.Called(sec)
@@ -1195,6 +1181,20 @@ func (_m *Flags) SetWatchdogDelaySec(sec int) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(int) error); ok {
 		r0 = rf(sec)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetWatchdogEnabled provides a mock function with given fields: enable
+func (_m *Flags) SetWatchdogEnabled(enable bool) error {
+	ret := _m.Called(enable)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enable)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1328,6 +1328,20 @@ func (_m *Flags) UpdateDirectory() string {
 	return r0
 }
 
+// UseTUFAutoupdater provides a mock function with given fields:
+func (_m *Flags) UseTUFAutoupdater() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // WatchdogDelaySec provides a mock function with given fields:
 func (_m *Flags) WatchdogDelaySec() int {
 	ret := _m.Called()
@@ -1337,6 +1351,20 @@ func (_m *Flags) WatchdogDelaySec() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// WatchdogEnabled provides a mock function with given fields:
+func (_m *Flags) WatchdogEnabled() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

@@ -17,6 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type contextKey string
+
+func (c contextKey) String() string {
+	return string(c)
+}
+
+const contextKeyEnv contextKey = "ENV"
+
 func helperCommandContext(ctx context.Context, command string, args ...string) (cmd *exec.Cmd) {
 	cs := []string{"-test.run=TestHelperProcess", "--", command}
 	cs = append(cs, args...)
@@ -24,7 +32,7 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 
 	// Do we have an ENV key? (type assert)
-	if ctxEnv, ok := ctx.Value("ENV").([]string); ok {
+	if ctxEnv, ok := ctx.Value(contextKeyEnv).([]string); ok {
 		cmd.Env = append(cmd.Env, ctxEnv...)
 	}
 
@@ -191,7 +199,8 @@ func TestGetVersion(t *testing.T) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			ctx = context.WithValue(ctx, "ENV", []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
+
+			ctx = context.WithValue(ctx, contextKeyEnv, []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
 			os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
 			ver, err := b.getVersion(ctx)
 			if tt.err == true {
