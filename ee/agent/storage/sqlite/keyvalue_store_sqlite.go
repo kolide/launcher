@@ -39,6 +39,7 @@ var migrations embed.FS
 
 type sqliteStore struct {
 	conn          *sql.DB
+	readOnly      bool
 	rootDirectory string
 	tableName     string
 }
@@ -57,6 +58,7 @@ func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 
 	return &sqliteStore{
 		conn:          conn,
+		readOnly:      true,
 		rootDirectory: rootDirectory,
 		tableName:     name.String(),
 	}, nil
@@ -76,6 +78,7 @@ func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 
 	s := &sqliteStore{
 		conn:          conn,
+		readOnly:      false,
 		rootDirectory: rootDirectory,
 		tableName:     name.String(),
 	}
@@ -198,6 +201,10 @@ func (s *sqliteStore) Set(key, value []byte) error {
 		return errors.New("store is nil")
 	}
 
+	if s.readOnly {
+		return errors.New("cannot perform set with RO connection")
+	}
+
 	if string(key) == "" {
 		return errors.New("key is blank")
 	}
@@ -221,6 +228,10 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`,
 func (s *sqliteStore) Update(kvPairs map[string]string) ([]string, error) {
 	if s == nil {
 		return nil, errors.New("store is nil")
+	}
+
+	if s.readOnly {
+		return nil, errors.New("cannot perform update with RO connection")
 	}
 
 	if len(kvPairs) == 0 {

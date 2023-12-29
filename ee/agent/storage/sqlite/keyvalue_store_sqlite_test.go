@@ -194,6 +194,21 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestSetUpdate_RO(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+
+	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "creating test store")
+
+	require.Error(t, s.Set([]byte(keys.UpdateChannel.String()), []byte("beta")), "should not be able to perform set with RO connection")
+	_, updateErr := s.Update(map[string]string{"key1": "value1"})
+	require.Error(t, updateErr, "should not be able to perform update with RO connection")
+
+	require.NoError(t, s.Close())
+}
+
 // Test_Migrations runs all of the migrations in the migrations/ subdirectory
 // in both directions, ensuring that all up and down migrations are valid.
 func Test_Migrations(t *testing.T) {
