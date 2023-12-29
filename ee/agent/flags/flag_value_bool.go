@@ -60,3 +60,11 @@ func bytesToBool(controlServerValue []byte) bool {
 	}
 	return booleanValue
 }
+
+func BoolToString(enabled bool) string {
+	return string(boolToBytes(enabled))
+}
+
+func StringToBool(controlServerValue string) bool {
+	return bytesToBool([]byte(controlServerValue))
+}

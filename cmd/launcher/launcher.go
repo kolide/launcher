@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/control/actionqueue"
@@ -215,6 +216,12 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
 		}
 	}
+
+	s, err := startupsettings.OpenWriter(ctx, k)
+	if err != nil {
+		return fmt.Errorf("creating startup db: %w", err)
+	}
+	defer s.Close()
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
