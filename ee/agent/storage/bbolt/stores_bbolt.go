@@ -19,6 +19,7 @@ func MakeStores(logger log.Logger, db *bbolt.DB) (map[storage.Store]types.KVStor
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
+		storage.PersistentHostDataStore,
 		storage.InitialResultsStore,
 		storage.ResultLogsStore,
 		storage.OsqueryHistoryInstanceStore,

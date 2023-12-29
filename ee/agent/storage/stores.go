@@ -8,6 +8,7 @@ const (
 	AutoupdateErrorsStore       Store = "tuf_autoupdate_errors"    // The store used for tracking new autoupdater errors.
 	ConfigStore                 Store = "config"                   // The store used for launcher configuration.
 	ControlStore                Store = "control_service_data"     // The store used for control service caching data.
+	PersistentHostDataStore     Store = "persistent_host_data"     // The store used for data about this host.
 	InitialResultsStore         Store = "initial_results"          // The store used for initial runner queries.
 	ResultLogsStore             Store = "result_logs"              // The store used for buffered result logs.
 	OsqueryHistoryInstanceStore Store = "osquery_instance_history" // The store used for the history of osquery instances.
