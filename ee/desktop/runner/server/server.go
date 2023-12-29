@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -49,7 +50,7 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 	}
 
 	if rs.slogger == nil {
-		return nil, fmt.Errorf("slogger is nil")
+		return nil, errors.New("slogger cannot be nil")
 	}
 
 	rs.slogger = slogger.With("component", "desktop_runner_root_server")
