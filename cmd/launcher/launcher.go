@@ -346,8 +346,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		// create an action queue for all other action style commands
 		actionsQueue := actionqueue.New(
+			k,
 			actionqueue.WithContext(ctx),
-			actionqueue.WithLogger(logger),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
 			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
 		)
