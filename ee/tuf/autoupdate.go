@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -17,8 +18,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/traces"
@@ -69,17 +68,11 @@ type TufAutoupdater struct {
 	interrupt              chan struct{}
 	interrupted            bool
 	signalRestart          chan error
-	logger                 log.Logger
+	slogger                *slog.Logger
 	restartFuncs           map[autoupdatableBinary]func() error
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
-
-func WithLogger(logger log.Logger) TufAutoupdaterOption {
-	return func(ta *TufAutoupdater) {
-		ta.logger = log.With(logger, "component", "tuf_autoupdater")
-	}
-}
 
 func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 	return func(ta *TufAutoupdater) {
@@ -99,7 +92,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 		store:                  k.AutoupdateErrorsStore(),
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
-		logger:                 log.NewNopLogger(),
+		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
 		restartFuncs:           make(map[autoupdatableBinary]func() error),
 	}
 
@@ -118,7 +111,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(k.RootDirectory())
 	}
-	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, ta.logger)
+	ta.libraryManager, err = newUpdateLibraryManager(k.MirrorServerURL(), mirrorHttpClient, updateDirectory, k.Slogger())
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
@@ -179,7 +172,9 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// Delay startup, if initial delay is set
 	select {
 	case <-ta.interrupt:
-		level.Debug(ta.logger).Log("msg", "received external interrupt during initial delay, stopping")
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received external interrupt during initial delay, stopping",
+		)
 		return nil
 	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
@@ -197,7 +192,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	for {
 		if err := ta.checkForUpdate(); err != nil {
 			ta.storeError(err)
-			level.Debug(ta.logger).Log("msg", "error checking for update", "err", err)
+			ta.slogger.Log(context.TODO(), slog.LevelError,
+				"error checking for update",
+				"err", err,
+			)
 		}
 
 		select {
@@ -206,10 +204,14 @@ func (ta *TufAutoupdater) Execute() (err error) {
 		case <-cleanupTicker.C:
 			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
-			level.Debug(ta.logger).Log("msg", "received external interrupt, stopping")
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received external interrupt, stopping",
+			)
 			return nil
 		case signalRestartErr := <-ta.signalRestart:
-			level.Debug(ta.logger).Log("msg", "received interrupt to restart launcher after update, stopping")
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received interrupt to restart launcher after update, stopping",
+			)
 			return signalRestartErr
 		}
 	}
@@ -232,7 +234,11 @@ func (ta *TufAutoupdater) tidyLibrary() {
 		// Get the current running version to preserve it when tidying the available updates
 		currentVersion, err := ta.currentRunningVersion(binary)
 		if err != nil {
-			level.Debug(ta.logger).Log("msg", "could not get current running version", "binary", binary, "err", err)
+			ta.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not get current running version",
+				"binary", binary,
+				"err", err,
+			)
 			continue
 		}
 
@@ -309,7 +315,11 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 		}
 
 		if downloadedUpdateVersion != "" {
-			level.Debug(ta.logger).Log("msg", "update downloaded", "binary", binary, "version", downloadedUpdateVersion)
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"update downloaded",
+				"binary", binary,
+				"version", downloadedUpdateVersion,
+			)
 			updatesDownloaded[binary] = versionFromTarget(binary, downloadedUpdateVersion)
 		}
 
@@ -330,7 +340,10 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
 		// Only reload if we're not using a localdev path
 		if ta.knapsack.LocalDevelopmentPath() == "" {
-			level.Debug(ta.logger).Log("msg", "launcher updated -- exiting to load new version", "new_binary_version", updatedVersion)
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"launcher updated -- exiting to load new version",
+				"new_binary_version", updatedVersion,
+			)
 			ta.signalRestart <- NewLauncherReloadNeededErr(updatedVersion)
 			return nil
 		}
@@ -344,16 +357,20 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 
 		if restart, ok := ta.restartFuncs[binary]; ok {
 			if err := restart(); err != nil {
-				level.Debug(ta.logger).Log("msg", "failed to restart binary after update",
+				ta.slogger.Log(context.TODO(), slog.LevelWarn,
+					"failed to restart binary after update",
 					"binary", binary,
 					"new_binary_version", newBinaryVersion,
-					"err", err)
+					"err", err,
+				)
 				continue
 			}
 
-			level.Debug(ta.logger).Log("msg", "restarted binary after update",
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"restarted binary after update",
 				"binary", binary,
-				"new_binary_version", newBinaryVersion)
+				"new_binary_version", newBinaryVersion,
+			)
 		}
 	}
 
@@ -457,7 +474,10 @@ func PlatformArch() string {
 func (ta *TufAutoupdater) storeError(autoupdateErr error) {
 	timestamp := strconv.Itoa(int(time.Now().Unix()))
 	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
-		level.Debug(ta.logger).Log("msg", "could not store autoupdater error", "err", err)
+		ta.slogger.Log(context.TODO(), slog.LevelError,
+			"could not store autoupdater error",
+			"err", err,
+		)
 	}
 }
 
@@ -485,11 +505,17 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 
 		return nil
 	}); err != nil {
-		level.Debug(ta.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not iterate over bucket items to determine which are expired",
+			"err", err,
+		)
 	}
 
 	// Delete all old keys
 	if err := ta.store.Delete(keysToDelete...); err != nil {
-		level.Debug(ta.logger).Log("msg", "could not delete old autoupdater errors from bucket", "err", err)
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not delete old autoupdater errors from bucket",
+			"err", err,
+		)
 	}
 }
