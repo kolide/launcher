@@ -69,7 +69,7 @@ const (
 	// DB key for UUID
 	uuidKey = "uuid"
 	// DB key for node key
-	NodeKeyKey = "nodeKey"
+	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
 	// DB keys for the rsa keys
@@ -336,7 +336,7 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 
 // NodeKey returns the device node key from the storage layer
 func NodeKey(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(NodeKeyKey))
+	key, err := getter.Get([]byte(nodeKeyKey))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -476,7 +476,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.knapsack.ConfigStore().Set([]byte(NodeKeyKey), []byte(keyString))
+	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -498,7 +498,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.knapsack.ConfigStore().Delete([]byte(NodeKeyKey))
+	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
