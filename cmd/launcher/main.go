@@ -57,7 +57,7 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		if tuf.UsingNewAutoupdater() {
+		if tuf.ShouldUseNewAutoupdater(ctx) {
 			runNewerLauncherIfAvailable(ctx, logger)
 		} else {
 			newerBinary, err := autoupdate.FindNewestSelf(ctx)
