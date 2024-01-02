@@ -3,12 +3,11 @@ package exporter
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -48,7 +47,7 @@ type TraceExporter struct {
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
 	osqueryClient             querier
-	logger                    log.Logger
+	slogger                   *slog.Logger
 	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
 	attrLock                  sync.RWMutex
 	ingestClientAuthenticator *clientAuthenticator
@@ -65,7 +64,7 @@ type TraceExporter struct {
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) (*TraceExporter, error) {
+func NewTraceExporter(ctx context.Context, k types.Knapsack) (*TraceExporter, error) {
 	// Set all the attributes that we know we can get first
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(applicationName),
@@ -86,7 +85,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) 
 			MaxBufferedSpans: 500,
 		},
 		knapsack:                  k,
-		logger:                    log.With(logger, "component", "trace_exporter"),
+		slogger:                   k.Slogger().With("component", "trace_exporter"),
 		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableTraceIngestTLS()),
@@ -110,7 +109,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, logger log.Logger) 
 
 	// Set our own error handler to avoid otel printing errors
 	otel.SetErrorHandler(newErrorHandler(
-		log.With(logger, "component", "trace_exporter"),
+		k.Slogger().With("component", "trace_exporter"),
 	))
 
 	t.addDeviceIdentifyingAttributes()
@@ -132,7 +131,9 @@ func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
 		// we don't want to rebuild the exporter here because we may drop
 		// buffered spans, so we just replace the provider
 		t.setNewGlobalProvider(false)
-		level.Debug(t.logger).Log("msg", "successfully replaced global provider after adding osquery attributes")
+		t.slogger.Log(context.TODO(), slog.LevelDebug,
+			"successfully replaced global provider after adding osquery attributes",
+		)
 	}()
 }
 
@@ -143,26 +144,38 @@ func (t *TraceExporter) addDeviceIdentifyingAttributes() {
 	defer t.attrLock.Unlock()
 
 	if deviceId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
-		level.Debug(t.logger).Log("msg", "could not get device id", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get device id",
+			"err", err,
+		)
 	} else {
 		t.attrs = append(t.attrs, semconv.ServiceInstanceID(string(deviceId)))
 		t.attrs = append(t.attrs, attribute.String("k2.device_id", string(deviceId)))
 	}
 
 	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
-		level.Debug(t.logger).Log("msg", "could not get munemo", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get munemo",
+			"err", err,
+		)
 	} else {
 		t.attrs = append(t.attrs, attribute.String("k2.munemo", string(munemo)))
 	}
 
 	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
-		level.Debug(t.logger).Log("msg", "could not get organization id", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get organization id",
+			"err", err,
+		)
 	} else {
 		t.attrs = append(t.attrs, attribute.String("k2.organization_id", string(orgId)))
 	}
 
 	if serialNumber, err := t.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
-		level.Debug(t.logger).Log("msg", "could not get serial number", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get serial number",
+			"err", err,
+		)
 	} else {
 		t.attrs = append(t.attrs, attribute.String("launcher.serial", string(serialNumber)))
 	}
@@ -204,7 +217,9 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 
 		select {
 		case <-t.ctx.Done():
-			level.Debug(t.logger).Log("msg", "trace exporter interrupted while waiting to add osquery attributes")
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"trace exporter interrupted while waiting to add osquery attributes",
+			)
 			return
 		case <-time.After(osqueryClientRecheckInterval):
 			continue
@@ -212,7 +227,10 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 	}
 
 	if err != nil || len(resp) == 0 {
-		level.Debug(t.logger).Log("msg", "trace exporter could not fetch osquery attributes", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"trace exporter could not fetch osquery attributes",
+			"err", err,
+		)
 		return
 	}
 
@@ -239,7 +257,10 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
 	)
 	if err != nil {
-		level.Debug(t.logger).Log("msg", "could not merge resource", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not merge resource",
+			"err", err,
+		)
 		r = resource.Default()
 	}
 
@@ -284,7 +305,10 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	// create exporter with new trace client
 	exporter, err := otlptrace.New(t.ctx, traceClient)
 	if err != nil {
-		level.Debug(t.logger).Log("msg", "could not create new exporter", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not create new exporter",
+			"err", err,
+		)
 		return
 	}
 
@@ -323,7 +347,10 @@ func (t *TraceExporter) Interrupt(_ error) {
 func (t *TraceExporter) Ping() {
 	newToken, err := t.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
-		level.Debug(t.logger).Log("msg", "could not get new token from token store", "err", err)
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get new token from token store",
+			"err", err,
+		)
 		return
 	}
 
@@ -347,14 +374,18 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.addAttributesFromOsquery()
 			t.enabled = true
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "enabling trace export")
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"enabling trace export",
+			)
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
 			if t.provider != nil {
 				t.provider.Shutdown(t.ctx)
 			}
 			t.enabled = false
-			level.Debug(t.logger).Log("msg", "disabling trace export")
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"disabling trace export",
+			)
 		}
 	}
 
@@ -363,7 +394,10 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.traceSamplingRate != t.knapsack.TraceSamplingRate() {
 			t.traceSamplingRate = t.knapsack.TraceSamplingRate()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating trace sampling rate", "new_sampling_rate", t.traceSamplingRate)
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"updating trace sampling rate",
+				"new_sampling_rate", t.traceSamplingRate,
+			)
 		}
 	}
 
@@ -372,7 +406,10 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
 			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating ingest server url", "new_ingest_url", t.ingestUrl)
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"updating ingest server url",
+				"new_ingest_url", t.ingestUrl,
+			)
 		}
 	}
 
@@ -382,7 +419,10 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableTraceIngestTLS())
 			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating ingest server config", "new_disable_trace_ingest_tls", t.disableIngestTLS)
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"updating ingest server config",
+				"new_disable_trace_ingest_tls", t.disableIngestTLS,
+			)
 		}
 	}
 
@@ -391,7 +431,10 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.batchTimeout != t.knapsack.TraceBatchTimeout() {
 			t.batchTimeout = t.knapsack.TraceBatchTimeout()
 			needsNewProvider = true
-			level.Debug(t.logger).Log("msg", "updating trace batch timeout", "new_batch_timeout", t.batchTimeout)
+			t.slogger.Log(context.TODO(), slog.LevelDebug,
+				"updating trace batch timeout",
+				"new_batch_timeout", t.batchTimeout,
+			)
 		}
 	}
 
