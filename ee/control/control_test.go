@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,10 +82,11 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 		})
@@ -114,10 +115,11 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			err = cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -161,10 +163,11 @@ func TestControlServiceUpdate(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -221,10 +224,11 @@ func TestControlServiceFetch(t *testing.T) {
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("ForceControlSubsystems").Return(false)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
-			cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
 			require.NoError(t, err)
 			for _, ss := range tt.s {
@@ -285,13 +289,14 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				mockKnapsack := typesMocks.NewKnapsack(t)
 				mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 				mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+				mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 				if j >= tt.expectedUpdates {
 					// ForceControlSubsystems is only called when no update would normally be triggered
 					mockKnapsack.On("ForceControlSubsystems").Return(false)
 				}
 
-				cs := New(log.NewNopLogger(), mockKnapsack, data, controlOpts...)
+				cs := New(mockKnapsack, data, controlOpts...)
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
@@ -314,8 +319,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("ControlRequestInterval").Return(24 * time.Hour)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	k.On("Slogger").Return(multislogger.New().Logger)
 	data := &TestClient{}
-	control := New(log.NewNopLogger(), k, data)
+	control := New(k, data)
 
 	go control.ExecuteWithContext(ctx)
 

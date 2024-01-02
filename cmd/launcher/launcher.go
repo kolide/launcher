@@ -321,7 +321,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	if k.ControlServerURL() == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
+		controlService, err := createControlService(ctx, k.ControlStore(), k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
