@@ -322,7 +322,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	if k.ControlServerURL() == "" {
 		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
 	} else {
-		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
+		controlService, err := createControlService(ctx, k.ControlStore(), k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -347,8 +347,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		// create an action queue for all other action style commands
 		actionsQueue := actionqueue.New(
+			k,
 			actionqueue.WithContext(ctx),
-			actionqueue.WithLogger(logger),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
 			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
 		)
@@ -365,8 +365,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			ctx,
+			k,
 			runner,
-			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
@@ -444,9 +444,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 	}
 
-	// Run the legacy autoupdater only if autoupdating is enabled and the given channel hasn't moved
-	// to the new autoupdater yet.
-	if k.Autoupdate() && !tuf.ChannelUsesNewAutoupdater(k.UpdateChannel()) {
+	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
+	// is not yet in use.
+	if k.Autoupdate() && !k.UseTUFAutoupdater() {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,

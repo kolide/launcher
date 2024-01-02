@@ -32,17 +32,17 @@ func MakeStores(t *testing.T, logger log.Logger, db *bbolt.DB) (map[storage.Stor
 	}
 
 	if os.Getenv("CI") == "true" {
-		return makeInMemoryStores(t, logger, storeNames), nil
+		return makeInMemoryStores(t, storeNames), nil
 	}
 
 	return makeBboltStores(t, logger, db, storeNames)
 }
 
-func makeInMemoryStores(t *testing.T, logger log.Logger, storeNames []storage.Store) map[storage.Store]types.KVStore {
+func makeInMemoryStores(t *testing.T, storeNames []storage.Store) map[storage.Store]types.KVStore {
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		stores[storeName] = inmemory.NewStore(logger)
+		stores[storeName] = inmemory.NewStore()
 	}
 
 	return stores

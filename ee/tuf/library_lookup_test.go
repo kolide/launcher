@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
@@ -44,6 +46,12 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			tufci.CopyBinary(t, tooRecentPath)
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
+			// Ensure we actually use the new autoupdater
+			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			require.NoError(t, err, "setting up db connection")
+			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
+			require.NoError(t, store.Close(), "closing test db")
+
 			// Check it
 			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
@@ -71,6 +79,12 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not make test binary")
 
+			// Ensure we actually use the new autoupdater
+			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			require.NoError(t, err, "setting up db connection")
+			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
+			require.NoError(t, store.Close(), "closing test db")
+
 			// Check it
 			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
@@ -80,22 +94,25 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 	}
 }
 
-func TestCheckOutLatest_NotAvailableOnNonNightlyChannels(t *testing.T) {
+func TestCheckOutLatest_NotAvailableWhenNewAutoupdaterNotEnabled(t *testing.T) {
 	t.Parallel()
 
 	for _, binary := range binaries {
 		binary := binary
-		for _, channel := range []string{"beta", "stable"} {
-			channel := channel
-			t.Run(fmt.Sprintf("%s-%s", binary, channel), func(t *testing.T) {
-				t.Parallel()
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
 
-				rootDir := t.TempDir()
+			rootDir := t.TempDir()
 
-				_, err := CheckOutLatest(context.TODO(), binary, rootDir, "", channel, log.NewNopLogger())
-				require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
-			})
-		}
+			// Ensure we do not use the new autoupdater
+			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			require.NoError(t, err, "setting up db connection")
+			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("")), "setting key")
+			require.NoError(t, store.Close(), "closing test db")
+
+			_, err = CheckOutLatest(context.TODO(), binary, rootDir, "", "stable", log.NewNopLogger())
+			require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
+		})
 	}
 }
 
@@ -181,38 +198,35 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 	}
 }
 
-func TestChannelUsesNewAutoupdater(t *testing.T) {
+func Test_usingNewAutoupdater_DatabaseNotExist(t *testing.T) {
 	t.Parallel()
 
-	channelsForTest := []struct {
-		channelName        string
-		usesNewAutoupdater bool
-	}{
-		{
-			channelName:        "nightly",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "alpha",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "stable",
-			usesNewAutoupdater: false,
-		},
-		{
-			channelName:        "beta",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "",
-			usesNewAutoupdater: false,
-		},
-	}
+	require.Equal(t, false, usingNewAutoupdater(context.TODO(), t.TempDir()))
+}
 
-	for _, channel := range channelsForTest {
-		require.Equal(t, channel.usesNewAutoupdater, ChannelUsesNewAutoupdater(channel.channelName))
-	}
+func Test_usingNewAutoupdater_FlagNotSet(t *testing.T) {
+	t.Parallel()
+
+	tempRootDir := t.TempDir()
+
+	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Close(), "closing test db")
+
+	require.Equal(t, false, usingNewAutoupdater(context.TODO(), tempRootDir))
+}
+
+func Test_usingNewAutoupdater_FlagSet(t *testing.T) {
+	t.Parallel()
+
+	tempRootDir := t.TempDir()
+
+	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
+	require.NoError(t, store.Close(), "closing test db")
+
+	require.Equal(t, true, usingNewAutoupdater(context.TODO(), tempRootDir))
 }
 
 func Test_getAutoupdateConfig_ConfigFlagSet(t *testing.T) {

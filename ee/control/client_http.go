@@ -13,14 +13,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 )
 
 // HTTPClient handles retrieving control data via HTTP
 type HTTPClient struct {
-	logger     log.Logger
 	addr       string
 	baseURL    *url.URL
 	client     *http.Client
@@ -44,13 +42,12 @@ type configResponse struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func NewControlHTTPClient(logger log.Logger, addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &HTTPClient{
-		logger:  logger,
 		baseURL: baseURL,
 		client:  client,
 		addr:    addr,
