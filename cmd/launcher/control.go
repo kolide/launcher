@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control"
 )
 
-func createHTTPClient(ctx context.Context, logger log.Logger, k types.Knapsack) (*control.HTTPClient, error) {
-	level.Debug(logger).Log("msg", "creating control http client")
+func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClient, error) {
+	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		"creating control http client",
+	)
 
 	clientOpts := []control.HTTPClientOption{}
 	if k.InsecureControlTLS() {
@@ -21,7 +22,7 @@ func createHTTPClient(ctx context.Context, logger log.Logger, k types.Knapsack) 
 	if k.DisableControlTLS() {
 		clientOpts = append(clientOpts, control.WithDisableTLS())
 	}
-	client, err := control.NewControlHTTPClient(logger, k.ControlServerURL(), http.DefaultClient, clientOpts...)
+	client, err := control.NewControlHTTPClient(k.ControlServerURL(), http.DefaultClient, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating control http client: %w", err)
 	}
@@ -29,10 +30,12 @@ func createHTTPClient(ctx context.Context, logger log.Logger, k types.Knapsack) 
 	return client, nil
 }
 
-func createControlService(ctx context.Context, logger log.Logger, store types.GetterSetter, k types.Knapsack) (*control.ControlService, error) {
-	level.Debug(logger).Log("msg", "creating control service")
+func createControlService(ctx context.Context, store types.GetterSetter, k types.Knapsack) (*control.ControlService, error) {
+	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		"creating control service",
+	)
 
-	client, err := createHTTPClient(ctx, logger, k)
+	client, err := createHTTPClient(ctx, k)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +43,7 @@ func createControlService(ctx context.Context, logger log.Logger, store types.Ge
 	controlOpts := []control.Option{
 		control.WithStore(k.ControlStore()),
 	}
-	service := control.New(logger, k, client, controlOpts...)
+	service := control.New(k, client, controlOpts...)
 
 	return service, nil
 }
