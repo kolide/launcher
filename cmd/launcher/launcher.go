@@ -433,7 +433,6 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 			metadataClient,
 			mirrorClient,
 			extension,
-			tuf.WithLogger(logger),
 			tuf.WithOsqueryRestart(runnerRestart),
 		)
 		if err != nil {

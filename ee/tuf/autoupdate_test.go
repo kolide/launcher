@@ -3,6 +3,7 @@ package tuf
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,6 +38,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	_, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -77,16 +80,17 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
+
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Get metadata for each release
 	_, err = autoupdater.metadataClient.Update()
@@ -167,16 +171,17 @@ func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) 
 	mockKnapsack.On("UseTUFAutoupdater").Return(false)
 	mockQuerier := newMockQuerier(t)
 
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
+
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Get metadata for each release
 	_, err = autoupdater.metadataClient.Update()
@@ -240,16 +245,17 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
+
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Get metadata for each release
 	_, err = autoupdater.metadataClient.Update()
@@ -314,16 +320,17 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
+
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Get metadata for each release
 	_, err = autoupdater.metadataClient.Update()
@@ -399,14 +406,15 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
+	// Set logger so that we can capture output
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
+
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
 		mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Expect that we interrupt
 	mockLibraryManager := NewMocklibrarian(t)
@@ -460,6 +468,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
@@ -467,10 +476,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient,
 		mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	autoupdater.logger = log.NewJSONLogger(&logBytes)
 
 	// Set up normal library and querier interactions
 	mockLibraryManager := NewMocklibrarian(t)
@@ -520,7 +525,7 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		logger:    log.NewNopLogger(),
+		slogger:   multislogger.New().Logger,
 		osquerier: mockQuerier,
 	}
 
@@ -536,7 +541,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		logger:    log.NewNopLogger(),
+		slogger:   multislogger.New().Logger,
 		osquerier: mockQuerier,
 	}
 
@@ -555,7 +560,7 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		logger:                 log.NewNopLogger(),
+		slogger:                multislogger.New().Logger,
 		osquerier:              mockQuerier,
 		osquerierRetryInterval: 1 * time.Millisecond,
 	}
@@ -585,6 +590,7 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 	mockQuerier := newMockQuerier(t)
 
 	autoupdater, err := NewTufAutoupdater(mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
@@ -630,8 +636,8 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	t.Parallel()
 
 	autoupdater := &TufAutoupdater{
-		store:  setupStorage(t),
-		logger: log.NewNopLogger(),
+		store:   setupStorage(t),
+		slogger: multislogger.New().Logger,
 	}
 
 	// Add one legitimate timestamp

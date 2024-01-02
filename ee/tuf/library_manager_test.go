@@ -12,9 +12,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 )
@@ -23,7 +23,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.New().Logger)
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
@@ -65,7 +65,7 @@ func TestAvailable(t *testing.T) {
 	testBaseDir := t.TempDir()
 
 	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, log.NewNopLogger())
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.New().Logger)
 	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	// Set up valid "osquery" executable
@@ -109,7 +109,7 @@ func TestAddToLibrary(t *testing.T) {
 			targetFile := fmt.Sprintf("%s-%s.tar.gz", b, testReleaseVersion)
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.New().Logger)
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
@@ -154,7 +154,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
 				mirrorClient: http.DefaultClient,
-				logger:       log.NewNopLogger(),
+				slogger:      multislogger.New().Logger,
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
 			}
@@ -193,7 +193,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
 				mirrorClient: http.DefaultClient,
-				logger:       log.NewNopLogger(),
+				slogger:      multislogger.New().Logger,
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
 			}
@@ -278,7 +278,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			defer testMaliciousMirror.Close()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, multislogger.New().Logger)
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download
@@ -449,7 +449,7 @@ func TestTidyLibrary(t *testing.T) {
 				// Set up test library manager
 				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					logger:  log.NewNopLogger(),
+					slogger: multislogger.New().Logger,
 					baseDir: testBaseDir,
 					lock:    newLibraryLock(),
 				}

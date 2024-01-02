@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -15,8 +16,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/traces"
@@ -33,16 +32,16 @@ type updateLibraryManager struct {
 	mirrorClient *http.Client
 	baseDir      string
 	lock         *libraryLock
-	logger       log.Logger
+	slogger      *slog.Logger
 }
 
-func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, logger log.Logger) (*updateLibraryManager, error) {
+func newUpdateLibraryManager(mirrorUrl string, mirrorClient *http.Client, baseDir string, slogger *slog.Logger) (*updateLibraryManager, error) {
 	ulm := updateLibraryManager{
 		mirrorUrl:    mirrorUrl,
 		mirrorClient: mirrorClient,
 		baseDir:      baseDir,
 		lock:         newLibraryLock(),
-		logger:       log.With(logger, "component", "tuf_autoupdater_library_manager"),
+		slogger:      slogger.With("component", "tuf_autoupdater_library_manager"),
 	}
 
 	// Ensure the updates directory exists
@@ -102,7 +101,11 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 		}
 		dirToRemove := filepath.Dir(stagedUpdatePath)
 		if err := os.RemoveAll(dirToRemove); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not remove temp staging directory", "err", err, "directory", dirToRemove)
+			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not remove temp staging directory",
+				"directory", dirToRemove,
+				"err", err,
+			)
 		}
 	}()
 	if err != nil {
@@ -186,7 +189,11 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	defer func() {
 		// In case of error, clean up the staged version
 		if err := os.RemoveAll(stagedVersionedDirectory); err != nil {
-			level.Debug(ulm.logger).Log("msg", "could not remove staged update", "err", err, "directory", stagedVersionedDirectory)
+			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not remove staged update",
+				"directory", stagedVersionedDirectory,
+				"err", err,
+			)
 		}
 	}()
 
@@ -228,9 +235,16 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 func (ulm *updateLibraryManager) removeUpdate(binary autoupdatableBinary, binaryVersion string) {
 	directoryToRemove := filepath.Join(updatesDirectory(binary, ulm.baseDir), binaryVersion)
 	if err := os.RemoveAll(directoryToRemove); err != nil {
-		level.Debug(ulm.logger).Log("msg", "could not remove update", "err", err, "directory", directoryToRemove)
+		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not remove update",
+			"directory", directoryToRemove,
+			"err", err,
+		)
 	} else {
-		level.Debug(ulm.logger).Log("msg", "removed update", "directory", directoryToRemove)
+		ulm.slogger.Log(context.TODO(), slog.LevelDebug,
+			"removed update",
+			"directory", directoryToRemove,
+		)
 	}
 }
 
@@ -244,7 +258,9 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 	// Remove any updates we no longer need
 	if currentVersion == "" {
-		level.Debug(ulm.logger).Log("msg", "cannot tidy update library without knowing current running version")
+		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+			"cannot tidy update library without knowing current running version",
+		)
 		return
 	}
 
@@ -252,12 +268,19 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), binary, ulm.baseDir)
 	if err != nil {
-		level.Debug(ulm.logger).Log("msg", "could not get versions in library to tidy update library", "err", err)
+		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get versions in library to tidy update library",
+			"err", err,
+		)
 		return
 	}
 
 	for _, invalidVersion := range invalidVersionsInLibrary {
-		level.Debug(ulm.logger).Log("msg", "updates library contains invalid version", "err", err, "library_path", invalidVersion)
+		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+			"updates library contains invalid version",
+			"library_path", invalidVersion,
+			"err", err,
+		)
 		ulm.removeUpdate(binary, invalidVersion)
 	}
 
