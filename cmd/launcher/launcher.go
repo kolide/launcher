@@ -363,8 +363,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			ctx,
+			k,
 			runner,
-			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
