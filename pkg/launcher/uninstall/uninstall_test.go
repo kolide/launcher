@@ -35,8 +35,9 @@ func TestUninstall(t *testing.T) {
 			require.NoError(t, err)
 
 			// create file in test dir
-			_, err = os.Create(enrollSecretPath)
+			f, err := os.Create(enrollSecretPath)
 			require.NoError(t, err)
+			require.NoError(t, f.Close())
 
 			// sanity check that the files exist
 			_, err = os.Stat(enrollSecretPath)
