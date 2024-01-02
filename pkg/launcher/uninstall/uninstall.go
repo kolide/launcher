@@ -1,39 +1,34 @@
 package uninstall
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
-	"runtime"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
-func Uninstall(logger log.Logger, knapsack types.Knapsack) {
-	logger = log.With(logger, "component", "uninstall")
+func Uninstall(ctx context.Context, k types.Knapsack) {
+	slogger := k.Slogger().With("component", "uninstall")
 
-	if runtime.GOOS != "darwin" {
-		level.Info(logger).Log("msg", "uninstall is currently only supported on darwin")
-		return
+	if err := removeEnrollSecretFile(k); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"removing enroll secret file",
+			"err", err,
+		)
 	}
 
-	if err := knapsack.ConfigStore().Delete([]byte(osquery.NodeKeyKey)); err != nil {
-		level.Error(logger).Log("msg", "deleting node key", "err", err)
+	if err := removeDatabase(k); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"removing database",
+			"err", err,
+		)
 	}
 
-	if err := removeEnrollSecretFile(knapsack); err != nil {
-		level.Error(logger).Log("msg", "removing enroll secret", "err", err)
-	}
-
-	if err := removeStartScripts(); err != nil {
-		level.Error(logger).Log("msg", "removing start scripts", "err", err)
-	}
-
-	if err := removeInstallation(); err != nil {
-		level.Error(logger).Log("msg", "removing installation", "err", err)
-	}
+	// TODO: remove start up files
+	// TODO: remove installation
 
 	os.Exit(0)
 }
@@ -45,6 +40,18 @@ func removeEnrollSecretFile(knapsack types.Knapsack) error {
 
 	if err := os.Remove(knapsack.EnrollSecretPath()); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func removeDatabase(k types.Knapsack) error {
+	if err := k.BboltDB().Close(); err != nil {
+		return fmt.Errorf("closing bbolt db: %w", err)
+	}
+
+	if err := os.Remove(k.BboltDB().Path()); err != nil {
+		return fmt.Errorf("deleting bbolt db: %w", err)
 	}
 
 	return nil

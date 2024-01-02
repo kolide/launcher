@@ -358,8 +358,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		// register accelerate control consumer
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
 		// register uninstall consumer
-		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(logger, k))
-
+		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(k))
 		// register flare consumer
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
