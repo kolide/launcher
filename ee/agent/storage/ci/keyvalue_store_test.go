@@ -21,7 +21,7 @@ func getStores(t *testing.T) []types.KVStore {
 	require.NoError(t, err)
 
 	stores := []types.KVStore{
-		inmemory.NewStore(logger),
+		inmemory.NewStore(),
 		bboltStore,
 	}
 	return stores
