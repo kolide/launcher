@@ -3,6 +3,7 @@ package localserver
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types"
-	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
+	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 
 	var logBytes bytes.Buffer
-	server := testServer(t, mockKnapsack, &logBytes)
+	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack.On("Slogger").Return(slogger)
+
+	server := testServer(t, mockKnapsack)
 
 	req, err := http.NewRequest("", "", nil)
 	require.NoError(t, err)
@@ -59,10 +65,10 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 }
 
-func testServer(t *testing.T, k types.Knapsack, logBytes *bytes.Buffer) *localServer {
+func testServer(t *testing.T, k types.Knapsack) *localServer {
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	server, err := New(k, WithLogger(log.NewLogfmtLogger(logBytes)))
+	server, err := New(k)
 	require.NoError(t, err)
 	return server
 }

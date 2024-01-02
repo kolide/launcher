@@ -1,17 +1,17 @@
 package table
 
 import (
-	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/osquery/tables/cryptoinfotable"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/desktopprocs"
-	"github.com/kolide/launcher/pkg/osquery/tables/dev_table_tooling"
-	"github.com/kolide/launcher/pkg/osquery/tables/firefox_preferences"
-	"github.com/kolide/launcher/pkg/osquery/tables/launcher_db"
-	"github.com/kolide/launcher/pkg/osquery/tables/osquery_instance_history"
-	"github.com/kolide/launcher/pkg/osquery/tables/tdebug"
-	"github.com/kolide/launcher/pkg/osquery/tables/tufinfo"
-	"github.com/kolide/launcher/pkg/osquery/tables/zfs"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
+	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/desktopprocs"
+	"github.com/kolide/launcher/ee/tables/dev_table_tooling"
+	"github.com/kolide/launcher/ee/tables/firefox_preferences"
+	"github.com/kolide/launcher/ee/tables/launcher_db"
+	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
+	"github.com/kolide/launcher/ee/tables/tdebug"
+	"github.com/kolide/launcher/ee/tables/tufinfo"
 
 	"github.com/go-kit/kit/log"
 	osquery "github.com/osquery/osquery-go"
@@ -48,21 +48,19 @@ func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		dev_table_tooling.TablePlugin(logger),
 		firefox_preferences.TablePlugin(logger),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_info", dataflattentable.JsonType, zerotierCli("info")),
+			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_networks", dataflattentable.JsonType, zerotierCli("listnetworks")),
+			"kolide_zerotier_networks", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listnetworks"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_zerotier_peers", dataflattentable.JsonType, zerotierCli("listpeers")),
+			"kolide_zerotier_peers", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listpeers"}),
 		tdebug.LauncherGcInfo(logger),
-		zfs.ZfsPropertiesPlugin(logger),
-		zfs.ZpoolPropertiesPlugin(logger),
 	}
 
 	// The dataflatten tables
 	tables = append(tables, dataflattentable.AllTablePlugins(logger)...)
 
 	// add in the platform specific ones (as denoted by build tags)
-	tables = append(tables, platformTables(logger, currentOsquerydBinaryPath)...)
+	tables = append(tables, platformSpecificTables(logger, currentOsquerydBinaryPath)...)
 
 	return tables
 }

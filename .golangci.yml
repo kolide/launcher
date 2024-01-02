@@ -6,6 +6,7 @@ run:
 linters:
   enable:
     - bodyclose
+    - containedctx
     - unused
     - gofmt
     - govet
@@ -14,6 +15,9 @@ linters:
     - sqlclosecheck
     - unconvert
     - paralleltest
+    - forbidigo
+    - sloglint
+    - revive
   disable:
     - errcheck
     - gosec
@@ -31,10 +35,42 @@ linters-settings:
     ignore: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
+  forbidigo:
+    forbid:
+      - p: ^exec\.Command.*$
+        msg: use ee/allowedcmd functions instead
+  sloglint:
+    kv-only: true
+    context-only: true
+    key-naming-case: snake
+    static-msg: true
+  revive:
+    rules:
+      - name: superfluous-else
+        severity: warning
+        disabled: false
+        arguments:
+          - "preserveScope"
+      - name: package-comments
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: context-keys-type
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: errorf
+        disabled: false
+      - name: unreachable-code
+        disabled: false
+      - name: early-return
+        disabled: false
+      - name: confusing-naming
+        disabled: false
 
 issues:
   exclude-rules:
     # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
     - linters:
-      - paralleltest
+        - paralleltest
       text: "does not use range value in test Run"

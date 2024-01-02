@@ -4,11 +4,14 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/pkg/errors"
 )
 
@@ -18,10 +21,29 @@ func setpgid() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{}
 }
 
-func killProcessGroup(cmd *exec.Cmd) error {
+func killProcessGroup(origCmd *exec.Cmd) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// some discussion here https://github.com/golang/dep/pull/857
-	// TODO: should we check err?
-	exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprint(cmd.Process.Pid)).Run()
+	cmd, err := allowedcmd.Taskkill(ctx, "/F", "/T", "/PID", fmt.Sprint(origCmd.Process.Pid))
+	if err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(out) > 0 {
+			return fmt.Errorf("running taskkill: output: %s, err: %w", string(out), err)
+		}
+
+		if ctx.Err() != nil {
+			return fmt.Errorf("running taskkill: context err: %v, err: %w", ctx.Err(), err)
+		}
+
+		return fmt.Errorf("running taskkill: err: %w", err)
+	}
+
 	return nil
 }
 

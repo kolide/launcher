@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control/actionqueue/mocks"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

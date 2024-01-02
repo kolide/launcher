@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
@@ -13,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
-	"github.com/kolide/launcher/pkg/agent/flags/keys"
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,7 +34,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	// CPU consumption go way up.
 
 	// To get around the issue mentioned above, build the binary first and set its path as the executable path on the runner.
-	executablePath := filepath.Join(t.TempDir(), "desktop-test")
+	executablePath := filepath.Join(t.TempDir(), "desktop-test", "launcher")
 
 	if runtime.GOOS == "windows" {
 		executablePath = fmt.Sprintf("%s.exe", executablePath)
@@ -44,7 +45,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher")
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher") //nolint:forbidigo // Fine to use exec.CommandContext in test
 	buildStartTime := time.Now()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -113,6 +114,9 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			t.Parallel()
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
@@ -120,6 +124,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Slogger").Return(slogger)
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
@@ -129,7 +134,6 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			r, err := New(
 				mockKnapsack,
-				WithLogger(log.NewLogfmtLogger(&logBytes)),
 				WithExecutablePath(executablePath),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
@@ -292,6 +296,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
@@ -325,6 +330,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, WithUsersFilesRoot(dir))

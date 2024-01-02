@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
@@ -19,20 +20,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/flags/keys"
-	"github.com/kolide/launcher/pkg/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -41,14 +41,6 @@ import (
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
-
-func WithLogger(logger log.Logger) desktopUsersProcessesRunnerOption {
-	return func(r *DesktopUsersProcessesRunner) {
-		r.logger = log.With(logger,
-			"component", "desktop_users_processes_runner",
-		)
-	}
-}
 
 // WithExecutablePath sets the path to the executable that will be run for each desktop.
 func WithExecutablePath(path string) desktopUsersProcessesRunnerOption {
@@ -101,7 +93,7 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 // will create a new one.
 // Initialize with New().
 type DesktopUsersProcessesRunner struct {
-	logger log.Logger
+	slogger *slog.Logger
 	// updateInterval is the interval on which desktop processes will be spawned, if necessary
 	updateInterval time.Duration
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
@@ -161,7 +153,6 @@ func (pr processRecord) String() string {
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
 func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
-		logger:                 log.NewNopLogger(),
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
 		updateInterval:         k.DesktopUpdateInterval(),
@@ -174,6 +165,8 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 		knapsack:               k,
 	}
 
+	runner.slogger = k.Slogger().With("component", "desktop_runner")
+
 	for _, opt := range opts {
 		opt(runner)
 	}
@@ -185,7 +178,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
-	rs, err := runnerserver.New(runner.logger, k)
+	rs, err := runnerserver.New(runner.slogger, k)
 	if err != nil {
 		return nil, fmt.Errorf("creating desktop runner server: %w", err)
 	}
@@ -193,8 +186,8 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	runner.runnerServer = rs
 	go func() {
 		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			level.Error(runner.logger).Log(
-				"msg", "running monitor server",
+			runner.slogger.Log(context.TODO(), slog.LevelError,
+				"running monitor server",
 				"err", err,
 			)
 		}
@@ -203,7 +196,10 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	if runtime.GOOS == "darwin" {
 		osversion, err := osversion()
 		if err != nil {
-			level.Error(runner.logger).Log("msg", "getting os version", "err", err)
+			runner.slogger.Log(context.TODO(), slog.LevelError,
+				"getting os version",
+				"err", err,
+			)
 		}
 		runner.osVersion = osversion
 	}
@@ -225,7 +221,10 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
 		if err := r.runConsoleUserDesktop(); err != nil {
-			level.Info(r.logger).Log("msg", "running console user desktop", "err", err)
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"running console user desktop",
+				"err", err,
+			)
 		}
 
 		select {
@@ -238,7 +237,9 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 			r.checkOsUpdate()
 			continue
 		case <-r.interrupt:
-			level.Debug(r.logger).Log("msg", "interrupt received, exiting desktop execute loop")
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
+				"interrupt received, exiting desktop execute loop",
+			)
 			return nil
 		}
 	}
@@ -264,8 +265,8 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	defer cancel()
 
 	if err := r.runnerServer.Shutdown(ctx); err != nil {
-		level.Error(r.logger).Log(
-			"msg", "shutting down monitor server",
+		r.slogger.Log(ctx, slog.LevelError,
+			"shutting down monitor server",
 			"err", err,
 		)
 	}
@@ -286,8 +287,8 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Shutdown(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending shutdown command to user desktop process",
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"sending shutdown command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
 				"path", proc.path,
@@ -301,8 +302,8 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	select {
 	case <-wgDone:
 		if shutdownRequestCount > 0 {
-			level.Debug(r.logger).Log(
-				"msg", "successfully completed desktop process shutdown requests",
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
+				"successfully completed desktop process shutdown requests",
 				"count", shutdownRequestCount,
 			)
 		}
@@ -310,14 +311,17 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
-		level.Error(r.logger).Log("msg", "timeout waiting for desktop processes to exit, now killing")
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"timeout waiting for desktop processes to exit, now killing",
+		)
+
 		for uid, processRecord := range r.uidProcs {
 			if !r.processExists(processRecord) {
 				continue
 			}
 			if err := processRecord.Process.Kill(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "error killing desktop process",
+				r.slogger.Log(context.TODO(), slog.LevelError,
+					"killing desktop process",
 					"uid", uid,
 					"pid", processRecord.Process.Pid,
 					"path", processRecord.path,
@@ -363,7 +367,10 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return fmt.Errorf("error reading control data: %w", err)
 	}
 	if err := r.writeSharedFile(r.menuTemplatePath(), dataBytes); err != nil {
-		level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"menu template file did not exist, could not create it",
+			"err", err,
+		)
 	}
 
 	// Regardless, we will write the menu data out to a file that can be grabbed by
@@ -376,7 +383,10 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 	if slices.Contains(flagKeys, keys.DesktopEnabled) {
 		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
-		level.Debug(r.logger).Log("msg", fmt.Sprintf("runner processSpawningEnabled set by control server: %s", strconv.FormatBool(r.processSpawningEnabled)))
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"runner processSpawningEnabled set by control server",
+			"processSpawningEnabled", r.processSpawningEnabled,
+		)
 	}
 }
 
@@ -404,9 +414,9 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	if err := r.generateMenuFile(); err != nil {
 		if r.knapsack.DebugServerData() {
-			level.Error(r.logger).Log(
-				"msg", "failed to generate menu file",
-				"error", err,
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"failed to generate menu file",
+				"err", err,
 			)
 		}
 	}
@@ -415,8 +425,9 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
-			level.Error(r.logger).Log(
-				"msg", "error sending refresh command to desktop process",
+
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"sending refresh command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
 				"path", proc.path,
@@ -476,10 +487,16 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 
 	if os.IsNotExist(err) {
 		if err := r.writeSharedFile(menuTemplatePath, menu.InitialMenu); err != nil {
-			level.Error(r.logger).Log("msg", "menu template file did not exist, could not create it", "err", err)
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"menu template file did not exist, could not create it",
+				"err", err,
+			)
 		}
 	} else if err != nil {
-		level.Error(r.logger).Log("msg", "could not check if menu template file exists", "err", err)
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"could not check if menu template file exists",
+			"err", err,
+		)
 	}
 }
 
@@ -509,53 +526,74 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		}
 
 		// we've decided to spawn a new desktop user process for this user
-		// make sure any existing user desktop processes stop being
-		// recognized by the runner server
+		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {
+			return fmt.Errorf("spawning new desktop user process for %s: %w", uid, err)
+		}
+	}
+
+	return nil
+}
+
+func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string, executablePath string) error {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
+	// make sure any existing user desktop processes stop being
+	// recognized by the runner server
+	r.runnerServer.DeRegisterClient(uid)
+
+	socketPath, err := r.setupSocketPath(uid)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("getting socket path: %w", err))
+		return fmt.Errorf("getting socket path: %w", err)
+	}
+
+	cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("creating desktop command: %w", err))
+		return fmt.Errorf("creating desktop command: %w", err)
+	}
+
+	if err := r.runAsUser(ctx, uid, cmd); err != nil {
+		traces.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
+		return fmt.Errorf("running desktop command as user: %w", err)
+	}
+
+	span.AddEvent("command_started")
+
+	r.waitOnProcessAsync(uid, cmd.Process)
+
+	client := client.New(r.userServerAuthToken, socketPath)
+	if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		socketPath, err := r.setupSocketPath(uid)
-		if err != nil {
-			return fmt.Errorf("getting socket path: %w", err)
+		if err := cmd.Process.Kill(); err != nil {
+			r.slogger.Log(ctx, slog.LevelError,
+				"killing user desktop process after startup ping failed",
+				"uid", uid,
+				"pid", cmd.Process.Pid,
+				"path", cmd.Path,
+				"err", err,
+			)
 		}
 
-		cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
-		if err != nil {
-			return fmt.Errorf("creating desktop command: %w", err)
-		}
+		traces.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
 
-		if err := r.runAsUser(ctx, uid, cmd); err != nil {
-			return fmt.Errorf("running desktop command as user: %w", err)
-		}
+		return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
+	}
 
-		r.waitOnProcessAsync(uid, cmd.Process)
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"desktop process started",
+		"uid", uid,
+		"pid", cmd.Process.Pid,
+	)
 
-		client := client.New(r.userServerAuthToken, socketPath)
-		if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
-			// unregister proc from desktop server so server will not respond to its requests
-			r.runnerServer.DeRegisterClient(uid)
+	span.AddEvent("desktop_started")
 
-			if err := cmd.Process.Kill(); err != nil {
-				level.Error(r.logger).Log(
-					"msg", "killing user desktop process after startup ping failed",
-					"uid", uid,
-					"pid", cmd.Process.Pid,
-					"path", cmd.Path,
-					"err", err,
-				)
-			}
-
-			return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
-		}
-
-		level.Debug(r.logger).Log(
-			"msg", "desktop started",
-			"uid", uid,
-			"pid", cmd.Process.Pid,
-		)
-
-		if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
-			return fmt.Errorf("adding process to internal tracking state: %w", err)
-		}
+	if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
+		traces.SetError(span, fmt.Errorf("adding process to internal tracking state: %w", err))
+		return fmt.Errorf("adding process to internal tracking state: %w", err)
 	}
 
 	return nil
@@ -597,8 +635,8 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
 		if err != nil {
-			level.Info(r.logger).Log(
-				"msg", "desktop process died",
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"desktop process died",
 				"uid", uid,
 				"pid", proc.Pid,
 				"err", err,
@@ -632,10 +670,10 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 
 	// have a record of process, but it died for some reason, log it
 	if !r.processExists(proc) {
-		level.Info(r.logger).Log(
-			"msg", "found existing desktop process dead for console user",
-			"pid", r.uidProcs[uid].Process.Pid,
-			"process_path", r.uidProcs[uid].path,
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"found existing desktop process dead for console user",
+			"pid", proc.Process.Pid,
+			"process_path", proc.path,
 			"uid", uid,
 		)
 
@@ -656,8 +694,8 @@ func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord)
 	// the call to process.NewProcessWithContext ensures process exists
 	proc, err := process.NewProcessWithContext(ctx, int32(processRecord.Process.Pid))
 	if err != nil {
-		level.Info(r.logger).Log(
-			"msg", "looking up existing desktop process",
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"error checking existing desktop process",
 			"pid", processRecord.Process.Pid,
 			"process_path", processRecord.path,
 			"err", err,
@@ -667,8 +705,8 @@ func (r *DesktopUsersProcessesRunner) processExists(processRecord processRecord)
 
 	path, err := proc.ExeWithContext(ctx)
 	if err != nil || path != processRecord.path {
-		level.Info(r.logger).Log(
-			"msg", "error or path mismatch checking existing desktop process path",
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"error or path mismatch checking existing desktop process path",
 			"pid", processRecord.Process.Pid,
 			"process_record_path", processRecord.path,
 			"err", err,
@@ -704,8 +742,8 @@ func (r *DesktopUsersProcessesRunner) setupSocketPath(uid string) (string, error
 	}
 
 	if err := removeFilesWithPrefix(userFolderPath, nonWindowsDesktopSocketPrefix); err != nil {
-		level.Info(r.logger).Log(
-			"msg", "removing existing desktop sockets for user",
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"removing existing desktop sockets for user",
 			"uid", uid,
 			"err", err,
 		)
@@ -734,7 +772,7 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
-	cmd := exec.Command(executablePath, "desktop")
+	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
 
 	cmd.Env = []string{
 		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
@@ -753,6 +791,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("RUNNER_SERVER_URL=%s", r.runnerServer.Url()),
 		fmt.Sprintf("RUNNER_SERVER_AUTH_TOKEN=%s", r.runnerServer.RegisterClient(uid)),
 		fmt.Sprintf("DEBUG=%v", r.knapsack.Debug()),
+		// needed for windows to find various allowed commands
+		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}
 
@@ -771,10 +811,10 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		scanner := bufio.NewScanner(combined)
 
 		for scanner.Scan() {
-			level.Debug(r.logger).Log(
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
+				scanner.Text(),
 				"uid", uid,
 				"subprocess", "desktop",
-				"msg", scanner.Text(),
 			)
 		}
 	}()
@@ -789,10 +829,16 @@ func (r *DesktopUsersProcessesRunner) writeIconFile() {
 
 	if os.IsNotExist(err) {
 		if err := os.WriteFile(expectedLocation, assets.MenubarDefaultLightmodeIco, 0644); err != nil {
-			level.Error(r.logger).Log("msg", "icon file did not exist, could not create it", "err", err)
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"icon file did not exist, could not create it",
+				"err", err,
+			)
 		}
 	} else if err != nil {
-		level.Error(r.logger).Log("msg", "could not check if icon file exists", "err", err)
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"could not check if icon file exists",
+			"err", err,
+		)
 	}
 }
 
@@ -836,13 +882,16 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 
 	osVersion, err := osversion()
 	if err != nil {
-		level.Error(r.logger).Log("msg", "getting os version", "err", err)
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"getting os version",
+			"err", err,
+		)
 		return
 	}
 
 	if osVersion != r.osVersion {
-		level.Debug(r.logger).Log(
-			"msg", "os version changed, restarting desktop",
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"os version changed, restarting desktop",
 			"old", r.osVersion,
 			"new", osVersion,
 		)

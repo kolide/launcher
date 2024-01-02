@@ -9,8 +9,8 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-// platformTables returns an empty set. It's here as a catchall for
+// platformSpecificTables returns an empty set. It's here as a catchall for
 // unimplemented platforms.
-func platformTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
+func platformSpecificTables(client *osquery.ExtensionManagerClient, logger log.Logger, currentOsquerydBinaryPath string) []*table.Plugin {
 	return []*table.Plugin{}
 }

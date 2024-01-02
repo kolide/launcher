@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -25,27 +26,30 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/storage"
+	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
+	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/flags"
-	"github.com/kolide/launcher/pkg/agent/knapsack"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	agentbbolt "github.com/kolide/launcher/pkg/agent/storage/bbolt"
+	"github.com/kolide/launcher/ee/powereventwatcher"
+	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
-	"github.com/kolide/launcher/pkg/autoupdate/tuf"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
-	"github.com/kolide/launcher/pkg/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -53,7 +57,6 @@ import (
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces/exporter"
-	"github.com/kolide/launcher/pkg/windows/powereventwatcher"
 
 	"go.etcd.io/bbolt"
 )
@@ -69,12 +72,11 @@ const (
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
-func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) error {
+func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller, "session_pid", os.Getpid())
-
-	go runOsqueryVersionCheck(ctx, logger, opts.OsquerydPath)
+	logger := ctxlog.FromContext(ctx)
+	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
@@ -167,16 +169,60 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db)
+	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
+
+	go runOsqueryVersionCheck(ctx, logger, k.LatestOsquerydPath(ctx))
+
+	if k.Debug() {
+		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
+		k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}))
+	}
+
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	runGroup := rungroup.NewRunGroup(logger)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
+	var traceExporter *exporter.TraceExporter
 	if k.ControlServerURL() != "" {
+
+		initialDebugDuration := 10 * time.Minute
+
+		// Set log shipping level to debug for the first X minutes of
+		// run time. This will also increase the sending frequency.
+		k.SetLogShippingLevelOverride("debug", initialDebugDuration)
+
 		logShipper = logshipper.New(k, logger)
+		runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
+
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
+		k.AddSlogHandler(logShipper.SlogHandler())
+		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
+
+		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
+		k.SetExportTracesOverride(true, initialDebugDuration)
+
+		traceExporter, err = exporter.NewTraceExporter(ctx, k, logger)
+		if err != nil {
+			level.Debug(logger).Log(
+				"msg", "could not set up trace exporter",
+				"err", err,
+			)
+		} else {
+			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
+		}
 	}
+
+	s, err := startupsettings.OpenWriter(ctx, k)
+	if err != nil {
+		return fmt.Errorf("creating startup db: %w", err)
+	}
+	defer s.Close()
 
 	// construct the appropriate http client based on security settings
 	httpClient := http.DefaultClient
@@ -207,8 +253,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("found no valid certs in PEM at path: %s", k.RootPEM())
 		}
 	}
-	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(logger)
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	checkpointer := checkups.NewCheckupLogger(logger, k)
@@ -222,6 +266,9 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	signalListener := newSignalListener(sigChannel, cancel, logger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
+	// For now, remediation is not performed -- we only log the hardware change.
+	agent.DetectAndRemediateHardwareChange(ctx, k)
+
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
 		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
@@ -233,14 +280,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	{
 		switch k.Transport() {
 		case "grpc":
-			grpcConn, err := service.DialGRPC(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
+			grpcConn, err := service.DialGRPC(k, rootPool)
 			if err != nil {
 				return fmt.Errorf("dialing grpc server: %w", err)
 			}
 			defer grpcConn.Close()
-			client = service.NewGRPCClient(grpcConn, logger)
+			client = service.NewGRPCClient(k, grpcConn)
 		case "jsonrpc":
-			client = service.NewJSONRPCClient(k.KolideServerURL(), k.InsecureTLS(), k.InsecureTransportTLS(), k.CertPins(), rootPool, logger)
+			client = service.NewJSONRPCClient(k, rootPool)
 		case "osquery":
 			client = service.NewNoopClient(logger)
 		default:
@@ -261,11 +308,14 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	level.Info(logger).Log(
-		"msg", "started kolide launcher",
+	k.SystemSlogger().Info("started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
+
+	if traceExporter != nil {
+		traceExporter.SetOsqueryClient(extension)
+	}
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
@@ -285,7 +335,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 
 		runner, err = desktopRunner.New(
 			k,
-			desktopRunner.WithLogger(logger),
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 		)
@@ -312,12 +361,12 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(logger, k))
 
 		// register flare consumer
-		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(logger, k))
+		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
-			runner,
 			ctx,
+			runner,
 			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {
@@ -333,22 +382,27 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			return fmt.Errorf("failed to register auth token consumer: %w", err)
 		}
 
-		if exp, err := exporter.NewTraceExporter(ctx, k, extension, logger); err != nil {
-			level.Debug(logger).Log(
-				"msg", "could not set up trace exporter",
-				"err", err,
-			)
-		} else {
-			runGroup.Add("traceExporter", exp.Execute, exp.Interrupt)
-			controlService.RegisterSubscriber(authTokensSubsystemName, exp)
-		}
-
 		// begin log shipping and subsribe to token updates
 		// nil check incase it failed to create for some reason
 		if logShipper != nil {
-			runGroup.Add("logShipper", logShipper.Run, logShipper.Stop)
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
-			controlService.RegisterSubscriber(agentFlagsSubsystemName, logShipper)
+		}
+
+		if traceExporter != nil {
+			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
+		}
+
+		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
+			level.Debug(logger).Log(
+				"msg", "unable to set up metadata writer",
+				"err", err,
+			)
+		} else {
+			controlService.RegisterSubscriber(serverDataSubsystemName, metadataWriter)
+			// explicitly trigger the ping at least once to ensure updated metadata is written
+			// on upgrades, the subscriber will continue to do this automatically when new
+			// information is made available from server_data (e.g. on a fresh install)
+			metadataWriter.Ping()
 		}
 	}
 
@@ -359,7 +413,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 	if runLocalServer {
 		ls, err := localserver.New(
 			k,
-			localserver.WithLogger(logger),
 		)
 
 		if err != nil {
@@ -383,7 +436,6 @@ func runLauncher(ctx context.Context, cancel func(), opts *launcher.Options) err
 			metadataClient,
 			mirrorClient,
 			extension,
-			tuf.WithLogger(logger),
 			tuf.WithOsqueryRestart(runnerRestart),
 		)
 		if err != nil {
@@ -497,9 +549,18 @@ func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath
 	outTrimmed := strings.TrimSpace(output.String())
 
 	if osqErr != nil {
-		level.Error(logger).Log("msg", "could not check osqueryd version", "output", outTrimmed, "err", err, "execution_time_ms", executionTimeMs)
+		level.Error(logger).Log("msg", "could not check osqueryd version",
+			"output", outTrimmed,
+			"err", err,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
 		return
 	}
 
-	level.Debug(logger).Log("msg", "checked osqueryd version", "version", outTrimmed, "execution_time_ms", executionTimeMs)
+	level.Debug(logger).Log("msg", "checked osqueryd version",
+		"version", outTrimmed,
+		"execution_time_ms", executionTimeMs,
+		"osqueryd_path", osquerydPath,
+	)
 }

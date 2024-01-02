@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
 )

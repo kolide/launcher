@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestRootServer(t *testing.T) {
 	mockSack := mocks.NewKnapsack(t)
 	mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
 
-	monitorServer, err := New(log.NewNopLogger(), mockSack)
+	monitorServer, err := New(multislogger.New().Logger, mockSack)
 	require.NoError(t, err)
 
 	go func() {

@@ -7,23 +7,25 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/knightsc/system_policy/osquery/table/kextpolicy"
 	"github.com/knightsc/system_policy/osquery/table/legacyexec"
-	"github.com/kolide/launcher/pkg/osquery/tables/airport"
-	appicons "github.com/kolide/launcher/pkg/osquery/tables/app-icons"
-	"github.com/kolide/launcher/pkg/osquery/tables/apple_silicon_security_policy"
-	"github.com/kolide/launcher/pkg/osquery/tables/dataflattentable"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/remotectl"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/repcli"
-	"github.com/kolide/launcher/pkg/osquery/tables/execparsers/softwareupdate"
-	"github.com/kolide/launcher/pkg/osquery/tables/filevault"
-	"github.com/kolide/launcher/pkg/osquery/tables/firmwarepasswd"
-	"github.com/kolide/launcher/pkg/osquery/tables/ioreg"
-	"github.com/kolide/launcher/pkg/osquery/tables/macos_software_update"
-	"github.com/kolide/launcher/pkg/osquery/tables/mdmclient"
-	"github.com/kolide/launcher/pkg/osquery/tables/munki"
-	"github.com/kolide/launcher/pkg/osquery/tables/osquery_user_exec_table"
-	"github.com/kolide/launcher/pkg/osquery/tables/profiles"
-	"github.com/kolide/launcher/pkg/osquery/tables/pwpolicy"
-	"github.com/kolide/launcher/pkg/osquery/tables/systemprofiler"
+	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/airport"
+	appicons "github.com/kolide/launcher/ee/tables/app-icons"
+	"github.com/kolide/launcher/ee/tables/apple_silicon_security_policy"
+	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
+	"github.com/kolide/launcher/ee/tables/execparsers/repcli"
+	"github.com/kolide/launcher/ee/tables/execparsers/softwareupdate"
+	"github.com/kolide/launcher/ee/tables/filevault"
+	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
+	"github.com/kolide/launcher/ee/tables/ioreg"
+	"github.com/kolide/launcher/ee/tables/macos_software_update"
+	"github.com/kolide/launcher/ee/tables/mdmclient"
+	"github.com/kolide/launcher/ee/tables/munki"
+	"github.com/kolide/launcher/ee/tables/osquery_user_exec_table"
+	"github.com/kolide/launcher/ee/tables/profiles"
+	"github.com/kolide/launcher/ee/tables/pwpolicy"
+	"github.com/kolide/launcher/ee/tables/systemprofiler"
+	"github.com/kolide/launcher/ee/tables/zfs"
 	_ "github.com/mattn/go-sqlite3"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -35,7 +37,7 @@ const (
 	screenlockQuery    = "select enabled, grace_period from screenlock"
 )
 
-func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	munki := munki.New()
 
 	// This table uses undocumented APIs, There is some discussion at the
@@ -99,25 +101,27 @@ func platformTables(logger log.Logger, currentOsquerydBinaryPath string) []osque
 		apple_silicon_security_policy.TablePlugin(logger),
 		legacyexec.TablePlugin(),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_diskutil_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "list", "-plist"}),
+			"kolide_diskutil_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"list", "-plist"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_falconctl_stats", dataflattentable.PlistType, []string{"/Applications/Falcon.app/Contents/Resources/falconctl", "stats", "-p"}),
+			"kolide_falconctl_stats", dataflattentable.PlistType, allowedcmd.Falconctl, []string{"stats", "-p"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_apfs_list", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "list", "-plist"}),
+			"kolide_apfs_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_apfs_users", dataflattentable.PlistType, []string{"/usr/sbin/diskutil", "apfs", "listUsers", "/", "-plist"}),
+			"kolide_apfs_users", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"apfs", "listUsers", "/", "-plist"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, []string{"/usr/bin/tmutil", "destinationinfo", "-X"}),
+			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, allowedcmd.Tmutil, []string{"destinationinfo", "-X"}),
 		dataflattentable.TablePluginExec(logger,
-			"kolide_powermetrics", dataflattentable.PlistType, []string{"/usr/bin/powermetrics", "-n", "1", "-f", "plist"}),
+			"kolide_powermetrics", dataflattentable.PlistType, allowedcmd.Powermetrics, []string{"-n", "1", "-f", "plist"}),
 		screenlockTable,
 		pwpolicy.TablePlugin(logger),
 		systemprofiler.TablePlugin(logger),
 		munki.ManagedInstalls(logger),
 		munki.MunkiReport(logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, []string{`/usr/libexec/remotectl`, `dumpstate`}),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, []string{`/usr/sbin/softwareupdate`, `--list`}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, []string{"/Applications/VMware Carbon Black Cloud/repcli.bundle/Contents/MacOS/repcli", "status"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
+		zfs.ZfsPropertiesPlugin(logger),
+		zfs.ZpoolPropertiesPlugin(logger),
 	}
 }

@@ -1,20 +1,22 @@
 package service
 
 import (
-	"github.com/go-kit/kit/log"
+	"log/slog"
+
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type Middleware func(KolideService) KolideService
 
-func LoggingMiddleware(logger log.Logger) Middleware {
+func LoggingMiddleware(k types.Knapsack) Middleware {
 	return func(next KolideService) KolideService {
-		return logmw{logger, next}
+		return logmw{k, next}
 	}
 }
 
 type logmw struct {
-	logger log.Logger
-	next   KolideService
+	knapsack types.Knapsack
+	next     KolideService
 }
 
 func uuidMiddleware(next KolideService) KolideService {
@@ -23,4 +25,12 @@ func uuidMiddleware(next KolideService) KolideService {
 
 type uuidmw struct {
 	next KolideService
+}
+
+// levelForError returns slog.LevelError if err != nil, else slog.LevelDebug
+func levelForError(err error) slog.Level {
+	if err != nil {
+		return slog.LevelError
+	}
+	return slog.LevelDebug
 }

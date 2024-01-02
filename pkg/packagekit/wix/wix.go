@@ -107,7 +107,7 @@ func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool
 		wixPath:     FindWixInstall(),
 		packageRoot: packageRoot,
 
-		execCC: exec.CommandContext,
+		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	for _, opt := range wixOpts {

@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 
 	"github.com/stretchr/testify/require"
 
@@ -102,13 +105,21 @@ func TestSwappingCert(t *testing.T) { // nolint:paralleltest
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
-		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
-	)
+	knapsack := mocks.NewKnapsack(t)
+	knapsack.On("KolideServerURL").Return("localhost:8443")
+	knapsack.On("InsecureTransportTLS").Return(false)
+	knapsack.On("InsecureTLS").Return(false)
+	knapsack.On("CertPins").Return([][]byte{})
+	knapsack.On("Transport").Return("grpc")
+
+	slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	knapsack.On("Slogger").Return(slogger)
+
+	conn, err := DialGRPC(knapsack, nil, grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}))
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := NewGRPCClient(conn, log.NewNopLogger())
+	client := NewGRPCClient(knapsack, conn)
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.Error(t, err)
@@ -146,13 +157,21 @@ func TestCertRemainsBad(t *testing.T) { // nolint:paralleltest
 	pool.AppendCertsFromPEM(pem1)
 	pool.AppendCertsFromPEM(pem2)
 
-	conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
-		grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}),
-	)
+	knapsack := mocks.NewKnapsack(t)
+	knapsack.On("KolideServerURL").Return("localhost:8443")
+	knapsack.On("InsecureTransportTLS").Return(false)
+	knapsack.On("InsecureTLS").Return(false)
+	knapsack.On("CertPins").Return([][]byte{})
+	knapsack.On("Transport").Return("grpc")
+
+	slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	knapsack.On("Slogger").Return(slogger)
+
+	conn, err := DialGRPC(knapsack, nil, grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(&tls.Config{RootCAs: pool})}))
 	require.NoError(t, err)
 	defer conn.Close()
 
-	client := NewGRPCClient(conn, log.NewNopLogger())
+	client := NewGRPCClient(knapsack, conn)
 
 	_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 	require.Error(t, err)
@@ -215,16 +234,24 @@ func TestCertPinning(t *testing.T) { // nolint:paralleltest
 			certPins, err := parseCertPins(tt.pins)
 			require.NoError(t, err)
 
-			tlsconf := makeTLSConfig("localhost", false, certPins, nil, log.NewNopLogger())
+			knapsack := mocks.NewKnapsack(t)
+			knapsack.On("KolideServerURL").Return("localhost:8443")
+			knapsack.On("InsecureTransportTLS").Return(false)
+			knapsack.On("InsecureTLS").Return(false)
+			knapsack.On("CertPins").Return(certPins)
+			knapsack.On("Transport").Return("grpc")
+
+			slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+			knapsack.On("Slogger").Return(slogger)
+
+			tlsconf := makeTLSConfig(knapsack, nil)
 			tlsconf.RootCAs = pool
 
-			conn, err := DialGRPC("localhost:8443", false, false, nil, nil, log.NewNopLogger(),
-				grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(tlsconf)}),
-			)
+			conn, err := DialGRPC(knapsack, nil, grpc.WithTransportCredentials(&tlsCreds{credentials.NewTLS(tlsconf)}))
 			require.NoError(t, err)
 			defer conn.Close()
 
-			client := NewGRPCClient(conn, log.NewNopLogger())
+			client := NewGRPCClient(knapsack, conn)
 
 			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {
@@ -279,11 +306,22 @@ func TestRootCAs(t *testing.T) { // nolint:paralleltest
 
 	for _, tt := range testCases { // nolint:paralleltest
 		t.Run("", func(t *testing.T) {
-			conn, err := DialGRPC("localhost:8443", false, false, nil, tt.pool, log.NewNopLogger())
+
+			knapsack := mocks.NewKnapsack(t)
+			knapsack.On("KolideServerURL").Return("localhost:8443")
+			knapsack.On("InsecureTransportTLS").Return(false)
+			knapsack.On("InsecureTLS").Return(false)
+			knapsack.On("CertPins").Return([][]byte{})
+			knapsack.On("Transport").Return("grpc")
+
+			slogger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+			knapsack.On("Slogger").Return(slogger)
+
+			conn, err := DialGRPC(knapsack, tt.pool)
 			require.NoError(t, err)
 			defer conn.Close()
 
-			client := NewGRPCClient(conn, log.NewNopLogger())
+			client := NewGRPCClient(knapsack, conn)
 
 			_, _, err = client.RequestEnrollment(context.Background(), "", "", EnrollmentDetails{})
 			if tt.success {

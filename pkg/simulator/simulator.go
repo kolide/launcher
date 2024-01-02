@@ -5,8 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -15,6 +17,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
@@ -365,7 +369,9 @@ func LaunchSimulation(logger log.Logger, host QueryRunner, grpcURL, uuid, enroll
 		}
 		defer conn.Close()
 
-		h.state.serviceClient = service.NewGRPCClient(conn, log.NewNopLogger())
+		multislogger := multislogger.New(slog.NewJSONHandler(os.Stdout, nil))
+		knapsack := knapsack.New(nil, nil, nil, multislogger, nil)
+		h.state.serviceClient = service.NewGRPCClient(knapsack, conn)
 
 		h.state.lock.Unlock()
 

@@ -1,6 +1,5 @@
 // Package runsimple is meant as a simple runner for osquery. It is initial just handling one off executions, but may
 // perhaps, expand to also handling daemonization
-
 package runsimple
 
 import (
@@ -88,7 +87,7 @@ func (p osqueryProcess) RunSql(ctx context.Context, sql []byte) error {
 
 	p.stdin = bytes.NewReader(sql)
 
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct path
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin
@@ -103,7 +102,7 @@ func (p osqueryProcess) RunVersion(ctx context.Context) error {
 		"--version",
 	}
 
-	cmd := exec.CommandContext(ctx, p.osquerydPath, args...)
+	cmd := exec.CommandContext(ctx, p.osquerydPath, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct path
 
 	// It's okay for these to be nil, so we can just set them without checking.
 	cmd.Stdin = p.stdin

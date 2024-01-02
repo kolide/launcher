@@ -9,12 +9,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
-	runnerServer, err := runnerserver.New(log.NewNopLogger(), nil)
+	runnerServer, err := runnerserver.New(multislogger.New().Logger, nil)
 	require.NoError(t, err)
 
 	// register client and get token

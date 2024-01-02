@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/agent"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
@@ -48,7 +49,8 @@ func runSocket(args []string) error {
 		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil)...))
 	}
 
-	runner, err := runtime.LaunchInstance(opts...)
+	_, cancel := context.WithCancel(context.Background())
+	runner, err := runtime.LaunchInstance(cancel, opts...)
 	if err != nil {
 		return fmt.Errorf("creating osquery instance: %w", err)
 	}

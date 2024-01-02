@@ -6,20 +6,34 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"net/url"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
-func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x509.CertPool, logger log.Logger) *tls.Config {
+func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
+
+	hostname := k.KolideServerURL()
+	if k.Transport() == "grpc" {
+		// gRPC doesn't use the port for TLS verification. So we strip it here.
+		u, err := url.Parse(k.KolideServerURL())
+		if err != nil {
+			k.Slogger().Error("failed to parse server URL",
+				"err", err,
+			)
+			return nil
+		}
+		hostname = u.Hostname()
+	}
+
 	conf := &tls.Config{
-		ServerName:         host,
-		InsecureSkipVerify: insecureTLS,
+		ServerName:         hostname,
+		InsecureSkipVerify: k.InsecureTLS(),
 		RootCAs:            rootPool,
 		MinVersion:         tls.VersionTLS12,
 	}
 
-	if len(certPins) > 0 {
+	if len(k.CertPins()) > 0 {
 		conf.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			for _, chain := range verifiedChains {
 				for _, cert := range chain {
@@ -27,7 +41,7 @@ func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x
 					// SubjectPublicKeyInfo with each of
 					// the pinned hashes.
 					hash := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
-					for _, pin := range certPins {
+					for _, pin := range k.CertPins() {
 						if bytes.Equal(pin, hash[:]) {
 							// Cert matches pin.
 							return nil
@@ -40,8 +54,7 @@ func makeTLSConfig(host string, insecureTLS bool, certPins [][]byte, rootPool *x
 			// gRPC does not seem to expose the error in a way that
 			// we can get at it later. At least this provides some
 			// feedback to the user about what is going wrong.
-			level.Info(logger).Log(
-				"msg", "no match found with pinned certificates",
+			k.Slogger().Error("no match found with pinned certificates",
 				"err", "certificate pin validation failed",
 			)
 			return errors.New("no match found with pinned cert")

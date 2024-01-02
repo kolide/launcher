@@ -11,7 +11,7 @@ import (
 )
 
 func dialContext(socketPath string) func(_ context.Context, _, _ string) (net.Conn, error) {
-	return func(_ context.Context, _, _ string) (net.Conn, error) {
-		return winio.DialPipe(socketPath, nil)
+	return func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return winio.DialPipeContext(ctx, socketPath)
 	}
 }

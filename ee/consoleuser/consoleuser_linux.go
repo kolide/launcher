@@ -7,8 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type listSessionsResult []struct {
@@ -18,7 +19,11 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	output, err := exec.CommandContext(ctx, "loginctl", "list-sessions", "--no-legend", "--no-pager", "--output=json").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	if err != nil {
+		return nil, fmt.Errorf("creating loginctl command: %w", err)
+	}
+	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
 	}
@@ -36,22 +41,32 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		// if there is no seat, this is not a graphical session
-		if s.Seat == "" {
-			continue
-		}
-
-		// get the active property of the session, this command does not respect the --output=json flag
-		output, err := exec.CommandContext(ctx, "loginctl", "show-session", s.Session, "--value", "--property=Active").Output()
+		cmd, err := allowedcmd.Loginctl(ctx,
+			"show-session", s.Session,
+			"--property=Remote",
+			"--property=Active",
+		)
 		if err != nil {
-			return nil, fmt.Errorf("loginctl show-session (for uid %d): %w", s.UID, err)
+			return nil, fmt.Errorf("creating loginctl command: %w", err)
 		}
 
-		if strings.Trim(string(output), "\n") != "yes" {
-			continue
+		output, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("loginctl show-session (for sessionId %s): %w", s.Session, err)
 		}
 
-		uids = append(uids, fmt.Sprintf("%d", s.UID))
+		// to make remote session behave like local session and include systray icons on ubuntu 22.04
+		// had to create a ~/.xsessionrc file with the following content:
+		// export GNOME_SHELL_SESSION_MODE=ubuntu
+		// export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+		// export XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu:/etc/xdg
+
+		// ssh: remote=yes
+		// local: remote=no
+		// rdp: remote=no
+		if strings.Contains(string(output), "Remote=no") && strings.Contains(string(output), "Active=yes") {
+			uids = append(uids, fmt.Sprintf("%d", s.UID))
+		}
 	}
 
 	return uids, nil

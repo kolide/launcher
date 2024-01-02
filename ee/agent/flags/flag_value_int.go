@@ -1,0 +1,101 @@
+package flags
+
+import (
+	"math"
+	"strconv"
+
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+)
+
+type intOption func(*intFlagValue)
+
+func WithIntValueOverride(override FlagValueOverride) intOption {
+	return func(f *intFlagValue) {
+		f.override = override
+	}
+}
+
+func WithIntValueDefault(defaultVal int) intOption {
+	return func(i *intFlagValue) {
+		i.defaultVal = defaultVal
+	}
+}
+
+func WithIntValueMin(min int) intOption {
+	return func(i *intFlagValue) {
+		i.min = min
+	}
+}
+
+func WithIntValueMax(max int) intOption {
+	return func(i *intFlagValue) {
+		i.max = max
+	}
+}
+
+type intFlagValue struct {
+	logger     log.Logger
+	key        keys.FlagKey
+	override   FlagValueOverride
+	defaultVal int
+	min        int
+	max        int
+}
+
+func NewIntFlagValue(logger log.Logger, key keys.FlagKey, opts ...intOption) *intFlagValue {
+	i := &intFlagValue{
+		logger: logger,
+		key:    key,
+		min:    -1 * math.MaxInt,
+		max:    math.MaxInt,
+	}
+
+	for _, opt := range opts {
+		opt(i)
+	}
+
+	return i
+}
+
+func (i *intFlagValue) get(controlServerValue []byte) int {
+	intValue := i.defaultVal
+	if controlServerValue != nil {
+		// Control server provided ints are stored as strings and need to be converted back
+		var err error
+		parsedInt, err := strconv.Atoi(string(controlServerValue))
+		if err == nil {
+			intValue = parsedInt
+		} else {
+			level.Debug(i.logger).Log("msg", "failed to convert stored int flag value", "key", i.key, "err", err)
+		}
+	}
+
+	if i.override != nil && i.override.Value() != nil {
+		// An override was provided, if it's valid let it take precedence
+		value, ok := i.override.Value().(int)
+		if ok {
+			intValue = value
+		}
+	}
+
+	// Integers are sanitized to avoid unreasonable values
+	return clampIntValue(intValue, i.min, i.max)
+}
+
+// clampValue returns a value that is clamped to be within the range defined by min and max.
+func clampIntValue(value int, min, max int) int {
+	switch {
+	case value < min:
+		return min
+	case value > max:
+		return max
+	default:
+		return value
+	}
+}
+
+func intToBytes(i int) []byte {
+	return []byte(strconv.Itoa(i))
+}

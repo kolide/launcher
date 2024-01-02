@@ -1,16 +1,22 @@
 package logshipper
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types"
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,57 +37,85 @@ func TestLogShipper(t *testing.T) {
 			t.Parallel()
 
 			knapsack := mocks.NewKnapsack(t)
-			tokenStore := testTokenStore(t)
-			authToken := ulid.New()
+			knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+			knapsack.On("LogShippingLevel").Return("info").Times(5)
 
+			tokenStore := testKVStore(t, storage.TokenStore.String())
 			knapsack.On("TokenStore").Return(tokenStore)
-			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
-			endpoint := "https://someurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
-			knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-			knapsack.On("Debug").Return(true)
-
+			// no auth token
 			ls := New(knapsack, log.NewNopLogger())
+			require.False(t, ls.isShippingStarted, "shipping should not have stared since there is no auth token")
 
+			// no ingest server url
+			authToken := ulid.New()
+			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
+			knapsack.On("LogIngestServerURL").Return("").Once()
+			ls.Ping()
+			require.False(t, ls.isShippingStarted, "shipping should not have stared since there is no ingest server url")
 			require.Equal(t, authToken, ls.sender.authtoken)
-			require.Equal(t, endpoint, ls.sender.endpoint)
-			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
 
+			// no device identifying attributes
+			logIngestUrl := "https://example.com"
+			knapsack.On("LogIngestServerURL").Return(logIngestUrl).Times(4)
+			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, log.NewNopLogger(), "test")).Once()
+			ls.Ping()
+			require.False(t, ls.isShippingStarted, "shipping should not have stared since there are no device identifying attributes")
+			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+
+			// happy path
+
+			// put some stuff in the send buffer
+			_, err := ls.sendBuffer.Write([]byte(`{"a":"b"}`))
+			require.NoError(t, err)
+			_, err = ls.sendBuffer.Write([]byte(`{"c":"d"}`))
+			require.NoError(t, err)
+
+			knapsack.On("ServerProvidedDataStore").Return(testKVStore(t, storage.ServerProvidedDataStore.String()))
+			ls.Ping()
+			require.True(t, ls.isShippingStarted, "shipping should now be enabled")
+			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, logIngestUrl, ls.sender.endpoint)
+
+			// make sure attributes are added to logs in send buffer
+			ls.sendBuffer.UpdateData(func(in io.Reader, out io.Writer) error {
+				var data map[string]string
+				err := json.NewDecoder(in).Decode(&data)
+				require.NoError(t, err)
+
+				for k, v := range deviceIdentifyingAttributes {
+					require.Equal(t, v, data[k], "device identifying attributes should be in the send buffer")
+				}
+
+				// write data back to out
+				err = json.NewEncoder(out).Encode(data)
+				require.NoError(t, err)
+				return nil
+			})
+
+			// update auth token
 			authToken = ulid.New()
 			tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
-
-			endpoint = "http://someotherurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
-
 			ls.Ping()
-			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
-			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
+			require.Equal(t, authToken, ls.sender.authtoken, "auth token should update")
+			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 
-			endpoint = ""
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+			// update shipping level
+			knapsack.On("LogShippingLevel").Return("debug")
+			knapsack.On("Slogger").Return(multislogger.New().Logger)
 			ls.Ping()
+			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
+			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 
-			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
-			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to empty endpoint")
-
-			endpoint = "http://somenewvalidurl"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
-
+			// update log ingest url
+			logIngestUrl = "https://example.com/new"
+			knapsack.On("LogIngestServerURL").Return(logIngestUrl)
 			ls.Ping()
-			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, endpoint, ls.sender.endpoint, "log shipper should update endpoint on sender")
-			require.True(t, ls.isShippingEnabled, "shipping should be enabled")
-
-			endpoint = "not_a_url%$%"
-			knapsack.On("LogIngestServerURL").Return(endpoint).Times(2)
-			ls.Ping()
-
-			require.Equal(t, authToken, ls.sender.authtoken, "log shipper should update auth token on sender")
-			require.Equal(t, "", ls.sender.endpoint, "log shipper should update endpoint to empty string when invalid")
-			require.False(t, ls.isShippingEnabled, "shipping should be disabled due to invalid endpoint")
+			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
+			require.Equal(t, authToken, ls.sender.authtoken)
+			require.Equal(t, logIngestUrl, ls.sender.endpoint)
 		})
 	}
 }
@@ -90,16 +124,21 @@ func TestStop_Multiple(t *testing.T) {
 	t.Parallel()
 
 	knapsack := mocks.NewKnapsack(t)
-	tokenStore := testTokenStore(t)
-	authToken := ulid.New()
 
+	tokenStore := testKVStore(t, storage.TokenStore.String())
+	authToken := ulid.New()
 	knapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
+
+	serverDataStore := testKVStore(t, storage.ServerProvidedDataStore.String())
+	knapsack.On("ServerProvidedDataStore").Return(serverDataStore)
 
 	endpoint := "https://someurl"
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-	knapsack.On("Debug").Return(true)
+	knapsack.On("LogShippingLevel").Return("debug")
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -140,24 +179,41 @@ func TestStopWithoutRun(t *testing.T) {
 	t.Parallel()
 
 	knapsack := mocks.NewKnapsack(t)
-	tokenStore := testTokenStore(t)
+	tokenStore := testKVStore(t, storage.TokenStore.String())
 	authToken := ulid.New()
 
 	knapsack.On("TokenStore").Return(tokenStore)
 	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
 
+	serverDataStore := testKVStore(t, storage.ServerProvidedDataStore.String())
+	knapsack.On("ServerProvidedDataStore").Return(serverDataStore)
+
 	endpoint := "https://someurl"
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
-	knapsack.On("Debug").Return(true)
+	knapsack.On("LogShippingLevel").Return("debug")
+	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
 
 	ls.Stop(errors.New("test error"))
 }
 
-func testTokenStore(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.TokenStore.String())
+var deviceIdentifyingAttributes = map[string]string{
+	"device_id":       ulid.New(),
+	"munemo":          ulid.New(),
+	"organization_id": ulid.New(),
+	"serial_number":   ulid.New(),
+}
+
+func testKVStore(t *testing.T, name string) types.KVStore {
+	s, err := storageci.NewStore(t, log.NewNopLogger(), name)
+
+	for k, v := range deviceIdentifyingAttributes {
+		s.Set([]byte(k), []byte(v))
+	}
+
 	require.NoError(t, err)
 	return s
 }

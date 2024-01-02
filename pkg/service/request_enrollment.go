@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
@@ -193,6 +192,11 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
+		message := "success"
+		if err != nil {
+			message = "failure"
+		}
+
 		keyvals := []interface{}{
 			"method", "RequestEnrollment",
 			"uuid", uuid,
@@ -202,16 +206,14 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			"took", time.Since(begin),
 		}
 
-		logger := level.Debug(mw.logger)
 		if err != nil {
-			logger = level.Info(mw.logger)
 			keyvals = append(keyvals,
 				"enrollSecret", enrollSecret,
 				"nodekey", nodekey,
 			)
 		}
-		logger.Log(keyvals...)
 
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...)
 	}(time.Now())
 
 	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)

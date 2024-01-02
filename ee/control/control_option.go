@@ -1,7 +1,7 @@
 package control
 
 import (
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type Option func(*ControlService)

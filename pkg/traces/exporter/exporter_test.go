@@ -10,12 +10,13 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
-	"github.com/kolide/launcher/pkg/agent/flags/keys"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types"
-	typesmocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
@@ -42,7 +43,8 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
 	osqueryClient := mocks.NewQuerier(t)
 	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
@@ -54,7 +56,8 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 		},
 	}, nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, osqueryClient, log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
+	traceExporter.SetOsqueryClient(osqueryClient)
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
@@ -85,9 +88,10 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -122,9 +126,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS).Return(nil)
+	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, mocks.NewQuerier(t), log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
@@ -284,16 +289,16 @@ func TestPing(t *testing.T) {
 
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
-		osqueryClient:             mocks.NewQuerier(t),
+		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 		logger:                    log.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: clientAuthenticator,
-		ingestAuthToken:           initialTestToken,
+		ingestAuthToken:           "test token",
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
-		enabled:                   true,
 		traceSamplingRate:         1.0,
+		ctx:                       context.TODO(),
 	}
 
 	// Simulate a new token being set by updating the data store
@@ -351,6 +356,11 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			s := testServerProvidedDataStore(t)
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("ExportTraces").Return(tt.newEnableValue)
+
+			if tt.shouldReplaceProvider {
+				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+			}
+
 			osqueryClient := mocks.NewQuerier(t)
 
 			if tt.shouldReplaceProvider {
@@ -368,6 +378,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
@@ -432,11 +443,16 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceSamplingRate").Return(tt.newTraceSamplingRate)
+
+			if tt.shouldReplaceProvider {
+				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+			}
 			osqueryClient := mocks.NewQuerier(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
@@ -480,9 +496,10 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			shouldReplaceProvider:           true,
 		},
 		{
-			testName:                        "update ingest URL, but tracing not enabled",
-			currentTraceIngestServerURL:     "localhost:3417",
-			newObservabilityIngestServerURL: "localhost:3418",
+			testName:                    "update ingest URL, but tracing not enabled",
+			currentTraceIngestServerURL: "localhost:3417",
+			// new ingets url won't get set until we replace provider
+			newObservabilityIngestServerURL: "localhost:3417",
 			tracingEnabled:                  false,
 			shouldReplaceProvider:           false,
 		},
@@ -505,6 +522,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
@@ -568,6 +586,10 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("DisableTraceIngestTLS").Return(tt.newDisableTraceIngestTLS)
+
+			if tt.shouldReplaceProvider {
+				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+			}
 			osqueryClient := mocks.NewQuerier(t)
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
@@ -575,6 +597,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
 				logger:                    log.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
@@ -593,6 +616,81 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 
 			require.Equal(t, tt.newDisableTraceIngestTLS, traceExporter.disableIngestTLS, "ingest TLS value not updated")
 			require.Equal(t, tt.newDisableTraceIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
+
+			if tt.shouldReplaceProvider {
+				require.NotNil(t, traceExporter.provider)
+			} else {
+				require.Nil(t, traceExporter.provider)
+			}
+		})
+	}
+}
+
+func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
+	tests := []struct {
+		testName              string
+		currentBatchTimeout   time.Duration
+		newBatchTimeout       time.Duration
+		tracingEnabled        bool
+		shouldReplaceProvider bool
+	}{
+		{
+			testName:              "update",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       5 * time.Second,
+			tracingEnabled:        true,
+			shouldReplaceProvider: true,
+		},
+		{
+			testName:              "update but tracing not enabled",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       5 * time.Second,
+			tracingEnabled:        false,
+			shouldReplaceProvider: false,
+		},
+		{
+			testName:              "no update",
+			currentBatchTimeout:   1 * time.Minute,
+			newBatchTimeout:       1 * time.Minute,
+			tracingEnabled:        true,
+			shouldReplaceProvider: false,
+		},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("TraceBatchTimeout").Return(tt.newBatchTimeout)
+
+			if tt.shouldReplaceProvider {
+				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+			}
+
+			osqueryClient := mocks.NewQuerier(t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			traceExporter := &TraceExporter{
+				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				osqueryClient:             osqueryClient,
+				logger:                    log.NewNopLogger(),
+				attrs:                     make([]attribute.KeyValue, 0),
+				attrLock:                  sync.RWMutex{},
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
+				ingestAuthToken:           "test token",
+				ingestUrl:                 "localhost:4317",
+				disableIngestTLS:          false,
+				enabled:                   tt.tracingEnabled,
+				traceSamplingRate:         1.0,
+				batchTimeout:              tt.currentBatchTimeout,
+				ctx:                       ctx,
+				cancel:                    cancel,
+			}
+
+			traceExporter.FlagsChanged(keys.TraceBatchTimeout)
+
+			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 
 			if tt.shouldReplaceProvider {
 				require.NotNil(t, traceExporter.provider)

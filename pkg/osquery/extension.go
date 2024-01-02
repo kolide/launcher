@@ -7,19 +7,19 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
+	"log/slog"
 
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/storage"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
@@ -139,7 +139,6 @@ func NewExtension(client service.KolideService, k types.Knapsack, opts Extension
 	}
 
 	if opts.Logger == nil {
-		// Nop logger
 		opts.Logger = log.NewNopLogger()
 	}
 
@@ -374,9 +373,15 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	logger := log.With(e.logger, "method", "enroll")
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
-	level.Debug(logger).Log("msg", "checking enrollment")
+	slogger := e.knapsack.Slogger().With("method", "enroll")
+
+	slogger.Log(ctx, slog.LevelInfo,
+		"checking enrollment",
+	)
+	span.AddEvent("checking_enrollment")
 
 	// Only one thread should ever be allowed to attempt enrollment at the
 	// same time.
@@ -386,23 +391,33 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
-		level.Debug(logger).Log("msg", "node key exists, skipping enrollment")
+		slogger.Log(ctx, slog.LevelDebug,
+			"node key exists, skipping enrollment",
+		)
+		span.AddEvent("node_key_already_exists")
 		return e.NodeKey, false, nil
 	}
 
 	// Look up a node key cached in the local store
 	key, err := NodeKey(e.knapsack.ConfigStore())
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
 
 	if key != "" {
-		level.Debug(logger).Log("msg", "found stored node key, skipping enrollment")
+		slogger.Log(ctx, slog.LevelDebug,
+			"found stored node key, skipping enrollment",
+		)
+		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
 		return e.NodeKey, false, nil
 	}
 
-	level.Debug(logger).Log("msg", "starting enrollment")
+	slogger.Log(ctx, slog.LevelInfo,
+		"no node key found, starting enrollment",
+	)
+	span.AddEvent("starting_enrollment")
 
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
@@ -413,12 +428,18 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// it seems less likely. Try a couple times, but backoff fast.
 	var enrollDetails service.EnrollmentDetails
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		level.Info(logger).Log("msg", "Cannot get additional enrollment details without an osqueryd path. This is probably CI")
+		slogger.Log(ctx, slog.LevelInfo,
+			"skipping enrollment details, no osqueryd path, this is probably CI",
+		)
+		span.AddEvent("skipping_enrollment_details")
 	} else {
 		if err := backoff.WaitFor(func() error {
 			enrollDetails, err = getEnrollDetails(ctx, osqPath)
 			if err != nil {
-				level.Debug(logger).Log("msg", "getEnrollDetails failed in backoff", "err", err)
+				slogger.Log(ctx, slog.LevelDebug,
+					"getEnrollDetails failed in backoff",
+					"err", err,
+				)
 			}
 			return err
 		}, 30*time.Second, 5*time.Second); err != nil {
@@ -426,7 +447,13 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				return "", true, fmt.Errorf("query enrollment details: %w", err)
 			}
 
-			level.Info(logger).Log("msg", "Failed to get enrollment details (even with retries). Moving on", "err", err)
+			slogger.Log(ctx, slog.LevelError,
+				"failed to get enrollment details with retries, moving on",
+				"err", err,
+			)
+			traces.SetError(span, fmt.Errorf("query enrollment details: %w", err))
+		} else {
+			span.AddEvent("got_enrollment_details")
 		}
 	}
 	// If no cached node key, enroll for new node key
@@ -435,13 +462,17 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
-		return "", true, fmt.Errorf("transport error in enrollment: %w", err)
+		err := fmt.Errorf("transport error in enrollment: %w", err)
+		traces.SetError(span, err)
+		return "", true, err
 	}
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
 		}
-		return "", true, fmt.Errorf("enrollment invalid: %w", err)
+		err = fmt.Errorf("enrollment invalid: %w", err)
+		traces.SetError(span, err)
+		return "", true, err
 	}
 
 	// Save newly acquired node key if successful
@@ -452,7 +483,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	e.NodeKey = keyString
 
-	level.Debug(logger).Log("msg", "completed enrollment")
+	slogger.Log(ctx, slog.LevelInfo,
+		"completed enrollment",
+	)
+	span.AddEvent("completed_enrollment")
 
 	return e.NodeKey, false, nil
 }
@@ -953,133 +987,4 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	return nil
-}
-
-type initialRunner struct {
-	logger     log.Logger
-	enabled    bool
-	identifier string
-	client     Querier
-	store      types.GetterSetter
-}
-
-func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
-	var config OsqueryConfig
-	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
-		return fmt.Errorf("unmarshal osquery config blob: %w", err)
-	}
-
-	var allQueries []string
-	for packName, pack := range config.Packs {
-		// only run queries from kolide packs
-		if !strings.Contains(packName, "_kolide_") {
-			continue
-		}
-
-		// Run all the queries, snapshot and differential
-		for query := range pack.Queries {
-			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
-			allQueries = append(allQueries, queryName)
-		}
-	}
-
-	toRun, err := i.queriesToRun(allQueries)
-	if err != nil {
-		return fmt.Errorf("checking if query should run: %w", err)
-	}
-
-	var initialRunResults []OsqueryResultLog
-	for packName, pack := range config.Packs {
-		if !i.enabled { // only execute them when the plugin is enabled.
-			break
-		}
-		for query, queryContent := range pack.Queries {
-			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
-			if _, ok := toRun[queryName]; !ok {
-				continue
-			}
-			resp, err := i.client.Query(queryContent.Query)
-			// returning here causes the rest of the queries not to run
-			// this is a bummer because often configs have queries with bad syntax/tables that do not exist.
-			// log the error and move on.
-			// using debug to not fill disks. the worst that will happen is that the result will come in later.
-			level.Debug(i.logger).Log(
-				"msg", "querying for initial results",
-				"query_name", queryName,
-				"err", err,
-				"results", len(resp),
-			)
-			if err != nil || len(resp) == 0 {
-				continue
-			}
-
-			initialRunResults = append(initialRunResults, OsqueryResultLog{
-				Name:           queryName,
-				HostIdentifier: i.identifier,
-				UnixTime:       int(time.Now().UTC().Unix()),
-				DiffResults:    &DiffResults{Added: resp},
-			})
-		}
-	}
-
-	cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	for _, result := range initialRunResults {
-		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(result); err != nil {
-			return fmt.Errorf("encoding initial run result: %w", err)
-		}
-		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
-			level.Debug(i.logger).Log(
-				"msg", "writing initial result log to server",
-				"query_name", result.Name,
-				"err", err,
-			)
-			continue
-		}
-	}
-
-	// note: caching would happen always on first use, even if the runner is not enabled.
-	// This avoids the problem of queries not being known even though they've been in the config for a long time.
-	if err := i.cacheRanQueries(toRun); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (i *initialRunner) queriesToRun(allFromConfig []string) (map[string]struct{}, error) {
-	known := make(map[string]struct{})
-
-	for _, q := range allFromConfig {
-		knownQuery, err := i.store.Get([]byte(q))
-		if err != nil {
-			return nil, fmt.Errorf("check store for queries to run: %w", err)
-		}
-		if knownQuery != nil {
-			continue
-		}
-		known[q] = struct{}{}
-	}
-
-	return known, nil
-}
-
-func (i *initialRunner) cacheRanQueries(known map[string]struct{}) error {
-	for q := range known {
-		if err := i.store.Set([]byte(q), []byte(q)); err != nil {
-			return fmt.Errorf("cache initial result query %q: %w", q, err)
-		}
-	}
-
-	return nil
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
 }

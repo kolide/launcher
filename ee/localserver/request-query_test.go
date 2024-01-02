@@ -10,10 +10,11 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	typesMocks "github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +58,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -66,8 +68,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 				mockQuerier.On("Query", tt.query).Return(tt.mockQueryResult, nil).Once()
 			}
 
-			var logBytes bytes.Buffer
-			server := testServer(t, mockKnapsack, &logBytes)
+			server := testServer(t, mockKnapsack)
 			server.querier = mockQuerier
 
 			jsonBytes, err := json.Marshal(map[string]string{
@@ -222,6 +223,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
@@ -236,8 +238,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			}
 
 			// set up test server
-			var logBytes bytes.Buffer
-			server := testServer(t, mockKnapsack, &logBytes)
+			server := testServer(t, mockKnapsack)
 			server.querier = mockQuerier
 
 			// make request body

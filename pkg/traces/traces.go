@@ -3,9 +3,11 @@ package traces
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"runtime"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -19,20 +21,37 @@ const (
 	defaultAttributeNamespace = "unknown"
 )
 
+// StartHttpRequestSpan returns a copy of the request with a new context to include span info and span,
+// including information about the calling function as appropriate.
+// Standardizes the tracer name. The caller is always responsible for
+// ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
+// string representing the attribute key and the second in the pair is the attribute value.
+func StartHttpRequestSpan(r *http.Request, keyVals ...interface{}) (*http.Request, trace.Span) {
+	ctx, span := startSpanWithExtractedAttributes(r.Context(), keyVals...)
+	return r.WithContext(ctx), span
+}
+
 // StartSpan returns a new context and span, including information about the calling function
 // as appropriate. Standardizes the tracer name. The caller is always responsible for
 // ending the span. `keyVals` should be a list of pairs, where the first in the pair is a
 // string representing the attribute key and the second in the pair is the attribute value.
 func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
+	return startSpanWithExtractedAttributes(ctx, keyVals...)
+}
+
+// startSpanWithExtractedAttributes is the internal implementation of StartSpan and StartHttpRequestSpan
+// with runtime.Caller(2) so that the caller of the wrapper function is used.
+func startSpanWithExtractedAttributes(ctx context.Context, keyVals ...interface{}) (context.Context, trace.Span) {
 	spanName := defaultSpanName
 
 	opts := make([]trace.SpanStartOption, 0)
 
 	// Extract information about the caller to set some standard attributes (code.filepath,
 	// code.lineno, code.function) and to set more specific span and attribute names.
-	// runtime.Caller(0) would return information about `StartSpan` -- calling
-	// runtime.Caller(1) will return information about the function calling `StartSpan`.
-	programCounter, callerFile, callerLine, ok := runtime.Caller(1)
+	// runtime.Caller(0) would return information about `startSpan` -- calling
+	// runtime.Caller(1) will return information about the wrapper function calling `startSpan`.
+	// runtime.Caller(2) will return information about the function calling the wrapper function
+	programCounter, callerFile, callerLine, ok := runtime.Caller(2)
 	if ok {
 		opts = append(opts, trace.WithAttributes(
 			semconv.CodeFilepath(callerFile),
@@ -48,7 +67,12 @@ func StartSpan(ctx context.Context, keyVals ...interface{}) (context.Context, tr
 
 	opts = append(opts, trace.WithAttributes(buildAttributes(callerFile, keyVals...)...))
 
-	return otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
+	spanCtx, span := otel.Tracer(instrumentationPkg).Start(ctx, spanName, opts...)
+	spanCtx = context.WithValue(spanCtx, multislogger.SpanIdKey, span.SpanContext().SpanID().String())
+	spanCtx = context.WithValue(spanCtx, multislogger.TraceIdKey, span.SpanContext().TraceID().String())
+	spanCtx = context.WithValue(spanCtx, multislogger.TraceSampledKey, span.SpanContext().IsSampled())
+
+	return spanCtx, span
 }
 
 // SetError records the error on the span and sets the span's status to error.

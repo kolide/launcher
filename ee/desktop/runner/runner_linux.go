@@ -7,21 +7,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 const defaultDisplay = ":0"
 
+// Display takes the format host:displaynumber.screen
+var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
+
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
@@ -78,18 +87,27 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 	uidInt, err := strconv.ParseInt(uid, 10, 32)
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not convert uid to int32",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not convert uid to int32",
 			"err", err,
 		)
 		return envVars
 	}
 
 	// Get the user's session so we can get their display (needed for opening notification action URLs in browser)
-	sessionOutput, err := exec.CommandContext(ctx, "loginctl", "show-user", uid, "--value", "--property=Sessions").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "show-user", uid, "--value", "--property=Sessions")
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not get user session",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not create loginctl command",
+			"uid", uid,
+			"err", err,
+		)
+		return envVars
+	}
+	sessionOutput, err := cmd.Output()
+	if err != nil {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get user session",
 			"uid", uid,
 			"err", err,
 		)
@@ -104,10 +122,19 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	sessionList := strings.Split(sessions, " ")
 	for _, session := range sessionList {
 		// Figure out what type of graphical session the user has -- x11, wayland?
-		typeOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Type").Output()
+		cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Type")
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get session type",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not create loginctl command to get session type",
+				"uid", uid,
+				"err", err,
+			)
+			continue
+		}
+		typeOutput, err := cmd.Output()
+		if err != nil {
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get session type",
 				"uid", uid,
 				"err", err,
 			)
@@ -116,15 +143,12 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 
 		sessionType := strings.Trim(string(typeOutput), "\n")
 		if sessionType == "x11" {
-			envVars["DISPLAY"] = r.displayFromX11(ctx, session)
+			envVars["DISPLAY"] = r.displayFromX11(ctx, session, int32(uidInt))
 			break
 		} else if sessionType == "wayland" {
 			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
 
 			break
-		} else {
-			// Not a graphical session
-			continue
 		}
 	}
 
@@ -144,33 +168,38 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	return envVars
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string) string {
+func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
 	// We can read $DISPLAY from the session properties
-	xDisplayOutput, err := exec.CommandContext(ctx, "loginctl", "show-session", session, "--value", "--property=Display").Output()
+	cmd, err := allowedcmd.Loginctl(ctx, "show-session", session, "--value", "--property=Display")
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not get Display from user session",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not create command to get Display from user session",
 			"err", err,
 		)
-		return defaultDisplay
+		return r.displayFromXDisplayServerProcess(ctx, uid)
+	}
+	xDisplayOutput, err := cmd.Output()
+	if err != nil {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get Display from user session",
+			"err", err,
+		)
+		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 
 	display := strings.Trim(string(xDisplayOutput), "\n")
 	if display == "" {
-		return defaultDisplay
+		return r.displayFromXDisplayServerProcess(ctx, uid)
 	}
 
 	return display
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
-	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
-	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
-	// the Xwayland process and examining its args.
+func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx context.Context, uid int32) string {
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		level.Debug(r.logger).Log(
-			"msg", "could not query processes to find Xwayland process",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not query processes to find display server process",
 			"err", err,
 		)
 		return defaultDisplay
@@ -179,8 +208,75 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	for _, p := range processes {
 		cmdline, err := p.CmdlineWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get cmdline slice for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get cmdline slice for process",
+				"err", err,
+			)
+			continue
+		}
+
+		if !strings.Contains(cmdline, "Xorg") && !strings.Contains(cmdline, "Xvfb") {
+			continue
+		}
+
+		// We have an Xorg or Xvfb process -- check to make sure it's for our running user
+		uids, err := p.UidsWithContext(ctx)
+		if err != nil {
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get uids for process",
+				"err", err,
+			)
+			continue
+		}
+		uidMatch := false
+		for _, procUid := range uids {
+			if procUid == uid {
+				uidMatch = true
+				break
+			}
+		}
+
+		if uidMatch {
+			// We have a match! Grab the display value.
+			// The Xorg process may look like:
+			// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
+			// The Xvfb process looks like:
+			// Xvfb :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -screen 0 3840x2560x24
+			cmdlineArgs := strings.Split(cmdline, " ")
+			if len(cmdlineArgs) < 2 {
+				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
+				continue
+			}
+
+			// Confirm that this is a legitimate display value. (Newer versions of Xorg omit the display value from
+			// the list of arguments, so we need to weed those out.)
+			if displayRegex.MatchString(cmdlineArgs[1]) {
+				return cmdlineArgs[1]
+			}
+		}
+	}
+
+	return defaultDisplay
+}
+
+func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
+	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
+	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
+	// the Xwayland process and examining its args.
+	processes, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not query processes to find Xwayland process",
+			"err", err,
+		)
+		return defaultDisplay
+	}
+
+	for _, p := range processes {
+		cmdline, err := p.CmdlineWithContext(ctx)
+		if err != nil {
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get cmdline slice for process",
 				"err", err,
 			)
 			continue
@@ -193,8 +289,8 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 		// We have an Xwayland process -- check to make sure it's for our running user
 		uids, err := p.UidsWithContext(ctx)
 		if err != nil {
-			level.Debug(r.logger).Log(
-				"msg", "could not get uids for process",
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not get uids for process",
 				"err", err,
 			)
 			continue
@@ -245,10 +341,12 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 		return homeLocation
 	}
 
-	level.Debug(r.logger).Log("msg", "could not find xauthority in any known location",
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"could not find xauthority in any known location",
 		"wayland", waylandXAuthorityLocationPattern,
 		"x11", x11XauthorityLocation,
-		"default", homeLocation)
+		"default", homeLocation,
+	)
 
 	return ""
 }

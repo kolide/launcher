@@ -8,8 +8,8 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/agent"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/osquery/osquery-go/plugin/table"

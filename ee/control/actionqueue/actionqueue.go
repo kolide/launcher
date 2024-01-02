@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/agent/storage/inmemory"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 const (
@@ -35,7 +35,7 @@ type action struct {
 }
 
 type actionqueue struct {
-	ctx                   context.Context
+	ctx                   context.Context // nolint:containedctx
 	actors                map[string]actor
 	store                 types.KVStore
 	oldNotificationsStore types.KVStore

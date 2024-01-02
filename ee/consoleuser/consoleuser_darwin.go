@@ -8,9 +8,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 // example scutil output
@@ -90,7 +91,10 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "scutil")
+	cmd, err := allowedcmd.Scutil(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating scutil command: %w", err)
+	}
 	cmd.Stdin = strings.NewReader("show State:/Users/ConsoleUser")
 
 	output, err := cmd.CombinedOutput()

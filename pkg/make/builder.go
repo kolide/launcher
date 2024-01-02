@@ -1,11 +1,11 @@
-/* Package make provides some simple functions to handle build and go
+/*
+Package make provides some simple functions to handle build and go
 dependencies.
 
 We used to do this with gnumake rules, but as we added windows
 compatibility, we found make too limiting. Moving this into go allows
 us to write cleaner cross-platform code.
 */
-
 package make
 
 import (
@@ -128,7 +128,7 @@ func New(opts ...Option) *Builder {
 		goPath: "go",
 		goVer:  strings.TrimPrefix(runtime.Version(), "go"),
 
-		execCC: exec.CommandContext,
+		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	for _, opt := range opts {
@@ -598,7 +598,20 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			return err
 		}
 
-		if stderr.Len() > 0 {
+		// With the Sonoma-era Xcode binaries, we've started seeing a bunch of spurious warnings. They appear to
+		// _mostly_ effect our developer build process. In the interest in not breaking the build, we ignore them.
+		// https://github.com/golang/go/issues/62597#issuecomment-1733893918 is some of them, and some seem related to
+		// the zig cross compiling
+		stderrStr := stderr.String()
+		if os.Getenv("GITHUB_ACTIONS") == "" {
+			stderrStr = strings.ReplaceAll(stderrStr, "ld: warning: ignoring duplicate libraries: '-lobjc'\n", "")
+			stderrStr = strings.ReplaceAll(stderrStr, fmt.Sprintf("# github.com/kolide/launcher/cmd/%s\n", filepath.Base(src)), "")
+
+			re := regexp.MustCompile(`ld: warning: object file \(.*\) was built for newer 'macOS' version \(.+\) than being linked \(.+\)\n`)
+			stderrStr = re.ReplaceAllString(stderrStr, "")
+		}
+
+		if len(stderrStr) > 0 {
 			return errors.New("stderr not empty")
 		}
 

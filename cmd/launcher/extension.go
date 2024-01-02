@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -11,10 +12,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/cmd/launcher/internal"
-	"github.com/kolide/launcher/pkg/agent/types"
+	"github.com/kolide/launcher/ee/agent/types"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	kolidelog "github.com/kolide/launcher/pkg/log"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	ktable "github.com/kolide/launcher/pkg/osquery/table"
@@ -118,21 +119,24 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 		return runner.Restart()
 	}
 
+	osqCtx, osqCancel := context.WithCancel(ctx)
+
 	return &actorQuerier{
 			Actor: actor.Actor{
 				// and the methods for starting and stopping the extension
 				Execute: func() error {
 					// Attempt to enroll before starting up osquery. If we can't enroll now, don't error out --
 					// we'll attempt again the first time osquery calls launcher plugins.
-					_, invalid, err := ext.Enroll(ctx)
+					_, invalid, err := ext.Enroll(osqCtx)
 					if err != nil {
 						level.Debug(logger).Log("msg", "error performing enrollment", "err", err)
 					} else if invalid {
 						level.Debug(logger).Log("msg", "invalid enroll secret", "err", err)
 					}
 
-					// Start the osqueryd instance
-					if err := runner.Start(); err != nil {
+					// Start the osqueryd instance -- pass in cancel so the osquery runner can let
+					// this function know to stop waiting when the runner shuts down
+					if err := runner.Start(osqCancel); err != nil {
 						return fmt.Errorf("launching osquery instance: %w", err)
 					}
 
@@ -142,7 +146,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 						// TODO: remove when underlying libs are refactored
 						// everything exits right now, so block this actor on the context finishing
-						<-ctx.Done()
+						<-osqCtx.Done()
 						return nil
 					}
 
@@ -156,7 +160,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 					// TODO: remove when underlying libs are refactored
 					// everything exits right now, so block this actor on the context finishing
-					<-ctx.Done()
+					<-osqCtx.Done()
 					return nil
 				},
 				Interrupt: func(_ error) {
@@ -167,6 +171,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 							level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
 						}
 					}
+					osqCancel()
 				},
 			},
 			querier: runner.Query,
@@ -180,22 +185,21 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryInstanceOption {
 	// create the logging adapters for osquery
 	osqueryStderrLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
+		k.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stderr",
+		),
 		k.RootDirectory(),
-		kolidelog.WithLevelFunc(level.Info),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stderr"),
+		kolidelog.WithLevel(slog.LevelInfo),
 	)
 	osqueryStdoutLogger := kolidelog.NewOsqueryLogAdapter(
-		logger,
+		k.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stdout",
+		),
 		k.RootDirectory(),
-		kolidelog.WithLevelFunc(level.Debug),
-		kolidelog.WithKeyValue("component", "osquery"),
-		kolidelog.WithKeyValue("osqlevel", "stdout"),
+		kolidelog.WithLevel(slog.LevelDebug),
 	)
-
-	// Only enable watchdog internally for now
-	enableWatchdog := k.UpdateChannel() == "nightly"
 
 	return []runtime.OsqueryInstanceOption{
 		runtime.WithKnapsack(k),
@@ -211,7 +215,6 @@ func commonRunnerOptions(logger log.Logger, k types.Knapsack) []runtime.OsqueryI
 		runtime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
 		runtime.WithUpdateDirectory(k.UpdateDirectory()),
 		runtime.WithUpdateChannel(k.UpdateChannel()),
-		runtime.WithEnableWatchdog(enableWatchdog),
 	}
 }
 

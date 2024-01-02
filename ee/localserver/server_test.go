@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/pkg/agent/storage"
-	storageci "github.com/kolide/launcher/pkg/agent/storage/ci"
-	"github.com/kolide/launcher/pkg/agent/types/mocks"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,12 +23,25 @@ func TestInterrupt_Multiple(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, osquery.SetupLauncherKeys(c))
 
-	k := mocks.NewKnapsack(t)
+	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("ConfigStore").Return(c)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
+	// Override the poll and recalculate interval for the test so we can be sure that the async workers
+	// do run, but then stop running on shutdown
+	pollInterval = 2 * time.Second
+	recalculateInterval = 100 * time.Millisecond
+
+	// Create the localserver
 	ls, err := New(k)
 	require.NoError(t, err)
+
+	// Set the querier
+	querier := mocks.NewQuerier(t)
+	// On a 2-sec interval, letting the server run for 3 seconds, we should see only one query
+	querier.On("Query", mock.Anything).Return(nil, nil).Once()
+	ls.SetQuerier(querier)
 
 	// Let the server run for a bit
 	go ls.Start()
@@ -59,4 +75,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+
+	k.AssertExpectations(t)
+	querier.AssertExpectations(t)
 }

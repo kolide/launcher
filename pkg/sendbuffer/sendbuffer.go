@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 type sender interface {
@@ -16,31 +17,32 @@ type sender interface {
 }
 
 var (
-	defaultMaxSize     = 128 * 1024
-	defaultMaxSendSize = 8 * 1024
+	defaultMaxSizeBytes  = 512 * 1024
+	defaultSendSizeBytes = 8 * 1024
 )
 
 type SendBuffer struct {
-	logs                              [][]byte
-	size, maxStorageSize, maxSendSize int
-	writeMutex, sendMutex             sync.Mutex
-	logger                            log.Logger
-	sender                            sender
-	sendInterval                      time.Duration
-	isSending                         bool
+	logs                                        [][]byte
+	size, maxStorageSizeBytes, maxSendSizeBytes int
+	sendMutex                                   sync.Mutex
+	writeMutex                                  sync.RWMutex
+	logger                                      log.Logger
+	sender                                      sender
+	sendTicker                                  *time.Ticker
+	isSending                                   bool
 }
 
 type option func(*SendBuffer)
 
-func WithMaxStorageSize(maxSize int) option {
+func WithMaxStorageSizeBytes(maxSize int) option {
 	return func(sb *SendBuffer) {
-		sb.maxStorageSize = maxSize
+		sb.maxStorageSizeBytes = maxSize
 	}
 }
 
-func WithMaxSendSize(sendSize int) option {
+func WithMaxSendSizeBytes(sendSize int) option {
 	return func(sb *SendBuffer) {
-		sb.maxSendSize = sendSize
+		sb.maxSendSizeBytes = sendSize
 	}
 }
 
@@ -53,18 +55,18 @@ func WithLogger(logger log.Logger) option {
 // WithSendInterval sets the interval at which the buffer will send data.
 func WithSendInterval(sendInterval time.Duration) option {
 	return func(sb *SendBuffer) {
-		sb.sendInterval = sendInterval
+		sb.sendTicker.Reset(sendInterval)
 	}
 }
 
 func New(sender sender, opts ...option) *SendBuffer {
 	sb := &SendBuffer{
-		maxStorageSize: defaultMaxSize,
-		maxSendSize:    defaultMaxSendSize,
-		sender:         sender,
-		sendInterval:   1 * time.Minute,
-		logger:         log.NewNopLogger(),
-		isSending:      false,
+		maxStorageSizeBytes: defaultMaxSizeBytes,
+		maxSendSizeBytes:    defaultSendSizeBytes,
+		sender:              sender,
+		sendTicker:          time.NewTicker(1 * time.Minute),
+		logger:              log.NewNopLogger(),
+		isSending:           false,
 	}
 
 	for _, opt := range opts {
@@ -81,15 +83,21 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 	defer sb.writeMutex.Unlock()
 
 	if len(in) == 0 {
-		return 0, nil
+		sb.logger.Log(
+			"msg", "dropped data because element was empty",
+			"method", "UpdateData",
+		)
+
+		return len(in), nil
 	}
 
 	// if the single data piece is larger than the max send size, drop it and log
-	if len(in) > sb.maxSendSize {
+	if len(in) > sb.maxSendSizeBytes {
 		sb.logger.Log(
 			"msg", "dropped data because element greater than max send size",
-			"size_of_data", len(in),
-			"max_send_size", sb.maxSendSize,
+			"method", "Write",
+			"size_of_data_bytes", len(in),
+			"max_send_size_bytes", sb.maxSendSizeBytes,
 			"head", string(in)[0:minInt(len(in), 100)],
 		)
 		return len(in), nil
@@ -97,16 +105,19 @@ func (sb *SendBuffer) Write(in []byte) (int, error) {
 
 	// if we are full, something has backed up
 	// purge everything
-	if len(in)+sb.size > sb.maxStorageSize {
+	if len(in)+sb.size > sb.maxStorageSizeBytes {
 		sb.deleteLogs(len(sb.logs))
 
 		sb.logger.Log(
 			"msg", "reached capacity, dropping all data and starting over",
-			"size_of_data", len(in),
-			"buffer_size", sb.size,
-			"size_plus_data", sb.size+len(in),
-			"max_size", sb.maxStorageSize,
+			"method", "Write",
+			"size_of_data_bytes", len(in),
+			"buffer_size_bytes", sb.size,
+			"size_plus_data_bytes", sb.size+len(in),
+			"max_size", sb.maxStorageSizeBytes,
 		)
+
+		return len(in), nil
 	}
 
 	// If we don't make a copy of the data, we get data loss in the logs array.
@@ -129,20 +140,109 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		sb.isSending = false
 	}()
 
-	ticker := time.NewTicker(sb.sendInterval)
-	defer ticker.Stop()
-
 	for {
 		if err := sb.sendAndPurge(); err != nil {
 			sb.logger.Log("msg", "failed to send and purge", "err", err)
 		}
 
 		select {
-		case <-ticker.C:
+		case <-sb.sendTicker.C:
 			continue
 		case <-ctx.Done():
 			return nil
 		}
+	}
+}
+
+func (sb *SendBuffer) SetSendInterval(sendInterval time.Duration) {
+	sb.sendTicker.Reset(sendInterval)
+}
+
+func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
+
+	var indexesToDelete []int
+
+	for i := 0; i < len(sb.logs); i++ {
+		in := bytes.NewReader(sb.logs[i])
+		out := &bytes.Buffer{}
+
+		inSize := in.Len()
+
+		// do the update, if it fails, preserve data
+		if err := f(in, out); err != nil {
+			level.Debug(sb.logger).Log(
+				"msg", "update function failed, preserving original data",
+				"method", "UpdateData",
+				"err", err,
+			)
+
+			continue
+		}
+
+		// subtract original size, wait until after update func is called
+		// incase it fails, we don't want to modify size
+		sb.size -= inSize
+		sb.logs[i] = nil
+
+		outLen := out.Len()
+
+		// if the new length is 0, mark for deletion
+		if outLen == 0 {
+			indexesToDelete = append(indexesToDelete, i)
+
+			level.Debug(sb.logger).Log(
+				"msg", "dropped data because element was empty",
+				"method", "UpdateData",
+			)
+
+			continue
+		}
+
+		// if new size excceds max send size, mark for deletion
+		if outLen > sb.maxSendSizeBytes {
+			indexesToDelete = append(indexesToDelete, i)
+
+			level.Debug(sb.logger).Log(
+				"msg", "dropped data because element greater than max send size",
+				"method", "UpdateData",
+				"size_of_data_bytes", out.Len(),
+				"max_send_size_bytes", sb.maxSendSizeBytes,
+				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+			)
+
+			continue
+		}
+
+		// if new size exceeds max storage size, mark for deletion
+		if outLen+sb.size > sb.maxStorageSizeBytes {
+			indexesToDelete = append(indexesToDelete, i)
+
+			// log it
+			sb.logger.Log(
+				"msg", "dropped data because buffer full",
+				"method", "UpdateData",
+				"size_of_data_bytes", outLen,
+				"buffer_size_bytes", sb.size,
+				"size_plus_data_bytes", sb.size+outLen,
+				"max_size", sb.maxStorageSizeBytes,
+				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+			)
+
+			continue
+		}
+
+		// update log and size
+		sb.logs[i] = out.Bytes()
+		sb.size += outLen
+	}
+
+	// remove indexes marked for deletion
+	for i := 0; i < len(indexesToDelete); i++ {
+		// shift left by i each time we delete an element to accout for decreased length
+		indexToDelete := indexesToDelete[i] - i
+		sb.logs = append(sb.logs[:indexToDelete], sb.logs[indexToDelete+1:]...)
 	}
 }
 
@@ -161,7 +261,8 @@ func (sb *SendBuffer) sendAndPurge() error {
 	defer sb.sendMutex.Unlock()
 
 	toSendBuff := &bytes.Buffer{}
-	if err := sb.flushToWriter(toSendBuff); err != nil {
+	lastKey, err := sb.copyLogs(toSendBuff, sb.maxSendSizeBytes)
+	if err != nil {
 		return err
 	}
 
@@ -170,34 +271,43 @@ func (sb *SendBuffer) sendAndPurge() error {
 	}
 
 	if err := sb.sender.Send(toSendBuff); err != nil {
-		sb.logger.Log("msg", "failed to send, dropping data", "err", err)
+		sb.logger.Log("msg", "failed to send, will retry", "err", err)
+		return nil
 	}
+	// testing on a new enrollment in debug mode, log size hit 130K bytes
+	// before enrollment completed and was able to ship logs
+	// 2023-11-16
+	sb.writeMutex.Lock()
+	defer sb.writeMutex.Unlock()
+	sb.deleteLogs(lastKey)
 
 	return nil
 }
 
-func (sb *SendBuffer) flushToWriter(w io.Writer) error {
-	sb.writeMutex.Lock()
-	defer sb.writeMutex.Unlock()
+// copyLogs writes to the provided writer, peeking at the size of each log
+// before for copying and returning when the next log would exceed the maxSize,
+// it's up to the caller to delete any copied logs
+func (sb *SendBuffer) copyLogs(w io.Writer, maxSizeBytes int) (int, error) {
+	sb.writeMutex.RLock()
+	defer sb.writeMutex.RUnlock()
 
 	size := 0
-	removeDataKeysToIndex := 0
+	lastLogIndex := 0
 
 	for i := 0; i < len(sb.logs); i++ {
-		if len(sb.logs[i])+size > sb.maxSendSize {
+		if len(sb.logs[i])+size > maxSizeBytes {
 			break
 		}
 
 		if _, err := w.Write(sb.logs[i]); err != nil {
-			return err
+			return 0, err
 		}
 
 		size += len(sb.logs[i])
-		removeDataKeysToIndex++
+		lastLogIndex++
 	}
 
-	sb.deleteLogs(removeDataKeysToIndex)
-	return nil
+	return lastLogIndex, nil
 }
 
 func (sb *SendBuffer) deleteLogs(toIndex int) {
