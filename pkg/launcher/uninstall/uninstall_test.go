@@ -49,7 +49,7 @@ func TestUninstall(t *testing.T) {
 			k.On("EnrollSecretPath").Return(enrollSecretPath)
 			k.On("Slogger").Return(multislogger.New().Logger)
 
-			uninstall(context.TODO(), k)
+			uninstallNoExit(context.TODO(), k)
 
 			// check that file was deleted
 			_, err = os.Stat(enrollSecretPath)

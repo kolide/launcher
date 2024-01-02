@@ -11,11 +11,11 @@ import (
 )
 
 func Uninstall(ctx context.Context, k types.Knapsack) {
-	uninstall(ctx, k)
+	uninstallNoExit(ctx, k)
 	os.Exit(0)
 }
 
-func uninstall(ctx context.Context, k types.Knapsack) {
+func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 	slogger := k.Slogger().With("component", "uninstall")
 
 	if err := removeEnrollSecretFile(k); err != nil {
