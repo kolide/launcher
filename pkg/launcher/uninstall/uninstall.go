@@ -11,6 +11,11 @@ import (
 )
 
 func Uninstall(ctx context.Context, k types.Knapsack) {
+	uninstall(ctx, k)
+	os.Exit(0)
+}
+
+func uninstall(ctx context.Context, k types.Knapsack) {
 	slogger := k.Slogger().With("component", "uninstall")
 
 	if err := removeEnrollSecretFile(k); err != nil {
@@ -29,8 +34,6 @@ func Uninstall(ctx context.Context, k types.Knapsack) {
 
 	// TODO: remove start up files
 	// TODO: remove installation
-
-	os.Exit(0)
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {
@@ -46,11 +49,13 @@ func removeEnrollSecretFile(knapsack types.Knapsack) error {
 }
 
 func removeDatabase(k types.Knapsack) error {
+	path := k.BboltDB().Path()
+
 	if err := k.BboltDB().Close(); err != nil {
 		return fmt.Errorf("closing bbolt db: %w", err)
 	}
 
-	if err := os.Remove(k.BboltDB().Path()); err != nil {
+	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("deleting bbolt db: %w", err)
 	}
 
