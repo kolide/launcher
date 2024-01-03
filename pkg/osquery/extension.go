@@ -7,15 +7,13 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
-	"log/slog"
-
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -47,7 +45,7 @@ type Extension struct {
 	done          chan struct{}
 	interrupted   bool
 	wg            sync.WaitGroup
-	logger        log.Logger
+	slogger       *slog.Logger
 
 	initialRunner *initialRunner
 }
@@ -109,6 +107,9 @@ type ExtensionOpts struct {
 	Clock clock.Clock
 	// Logger is the logger that the extension should use. This is for
 	// logging about the launcher, and not for logging osquery results.
+	// Logging should be done through the knapsack slogger -- this is
+	// preserved only for temporary use in call to agent.SetupKeys until
+	// we move that over to using the slogger too.
 	Logger log.Logger
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
@@ -163,23 +164,30 @@ func NewExtension(client service.KolideService, k types.Knapsack, opts Extension
 
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
-		level.Debug(opts.Logger).Log("msg", "NewExtension got error reading nodekey. Ignoring", "err", err)
+		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+			"NewExtension got error reading nodekey. Ignoring",
+			"err", err,
+		)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
 	} else if nodekey == "" {
-		level.Debug(opts.Logger).Log("msg", "NewExtension did not find a nodekey. Likely first enroll")
+		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+			"NewExtension did not find a nodekey. Likely first enroll",
+		)
 	} else {
-		level.Debug(opts.Logger).Log("msg", "NewExtension found existing nodekey")
+		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+			"NewExtension found existing nodekey",
+		)
 	}
 
 	initialRunner := &initialRunner{
-		logger:     log.With(opts.Logger, "component", "initial_runner"),
+		slogger:    k.Slogger().With("component", "initial_runner"),
 		identifier: identifier,
 		store:      k.InitialResultsStore(),
 		enabled:    opts.RunDifferentialQueriesImmediately,
 	}
 
 	return &Extension{
-		logger:        log.With(opts.Logger, "component", "osquery_extension"),
+		slogger:       k.Slogger().With("component", "osquery_extension"),
 		serviceClient: client,
 		knapsack:      k,
 		NodeKey:       nodekey,
@@ -376,9 +384,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	slogger := e.knapsack.Slogger().With("method", "enroll")
-
-	slogger.Log(ctx, slog.LevelInfo,
+	e.slogger.Log(ctx, slog.LevelInfo,
 		"checking enrollment",
 	)
 	span.AddEvent("checking_enrollment")
@@ -391,7 +397,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If we already have a successful enrollment (perhaps from another
 	// thread), no need to do anything else.
 	if e.NodeKey != "" {
-		slogger.Log(ctx, slog.LevelDebug,
+		e.slogger.Log(ctx, slog.LevelDebug,
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
@@ -406,7 +412,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	if key != "" {
-		slogger.Log(ctx, slog.LevelDebug,
+		e.slogger.Log(ctx, slog.LevelDebug,
 			"found stored node key, skipping enrollment",
 		)
 		span.AddEvent("found_stored_node_key")
@@ -414,7 +420,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return e.NodeKey, false, nil
 	}
 
-	slogger.Log(ctx, slog.LevelInfo,
+	e.slogger.Log(ctx, slog.LevelInfo,
 		"no node key found, starting enrollment",
 	)
 	span.AddEvent("starting_enrollment")
@@ -428,7 +434,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// it seems less likely. Try a couple times, but backoff fast.
 	var enrollDetails service.EnrollmentDetails
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		slogger.Log(ctx, slog.LevelInfo,
+		e.slogger.Log(ctx, slog.LevelInfo,
 			"skipping enrollment details, no osqueryd path, this is probably CI",
 		)
 		span.AddEvent("skipping_enrollment_details")
@@ -436,7 +442,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		if err := backoff.WaitFor(func() error {
 			enrollDetails, err = getEnrollDetails(ctx, osqPath)
 			if err != nil {
-				slogger.Log(ctx, slog.LevelDebug,
+				e.slogger.Log(ctx, slog.LevelDebug,
 					"getEnrollDetails failed in backoff",
 					"err", err,
 				)
@@ -447,7 +453,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 				return "", true, fmt.Errorf("query enrollment details: %w", err)
 			}
 
-			slogger.Log(ctx, slog.LevelError,
+			e.slogger.Log(ctx, slog.LevelError,
 				"failed to get enrollment details with retries, moving on",
 				"err", err,
 			)
@@ -483,7 +489,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	e.NodeKey = keyString
 
-	slogger.Log(ctx, slog.LevelInfo,
+	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",
 	)
 	span.AddEvent("completed_enrollment")
@@ -508,8 +514,8 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, error) {
 	config, err := e.generateConfigsWithReenroll(ctx, true)
 	if err != nil {
-		level.Debug(e.logger).Log(
-			"msg", "generating configs with reenroll failed",
+		e.slogger.Log(ctx, slog.LevelDebug,
+			"generating configs with reenroll failed",
 			"err", err,
 		)
 		// Try to use cached config
@@ -570,7 +576,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
 		// Only log the state change once -- RequestConfig happens every 5 mins
 		if uptimeMins <= 15 {
-			level.Debug(e.logger).Log("msg", "osquery has been up for more than 10 minutes, turning off verbose logging", "uptime_mins", uptimeMins)
+			e.slogger.Log(ctx, slog.LevelDebug,
+				"osquery has been up for more than 10 minutes, turning off verbose logging",
+				"uptime_mins", uptimeMins,
+			)
 		}
 		osqueryVerbose = false
 	}
@@ -589,7 +598,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 
 	if config != "" {
 		if err := json.Unmarshal([]byte(config), &cfg); err != nil {
-			level.Debug(e.logger).Log("msg", "could not unmarshal config, cannot set verbose", "err", err)
+			e.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not unmarshal config, cannot set verbose",
+				"err", err,
+			)
 			return config
 		}
 	} else {
@@ -600,7 +612,9 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 	if cfgOpts, ok := cfg["options"]; ok {
 		opts, ok = cfgOpts.(map[string]any)
 		if !ok {
-			level.Debug(e.logger).Log("msg", "config options are malformed, cannot set verbose")
+			e.slogger.Log(context.TODO(), slog.LevelWarn,
+				"config options are malformed, cannot set verbose",
+			)
 			return config
 		}
 	} else {
@@ -612,7 +626,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 
 	cfgBytes, err := json.Marshal(cfg)
 	if err != nil {
-		level.Debug(e.logger).Log("msg", "could not marshal config, cannot set verbose", "err", err)
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not marshal config, cannot set verbose",
+			"err", err,
+		)
 		return config
 	}
 	return string(cfgBytes)
@@ -658,16 +675,20 @@ func (e *Extension) writeAndPurgeLogs() {
 		// Write logs
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
-			level.Info(e.Opts.Logger).Log(
-				"err", fmt.Errorf("sending %v logs: %w", typ, err),
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"sending logs",
+				"type", typ.String(),
+				"err", err,
 			)
 		}
 
 		// Purge overflow
 		err = e.purgeBufferedLogsForType(typ)
 		if err != nil {
-			level.Info(e.Opts.Logger).Log(
-				"err", fmt.Errorf("purging %v logs: %w", typ, err),
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"purging logs",
+				"type", typ.String(),
+				"err", err,
 			)
 		}
 	}
@@ -738,9 +759,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			if len(v) > e.Opts.MaxBytesPerBatch {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
-				level.Info(e.Opts.Logger).Log(
-					"msg", "dropped log",
-					"logID", k,
+				e.slogger.Log(context.TODO(), slog.LevelInfo,
+					"dropped log",
+					"log_id", k,
 					"size", len(v),
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
@@ -845,8 +866,8 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 			return nil
 		}
 
-		level.Info(e.Opts.Logger).Log(
-			"msg", "Buffered logs limit exceeded. Purging excess.",
+		e.slogger.Log(context.TODO(), slog.LevelInfo,
+			"buffered logs limit exceeded, purging excess",
 			"limit", e.Opts.MaxBufferedLogs,
 			"purge_count", deleteCount,
 		)
@@ -878,9 +899,9 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 	bucketName, err := bucketNameFromLogType(typ)
 	if err != nil {
-		level.Info(e.Opts.Logger).Log(
-			"msg", "Received unknown log type",
-			"log_type", typ,
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received unknown log type",
+			"log_type", typ.String(),
 		)
 		return fmt.Errorf("unknown log type: %w", err)
 	}
