@@ -12,6 +12,17 @@ import (
 
 func Uninstall(ctx context.Context, k types.Knapsack) {
 	uninstallNoExit(ctx, k)
+
+	if err := disableAutoStart(ctx); err != nil {
+		k.Slogger().Log(ctx, slog.LevelError,
+			"disabling auto start",
+			"err", err,
+		)
+	}
+
+	// TODO: remove start up files
+	// TODO: remove installation
+
 	os.Exit(0)
 }
 
@@ -31,9 +42,6 @@ func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 			"err", err,
 		)
 	}
-
-	// TODO: remove start up files
-	// TODO: remove installation
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {
