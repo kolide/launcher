@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
+	"github.com/kolide/launcher/cmd/launcher/internal/timemachine"
 	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
@@ -171,6 +172,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
 
 	go runOsqueryVersionCheck(ctx, logger, k.LatestOsquerydPath(ctx))
+	go timemachine.ExcludeLauncherDB(ctx, k)
 
 	if k.Debug() {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
