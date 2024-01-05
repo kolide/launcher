@@ -18,7 +18,7 @@ func ExcludeLauncherDB(ctx context.Context, k types.Knapsack) {
 	cmd, err := allowedcmd.Tmutil(ctx, "addexclusion", dbPath)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
-			"failed to add launcher db to time machine exclusions",
+			"could not create tmutil command to add launcher db to time machine exclusions",
 			"err", err,
 			"path", dbPath,
 		)
@@ -27,7 +27,7 @@ func ExcludeLauncherDB(ctx context.Context, k types.Knapsack) {
 
 	if err := cmd.Run(); err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
-			"failed to add launcher db to time machine exclusions",
+			"running command to add launcher db to time machine exclusions",
 			"err", err,
 			"path", dbPath,
 		)
