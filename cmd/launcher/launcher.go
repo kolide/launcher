@@ -208,7 +208,7 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k, logger)
+		traceExporter, err = exporter.NewTraceExporter(ctx, k)
 		if err != nil {
 			level.Debug(logger).Log(
 				"msg", "could not set up trace exporter",

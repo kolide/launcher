@@ -58,7 +58,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
-	m.On("Slogger").Return(multislogger.New().Logger).Maybe()
+	m.On("Slogger").Return(multislogger.New().Logger)
 	return m
 }
 
@@ -92,6 +92,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 
 	m := mocks.NewKnapsack(t)
 	m.On("ConfigStore").Return(agentbbolt.NewStore(log.NewNopLogger(), db, storage.ConfigStore.String()))
+	m.On("Slogger").Return(multislogger.New().Logger).Maybe()
 
 	e, err := NewExtension(&mock.KolideService{}, m, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	assert.NotNil(t, err)
@@ -508,6 +509,7 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -546,6 +548,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
 
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.Nil(t, err)
@@ -662,6 +665,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(m, k, ExtensionOpts{
 		EnrollSecret:     "enroll_secret",
@@ -737,6 +741,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(m, k, ExtensionOpts{
 		EnrollSecret:     "enroll_secret",
@@ -821,6 +826,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
@@ -952,6 +958,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("InitialResultsStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.InitialResultsStore.String()))
 	k.On("BboltDB").Return(db)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	max := 10
 	e, err := NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret", MaxBufferedLogs: max})
@@ -1145,6 +1152,7 @@ func TestLauncherRsaKeys(t *testing.T) {
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(configStore)
 	k.On("InitialResultsStore").Return(initialResultsStore)
+	k.On("Slogger").Return(multislogger.New().Logger)
 
 	_, err = NewExtension(m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
 	require.NoError(t, err)
@@ -1298,7 +1306,7 @@ func Test_setVerbose(t *testing.T) {
 			t.Parallel()
 
 			e := &Extension{
-				logger: log.NewNopLogger(),
+				slogger: multislogger.New().Logger,
 			}
 
 			cfgBytes, err := json.Marshal(tt.initialConfig)
@@ -1318,7 +1326,7 @@ func Test_setVerbose_EmptyConfig(t *testing.T) {
 	t.Parallel()
 
 	e := &Extension{
-		logger: log.NewNopLogger(),
+		slogger: multislogger.New().Logger,
 	}
 
 	expectedCfg := map[string]any{
@@ -1339,7 +1347,7 @@ func Test_setVerbose_MalformedConfig(t *testing.T) {
 	t.Parallel()
 
 	e := &Extension{
-		logger: log.NewNopLogger(),
+		slogger: multislogger.New().Logger,
 	}
 
 	malformedCfg := map[string]any{
