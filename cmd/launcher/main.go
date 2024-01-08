@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -57,7 +58,7 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		if tuf.UsingNewAutoupdater() {
+		if tuf.ShouldUseNewAutoupdater(ctx) {
 			runNewerLauncherIfAvailable(ctx, logger)
 		} else {
 			newerBinary, err := autoupdate.FindNewestSelf(ctx)
@@ -131,6 +132,12 @@ func main() {
 				"msg", "panic occurred",
 				"err", r,
 			)
+			if err, ok := r.(error); ok {
+				level.Info(logger).Log(
+					"msg", "panic stack trace",
+					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+				)
+			}
 			time.Sleep(time.Second)
 		}
 	}()

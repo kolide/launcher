@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/traces"
@@ -26,12 +30,6 @@ type autoupdateConfig struct {
 	updateDirectory      string
 	channel              string
 	localDevelopmentPath string
-}
-
-var channelsUsingNewAutoupdater = map[string]bool{
-	"nightly": true,
-	"alpha":   true,
-	"beta":    true,
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
@@ -52,18 +50,36 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 	return CheckOutLatest(context.Background(), binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
 }
 
-func UsingNewAutoupdater() bool {
+// ShouldUseNewAutoupdater retrieves the root directory from the command-line args
+// (either set via command-line arg, or set in the config file indicated by the --config arg),
+// and then looks up whether the new autoupdater has been enabled for this installation.
+func ShouldUseNewAutoupdater(ctx context.Context) bool {
 	cfg, err := getAutoupdateConfig(os.Args[1:])
 	if err != nil {
 		return false
 	}
 
-	return ChannelUsesNewAutoupdater(cfg.channel)
+	return usingNewAutoupdater(ctx, cfg.rootDirectory)
 }
 
 // getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library
 // from either the given args or from the config file.
 func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
+	// pflag, while mostly great for our usecase here, expects getopt-style flags, which means
+	// it doesn't support the Golang standard of using single and double dashes interchangeably
+	// for flags. (e.g., pflag cannot parse `-config`, but Golang treats `-config` the same as
+	// `--config`.) This transforms all single-dash args to double-dashes so that pflag can parse
+	// them as expected.
+	argsToParse := make([]string, len(args))
+	for i := 0; i < len(args); i += 1 {
+		if strings.HasPrefix(args[i], "-") && !strings.HasPrefix(args[i], "--") {
+			argsToParse[i] = "-" + args[i]
+			continue
+		}
+
+		argsToParse[i] = args[i]
+	}
+
 	// Create a flagset with options that are relevant to autoupdate only.
 	// Ensure that we won't fail out when we see other command-line options.
 	pflagSet := pflag.NewFlagSet("autoupdate options", pflag.ContinueOnError)
@@ -77,7 +93,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
 	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
 
-	if err := pflagSet.Parse(args); err != nil {
+	if err := pflagSet.Parse(argsToParse); err != nil {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
 	}
 
@@ -88,7 +104,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	// is set) or via command line (flRootDirectory and flUpdateChannel are set), but do not
 	// support a mix of both for this usage.
 	if flConfigFilePath == "" && flRootDirectory == "" && flUpdateChannel == "" {
-		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(args))
+		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(argsToParse))
 	}
 
 	if flConfigFilePath != "" {
@@ -138,6 +154,25 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 	return cfg, nil
 }
 
+// usingNewAutoupdater reads from the shared startup settings db to see whether the
+// UseTUFAutoupdater flag has been set for this installation.
+func usingNewAutoupdater(ctx context.Context, rootDirectory string) bool {
+	r, err := startupsettings.OpenReader(ctx, rootDirectory)
+	if err != nil {
+		// For now, default to not using the new autoupdater
+		return false
+	}
+	defer r.Close()
+
+	enabledStr, err := r.Get(keys.UseTUFAutoupdater.String())
+	if err != nil {
+		// For now, default to not using the new autoupdater
+		return false
+	}
+
+	return flags.StringToBool(enabledStr)
+}
+
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
 func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
@@ -145,9 +180,9 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 	defer span.End()
 
 	// TODO: Remove this check once we decide to roll out the new autoupdater more broadly
-	if !ChannelUsesNewAutoupdater(channel) {
+	if !usingNewAutoupdater(ctx, rootDirectory) {
 		span.AddEvent("not_using_new_autoupdater")
-		return nil, fmt.Errorf("not rolling out new TUF to channel %s that should still use legacy autoupdater", channel)
+		return nil, errors.New("not using new autoupdater yet")
 	}
 
 	if updateDirectory == "" {
@@ -166,11 +201,6 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
 	return mostRecentVersion(ctx, binary, updateDirectory)
-}
-
-func ChannelUsesNewAutoupdater(channel string) bool {
-	_, ok := channelsUsingNewAutoupdater[channel]
-	return ok
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our

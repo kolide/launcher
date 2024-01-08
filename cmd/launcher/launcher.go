@@ -19,7 +19,6 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
@@ -71,22 +70,25 @@ const (
 // runLauncher is the entry point into running launcher. It creates a
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
-func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
+func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := ctxlog.FromContext(ctx)
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
+	slogger := multiSlogger.Logger
 
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
-		level.Debug(logger).Log(
-			"msg", "delay_start configured, waiting before starting launcher",
+		slogger.Log(ctx, slog.LevelDebug,
+			"delay_start configured, waiting before starting launcher",
 			"delay_start", opts.DelayStart.String(),
 		)
 		time.Sleep(opts.DelayStart)
 	}
 
-	level.Debug(logger).Log("msg", "runLauncher starting")
+	slogger.Log(ctx, slog.LevelDebug,
+		"runLauncher starting",
+	)
 
 	// We've seen launcher intermittently be unable to recover from
 	// DNS failures in the past, so this check gives us a little bit
@@ -96,11 +98,14 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	// Note that the SplitN won't work for bare ip6 addresses.
 	if err := backoff.WaitFor(func() error {
 		hostport := strings.SplitN(opts.KolideServerURL, ":", 2)
+		if len(hostport) < 1 {
+			return fmt.Errorf("unable to parse url: %s", opts.KolideServerURL)
+		}
 		_, lookupErr := net.LookupIP(hostport[0])
 		return lookupErr
 	}, 10*time.Second, 1*time.Second); err != nil {
-		level.Info(logger).Log(
-			"msg", "could not successfully perform IP lookup before starting launcher, proceeding anyway",
+		slogger.Log(ctx, slog.LevelInfo,
+			"could not successfully perform IP lookup before starting launcher, proceeding anyway",
 			"kolide_server_url", opts.KolideServerURL,
 			"err", err,
 		)
@@ -114,8 +119,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		if err != nil {
 			return fmt.Errorf("creating temporary root directory: %w", err)
 		}
-		level.Info(logger).Log(
-			"msg", "using default system root directory",
+
+		slogger.Log(ctx, slog.LevelInfo,
+			"using default system root directory",
 			"path", rootDirectory,
 		)
 	}
@@ -168,9 +174,11 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db, slogger, systemSlogger)
+	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
+	// reassign slogger to knapsack slogger to get launcher run id added to slogger
+	slogger = k.Slogger()
 
-	go runOsqueryVersionCheck(ctx, logger, k.LatestOsquerydPath(ctx))
+	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 
 	if k.Debug() {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
@@ -206,10 +214,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k, logger)
+		traceExporter, err = exporter.NewTraceExporter(ctx, k)
 		if err != nil {
-			level.Debug(logger).Log(
-				"msg", "could not set up trace exporter",
+			slogger.Log(ctx, slog.LevelDebug,
+				"could not set up trace exporter",
 				"err", err,
 			)
 		} else {
@@ -270,7 +278,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
-		level.Debug(logger).Log("msg", "could not init power event watcher", "err", err)
+		slogger.Log(ctx, slog.LevelDebug,
+			"could not init power event watcher",
+			"err", err,
+		)
 	} else {
 		runGroup.Add("powerEventWatcher", powerEventWatcher.Execute, powerEventWatcher.Interrupt)
 	}
@@ -319,9 +330,11 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	if k.ControlServerURL() == "" {
-		level.Debug(logger).Log("msg", "control server URL not set, will not create control service")
+		slogger.Log(ctx, slog.LevelDebug,
+			"control server URL not set, will not create control service",
+		)
 	} else {
-		controlService, err := createControlService(ctx, logger, k.ControlStore(), k)
+		controlService, err := createControlService(ctx, k.ControlStore(), k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -346,8 +359,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		// create an action queue for all other action style commands
 		actionsQueue := actionqueue.New(
+			k,
 			actionqueue.WithContext(ctx),
-			actionqueue.WithLogger(logger),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
 			actionqueue.WithOldNotificationsStore(k.SentNotificationsStore()),
 		)
@@ -363,8 +376,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
 			ctx,
+			k,
 			runner,
-			notificationconsumer.WithLogger(logger),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to set up notifier: %w", err)
@@ -390,8 +403,8 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
-			level.Debug(logger).Log(
-				"msg", "unable to set up metadata writer",
+			slogger.Log(ctx, slog.LevelDebug,
+				"unable to set up metadata writer",
 				"err", err,
 			)
 		} else {
@@ -414,7 +427,10 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
-			level.Error(logger).Log("msg", "Failed to setup localserver", "error", err)
+			slogger.Log(ctx, slog.LevelError,
+				"failed to setup local server",
+				"err", err,
+			)
 		}
 
 		ls.SetQuerier(extension)
@@ -442,9 +458,9 @@ func runLauncher(ctx context.Context, cancel func(), slogger, systemSlogger *mul
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 	}
 
-	// Run the legacy autoupdater only if autoupdating is enabled and the given channel hasn't moved
-	// to the new autoupdater yet.
-	if k.Autoupdate() && !tuf.ChannelUsesNewAutoupdater(k.UpdateChannel()) {
+	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
+	// is not yet in use.
+	if k.Autoupdate() && !k.UseTUFAutoupdater() {
 		osqueryUpdaterconfig := &updater.UpdaterConfig{
 			Logger:             logger,
 			RootDirectory:      rootDirectory,
@@ -520,18 +536,21 @@ func writePidFile(path string) error {
 // be due to the notarization check taking too long, we execute the binary here ahead
 // of time in the hopes of getting the check out of the way. This is expected to be called
 // from a goroutine, and thus does not return an error.
-func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath string) {
+func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydPath string) {
 	if runtime.GOOS != "darwin" {
 		return
 	}
 
-	logger = log.With(logger, "component", "osquery-version-check")
+	slogger = slogger.With("component", "osquery-version-check")
 
 	var output bytes.Buffer
 
 	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
 	if err != nil {
-		level.Error(logger).Log("msg", "unable to create process", "err", err)
+		slogger.Log(ctx, slog.LevelError,
+			"unable to create process",
+			"err", err,
+		)
 		return
 	}
 
@@ -546,7 +565,8 @@ func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath
 	outTrimmed := strings.TrimSpace(output.String())
 
 	if osqErr != nil {
-		level.Error(logger).Log("msg", "could not check osqueryd version",
+		slogger.Log(ctx, slog.LevelError,
+			"could not check osqueryd version",
 			"output", outTrimmed,
 			"err", err,
 			"execution_time_ms", executionTimeMs,
@@ -555,7 +575,8 @@ func runOsqueryVersionCheck(ctx context.Context, logger log.Logger, osquerydPath
 		return
 	}
 
-	level.Debug(logger).Log("msg", "checked osqueryd version",
+	slogger.Log(ctx, slog.LevelDebug,
+		"checked osqueryd version",
 		"version", outTrimmed,
 		"execution_time_ms", executionTimeMs,
 		"osqueryd_path", osquerydPath,

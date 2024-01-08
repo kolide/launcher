@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/control/actionqueue/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -50,7 +53,10 @@ func TestActionQueue_HandlesDuplicates(t *testing.T) {
 	mockActor := mocks.NewActor(t)
 	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
-	actionqueue := New()
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+
+	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActor)
 
 	require.NoError(t, actionqueue.Update(testActionsData))
@@ -88,7 +94,10 @@ func TestActionQueue_ChecksOldNotificationStore(t *testing.T) {
 	mockActor := mocks.NewActor(t)
 	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
-	actionqueue := New(WithOldNotificationsStore(oldNotificationStore))
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+
+	actionqueue := New(mockKnapsack, WithOldNotificationsStore(oldNotificationStore))
 
 	actionqueue.RegisterActor(testActorType, mockActor)
 
@@ -143,7 +152,10 @@ func TestActionQueue_HandlesMultipleActorTypes(t *testing.T) {
 	anotherMockActor := mocks.NewActor(t)
 	anotherMockActor.On("Do", mock.Anything).Return(nil).Twice()
 
-	actionqueue := New()
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+
+	actionqueue := New(mockKnapsack)
 
 	actionqueue.RegisterActor(testActorType, mockActor)
 	actionqueue.RegisterActor(anotherTestActorType, anotherMockActor)
@@ -177,8 +189,11 @@ func TestActionQueue_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T
 	errorCall := mockActor.On("Do", mock.Anything).Return(errors.New("test error")).Once()
 	mockActor.On("Do", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+
 	// Call Do and assert our expectations about completed actions
-	actionqueue := New()
+	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActor)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }
@@ -189,10 +204,12 @@ func TestCleanup(t *testing.T) {
 	mockActor := mocks.NewActor(t)
 	store := setupStorage(t)
 	var logBytes threadsafebuffer.ThreadSafeBuffer
-	logger := log.NewLogfmtLogger(&logBytes)
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(slogger.Logger)
 	actionQueue := New(
+		mockKnapsack,
 		WithStore(store),
-		WithLogger(logger),
 		WithCleanupInterval(100*time.Millisecond),
 		WithContext(context.Background()),
 	)
@@ -250,9 +267,11 @@ func TestStopCleanup_Multiple(t *testing.T) {
 
 	mockActor := mocks.NewActor(t)
 	store := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 	actionQueue := New(
+		mockKnapsack,
 		WithStore(store),
-		WithLogger(log.NewNopLogger()),
 		WithCleanupInterval(100*time.Millisecond),
 		WithContext(context.Background()),
 	)
@@ -325,7 +344,11 @@ func TestActionQueue_HandlesMalformedActions(t *testing.T) {
 
 	// Expect that the Do is still called once, to send do the good action
 	mockActioner.On("Do", bytes.NewReader(goodActionRaw)).Return(nil)
-	actionqueue := New()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+
+	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActioner)
 	require.NoError(t, actionqueue.Update(testActionsData))
 }

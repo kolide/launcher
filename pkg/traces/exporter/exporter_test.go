@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	osqueryClient := mocks.NewQuerier(t)
 	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
@@ -56,7 +58,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 		},
 	}, nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
 	traceExporter.SetOsqueryClient(osqueryClient)
 	require.NoError(t, err)
 
@@ -90,8 +92,9 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -128,8 +131,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, log.NewNopLogger())
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
@@ -189,7 +193,7 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
 		osqueryClient:             mocks.NewQuerier(t),
-		logger:                    log.NewNopLogger(),
+		slogger:                   multislogger.New().Logger,
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -243,7 +247,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  typesmocks.NewKnapsack(t),
 		osqueryClient:             osqueryClient,
-		logger:                    log.NewNopLogger(),
+		slogger:                   multislogger.New().Logger,
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -290,7 +294,7 @@ func TestPing(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
 		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-		logger:                    log.NewNopLogger(),
+		slogger:                   multislogger.New().Logger,
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: clientAuthenticator,
@@ -380,7 +384,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				logger:                    log.NewNopLogger(),
+				slogger:                   multislogger.New().Logger,
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -454,7 +458,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				logger:                    log.NewNopLogger(),
+				slogger:                   multislogger.New().Logger,
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -524,7 +528,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				logger:                    log.NewNopLogger(),
+				slogger:                   multislogger.New().Logger,
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -599,7 +603,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				logger:                    log.NewNopLogger(),
+				slogger:                   multislogger.New().Logger,
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: clientAuthenticator,
@@ -674,7 +678,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				logger:                    log.NewNopLogger(),
+				slogger:                   multislogger.New().Logger,
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
