@@ -48,6 +48,10 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 		launcherRunId: ulid.New(),
 	}
 
+	if k.slogger != nil {
+		k.slogger.Logger = k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
+	}
+
 	return k
 }
 
