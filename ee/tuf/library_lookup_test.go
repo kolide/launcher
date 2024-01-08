@@ -252,14 +252,24 @@ transport jsonrpc
 
 	require.NoError(t, os.WriteFile(configFilepath, []byte(fileContents), 0755), "expected to set up test config file")
 
-	cfg, err := getAutoupdateConfig([]string{"--config", configFilepath})
+	cfg1, err := getAutoupdateConfig([]string{"--config", configFilepath})
 	require.NoError(t, err, "expected no error getting autoupdate config")
 
-	require.NotNil(t, cfg, "expected valid autoupdate config")
-	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
-	require.Equal(t, "", cfg.updateDirectory, "update directory should not have been set")
-	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
-	require.Equal(t, "", cfg.localDevelopmentPath, "local development path should not have been set")
+	require.NotNil(t, cfg1, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg1.rootDirectory, "root directory is incorrect")
+	require.Equal(t, "", cfg1.updateDirectory, "update directory should not have been set")
+	require.Equal(t, testChannel, cfg1.channel, "channel is incorrect")
+	require.Equal(t, "", cfg1.localDevelopmentPath, "local development path should not have been set")
+
+	// Same thing, just one - instead of 2
+	cfg2, err := getAutoupdateConfig([]string{"-config", configFilepath})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg2, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg2.rootDirectory, "root directory is incorrect")
+	require.Equal(t, "", cfg2.updateDirectory, "update directory should not have been set")
+	require.Equal(t, testChannel, cfg2.channel, "channel is incorrect")
+	require.Equal(t, "", cfg2.localDevelopmentPath, "local development path should not have been set")
 }
 
 func Test_getAutoupdateConfig_ConfigFlagNotSet(t *testing.T) {
@@ -278,6 +288,32 @@ func Test_getAutoupdateConfig_ConfigFlagNotSet(t *testing.T) {
 		"--update_channel", testChannel,
 		"--localdev_path", testLocaldevPath,
 		"--transport", "jsonrpc",
+	})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
+	require.Equal(t, testUpdateDir, cfg.updateDirectory, "update directory is incorrect")
+	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
+	require.Equal(t, testLocaldevPath, cfg.localDevelopmentPath, "local development path is incorrect")
+}
+
+func Test_getAutoupdateConfig_ConfigFlagNotSet_SingleHyphen(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testUpdateDir := t.TempDir()
+	testChannel := "nightly"
+	testLocaldevPath := filepath.Join("some", "path", "to", "a", "local", "build")
+
+	cfg, err := getAutoupdateConfig([]string{
+		"-root_directory", testRootDir,
+		"-osquery_flag", "enable_watchdog_debug=true",
+		"-update_directory", testUpdateDir,
+		"-autoupdate",
+		"-update_channel", testChannel,
+		"-localdev_path", testLocaldevPath,
+		"-transport", "jsonrpc",
 	})
 	require.NoError(t, err, "expected no error getting autoupdate config")
 

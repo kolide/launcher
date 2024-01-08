@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -64,6 +65,21 @@ func ShouldUseNewAutoupdater(ctx context.Context) bool {
 // getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library
 // from either the given args or from the config file.
 func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
+	// pflag, while mostly great for our usecase here, expects getopt-style flags, which means
+	// it doesn't support the Golang standard of using single and double dashes interchangeably
+	// for flags. (e.g., pflag cannot parse `-config`, but Golang treats `-config` the same as
+	// `--config`.) This transforms all single-dash args to double-dashes so that pflag can parse
+	// them as expected.
+	argsToParse := make([]string, len(args))
+	for i := 0; i < len(args); i += 1 {
+		if strings.HasPrefix(args[i], "-") && !strings.HasPrefix(args[i], "--") {
+			argsToParse[i] = "-" + args[i]
+			continue
+		}
+
+		argsToParse[i] = args[i]
+	}
+
 	// Create a flagset with options that are relevant to autoupdate only.
 	// Ensure that we won't fail out when we see other command-line options.
 	pflagSet := pflag.NewFlagSet("autoupdate options", pflag.ContinueOnError)
@@ -77,7 +93,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
 	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
 
-	if err := pflagSet.Parse(args); err != nil {
+	if err := pflagSet.Parse(argsToParse); err != nil {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
 	}
 
@@ -88,7 +104,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	// is set) or via command line (flRootDirectory and flUpdateChannel are set), but do not
 	// support a mix of both for this usage.
 	if flConfigFilePath == "" && flRootDirectory == "" && flUpdateChannel == "" {
-		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(args))
+		return getAutoupdateConfigFromFile(launcher.ConfigFilePath(argsToParse))
 	}
 
 	if flConfigFilePath != "" {
