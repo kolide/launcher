@@ -3,10 +3,10 @@ package uninstall
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
@@ -36,12 +36,7 @@ func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 		)
 	}
 
-	if err := removeDatabase(k); err != nil {
-		slogger.Log(ctx, slog.LevelError,
-			"removing database",
-			"err", err,
-		)
-	}
+	agent.WipeDatabase(ctx, k)
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {
@@ -51,20 +46,6 @@ func removeEnrollSecretFile(knapsack types.Knapsack) error {
 
 	if err := os.Remove(knapsack.EnrollSecretPath()); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func removeDatabase(k types.Knapsack) error {
-	path := k.BboltDB().Path()
-
-	if err := k.BboltDB().Close(); err != nil {
-		return fmt.Errorf("closing bbolt db: %w", err)
-	}
-
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("deleting bbolt db: %w", err)
 	}
 
 	return nil
