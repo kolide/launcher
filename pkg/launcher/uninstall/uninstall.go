@@ -26,6 +26,8 @@ func Uninstall(ctx context.Context, k types.Knapsack) {
 	os.Exit(0)
 }
 
+// uninstallNoExit just removes the enroll secret file and wipes the database without
+// exiting the process. This is so that we can test a portion of the uninstall process.
 func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 	slogger := k.Slogger().With("component", "uninstall")
 
