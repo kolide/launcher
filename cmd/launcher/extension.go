@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -46,6 +45,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	err error,
 ) {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
+	slogger := k.Slogger().With("component", "osquery_extension_actor")
 
 	// read the enroll secret, if either it or the path has been specified
 	var enrollSecret string
@@ -62,7 +62,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	// create the osquery extension
 	extOpts := osquery.ExtensionOpts{
 		EnrollSecret:                      enrollSecret,
-		Logger:                            logger,
+		Logger:                            logger, // Preserved only for temporary use in agent.SetupKeys
 		LoggingInterval:                   k.LoggingInterval(),
 		RunDifferentialQueriesImmediately: k.EnableInitialRunner(),
 	}
@@ -78,8 +78,8 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	// 5MB for others.
 	if k.LogMaxBytesPerBatch() != 0 {
 		if k.Transport() == "grpc" && k.LogMaxBytesPerBatch() > 3 {
-			level.Info(logger).Log(
-				"msg", "LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
+			slogger.Log(ctx, slog.LevelInfo,
+				"LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
 				"LogMaxBytesPerBatch", k.LogMaxBytesPerBatch(),
 			)
 		}
@@ -111,9 +111,8 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	runner := runtime.LaunchUnstartedInstance(runnerOptions...)
 
 	restartFunc := func() error {
-		level.Debug(logger).Log(
-			"caller", log.DefaultCaller,
-			"msg", "restart function",
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"osquery instance runner restart called",
 		)
 
 		return runner.Restart()
@@ -129,9 +128,15 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					// we'll attempt again the first time osquery calls launcher plugins.
 					_, invalid, err := ext.Enroll(osqCtx)
 					if err != nil {
-						level.Debug(logger).Log("msg", "error performing enrollment", "err", err)
+						slogger.Log(osqCtx, slog.LevelDebug,
+							"error performing enrollment",
+							"err", err,
+						)
 					} else if invalid {
-						level.Debug(logger).Log("msg", "invalid enroll secret", "err", err)
+						slogger.Log(osqCtx, slog.LevelDebug,
+							"invalid enroll secret",
+							"err", err,
+						)
 					}
 
 					// Start the osqueryd instance -- pass in cancel so the osquery runner can let
@@ -142,7 +147,9 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 
 					// If we're using osquery transport, we don't need the extension
 					if k.Transport() == "osquery" {
-						level.Debug(logger).Log("msg", "Using osquery transport, skipping extension startup")
+						slogger.Log(osqCtx, slog.LevelDebug,
+							"using osquery transport, skipping extension startup",
+						)
 
 						// TODO: remove when underlying libs are refactored
 						// everything exits right now, so block this actor on the context finishing
@@ -156,7 +163,9 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					// start the extension
 					ext.Start()
 
-					level.Info(logger).Log("msg", "extension started")
+					slogger.Log(osqCtx, slog.LevelInfo,
+						"extension started",
+					)
 
 					// TODO: remove when underlying libs are refactored
 					// everything exits right now, so block this actor on the context finishing
@@ -167,8 +176,15 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 					ext.Shutdown()
 					if runner != nil {
 						if err := runner.Shutdown(); err != nil {
-							level.Info(logger).Log("msg", "error shutting down runtime", "err", err)
-							level.Debug(logger).Log("msg", "error shutting down runtime", "err", err, "stack", fmt.Sprintf("%+v", err))
+							slogger.Log(osqCtx, slog.LevelInfo,
+								"error shutting down runtime",
+								"err", err,
+							)
+							slogger.Log(osqCtx, slog.LevelDebug,
+								"error shutting down runtime",
+								"err", err,
+								"stack", fmt.Sprintf("%+v", err),
+							)
 						}
 					}
 					osqCancel()

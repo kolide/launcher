@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -131,6 +132,12 @@ func main() {
 				"msg", "panic occurred",
 				"err", r,
 			)
+			if err, ok := r.(error); ok {
+				level.Info(logger).Log(
+					"msg", "panic stack trace",
+					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+				)
+			}
 			time.Sleep(time.Second)
 		}
 	}()

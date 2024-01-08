@@ -98,6 +98,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Note that the SplitN won't work for bare ip6 addresses.
 	if err := backoff.WaitFor(func() error {
 		hostport := strings.SplitN(opts.KolideServerURL, ":", 2)
+		if len(hostport) < 1 {
+			return fmt.Errorf("unable to parse url: %s", opts.KolideServerURL)
+		}
 		_, lookupErr := net.LookupIP(hostport[0])
 		return lookupErr
 	}, 10*time.Second, 1*time.Second); err != nil {
@@ -211,7 +214,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k, logger)
+		traceExporter, err = exporter.NewTraceExporter(ctx, k)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"could not set up trace exporter",
