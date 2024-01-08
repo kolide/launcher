@@ -428,7 +428,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
 			slogger.Log(ctx, slog.LevelError,
-				"failed to  setupup local server",
+				"failed to setup local server",
 				"err", err,
 			)
 		}
@@ -577,6 +577,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
+		"version", outTrimmed,
 		"execution_time_ms", executionTimeMs,
 		"osqueryd_path", osquerydPath,
 	)
