@@ -8,8 +8,11 @@
 
 Accepted: October 2023
 
-Changes rolled out to nightly channel in October 2023. Rollout to beta and
-stable is still TBD.
+Changes rolled out to nightly channel in October 2023.
+
+Changes rolled out to beta channel in November 2023.
+
+Slow rollout to stable channel began January 2024.
 
 Supersedes: [Launcher Auto Update Process Version 2](2019-09-05_autoupdate_v2.md)
 
