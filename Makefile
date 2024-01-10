@@ -218,8 +218,6 @@ package-builder: .pre-build deps
 
 package-builder-windows: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
-launcher-pummel:
-	go run cmd/make/make.go -targets=launcher-pummel
 
 deps-go:
 	go run cmd/make/make.go -targets=deps-go,install-tools
