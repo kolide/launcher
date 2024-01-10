@@ -178,8 +178,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 	// reassign slogger to knapsack slogger to get launcher run id added to slogger
 	slogger = k.Slogger()
-  
-	go runOsqueryVersionCheck(ctx, logger, k.LatestOsquerydPath(ctx))
+
+	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.ExcludeLauncherDB(ctx, k)
 
 	if k.Debug() {
