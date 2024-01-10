@@ -80,6 +80,7 @@ several ways:
 `kolide_tuf_autoupdater_errors` table; review and address unexpected errors.
 1. Perform a rollout to nightly only, and then to nightly and beta, to test the
 new system with a limited number of devices.
+1. Perform a gradual rollout to stable.
 1. Expand the TUF checkup in flare to fetch data about local and remote state,
 to enable troubleshooting for autoupdate issues.
 1. Add an automated test suite that exercises and validates autoupdate
