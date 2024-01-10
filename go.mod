@@ -4,7 +4,6 @@ require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/clbanning/mxj v1.8.4
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.9.0
