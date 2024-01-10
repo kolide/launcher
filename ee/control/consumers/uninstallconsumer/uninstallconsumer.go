@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/launcher/uninstall"
+	"github.com/kolide/launcher/ee/uninstall"
 )
 
 const (
