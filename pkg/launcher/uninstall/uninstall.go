@@ -28,6 +28,7 @@ func Uninstall(ctx context.Context, k types.Knapsack) {
 
 // uninstallNoExit just removes the enroll secret file and wipes the database without
 // exiting the process. This is so that we can test a portion of the uninstall process.
+// Logs errors, but does not return them, because we want to try each step independently.
 func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 	slogger := k.Slogger().With("component", "uninstall")
 
@@ -38,7 +39,12 @@ func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 		)
 	}
 
-	agent.WipeDatabase(ctx, k)
+	if err := agent.WipeDatabase(ctx, k); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"wiping database",
+			"err", err,
+		)
+	}
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {
