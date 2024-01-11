@@ -64,13 +64,16 @@ func TestAddExclusions(t *testing.T) {
 	for filename := range shouldBeExcluded {
 		path := filepath.Join(testDir, filename)
 
+		// create dir
 		if strings.HasSuffix(filename, "/") {
 			require.NoError(t, os.MkdirAll(path, 0755))
-		} else {
-			f, err := os.Create(path)
-			require.NoError(t, err)
-			f.Close()
+			continue
 		}
+
+		// create file
+		f, err := os.Create(path)
+		require.NoError(t, err)
+		f.Close()
 	}
 
 	knapsack := mocks.NewKnapsack(t)
