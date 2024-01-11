@@ -577,7 +577,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
-		"version", outTrimmed,
+		"osqueryd_version", outTrimmed,
 		"execution_time_ms", executionTimeMs,
 		"osqueryd_path", osquerydPath,
 	)
