@@ -5,17 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/osquery/osquery-go/plugin/logger"
 )
 
 type initialRunner struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	enabled    bool
 	identifier string
 	client     Querier
@@ -62,8 +61,8 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			// this is a bummer because often configs have queries with bad syntax/tables that do not exist.
 			// log the error and move on.
 			// using debug to not fill disks. the worst that will happen is that the result will come in later.
-			level.Debug(i.logger).Log(
-				"msg", "querying for initial results",
+			i.slogger.Log(context.TODO(), slog.LevelDebug,
+				"querying for initial results",
 				"query_name", queryName,
 				"err", err,
 				"results", len(resp),
@@ -90,8 +89,8 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 			return fmt.Errorf("encoding initial run result: %w", err)
 		}
 		if err := writeFn(cctx, logger.LogTypeString, []string{buf.String()}, true); err != nil {
-			level.Debug(i.logger).Log(
-				"msg", "writing initial result log to server",
+			i.slogger.Log(cctx, slog.LevelDebug,
+				"writing initial result log to server",
 				"query_name", result.Name,
 				"err", err,
 			)
