@@ -17,6 +17,8 @@ import (
 )
 
 func TestAddExclusions(t *testing.T) {
+	t.Parallel()
+
 	u, err := user.Current()
 	require.NoError(t, err)
 
@@ -58,6 +60,7 @@ func TestAddExclusions(t *testing.T) {
 		"launcher-version-1.4.1-4-gdb7106f": false,
 	}
 
+	// create files and dirs
 	for k := range shouldBeExcluded {
 		path := filepath.Join(testDir, k)
 
@@ -75,6 +78,7 @@ func TestAddExclusions(t *testing.T) {
 
 	AddExclusions(context.TODO(), k)
 
+	// ensure the files are included / excluded as expected
 	for fileName, shouldBeExcluded := range shouldBeExcluded {
 		cmd, err := allowedcmd.Tmutil(context.TODO(), "isexcluded", filepath.Join(testDir, fileName))
 		require.NoError(t, err)
