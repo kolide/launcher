@@ -61,10 +61,10 @@ func TestAddExclusions(t *testing.T) {
 	}
 
 	// create files and dirs
-	for k := range shouldBeExcluded {
-		path := filepath.Join(testDir, k)
+	for filename := range shouldBeExcluded {
+		path := filepath.Join(testDir, filename)
 
-		if strings.HasSuffix(k, "/") {
+		if strings.HasSuffix(filename, "/") {
 			require.NoError(t, os.MkdirAll(path, 0755))
 		} else {
 			f, err := os.Create(path)
@@ -73,10 +73,10 @@ func TestAddExclusions(t *testing.T) {
 		}
 	}
 
-	k := mocks.NewKnapsack(t)
-	k.On("RootDirectory").Return(testDir)
+	knapsack := mocks.NewKnapsack(t)
+	knapsack.On("RootDirectory").Return(testDir)
 
-	AddExclusions(context.TODO(), k)
+	AddExclusions(context.TODO(), knapsack)
 
 	// ensure the files are included / excluded as expected
 	for fileName, shouldBeExcluded := range shouldBeExcluded {
