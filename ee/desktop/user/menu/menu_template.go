@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	CurrentMenuVersion string = "0.1.1" // Bump menu version when major changes occur to the TemplateData format
+	CurrentMenuVersion string = "0.1.0" // Bump menu version when major changes occur to the TemplateData format
 
 	// Capabilities queriable via hasCapability
 	funcHasCapability     = "hasCapability"
