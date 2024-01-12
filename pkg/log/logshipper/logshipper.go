@@ -191,10 +191,10 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	deviceInfo := make(map[string]string)
 
 	versionInfo := version.Version()
-	deviceInfo["version"] = versionInfo.Version
+	deviceInfo["launcher_version"] = versionInfo.Version
 	deviceInfo["os"] = runtime.GOOS
 
-	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
+	ls.shippingLogger = log.With(ls.shippingLogger, "launcher_version", versionInfo.Version)
 
 	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
 		v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))

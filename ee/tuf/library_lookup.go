@@ -192,7 +192,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 	update, err := findExecutableFromRelease(ctx, binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
 	if err == nil {
 		span.AddEvent("found_latest_from_release")
-		level.Info(logger).Log("msg", "found executable matching current release", "path", update.Path, "version", update.Version)
+		level.Info(logger).Log("msg", "found executable matching current release", "executable_path", update.Path, "executable_version", update.Version)
 		return update, nil
 	}
 
