@@ -19,6 +19,30 @@ var KolideIco []byte
 //go:embed kolide.png
 var KolidePng []byte
 
+//go:embed menubar-circle-dot-darkmode.ico
+var MenubarCircleDotDarkmodeIco []byte
+
+//go:embed menubar-circle-dot-darkmode.png
+var MenubarCircleDotDarkmodePng []byte
+
+//go:embed menubar-circle-dot-lightmode.ico
+var MenubarCircleDotLightmodeIco []byte
+
+//go:embed menubar-circle-dot-lightmode.png
+var MenubarCircleDotLightmodePng []byte
+
+//go:embed menubar-circle-dot-lightmode-shadow.ico
+var MenubarCircleDotLightmodeShadowIco []byte
+
+//go:embed menubar-circle-dot-lightmode-shadow.png
+var MenubarCircleDotLightmodeShadowPng []byte
+
+//go:embed menubar-circle-dot-monochrome.ico
+var MenubarCircleDotMonochromeIco []byte
+
+//go:embed menubar-circle-dot-monochrome.png
+var MenubarCircleDotMonochromePng []byte
+
 //go:embed menubar-circle-x-darkmode.ico
 var MenubarCircleXDarkmodeIco []byte
 

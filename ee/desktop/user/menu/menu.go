@@ -22,6 +22,7 @@ const (
 	DefaultIcon             menuIcon = "default"
 	TriangleExclamationIcon menuIcon = "triangle-exclamation"
 	CircleXIcon             menuIcon = "circle-x"
+	CircleDotIcon           menuIcon = "circle-dot"
 )
 
 // MenuData encapsulates a menu bar icon and accessible menu items

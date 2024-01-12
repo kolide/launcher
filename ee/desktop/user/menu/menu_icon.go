@@ -42,6 +42,17 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarCircleXMonochromeIco,
 			assets.MenubarCircleXMonochromePng,
 		)
+	case CircleDotIcon:
+		return chooseIcon(
+			assets.MenubarCircleDotDarkmodeIco,
+			assets.MenubarCircleDotDarkmodePng,
+			assets.MenubarCircleDotLightmodeIco,
+			assets.MenubarCircleDotLightmodePng,
+			assets.MenubarCircleDotLightmodeShadowIco,
+			assets.MenubarCircleDotLightmodeShadowPng,
+			assets.MenubarCircleDotMonochromeIco,
+			assets.MenubarCircleDotMonochromePng,
+		)
 	case DefaultIcon:
 		fallthrough
 	default:
