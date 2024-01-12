@@ -44,6 +44,18 @@ func Test_Parse(t *testing.T) {
 			output: "This capability is unsupported.",
 		},
 		{
+			name:   "circleDot capability",
+			td:     &TemplateData{},
+			text:   "\"icon\":\"{{if not (hasCapability `circleDot`)}}triangle-exclamation{{else}}circle-dot{{end}}\"",
+			output: "\"icon\":\"circle-dot\"",
+		},
+		{
+			name:   "icon fallback capability",
+			td:     &TemplateData{},
+			text:   "\"icon\":\"{{if not (hasCapability `asOfYetUnknownIconType`)}}triangle-exclamation{{else}}new-icon-type{{end}}\"",
+			output: "\"icon\":\"triangle-exclamation\"",
+		},
+		{
 			name:   "relativeTime 2 hours ago",
 			td:     &TemplateData{LastMenuUpdateTime: time.Now().Add(-2 * time.Hour).Unix()},
 			text:   "This Menu Was Last Updated {{if hasCapability `relativeTime`}}{{relativeTime .LastMenuUpdateTime}}{{else}}never{{end}}.",
