@@ -20,17 +20,6 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarTranslucentMonochromeIco,
 			assets.MenubarTranslucentMonochromePng,
 		)
-	case DefaultIcon:
-		return chooseIcon(
-			assets.MenubarDefaultDarkmodeIco,
-			assets.MenubarDefaultDarkmodePng,
-			assets.MenubarDefaultLightmodeIco,
-			assets.MenubarDefaultLightmodePng,
-			assets.MenubarDefaultLightmodeShadowIco,
-			assets.MenubarDefaultLightmodeShadowPng,
-			assets.MenubarDefaultMonochromeIco,
-			assets.MenubarDefaultMonochromePng,
-		)
 	case TriangleExclamationIcon:
 		return chooseIcon(
 			assets.MenubarTriangleExclamationDarkmodeIco,
@@ -53,8 +42,19 @@ func getIcon(icon menuIcon) []byte {
 			assets.MenubarCircleXMonochromeIco,
 			assets.MenubarCircleXMonochromePng,
 		)
+	case DefaultIcon:
+		fallthrough
 	default:
-		return nil
+		return chooseIcon(
+			assets.MenubarDefaultDarkmodeIco,
+			assets.MenubarDefaultDarkmodePng,
+			assets.MenubarDefaultLightmodeIco,
+			assets.MenubarDefaultLightmodePng,
+			assets.MenubarDefaultLightmodeShadowIco,
+			assets.MenubarDefaultLightmodeShadowPng,
+			assets.MenubarDefaultMonochromeIco,
+			assets.MenubarDefaultMonochromePng,
+		)
 	}
 }
 

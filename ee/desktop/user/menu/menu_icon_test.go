@@ -10,14 +10,12 @@ func Test_getIcon(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		icon        menuIcon
-		expectedErr bool
+		name string
+		icon menuIcon
 	}{
 		{
-			name:        "invalid",
-			icon:        "invalid",
-			expectedErr: true,
+			name: "invalid",
+			icon: "invalid",
 		},
 		{
 			name: "Translucent",
@@ -42,11 +40,7 @@ func Test_getIcon(t *testing.T) {
 			t.Parallel()
 
 			icon := getIcon(tt.icon)
-			if tt.expectedErr {
-				assert.Nil(t, icon)
-			} else {
-				assert.NotNil(t, icon)
-			}
+			assert.NotNil(t, icon)
 		})
 	}
 }
