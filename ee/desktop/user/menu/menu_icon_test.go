@@ -35,6 +35,10 @@ func Test_getIcon(t *testing.T) {
 			name: "CircleX",
 			icon: CircleXIcon,
 		},
+		{
+			name: "CircleDot",
+			icon: CircleDotIcon,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
