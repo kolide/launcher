@@ -15,6 +15,7 @@ const (
 	funcRelativeTime      = "relativeTime"
 	errorlessTemplateVars = "errorlessTemplateVars" // capability to evaluate undefined template vars without failing
 	errorlessActions      = "errorlessActions"      // capability to evaluate undefined menu item actions without failing
+	circleDot             = "circleDot"             // capability to use circle-dot icon
 
 	// TemplateData keys
 	LauncherVersion    string = "LauncherVersion"
@@ -55,6 +56,8 @@ func (tp *templateParser) Parse(text string) (string, error) {
 			case errorlessTemplateVars:
 				return true
 			case errorlessActions:
+				return true
+			case circleDot:
 				return true
 			}
 			return false
