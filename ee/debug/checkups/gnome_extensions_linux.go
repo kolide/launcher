@@ -36,14 +36,12 @@ func (c *gnomeExtensions) ExtraFileName() string {
 func (c *gnomeExtensions) Run(ctx context.Context, extraWriter io.Writer) error {
 	fmt.Fprintf(extraWriter, "# Checking Gnome Extensions\n\n")
 
-	var usersToCheck []*user.User
-
 	currentUser, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("getting current user: %w", err)
 	}
 
-	usersToCheck = append(usersToCheck, currentUser)
+	usersToCheck := []*user.User{currentUser}
 
 	// running as root so we need to get the console users
 	if currentUser.Uid == "0" {
