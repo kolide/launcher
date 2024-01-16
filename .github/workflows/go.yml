@@ -126,7 +126,7 @@ jobs:
       working-directory: build
       run: |
         v=$(./launcher --version)
-        echo $v
+        echo "$v"
         echo "launcher_version_${{ matrix.os }}=$v" >> "$GITHUB_OUTPUT"
 
     - name: Download Osquery
@@ -149,11 +149,11 @@ jobs:
     - name: Launcher Version
       run: |
         oses=("ubuntu-20.04" "ubuntu-22.04" "macos-11" "macos-12" "macos-13" "windows-2019" "windows-2022")
-        version=${{ needs.exec_testing.outputs.launcher_version_"$(oses[0])" }}
+        version=${{ "needs.exec_testing.outputs.launcher_version_$(oses[0])" }}
         echo "using $version for comparison"
         for os in "${oses[@]}"; do
-          if [[ "${{ needs.exec_testing.outputs.launcher_version_"$os" }}" != "$version" ]]; then
-            echo "Version mismatch: $os: ${{ needs.exec_testing.outputs.launcher_version_"$os" }} != $version"
+          if [[ "${{ "needs.exec_testing.outputs.launcher_version_$os" }}" != "$version" ]]; then
+            echo "Version mismatch: $os: ${{ "needs.exec_testing.outputs.launcher_version_$os" }} != $version"
             exit 1
           fi
         done
