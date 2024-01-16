@@ -118,7 +118,7 @@ jobs:
     - id: version
       name: Launcher Version
       working-directory: build
-      run: echo "version=$(./launcher --version)" >> "$GITHUB_OUTPUT"
+      run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
 
   exec_testing:
     name: Exec Test
@@ -147,11 +147,11 @@ jobs:
     - name: Launcher Version
       working-directory: build
       run: |
-        thisVersion=$(./launcher --version)
-        printf "$thisVersion"
+        ./launcher --version
+        thisVersion=$(launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
         baseVersion="${{ needs.version_baseline.outputs.version }}"
-        if [[ "$v" != "$baseVersion" ]]; then
-          printf "launcher version does not match base line version\n$baseVersion"
+        if [[ "$thisVersion" != "$baseVersion" ]]; then
+          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
           exit 1
         fi
 
