@@ -118,6 +118,7 @@ jobs:
     - id: version
       name: Launcher Version
       working-directory: build
+      shell: bash
       run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
 
   exec_testing:
@@ -146,6 +147,7 @@ jobs:
 
     - name: Launcher Version
       working-directory: build
+      shell: bash
       run: |
         ./launcher --version
         thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
