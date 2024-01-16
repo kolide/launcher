@@ -124,7 +124,10 @@ jobs:
 
     - name: Launcher Version
       working-directory: build
-      run: ./launcher --version
+      run: |
+        v=$(./launcher --version)
+        echo $v
+        echo "launcher_version_${{ matrix.os }}=$v" >> "$GITHUB_OUTPUT"
 
     - name: Download Osquery
       working-directory: build
@@ -137,6 +140,23 @@ jobs:
     - name: Launcher Doctor
       working-directory: build
       run: ./launcher doctor
+
+  verify_versions_match:
+    name: Verify Versions Match
+    runs-on: ubuntu-latest
+    needs: exec_testing
+    steps:
+    - name: Launcher Version
+      run: |
+        oses=("ubuntu-20.04" "ubuntu-22.04" "macos-11" "macos-12" "macos-13" "windows-2019" "windows-2022")
+        version=${{ jobs.exec_testing.outputs.launcher_version_"$(oses[0])" }}
+        echo "using $version for comparison"
+        for os in "${oses[@]}"; do
+          if [[ "${{ jobs.exec_testing.outputs.launcher_version_"$os" }}" != "$version" ]]; then
+            echo "Version mismatch: $os: ${{ jobs.exec_testing.outputs.launcher_version_"$os" }} != $version"
+            exit 1
+          fi
+        done
 
 
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
