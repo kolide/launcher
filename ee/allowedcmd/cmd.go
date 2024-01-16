@@ -1,5 +1,11 @@
 package allowedcmd
 
+// Package allowedcmd wraps access to exec.Cmd in order to consolidate path lookup logic.
+// We mostly use hardcoded (known, safe) paths to executables, but make an exception
+// to allow for looking up executable locations when it's not possible to know these
+// locations in advance -- e.g. on NixOS, we cannot know the specific store path ahead
+// of time.
+
 import (
 	"context"
 	"fmt"
