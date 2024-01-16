@@ -148,7 +148,7 @@ jobs:
       working-directory: build
       run: |
         ./launcher --version
-        thisVersion=$(launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
         baseVersion="${{ needs.version_baseline.outputs.version }}"
         if [[ "$thisVersion" != "$baseVersion" ]]; then
           printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
