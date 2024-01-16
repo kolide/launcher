@@ -98,8 +98,11 @@ jobs:
         name: ${{ runner.os }}-coverage.out
         path: coverage.out
 
-  version_comparison:
-    name: Version Comparison
+  # this job captures the version of launcher on one of the runners then that version is
+  # compared to the version of all other runners during exec testing. This is to ensure
+  # that the version of launcher is the same across all runners.
+  version_baseline:
+    name: Version Baseline
     runs-on: ubuntu-20.04
     needs: build_and_test
     outputs:
@@ -132,7 +135,7 @@ jobs:
           - macos-13
           - windows-2019
           - windows-2022
-    needs: version_comparison
+    needs: version_baseline
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v3
@@ -145,10 +148,10 @@ jobs:
       working-directory: build
       run: |
         thisVersion=$(./launcher --version)
-        echo "$thisVersion"
-        baseVersion="${{ needs.version_comparison.outputs.version }}"
+        printf "$thisVersion"
+        baseVersion="${{ needs.version_baseline.outputs.version }}"
         if [[ "$v" != "$baseVersion" ]]; then
-          echo "launcher version does not match base version\n$baseVersion"
+          printf "launcher version does not match base line version\n$baseVersion"
           exit 1
         fi
 
