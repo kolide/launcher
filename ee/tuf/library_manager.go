@@ -18,6 +18,7 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
@@ -100,7 +101,9 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 			return
 		}
 		dirToRemove := filepath.Dir(stagedUpdatePath)
-		if err := os.RemoveAll(dirToRemove); err != nil {
+		if err := backoff.WaitFor(func() error {
+			return os.RemoveAll(dirToRemove)
+		}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
 			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not remove temp staging directory",
 				"directory", dirToRemove,
@@ -187,13 +190,17 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		return fmt.Errorf("could not create temporary directory for untarring and validating new update: %w", err)
 	}
 	defer func() {
-		// In case of error, clean up the staged version
-		if err := os.RemoveAll(stagedVersionedDirectory); err != nil {
-			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not remove staged update",
-				"directory", stagedVersionedDirectory,
-				"err", err,
-			)
+		// In case of error, clean up the staged version and its directory
+		if _, err := os.Stat(stagedVersionedDirectory); err == nil || !os.IsNotExist(err) {
+			if err := backoff.WaitFor(func() error {
+				return os.RemoveAll(stagedVersionedDirectory)
+			}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
+				ulm.slogger.Log(context.TODO(), slog.LevelWarn,
+					"could not remove staged update",
+					"directory", stagedVersionedDirectory,
+					"err", err,
+				)
+			}
 		}
 	}()
 
