@@ -65,12 +65,6 @@ jobs:
       if: ${{ contains(matrix.os, 'ubuntu') }}
       uses: goto-bus-stop/setup-zig@v2
 
-    - name: version troubleshooting
-      run: |
-        git describe --tags --always --dirty
-        git status
-        git diff HEAD
-
     - name: Build
       run: make -j2 github-build
 
