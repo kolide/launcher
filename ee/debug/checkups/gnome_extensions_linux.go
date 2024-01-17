@@ -81,6 +81,8 @@ func (c *gnomeExtensions) Run(ctx context.Context, extraWriter io.Writer) error 
 					Gid: uint32(runningUserGid),
 				},
 			}
+
+			cmd.Env = append(cmd.Env, fmt.Sprintf("XDG_RUNTIME_DIR=/run/user/%s", consoleUser.Uid))
 		}
 
 		out, err := cmd.CombinedOutput()
