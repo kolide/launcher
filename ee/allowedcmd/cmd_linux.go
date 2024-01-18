@@ -83,6 +83,10 @@ func Lsof(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/lsof", arg...)
 }
 
+func NixEnv(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/nix/var/nix/profiles/default/bin/nix-env", arg...)
+}
+
 func Nmcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/nmcli", arg...)
 }
