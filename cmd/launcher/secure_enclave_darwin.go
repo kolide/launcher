@@ -4,10 +4,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -17,7 +19,9 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/ee/agent/certs"
+	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
+	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -127,7 +131,16 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("creating secure enclave signer: %w", err)
 	}
 
-	sig, err := seSigner.Sign(rand.Reader, signRequest.Digest, crypto.SHA256)
+	if err := validateSecureEnclaveData(signRequest.Data); err != nil {
+		return fmt.Errorf("validating data: %w", err)
+	}
+
+	digest, err := echelper.HashForSignature(signRequest.Data)
+	if err != nil {
+		return fmt.Errorf("hashing data for signature: %w", err)
+	}
+
+	sig, err := seSigner.Sign(rand.Reader, digest, crypto.SHA256)
 	if err != nil {
 		return fmt.Errorf("signing request: %w", err)
 	}
@@ -159,4 +172,22 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveReque
 	}
 
 	return nil
+}
+
+func validateSecureEnclaveData(data []byte) error {
+	if err := jsonStrictDecode(data, &localserver.RequestIdsResponse{}); err == nil {
+		return nil
+	}
+
+	if err := jsonStrictDecode(data, &[]distributed.Result{}); err == nil {
+		return nil
+	}
+
+	return errors.New("unrecognized data format")
+}
+
+func jsonStrictDecode(data []byte, v interface{}) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(v)
 }

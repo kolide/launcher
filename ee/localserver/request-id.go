@@ -17,15 +17,15 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type identifiers struct {
+type Identifiers struct {
 	UUID           string
 	InstanceId     string
 	HardwareSerial string
 }
 
-type requestIdsResponse struct {
+type RequestIdsResponse struct {
 	RequestId string
-	identifiers
+	Identifiers
 	Nonce        string
 	Timestamp    time.Time
 	ConsoleUsers []*user.User
@@ -72,11 +72,11 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
-	response := requestIdsResponse{
+	response := RequestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
 	}
-	response.identifiers = ls.identifiers
+	response.Identifiers = ls.identifiers
 
 	consoleUsers, err := consoleUsers()
 	if err != nil {

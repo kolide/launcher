@@ -52,7 +52,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 
 	// convert the response to a struct
-	var response requestIdsResponse
+	var response RequestIdsResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
 
 	// in the current CI environment (GitHub Actions) the linux runner

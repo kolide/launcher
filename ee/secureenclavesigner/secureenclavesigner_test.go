@@ -97,10 +97,8 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	require.NotNil(t, pubKey)
 
 	dataToSign := []byte(ulid.New())
-	digest, err := echelper.HashForSignature(dataToSign)
-	require.NoError(t, err)
 
-	sigB64, err := ses.Sign(rand.Reader, digest, crypto.SHA256)
+	sigB64, err := ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
 	require.NoError(t, err)
 
 	sig, err := base64.StdEncoding.DecodeString(string(sigB64))
@@ -113,7 +111,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath))
 	require.NoError(t, err)
 
-	sigB64, err = ses.Sign(rand.Reader, digest, crypto.SHA256)
+	sigB64, err = ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
 	require.NoError(t, err)
 
 	sig, err = base64.StdEncoding.DecodeString(string(sigB64))
@@ -125,7 +123,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath), WithExistingKey(pubKey.(*ecdsa.PublicKey)))
 	require.NoError(t, err)
 
-	sigB64, err = ses.Sign(rand.Reader, digest, crypto.SHA256)
+	sigB64, err = ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
 	require.NoError(t, err)
 
 	sig, err = base64.StdEncoding.DecodeString(string(sigB64))

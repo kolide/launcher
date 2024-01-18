@@ -27,8 +27,8 @@ const (
 
 type SignRequest struct {
 	SecureEnclaveRequest
-	// Digest is the hash []byte of the data to be signed
-	Digest []byte `msgpack:"digest"`
+	// Data is the data to be signed
+	Data []byte `msgpack:"data"`
 	// SecureEnclavePubKey is the B64 encoded DER of the public key to be used to verify the signature
 	SecureEnclavePubKey []byte `msgpack:"secure_enclave_pub_key"`
 }
@@ -117,7 +117,7 @@ func (ses *secureEnclaveSigner) Public() crypto.PublicKey {
 
 // Sign signs the digest using the secure enclave
 // If a public key is not set, it will create a new key
-func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (ses *secureEnclaveSigner) Sign(rand io.Reader, data []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	// create the key if we don't have it
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -138,7 +138,7 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 			Challenge:    ses.challenge,
 			ServerPubKey: ses.serverPubKeyB64Der,
 		},
-		Digest:              digest,
+		Data:                data,
 		SecureEnclavePubKey: pubKeyBytes,
 	}
 
