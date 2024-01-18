@@ -115,9 +115,11 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	challenge, _, err := challenge.Generate(testServerPrivKey, someData, someData, someData)
 	require.NoError(t, err)
 
-	requestBytes, err := msgpack.Marshal(secureenclavesigner.Request{
-		Challenge:    challenge,
-		ServerPubKey: testServerPubKeyB64Der,
+	requestBytes, err := msgpack.Marshal(secureenclavesigner.CreateKeyRequest{
+		SecureEnclaveRequest: secureenclavesigner.SecureEnclaveRequest{
+			Challenge:    challenge,
+			ServerPubKey: testServerPubKeyB64Der,
+		},
 	})
 	require.NoError(t, err)
 
@@ -145,7 +147,7 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 
 	signRequestBytes, err := msgpack.Marshal(secureenclavesigner.SignRequest{
-		Request: secureenclavesigner.Request{
+		SecureEnclaveRequest: secureenclavesigner.SecureEnclaveRequest{
 			Challenge:    challenge,
 			ServerPubKey: testServerPubKeyB64Der,
 		},
@@ -200,7 +202,7 @@ func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
 		require.ErrorContains(t, runSecureEnclave([]string{cmd,
 			base64.StdEncoding.EncodeToString(
 				msgpackMustMarshall(t,
-					secureenclavesigner.Request{
+					secureenclavesigner.SecureEnclaveRequest{
 						Challenge:    challengeBox,
 						ServerPubKey: testServerPubKeyB64Der,
 					},
@@ -222,7 +224,7 @@ func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
 		require.ErrorContains(t, runSecureEnclave([]string{cmd,
 			base64.StdEncoding.EncodeToString(
 				msgpackMustMarshall(t,
-					secureenclavesigner.Request{
+					secureenclavesigner.SecureEnclaveRequest{
 						Challenge: malloryChallengeBox,
 						// claim to be signed known key
 						ServerPubKey: testServerPubKeyB64Der,

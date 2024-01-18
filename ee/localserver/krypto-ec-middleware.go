@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	timestampValidityRange             = 150
+	timestampValiditySeconds           = 150
 	kolideKryptoEccHeader20230130Value = "2023-01-30"
 	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
 	kolideSessionIdHeaderKey           = "X-Kolide-Session"
@@ -219,7 +219,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
-		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
+		if timestampDelta > timestampValiditySeconds || timestampDelta < -timestampValiditySeconds {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 			span.SetStatus(codes.Error, "timestamp is out of range")
 			e.slogger.Log(r.Context(), slog.LevelError,

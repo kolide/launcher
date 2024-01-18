@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/kolide/krypto/pkg/challenge"
@@ -20,7 +21,7 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-const secureEnclaveTimestampValidityRange = 150
+const secureEnclaveTimestampValiditySeconds = 150
 
 var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
@@ -78,12 +79,12 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("decoding b64 request: %w", err)
 	}
 
-	var request secureenclavesigner.Request
-	if err := msgpack.Unmarshal(b, &request); err != nil {
+	var createKeyRequest secureenclavesigner.CreateKeyRequest
+	if err := msgpack.Unmarshal(b, &createKeyRequest); err != nil {
 		return fmt.Errorf("unmarshaling msgpack request: %w", err)
 	}
 
-	if err := verifySecureEnclaveChallenge(request); err != nil {
+	if err := verifySecureEnclaveChallenge(createKeyRequest.SecureEnclaveRequest); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
@@ -97,8 +98,7 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("marshalling public key to der: %w", err)
 	}
 
-	// write results to stdout since so that parent process can use
-	fmt.Println(string(secureEnclavePubDer))
+	os.Stdout.Write(secureEnclavePubDer)
 	return nil
 }
 
@@ -113,7 +113,7 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack sign request: %w", err)
 	}
 
-	if err := verifySecureEnclaveChallenge(signRequest.Request); err != nil {
+	if err := verifySecureEnclaveChallenge(signRequest.SecureEnclaveRequest); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
@@ -132,12 +132,11 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("signing request: %w", err)
 	}
 
-	// write results to stdout since so that parent process can use
-	fmt.Print(base64.StdEncoding.EncodeToString(sig))
+	os.Stdout.Write([]byte(base64.StdEncoding.EncodeToString(sig)))
 	return nil
 }
 
-func verifySecureEnclaveChallenge(request secureenclavesigner.Request) error {
+func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveRequest) error {
 	c, err := challenge.UnmarshalChallenge(request.Challenge)
 	if err != nil {
 		return fmt.Errorf("unmarshaling challenge: %w", err)
@@ -155,7 +154,7 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.Request) error {
 	// Check the timestamp, this prevents people from saving a challenge and then
 	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 	timestampDelta := time.Now().Unix() - c.Timestamp()
-	if timestampDelta > secureEnclaveTimestampValidityRange || timestampDelta < -secureEnclaveTimestampValidityRange {
+	if timestampDelta > secureEnclaveTimestampValiditySeconds || timestampDelta < -secureEnclaveTimestampValiditySeconds {
 		return fmt.Errorf("timestamp delta %d is outside of validity range", timestampDelta)
 	}
 
