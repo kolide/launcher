@@ -7,12 +7,12 @@ package secureenclavesigner
 //
 // This kind of feels like belt and suspenders.
 //
-// However, a non -ldflag path other than hard coding a test private key (gross),
-// has not been discovered.
-//
 // We could probably drop the build tag and just use the -ldflag, then determine
 // if we're under test by checking the value of the var set by the -ldflag, but
 // that feels more tangly.
+//
+// We could also generate a file with the private key, add it's path to .gitignore
+// and use that to test
 
 // Undertest is true when running secure enclave test build
 const Undertest = true

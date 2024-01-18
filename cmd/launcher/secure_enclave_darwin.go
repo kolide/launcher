@@ -38,6 +38,27 @@ func runSecureEnclave(args []string) error {
 		return errors.New("not enough arguments, expect create_key <request> or sign <sign_request>")
 	}
 
+	if err := loadServerKeys(); err != nil {
+		return fmt.Errorf("loading server keys: %w", err)
+	}
+
+	if args[1] == "" {
+		return errors.New("missing request")
+	}
+
+	switch args[0] {
+	case secureenclavesigner.CreateKeyCmd:
+		return createSecureEnclaveKey(args[1])
+
+	case secureenclavesigner.SignCmd:
+		return signWithSecureEnclave(args[1])
+
+	default:
+		return fmt.Errorf("unknown command %s", args[0])
+	}
+}
+
+func loadServerKeys() error {
 	if secureenclavesigner.Undertest {
 		if secureenclavesigner.TestServerPubKey == "" {
 			return errors.New("test server public key not set")
@@ -65,16 +86,7 @@ func runSecureEnclave(args []string) error {
 		serverPubKeys[string(pubB64Der)] = key
 	}
 
-	switch args[0] {
-	case secureenclavesigner.CreateKeyCmd:
-		return createSecureEnclaveKey(args[1])
-
-	case secureenclavesigner.SignCmd:
-		return signWithSecureEnclave(args[1])
-
-	default:
-		return fmt.Errorf("unknown command %s", args[0])
-	}
+	return nil
 }
 
 func createSecureEnclaveKey(requestB64 string) error {
@@ -168,7 +180,7 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveReque
 	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 	timestampDelta := time.Now().Unix() - c.Timestamp()
 	if timestampDelta > secureEnclaveTimestampValiditySeconds || timestampDelta < -secureEnclaveTimestampValiditySeconds {
-		return fmt.Errorf("timestamp delta %d is outside of validity range", timestampDelta)
+		return fmt.Errorf("timestamp delta %d is outside of validity range %d", timestampDelta, secureEnclaveTimestampValiditySeconds)
 	}
 
 	return nil
