@@ -133,6 +133,10 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
+	if err := validateSecureEnclaveData(signRequest.Data); err != nil {
+		return fmt.Errorf("validating data: %w", err)
+	}
+
 	secureEnclavePubKey, err := echelper.PublicB64DerToEcdsaKey(signRequest.SecureEnclavePubKey)
 	if err != nil {
 		return fmt.Errorf("marshalling b64 der to public key: %w", err)
@@ -186,6 +190,8 @@ func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveReque
 	return nil
 }
 
+// validateSecureEnclaveData validates that the data is in a format that we expect to be signed,
+// currently these are the responses returned by local server.
 func validateSecureEnclaveData(data []byte) error {
 	if err := jsonStrictDecode(data, &localserver.RequestIdsResponse{}); err == nil {
 		return nil
