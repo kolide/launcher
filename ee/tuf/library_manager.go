@@ -220,16 +220,24 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		return fmt.Errorf("could not patch executable: %w", err)
 	}
 
-	// Validate the executable
-	if err := autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version"); err != nil {
-		return fmt.Errorf("could not verify executable: %w", err)
+	// Validate the executable -- the exectuable check will occasionally time out, especially on Windows,
+	// and we aren't in a rush here, so we retry a couple times.
+	if err := backoff.WaitFor(func() error {
+		return autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version")
+	}, 45*time.Second, 15*time.Second); err != nil {
+		return fmt.Errorf("could not verify executable after retries: %w", err)
 	}
 
-	// All good! Shelve it in the library under its version
+	// All good! Shelve it in the library under its version. We also perform some retries
+	// here for Windows, since sometimes Windows will think the binary is still in use and
+	// will refuse to move it.
 	newUpdateDirectory := filepath.Join(updatesDirectory(binary, ulm.baseDir), targetVersion)
-	if err := os.Rename(stagedVersionedDirectory, newUpdateDirectory); err != nil {
-		return fmt.Errorf("could not move staged target %s from %s to %s: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
+	if err := backoff.WaitFor(func() error {
+		return os.Rename(stagedVersionedDirectory, newUpdateDirectory)
+	}, 6*time.Second, 2*time.Second); err != nil {
+		return fmt.Errorf("could not move staged target %s from %s to %s after retries: %w", targetFilename, stagedVersionedDirectory, newUpdateDirectory, err)
 	}
+
 	// Need rwxr-xr-x so that the desktop (running as user) can execute the downloaded binary too
 	if err := os.Chmod(newUpdateDirectory, 0755); err != nil {
 		return fmt.Errorf("could not chmod %s: %w", newUpdateDirectory, err)
