@@ -220,7 +220,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		return fmt.Errorf("could not patch executable: %w", err)
 	}
 
-	// Validate the executable -- the exectuable check will occasionally time out, especially on Windows,
+	// Validate the executable -- the executable check will occasionally time out, especially on Windows,
 	// and we aren't in a rush here, so we retry a couple times.
 	if err := backoff.WaitFor(func() error {
 		return autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version")
