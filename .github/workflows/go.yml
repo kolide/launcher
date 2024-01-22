@@ -59,7 +59,7 @@ jobs:
       run: make deps
 
     - name: Run govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest; govulncheck ./...
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.0.1; govulncheck ./...
 
     - name: Set up zig
       if: ${{ contains(matrix.os, 'ubuntu') }}
@@ -98,6 +98,29 @@ jobs:
         name: ${{ runner.os }}-coverage.out
         path: coverage.out
 
+  # this job captures the version of launcher on one of the runners then that version is
+  # compared to the version of all other runners during exec testing. This is to ensure
+  # that the version of launcher is the same across all runners.
+  version_baseline:
+    name: Version Baseline
+    runs-on: ubuntu-20.04
+    needs: build_and_test
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - name: cache restore build output
+      uses: actions/cache/restore@v3
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - id: version
+      name: Launcher Version
+      working-directory: build
+      shell: bash
+      run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
+
   exec_testing:
     name: Exec Test
     runs-on: ${{ matrix.os }}
@@ -113,7 +136,7 @@ jobs:
           - macos-13
           - windows-2019
           - windows-2022
-    needs: build_and_test
+    needs: version_baseline
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v3
@@ -124,7 +147,15 @@ jobs:
 
     - name: Launcher Version
       working-directory: build
-      run: ./launcher --version
+      shell: bash
+      run: |
+        ./launcher --version
+        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+        baseVersion="${{ needs.version_baseline.outputs.version }}"
+        if [[ "$thisVersion" != "$baseVersion" ]]; then
+          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+          exit 1
+        fi
 
     - name: Download Osquery
       working-directory: build

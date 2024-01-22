@@ -4,7 +4,6 @@ require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/clbanning/mxj v1.8.4
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-bindata/go-bindata v1.0.0
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.9.0
@@ -15,7 +14,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
-	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
 	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121

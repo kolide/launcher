@@ -31,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
+	"github.com/kolide/launcher/ee/agent/timemachine"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
@@ -179,6 +180,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	slogger = k.Slogger()
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
+	go timemachine.AddExclusions(ctx, k)
 
 	if k.Debug() {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
@@ -577,7 +579,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
-		"version", outTrimmed,
+		"osqueryd_version", outTrimmed,
 		"execution_time_ms", executionTimeMs,
 		"osqueryd_path", osquerydPath,
 	)

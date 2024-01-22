@@ -318,7 +318,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 			ta.slogger.Log(context.TODO(), slog.LevelInfo,
 				"update downloaded",
 				"binary", binary,
-				"version", downloadedUpdateVersion,
+				"binary_version", downloadedUpdateVersion,
 			)
 			updatesDownloaded[binary] = versionFromTarget(binary, downloadedUpdateVersion)
 		}
