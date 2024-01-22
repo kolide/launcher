@@ -601,7 +601,7 @@ func Test_storeError(t *testing.T) {
 	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
 
 	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
-	// for launcher in tests.
+	// for launcher in tests
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 
 	// Start the autoupdater going

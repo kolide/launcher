@@ -48,6 +48,8 @@ func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSou
 		t.flattenBytesFunc = dataflatten.Plist
 	case JsonType:
 		t.flattenBytesFunc = dataflatten.Json
+	case XmlType:
+		t.flattenBytesFunc = dataflatten.Xml
 	case KeyValueType:
 		// TODO: allow callers of TablePluginExec to specify the record
 		// splitting strategy
