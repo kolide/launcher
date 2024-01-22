@@ -30,8 +30,8 @@ const secureEnclaveTimestampValiditySeconds = 150
 var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
 // runSecureEnclave performs either a create-key or sign operation using the secure enclave.
-// It's available as a separate command because launcher runs a root by default and since it's
-// not in a user security context it can't use the secure enclave directly. However, this command
+// It's available as a separate command because launcher runs aa root by default and since it's
+// not in a user security context, it can't use the secure enclave directly. However, this command
 // can be run in the user context using launchctl.
 func runSecureEnclave(args []string) error {
 	if len(args) < 2 {
