@@ -48,6 +48,7 @@ type subscriber interface {
 type dataProvider interface {
 	GetConfig() (io.Reader, error)
 	GetSubsystemData(hash string) (io.Reader, error)
+	MessageServer(method serverMessageMethod, params interface{}) error
 }
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
@@ -88,6 +89,9 @@ func (cs *ControlService) Start(ctx context.Context) {
 		"control service started",
 	)
 	ctx, cs.cancel = context.WithCancel(ctx)
+
+	recheckOnce := sync.Once{}
+
 	for {
 		// Fetch immediately on each iteration, avoiding the initial ticker delay
 		if err := cs.Fetch(); err != nil {
@@ -95,7 +99,17 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"failed to fetch data from control server. Not fatal, moving on",
 				"err", err,
 			)
+		} else {
+			recheckOnce.Do(func() {
+				if err := cs.fetcher.MessageServer(recheck, nil); err != nil {
+					cs.slogger.Log(ctx, slog.LevelWarn,
+						"failed to send recheck message on control server start",
+						"err", err,
+					)
+				}
+			})
 		}
+
 		select {
 		case <-ctx.Done():
 			return

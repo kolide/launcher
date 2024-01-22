@@ -55,6 +55,10 @@ func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
 	return nil, nil
 }
 
+func (dp nopDataProvider) MessageServer(method serverMessageMethod, params interface{}) error {
+	return nil
+}
+
 func TestControlServiceRegisterConsumer(t *testing.T) {
 	t.Parallel()
 
