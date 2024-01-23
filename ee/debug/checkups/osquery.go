@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -61,19 +61,15 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 }
 
 func (o *osqueryCheckup) interactive(ctx context.Context) error {
-	var launcherPath string
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		launcherPath = "/usr/local/kolide-k2/bin/launcher"
-	case "windows":
-		launcherPath = `C:\Program Files\Kolide\Launcher-kolide-k2\bin\launcher.exe`
+	launcherPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("getting current running executable: %w", err)
 	}
 
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	// We trust the autoupdate library to find the correct path
-	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive") //nolint:forbidigo // We trust the autoupdate library to find the correct path
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive") //nolint:forbidigo // It is safe to exec the current running executable
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
