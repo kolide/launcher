@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags"
@@ -200,7 +201,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
-	return mostRecentVersion(ctx, binary, updateDirectory)
+	return mostRecentVersion(ctx, binary, updateDirectory, channel)
 }
 
 // findExecutableFromRelease looks at our local TUF repository to find the release for our
@@ -240,7 +241,7 @@ func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, 
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
+func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -259,6 +260,22 @@ func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpda
 
 	// Versions are sorted in ascending order -- return the last one
 	mostRecentVersionInLibraryRaw := validVersionsInLibrary[len(validVersionsInLibrary)-1]
+
+	// We rolled out TUF more broadly beginning in v1.4.1. Don't select versions earlier than that.
+	if binary == binaryLauncher && channel == "stable" {
+		recentVersion, err := semver.NewVersion(mostRecentVersionInLibraryRaw)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse most recent version %s in launcher library: %w", recentVersion, err)
+		}
+		startingVersion, err := semver.NewVersion("1.4.1")
+		if err != nil {
+			return nil, fmt.Errorf("could not parse required starting version for launcher binary: %w", err)
+		}
+		if recentVersion.LessThan(startingVersion) {
+			return nil, fmt.Errorf("most recent version %s for binary launcher is not newer than required v1.4.1", recentVersion)
+		}
+	}
+
 	versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), mostRecentVersionInLibraryRaw)
 	return &BinaryUpdateInfo{
 		Path:    executableLocation(versionDir, binary),
