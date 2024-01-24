@@ -342,7 +342,7 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 
 // WipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func WipeDatabase(ctx context.Context, k types.Knapsack) error { // nolint:unused
+func WipeDatabase(ctx context.Context, k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
 			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)

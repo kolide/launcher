@@ -74,7 +74,7 @@ func TestUninstall(t *testing.T) {
 			k.On("EnrollSecretPath").Return(enrollSecretPath)
 			k.On("Slogger").Return(multislogger.New().Logger)
 
-			uninstallNoExit(context.TODO(), k)
+			Uninstall(context.TODO(), k, false)
 
 			// check that file was deleted
 			_, err = os.Stat(enrollSecretPath)

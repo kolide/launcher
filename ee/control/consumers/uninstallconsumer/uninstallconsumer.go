@@ -24,6 +24,6 @@ func New(knapsack types.Knapsack) *UninstallConsumer {
 }
 
 func (c *UninstallConsumer) Do(data io.Reader) error {
-	uninstall.Uninstall(context.TODO(), c.knapsack)
+	uninstall.Uninstall(context.TODO(), c.knapsack, true)
 	return nil
 }

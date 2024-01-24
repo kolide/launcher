@@ -10,26 +10,10 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-func Uninstall(ctx context.Context, k types.Knapsack) {
-	uninstallNoExit(ctx, k)
-
-	if err := disableAutoStart(ctx); err != nil {
-		k.Slogger().Log(ctx, slog.LevelError,
-			"disabling auto start",
-			"err", err,
-		)
-	}
-
-	// TODO: remove start up files
-	// TODO: remove installation
-
-	os.Exit(0)
-}
-
-// uninstallNoExit just removes the enroll secret file and wipes the database without
-// exiting the process. This is so that we can test a portion of the uninstall process.
+// Uninstall just removes the enroll secret file and wipes the database.
 // Logs errors, but does not return them, because we want to try each step independently.
-func uninstallNoExit(ctx context.Context, k types.Knapsack) {
+// If exitOnCompletion is true, it will also disable launcher autostart and exit.
+func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 	slogger := k.Slogger().With("component", "uninstall")
 
 	if err := removeEnrollSecretFile(k); err != nil {
@@ -45,6 +29,19 @@ func uninstallNoExit(ctx context.Context, k types.Knapsack) {
 			"err", err,
 		)
 	}
+
+	if !exitOnCompletion {
+		return
+	}
+
+	if err := disableAutoStart(ctx); err != nil {
+		k.Slogger().Log(ctx, slog.LevelError,
+			"disabling auto start",
+			"err", err,
+		)
+	}
+
+	os.Exit(0)
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {
