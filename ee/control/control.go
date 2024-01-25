@@ -48,7 +48,7 @@ type subscriber interface {
 type dataProvider interface {
 	GetConfig() (io.Reader, error)
 	GetSubsystemData(hash string) (io.Reader, error)
-	MessageServer(method serverMessageMethod, params interface{}) error
+	MessageServer(method string, params interface{}) error
 }
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
