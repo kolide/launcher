@@ -340,16 +340,13 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 	return pubKeyBytes, nil
 }
 
-// wipeDatabase iterates over all stores in the database, deleting all keys from
+// WipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(ctx context.Context, k types.Knapsack) error { // nolint:unused
-	return errors.New("currently not supported")
-	/*
-		for storeName, store := range k.Stores() {
-			if err := store.DeleteAll(); err != nil {
-				return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
-			}
+func WipeDatabase(ctx context.Context, k types.Knapsack) error {
+	for storeName, store := range k.Stores() {
+		if err := store.DeleteAll(); err != nil {
+			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
 		}
-		return nil
-	*/
+	}
+	return nil
 }

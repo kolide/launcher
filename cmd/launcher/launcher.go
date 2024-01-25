@@ -37,6 +37,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
@@ -371,7 +372,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		// register accelerate control consumer
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
-
+		// register uninstall consumer
+		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(k))
 		// register flare consumer
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
