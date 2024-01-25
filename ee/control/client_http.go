@@ -150,23 +150,15 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	return reader, nil
 }
 
-// serverMessageMethod is a method that can be sent to the server, it is
-// set as the method in json-rpc format
-type serverMessageMethod string
-
-const (
-	recheck serverMessageMethod = "recheck"
-)
-
 // MessageServer sends a message to the server using JSON-RPC format
-func (c *HTTPClient) MessageServer(method serverMessageMethod, params interface{}) error {
+func (c *HTTPClient) MessageServer(method string, params interface{}) error {
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
 	}
 
 	bodyMap := map[string]interface{}{
 		"jsonrpc": "2.0",
-		"method":  string(method),
+		"method":  method,
 		"params":  params,
 	}
 

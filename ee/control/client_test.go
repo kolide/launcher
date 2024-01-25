@@ -39,6 +39,6 @@ func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
 	return bytes.NewReader(bodyBytes), nil
 }
 
-func (c *TestClient) MessageServer(method serverMessageMethod, params interface{}) error {
+func (c *TestClient) MessageServer(method string, params interface{}) error {
 	return nil
 }
