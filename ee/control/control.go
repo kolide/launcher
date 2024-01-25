@@ -101,11 +101,10 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"err", fetchErr,
 			)
 		case !startUpMessageSuccess:
-			messageErr := cs.fetcher.MessageServer("startup", nil)
-			if messageErr != nil {
+			if err := cs.fetcher.MessageServer("startup", nil); err != nil {
 				cs.slogger.Log(ctx, slog.LevelWarn,
 					"failed to send startup message on control server start",
-					"err", messageErr,
+					"err", err,
 				)
 				break
 			}
