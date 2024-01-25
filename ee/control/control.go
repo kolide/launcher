@@ -2,6 +2,8 @@ package control
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"golang.org/x/exp/slices"
@@ -90,24 +93,36 @@ func (cs *ControlService) Start(ctx context.Context) {
 	)
 	ctx, cs.cancel = context.WithCancel(ctx)
 
-	recheckOnce := sync.Once{}
+	startUpRecheckSuccess := false
 
 	for {
-		// Fetch immediately on each iteration, avoiding the initial ticker delay
-		if err := cs.Fetch(); err != nil {
+		fetchErr := cs.Fetch()
+		switch {
+		case fetchErr != nil:
 			cs.slogger.Log(ctx, slog.LevelWarn,
 				"failed to fetch data from control server. Not fatal, moving on",
-				"err", err,
+				"err", fetchErr,
 			)
-		} else {
-			recheckOnce.Do(func() {
-				if err := cs.fetcher.MessageServer(recheck, nil); err != nil {
-					cs.slogger.Log(ctx, slog.LevelWarn,
-						"failed to send recheck message on control server start",
-						"err", err,
-					)
-				}
-			})
+		case !startUpRecheckSuccess:
+			idInfo, err := launcherIdentifyingData()
+			if err != nil {
+				cs.slogger.Log(ctx, slog.LevelWarn,
+					"failed to get identifying data for recheck message",
+					"err", err,
+				)
+				break
+			}
+
+			messageErr := cs.fetcher.MessageServer(recheck, idInfo)
+			if messageErr != nil {
+				cs.slogger.Log(ctx, slog.LevelWarn,
+					"failed to send recheck message on control server start",
+					"err", messageErr,
+				)
+				break
+			}
+
+			startUpRecheckSuccess = true
 		}
 
 		select {
@@ -118,6 +133,33 @@ func (cs *ControlService) Start(ctx context.Context) {
 			continue
 		}
 	}
+}
+
+func launcherIdentifyingData() (map[string]string, error) {
+	var details = make(map[string]string)
+
+	// not fatal if we don't have hardware keys so just try for now
+	if agent.HardwareKeys().Public() != nil {
+		if key, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+			// der is a binary format, so convert to b64
+			details["launcher_hardware_key"] = base64.StdEncoding.EncodeToString(key)
+			details["launcher_hardware_key_source"] = agent.HardwareKeys().Type()
+		}
+	}
+
+	// not having local keys is fatal as this is how this launcher instance will be identified
+	if agent.LocalDbKeys().Public() == nil {
+		return nil, errors.New("local db keys are nil")
+	}
+
+	key, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public())
+	if err != nil {
+		return nil, fmt.Errorf("marshal local db key: %w", err)
+	}
+
+	// der is a binary format, so convert to b64
+	details["launcher_local_key"] = base64.StdEncoding.EncodeToString(key)
+	return details, nil
 }
 
 func (cs *ControlService) Interrupt(_ error) {
