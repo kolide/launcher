@@ -90,7 +90,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	)
 	ctx, cs.cancel = context.WithCancel(ctx)
 
-	startUpRecheckSuccess := false
+	startUpMessageSuccess := false
 
 	for {
 		fetchErr := cs.Fetch()
@@ -100,7 +100,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"failed to fetch data from control server. Not fatal, moving on",
 				"err", fetchErr,
 			)
-		case !startUpRecheckSuccess:
+		case !startUpMessageSuccess:
 			messageErr := cs.fetcher.MessageServer("startup", nil)
 			if messageErr != nil {
 				cs.slogger.Log(ctx, slog.LevelWarn,
@@ -110,7 +110,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 				break
 			}
 
-			startUpRecheckSuccess = true
+			startUpMessageSuccess = true
 		}
 
 		select {
