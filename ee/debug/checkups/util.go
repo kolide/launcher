@@ -26,6 +26,9 @@ func recursiveDirectoryContents(extraFH io.Writer, basedir string) (int, error) 
 	// I'm not sure why, but WalkDir seems to visit some things twice. Meanwhile, just use a map to to count things
 	files := make(map[string]bool, 0)
 
+	// Handle occasional trailing slash on base directory
+	basedir = filepath.Clean(basedir)
+
 	filewalkErr := filepath.WalkDir(basedir, func(path string, d fs.DirEntry, err error) error {
 		if filepath.Dir(path) == basedir {
 			files[path] = true
