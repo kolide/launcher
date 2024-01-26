@@ -58,7 +58,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 		},
 	}, nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	traceExporter.SetOsqueryClient(osqueryClient)
 	require.NoError(t, err)
 
@@ -94,7 +94,7 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, nil)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -118,9 +118,7 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
-func TestInterrupt_Multiple(t *testing.T) {
-	t.Parallel()
-
+func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	tokenStore := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
@@ -133,7 +131,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
