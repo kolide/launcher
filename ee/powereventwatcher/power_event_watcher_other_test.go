@@ -4,6 +4,7 @@
 package powereventwatcher
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	p, err := New(typesmocks.NewKnapsack(t), log.NewNopLogger())
+	p, err := New(context.TODO(), typesmocks.NewKnapsack(t), log.NewNopLogger())
 	require.NoError(t, err)
 
 	// Start and then interrupt

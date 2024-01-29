@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // logger is an interface that allows mocking of logger
@@ -63,6 +64,9 @@ func (c *logCheckPointer) Interrupt(_ error) {
 }
 
 func (c *logCheckPointer) Once(ctx context.Context) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	checkups := checkupsFor(c.knapsack, logSupported)
 
 	for _, checkup := range checkups {

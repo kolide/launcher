@@ -90,6 +90,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"delay_start", opts.DelayStart.String(),
 		)
 		time.Sleep(opts.DelayStart)
+		startupSpan.AddEvent("delay_start_completed")
 	}
 
 	slogger.Log(ctx, slog.LevelDebug,
@@ -116,6 +117,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	}
+	startupSpan.AddEvent("dns_lookup_complete")
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
@@ -148,6 +150,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			return fmt.Errorf("chmodding root directory parent: %w", err)
 		}
 	}
+	startupSpan.AddEvent("root_directory_created")
 
 	if _, err := osquery.DetectPlatform(); err != nil {
 		return fmt.Errorf("detecting platform: %w", err)
@@ -168,12 +171,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("open launcher db: %w", err)
 	}
 	defer db.Close()
+	startupSpan.AddEvent("database_opened")
 
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
-	stores, err := agentbbolt.MakeStores(logger, db)
+	stores, err := agentbbolt.MakeStores(ctx, logger, db)
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
@@ -203,6 +207,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	var logShipper *logshipper.LogShipper
 	var traceExporter *exporter.TraceExporter
 	if k.ControlServerURL() != "" {
+		startupSpan.AddEvent("log_shipper_init_start")
 
 		initialDebugDuration := 10 * time.Minute
 
@@ -230,6 +235,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		} else {
 			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
 		}
+
+		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
 	s, err := startupsettings.OpenWriter(ctx, k)
@@ -253,7 +260,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
-	internal.RecordLauncherVersion(rootDirectory)
+	internal.RecordLauncherVersion(ctx, rootDirectory)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -283,7 +290,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// For now, remediation is not performed -- we only log the hardware change.
 	agent.DetectAndRemediateHardwareChange(ctx, k)
 
-	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
+	powerEventWatcher, err := powereventwatcher.New(ctx, k, log.With(logger, "component", "power_event_watcher"))
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"could not init power event watcher",

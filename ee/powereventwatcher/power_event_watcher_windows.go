@@ -4,6 +4,7 @@
 package powereventwatcher
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -46,7 +48,10 @@ const (
 )
 
 // New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func New(k types.Knapsack, logger log.Logger) (*powerEventWatcher, error) {
+func New(ctx context.Context, k types.Knapsack, logger log.Logger) (*powerEventWatcher, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")
 
 	p := &powerEventWatcher{
