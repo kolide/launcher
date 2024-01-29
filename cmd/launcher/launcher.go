@@ -117,7 +117,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	}
-	startupSpan.AddEvent("dns_lookup_complete")
+	startupSpan.AddEvent("dns_lookup_completed")
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
