@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -68,7 +69,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 func testServer(t *testing.T, k types.Knapsack) *localServer {
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	server, err := New(k)
+	server, err := New(context.TODO(), k)
 	require.NoError(t, err)
 	return server
 }

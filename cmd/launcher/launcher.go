@@ -437,6 +437,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
+			ctx,
 			k,
 		)
 
@@ -460,6 +461,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
+			ctx,
 			k,
 			metadataClient,
 			mirrorClient,
