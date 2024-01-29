@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/actor"
 	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/updater/tuf"
 )
 
@@ -38,6 +39,8 @@ func NewUpdater(
 	finalizer autoupdate.UpdateFinalizer,
 	config *UpdaterConfig,
 ) (*actor.Actor, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	if config.Logger == nil {
 		config.Logger = log.NewNopLogger()

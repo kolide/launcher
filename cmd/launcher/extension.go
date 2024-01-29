@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	ktable "github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
@@ -44,6 +45,9 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	shutdown func() error, // shutdown osqueryd runner
 	err error,
 ) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 	slogger := k.Slogger().With("component", "osquery_extension_actor")
 
@@ -91,7 +95,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	}
 
 	// create the extension
-	ext, err := osquery.NewExtension(launcherClient, k, extOpts)
+	ext, err := osquery.NewExtension(ctx, launcherClient, k, extOpts)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("starting grpc extension: %w", err)
 	}

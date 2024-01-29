@@ -4,6 +4,7 @@
 package tuf
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -27,7 +28,7 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")

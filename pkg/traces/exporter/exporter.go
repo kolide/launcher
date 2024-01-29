@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
@@ -63,6 +64,9 @@ type TraceExporter struct {
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
 func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TraceExporter, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	ctx, cancel := context.WithCancel(ctx)
 
