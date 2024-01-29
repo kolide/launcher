@@ -48,7 +48,7 @@ type subscriber interface {
 type dataProvider interface {
 	GetConfig() (io.Reader, error)
 	GetSubsystemData(hash string) (io.Reader, error)
-	MessageServer(method string, params interface{}) error
+	Message(method string, params interface{}) error
 }
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
@@ -101,7 +101,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"err", fetchErr,
 			)
 		case !startUpMessageSuccess:
-			if err := cs.fetcher.MessageServer("startup", nil); err != nil {
+			if err := cs.fetcher.Message("startup", nil); err != nil {
 				cs.slogger.Log(ctx, slog.LevelWarn,
 					"failed to send startup message on control server start",
 					"err", err,

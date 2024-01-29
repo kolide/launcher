@@ -150,8 +150,8 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	return reader, nil
 }
 
-// MessageServer sends a message to the server using JSON-RPC format
-func (c *HTTPClient) MessageServer(method string, params interface{}) error {
+// Message sends a message to the server using JSON-RPC format
+func (c *HTTPClient) Message(method string, params interface{}) error {
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
 	}
