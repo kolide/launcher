@@ -56,6 +56,7 @@ import (
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
 
 	"go.etcd.io/bbolt"
@@ -73,6 +74,9 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
+	initialTraceBuffer := exporter.NewInitialTraceBuffer()
+	ctx, startupSpan := traces.StartSpan(ctx)
+
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := ctxlog.FromContext(ctx)
@@ -217,7 +221,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k)
+		traceExporter, err = exporter.NewTraceExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"could not set up trace exporter",
@@ -520,6 +524,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 		runGroup.Add("launcherLegacyAutoupdater", launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 	}
+
+	startupSpan.End()
 
 	if err := runGroup.Run(); err != nil {
 		return fmt.Errorf("run service: %w", err)
