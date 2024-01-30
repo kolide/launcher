@@ -10,8 +10,8 @@ type actionType string
 
 const (
 	DoNothing actionType = "" // Omitted action implies do nothing
-	OpenURL              = "open-url"
-	Flare                = "flare"
+	OpenURL   actionType = "open-url"
+	Flare     actionType = "flare"
 )
 
 // Action encapsulates what action should be performed when a menu item is invoked

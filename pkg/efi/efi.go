@@ -31,13 +31,13 @@ type Attributes uint32
 // From the UEFI spec
 const (
 	EFI_VARIABLE_NON_VOLATILE                          Attributes = 0x00000001
-	EFI_VARIABLE_BOOTSERVICE_ACCESS                               = 0x00000002
-	EFI_VARIABLE_RUNTIME_ACCESS                                   = 0x00000004
-	EFI_VARIABLE_HARDWARE_ERROR_RECORD                            = 0x00000008
-	EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS                       = 0x00000010
-	EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS            = 0x00000020
-	EFI_VARIABLE_APPEND_WRITE                                     = 0x00000040
-	EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS                    = 0x00000080
+	EFI_VARIABLE_BOOTSERVICE_ACCESS                    Attributes = 0x00000002
+	EFI_VARIABLE_RUNTIME_ACCESS                        Attributes = 0x00000004
+	EFI_VARIABLE_HARDWARE_ERROR_RECORD                 Attributes = 0x00000008
+	EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS            Attributes = 0x00000010
+	EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS Attributes = 0x00000020
+	EFI_VARIABLE_APPEND_WRITE                          Attributes = 0x00000040
+	EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS         Attributes = 0x00000080
 )
 
 // ReadVar reads a given uuid, name pair from the efivars filesystem

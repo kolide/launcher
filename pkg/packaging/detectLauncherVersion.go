@@ -22,7 +22,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
-		return fmt.Errorf("Failed to exec. Perhaps -- Can't autodetect while cross compiling. (%s): %w", stdout, err)
+		return fmt.Errorf("failed to exec -- possibly can't autodetect while cross compiling: out `%s`: %w", stdout, err)
 	}
 
 	stdoutSplit := strings.Split(stdout, "\n")
@@ -30,7 +30,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	version := versionLine[len(versionLine)-1]
 
 	if version == "" {
-		return errors.New("Unable to parse launcher version.")
+		return errors.New("unable to parse launcher version")
 	}
 
 	level.Debug(logger).Log("msg", "formatting version string for target platform", "origVersion", version, "platform", p.target.Platform)
@@ -76,11 +76,11 @@ func formatVersion(rawVersion string, platform PlatformFlavor) (string, error) {
 	matches := versionRegex.FindAllStringSubmatch(rawVersion, -1)
 
 	if len(matches) == 0 {
-		return "", fmt.Errorf("Version %s did not match expected format", rawVersion)
+		return "", fmt.Errorf("version %s did not match expected format", rawVersion)
 	}
 
 	if len(matches[0]) != 5 {
-		return "", fmt.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), rawVersion)
+		return "", fmt.Errorf("something very wrong: expected 5 subgroups, got %d, from string %s", len(matches), rawVersion)
 	}
 
 	major := matches[0][1]

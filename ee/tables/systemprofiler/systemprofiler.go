@@ -215,7 +215,7 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 	level.Debug(t.logger).Log("msg", "calling system_profiler", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil

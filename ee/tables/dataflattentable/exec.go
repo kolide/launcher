@@ -115,7 +115,7 @@ func (t *Table) exec(ctx context.Context) ([]byte, error) {
 	if err := cmd.Run(); os.IsNotExist(err) {
 		return nil, fmt.Errorf("command %s not found: %w", cmd.Path, err)
 	} else if err != nil {
-		return nil, fmt.Errorf("calling %s. Got: %s: %w", cmd.Path, string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("calling %s. Got: %s: %w", cmd.Path, stderr.String(), err)
 	}
 
 	// success!

@@ -31,11 +31,11 @@ func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) e
 	defer span.End()
 
 	if initOptions.Identifier == "" {
-		return errors.New("Identifier must not be empty")
+		return errors.New("identifier must not be empty")
 	}
 
 	if initOptions.Path == "" {
-		return errors.New("Path must not be empty")
+		return errors.New("path must not be empty")
 	}
 
 	pathState := map[string]bool{

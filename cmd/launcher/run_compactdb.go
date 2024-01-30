@@ -17,7 +17,7 @@ func runCompactDb(args []string) error {
 	}
 
 	if opts.RootDirectory == "" {
-		return errors.New("No root directory specified")
+		return errors.New("no root directory specified")
 	}
 
 	// relevel

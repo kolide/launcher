@@ -102,7 +102,7 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(enrollmentResponse)
 	if !ok {
-		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)

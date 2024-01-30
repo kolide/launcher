@@ -141,7 +141,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	}
 
 	// Ignoring ok value, this should only fail if an invalid storeType is provided
-	store, _ := k.stores[storeType]
+	store := k.stores[storeType]
 	return store
 }
 

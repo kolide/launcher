@@ -104,7 +104,7 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	level.Debug(t.logger).Log("msg", "calling pwpolicy", "args", cmd.Args)
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", stderr.String(), err)
 	}
 
 	// Remove first line of output because it always contains non-plist content
