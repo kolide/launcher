@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type dbResetRecord struct {
@@ -47,6 +48,9 @@ const (
 // has changed, it logs the change. In the future, it will take a backup of the database, and
 // then clear all data from it.
 func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...")
 
 	serialChanged := false

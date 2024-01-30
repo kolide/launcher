@@ -83,8 +83,11 @@ func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 	}
 }
 
-func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
+func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ta := &TufAutoupdater{
 		knapsack:               k,
 		interrupt:              make(chan struct{}, 1),
@@ -101,7 +104,7 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 	}
 
 	var err error
-	ta.metadataClient, err = initMetadataClient(k.RootDirectory(), k.TufServerURL(), metadataHttpClient)
+	ta.metadataClient, err = initMetadataClient(ctx, k.RootDirectory(), k.TufServerURL(), metadataHttpClient)
 	if err != nil {
 		return nil, fmt.Errorf("could not init metadata client: %w", err)
 	}
@@ -121,7 +124,10 @@ func NewTufAutoupdater(k types.Knapsack, metadataHttpClient *http.Client, mirror
 
 // initMetadataClient sets up a TUF client with our validated root metadata, prepared to fetch updates
 // from our TUF server.
-func initMetadataClient(rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+func initMetadataClient(ctx context.Context, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Set up the local TUF directory for our TUF client
 	localTufDirectory := LocalTufDirectory(rootDirectory)
 	if err := os.MkdirAll(localTufDirectory, 0750); err != nil {

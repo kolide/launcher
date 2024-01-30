@@ -122,7 +122,10 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}

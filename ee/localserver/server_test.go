@@ -1,6 +1,7 @@
 package localserver
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	recalculateInterval = 100 * time.Millisecond
 
 	// Create the localserver
-	ls, err := New(k)
+	ls, err := New(context.TODO(), k)
 	require.NoError(t, err)
 
 	// Set the querier
