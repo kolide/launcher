@@ -11,7 +11,7 @@ type noopKeys struct {
 }
 
 func (n noopKeys) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) (signature []byte, err error) {
-	return nil, errors.New("Can't sign. Unconfigured keys")
+	return nil, errors.New("can't sign, unconfigured keys")
 }
 
 func (n noopKeys) Public() crypto.PublicKey {

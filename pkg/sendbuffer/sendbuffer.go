@@ -209,7 +209,7 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 				"method", "UpdateData",
 				"size_of_data_bytes", out.Len(),
 				"max_send_size_bytes", sb.maxSendSizeBytes,
-				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+				"head", out.String()[0:minInt(outLen, 100)],
 			)
 
 			continue
@@ -227,7 +227,7 @@ func (sb *SendBuffer) UpdateData(f func(in io.Reader, out io.Writer) error) {
 				"buffer_size_bytes", sb.size,
 				"size_plus_data_bytes", sb.size+outLen,
 				"max_size", sb.maxStorageSizeBytes,
-				"head", string(out.Bytes())[0:minInt(outLen, 100)],
+				"head", out.String()[0:minInt(outLen, 100)],
 			)
 
 			continue

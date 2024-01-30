@@ -370,6 +370,7 @@ func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 
 	// sanity check that files got created
 	count, err := countFilesWithPrefix(socketDir, "")
+	require.NoError(t, err)
 	require.Equal(t, 4, count)
 
 	// calling set up socket path should remove the fake socket files

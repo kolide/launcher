@@ -74,6 +74,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			jsonBytes, err := json.Marshal(map[string]string{
 				"query": tt.query,
 			})
+			require.NoError(t, err)
 			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
 			require.NoError(t, err)
 
@@ -264,7 +265,6 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			}
 
 			require.Equal(t, mustMarshal(t, tt.expectedResult), rr.Body.Bytes())
-			return
 		})
 	}
 }

@@ -91,6 +91,4 @@ func main() {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", row.StringPath("/"), p, k, row.Value)
 	}
 	w.Flush()
-
-	return
 }

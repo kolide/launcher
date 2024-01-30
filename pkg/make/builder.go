@@ -446,7 +446,7 @@ func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string
 	passwordRetrieverFn := func(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
 		pass = os.Getenv(key)
 		if pass == "" {
-			err = fmt.Errorf("Missing pass phrase env var %q", key)
+			err = fmt.Errorf("missing pass phrase env var %q", key)
 		}
 		return pass, giveUp, err
 	}
@@ -681,11 +681,11 @@ func (b *Builder) getVersion(ctx context.Context) (string, error) {
 	matches := versionRegex.FindAllStringSubmatch(gitVersion, -1)
 
 	if len(matches) == 0 {
-		return "", fmt.Errorf(`Version "%s" did not match expected format. Expect major.minor[.patch][-additional]`, gitVersion)
+		return "", fmt.Errorf(`version "%s" did not match expected format: expected major.minor[.patch][-additional]`, gitVersion)
 	}
 
 	if len(matches[0]) != 5 {
-		return "", fmt.Errorf("Something very wrong. Expected 5 subgroups got %d from string %s", len(matches), gitVersion)
+		return "", fmt.Errorf("something very wrong: expected 5 subgroups, got %d, from string %s", len(matches), gitVersion)
 	}
 
 	major := matches[0][1]

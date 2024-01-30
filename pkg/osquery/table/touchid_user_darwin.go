@@ -39,7 +39,7 @@ type touchIDUserConfigTable struct {
 }
 
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	q, _ := queryContext.Constraints["uid"]
+	q := queryContext.Constraints["uid"]
 	if len(q.Constraints) == 0 {
 		level.Debug(t.logger).Log(
 			"msg", "The touchid_user_config table requires that you specify a constraint WHERE uid =",
@@ -156,5 +156,5 @@ func runCommandContext(ctx context.Context, uid int, cmd allowedcmd.AllowedComma
 		return "", err
 	}
 
-	return string(stdout.Bytes()), nil
+	return stdout.String(), nil
 }

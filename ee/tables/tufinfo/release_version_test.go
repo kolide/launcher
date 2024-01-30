@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
@@ -19,8 +18,6 @@ import (
 
 func TestTufReleaseVersionTable(t *testing.T) {
 	t.Parallel()
-
-	rand.Seed(time.Now().UnixNano())
 
 	// Set up some expected results
 	expectedResults := make(map[string]string, 0)

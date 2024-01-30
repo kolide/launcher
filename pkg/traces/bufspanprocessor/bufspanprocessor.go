@@ -74,7 +74,6 @@ func (b *BufSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	}
 
 	b.bufferedSpans = append(b.bufferedSpans, s)
-	return
 }
 
 // Shutdown is called when the SDK shuts down. Any cleanup or release of

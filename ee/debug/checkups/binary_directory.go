@@ -21,7 +21,7 @@ func (c *BinaryDirectory) Name() string {
 func (c *BinaryDirectory) Run(_ context.Context, extraFH io.Writer) error {
 	bindir := getBinDir()
 	if bindir == "" {
-		return errors.New("No default bin directory")
+		return errors.New("no default bin directory")
 	}
 
 	// Note that we're recursing `/usr/local/kolide-k2` and not .../bin. So the counts may not be what

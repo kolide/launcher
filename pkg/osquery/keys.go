@@ -73,7 +73,7 @@ func KeyFromPem(pemRaw []byte) (interface{}, error) {
 		return x509.ParsePKIXPublicKey(block.Bytes)
 	}
 
-	return nil, fmt.Errorf("Unknown block type: %s", block.Type)
+	return nil, fmt.Errorf("unknown block type: %s", block.Type)
 }
 
 func PublicKeyToPem(pub any, out io.Writer) error {

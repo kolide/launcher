@@ -2,6 +2,7 @@ package checkups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,7 +77,7 @@ func getTimeFromDateHeader(url string) (time.Time, error) {
 	// Parse the "Date" header from the response.
 	dateHeader := resp.Header.Get("Date")
 	if dateHeader == "" {
-		return time.Time{}, fmt.Errorf("Date header not found in response")
+		return time.Time{}, errors.New("date header not found in response")
 	}
 
 	// Parse the date string from the header.

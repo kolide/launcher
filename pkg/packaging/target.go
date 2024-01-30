@@ -19,12 +19,12 @@ type InitFlavor string
 
 const (
 	LaunchD          InitFlavor = "launchd"
-	Systemd                     = "systemd"
-	Init                        = "init"
-	Upstart                     = "upstart"
-	WindowsService              = "service"
-	NoInit                      = "none"
-	UpstartAmazonAMI            = "upstart_amazon_ami"
+	Systemd          InitFlavor = "systemd"
+	Init             InitFlavor = "init"
+	Upstart          InitFlavor = "upstart"
+	WindowsService   InitFlavor = "service"
+	NoInit           InitFlavor = "none"
+	UpstartAmazonAMI InitFlavor = "upstart_amazon_ami"
 )
 
 var knownInitFlavors = [...]InitFlavor{LaunchD, Systemd, Init, Upstart, WindowsService, NoInit, UpstartAmazonAMI}
@@ -33,8 +33,8 @@ type PlatformFlavor string
 
 const (
 	Darwin  PlatformFlavor = "darwin"
-	Windows                = "windows"
-	Linux                  = "linux"
+	Windows PlatformFlavor = "windows"
+	Linux   PlatformFlavor = "linux"
 )
 
 var knownPlatformFlavors = [...]PlatformFlavor{Darwin, Windows, Linux}
@@ -43,11 +43,11 @@ type PackageFlavor string
 
 const (
 	Pkg    PackageFlavor = "pkg"
-	Tar                  = "tar"
-	Deb                  = "deb"
-	Rpm                  = "rpm"
-	Msi                  = "msi"
-	Pacman               = "pacman"
+	Tar    PackageFlavor = "tar"
+	Deb    PackageFlavor = "deb"
+	Rpm    PackageFlavor = "rpm"
+	Msi    PackageFlavor = "msi"
+	Pacman PackageFlavor = "pacman"
 )
 
 var knownPackageFlavors = [...]PackageFlavor{Pkg, Tar, Deb, Rpm, Msi, Pacman}
@@ -70,7 +70,7 @@ var defaultArchMap = map[PlatformFlavor]ArchFlavor{
 func (t *Target) Parse(s string) error {
 	components := strings.Split(s, "-")
 	if len(components) != 3 {
-		return fmt.Errorf("Unable to parse %s, should have exactly 3 components", s)
+		return fmt.Errorf("unable to parse %s, should have exactly 3 components", s)
 	}
 
 	if err := t.PlatformFromString(components[0]); err != nil {
@@ -147,7 +147,7 @@ func (t *Target) InitFromString(s string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Unknown init %s", s)
+	return fmt.Errorf("unknown init %s", s)
 }
 
 // PlatformFromString sets a target's platform flavor from string representation
@@ -158,7 +158,7 @@ func (t *Target) PlatformFromString(s string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Unknown platform %s", s)
+	return fmt.Errorf("unknown platform %s", s)
 }
 
 // PackageFromString sets a target's package flavor from string representation
@@ -169,7 +169,7 @@ func (t *Target) PackageFromString(s string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Unknown package %s", s)
+	return fmt.Errorf("unknown package %s", s)
 
 }
 

@@ -100,7 +100,7 @@ func TestSendBuffer(t *testing.T) {
 					time.Sleep(1 * time.Millisecond)
 				}
 
-				require.Equal(t, tt.expectedReceives[i], string(lastReceivedData.Bytes()))
+				require.Equal(t, tt.expectedReceives[i], lastReceivedData.String())
 				requireStoreSizeEqualsHttpBufferReportedSize(t, sb)
 			}
 		})
