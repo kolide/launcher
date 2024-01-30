@@ -69,7 +69,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive") //nolint:forbidigo // It is safe to exec the current running executable
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--osqueryd_path", o.k.LatestOsquerydPath(ctx)) //nolint:forbidigo // It is safe to exec the current running executable
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
