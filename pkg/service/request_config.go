@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type configRequest struct {
@@ -108,6 +109,9 @@ func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 
 // RequestConfig implements KolideService.RequestConfig.
 func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := configRequest{NodeKey: nodeKey}
