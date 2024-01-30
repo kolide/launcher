@@ -22,9 +22,9 @@ type outputType string
 
 const (
 	Deb    outputType = "deb"
-	RPM               = "rpm"
-	Tar               = "tar"
-	Pacman            = "pacman"
+	RPM    outputType = "rpm"
+	Tar    outputType = "tar"
+	Pacman outputType = "pacman"
 )
 
 type fpmOptions struct {
@@ -85,7 +85,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	}
 
 	if f.outputType == "" {
-		return errors.New("Missing output type")
+		return errors.New("missing output type")
 	}
 
 	if f.arch == "" {

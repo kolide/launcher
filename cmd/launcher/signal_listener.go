@@ -28,11 +28,9 @@ func newSignalListener(sigChannel chan os.Signal, cancel context.CancelFunc, log
 
 func (s *signalListener) Execute() error {
 	signal.Notify(s.sigChannel, os.Interrupt, syscall.SIGTERM)
-	select {
-	case sig := <-s.sigChannel:
-		level.Info(s.logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
-		return nil
-	}
+	sig := <-s.sigChannel
+	level.Info(s.logger).Log("msg", "beginning shutdown via signal", "signal_received", sig)
+	return nil
 }
 
 func (s *signalListener) Interrupt(_ error) {

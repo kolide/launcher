@@ -45,6 +45,10 @@ func TestMain(m *testing.M) {
 	defer rmBinDirectory()
 
 	s, err := storageci.NewStore(nil, log.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
+	if err != nil {
+		fmt.Println("Failed to make new store")
+		os.Exit(1)
+	}
 	if err := history.InitHistory(s); err != nil {
 		fmt.Println("Failed to init history")
 		os.Exit(1)

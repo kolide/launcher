@@ -19,7 +19,7 @@ var (
 // moving around.
 func DbCompact(boltPath string, compactMaxTxSize int64) (string, error) {
 	if !fileExists(boltPath) {
-		return "", errors.New("No launcher.db. Cannot compact")
+		return "", errors.New("no launcher.db, cannot compact")
 	}
 
 	newBoltPath := boltPath + ".new"

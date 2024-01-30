@@ -53,7 +53,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	}
 
 	r := regexp.MustCompile(` (?P<chip>T\d) `) // Matching on: Apple T[1|2] Security Chip
-	match := r.FindStringSubmatch(string(stdout.Bytes()))
+	match := r.FindStringSubmatch(stdout.String())
 	if len(match) == 0 {
 		secureEnclaveCPU = ""
 	} else {
@@ -71,7 +71,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("calling bioutil for system configuration: %w", err)
 	}
-	configOutStr := string(stdout.Bytes())
+	configOutStr := stdout.String()
 	configSplit := strings.Split(configOutStr, ":")
 	if len(configSplit) >= 3 {
 		touchIDCompatible = "1"

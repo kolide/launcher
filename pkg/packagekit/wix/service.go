@@ -16,15 +16,15 @@ type YesNoType string
 
 const (
 	Yes YesNoType = "yes"
-	No            = "no"
+	No  YesNoType = "no"
 )
 
 type ErrorControlType string
 
 const (
 	ErrorControlIgnore   ErrorControlType = "ignore"
-	ErrorControlNormal                    = "normal"
-	ErrorControlCritical                  = "critical"
+	ErrorControlNormal   ErrorControlType = "normal"
+	ErrorControlCritical ErrorControlType = "critical"
 )
 
 type StartType string
@@ -42,8 +42,8 @@ type InstallUninstallType string
 
 const (
 	InstallUninstallInstall   InstallUninstallType = "install"
-	InstallUninstallUninstall                      = "uninstall"
-	InstallUninstallBoth                           = "both"
+	InstallUninstallUninstall InstallUninstallType = "uninstall"
+	InstallUninstallBoth      InstallUninstallType = "both"
 )
 
 // ServiceInstall implements http://wixtoolset.org/documentation/manual/v3/xsd/wix/serviceinstall.html
@@ -262,7 +262,7 @@ func (s *Service) Match(line string) (bool, error) {
 	}
 
 	if s.count > s.expectedCount {
-		return isMatch, fmt.Errorf("Too many matches. Have %d, expected %d. (on %s)", s.count, s.expectedCount, s.matchString)
+		return isMatch, fmt.Errorf("too many matches: have %d, expected %d (on %s)", s.count, s.expectedCount, s.matchString)
 	}
 
 	return isMatch, nil

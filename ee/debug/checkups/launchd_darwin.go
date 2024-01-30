@@ -93,7 +93,7 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	if !strings.Contains(printOut.String(), "state = running") {
 		c.status = Failing
-		c.summary = fmt.Sprintf("state not active")
+		c.summary = "state not active"
 		return nil
 	}
 

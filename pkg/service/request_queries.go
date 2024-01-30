@@ -100,7 +100,7 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(queryCollectionResponse)
 	if !ok {
-		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *queryCollectionResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)

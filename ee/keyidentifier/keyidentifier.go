@@ -99,7 +99,7 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	// Out of options
-	return nil, errors.New("Unable to parse key")
+	return nil, errors.New("unable to parse key")
 }
 
 // attemptPem tries to decode the pem, and then work with the key. It's

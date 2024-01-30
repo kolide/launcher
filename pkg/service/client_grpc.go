@@ -106,8 +106,8 @@ func DialGRPC(
 
 	k.Slogger().Debug("dialing grpc server",
 		"server", k.KolideServerURL(),
-		"tls_secure", k.InsecureTLS() == false,
-		"transport_secure", k.InsecureTransportTLS() == false,
+		"tls_secure", !k.InsecureTLS(),
+		"transport_secure", !k.InsecureTransportTLS(),
 		"cert_pinning", len(k.CertPins()) > 0,
 	)
 

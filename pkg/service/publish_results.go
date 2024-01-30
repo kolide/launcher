@@ -136,7 +136,7 @@ func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (i
 func encodeJSONRPCPublishResultsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(publishResultsResponse)
 	if !ok {
-		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *publishResultsResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *publishResultsResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)

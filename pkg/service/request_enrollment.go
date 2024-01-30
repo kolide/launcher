@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type enrollmentRequest struct {
@@ -101,7 +102,7 @@ func decodeJSONRPCEnrollmentResponse(_ context.Context, res jsonrpc.Response) (i
 func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(enrollmentResponse)
 	if !ok {
-		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *enrollmentResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
@@ -168,6 +169,9 @@ const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
 func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 

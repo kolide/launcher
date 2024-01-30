@@ -183,7 +183,7 @@ func runSubcommands() error {
 	case "uninstall":
 		run = runUninstall
 	default:
-		return fmt.Errorf("Unknown subcommand %s", os.Args[1])
+		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
 
 	if err := run(os.Args[2:]); err != nil {
