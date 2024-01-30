@@ -32,7 +32,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
-		return "", errors.New("Empty cache dir argument")
+		return "", errors.New("empty cache dir argument")
 	}
 
 	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, version), binaryName)
@@ -69,7 +69,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("Failed download. Got http status %s", response.Status)
+		return "", fmt.Errorf("failed download, got http status %s", response.Status)
 	}
 
 	// Store it in cache

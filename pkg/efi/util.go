@@ -2,7 +2,7 @@ package efi
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"log"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -13,7 +13,7 @@ import (
 // https://gist.github.com/bradleypeabody/185b1d7ed6c0c2ab6cec
 func decodeUTF16(b []byte) (string, error) {
 	if len(b)%2 != 0 {
-		return "", fmt.Errorf("Must have even length byte slice")
+		return "", errors.New("must have even length byte slice")
 	}
 
 	u16s := make([]uint16, 1)

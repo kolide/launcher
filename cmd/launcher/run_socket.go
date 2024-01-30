@@ -59,7 +59,7 @@ func runSocket(args []string) error {
 
 	// Wait forever
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.Signal(15))
 	<-sig
 
 	// allow for graceful termination.

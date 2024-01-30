@@ -24,9 +24,7 @@ func TestIdentifyFiles(t *testing.T) {
 	kIdentifier, err := New(WithLogger(logutil.NewCLILogger(true)))
 	require.NoError(t, err)
 
-	testFiles := []string{}
-
-	testFiles, err = filepath.Glob("testdata/specs/*.json")
+	testFiles, err := filepath.Glob("testdata/specs/*.json")
 	require.NoError(t, err, "error in filepath.Glob")
 
 	for _, specPath := range testFiles {

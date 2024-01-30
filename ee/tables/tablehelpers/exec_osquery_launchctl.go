@@ -61,7 +61,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("running osquery. Got: '%s': %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("running osquery. Got: '%s': %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil

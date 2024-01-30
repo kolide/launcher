@@ -89,7 +89,7 @@ func main() {
 
 	ctx := context.Background()
 
-	for name, _ := range iconNames {
+	for name := range iconNames {
 		if err := generateIco(ctx, logger, name); err != nil {
 			level.Error(logger).Log(
 				"msg", "error generating ico",

@@ -105,7 +105,7 @@ func (s *inMemoryKeyValueStore) Update(kvPairs map[string]string) ([]string, err
 
 	var deletedKeys []string
 
-	for key, _ := range s.items {
+	for key := range s.items {
 		if _, ok := kvPairs[key]; ok {
 			continue
 		}

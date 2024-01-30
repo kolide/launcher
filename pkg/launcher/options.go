@@ -312,7 +312,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	if osquerydPath == "" {
 		osquerydPath = FindOsquery()
 		if osquerydPath == "" {
-			return nil, errors.New("Could not find osqueryd binary")
+			return nil, errors.New("could not find osqueryd binary")
 		}
 	}
 
@@ -322,7 +322,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	}
 
 	if *flEnrollSecret != "" && *flEnrollSecretPath != "" {
-		return nil, errors.New("Both enroll_secret and enroll_secret_path were defined")
+		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
 	updateChannel := autoupdate.Stable

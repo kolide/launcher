@@ -18,8 +18,8 @@ type kiDataNames string
 
 const (
 	kiCaCertificate kiDataNames = "certificate"
-	kiCertificate               = "certificate"
-	kiKey                       = "key"
+	kiCertificate   kiDataNames = "certificate"
+	kiKey           kiDataNames = "key"
 )
 
 // kiType is an internal type to denote what an indentified blob is. It is ultimately presented as a string
@@ -27,8 +27,8 @@ type kiType string
 
 const (
 	kiCACERTIFICATE kiType = "CA-CERTIFICATE" // Not totally sure what the correct string is here
-	kiCERTIFICATE          = "CERTIFICATE"
-	kiKEY                  = "KEY"
+	kiCERTIFICATE   kiType = "CERTIFICATE"
+	kiKEY           kiType = "KEY"
 )
 
 // kiType is an internal type to denote what encoding was used. It is ultimately presented as a string
@@ -36,8 +36,8 @@ type kiEncoding string
 
 const (
 	kiPEM kiEncoding = "PEM"
-	kiDER            = "DER"
-	kiP12            = "P12"
+	kiDER kiEncoding = "DER"
+	kiP12 kiEncoding = "P12"
 )
 
 func NewKey(encoding kiEncoding) *KeyInfo {

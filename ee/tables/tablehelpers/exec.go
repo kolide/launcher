@@ -59,6 +59,6 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd al
 		return nil, fmt.Errorf("could not find %s to run: %w", cmd.Path, err)
 	default:
 		traces.SetError(span, err)
-		return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), stderr.String(), err)
 	}
 }

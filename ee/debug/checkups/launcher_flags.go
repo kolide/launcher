@@ -24,7 +24,7 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 	lf.status = Failing
 
 	configFilePath := lf.flagsFilePath()
-	fmt.Fprint(extraFh, fmt.Sprintf("flags file path: %s\n", configFilePath))
+	fmt.Fprintf(extraFh, "flags file path: %s\n", configFilePath)
 
 	stat, err := os.Stat(configFilePath)
 	if err != nil {
@@ -32,7 +32,7 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 		return nil
 	}
 
-	fmt.Fprint(extraFh, fmt.Sprintf("flags file is %d bytes, and was last modified at %s\n", stat.Size(), stat.ModTime()))
+	fmt.Fprintf(extraFh, "flags file is %d bytes, and was last modified at %s\n", stat.Size(), stat.ModTime())
 
 	file, err := os.Open(configFilePath)
 	if err != nil {

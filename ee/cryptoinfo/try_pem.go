@@ -22,7 +22,7 @@ func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
 	}
 
 	if len(expanded) == 0 {
-		return nil, fmt.Errorf("No pem decoded")
+		return nil, fmt.Errorf("no pem decoded")
 	}
 
 	return expanded, nil
@@ -34,5 +34,5 @@ func expandPem(block *pem.Block) *KeyInfo {
 		return NewCertificate(kiPEM).SetHeaders(block.Headers).SetData(parseCertificate(block.Bytes))
 	}
 
-	return NewError(kiPEM, fmt.Errorf("Unknown block type: %s", block.Type))
+	return NewError(kiPEM, fmt.Errorf("unknown block type: %s", block.Type))
 }
