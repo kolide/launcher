@@ -322,7 +322,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	}
 
 	if *flEnrollSecret != "" && *flEnrollSecretPath != "" {
-		return nil, errors.New("both enroll_secret and enroll_secret_path were not defined")
+		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
 	updateChannel := autoupdate.Stable
