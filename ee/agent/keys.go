@@ -3,6 +3,7 @@ package agent
 import (
 	"crypto"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -39,18 +40,21 @@ func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(logger, store)
-		if err != nil {
-			return err
-		}
-		hardwareKeys = hwKeys
-		return nil
-	}, 1*time.Second, 250*time.Millisecond)
+	// Secure Enclave is not currently supported, so don't spend startup time waiting for it to work -- see keys_darwin.go for more details.
+	if runtime.GOOS != "darwin" {
+		err = backoff.WaitFor(func() error {
+			hwKeys, err := setupHardwareKeys(logger, store)
+			if err != nil {
+				return err
+			}
+			hardwareKeys = hwKeys
+			return nil
+		}, 1*time.Second, 250*time.Millisecond)
 
-	if err != nil {
-		// Use of hardware keys is not fully implemented as of 2023-02-01, so log an error and move on
-		level.Info(logger).Log("msg", "failed to setting up hardware keys", "err", err)
+		if err != nil {
+			// Use of hardware keys is not fully implemented as of 2023-02-01, so log an error and move on
+			level.Info(logger).Log("msg", "failed to setting up hardware keys", "err", err)
+		}
 	}
 
 	return nil
