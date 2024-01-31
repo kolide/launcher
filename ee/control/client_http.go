@@ -150,6 +150,42 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	return reader, nil
 }
 
+// Message sends a message to the server using JSON-RPC format
+func (c *HTTPClient) Message(method string, params interface{}) error {
+	if c.token == "" {
+		return errors.New("token is nil, cannot send message to server")
+	}
+
+	bodyMap := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+	}
+
+	if params == nil {
+		delete(bodyMap, "params")
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return fmt.Errorf("could not marshal message body: %w", err)
+	}
+
+	dataReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("could not create server message: %w", err)
+	}
+
+	dataReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	dataReq.Header.Set("Content-Type", "application/json")
+	dataReq.Header.Set("Accept", "application/json")
+
+	// we don't care about the response here, just want to know
+	// if there was an error sending our request
+	_, err = c.do(dataReq)
+	return err
+}
+
 // TODO: this should probably just return a io.Reader
 func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
 	// We always need to include the API version in the headers
