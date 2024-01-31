@@ -18,13 +18,6 @@ type actionMessage struct {
 	Params interface{} `json:"params"`
 }
 
-func newActionMessage(method string, params interface{}) *actionMessage {
-	return &actionMessage{
-		Method: method,
-		Params: params,
-	}
-}
-
 func (a actionMessage) Perform(m *menu) {
 	runnerServerUrl := os.Getenv("RUNNER_SERVER_URL")
 	if runnerServerUrl == "" {

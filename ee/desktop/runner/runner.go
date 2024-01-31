@@ -151,7 +151,7 @@ func (pr processRecord) String() string {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(k types.Knapsack, messenger runnerserver.Messanger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),

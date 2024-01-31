@@ -24,7 +24,7 @@ type RunnerServer struct {
 	desktopProcAuthTokens           map[string]string
 	mutex                           sync.Mutex
 	controlRequestIntervalOverrider controlRequestIntervalOverrider
-	messenger                       Messanger
+	messenger                       Messenger
 }
 
 const (
@@ -39,13 +39,13 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-type Messanger interface {
+type Messenger interface {
 	Message(method string, params interface{}) error
 }
 
 func New(slogger *slog.Logger,
 	controlRequestIntervalOverrider controlRequestIntervalOverrider,
-	messenger Messanger) (*RunnerServer, error) {
+	messenger Messenger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
