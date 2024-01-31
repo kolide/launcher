@@ -22,6 +22,12 @@ type initialRunner struct {
 }
 
 func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Context, l logger.LogType, results []string, reeenroll bool) error) error {
+	if !i.enabled {
+		i.slogger.Log(context.TODO(), slog.LevelDebug,
+			"initial runner not enabled",
+		)
+		return nil
+	}
 	var config OsqueryConfig
 	if err := json.Unmarshal([]byte(configBlob), &config); err != nil {
 		return fmt.Errorf("unmarshal osquery config blob: %w", err)
@@ -48,9 +54,6 @@ func (i *initialRunner) Execute(configBlob string, writeFn func(ctx context.Cont
 
 	var initialRunResults []OsqueryResultLog
 	for packName, pack := range config.Packs {
-		if !i.enabled { // only execute them when the plugin is enabled.
-			break
-		}
 		for query, queryContent := range pack.Queries {
 			queryName := fmt.Sprintf("pack:%s:%s", packName, query)
 			if _, ok := toRun[queryName]; !ok {

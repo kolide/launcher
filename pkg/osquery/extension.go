@@ -186,7 +186,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		slogger:    k.Slogger().With("component", "initial_runner"),
 		identifier: identifier,
 		store:      k.InitialResultsStore(),
-		enabled:    opts.RunDifferentialQueriesImmediately,
+		enabled:    false, // currently, we don't want to run the initial runner, even if the flag is set
 	}
 
 	return &Extension{
