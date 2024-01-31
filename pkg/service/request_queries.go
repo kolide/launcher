@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	"github.com/osquery/osquery-go/plugin/distributed"
-
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
+	"github.com/kolide/launcher/pkg/traces"
+	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
 type queriesRequest struct {
@@ -131,6 +132,9 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 
 // RequestQueries implements KolideService.RequestQueries
 func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	request := queriesRequest{NodeKey: nodeKey}
@@ -155,7 +159,8 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
 		if err != nil {
-			mw.knapsack.Slogger().Error("failure",
+			mw.knapsack.Slogger().Log(ctx, slog.LevelError,
+				"failure",
 				"method", "RequestQueries",
 				"uuid", uuid,
 				"res", string(resJSON),
