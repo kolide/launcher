@@ -278,6 +278,14 @@ func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscr
 	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
 }
 
+func (cs *ControlService) Message(method string, params interface{}) error {
+	if cs.fetcher == nil {
+		return errors.New("fetcher is nil, cannot send message to server")
+	}
+
+	return cs.fetcher.Message(method, params)
+}
+
 // Updates all registered consumers and subscribers of subsystem updates
 func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 	// First, send to consumer, if any

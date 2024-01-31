@@ -20,7 +20,7 @@ func TestRootServer(t *testing.T) {
 	mockSack := mocks.NewKnapsack(t)
 	mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
 
-	monitorServer, err := New(multislogger.New().Logger, mockSack)
+	monitorServer, err := New(multislogger.New().Logger, mockSack, nil)
 	require.NoError(t, err)
 
 	go func() {

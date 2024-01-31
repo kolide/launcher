@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,11 +24,13 @@ type RunnerServer struct {
 	desktopProcAuthTokens           map[string]string
 	mutex                           sync.Mutex
 	controlRequestIntervalOverrider controlRequestIntervalOverrider
+	messenger                       Messanger
 }
 
 const (
 	HealthCheckEndpoint                = "/health"
 	MenuOpenedEndpoint                 = "/menuopened"
+	MessageEndpoint                    = "/message"
 	controlRequestAccelerationInterval = 5 * time.Second
 	controlRequestAcclerationDuration  = 1 * time.Minute
 )
@@ -36,7 +39,13 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
+type Messanger interface {
+	Message(method string, params interface{}) error
+}
+
+func New(slogger *slog.Logger,
+	controlRequestIntervalOverrider controlRequestIntervalOverrider,
+	messenger Messanger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
@@ -47,6 +56,7 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 		slogger:                         slogger,
 		desktopProcAuthTokens:           make(map[string]string),
 		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
+		messenger:                       messenger,
 	}
 
 	if rs.slogger == nil {
@@ -72,6 +82,8 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 
 		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
+
+	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.message))
 
 	rs.server = &http.Server{
 		Handler: rs.authMiddleware(mux),
@@ -150,4 +162,43 @@ func (ms *RunnerServer) isAuthTokenValid(authToken string) bool {
 	}
 
 	return false
+}
+
+func (ms *RunnerServer) message(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		// TODO: log
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	data := make(map[string]interface{})
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		// TODO: log
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	methodRaw, ok := data["method"]
+	if !ok {
+		// TODO: log
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// check that method is a string
+	method, ok := methodRaw.(string)
+	if !ok {
+		// TODO: log
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := ms.messenger.Message(method, data["params"]); err != nil {
+		// TODO: log
+		// return non 200 here? what is menu bar supposed to do with that?
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
 }
