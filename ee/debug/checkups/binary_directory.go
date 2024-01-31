@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
+
+	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type BinaryDirectory struct {
@@ -68,10 +71,46 @@ func getBinDir() string {
 	case "darwin":
 		return "/usr/local/kolide-k2"
 	case "linux":
+		if allowedcmd.IsNixOS() {
+			return getBinDirOnNixOS()
+		}
 		return "/usr/local/kolide-k2"
 	case "windows":
 		return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
 	}
 
 	return ""
+}
+
+// getBinDirOnNixOS returns the most likely binary directory for NixOS,
+// looking through the nix store to find it.
+func getBinDirOnNixOS() string {
+	// The binary directory on NixOS will look like, e.g.,:
+	// `/nix/store/w8k7h0s9v64gqj60as756gg81c788zkp-kolide-launcher-1.4.4-6-g33c6fd9/bin`
+	matches, err := filepath.Glob("/nix/store/*-kolide-launcher-*/bin")
+	if err != nil || len(matches) == 0 {
+		return ""
+	}
+
+	if len(matches) == 1 {
+		return matches[0]
+	}
+
+	// In this case, launcher has been installed multiple times. We will pick
+	// the most recent installation.
+	mostRecentDir := ""
+	mostRecentDirTimestamp := int64(0)
+	for _, m := range matches {
+		dirInfo, err := os.Stat(m)
+		if err != nil {
+			continue
+		}
+
+		if dirInfo.ModTime().Unix() > mostRecentDirTimestamp {
+			mostRecentDir = m
+			mostRecentDirTimestamp = dirInfo.ModTime().Unix()
+		}
+	}
+
+	return mostRecentDir
 }
