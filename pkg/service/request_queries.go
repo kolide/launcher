@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -158,7 +159,8 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
 		if err != nil {
-			mw.knapsack.Slogger().Error("failure",
+			mw.knapsack.Slogger().Log(ctx, slog.LevelError,
+				"failure",
 				"method", "RequestQueries",
 				"uuid", uuid,
 				"res", string(resJSON),
