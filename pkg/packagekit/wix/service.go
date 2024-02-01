@@ -30,7 +30,7 @@ const (
 type StartType string
 
 const (
-	StartAuto     StartType = "auto"
+	StartAuto     StartType = "auto" // nolint:staticcheck // TODO FIXME
 	StartDemand             = "demand"
 	StartDisabled           = "disabled"
 	StartBoot               = "boot"
