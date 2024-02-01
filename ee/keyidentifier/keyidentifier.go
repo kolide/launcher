@@ -136,7 +136,7 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 
 	case "PRIVATE KEY":
 		// RFC5208 - https://tools.ietf.org/html/rfc5208
-		ki.Encrypted = boolPtr(x509.IsEncryptedPEMBlock(block))
+		ki.Encrypted = boolPtr(x509.IsEncryptedPEMBlock(block)) // nolint:staticcheck
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 			switch assertedKey := key.(type) {
 			case *rsa.PrivateKey:
