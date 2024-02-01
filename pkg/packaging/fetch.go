@@ -158,7 +158,7 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (s
 	}
 
 	// Set up our remote store i.e. tuf.kolide.com
-	remoteStore, err := client.HTTPRemoteStore("http://tuf.kolide.com", &client.HTTPRemoteOptions{
+	remoteStore, err := client.HTTPRemoteStore("https://tuf.kolide.com", &client.HTTPRemoteOptions{
 		MetadataPath: "/repository",
 	}, http.DefaultClient)
 	if err != nil {
