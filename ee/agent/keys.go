@@ -3,6 +3,7 @@ package agent
 import (
 	"crypto"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -37,6 +38,11 @@ func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 	localDbKeys, err = keys.SetupLocalDbKey(logger, store)
 	if err != nil {
 		return fmt.Errorf("setting up local db keys: %w", err)
+	}
+
+	// Secure Enclave is not currently supported, so don't spend startup time waiting for it to work -- see keys_darwin.go for more details.
+	if runtime.GOOS == "darwin" {
+		return nil
 	}
 
 	err = backoff.WaitFor(func() error {

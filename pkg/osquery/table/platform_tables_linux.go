@@ -58,6 +58,7 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 		dataflattentable.NewExecAndParseTable(logger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, allowedcmd.Pacman, []string{"-Qu"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, allowedcmd.Rpm, []string{"-qai"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.TablePluginExec(logger, "kolide_nftables", dataflattentable.JsonType, allowedcmd.Nftables, []string{"-jat", "list", "ruleset"}), // -j (json) -a (show object handles) -t (terse, omit set contents)
 		zfs.ZfsPropertiesPlugin(logger),
 		zfs.ZpoolPropertiesPlugin(logger),
 	}

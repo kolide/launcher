@@ -941,6 +941,9 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 	if isNodeInvalidErr(err) {
@@ -985,6 +988,9 @@ func (e *Extension) WriteResults(ctx context.Context, results []distributed.Resu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if isNodeInvalidErr(err) {
 		invalid = true
