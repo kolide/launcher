@@ -204,6 +204,7 @@ func (ms *RunnerServer) sendMessage(w http.ResponseWriter, r *http.Request) {
 			"error sending message",
 			"err", err,
 		)
+
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
