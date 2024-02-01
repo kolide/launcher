@@ -7,28 +7,24 @@ linters:
   enable:
     - bodyclose
     - containedctx
-    - unused
+    - forbidigo
     - gofmt
     - govet
+    - ineffassign
     - misspell
     - nakedret
-    - sqlclosecheck
-    - unconvert
     - paralleltest
-    - forbidigo
-    - sloglint
     - revive
+    - sloglint
+    - sqlclosecheck
+    - staticcheck
+    - unconvert
+    - unused
   disable:
     - errcheck
     - gosec
     - gosimple
-    - ineffassign
-    - interfacer
-    - maligned
     - noctx
-    - staticcheck
-    - structcheck
-    - varcheck
 
 linters-settings:
   errcheck:
@@ -67,6 +63,8 @@ linters-settings:
         disabled: false
       - name: confusing-naming
         disabled: false
+  staticcheck:
+    checks: ["all"]
 
 issues:
   exclude-rules:
