@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
@@ -46,12 +44,6 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			tufci.CopyBinary(t, tooRecentPath)
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
-			// Ensure we actually use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
 			// Check it
 			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
@@ -79,39 +71,11 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not make test binary")
 
-			// Ensure we actually use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
 			// Check it
 			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
-		})
-	}
-}
-
-func TestCheckOutLatest_NotAvailableWhenNewAutoupdaterNotEnabled(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			rootDir := t.TempDir()
-
-			// Ensure we do not use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
-			_, err = CheckOutLatest(context.TODO(), binary, rootDir, "", "stable", log.NewNopLogger())
-			require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
 		})
 	}
 }
@@ -229,37 +193,6 @@ func Test_mostRecentVersion_acceptsLauncher_v1_4_1(t *testing.T) {
 	latest, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
 	require.NoError(t, err, "should be able to select launcher version equal to v1.4.1")
 	require.Equal(t, firstVersionPath, latest.Path)
-}
-
-func Test_usingNewAutoupdater_DatabaseNotExist(t *testing.T) {
-	t.Parallel()
-
-	require.Equal(t, false, usingNewAutoupdater(context.TODO(), t.TempDir()))
-}
-
-func Test_usingNewAutoupdater_FlagNotSet(t *testing.T) {
-	t.Parallel()
-
-	tempRootDir := t.TempDir()
-
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, store.Close(), "closing test db")
-
-	require.Equal(t, false, usingNewAutoupdater(context.TODO(), tempRootDir))
-}
-
-func Test_usingNewAutoupdater_FlagSet(t *testing.T) {
-	t.Parallel()
-
-	tempRootDir := t.TempDir()
-
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-	require.NoError(t, store.Close(), "closing test db")
-
-	require.Equal(t, true, usingNewAutoupdater(context.TODO(), tempRootDir))
 }
 
 func Test_getAutoupdateConfig_ConfigFlagSet(t *testing.T) {

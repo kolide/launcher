@@ -375,13 +375,6 @@ func (k *knapsack) Autoupdate() bool {
 	return k.flags.Autoupdate()
 }
 
-func (k *knapsack) SetNotaryServerURL(url string) error {
-	return k.flags.SetNotaryServerURL(url)
-}
-func (k *knapsack) NotaryServerURL() string {
-	return k.flags.NotaryServerURL()
-}
-
 func (k *knapsack) SetTufServerURL(url string) error {
 	return k.flags.SetTufServerURL(url)
 }
@@ -410,13 +403,6 @@ func (k *knapsack) UpdateChannel() string {
 	return k.flags.UpdateChannel()
 }
 
-func (k *knapsack) SetNotaryPrefix(prefix string) error {
-	return k.flags.SetNotaryPrefix(prefix)
-}
-func (k *knapsack) NotaryPrefix() string {
-	return k.flags.NotaryPrefix()
-}
-
 func (k *knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return k.flags.SetAutoupdateInitialDelay(delay)
 }
@@ -429,13 +415,6 @@ func (k *knapsack) SetUpdateDirectory(directory string) error {
 }
 func (k *knapsack) UpdateDirectory() string {
 	return k.flags.UpdateDirectory()
-}
-
-func (k *knapsack) SetUseTUFAutoupdater(enabled bool) error {
-	return k.flags.SetUseTUFAutoupdater(enabled)
-}
-func (k *knapsack) UseTUFAutoupdater() bool {
-	return k.flags.UseTUFAutoupdater()
 }
 
 func (k *knapsack) SetExportTraces(enabled bool) error {

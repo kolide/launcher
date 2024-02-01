@@ -1,7 +1,7 @@
+// Package tuf provides an autoupdater that uses our new TUF infrastructure,
+// replacing the previous Notary-based implementation. It allows launcher to
+// download new launcher and osqueryd binaries.
 package tuf
-
-// This new autoupdater points to our new TUF infrastructure, and will eventually supersede
-// the legacy `Updater` in pkg/autoupdate that points to Notary.
 
 import (
 	"context"
@@ -334,12 +334,6 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	// If an update failed, save the error
 	if len(updateErrors) > 0 {
 		return fmt.Errorf("could not download updates: %+v", updateErrors)
-	}
-
-	// Only perform restarts if we're configured to use this new autoupdate library,
-	// to prevent performing unnecessary restarts.
-	if !ta.knapsack.UseTUFAutoupdater() {
-		return nil
 	}
 
 	// If launcher was updated, we want to exit and reload

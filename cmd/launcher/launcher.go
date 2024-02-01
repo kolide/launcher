@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -20,11 +19,9 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
-	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -43,7 +40,6 @@ import (
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
@@ -245,18 +241,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 	defer s.Close()
 
-	// construct the appropriate http client based on security settings
-	httpClient := http.DefaultClient
-	if k.InsecureTLS() {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
@@ -326,7 +310,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client)
+	extension, runnerRestart, _, err := createExtensionRuntime(ctx, k, client)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
@@ -454,9 +438,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
-	// If autoupdating is enabled, run the new autoupdater
+	// If autoupdating is enabled, run the autoupdater
 	if k.Autoupdate() {
-		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 30 * time.Second
 		mirrorClient := http.DefaultClient
@@ -474,65 +457,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
-	}
-
-	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
-	// is not yet in use.
-	if k.Autoupdate() && !k.UseTUFAutoupdater() {
-		osqueryUpdaterconfig := &updater.UpdaterConfig{
-			Logger:             logger,
-			RootDirectory:      rootDirectory,
-			AutoupdateInterval: k.AutoupdateInterval(),
-			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
-			NotaryURL:          k.NotaryServerURL(),
-			MirrorURL:          k.MirrorServerURL(),
-			NotaryPrefix:       k.NotaryPrefix(),
-			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
-			SigChannel:         sigChannel,
-		}
-
-		// create an updater for osquery
-		osqueryLegacyUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
-		if err != nil {
-			return fmt.Errorf("create osquery updater: %w", err)
-		}
-		runGroup.Add("osqueryLegacyAutoupdater", osqueryLegacyUpdater.Execute, osqueryLegacyUpdater.Interrupt)
-
-		launcherUpdaterconfig := &updater.UpdaterConfig{
-			Logger:             logger,
-			RootDirectory:      rootDirectory,
-			AutoupdateInterval: k.AutoupdateInterval(),
-			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
-			NotaryURL:          k.NotaryServerURL(),
-			MirrorURL:          k.MirrorServerURL(),
-			NotaryPrefix:       k.NotaryPrefix(),
-			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay(),
-			SigChannel:         sigChannel,
-		}
-
-		// create an updater for launcher
-		launcherPath, err := os.Executable()
-		if err != nil {
-			logutil.Fatal(logger, "err", err)
-		}
-		launcherLegacyUpdater, err := updater.NewUpdater(
-			ctx,
-			launcherPath,
-			updater.UpdateFinalizer(logger, func() error {
-				// stop desktop on auto updates
-				if runner != nil {
-					runner.Interrupt(nil)
-				}
-				return runnerShutdown()
-			}),
-			launcherUpdaterconfig,
-		)
-		if err != nil {
-			return fmt.Errorf("create launcher updater: %w", err)
-		}
-		runGroup.Add("launcherLegacyAutoupdater", launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
 	}
 
 	startupSpan.End()

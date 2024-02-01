@@ -77,18 +77,18 @@ type Options struct {
 
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
-	// NotaryServerURL is the URL for the Notary server.
+	// NotaryServerURL is the URL for the deprecated Notary server.
 	NotaryServerURL string
 	// TufServerURL is the URL for the tuf server.
 	TufServerURL string
-	// MirrorServerURL is the URL for the Notary mirror.
+	// MirrorServerURL is the URL for the TUF mirror.
 	MirrorServerURL string
 	// AutoupdateInterval is the interval at which Launcher will check for
 	// updates.
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 	UpdateChannel autoupdate.UpdateChannel
-	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
+	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the deprecated Notary server
 	NotaryPrefix string
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
@@ -247,12 +247,10 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
-		flNotaryServerURL        = flagset.String("notary_url", autoupdate.DefaultNotary, "The Notary update server (default: https://notary.kolide.co)")
 		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
 		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
 		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
 		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
-		flNotaryPrefix           = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "The prefix for Notary path that contains the collections (default: kolide/)")
 		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 		flUpdateDirectory        = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
 
@@ -271,6 +269,8 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.Bool("control", false, "DEPRECATED")
 		_ = flagset.String("control_hostname", "", "DEPRECATED")
 		_ = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
+		_ = flagset.String("notary_url", "", "The deprecated Notary update server")
+		_ = flagset.String("notary_prefix", "", "The prefix for Notary path that contains the collections")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -406,8 +406,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		LogMaxBytesPerBatch:                *flLogMaxBytesPerBatch,
 		LoggingInterval:                    *flLoggingInterval,
 		MirrorServerURL:                    *flMirrorURL,
-		NotaryPrefix:                       *flNotaryPrefix,
-		NotaryServerURL:                    *flNotaryServerURL,
 		TufServerURL:                       *flTufServerURL,
 		OsqueryFlags:                       flOsqueryFlags,
 		OsqueryTlsConfigEndpoint:           *flOsqTlsConfig,
@@ -511,11 +509,9 @@ func developerUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("logging_interval")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("notary_url")
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
 	printOpt("update_channel")
-	printOpt("notary_prefix")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
 	fmt.Fprintf(os.Stderr, "\n")

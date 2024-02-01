@@ -153,15 +153,11 @@ type Flags interface {
 	SetAutoupdate(enabled bool) error
 	Autoupdate() bool
 
-	// NotaryServerURL is the URL for the Notary server.
-	SetNotaryServerURL(url string) error
-	NotaryServerURL() string
-
 	// TufServerURL is the URL for the tuf server.
 	SetTufServerURL(url string) error
 	TufServerURL() string
 
-	// MirrorServerURL is the URL for the Notary mirror.
+	// MirrorServerURL is the URL for the TUF mirror.
 	SetMirrorServerURL(url string) error
 	MirrorServerURL() string
 
@@ -173,10 +169,6 @@ type Flags interface {
 	SetUpdateChannel(channel string) error
 	UpdateChannel() string
 
-	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
-	SetNotaryPrefix(prefix string) error
-	NotaryPrefix() string
-
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	SetAutoupdateInitialDelay(delay time.Duration) error
 	AutoupdateInitialDelay() time.Duration
@@ -184,10 +176,6 @@ type Flags interface {
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
-
-	// UseTUFAutoupdater controls whether launcher uses the new TUF autoupdater instead of the legacy autoupdater
-	SetUseTUFAutoupdater(enabled bool) error
-	UseTUFAutoupdater() bool
 
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error

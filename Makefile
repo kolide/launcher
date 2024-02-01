@@ -220,14 +220,13 @@ package-builder-windows: .pre-build deps
 	go run cmd/make/make.go -targets=package-builder -linkstamp --os windows
 
 deps-go:
-	go run cmd/make/make.go -targets=deps-go,install-tools
+	go run cmd/make/make.go -targets=deps-go
 
 deps: deps-go generate
 
 .PHONY: generate
 generate: deps-go
 	go generate ./pkg/packagekit/... ./pkg/packaging/... ./ee/tables/... ./pkg/augeas/...
-	go run cmd/make/make.go -targets=generate-tuf
 
 .PHONY: proto
 proto:
