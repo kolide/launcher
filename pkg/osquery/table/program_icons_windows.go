@@ -55,10 +55,10 @@ func generateUninstallerProgramIcons() []map[string]string {
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
 			key, err := registry.OpenKey(key, path, registry.READ)
-			defer key.Close()
 			if err != nil {
 				continue
 			}
+			defer key.Close()
 
 			iconPath, _, err := key.GetStringValue("DisplayIcon")
 			icon, err := parseIcoFile(iconPath)
@@ -93,10 +93,10 @@ func generateInstallersProgramIcons() []map[string]string {
 	for key, paths := range productRegPaths {
 		for _, path := range paths {
 			key, err := registry.OpenKey(key, path, registry.READ)
-			defer key.Close()
 			if err != nil {
 				continue
 			}
+			defer key.Close()
 
 			iconPath, _, err := key.GetStringValue("ProductIcon")
 			icon, err := parseIcoFile(iconPath)
