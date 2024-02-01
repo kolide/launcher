@@ -31,9 +31,9 @@ func openHandle(host, source string) (h windows.Handle, err error) {
 	}
 	var s *uint16
 	if host != "" {
-		s = syscall.StringToUTF16Ptr(host)
+		s = syscall.UTF16PtrFromString(host)
 	}
-	h, err = windows.RegisterEventSource(s, syscall.StringToUTF16Ptr(source))
+	h, err = windows.RegisterEventSource(s, syscall.UTF16PtrFromString(source))
 	return h, err
 }
 
@@ -46,7 +46,7 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) Write(p []byte) (n int, err error) {
-	ss := []*uint16{syscall.StringToUTF16Ptr(string(p))}
+	ss := []*uint16{syscall.UTF16PtrFromString(string(p))}
 	// always report as Info. Launcher logs as either info or debug, but the event log does not
 	// appear to have a debug level.
 	err = windows.ReportEvent(w.handle, windows.EVENTLOG_INFORMATION_TYPE, 0, 1, 0, 1, 0, &ss[0], nil)
