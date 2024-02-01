@@ -78,7 +78,6 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
-	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -153,80 +152,6 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
-func TestExecute_launcherUpdate_noRestartIfUsingLegacyAutoupdater(t *testing.T) {
-	t.Parallel()
-
-	testRootDir := t.TempDir()
-	testReleaseVersion := "1.2.3"
-	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("UpdateChannel").Return("stable")
-	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
-	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
-	mockKnapsack.On("UpdateDirectory").Return("")
-	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("UseTUFAutoupdater").Return(false)
-	mockQuerier := newMockQuerier(t)
-
-	// Set logger so that we can capture output
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	mockKnapsack.On("Slogger").Return(slogger.Logger)
-
-	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
-	require.NoError(t, err, "could not initialize new TUF autoupdater")
-
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
-	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
-	require.NoError(t, err, "could not get test metadata for osqueryd")
-	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
-	require.NoError(t, err, "could not get test metadata for launcher")
-
-	// Expect that we attempt to tidy the library first before running execute loop
-	mockLibraryManager := NewMocklibrarian(t)
-	autoupdater.libraryManager = mockLibraryManager
-	currentLauncherVersion := "" // cannot determine using version package in test
-	currentOsqueryVersion := "1.1.1"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
-	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
-
-	// Expect that we attempt to update the library
-	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion)).Return(false)
-	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, currentOsqueryVersion, fmt.Sprintf("osqueryd-%s.tar.gz", testReleaseVersion), osquerydMetadata).Return(nil)
-	mockLibraryManager.On("AddToLibrary", binaryLauncher, currentLauncherVersion, fmt.Sprintf("launcher-%s.tar.gz", testReleaseVersion), launcherMetadata).Return(nil)
-
-	// Let the autoupdater run for a bit -- it will shut itself down after a launcher update
-	go autoupdater.Execute()
-	time.Sleep(500 * time.Millisecond)
-
-	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
-	mockLibraryManager.AssertExpectations(t)
-
-	// Check log lines to confirm that we DO NOT see the log `received interrupt to restart launcher after update, stopping`
-	logLines := strings.Split(strings.TrimSpace(logBytes.String()), "\n")
-	for _, line := range logLines {
-		require.NotContains(t, line, "received interrupt to restart launcher after update, stopping")
-	}
-
-	// The autoupdater won't stop on its own, so stop it
-	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
-
-	// Confirm we pulled all config items as expected
-	mockKnapsack.AssertExpectations(t)
-}
-
 func TestExecute_osquerydUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -243,7 +168,6 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -318,7 +242,6 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -404,7 +327,6 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -470,7 +392,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
-	mockKnapsack.On("UseTUFAutoupdater").Return(true).Maybe()
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater

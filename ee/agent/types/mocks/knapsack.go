@@ -1370,20 +1370,6 @@ func (_m *Knapsack) SetUpdateDirectory(directory string) error {
 	return r0
 }
 
-// SetUseTUFAutoupdater provides a mock function with given fields: enabled
-func (_m *Knapsack) SetUseTUFAutoupdater(enabled bool) error {
-	ret := _m.Called(enabled)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enabled)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetWatchdogDelaySec provides a mock function with given fields: sec
 func (_m *Knapsack) SetWatchdogDelaySec(sec int) error {
 	ret := _m.Called(sec)
@@ -1613,20 +1599,6 @@ func (_m *Knapsack) UpdateDirectory() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// UseTUFAutoupdater provides a mock function with given fields:
-func (_m *Knapsack) UseTUFAutoupdater() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
