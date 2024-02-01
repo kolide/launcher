@@ -2,13 +2,11 @@ package knapsack
 
 import (
 	"context"
-	"time"
 
 	"log/slog"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
@@ -17,11 +15,15 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
+type flags types.Flags
+
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 type knapsack struct {
 	stores map[storage.Store]types.KVStore
-	flags  types.Flags
+	// Embed flags so we get all the flag interfaces
+	flags
 
 	// BboltDB is the underlying bbolt database.
 	// Ideally, we can eventually remove this. This is only here because some parts of the codebase
@@ -78,7 +80,6 @@ func (k *knapsack) BboltDB() *bbolt.DB {
 }
 
 // Stores interface methods
-
 func (k *knapsack) Stores() map[storage.Store]types.KVStore {
 	return k.stores
 }
@@ -145,43 +146,6 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	return store
 }
 
-// Flags interface methods
-
-func (k *knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
-	k.flags.RegisterChangeObserver(observer, flagKeys...)
-}
-
-func (k *knapsack) AutoloadedExtensions() []string {
-	return k.flags.AutoloadedExtensions()
-}
-
-func (k *knapsack) SetKolideServerURL(url string) error {
-	return k.flags.SetKolideServerURL(url)
-}
-func (k *knapsack) KolideServerURL() string {
-	return k.flags.KolideServerURL()
-}
-
-func (k *knapsack) KolideHosted() bool {
-	return k.flags.KolideHosted()
-}
-
-func (k *knapsack) EnrollSecret() string {
-	return k.flags.EnrollSecret()
-}
-
-func (k *knapsack) EnrollSecretPath() string {
-	return k.flags.EnrollSecretPath()
-}
-
-func (k *knapsack) RootDirectory() string {
-	return k.flags.RootDirectory()
-}
-
-func (k *knapsack) OsquerydPath() string {
-	return k.flags.OsquerydPath()
-}
-
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
 	if err != nil {
@@ -189,327 +153,4 @@ func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	}
 
 	return latestBin.Path
-}
-
-func (k *knapsack) CertPins() [][]byte {
-	return k.flags.CertPins()
-}
-
-func (k *knapsack) RootPEM() string {
-	return k.flags.RootPEM()
-}
-
-func (k *knapsack) SetLoggingInterval(interval time.Duration) error {
-	return k.flags.SetLoggingInterval(interval)
-}
-func (k *knapsack) LoggingInterval() time.Duration {
-	return k.flags.LoggingInterval()
-}
-
-func (k *knapsack) EnableInitialRunner() bool {
-	return k.flags.EnableInitialRunner()
-}
-
-func (k *knapsack) Transport() string {
-	return k.flags.Transport()
-}
-
-func (k *knapsack) LogMaxBytesPerBatch() int {
-	return k.flags.LogMaxBytesPerBatch()
-}
-
-func (k *knapsack) SetDesktopEnabled(enabled bool) error {
-	return k.flags.SetDesktopEnabled(enabled)
-}
-func (k *knapsack) DesktopEnabled() bool {
-	return k.flags.DesktopEnabled()
-}
-
-func (k *knapsack) SetDesktopUpdateInterval(interval time.Duration) error {
-	return k.flags.SetDesktopUpdateInterval(interval)
-}
-func (k *knapsack) DesktopUpdateInterval() time.Duration {
-	return k.flags.DesktopUpdateInterval()
-}
-
-func (k *knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error {
-	return k.flags.SetDesktopMenuRefreshInterval(interval)
-}
-func (k *knapsack) DesktopMenuRefreshInterval() time.Duration {
-	return k.flags.DesktopMenuRefreshInterval()
-}
-
-func (k *knapsack) SetDebugServerData(debug bool) error {
-	return k.flags.SetDebugServerData(debug)
-}
-func (k *knapsack) DebugServerData() bool {
-	return k.flags.DebugServerData()
-}
-
-func (k *knapsack) SetForceControlSubsystems(force bool) error {
-	return k.flags.SetForceControlSubsystems(force)
-}
-func (k *knapsack) ForceControlSubsystems() bool {
-	return k.flags.ForceControlSubsystems()
-}
-
-func (k *knapsack) SetControlServerURL(url string) error {
-	return k.flags.SetControlServerURL(url)
-}
-func (k *knapsack) ControlServerURL() string {
-	return k.flags.ControlServerURL()
-}
-
-func (k *knapsack) SetControlRequestInterval(interval time.Duration) error {
-	return k.flags.SetControlRequestInterval(interval)
-}
-func (k *knapsack) SetControlRequestIntervalOverride(interval, duration time.Duration) {
-	k.flags.SetControlRequestIntervalOverride(interval, duration)
-}
-func (k *knapsack) ControlRequestInterval() time.Duration {
-	return k.flags.ControlRequestInterval()
-}
-
-func (k *knapsack) SetDisableControlTLS(disabled bool) error {
-	return k.flags.SetDisableControlTLS(disabled)
-}
-func (k *knapsack) DisableControlTLS() bool {
-	return k.flags.DisableControlTLS()
-}
-
-func (k *knapsack) SetInsecureControlTLS(disabled bool) error {
-	return k.flags.SetInsecureControlTLS(disabled)
-}
-func (k *knapsack) InsecureControlTLS() bool {
-	return k.flags.InsecureControlTLS()
-}
-
-func (k *knapsack) SetInsecureTLS(insecure bool) error {
-	return k.flags.SetInsecureTLS(insecure)
-}
-func (k *knapsack) InsecureTLS() bool {
-	return k.flags.InsecureTLS()
-}
-
-func (k *knapsack) SetInsecureTransportTLS(insecure bool) error {
-	return k.flags.SetInsecureTransportTLS(insecure)
-}
-func (k *knapsack) InsecureTransportTLS() bool {
-	return k.flags.InsecureTransportTLS()
-}
-
-func (k *knapsack) IAmBreakingEELicense() bool {
-	return k.flags.IAmBreakingEELicense()
-}
-
-func (k *knapsack) SetDebug(debug bool) error {
-	return k.flags.SetDebug(debug)
-}
-func (k *knapsack) Debug() bool {
-	return k.flags.Debug()
-}
-
-func (k *knapsack) DebugLogFile() string {
-	return k.flags.DebugLogFile()
-}
-
-func (k *knapsack) SetOsqueryVerbose(verbose bool) error {
-	return k.flags.SetOsqueryVerbose(verbose)
-}
-func (k *knapsack) OsqueryVerbose() bool {
-	return k.flags.OsqueryVerbose()
-}
-
-func (k *knapsack) SetWatchdogEnabled(enable bool) error {
-	return k.flags.SetWatchdogEnabled(enable)
-}
-func (k *knapsack) WatchdogEnabled() bool {
-	return k.flags.WatchdogEnabled()
-}
-
-func (k *knapsack) SetWatchdogDelaySec(sec int) error {
-	return k.flags.SetWatchdogDelaySec(sec)
-}
-func (k *knapsack) WatchdogDelaySec() int {
-	return k.flags.WatchdogDelaySec()
-}
-
-func (k *knapsack) SetWatchdogMemoryLimitMB(limit int) error {
-	return k.flags.SetWatchdogMemoryLimitMB(limit)
-}
-func (k *knapsack) WatchdogMemoryLimitMB() int {
-	return k.flags.WatchdogMemoryLimitMB()
-}
-
-func (k *knapsack) SetWatchdogUtilizationLimitPercent(limit int) error {
-	return k.flags.SetWatchdogUtilizationLimitPercent(limit)
-}
-func (k *knapsack) WatchdogUtilizationLimitPercent() int {
-	return k.flags.WatchdogUtilizationLimitPercent()
-}
-
-func (k *knapsack) OsqueryFlags() []string {
-	return k.flags.OsqueryFlags()
-}
-
-func (k *knapsack) OsqueryTlsConfigEndpoint() string {
-	return k.flags.OsqueryTlsConfigEndpoint()
-}
-func (k *knapsack) OsqueryTlsEnrollEndpoint() string {
-	return k.flags.OsqueryTlsEnrollEndpoint()
-}
-func (k *knapsack) OsqueryTlsLoggerEndpoint() string {
-	return k.flags.OsqueryTlsLoggerEndpoint()
-}
-func (k *knapsack) OsqueryTlsDistributedReadEndpoint() string {
-	return k.flags.OsqueryTlsDistributedReadEndpoint()
-}
-func (k *knapsack) OsqueryTlsDistributedWriteEndpoint() string {
-	return k.flags.OsqueryTlsDistributedWriteEndpoint()
-}
-
-func (k *knapsack) SetAutoupdate(enabled bool) error {
-	return k.flags.SetAutoupdate(enabled)
-}
-func (k *knapsack) Autoupdate() bool {
-	return k.flags.Autoupdate()
-}
-
-func (k *knapsack) SetNotaryServerURL(url string) error {
-	return k.flags.SetNotaryServerURL(url)
-}
-func (k *knapsack) NotaryServerURL() string {
-	return k.flags.NotaryServerURL()
-}
-
-func (k *knapsack) SetTufServerURL(url string) error {
-	return k.flags.SetTufServerURL(url)
-}
-func (k *knapsack) TufServerURL() string {
-	return k.flags.TufServerURL()
-}
-
-func (k *knapsack) SetMirrorServerURL(url string) error {
-	return k.flags.SetMirrorServerURL(url)
-}
-func (k *knapsack) MirrorServerURL() string {
-	return k.flags.MirrorServerURL()
-}
-
-func (k *knapsack) SetAutoupdateInterval(interval time.Duration) error {
-	return k.flags.SetAutoupdateInterval(interval)
-}
-func (k *knapsack) AutoupdateInterval() time.Duration {
-	return k.flags.AutoupdateInterval()
-}
-
-func (k *knapsack) SetUpdateChannel(channel string) error {
-	return k.flags.SetUpdateChannel(channel)
-}
-func (k *knapsack) UpdateChannel() string {
-	return k.flags.UpdateChannel()
-}
-
-func (k *knapsack) SetNotaryPrefix(prefix string) error {
-	return k.flags.SetNotaryPrefix(prefix)
-}
-func (k *knapsack) NotaryPrefix() string {
-	return k.flags.NotaryPrefix()
-}
-
-func (k *knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
-	return k.flags.SetAutoupdateInitialDelay(delay)
-}
-func (k *knapsack) AutoupdateInitialDelay() time.Duration {
-	return k.flags.AutoupdateInitialDelay()
-}
-
-func (k *knapsack) SetUpdateDirectory(directory string) error {
-	return k.flags.SetUpdateDirectory(directory)
-}
-func (k *knapsack) UpdateDirectory() string {
-	return k.flags.UpdateDirectory()
-}
-
-func (k *knapsack) SetUseTUFAutoupdater(enabled bool) error {
-	return k.flags.SetUseTUFAutoupdater(enabled)
-}
-func (k *knapsack) UseTUFAutoupdater() bool {
-	return k.flags.UseTUFAutoupdater()
-}
-
-func (k *knapsack) SetExportTraces(enabled bool) error {
-	return k.flags.SetExportTraces(enabled)
-}
-func (k *knapsack) SetExportTracesOverride(value bool, duration time.Duration) {
-	k.flags.SetExportTracesOverride(value, duration)
-}
-func (k *knapsack) ExportTraces() bool {
-	return k.flags.ExportTraces()
-}
-
-func (k *knapsack) SetTraceSamplingRate(rate float64) error {
-	return k.flags.SetTraceSamplingRate(rate)
-}
-func (k *knapsack) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
-	k.flags.SetTraceSamplingRateOverride(value, duration)
-}
-func (k *knapsack) TraceSamplingRate() float64 {
-	return k.flags.TraceSamplingRate()
-}
-
-func (k *knapsack) SetTraceIngestServerURL(url string) error {
-	return k.flags.SetTraceIngestServerURL(url)
-}
-func (k *knapsack) TraceIngestServerURL() string {
-	return k.flags.TraceIngestServerURL()
-}
-
-func (k *knapsack) SetDisableTraceIngestTLS(enabled bool) error {
-	return k.flags.SetDisableTraceIngestTLS(enabled)
-}
-func (k *knapsack) DisableTraceIngestTLS() bool {
-	return k.flags.DisableTraceIngestTLS()
-}
-
-func (k *knapsack) SetTraceBatchTimeout(duration time.Duration) error {
-	return k.flags.SetTraceBatchTimeout(duration)
-}
-func (k *knapsack) TraceBatchTimeout() time.Duration {
-	return k.flags.TraceBatchTimeout()
-}
-
-func (k *knapsack) SetLogIngestServerURL(url string) error {
-	return k.flags.SetLogIngestServerURL(url)
-}
-func (k *knapsack) LogIngestServerURL() string {
-	return k.flags.LogIngestServerURL()
-}
-
-func (k *knapsack) SetLogShippingLevel(level string) error {
-	return k.flags.SetLogShippingLevel(level)
-}
-func (k *knapsack) SetLogShippingLevelOverride(value string, duration time.Duration) {
-	k.flags.SetLogShippingLevelOverride(value, duration)
-}
-func (k *knapsack) LogShippingLevel() string {
-	return k.flags.LogShippingLevel()
-}
-
-func (k *knapsack) SetInModernStandby(enabled bool) error {
-	return k.flags.SetInModernStandby(enabled)
-}
-func (k *knapsack) InModernStandby() bool {
-	return k.flags.InModernStandby()
-}
-
-func (k *knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
-	return k.flags.SetOsqueryHealthcheckStartupDelay(delay)
-}
-func (k *knapsack) OsqueryHealthcheckStartupDelay() time.Duration {
-	return k.flags.OsqueryHealthcheckStartupDelay()
-}
-
-func (k *knapsack) LocalDevelopmentPath() string {
-	return k.flags.LocalDevelopmentPath()
 }
