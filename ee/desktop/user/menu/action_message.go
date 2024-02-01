@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -59,7 +60,7 @@ func (a actionMessage) Perform(m *menu) {
 		return
 	}
 
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusOK {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform message action",
 			"method", a.Method,
