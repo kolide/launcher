@@ -61,6 +61,9 @@ func generateUninstallerProgramIcons() []map[string]string {
 			defer key.Close()
 
 			iconPath, _, err := key.GetStringValue("DisplayIcon")
+			if err != nil {
+				continue
+			}
 			icon, err := parseIcoFile(iconPath)
 			if err != nil {
 				continue
@@ -99,6 +102,9 @@ func generateInstallersProgramIcons() []map[string]string {
 			defer key.Close()
 
 			iconPath, _, err := key.GetStringValue("ProductIcon")
+			if err != nil {
+				continue
+			}
 			icon, err := parseIcoFile(iconPath)
 			if err != nil {
 				continue
@@ -126,6 +132,9 @@ func generateInstallersProgramIcons() []map[string]string {
 func parseIcoFile(fullPath string) (icon, error) {
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
+	if err != nil {
+		return programIcon, err
+	}
 	icoReader, err := os.Open(expandedPath)
 	if err != nil {
 		return programIcon, err
