@@ -9,10 +9,10 @@ import (
 type actionType string
 
 const (
-	DoNothing actionType = "" // Omitted action implies do nothing
-	OpenURL   actionType = "open-url"
-	Flare     actionType = "flare"
-	Message   actionType = "message"
+	DoNothing      actionType = "" // Omitted action implies do nothing
+	OpenURL        actionType = "open-url"
+	Flare          actionType = "flare"
+	MessageControl actionType = "message"
 )
 
 // Action encapsulates what action should be performed when a menu item is invoked
@@ -52,7 +52,7 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 		a.Performer = openURL
 	case Flare:
 		a.Performer = actionFlare{}
-	case Message:
+	case MessageControl:
 		message := actionMessage{}
 		if err := json.Unmarshal(a.Action, &message); err != nil {
 			return fmt.Errorf("failed to unmarshal ActionMessage: %w", err)

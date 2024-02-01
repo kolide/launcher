@@ -40,7 +40,7 @@ type controlRequestIntervalOverrider interface {
 }
 
 type Messenger interface {
-	Message(method string, params interface{}) error
+	SendMessage(method string, params interface{}) error
 }
 
 func New(slogger *slog.Logger,
@@ -83,7 +83,7 @@ func New(slogger *slog.Logger,
 		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
 
-	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.message))
+	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))
 
 	rs.server = &http.Server{
 		Handler: rs.authMiddleware(mux),
@@ -164,39 +164,48 @@ func (ms *RunnerServer) isAuthTokenValid(authToken string) bool {
 	return false
 }
 
-func (ms *RunnerServer) message(w http.ResponseWriter, r *http.Request) {
+func (ms *RunnerServer) sendMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Body == nil {
-		// TODO: log
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"no request body",
+		)
+
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
-	data := make(map[string]interface{})
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		// TODO: log
+	message := struct {
+		Method string      `json:"method"`
+		Params interface{} `json:"params"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"could not decode request body",
+			"err", err,
+		)
+
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	methodRaw, ok := data["method"]
-	if !ok {
-		// TODO: log
+	if message.Method == "" {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"does not include method property",
+		)
+
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	// check that method is a string
-	method, ok := methodRaw.(string)
-	if !ok {
-		// TODO: log
-		w.WriteHeader(http.StatusBadRequest)
+	if err := ms.messenger.SendMessage(message.Method, message.Params); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"error sending message",
+			"err", err,
+		)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-
-	if err := ms.messenger.Message(method, data["params"]); err != nil {
-		// TODO: log
-		// return non 200 here? what is menu bar supposed to do with that?
 	}
 
 	w.WriteHeader(http.StatusOK)
