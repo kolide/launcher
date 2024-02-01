@@ -60,6 +60,10 @@ func (a actionMessage) Perform(m *menu) {
 		return
 	}
 
+	if response.Body != nil {
+		defer response.Body.Close()
+	}
+
 	if response.StatusCode != http.StatusOK {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform message action",
