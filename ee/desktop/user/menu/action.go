@@ -12,7 +12,7 @@ const (
 	DoNothing      actionType = "" // Omitted action implies do nothing
 	OpenURL        actionType = "open-url"
 	Flare          actionType = "flare"
-	MessageControl actionType = "message"
+	MessageControl actionType = "message-control"
 )
 
 // Action encapsulates what action should be performed when a menu item is invoked

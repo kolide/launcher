@@ -36,13 +36,9 @@ func (a actionMessage) Perform(m *menu) {
 	}
 
 	client := authedclient.New(runnerServerAuthToken, 2*time.Second)
-	runnerHealthUrl := fmt.Sprintf("%s/%s", runnerServerUrl, server.MessageEndpoint)
+	runnerMessageUrl := fmt.Sprintf("%s%s", runnerServerUrl, server.MessageEndpoint)
 
-	body := make(map[string]interface{})
-	body["method"] = a.Method
-	body["params"] = a.Params
-
-	bodyJson, err := json.Marshal(body)
+	jsonBody, err := json.Marshal(a)
 	if err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to marshal message body",
@@ -51,12 +47,24 @@ func (a actionMessage) Perform(m *menu) {
 		return
 	}
 
-	if _, err := client.Post(runnerHealthUrl, "application/json", bytes.NewReader(bodyJson)); err != nil {
+	response, err := client.Post(runnerMessageUrl, "application/json", bytes.NewReader(jsonBody))
+	if err != nil {
 		level.Error(m.logger).Log(
 			"msg", "failed to perform message action",
 			"method", a.Method,
 			"params", a.Params,
 			"err", err,
+		)
+
+		return
+	}
+
+	if response.StatusCode != 200 {
+		level.Error(m.logger).Log(
+			"msg", "failed to perform message action",
+			"method", a.Method,
+			"params", a.Params,
+			"status_code", response.StatusCode,
 		)
 	}
 }
