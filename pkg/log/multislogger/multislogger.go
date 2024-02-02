@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/kolide/kit/ulid"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -32,16 +33,18 @@ var ctxValueKeysToAdd = []contextKey{
 
 type MultiSlogger struct {
 	*slog.Logger
-	handlers []slog.Handler
+	handlers      []slog.Handler
+	launcherRunId string
 }
 
 // New creates a new multislogger if no handlers are passed in, it will
 // create a logger that discards all logs
 func New(h ...slog.Handler) *MultiSlogger {
-	ms := new(MultiSlogger)
-
-	// setting to fanout with no handlers is noop
-	ms.Logger = slog.New(slogmulti.Fanout())
+	ms := &MultiSlogger{
+		// setting to fanout with no handlers is noop
+		Logger:        slog.New(slogmulti.Fanout()),
+		launcherRunId: ulid.New(),
+	}
 
 	ms.AddHandler(h...)
 	return ms
@@ -59,8 +62,19 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
+			Pipe(slogmulti.NewHandleInlineMiddleware(m.launcherRunIdMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
+}
+
+// launcherRunIdMiddleware adds the launcher run id to the log record
+func (ms *MultiSlogger) launcherRunIdMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	record.AddAttrs(slog.Attr{
+		Key:   "launcher_run_id",
+		Value: slog.StringValue(ms.launcherRunId),
+	})
+
+	return next(ctx, record)
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
@@ -33,7 +32,6 @@ type knapsack struct {
 	db *bbolt.DB
 
 	slogger, systemSlogger *multislogger.MultiSlogger
-	launcherRunId          string
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 	// Some potential future additions include:
@@ -47,11 +45,6 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 		stores:        stores,
 		slogger:       slogger,
 		systemSlogger: systemSlogger,
-		launcherRunId: ulid.New(),
-	}
-
-	if k.slogger != nil {
-		*k.slogger.Logger = *k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
 	}
 
 	return k
@@ -68,8 +61,6 @@ func (k *knapsack) SystemSlogger() *slog.Logger {
 
 func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.slogger.AddHandler(handler...)
-	*k.slogger.Logger = *k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
-	// also send system logs to the same handlers
 	k.systemSlogger.AddHandler(handler...)
 }
 
