@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
@@ -97,7 +98,7 @@ func NewGRPCClient(k types.Knapsack, conn *grpc.ClientConn) KolideService {
 	return client
 }
 
-// dialGRPC creates a grpc client connection.
+// DialGRPC creates a grpc client connection.
 func DialGRPC(
 	k types.Knapsack,
 	rootPool *x509.CertPool,
@@ -111,11 +112,12 @@ func DialGRPC(
 		"cert_pinning", len(k.CertPins()) > 0,
 	)
 
-	grpcOpts := []grpc.DialOption{
-		grpc.WithTimeout(time.Second),
-	}
+	grpcCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	grpcOpts := []grpc.DialOption{}
 	if k.InsecureTransportTLS() {
-		grpcOpts = append(grpcOpts, grpc.WithInsecure())
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
 		creds := &tlsCreds{credentials.NewTLS(makeTLSConfig(k, rootPool))}
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(creds))
@@ -123,7 +125,7 @@ func DialGRPC(
 
 	grpcOpts = append(grpcOpts, opts...)
 
-	conn, err := grpc.Dial(k.KolideServerURL(), grpcOpts...)
+	conn, err := grpc.DialContext(grpcCtx, k.KolideServerURL(), grpcOpts...)
 	return conn, err
 }
 
