@@ -51,7 +51,7 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	}
 
 	if k.slogger != nil {
-		k.slogger.Logger = k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
+		*k.slogger.Logger = *k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
 	}
 
 	return k
@@ -68,8 +68,7 @@ func (k *knapsack) SystemSlogger() *slog.Logger {
 
 func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.slogger.AddHandler(handler...)
-	k.slogger.Logger = k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
-
+	*k.slogger.Logger = *k.slogger.Logger.With("launcher_run_id", k.launcherRunId)
 	// also send system logs to the same handlers
 	k.systemSlogger.AddHandler(handler...)
 }

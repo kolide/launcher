@@ -185,8 +185,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
-	// reassign slogger to knapsack slogger to get launcher run id added to slogger
-	slogger = k.Slogger()
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
@@ -197,8 +195,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			AddSource: true,
 			Level:     slog.LevelDebug,
 		}))
-		// need to reset slogger to include new handler
-		slogger = k.Slogger()
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -223,8 +219,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 		k.AddSlogHandler(logShipper.SlogHandler())
-		// need to reset slogger to include new handler
-		slogger = k.Slogger()
 
 		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 
