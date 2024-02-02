@@ -197,6 +197,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			AddSource: true,
 			Level:     slog.LevelDebug,
 		}))
+		// need to reset slogger to include new handler
+		slogger = k.Slogger()
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
@@ -221,6 +223,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 		k.AddSlogHandler(logShipper.SlogHandler())
+		// need to reset slogger to include new handler
+		slogger = k.Slogger()
+
 		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
