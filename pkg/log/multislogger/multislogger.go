@@ -62,19 +62,8 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
-			Pipe(slogmulti.NewHandleInlineMiddleware(m.launcherRunIdMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
-	)
-}
-
-// launcherRunIdMiddleware adds the launcher run id to the log record
-func (ms *MultiSlogger) launcherRunIdMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	record.AddAttrs(slog.Attr{
-		Key:   "launcher_run_id",
-		Value: slog.StringValue(ms.launcherRunId),
-	})
-
-	return next(ctx, record)
+	).With("launcher_run_id", m.launcherRunId)
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
