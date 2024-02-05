@@ -150,8 +150,8 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	return reader, nil
 }
 
-// Message sends a message to the server using JSON-RPC format
-func (c *HTTPClient) Message(method string, params interface{}) error {
+// SendMessage sends a message to the server using JSON-RPC format
+func (c *HTTPClient) SendMessage(method string, params interface{}) error {
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
 	}
@@ -169,6 +169,11 @@ func (c *HTTPClient) Message(method string, params interface{}) error {
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
 		return fmt.Errorf("could not marshal message body: %w", err)
+	}
+
+	const maxMessageSize = 1024
+	if len(body) > maxMessageSize {
+		return fmt.Errorf("message size %d exceeds maximum size %d", len(body), maxMessageSize)
 	}
 
 	dataReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))

@@ -55,7 +55,7 @@ func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) Message(method string, params interface{}) error {
+func (dp nopDataProvider) SendMessage(method string, params interface{}) error {
 	return nil
 }
 

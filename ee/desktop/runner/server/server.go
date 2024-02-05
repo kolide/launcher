@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,11 +24,13 @@ type RunnerServer struct {
 	desktopProcAuthTokens           map[string]string
 	mutex                           sync.Mutex
 	controlRequestIntervalOverrider controlRequestIntervalOverrider
+	messenger                       Messenger
 }
 
 const (
 	HealthCheckEndpoint                = "/health"
 	MenuOpenedEndpoint                 = "/menuopened"
+	MessageEndpoint                    = "/message"
 	controlRequestAccelerationInterval = 5 * time.Second
 	controlRequestAcclerationDuration  = 1 * time.Minute
 )
@@ -36,7 +39,13 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
+type Messenger interface {
+	SendMessage(method string, params interface{}) error
+}
+
+func New(slogger *slog.Logger,
+	controlRequestIntervalOverrider controlRequestIntervalOverrider,
+	messenger Messenger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
@@ -47,6 +56,7 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 		slogger:                         slogger,
 		desktopProcAuthTokens:           make(map[string]string),
 		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
+		messenger:                       messenger,
 	}
 
 	if rs.slogger == nil {
@@ -72,6 +82,8 @@ func New(slogger *slog.Logger, controlRequestIntervalOverrider controlRequestInt
 
 		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
+
+	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))
 
 	rs.server = &http.Server{
 		Handler: rs.authMiddleware(mux),
@@ -150,4 +162,53 @@ func (ms *RunnerServer) isAuthTokenValid(authToken string) bool {
 	}
 
 	return false
+}
+
+func (ms *RunnerServer) sendMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"no request body",
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	message := struct {
+		Method string      `json:"method"`
+		Params interface{} `json:"params"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"could not decode request body",
+			"err", err,
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if message.Method == "" {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"does not include method property",
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := ms.messenger.SendMessage(message.Method, message.Params); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"error sending message",
+			"err", err,
+		)
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
 }

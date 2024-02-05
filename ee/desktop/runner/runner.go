@@ -151,7 +151,7 @@ func (pr processRecord) String() string {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
@@ -178,7 +178,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
-	rs, err := runnerserver.New(runner.slogger, k)
+	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
 		return nil, fmt.Errorf("creating desktop runner server: %w", err)
 	}
