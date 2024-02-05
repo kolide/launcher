@@ -279,6 +279,13 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		return nil
 	}
 
+	if len(updateRequest.BinariesToUpdate) == 0 {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received request from control server to check for update now, but no binaries specified in request",
+		)
+		return nil
+	}
+
 	binariesToUpdate := make([]autoupdatableBinary, 0)
 	for _, b := range updateRequest.BinariesToUpdate {
 		binariesToUpdate = append(binariesToUpdate, b.Name)
@@ -293,10 +300,16 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		ta.storeError(err)
 		ta.slogger.Log(context.TODO(), slog.LevelError,
 			"error checking for update per control server request",
+			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 			"err", err,
 		)
 
 		return fmt.Errorf("could not check for update: %w", err)
+	} else {
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"successfully checked for update per control server request",
+			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
+		)
 	}
 
 	return nil
