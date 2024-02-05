@@ -12,8 +12,6 @@ import (
 	"runtime"
 	"time"
 
-	// "github.com/go-kit/kit/log"
-
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
