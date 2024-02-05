@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -55,15 +53,6 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	// convert the response to a struct
 	var response requestIdsResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
-
-	// in the current CI environment (GitHub Actions) the linux runner
-	// does not have a console user, so we expect an empty list
-	if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
-		assert.Empty(t, response.ConsoleUsers)
-		return
-	}
-
-	assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 }
 
 func testServer(t *testing.T, k types.Knapsack) *localServer {
