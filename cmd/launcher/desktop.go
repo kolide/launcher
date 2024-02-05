@@ -5,15 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"os/user"
 	"runtime"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/logutil"
+	// "github.com/go-kit/kit/log"
+
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
@@ -75,9 +75,15 @@ func runDesktop(args []string) error {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	// set up logging
-	logger := logutil.NewServerLogger(*fldebug)
-	logger = log.With(logger,
+	logLevel := slog.LevelInfo
+	if *fldebug {
+		logLevel = slog.LevelDebug
+	}
+
+	slogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     logLevel,
+	})).With(
 		"subprocess", "desktop",
 		"session_pid", os.Getpid(),
 	)
@@ -85,51 +91,51 @@ func runDesktop(args []string) error {
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
 	if err != nil {
-		level.Debug(logger).Log(
-			"msg", "error getting current user",
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"error getting current user",
 			"err", err,
 		)
 	} else {
-		logger = log.With(logger,
-			"uid", user.Uid,
-		)
+		slogger = slogger.With("uid", user.Uid)
 	}
 
-	level.Info(logger).Log("msg", "starting")
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"starting",
+	)
 
 	if *flUserServerSocketPath == "" {
 		*flUserServerSocketPath = defaultUserServerSocketPath()
-		level.Info(logger).Log(
-			"msg", "using default socket path since none was provided",
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"using default socket path since none was provided",
 			"socket_path", *flUserServerSocketPath,
 		)
 	}
 
-	runGroup := rungroup.NewRunGroup(logger)
+	runGroup := rungroup.NewRunGroup(slogger)
 
 	// listen for signals
 	runGroup.Add("desktopSignalListener", func() error {
-		listenSignals(logger)
+		listenSignals(slogger)
 		return nil
 	}, func(error) {})
 
 	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(logger, *flIconPath)
+	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
 	runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
 
 	// monitor parent
 	runGroup.Add("desktopMonitorParentProcess", func() error {
-		monitorParentProcess(logger, *flRunnerServerUrl, *flRunnerServerAuthToken, 2*time.Second)
+		monitorParentProcess(slogger, *flRunnerServerUrl, *flRunnerServerAuthToken, 2*time.Second)
 		return nil
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := userserver.New(logger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
+	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
 	if err != nil {
 		return err
 	}
 
-	m := menu.New(logger, *flhostname, *flmenupath)
+	m := menu.New(slogger, *flhostname, *flmenupath)
 	refreshMenu := func() {
 		m.Build()
 	}
@@ -140,8 +146,8 @@ func runDesktop(args []string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			level.Error(logger).Log(
-				"msg", "shutting down server",
+			slogger.Log(context.TODO(), slog.LevelError,
+				"shutting down server",
 				"err", err,
 			)
 		}
@@ -157,7 +163,7 @@ func runDesktop(args []string) error {
 
 	// notify runner server when menu opened
 	runGroup.Add("desktopMenuOpenedListener", func() error {
-		notifyRunnerServerMenuOpened(logger, *flRunnerServerUrl, *flRunnerServerAuthToken)
+		notifyRunnerServerMenuOpened(slogger, *flRunnerServerUrl, *flRunnerServerAuthToken)
 		return nil
 	}, func(err error) {})
 
@@ -165,8 +171,8 @@ func runDesktop(args []string) error {
 	go func() {
 		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
-			level.Error(logger).Log(
-				"msg", "running run group",
+			slogger.Log(context.TODO(), slog.LevelError,
+				"running run group",
 				"err", err,
 			)
 		}
@@ -178,20 +184,20 @@ func runDesktop(args []string) error {
 	return nil
 }
 
-func listenSignals(logger log.Logger) {
+func listenSignals(slogger *slog.Logger) {
 	signalsToHandle := []os.Signal{os.Interrupt, os.Kill}
 	signals := make(chan os.Signal, len(signalsToHandle))
 	signal.Notify(signals, signalsToHandle...)
 
 	sig := <-signals
 
-	level.Debug(logger).Log(
-		"msg", "received signal",
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"received signal",
 		"signal", sig,
 	)
 }
 
-func notifyRunnerServerMenuOpened(logger log.Logger, rootServerUrl, authToken string) {
+func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken string) {
 	client := authedclient.New(authToken, 2*time.Second)
 	menuOpendUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
 
@@ -200,8 +206,8 @@ func notifyRunnerServerMenuOpened(logger log.Logger, rootServerUrl, authToken st
 
 		response, err := client.Get(menuOpendUrl)
 		if err != nil {
-			level.Error(logger).Log(
-				"msg", "sending menu opened request to root server",
+			slogger.Log(context.TODO(), slog.LevelError,
+				"sending menu opened request to root server",
 				"err", err,
 			)
 		}
@@ -213,7 +219,7 @@ func notifyRunnerServerMenuOpened(logger log.Logger, rootServerUrl, authToken st
 }
 
 // monitorParentProcess continuously checks to see if parent is a live and sends on provided channel if it is not
-func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthToken string, interval time.Duration) {
+func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAuthToken string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -227,8 +233,8 @@ func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthTo
 	for ; true; <-ticker.C {
 		// check to to ensure that the ppid is still legit
 		if os.Getppid() < 2 {
-			level.Debug(logger).Log(
-				"msg", "ppid is 0 or 1, exiting",
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"ppid is 0 or 1, exiting",
 			)
 			break
 		}
@@ -255,8 +261,8 @@ func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthTo
 
 		// retry
 		if errCount < maxErrCount {
-			level.Debug(logger).Log(
-				"msg", "could not connect to parent, will retry",
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"could not connect to parent, will retry",
 				"err", err,
 				"attempts", errCount,
 				"max_attempts", maxErrCount,
@@ -265,9 +271,9 @@ func monitorParentProcess(logger log.Logger, runnerServerUrl, runnerServerAuthTo
 			continue
 		}
 
-		// errCount => maxErrCount, exit
-		level.Debug(logger).Log(
-			"msg", "could not connect to parent, max attempts reached, exiting",
+		// errCount >= maxErrCount, exit
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not connect to parent, max attempts reached, exiting",
 			"err", err,
 			"attempts", errCount,
 			"max_attempts", maxErrCount,

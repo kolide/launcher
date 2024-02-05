@@ -17,21 +17,20 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"unsafe"
-
-	"github.com/go-kit/kit/log"
 )
 
 type macNotifier struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	interrupt chan struct{}
 }
 
-func NewDesktopNotifier(logger log.Logger, _ string) *macNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, _ string) *macNotifier {
 	return &macNotifier{
-		logger:    log.With(logger, "component", "desktop_notifier"),
+		slogger:   slogger.With("component", "desktop_notifier"),
 		interrupt: make(chan struct{}),
 	}
 }

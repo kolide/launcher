@@ -1,7 +1,8 @@
 package menu
 
 import (
-	"github.com/go-kit/kit/log/level"
+	"context"
+	"log/slog"
 )
 
 // Performs the OpenURL action
@@ -11,9 +12,10 @@ type actionOpenURL struct {
 
 func (a actionOpenURL) Perform(m *menu) {
 	if err := open(a.URL); err != nil {
-		level.Error(m.logger).Log(
-			"msg", "failed to perform action",
+		m.slogger.Log(context.TODO(), slog.LevelError,
+			"failed to perform action",
 			"URL", a.URL,
-			"err", err)
+			"err", err,
+		)
 	}
 }

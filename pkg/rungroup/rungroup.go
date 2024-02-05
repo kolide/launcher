@@ -8,17 +8,16 @@ package rungroup
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"golang.org/x/sync/semaphore"
 )
 
 type (
 	Group struct {
-		logger log.Logger
-		actors []rungroupActor
+		slogger *slog.Logger
+		actors  []rungroupActor
 	}
 
 	rungroupActor struct {
@@ -38,10 +37,10 @@ const (
 	executeReturnTimeout = 5 * time.Second // After interrupted, how long for all actors to exit their `execute` functions
 )
 
-func NewRunGroup(logger log.Logger) *Group {
+func NewRunGroup(slogger *slog.Logger) *Group {
 	return &Group{
-		logger: log.With(logger, "component", "run_group"),
-		actors: make([]rungroupActor, 0),
+		slogger: slogger.With("component", "run_group"),
+		actors:  make([]rungroupActor, 0),
 	}
 }
 
@@ -55,11 +54,18 @@ func (g *Group) Run() error {
 	}
 
 	// Run each actor.
-	level.Debug(g.logger).Log("msg", "starting all actors", "actor_count", len(g.actors))
+	g.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting all actors",
+		"actor_count", len(g.actors),
+	)
+
 	errors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
 		go func(a rungroupActor) {
-			level.Debug(g.logger).Log("msg", "starting actor", "actor", a.name)
+			g.slogger.Log(context.TODO(), slog.LevelDebug,
+				"starting actor",
+				"actor", a.name,
+			)
 			err := a.execute()
 			errors <- actorError{
 				errorSourceName: a.name,
@@ -70,8 +76,17 @@ func (g *Group) Run() error {
 
 	// Wait for the first actor to stop.
 	initialActorErr := <-errors
-	level.Debug(g.logger).Log("msg", "received interrupt error from first actor -- shutting down other actors", "err", initialActorErr)
-	defer level.Debug(g.logger).Log("msg", "done shutting down actors", "actor_count", len(g.actors), "initial_err", initialActorErr)
+
+	g.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received interrupt error from first actor -- shutting down other actors",
+		"err", initialActorErr,
+	)
+
+	defer g.slogger.Log(context.TODO(), slog.LevelDebug,
+		"done shutting down actors",
+		"actor_count", len(g.actors),
+		"initial_err", initialActorErr,
+	)
 
 	// Signal all actors to stop.
 	numActors := int64(len(g.actors))
@@ -80,9 +95,15 @@ func (g *Group) Run() error {
 		interruptWait.Acquire(context.Background(), 1)
 		go func(a rungroupActor) {
 			defer interruptWait.Release(1)
-			level.Debug(g.logger).Log("msg", "interrupting actor", "actor", a.name)
+			g.slogger.Log(context.TODO(), slog.LevelDebug,
+				"interrupting actor",
+				"actor", a.name,
+			)
 			a.interrupt(initialActorErr.err)
-			level.Debug(g.logger).Log("msg", "interrupt complete", "actor", a.name)
+			g.slogger.Log(context.TODO(), slog.LevelDebug,
+				"interrupt complete",
+				"actor", a.name,
+			)
 		}(a)
 	}
 
@@ -91,7 +112,10 @@ func (g *Group) Run() error {
 
 	// Wait for interrupts to complete, but only until we hit our interruptCtx timeout
 	if err := interruptWait.Acquire(interruptCtx, numActors); err != nil {
-		level.Debug(g.logger).Log("msg", "timeout waiting for interrupts to complete, proceeding with shutdown", "err", err)
+		g.slogger.Log(context.TODO(), slog.LevelDebug,
+			"timeout waiting for interrupts to complete, proceeding with shutdown",
+			"err", err,
+		)
 	}
 
 	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
@@ -100,12 +124,19 @@ func (g *Group) Run() error {
 	for i := 1; i < cap(errors); i++ {
 		select {
 		case <-timeoutTimer.C:
-			level.Debug(g.logger).Log("msg", "rungroup shutdown deadline exceeded, not waiting for any more actors to return")
+			g.slogger.Log(context.TODO(), slog.LevelDebug,
+				"rungroup shutdown deadline exceeded, not waiting for any more actors to return",
+			)
 
 			// Return the original error so we can proceed with shutdown
 			return initialActorErr.err
 		case e := <-errors:
-			level.Debug(g.logger).Log("msg", "execute returned", "actor", e.errorSourceName, "index", i)
+			g.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received error from actor",
+				"actor", e.errorSourceName,
+				"err", e.err,
+				"index", i,
+			)
 		}
 	}
 
