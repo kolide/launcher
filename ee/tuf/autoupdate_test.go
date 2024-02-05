@@ -729,7 +729,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	time.Sleep(initialDelay)
 	require.NoError(t, autoupdater.Do(data), "expected no error making update request")
 
-	// Give autoupdater
+	// Give autoupdater a chance to run
 	time.Sleep(interval)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
