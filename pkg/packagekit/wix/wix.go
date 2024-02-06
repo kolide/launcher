@@ -264,7 +264,7 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 	}
 
 	// touch these known file names before harvest to ensure they're cleaned up on uninstall
-	dataFilenames := []string{"launcher.db", "metadata.json"}
+	dataFilenames := []string{"launcher.db", "metadata.json", "kv.sqlite"}
 
 	for _, fname := range dataFilenames {
 		newPath := filepath.Join(dataFilesPath, fname)
