@@ -305,12 +305,12 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		)
 
 		return fmt.Errorf("could not check for update: %w", err)
-	} else {
-		ta.slogger.Log(context.TODO(), slog.LevelInfo,
-			"successfully checked for update per control server request",
-			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
-		)
 	}
+
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully checked for update per control server request",
+		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
+	)
 
 	return nil
 }
