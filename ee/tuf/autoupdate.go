@@ -46,21 +46,9 @@ const (
 
 var binaries = []autoupdatableBinary{binaryLauncher, binaryOsqueryd}
 
-func (a *autoupdatableBinary) UnmarshalJSON(data []byte) (err error) {
-	var binary string
-	if err := json.Unmarshal(data, &binary); err != nil {
-		return err
-	}
-	switch binary {
-	case "launcher":
-		*a = binaryLauncher
-	case "osqueryd":
-		*a = binaryOsqueryd
-	default:
-		return fmt.Errorf("unknown binary %s", binary)
-	}
-
-	return nil
+var autoupdatableBinaryMap = map[string]autoupdatableBinary{
+	"launcher": binaryLauncher,
+	"osqueryd": binaryOsqueryd,
 }
 
 type ReleaseFileCustomMetadata struct {
@@ -77,7 +65,7 @@ type (
 
 	// In the future, we may allow for setting a particular version here as well
 	binaryToUpdate struct {
-		Name autoupdatableBinary `json:"name"`
+		Name string `json:"name"`
 	}
 )
 
@@ -279,16 +267,23 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		return nil
 	}
 
-	if len(updateRequest.BinariesToUpdate) == 0 {
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"received request from control server to check for update now, but no binaries specified in request",
-		)
-		return nil
-	}
-
 	binariesToUpdate := make([]autoupdatableBinary, 0)
 	for _, b := range updateRequest.BinariesToUpdate {
-		binariesToUpdate = append(binariesToUpdate, b.Name)
+		if val, ok := autoupdatableBinaryMap[b.Name]; ok {
+			binariesToUpdate = append(binariesToUpdate, val)
+			continue
+		}
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received request from control server autoupdate unknown binary, ignoring",
+			"unknown_binary", b.Name,
+		)
+	}
+
+	if len(binariesToUpdate) == 0 {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received request from control server to check for update now, but no valid binaries specified in request",
+		)
+		return nil
 	}
 
 	ta.slogger.Log(context.TODO(), slog.LevelInfo,

@@ -535,7 +535,7 @@ func TestDo(t *testing.T) {
 			updateData: controlServerAutoupdateRequest{
 				BinariesToUpdate: []binaryToUpdate{
 					{
-						Name: binaryLauncher,
+						Name: "launcher",
 					},
 				},
 			},
@@ -545,7 +545,7 @@ func TestDo(t *testing.T) {
 			updateData: controlServerAutoupdateRequest{
 				BinariesToUpdate: []binaryToUpdate{
 					{
-						Name: binaryOsqueryd,
+						Name: "osqueryd",
 					},
 				},
 			},
@@ -555,10 +555,26 @@ func TestDo(t *testing.T) {
 			updateData: controlServerAutoupdateRequest{
 				BinariesToUpdate: []binaryToUpdate{
 					{
-						Name: binaryLauncher,
+						Name: "launcher",
 					},
 					{
-						Name: binaryOsqueryd,
+						Name: "osqueryd",
+					},
+				},
+			},
+		},
+		{
+			name: "both binaries plus an invalid binary",
+			updateData: controlServerAutoupdateRequest{
+				BinariesToUpdate: []binaryToUpdate{
+					{
+						Name: "launcher",
+					},
+					{
+						Name: "osqueryd",
+					},
+					{
+						Name: "some_unknown_binary",
 					},
 				},
 			},
@@ -596,17 +612,20 @@ func TestDo(t *testing.T) {
 			_, err = autoupdater.metadataClient.Update()
 			require.NoError(t, err, "could not update metadata client to fetch target metadata")
 
-			// Expect that we attempt to update the library, only for the selected binary/binaries
+			// Expect that we attempt to update the library, only for the selected, valid binary/binaries
 			mockLibraryManager := NewMocklibrarian(t)
 			autoupdater.libraryManager = mockLibraryManager
 			currentOsqueryVersion := "1.1.1"
 			for _, b := range tt.updateData.BinariesToUpdate {
-				if b.Name == binaryOsqueryd {
+				if b.Name != "osqueryd" && b.Name != "launcher" {
+					continue
+				}
+				if b.Name == "osqueryd" {
 					mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
 				}
 
-				mockLibraryManager.On("Available", b.Name, fmt.Sprintf("%s-%s.tar.gz", string(b.Name), testReleaseVersion)).Return(false)
-				mockLibraryManager.On("AddToLibrary", b.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mockLibraryManager.On("Available", autoupdatableBinary(b.Name), fmt.Sprintf("%s-%s.tar.gz", b.Name, testReleaseVersion)).Return(false)
+				mockLibraryManager.On("AddToLibrary", autoupdatableBinary(b.Name), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
 			// Prepare control server request
@@ -624,42 +643,6 @@ func TestDo(t *testing.T) {
 			mockKnapsack.AssertExpectations(t)
 		})
 	}
-}
-
-func TestDo_RejectsInvalidRequests(t *testing.T) {
-	t.Parallel()
-
-	testRootDir := t.TempDir()
-	s := setupStorage(t)
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return("http://localhost")
-	mockKnapsack.On("UpdateDirectory").Return("")
-	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockQuerier := newMockQuerier(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
-
-	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
-	require.NoError(t, err, "could not initialize new TUF autoupdater")
-
-	// Expect that we do not attempt to update the library
-	mockLibraryManager := NewMocklibrarian(t)
-	autoupdater.libraryManager = mockLibraryManager
-
-	// Prepare control server request
-	data := bytes.NewReader([]byte(`{"binaries_to_update": [{"name": "some_unknown_binary"}]}`))
-
-	// Make request
-	require.NoError(t, autoupdater.Do(data), "expected autoupdater to reject invalid request without an error")
-
-	// Confirm we didn't add anything to the library
-	mockLibraryManager.AssertNotCalled(t, "Available")
-	mockLibraryManager.AssertNotCalled(t, "AddToLibrary")
-
-	// Confirm we pulled all config items as expected
-	mockKnapsack.AssertExpectations(t)
 }
 
 func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
@@ -714,10 +697,10 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	rawRequest, err := json.Marshal(controlServerAutoupdateRequest{
 		BinariesToUpdate: []binaryToUpdate{
 			{
-				Name: binaryLauncher,
+				Name: "launcher",
 			},
 			{
-				Name: binaryOsqueryd,
+				Name: "osqueryd",
 			},
 		},
 	})
