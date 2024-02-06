@@ -4,20 +4,21 @@
 package notify
 
 import (
-	"github.com/go-kit/kit/log"
+	"log/slog"
+
 	"github.com/kolide/toast"
 )
 
 type windowsNotifier struct {
 	iconFilepath string
-	logger       log.Logger
+	slogger      *slog.Logger
 	interrupt    chan struct{}
 }
 
-func NewDesktopNotifier(logger log.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
 		iconFilepath: iconFilepath,
-		logger:       log.With(logger, "component", "desktop_notifier"),
+		slogger:      slogger.With("component", "desktop_notifier"),
 		interrupt:    make(chan struct{}),
 	}
 }
