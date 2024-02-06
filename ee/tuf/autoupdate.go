@@ -256,6 +256,8 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupt <- struct{}{}
 }
 
+// Do satisfies the actionqueue.actor interface; it allows the control server to send
+// requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
 	var updateRequest controlServerAutoupdateRequest
 	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
