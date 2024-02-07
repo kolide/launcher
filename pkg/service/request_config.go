@@ -140,7 +140,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 			message = "failure"
 		}
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "RequestConfig",
 			"uuid", uuid,
 			"config_size", len(config),

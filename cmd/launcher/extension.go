@@ -84,7 +84,7 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 		if k.Transport() == "grpc" && k.LogMaxBytesPerBatch() > 3 {
 			slogger.Log(ctx, slog.LevelInfo,
 				"LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
-				"LogMaxBytesPerBatch", k.LogMaxBytesPerBatch(),
+				"log_max_bytes_per_batch", k.LogMaxBytesPerBatch(),
 			)
 		}
 		extOpts.MaxBytesPerBatch = k.LogMaxBytesPerBatch() << 20
