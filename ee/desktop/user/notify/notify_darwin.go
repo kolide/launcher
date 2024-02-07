@@ -24,13 +24,11 @@ import (
 )
 
 type macNotifier struct {
-	slogger   *slog.Logger
 	interrupt chan struct{}
 }
 
-func NewDesktopNotifier(slogger *slog.Logger, _ string) *macNotifier {
+func NewDesktopNotifier(_ *slog.Logger, _ string) *macNotifier {
 	return &macNotifier{
-		slogger:   slogger.With("component", "desktop_notifier"),
 		interrupt: make(chan struct{}),
 	}
 }

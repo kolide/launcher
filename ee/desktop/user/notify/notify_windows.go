@@ -11,14 +11,12 @@ import (
 
 type windowsNotifier struct {
 	iconFilepath string
-	slogger      *slog.Logger
 	interrupt    chan struct{}
 }
 
-func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
 		iconFilepath: iconFilepath,
-		slogger:      slogger.With("component", "desktop_notifier"),
 		interrupt:    make(chan struct{}),
 	}
 }

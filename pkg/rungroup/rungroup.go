@@ -77,7 +77,7 @@ func (g *Group) Run() error {
 	// Wait for the first actor to stop.
 	initialActorErr := <-errors
 
-	g.slogger.Log(context.TODO(), slog.LevelDebug,
+	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
 		"err", initialActorErr,
 	)
