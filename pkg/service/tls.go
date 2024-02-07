@@ -2,10 +2,12 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"log/slog"
 	"net/url"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -54,7 +56,8 @@ func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 			// gRPC does not seem to expose the error in a way that
 			// we can get at it later. At least this provides some
 			// feedback to the user about what is going wrong.
-			k.Slogger().Error("no match found with pinned certificates",
+			k.Slogger().Log(context.TODO(), slog.LevelError,
+				"no match found with pinned certificates",
 				"err", "certificate pin validation failed",
 			)
 			return errors.New("no match found with pinned cert")
