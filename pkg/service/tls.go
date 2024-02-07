@@ -20,7 +20,8 @@ func makeTLSConfig(k types.Knapsack, rootPool *x509.CertPool) *tls.Config {
 		// gRPC doesn't use the port for TLS verification. So we strip it here.
 		u, err := url.Parse(k.KolideServerURL())
 		if err != nil {
-			k.Slogger().Error("failed to parse server URL",
+			k.Slogger().Log(context.TODO(), slog.LevelError,
+				"failed to parse server URL",
 				"err", err,
 			)
 			return nil
