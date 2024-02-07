@@ -343,9 +343,9 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"could not find xauthority in any known location",
-		"wayland", waylandXAuthorityLocationPattern,
-		"x11", x11XauthorityLocation,
-		"default", homeLocation,
+		"wayland_location", waylandXAuthorityLocationPattern,
+		"x11_location", x11XauthorityLocation,
+		"default_location", homeLocation,
 	)
 
 	return ""

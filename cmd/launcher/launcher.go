@@ -332,7 +332,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
 
 	versionInfo := version.Version()
-	k.SystemSlogger().Info("started kolide launcher",
+	k.SystemSlogger().Log(ctx, slog.LevelInfo,
+		"started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
