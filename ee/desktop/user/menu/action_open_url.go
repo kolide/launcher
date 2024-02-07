@@ -14,7 +14,7 @@ func (a actionOpenURL) Perform(m *menu) {
 	if err := open(a.URL); err != nil {
 		m.slogger.Log(context.TODO(), slog.LevelError,
 			"failed to perform action",
-			"URL", a.URL,
+			"url", a.URL,
 			"err", err,
 		)
 	}
