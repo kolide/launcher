@@ -385,7 +385,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
 			"runner processSpawningEnabled set by control server",
-			"processSpawningEnabled", r.processSpawningEnabled,
+			"process_spawning_enabled", r.processSpawningEnabled,
 		)
 	}
 }
@@ -812,7 +812,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 
 		for scanner.Scan() {
 			r.slogger.Log(context.TODO(), slog.LevelDebug,
-				scanner.Text(),
+				scanner.Text(), // nolint:sloglint // it's fine to not have a constant or literal here
 				"uid", uid,
 				"subprocess", "desktop",
 			)

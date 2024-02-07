@@ -24,7 +24,7 @@ func TestMultiSlogger(t *testing.T) {
 	}
 
 	multislogger := New()
-	multislogger.Logger.Debug("dont panic")
+	multislogger.Logger.DebugContext(context.TODO(), "dont panic")
 
 	multislogger = New(slog.NewJSONHandler(&debugLogBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
@@ -32,13 +32,13 @@ func TestMultiSlogger(t *testing.T) {
 	shipperLogLevel.Set(slog.LevelInfo)
 	multislogger.AddHandler(slog.NewJSONHandler(&shipperBuf, &slog.HandlerOptions{Level: shipperLogLevel}))
 
-	multislogger.Logger.Debug("debug_msg")
+	multislogger.Logger.DebugContext(context.TODO(), "debug_msg")
 
 	require.Contains(t, debugLogBuf.String(), "debug_msg", "should be in debug log since it's debug level")
 	require.Empty(t, shipperBuf.String(), "should not be in shipper log since it's debug level")
 	clearBufsFn()
 
-	multislogger.Logger.Info("info_msg")
+	multislogger.Logger.InfoContext(context.TODO(), "info_msg")
 
 	require.Contains(t, debugLogBuf.String(), "info_msg", "should be in debug log since it's info level and that's higher than debug level")
 	require.Contains(t, shipperBuf.String(), "info_msg", "should be in shipper log since it's info level")
