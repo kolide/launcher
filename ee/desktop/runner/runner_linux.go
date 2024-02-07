@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -22,7 +23,10 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-const defaultDisplay = ":0"
+const (
+	defaultDisplay        = ":0"
+	defaultWaylandDisplay = "wayland-0"
+)
 
 // Display takes the format host:displaynumber.screen
 var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
@@ -147,6 +151,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 			break
 		} else if sessionType == "wayland" {
 			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
+			envVars["WAYLAND_DISPLAY"] = r.getWaylandDisplay(ctx, uid)
 
 			break
 		}
@@ -159,6 +164,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
 	envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+	envVars["XDG_RUNTIME_DIR"] = getXdgRuntimeDir(uid)
 
 	// We need xauthority set in order to launch the browser on Ubuntu 23.04
 	if xauthorityLocation := r.getXauthority(ctx, uid, username); xauthorityLocation != "" {
@@ -319,9 +325,42 @@ func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, u
 	return defaultDisplay
 }
 
+// getWaylandDisplay returns the appropriate value to set as WAYLAND_DISPLAY
+func (r *DesktopUsersProcessesRunner) getWaylandDisplay(ctx context.Context, uid string) string {
+	// Find the wayland display socket
+	waylandDisplaySocketPattern := filepath.Join(getXdgRuntimeDir(uid), "wayland-*")
+	matches, err := filepath.Glob(waylandDisplaySocketPattern)
+	if err != nil || len(matches) == 0 {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get wayland display from xdg runtime dir",
+			"err", err,
+		)
+		return defaultWaylandDisplay
+	}
+
+	// We may also match a lock file wayland-0.lock, so iterate through matches and only return the one that's a socket
+	for _, match := range matches {
+		info, err := os.Stat(match)
+		if err != nil {
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"could not stat potential wayland display socket",
+				"file_path", match,
+				"err", err,
+			)
+			continue
+		}
+
+		if info.Mode().Type() == fs.ModeSocket {
+			return filepath.Base(match)
+		}
+	}
+
+	return defaultWaylandDisplay
+}
+
 // getXauthority checks known locations for the xauthority file
 func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid string, username string) string {
-	xdgRuntimeDir := filepath.Join("run", "user", uid)
+	xdgRuntimeDir := getXdgRuntimeDir(uid)
 
 	// Glob for Wayland matches first
 	waylandXAuthorityLocationPattern := filepath.Join(xdgRuntimeDir, ".mutter-Xwaylandauth.*")
@@ -349,6 +388,10 @@ func (r *DesktopUsersProcessesRunner) getXauthority(ctx context.Context, uid str
 	)
 
 	return ""
+}
+
+func getXdgRuntimeDir(uid string) string {
+	return fmt.Sprintf("/run/user/%s", uid)
 }
 
 func osversion() (string, error) {
