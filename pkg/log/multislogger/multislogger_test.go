@@ -46,7 +46,7 @@ func TestMultiSlogger(t *testing.T) {
 
 	// set shipper level to debug
 	shipperLogLevel.Set(slog.LevelDebug)
-	multislogger.Logger.Debug("debug_msg")
+	multislogger.Logger.DebugContext(context.TODO(), "debug_msg")
 
 	require.Contains(t, debugLogBuf.String(), "debug_msg", "should be in debug log since it's debug level")
 	require.Contains(t, shipperBuf.String(), "debug_msg", "should now be in shipper log since it's level was set to debug")

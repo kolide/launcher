@@ -307,14 +307,16 @@ func (ls *LogShipper) updateLogShippingLevel() {
 	case "error":
 		ls.slogLevel.Set(slog.LevelError)
 	case "default":
-		ls.knapsack.Slogger().Error("unrecognized flag value for log shipping level",
+		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
+			"unrecognized flag value for log shipping level",
 			"flag_value", ls.knapsack.LogShippingLevel(),
 			"current_log_level", ls.slogLevel.String(),
 		)
 	}
 
 	if startingLevel != ls.slogLevel.Level() {
-		ls.knapsack.Slogger().Info("log shipping level changed",
+		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelInfo,
+			"log shipping level changed",
 			"old_log_level", startingLevel.String(),
 			"new_log_level", ls.slogLevel.Level().String(),
 			"send_interval", sendInterval.String(),

@@ -811,8 +811,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		scanner := bufio.NewScanner(combined)
 
 		for scanner.Scan() {
-			r.slogger.Log(context.TODO(), slog.LevelDebug,
-				scanner.Text(), // nolint:sloglint // it's fine to not have a constant or literal here
+			r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
+				scanner.Text(),
 				"uid", uid,
 				"subprocess", "desktop",
 			)
