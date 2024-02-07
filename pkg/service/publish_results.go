@@ -194,7 +194,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 			}
 		}
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishResults",
 			"uuid", uuid,
 			"results", string(resJSON),

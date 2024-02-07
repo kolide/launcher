@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/x509"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -105,7 +106,8 @@ func DialGRPC(
 	opts ...grpc.DialOption, // Used for overrides in testing
 ) (*grpc.ClientConn, error) {
 
-	k.Slogger().Debug("dialing grpc server",
+	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		"dialing grpc server",
 		"server", k.KolideServerURL(),
 		"tls_secure", !k.InsecureTLS(),
 		"transport_secure", !k.InsecureTransportTLS(),
