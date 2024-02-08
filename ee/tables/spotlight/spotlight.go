@@ -1,38 +1,54 @@
 //go:build darwin
 // +build darwin
 
-package table
+package spotlight
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
+	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
+
+type spotlightTable struct {
+	logger log.Logger
+}
 
 /*
 Spotlight returns a macOS spotlight table
 Example Query:
 
 	SELECT uid, f.path FROM file
-	AS f JOIN spotlight ON spotlight.path = f.path
+	AS f JOIN kolide_spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
 */
-func Spotlight() *table.Plugin {
+func TablePlugin(logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
 	}
-	return table.NewPlugin("kolide_spotlight", columns, generateSpotlight)
+
+	t := &spotlightTable{
+		logger: logger,
+	}
+
+	return table.NewPlugin("kolide_spotlight", columns, t.generate)
 }
 
-func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	q, ok := queryContext.Constraints["query"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The spotlight table requires that you specify a constraint WHERE query =")
 	}
+
 	where := q.Constraints[0].Expression
 	var query []string
 	if strings.Contains(where, "-") {
@@ -40,16 +56,28 @@ func generateSpotlight(ctx context.Context, queryContext table.QueryContext) ([]
 	} else {
 		query = []string{where}
 	}
-	lines, err := mdfind(query...)
+
+	out, err := tablehelpers.Exec(ctx, t.logger, 120, allowedcmd.Mdfind, query, false)
 	if err != nil {
 		return nil, fmt.Errorf("call mdfind: %w", err)
 	}
+
 	var resp []map[string]string
-	for _, line := range lines {
+
+	lr := bufio.NewReader(bytes.NewReader(out))
+	for {
+		line, _, err := lr.ReadLine()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
 		m := make(map[string]string, 2)
 		m["query"] = where
-		m["path"] = line
+		m["path"] = string(line)
 		resp = append(resp, m)
 	}
+
 	return resp, nil
 }
