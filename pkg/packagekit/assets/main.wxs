@@ -70,6 +70,7 @@
 	Level="1"
 	Display="hidden">
       <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="AppData" />
     </Feature>
 
     <Feature
