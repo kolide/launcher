@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
@@ -40,6 +42,10 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd al
 		return nil, fmt.Errorf("creating command: %w", err)
 	}
 
+	span.SetAttributes(attribute.String("exec.path", cmd.Path))
+	span.SetAttributes(attribute.String("exec.binary", filepath.Base(cmd.Path)))
+	span.SetAttributes(attribute.StringSlice("exec.args", args))
+
 	cmd.Stdout = &stdout
 	if includeStderr {
 		cmd.Stderr = &stdout
@@ -57,6 +63,10 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd al
 		return stdout.Bytes(), nil
 	case os.IsNotExist(err):
 		return nil, fmt.Errorf("could not find %s to run: %w", cmd.Path, err)
+	case ctx.Err() != nil:
+		// ctx.Err() should only be set if the context is canceled or done
+		traces.SetError(span, ctx.Err())
+		return nil, fmt.Errorf("context canceled during exec '%s'. Got: '%s': %w", cmd.String(), stderr.String(), ctx.Err())
 	default:
 		traces.SetError(span, err)
 		return nil, fmt.Errorf("exec '%s'. Got: '%s': %w", cmd.String(), stderr.String(), err)

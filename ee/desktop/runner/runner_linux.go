@@ -20,6 +20,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
+	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
@@ -150,7 +151,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 			envVars["DISPLAY"] = r.displayFromX11(ctx, session, int32(uidInt))
 			break
 		} else if sessionType == "wayland" {
-			envVars["DISPLAY"] = r.displayFromXwayland(ctx, int32(uidInt))
+			envVars["DISPLAY"] = r.displayFromDisplayServerProcess(ctx, int32(uidInt))
 			envVars["WAYLAND_DISPLAY"] = r.getWaylandDisplay(ctx, uid)
 
 			break
@@ -182,7 +183,7 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"could not create command to get Display from user session",
 			"err", err,
 		)
-		return r.displayFromXDisplayServerProcess(ctx, uid)
+		return r.displayFromDisplayServerProcess(ctx, uid)
 	}
 	xDisplayOutput, err := cmd.Output()
 	if err != nil {
@@ -190,18 +191,21 @@ func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, sessio
 			"could not get Display from user session",
 			"err", err,
 		)
-		return r.displayFromXDisplayServerProcess(ctx, uid)
+		return r.displayFromDisplayServerProcess(ctx, uid)
 	}
 
 	display := strings.Trim(string(xDisplayOutput), "\n")
 	if display == "" {
-		return r.displayFromXDisplayServerProcess(ctx, uid)
+		return r.displayFromDisplayServerProcess(ctx, uid)
 	}
 
 	return display
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx context.Context, uid int32) string {
+func (r *DesktopUsersProcessesRunner) displayFromDisplayServerProcess(ctx context.Context, uid int32) string {
+	// Sometimes we can't get DISPLAY from loginctl show-session output.
+	// We can look for it instead by looking for the display server process,
+	// and examining its args and open socket connections.
 	processes, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelDebug,
@@ -221,11 +225,11 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 			continue
 		}
 
-		if !strings.Contains(cmdline, "Xorg") && !strings.Contains(cmdline, "Xvfb") {
+		if !strings.Contains(cmdline, "Xorg") && !strings.Contains(cmdline, "Xvfb") && !strings.Contains(cmdline, "Xwayland") {
 			continue
 		}
 
-		// We have an Xorg or Xvfb process -- check to make sure it's for our running user
+		// We have a display server process -- check to make sure it's for our running user
 		uids, err := p.UidsWithContext(ctx)
 		if err != nil {
 			r.slogger.Log(ctx, slog.LevelDebug,
@@ -241,88 +245,74 @@ func (r *DesktopUsersProcessesRunner) displayFromXDisplayServerProcess(ctx conte
 				break
 			}
 		}
+		if !uidMatch {
+			continue
+		}
 
-		if uidMatch {
-			// We have a match! Grab the display value.
-			// The Xorg process may look like:
-			// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
-			// The Xvfb process looks like:
-			// Xvfb :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -screen 0 3840x2560x24
-			cmdlineArgs := strings.Split(cmdline, " ")
-			if len(cmdlineArgs) < 2 {
-				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
-				continue
-			}
+		// We have a match! Grab the DISPLAY value from the display server process's connection to the display socket.
+		display, err := r.getDisplayFromDisplayServerConnections(ctx, p.Pid)
+		if err == nil {
+			return display
+		}
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"could not extract display from open connections for process",
+			"pid", p.Pid,
+			"cmdline", cmdline,
+			"err", err,
+		)
 
-			// Confirm that this is a legitimate display value. (Newer versions of Xorg omit the display value from
-			// the list of arguments, so we need to weed those out.)
-			if displayRegex.MatchString(cmdlineArgs[1]) {
-				return cmdlineArgs[1]
-			}
+		// We weren't able to get the DISPLAY value from the open connections. Try to parse it from the command-line args instead.
+		// The xwayland process looks like:
+		// /usr/bin/Xwayland :0 -rootless -noreset -accessx -core -auth /run/user/1000/.mutter-Xwaylandauth.ROP401 -listen 4 -listen 5 -displayfd 6 -initfd 7
+		// The Xorg process may look like:
+		// /usr/lib/xorg/Xorg :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -logfile /dev/null -verbose 3 -config /tmp/chrome_remote_desktop_j5rldjlk.conf
+		// The Xvfb process looks like:
+		// Xvfb :20 -auth /home/<user>/.Xauthority -nolisten tcp -noreset -screen 0 3840x2560x24
+		cmdlineArgs := strings.Split(cmdline, " ")
+		if len(cmdlineArgs) < 2 {
+			// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
+			continue
+		}
+
+		if displayRegex.MatchString(cmdlineArgs[1]) {
+			return cmdlineArgs[1]
 		}
 	}
 
 	return defaultDisplay
 }
 
-func (r *DesktopUsersProcessesRunner) displayFromXwayland(ctx context.Context, uid int32) string {
-	//For wayland, DISPLAY is not included in loginctl show-session output -- in GNOME,
-	// Mutter spawns Xwayland and sets $DISPLAY at the same time. Find $DISPLAY by finding
-	// the Xwayland process and examining its args.
-	processes, err := process.ProcessesWithContext(ctx)
+const displaySocketPrefix = "/tmp/.X11-unix/X"
+
+// getDisplayFromDisplayServerConnections looks at the open connections from the given PID,
+// looking for the display socket to map to the correct display.
+func (r *DesktopUsersProcessesRunner) getDisplayFromDisplayServerConnections(ctx context.Context, pid int32) (string, error) {
+	openConns, err := net.ConnectionsPidWithContext(ctx, "unix", pid)
 	if err != nil {
-		r.slogger.Log(ctx, slog.LevelDebug,
-			"could not query processes to find Xwayland process",
-			"err", err,
-		)
-		return defaultDisplay
+		return "", fmt.Errorf("getting open connections for display server process: %w", err)
 	}
 
-	for _, p := range processes {
-		cmdline, err := p.CmdlineWithContext(ctx)
+	for _, openConn := range openConns {
+		if !strings.HasPrefix(openConn.Laddr.IP, displaySocketPrefix) {
+			continue
+		}
+
+		// We have the socket -- extract the display number
+		potentialDisplayNum := strings.TrimPrefix(openConn.Laddr.IP, displaySocketPrefix)
+		displayNum, err := strconv.Atoi(potentialDisplayNum)
 		if err != nil {
 			r.slogger.Log(ctx, slog.LevelDebug,
-				"could not get cmdline slice for process",
+				"could not parse display number from display socket",
+				"socket", openConn.String(),
 				"err", err,
 			)
 			continue
 		}
 
-		if !strings.Contains(cmdline, "Xwayland") {
-			continue
-		}
-
-		// We have an Xwayland process -- check to make sure it's for our running user
-		uids, err := p.UidsWithContext(ctx)
-		if err != nil {
-			r.slogger.Log(ctx, slog.LevelDebug,
-				"could not get uids for process",
-				"err", err,
-			)
-			continue
-		}
-		uidMatch := false
-		for _, procUid := range uids {
-			if procUid == uid {
-				uidMatch = true
-				break
-			}
-		}
-
-		if uidMatch {
-			// We have a match! Grab the display value. The xwayland process looks like:
-			// /usr/bin/Xwayland :0 -rootless -noreset -accessx -core -auth /run/user/1000/.mutter-Xwaylandauth.ROP401 -listen 4 -listen 5 -displayfd 6 -initfd 7
-			cmdlineArgs := strings.Split(cmdline, " ")
-			if len(cmdlineArgs) < 2 {
-				// Process is somehow malformed or not what we're looking for -- continue so we can evaluate the following process
-				continue
-			}
-
-			return cmdlineArgs[1]
-		}
+		return fmt.Sprintf(":%d", displayNum), nil
 	}
 
-	return defaultDisplay
+	return "", fmt.Errorf("socket not found for pid %d", pid)
 }
 
 // getWaylandDisplay returns the appropriate value to set as WAYLAND_DISPLAY
