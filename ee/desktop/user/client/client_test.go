@@ -9,9 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
-
 	"github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +42,7 @@ func TestClient_GetAndShutdown(t *testing.T) {
 
 			socketPath := testSocketPath(t)
 			shutdownChan := make(chan struct{})
-			server, err := server.New(log.NewNopLogger(), validAuthToken, socketPath, shutdownChan, nil)
+			server, err := server.New(multislogger.New().Logger, validAuthToken, socketPath, shutdownChan, nil)
 			require.NoError(t, err)
 
 			go func() {

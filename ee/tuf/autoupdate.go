@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -44,9 +46,28 @@ const (
 
 var binaries = []autoupdatableBinary{binaryLauncher, binaryOsqueryd}
 
+var autoupdatableBinaryMap = map[string]autoupdatableBinary{
+	"launcher": binaryLauncher,
+	"osqueryd": binaryOsqueryd,
+}
+
 type ReleaseFileCustomMetadata struct {
 	Target string `json:"target"`
 }
+
+// Control server subsystem (used to send "update now" commands)
+const AutoupdateSubsystemName = "autoupdate"
+
+type (
+	controlServerAutoupdateRequest struct {
+		BinariesToUpdate []binaryToUpdate `json:"binaries_to_update"`
+	}
+
+	// In the future, we may allow for setting a particular version here as well
+	binaryToUpdate struct {
+		Name string `json:"name"`
+	}
+)
 
 type librarian interface {
 	Available(binary autoupdatableBinary, targetFilename string) bool
@@ -65,6 +86,7 @@ type TufAutoupdater struct {
 	osquerierRetryInterval time.Duration
 	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	updateLock             *sync.Mutex
 	interrupt              chan struct{}
 	interrupted            bool
 	signalRestart          chan error
@@ -93,6 +115,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
 		store:                  k.AutoupdateErrorsStore(),
+		updateLock:             &sync.Mutex{},
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
 		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
@@ -196,7 +219,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	defer cleanupTicker.Stop()
 
 	for {
-		if err := ta.checkForUpdate(); err != nil {
+		if err := ta.checkForUpdate(binaries); err != nil {
 			ta.storeError(err)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
@@ -231,6 +254,62 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 	ta.interrupted = true
 
 	ta.interrupt <- struct{}{}
+}
+
+// Do satisfies the actionqueue.actor interface; it allows the control server to send
+// requests down to autoupdate immediately.
+func (ta *TufAutoupdater) Do(data io.Reader) error {
+	var updateRequest controlServerAutoupdateRequest
+	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received update request in unexpected format from control server, discarding",
+			"err", err,
+		)
+		// We don't return an error because we don't want the actionqueue to retry this request
+		return nil
+	}
+
+	binariesToUpdate := make([]autoupdatableBinary, 0)
+	for _, b := range updateRequest.BinariesToUpdate {
+		if val, ok := autoupdatableBinaryMap[b.Name]; ok {
+			binariesToUpdate = append(binariesToUpdate, val)
+			continue
+		}
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received request from control server autoupdate unknown binary, ignoring",
+			"unknown_binary", b.Name,
+		)
+	}
+
+	if len(binariesToUpdate) == 0 {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received request from control server to check for update now, but no valid binaries specified in request",
+		)
+		return nil
+	}
+
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"received request from control server to check for update now",
+		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
+	)
+
+	if err := ta.checkForUpdate(binariesToUpdate); err != nil {
+		ta.storeError(err)
+		ta.slogger.Log(context.TODO(), slog.LevelError,
+			"error checking for update per control server request",
+			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
+			"err", err,
+		)
+
+		return fmt.Errorf("could not check for update: %w", err)
+	}
+
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully checked for update per control server request",
+		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
+	)
+
+	return nil
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
@@ -287,7 +366,10 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
-func (ta *TufAutoupdater) checkForUpdate() error {
+func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) error {
+	ta.updateLock.Lock()
+	defer ta.updateLock.Unlock()
+
 	// Attempt an update a couple times before returning an error -- sometimes we just hit caching issues.
 	errs := make([]error, 0)
 	successfulUpdate := false
@@ -314,7 +396,7 @@ func (ta *TufAutoupdater) checkForUpdate() error {
 	// Check for and download any new releases that are available
 	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
-	for _, binary := range binaries {
+	for _, binary := range binariesToCheck {
 		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
