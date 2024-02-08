@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -14,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/pkg/backoff"
 )
@@ -27,7 +26,7 @@ type notificationSender interface {
 // UserServer provides IPC for the root desktop runner to communicate with the user desktop processes.
 // It allows the runner process to send notficaitons and commands to the desktop processes.
 type UserServer struct {
-	logger           log.Logger
+	slogger          *slog.Logger
 	server           *http.Server
 	listener         net.Listener
 	shutdownChan     chan<- struct{}
@@ -37,11 +36,11 @@ type UserServer struct {
 	refreshListeners []func()
 }
 
-func New(logger log.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*UserServer, error) {
+func New(slogger *slog.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*UserServer, error) {
 	userServer := &UserServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
-		logger:       log.With(logger, "component", "desktop_server"),
+		slogger:      slogger.With("component", "desktop_server"),
 		socketPath:   socketPath,
 		notifier:     notifier,
 	}
@@ -74,7 +73,10 @@ func New(logger log.Logger, authToken string, socketPath string, shutdownChan ch
 	userServer.server.RegisterOnShutdown(func() {
 		// remove socket on shutdown
 		if err := userServer.removeSocket(); err != nil {
-			level.Error(logger).Log("msg", "removing socket on shutdown", "err", err)
+			slogger.Log(context.TODO(), slog.LevelError,
+				"removing socket on shutdown",
+				"err", err,
+			)
 		}
 	})
 
@@ -119,7 +121,10 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	b, err := io.ReadAll(req.Body)
 	if err != nil {
-		level.Error(s.logger).Log("msg", "could not read body of notification request", "err", err)
+		s.slogger.Log(context.TODO(), slog.LevelError,
+			"could not read body of notification request",
+			"err", err,
+		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -127,13 +132,19 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 
 	var notificationToSend notify.Notification
 	if err := json.Unmarshal(b, &notificationToSend); err != nil {
-		level.Error(s.logger).Log("msg", "could not decode notification request", "err", err)
+		s.slogger.Log(context.TODO(), slog.LevelError,
+			"could not decode notification request",
+			"err", err,
+		)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if err := s.notifier.SendNotification(notificationToSend); err != nil {
-		level.Error(s.logger).Log("msg", "could not send notification", "err", err)
+		s.slogger.Log(context.TODO(), slog.LevelError,
+			"could not send notification",
+			"err", err,
+		)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -165,13 +176,17 @@ func (s *UserServer) authMiddleware(next http.Handler) http.Handler {
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
 
 		if len(authHeader) != 2 {
-			level.Debug(s.logger).Log("msg", "malformed authorization header")
+			s.slogger.Log(context.TODO(), slog.LevelDebug,
+				"malformed authorization header",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if authHeader[1] != s.authToken {
-			level.Debug(s.logger).Log("msg", "invalid authorization token")
+			s.slogger.Log(context.TODO(), slog.LevelDebug,
+				"invalid authorization token",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

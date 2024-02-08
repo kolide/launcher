@@ -1,7 +1,8 @@
 package menu
 
 import (
-	"github.com/go-kit/kit/log/level"
+	"context"
+	"log/slog"
 )
 
 // actionFlare performs the launcher flare action. This will make more sense once flare is uploading
@@ -11,7 +12,10 @@ type actionFlare struct {
 
 func (a actionFlare) Perform(m *menu) {
 	if err := runFlare(); err != nil {
-		level.Error(m.logger).Log("msg", "error creating flare", "err", err)
+		m.slogger.Log(context.TODO(), slog.LevelError,
+			"error creating flare",
+			"err", err,
+		)
 	}
 }
 

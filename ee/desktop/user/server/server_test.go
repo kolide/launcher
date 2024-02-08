@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,7 +116,12 @@ func testHandler() http.Handler {
 func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buffer) (*UserServer, chan struct{}) {
 	shutdownChan := make(chan struct{})
 
-	server, err := New(log.NewLogfmtLogger(logBytes), authHeader, socketPath, shutdownChan, nil)
+	slogger := slog.New(slog.NewTextHandler(logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
+	server, err := New(slogger, authHeader, socketPath, shutdownChan, nil)
 	require.NoError(t, err)
 	return server, shutdownChan
 }
