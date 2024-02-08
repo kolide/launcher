@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/go-kit/log"
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
