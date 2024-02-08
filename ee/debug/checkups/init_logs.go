@@ -11,16 +11,16 @@ import (
 	"runtime"
 )
 
-type SysLogs struct {
+type InitLogs struct {
 	status  Status
 	summary string
 }
 
-func (c *SysLogs) Name() string {
-	return "SysLogs"
+func (c *InitLogs) Name() string {
+	return "InitLogs"
 }
 
-func (c *SysLogs) Run(ctx context.Context, fullFH io.Writer) error {
+func (c *InitLogs) Run(ctx context.Context, fullFH io.Writer) error {
 	c.status = Passing
 
 	// if were discarding, just return
@@ -33,31 +33,31 @@ func (c *SysLogs) Run(ctx context.Context, fullFH io.Writer) error {
 
 	switch runtime.GOOS {
 	case "darwin":
-		writeDarwinSysLogs(logZip)
+		writeDarwinInitLogs(logZip)
 	case "windows":
-		writeWindowsSysLogs(ctx, logZip)
+		writeWindowsInitLogs(ctx, logZip)
 	}
 
 	return nil
 }
 
-func (c *SysLogs) Status() Status {
+func (c *InitLogs) Status() Status {
 	return c.status
 }
 
-func (c *SysLogs) Summary() string {
+func (c *InitLogs) Summary() string {
 	return c.summary
 }
 
-func (c *SysLogs) ExtraFileName() string {
-	return "sys_logs.zip"
+func (c *InitLogs) ExtraFileName() string {
+	return "init_logs.zip"
 }
 
-func (c *SysLogs) Data() any {
+func (c *InitLogs) Data() any {
 	return nil
 }
 
-func writeDarwinSysLogs(logZip *zip.Writer) {
+func writeDarwinInitLogs(logZip *zip.Writer) {
 	stdMatches, _ := filepath.Glob("/var/log/kolide-k2/*")
 
 	for _, f := range stdMatches {
@@ -78,7 +78,7 @@ func writeDarwinSysLogs(logZip *zip.Writer) {
 	}
 }
 
-func writeWindowsSysLogs(ctx context.Context, logZip *zip.Writer) {
+func writeWindowsInitLogs(ctx context.Context, logZip *zip.Writer) {
 	cmdStr := `Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='launcher'} | ConvertTo-Json`
 	cmd := exec.CommandContext(ctx, "powershell", "-Command", cmdStr) //nolint:forbidigo // This is just a debugging tool, not launcher proper
 
