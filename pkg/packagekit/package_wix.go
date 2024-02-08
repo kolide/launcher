@@ -137,7 +137,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		wixArgs = append(wixArgs, wix.WithService(launcherService))
 	}
 
-	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes(), wixArgs...)
+	wixTool, err := wix.New(po.Root, po.Identifier, mainWxsContent.Bytes(), wixArgs...)
 	if err != nil {
 		return fmt.Errorf("making wixTool: %w", err)
 	}
