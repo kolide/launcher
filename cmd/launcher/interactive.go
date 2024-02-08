@@ -32,7 +32,7 @@ func runInteractive(args []string) error {
 		return err
 	}
 
-	logger := logutil.NewCLILogger(*flDebug)
+	logger := logutil.NewServerLogger(*flDebug)
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
