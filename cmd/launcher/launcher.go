@@ -344,6 +344,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
+	var actionsQueue *actionqueue.ActionQueue
 	if k.ControlServerURL() == "" {
 		slogger.Log(ctx, slog.LevelDebug,
 			"control server URL not set, will not create control service",
@@ -374,7 +375,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
 		// create an action queue for all other action style commands
-		actionsQueue := actionqueue.New(
+		actionsQueue = actionqueue.New(
 			k,
 			actionqueue.WithContext(ctx),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
@@ -475,6 +476,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+		if actionsQueue != nil {
+			actionsQueue.RegisterActor(tuf.AutoupdateSubsystemName, tufAutoupdater)
+		}
 	}
 
 	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
