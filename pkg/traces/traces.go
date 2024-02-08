@@ -77,8 +77,12 @@ func startSpanWithExtractedAttributes(ctx context.Context, keyVals ...interface{
 
 // SetError records the error on the span and sets the span's status to error.
 func SetError(span trace.Span, err error) {
+	// These are some otel ways to record errors. But we're not sure where they come through in GCP traces
 	span.RecordError(err)
 	span.SetStatus(codes.Error, err.Error())
+
+	// Dump the error into a span attribute, because :shrug:
+	span.SetAttributes(attribute.String("error.message", err.Error()))
 }
 
 // buildAttributes takes the given keyVals, expected to be pairs representing the key
