@@ -82,7 +82,7 @@ func SetError(span trace.Span, err error) {
 	span.SetStatus(codes.Error, err.Error())
 
 	// Dump the error into a span attribute, because :shrug:
-	span.SetAttributes(attribute.String("error.message", err.Error()))
+	span.SetAttributes(semconv.ExceptionMessage(err.Error()))
 }
 
 // buildAttributes takes the given keyVals, expected to be pairs representing the key
