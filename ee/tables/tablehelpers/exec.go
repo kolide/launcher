@@ -58,8 +58,6 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd al
 		"cmd", cmd.String(),
 	)
 
-	// FIXME:  log if the error is a timeout
-
 	switch err := cmd.Run(); {
 	case err == nil:
 		return stdout.Bytes(), nil
