@@ -358,7 +358,7 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	r.slogger.Log(ctx, slog.LevelInfo,
 		"launching osqueryd",
-		"arg0", o.cmd.Path,
+		"path", o.cmd.Path,
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
@@ -384,7 +384,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		)
 
 		r.slogger.Log(ctx, slog.LevelWarn,
-			"error removing osquery extension socket",
+			"fatal error starting osquery -- could not exec.",
 			msgPairs...,
 		)
 		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
