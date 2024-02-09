@@ -6,7 +6,6 @@ package nix_env_upgradeable
 import (
 	"fmt"
 	"io"
-	"os/exec"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -56,7 +55,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
-			flattened, err := t.Xml(output, flattenOpts...)
+			flattened, err := dataflatten.Xml(output, flattenOpts...)
 			if err != nil {
 				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
 				continue
@@ -90,9 +89,9 @@ func (t *Table) getUserPackages(ctx context.Context, uid string) ([]byte, error)
 		return nil, fmt.Errorf("runAsUser nix-env command as user %s: %w", uid, err)
 	}
 
-	data, err := io.ReadAll(output)
+	data, err := io.ReadAll(stdout)
 	if err != nil {
-		return nil, fmt.Errorf("ReadAll nix-env output: %w", err)
+		return nil, fmt.Errorf("ReadAll nix-env stdout: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
