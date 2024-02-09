@@ -84,7 +84,7 @@ func Lsof(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func NixEnv(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, "/run/current-system/sw/bin/nix-env", arg...)
+	return validatedCommand(ctx, "/nix/var/nix/profiles/default/bin/nix-env", arg...)
 }
 
 func Nftables(ctx context.Context, arg ...string) (*exec.Cmd, error) {
