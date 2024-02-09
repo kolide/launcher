@@ -110,6 +110,8 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	slogger := k.Slogger().With("component", "osquery_extension")
+
 	if opts.EnrollSecret == "" {
 		return nil, errors.New("empty enroll secret")
 	}
@@ -146,23 +148,23 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
 			"err", err,
 		)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
 	} else if nodekey == "" {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), slog.LevelDebug,
 			"NewExtension did not find a nodekey. Likely first enroll",
 		)
 	} else {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), slog.LevelDebug,
 			"NewExtension found existing nodekey",
 		)
 	}
 
 	return &Extension{
-		slogger:       k.Slogger().With("component", "osquery_extension"),
+		slogger:       slogger,
 		serviceClient: client,
 		knapsack:      k,
 		NodeKey:       nodekey,
