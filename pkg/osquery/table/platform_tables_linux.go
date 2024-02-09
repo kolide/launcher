@@ -48,7 +48,6 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 		dataflattentable.TablePluginExec(logger, "kolide_lsblk", dataflattentable.JsonType,
 			allowedcmd.Lsblk, []string{"-fJp"},
 		),
-		dataflattentable.TablePluginExec(logger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
 		dataflattentable.TablePluginExec(logger, "kolide_wsone_uem_status_enroll", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--enroll"}),
 		dataflattentable.TablePluginExec(logger, "kolide_wsone_uem_status_dependency", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--dependency"}),
 		dataflattentable.TablePluginExec(logger, "kolide_wsone_uem_status_profile", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--profile"}),
