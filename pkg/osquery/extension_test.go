@@ -62,8 +62,10 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
+	m := mocks.NewKnapsack(t)
+	m.On("Slogger").Return(multislogger.New().Logger)
 
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, nil, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
