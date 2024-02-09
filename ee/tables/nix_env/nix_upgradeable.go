@@ -4,6 +4,7 @@
 package nix_env_upgradeable
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -73,7 +74,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) getUserPackages(ctx context.Context, uid string) ([]byte, error) {
-	cmd, err := t.execCC(ctx, []string{"--query", "--installed", "-c", "--xml"})
+	cmd, err := t.execCC(ctx, "--query", "--installed", "-c", "--xml")
 	if err != nil {
 		return nil, fmt.Errorf("creating nix-env command: %w", err)
 	}
@@ -84,8 +85,7 @@ func (t *Table) getUserPackages(ctx context.Context, uid string) ([]byte, error)
 	}
 
 	user_runner := runner.DesktopUsersProcessesRunner.New()
-	err := user_runner.runAsUser(ctx, uid, cmd)
-	if err != nil {
+	if err := user_runner.runAsUser(ctx, uid, cmd); err != nil {
 		return nil, fmt.Errorf("runAsUser nix-env command as user %s: %w", uid, err)
 	}
 
