@@ -62,6 +62,10 @@ func Ip(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/ip", arg...)
 }
 
+func Journalctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/journalctl", arg...)
+}
+
 func Loginctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/loginctl", arg...)
 }
