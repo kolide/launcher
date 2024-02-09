@@ -132,6 +132,10 @@ func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
 }
 
+func Ws1HubUtil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/opt/vmware/ws1-hub/bin/ws1HubUtil", arg...)
+}
+
 func XdgOpen(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/xdg-open", arg...)
 }
