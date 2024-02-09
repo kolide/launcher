@@ -49,6 +49,7 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 			allowedcmd.Lsblk, []string{"-fJp"},
 		),
 		dataflattentable.TablePluginExec(logger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
+		dataflattentable.TablePluginExec(logger, "kolide_wsone_uem_enroll_status", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--enroll"}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_falconctl_systags", simple_array.New("systags"), allowedcmd.Falconctl, []string{"-g", "--systags"}),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_apt_upgradeable", apt.Parser, allowedcmd.Apt, []string{"list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_dnf_upgradeable", dnf.Parser, allowedcmd.Dnf, []string{"check-update"}, dataflattentable.WithIncludeStderr()),
