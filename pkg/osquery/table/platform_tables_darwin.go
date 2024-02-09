@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/ee/tables/profiles"
 	"github.com/kolide/launcher/ee/tables/pwpolicy"
+	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
 	"github.com/kolide/launcher/ee/tables/zfs"
 	_ "github.com/mattn/go-sqlite3"
@@ -88,7 +89,7 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 		macos_software_update.RecommendedUpdates(logger),
 		macos_software_update.AvailableProducts(logger),
 		MachoInfo(),
-		Spotlight(),
+		spotlight.TablePlugin(logger),
 		TouchIDUserConfig(logger),
 		TouchIDSystemConfig(logger),
 		UserAvatar(logger),

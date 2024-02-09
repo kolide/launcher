@@ -80,7 +80,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	l.slogger.Log(context.TODO(), level,
+	l.slogger.Log(context.TODO(), level, // nolint:sloglint // it's fine to not have a constant or literal here
 		msg,
 		"caller", caller,
 	)
