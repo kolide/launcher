@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func getEnrollDetails(ctx context.Context, osquerydPath string) (service.EnrollmentDetails, error) {
+func GetEnrollDetails(ctx context.Context, osquerydPath string) (service.EnrollmentDetails, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 

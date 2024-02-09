@@ -443,7 +443,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		span.AddEvent("skipping_enrollment_details")
 	} else {
 		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(ctx, osqPath)
+			enrollDetails, err = GetEnrollDetails(ctx, osqPath)
 			if err != nil {
 				e.slogger.Log(ctx, slog.LevelDebug,
 					"getEnrollDetails failed in backoff",
