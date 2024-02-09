@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="0" maxComparedVersion="121.0.1" name="firefox-121.0.1" outputName="" pname="firefox" system="x86_64-linux" version="121.0.1" versionDiff="=">
+    <output name="out" />
+  </item>
+  <item attrPath="1" maxComparedVersion="2.42.0" name="git-2.42.0" outputName="" pname="git" system="x86_64-linux" version="2.42.0" versionDiff="=">
+    <output name="out" />
+  </item>
+</items>
