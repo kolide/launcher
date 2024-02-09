@@ -44,23 +44,7 @@ type Extension struct {
 	enrollMutex   sync.Mutex
 	done          chan struct{}
 	interrupted   bool
-	wg            sync.WaitGroup
 	slogger       *slog.Logger
-
-	initialRunner *initialRunner
-}
-
-// SetQuerier sets an osquery client on the extension, allowing
-// the extension to query the running osqueryd instance.
-func (e *Extension) SetQuerier(client Querier) {
-	if e.initialRunner != nil {
-		e.initialRunner.client = client
-	}
-}
-
-// Querier allows querying osquery.
-type Querier interface {
-	Query(sql string) ([]map[string]string, error)
 }
 
 const (
@@ -160,11 +144,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
-	identifier, err := IdentifierFromDB(configStore)
-	if err != nil {
-		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
-	}
-
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
 		k.Slogger().Log(context.TODO(), slog.LevelDebug,
@@ -182,13 +161,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		)
 	}
 
-	initialRunner := &initialRunner{
-		slogger:    k.Slogger().With("component", "initial_runner"),
-		identifier: identifier,
-		store:      k.InitialResultsStore(),
-		enabled:    false, // currently, we don't want to run the initial runner, even if the flag is set
-	}
-
 	return &Extension{
 		slogger:       k.Slogger().With("component", "osquery_extension"),
 		serviceClient: client,
@@ -196,21 +168,29 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
-		initialRunner: initialRunner,
 	}, nil
 }
 
-// Start begins the goroutines responsible for background processing (currently
-// just the log buffer flushing routine). It should be shut down by calling the
-// Shutdown() method.
-func (e *Extension) Start() {
-	e.wg.Add(1)
-	go e.writeLogsLoopRunner()
+func (e *Extension) Execute() error {
+	// Process logs until shutdown
+	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
+	defer ticker.Stop()
+	for {
+		e.writeAndPurgeLogs()
+
+		// select to either exit or write another batch of logs
+		select {
+		case <-e.done:
+			return nil
+		case <-ticker.Chan():
+			// Resume loop
+		}
+	}
 }
 
 // Shutdown should be called to cleanup the resources and goroutines associated
 // with this extension.
-func (e *Extension) Shutdown() {
+func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if e.interrupted {
 		return
@@ -218,7 +198,6 @@ func (e *Extension) Shutdown() {
 	e.interrupted = true
 
 	close(e.done)
-	e.wg.Wait()
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
@@ -588,10 +567,6 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 	config = e.setVerbose(config, osqueryVerbose)
 
-	if err := e.initialRunner.Execute(config, e.writeLogsWithReenroll); err != nil {
-		return "", fmt.Errorf("initial run results: %w", err)
-	}
-
 	return config, nil
 }
 
@@ -693,23 +668,6 @@ func (e *Extension) writeAndPurgeLogs() {
 				"type", typ.String(),
 				"err", err,
 			)
-		}
-	}
-}
-
-func (e *Extension) writeLogsLoopRunner() {
-	defer e.wg.Done()
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
-	defer ticker.Stop()
-	for {
-		e.writeAndPurgeLogs()
-
-		// select to either exit or write another batch of logs
-		select {
-		case <-e.done:
-			return
-		case <-ticker.Chan():
-			// Resume loop
 		}
 	}
 }
@@ -1017,4 +975,12 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	return nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
