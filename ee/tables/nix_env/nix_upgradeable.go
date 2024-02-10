@@ -7,13 +7,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
+	"os/user"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -85,8 +88,7 @@ func (t *Table) getUserPackages(ctx context.Context, uid string) ([]byte, error)
 		return nil, fmt.Errorf("assigning StdoutPipe for nix-env command: %w", err)
 	}
 
-	user_runner := runner.DesktopUsersProcessesRunner.New()
-	if err := user_runner.runAsUser(ctx, uid, cmd); err != nil {
+	if err := runAsUser(ctx, uid, cmd); err != nil {
 		return nil, fmt.Errorf("runAsUser nix-env command as user %s: %w", uid, err)
 	}
 
@@ -100,4 +102,43 @@ func (t *Table) getUserPackages(ctx context.Context, uid string) ([]byte, error)
 	}
 
 	return data, nil
+}
+
+func runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("getting current user: %w", err)
+	}
+
+	runningUser, err := user.LookupId(uid)
+	if err != nil {
+		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
+	}
+
+	if currentUser.Uid != "0" {
+		if currentUser.Uid != runningUser.Uid {
+			return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
+		}
+
+		return cmd.Start()
+	}
+
+	runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
+	}
+
+	runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(runningUserUid),
+			Gid: uint32(runningUserGid),
+		},
+	}
+
+	return cmd.Start()
 }
