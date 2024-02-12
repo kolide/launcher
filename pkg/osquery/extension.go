@@ -148,17 +148,17 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
 			"err", err,
 		)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
 	} else if nodekey == "" {
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension did not find a nodekey. Likely first enroll",
 		)
 	} else {
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension found existing nodekey",
 		)
 	}
