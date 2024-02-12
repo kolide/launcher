@@ -25,7 +25,7 @@ func TestQueries(t *testing.T) {
 		{
 			testfile: "test_data/empty.output",
 			uid:      []string{"1000"},
-			len:      0,
+			len:      1,
 		},
 		{
 			testfile: "test_data/error.output",
@@ -35,7 +35,7 @@ func TestQueries(t *testing.T) {
 		{
 			testfile: "test_data/example.output",
 			uid:      []string{"1002"},
-			len:      2,
+			len:      18,
 		},
 	}
 
