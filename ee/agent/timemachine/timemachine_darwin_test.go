@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -80,6 +81,11 @@ func TestAddExclusions(t *testing.T) {
 	knapsack.On("RootDirectory").Return(testDir)
 
 	AddExclusions(context.TODO(), knapsack)
+
+	// we've seen some flake in CI here where the exclusions have not been
+	// updated by the time we perform assertions, so sleep for a bit to give
+	// OS some time to catch up
+	time.Sleep(1 * time.Second)
 
 	// ensure the files are included / excluded as expected
 	for fileName, shouldBeExcluded := range shouldBeExcluded {
