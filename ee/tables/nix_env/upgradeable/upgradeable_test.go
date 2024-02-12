@@ -6,11 +6,11 @@ package nix_env_upgradeable
 import (
 	"context"
 	"os/exec"
-	"path"
 	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,24 +18,24 @@ func TestQueries(t *testing.T) {
 	t.Parallel()
 
 	var tests = []struct {
-		name string
-		file string
-		uid  []string
+		testfile string
+		uid      []string
+		len      int
 	}{
 		{
-			name: "no data",
-			file: path.Join("test_data", "empty.output"),
-			uid:  []string{"1000"},
+			testfile: "test_data/empty.output",
+			uid:      []string{"1000"},
+			len:      0,
 		},
 		{
-			name: "recursion error on profile",
-			file: path.Join("test_data", "error.output"),
-			uid:  []string{"1001"},
+			testfile: "test_data/error.output",
+			uid:      []string{"1001"},
+			len:      0,
 		},
 		{
-			name: "example query data",
-			file: path.Join("test_data", "example.output"),
-			uid:  []string{"1002"},
+			testfile: "test_data/example.output",
+			uid:      []string{"1002"},
+			len:      2,
 		},
 	}
 
@@ -43,20 +43,20 @@ func TestQueries(t *testing.T) {
 		tt := tt
 		testTable := &Table{
 			logger: log.NewNopLogger(),
-			execCC: execFaker(tt.file),
+			execCC: execFaker(tt.testfile),
 		}
 
-		testName := tt.file + "/" + tt.name
-		t.Run(testName, func(t *testing.T) {
+		t.Run(tt.testfile, func(t *testing.T) {
 			t.Parallel()
 
 			mockQC := tablehelpers.MockQueryContext(map[string][]string{
 				"uid": tt.uid,
 			})
 
-			_, err := testTable.generate(context.TODO(), mockQC)
+			rows, err := testTable.generate(context.TODO(), mockQC)
 
 			require.NoError(t, err)
+			assert.Equal(t, tt.len, len(rows))
 		})
 	}
 
