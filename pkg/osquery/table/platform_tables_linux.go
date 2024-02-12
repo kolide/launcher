@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/simple_array"
 	"github.com/kolide/launcher/ee/tables/fscrypt_info"
 	"github.com/kolide/launcher/ee/tables/gsettings"
+	"github.com/kolide/launcher/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/ee/tables/secureboot"
 	"github.com/kolide/launcher/ee/tables/xfconf"
 	"github.com/kolide/launcher/ee/tables/xrdb"
@@ -33,6 +34,7 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 		cryptsetup.TablePlugin(logger),
 		gsettings.Settings(logger),
 		gsettings.Metadata(logger),
+		nix_env_upgradeable.TablePlugin(logger),
 		secureboot.TablePlugin(logger),
 		xrdb.TablePlugin(logger),
 		fscrypt_info.TablePlugin(logger),
