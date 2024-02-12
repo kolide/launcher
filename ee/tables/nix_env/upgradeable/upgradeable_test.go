@@ -29,12 +29,12 @@ func TestQueries(t *testing.T) {
 		},
 		{
 			testfile: "test_data/error.output",
-			uid:      []string{"1001"},
+			uid:      []string{"1000"},
 			len:      0,
 		},
 		{
 			testfile: "test_data/example.output",
-			uid:      []string{"1002"},
+			uid:      []string{"1000"},
 			len:      18,
 		},
 	}
