@@ -85,6 +85,10 @@ jobs:
       run: make github-launcherapp
       if: ${{ contains(matrix.os, 'macos') }}
 
+    - name: Test output
+      run: cd ee/tables/nix_env/upgradeable && go test -v
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+
     - name: Test
       run: make test
 

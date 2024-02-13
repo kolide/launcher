@@ -51,6 +51,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			output, err := t.getUserPackages(ctx, uid)
 			if err != nil {
+				fmt.Println("failure querying user installed packages")
+				fmt.Println(err)
 				level.Info(t.logger).Log("msg", "failure querying user installed packages", "err", err, "uid", uid)
 				continue
 			}
@@ -62,6 +64,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			flattened, err := dataflatten.Xml(output, flattenOpts...)
 			if err != nil {
+				fmt.Println("failure flattening output")
+				fmt.Println(err)
 				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
 				continue
 			}
