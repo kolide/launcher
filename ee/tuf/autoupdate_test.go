@@ -517,7 +517,6 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 			mockKnapsack.On("UpdateDirectory").Return("")
 			mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-			mockKnapsack.On("UseTUFAutoupdater").Return(true)
 			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 			mockQuerier := newMockQuerier(t)
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
@@ -585,7 +584,6 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
-	mockKnapsack.On("UseTUFAutoupdater").Return(true)
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
