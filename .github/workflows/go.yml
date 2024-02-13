@@ -29,6 +29,10 @@ jobs:
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
+    - name: List users ubuntu
+      run: getent passwd
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
