@@ -5,6 +5,7 @@ package nix_env_upgradeable
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -22,11 +23,10 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const allowedCharacters = "0123456789-"
+const allowedCharacters = "0123456789"
 
 type Table struct {
 	logger    log.Logger
-	tableName string
 	execCC    allowedcmd.AllowedCommand
 }
 
@@ -37,21 +37,25 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 
 	t := &Table{
 		logger:    logger,
-		tableName: "kolide_nix_upgradeable",
 		execCC:    allowedcmd.NixEnv,
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return table.NewPlugin("kolide_nix_upgradeable", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	for _, uid := range tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters)) {
+	uids := tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters))
+	if len(uids) < 1 {
+		return results, errors.New("kolide_nix_upgradeable requires at least one user id to be specified")
+	}
+
+	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			output, err := t.getUserPackages(ctx, uid)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "failure querying user installed packages", "err", err, "uid", uid)
+				level.Info(t.logger).Log("msg", "failure querying user installed packages", "err", err, "target_uid", uid)
 				continue
 			}
 
