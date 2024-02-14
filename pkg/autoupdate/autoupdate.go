@@ -1,6 +1,4 @@
-// Package autoupdate provides some limited functionality related to
-// autoupdating. The majority of the functionality now lives in
-// ee/tuf.
+// Package autoupdate has largely been superseded by ee/tuf.
 package autoupdate
 
 // UpdateChannel determines the TUF target for a Updater.
