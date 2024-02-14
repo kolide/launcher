@@ -194,14 +194,13 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}()
 
 	if runtime.GOOS == "darwin" {
-		currentOsVersion, err := osversion()
+		runner.osVersion, err = osversion()
 		if err != nil {
 			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"getting os version",
 				"err", err,
 			)
 		}
-		runner.osVersion = currentOsVersion
 	}
 
 	setInstance(runner)
