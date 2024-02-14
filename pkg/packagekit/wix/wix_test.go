@@ -42,6 +42,7 @@ func TestWixPackage(t *testing.T) {
 	require.NoError(t, err)
 
 	wixTool, err := New(packageRoot,
+		"test-identifier",
 		mainWxsContent,
 		As32bit(),                 // wine is 32bit
 		SkipValidation(),          // wine can't validate

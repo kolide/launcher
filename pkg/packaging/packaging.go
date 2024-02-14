@@ -123,7 +123,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	launcherMapFlags := map[string]string{
 		"hostname":           p.Hostname,
-		"root_directory":     p.canonicalizePath(p.rootDir),
+		"root_directory":     p.canonicalizeRootDir(p.rootDir),
 		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
 		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
 	}
@@ -726,12 +726,19 @@ func (p *PackageOptions) setupDirectories() error {
 		// to take that into account for the guid generation.
 		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
 		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
+		// we handle the data directory setup differently for windows before final package generation,
+		// see wix/wix.go's setupDataDir method for additional context
 		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data")
 	default:
 		return fmt.Errorf("unknown platform %s", string(p.target.Platform))
 	}
 
 	for _, d := range []string{p.binDir, p.confDir, p.rootDir} {
+		// don't create the root (data) directory for windows before heat can run
+		if p.target.Platform == Windows && d == p.rootDir {
+			continue
+		}
+
 		if err := os.MkdirAll(filepath.Join(p.packageRoot, d), fsutil.DirMode); err != nil {
 			return fmt.Errorf("create dir (%s) for %s: %w", d, p.target.String(), err)
 		}
@@ -774,4 +781,16 @@ func (p *PackageOptions) canonicalizePath(path string) string {
 	}
 
 	return filepath.Join(`C:\Program Files\Kolide`, path)
+}
+
+// canonicalizeRootDir functions similarly to canonicalizePath above,
+// only impacting MSI targets. This is broken out from canonicalizePath
+// because for windows the full path to the root directory should be expanded
+// into ProgramData
+func (p *PackageOptions) canonicalizeRootDir(path string) string {
+	if p.target.Package != Msi {
+		return path
+	}
+
+	return filepath.Join(`C:\ProgramData\Kolide`, path)
 }

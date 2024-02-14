@@ -217,7 +217,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			)
 		}
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...)
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...) // nolint:sloglint // it's fine to not have a constant or literal here
 	}(time.Now())
 
 	nodekey, reauth, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)

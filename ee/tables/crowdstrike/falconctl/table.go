@@ -31,6 +31,7 @@ var (
 		"--metadata-query",
 		"--rfm-reason",
 		"--rfm-state",
+		"--rfm-history",
 		"--tags",
 		"--version",
 	}

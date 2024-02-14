@@ -11,21 +11,24 @@ import (
 	"strings"
 
 	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
 type wixTool struct {
-	wixPath        string     // Where is wix installed
-	packageRoot    string     // What's the root of the packaging files?
-	buildDir       string     // The wix tools want to work in a build dir.
-	msArch         string     // What's the Microsoft architecture name?
-	services       []*Service // array of services.
-	dockerImage    string     // If in docker, what image?
-	skipValidation bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
-	skipCleanup    bool       // Skip cleaning temp dirs. Useful when debugging wix generation
-	cleanDirs      []string   // directories to rm on cleanup
-	ui             bool       // whether or not to include a ui
-	extraFiles     []extraFile
+	wixPath         string     // Where is wix installed
+	packageRoot     string     // What's the root of the packaging files?
+	packageDataRoot string     // What's the root for the data directory packaging files?
+	buildDir        string     // The wix tools want to work in a build dir.
+	msArch          string     // What's the Microsoft architecture name?
+	services        []*Service // array of services.
+	dockerImage     string     // If in docker, what image?
+	skipValidation  bool       // Skip light validation. Seems to be needed for running in 32bit wine environments.
+	skipCleanup     bool       // Skip cleaning temp dirs. Useful when debugging wix generation
+	cleanDirs       []string   // directories to rm on cleanup
+	ui              bool       // whether or not to include a ui
+	extraFiles      []extraFile
+	identifier      string // the package identifier used for directory path creation (e.g. kolide-k2)
 
 	execCC func(context.Context, string, ...string) *exec.Cmd // Allows test overrides
 }
@@ -102,12 +105,12 @@ func SkipCleanup() WixOpt {
 // New takes a packageRoot of files, and a wxsContent of xml wix
 // configuration, and will return a struct with methods for building
 // packages with.
-func New(packageRoot string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
+func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts ...WixOpt) (*wixTool, error) {
 	wo := &wixTool{
 		wixPath:     FindWixInstall(),
 		packageRoot: packageRoot,
-
-		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
+		identifier:  identifier,
+		execCC:      exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
 	for _, opt := range wixOpts {
@@ -169,6 +172,10 @@ func (wo *wixTool) Cleanup() {
 // Package will run through the wix steps to produce a resulting
 // package. The path for the resultant package will be returned.
 func (wo *wixTool) Package(ctx context.Context) (string, error) {
+	if err := wo.setupDataDir(ctx); err != nil {
+		return "", fmt.Errorf("adding data file stubs: %w", err)
+	}
+
 	if err := wo.heat(ctx); err != nil {
 		return "", fmt.Errorf("running heat: %w", err)
 	}
@@ -236,6 +243,57 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	return nil
 }
 
+// setupDataDir handles the windows data directory setup by pre-creating any files
+// that we want to ensure are cleaned up on uninstall.
+// this is handled before the other heat/candle/light calls because we must issue
+// a separate heat call to harvest the data directory in ProgramData instead of Program Files
+func (wo *wixTool) setupDataDir(ctx context.Context) error {
+	var err error
+	wo.packageDataRoot, err = os.MkdirTemp("", "package.packageDataRoot")
+	if err != nil {
+		return fmt.Errorf("unable to create temporary packaging data directory: %w", err)
+	}
+
+	wo.cleanDirs = append(wo.cleanDirs, wo.packageDataRoot)
+
+	fullIdentifier := fmt.Sprintf("Launcher-%s", wo.identifier)
+	dataFilesPath := filepath.Join(wo.packageDataRoot, fullIdentifier, "data")
+
+	if err := os.MkdirAll(dataFilesPath, fsutil.DirMode); err != nil {
+		return fmt.Errorf("create base data dir error for wix harvest: %w", err)
+	}
+
+	// touch these known file names before harvest to ensure they're cleaned up on uninstall
+	dataFilenames := []string{"launcher.db", "metadata.json", "kv.sqlite"}
+
+	for _, fname := range dataFilenames {
+		newPath := filepath.Join(dataFilesPath, fname)
+		newFile, err := os.Create(newPath)
+		if err != nil {
+			return err
+		}
+
+		newFile.Close()
+	}
+
+	_, err = wo.execOut(ctx,
+		filepath.Join(wo.wixPath, "heat.exe"),
+		"dir", wo.packageDataRoot,
+		"-nologo",
+		"-gg", "-g1",
+		"-srd",
+		"-sfrag",
+		"-ke",
+		"-cg", "AppData",
+		"-template", "fragment",
+		"-dr", "DATADIR",
+		"-var", "var.SourceDataDir",
+		"-out", "AppData.wxs",
+	)
+
+	return err
+}
+
 // heat invokes wix's heat command. This examines a directory and
 // "harvests" the files into an xml structure. See
 // http://wixtoolset.org/documentation/manual/v3/overview/heat.html
@@ -259,6 +317,7 @@ func (wo *wixTool) heat(ctx context.Context) error {
 		"-var", "var.SourceDir",
 		"-out", "AppFiles.wxs",
 	)
+
 	return err
 }
 
@@ -271,9 +330,11 @@ func (wo *wixTool) candle(ctx context.Context) error {
 		"-nologo",
 		"-arch", wo.msArch,
 		"-dSourceDir="+wo.packageRoot,
+		"-dSourceDataDir="+wo.packageDataRoot,
 		"-ext", "WixUtilExtension",
 		"Installer.wxs",
 		"AppFiles.wxs",
+		"AppData.wxs",
 	)
 	return err
 }
@@ -286,8 +347,10 @@ func (wo *wixTool) light(ctx context.Context) error {
 		"-nologo",
 		"-dcl:high", // compression level
 		"-dSourceDir=" + wo.packageRoot,
+		"-dSourceDataDir=" + wo.packageDataRoot,
 		"-ext", "WixUtilExtension",
 		"AppFiles.wixobj",
+		"AppData.wixobj",
 		"Installer.wixobj",
 		"-out", "out.msi",
 	}
@@ -315,6 +378,7 @@ func (wo *wixTool) execOut(ctx context.Context, argv0 string, args ...string) (s
 		"run",
 		"--entrypoint", "",
 		"-v", fmt.Sprintf("%s:%s", wo.packageRoot, wo.packageRoot),
+		"-v", fmt.Sprintf("%s:%s", wo.packageDataRoot, wo.packageDataRoot),
 		"-v", fmt.Sprintf("%s:%s", wo.buildDir, wo.buildDir),
 		"-w", wo.buildDir,
 		wo.dockerImage,

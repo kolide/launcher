@@ -325,7 +325,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
-	updateChannel := autoupdate.Stable
+	var updateChannel autoupdate.UpdateChannel
 	switch *flUpdateChannel {
 	case "", "stable":
 		updateChannel = autoupdate.Stable

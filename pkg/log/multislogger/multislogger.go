@@ -2,9 +2,9 @@ package multislogger
 
 import (
 	"context"
-	"io"
 	"log/slog"
 
+	"github.com/kolide/kit/ulid"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -33,20 +33,17 @@ var ctxValueKeysToAdd = []contextKey{
 
 type MultiSlogger struct {
 	*slog.Logger
-	handlers []slog.Handler
+	handlers      []slog.Handler
+	launcherRunId string
 }
 
 // New creates a new multislogger if no handlers are passed in, it will
 // create a logger that discards all logs
 func New(h ...slog.Handler) *MultiSlogger {
-	ms := new(MultiSlogger)
-
-	if len(h) == 0 {
-		// if we don't have any handlers passed in, we'll just discard the logs
-		// do not add the discard handler to the handlers so it will not be
-		// included when a handler is added
-		ms.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-		return ms
+	ms := &MultiSlogger{
+		// setting to fanout with no handlers is noop
+		Logger:        slog.New(slogmulti.Fanout()),
+		launcherRunId: ulid.New(),
 	}
 
 	ms.AddHandler(h...)
@@ -54,19 +51,19 @@ func New(h ...slog.Handler) *MultiSlogger {
 }
 
 // AddHandler adds a handler to the multislogger, this creates a branch new
-// slog.Logger under the the hood, mean any attributes added with
-// Logger.With will be lost
+// slog.Logger under the the hood, and overwrites old Logger memory address,
+// this means any attributes added with Logger.With will be lost
 func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
 
 	// we have to rebuild the handler everytime because the slogmulti package we're
 	// using doesn't support adding handlers after the Fanout handler has been created
-	m.Logger = slog.New(
+	*m.Logger = *slog.New(
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
 			Handler(slogmulti.Fanout(m.handlers...)),
-	)
+	).With("launcher_run_id", m.launcherRunId)
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {

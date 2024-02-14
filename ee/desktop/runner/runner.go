@@ -151,7 +151,7 @@ func (pr processRecord) String() string {
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
-func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
+func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
 		interrupt:              make(chan struct{}),
 		uidProcs:               make(map[string]processRecord),
@@ -178,7 +178,7 @@ func New(k types.Knapsack, opts ...desktopUsersProcessesRunnerOption) (*DesktopU
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
 
-	rs, err := runnerserver.New(runner.slogger, k)
+	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
 		return nil, fmt.Errorf("creating desktop runner server: %w", err)
 	}
@@ -385,7 +385,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
 			"runner processSpawningEnabled set by control server",
-			"processSpawningEnabled", r.processSpawningEnabled,
+			"process_spawning_enabled", r.processSpawningEnabled,
 		)
 	}
 }
@@ -811,7 +811,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		scanner := bufio.NewScanner(combined)
 
 		for scanner.Scan() {
-			r.slogger.Log(context.TODO(), slog.LevelDebug,
+			r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
 				scanner.Text(),
 				"uid", uid,
 				"subprocess", "desktop",

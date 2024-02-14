@@ -38,8 +38,10 @@ import (
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
@@ -49,11 +51,16 @@ import (
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
+	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
+	"github.com/osquery/osquery-go/plugin/config"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 
 	"go.etcd.io/bbolt"
 )
@@ -181,8 +188,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
-	// reassign slogger to knapsack slogger to get launcher run id added to slogger
-	slogger = k.Slogger()
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
@@ -196,7 +201,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(logger)
+	runGroup := rungroup.NewRunGroup(slogger)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -217,6 +222,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 		k.AddSlogHandler(logShipper.SlogHandler())
+
 		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
@@ -309,25 +315,67 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
-	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, _, err := createExtensionRuntime(ctx, k, client)
+	// create the osquery extension
+	extension, err := createExtensionRuntime(ctx, k, client)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
-	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
+	runGroup.Add("osqueryExtension", extension.Execute, extension.Shutdown)
+	// create the runner that will launch osquery
+	osqueryRunner := osqueryruntime.New(
+		k,
+		osqueryruntime.WithKnapsack(k),
+		osqueryruntime.WithOsquerydBinary(k.OsquerydPath()),
+		osqueryruntime.WithRootDirectory(k.RootDirectory()),
+		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
+		osqueryruntime.WithLogger(logger),
+		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
+		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
+		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
+			k.Slogger().With(
+				"component", "osquery",
+				"osqlevel", "stdout",
+			),
+			k.RootDirectory(),
+			kolidelog.WithLevel(slog.LevelDebug),
+		)),
+		osqueryruntime.WithStderr(kolidelog.NewOsqueryLogAdapter(
+			k.Slogger().With(
+				"component", "osquery",
+				"osqlevel", "stderr",
+			),
+			k.RootDirectory(),
+			kolidelog.WithLevel(slog.LevelInfo),
+		)),
+		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
+		osqueryruntime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
+		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
+		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
+		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
+		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
+		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),
+		osqueryruntime.WithOsqueryExtensionPlugins(
+			config.NewPlugin("kolide_grpc", extension.GenerateConfigs),
+			distributed.NewPlugin("kolide_grpc", extension.GetQueries, extension.WriteResults),
+			osquerylogger.NewPlugin("kolide_grpc", extension.LogString),
+		),
+	)
+	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
 
 	versionInfo := version.Version()
-	k.SystemSlogger().Info("started kolide launcher",
+	k.SystemSlogger().Log(ctx, slog.LevelInfo,
+		"started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
 
 	if traceExporter != nil {
-		traceExporter.SetOsqueryClient(extension)
+		traceExporter.SetOsqueryClient(osqueryRunner)
 	}
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
+	var actionsQueue *actionqueue.ActionQueue
 	if k.ControlServerURL() == "" {
 		slogger.Log(ctx, slog.LevelDebug,
 			"control server URL not set, will not create control service",
@@ -346,6 +394,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		runner, err = desktopRunner.New(
 			k,
+			controlService,
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 		)
@@ -357,7 +406,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
 		// create an action queue for all other action style commands
-		actionsQueue := actionqueue.New(
+		actionsQueue = actionqueue.New(
 			k,
 			actionqueue.WithContext(ctx),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
@@ -434,7 +483,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			)
 		}
 
-		ls.SetQuerier(extension)
+		ls.SetQuerier(osqueryRunner)
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
@@ -449,14 +498,17 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			k,
 			metadataClient,
 			mirrorClient,
-			extension,
-			tuf.WithOsqueryRestart(runnerRestart),
+			osqueryRunner,
+			tuf.WithOsqueryRestart(osqueryRunner.Restart),
 		)
 		if err != nil {
 			return fmt.Errorf("creating TUF autoupdater updater: %w", err)
 		}
 
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+		if actionsQueue != nil {
+			actionsQueue.RegisterActor(tuf.AutoupdateSubsystemName, tufAutoupdater)
+		}
 	}
 
 	startupSpan.End()
