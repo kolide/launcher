@@ -423,15 +423,6 @@ func (fc *FlagController) Autoupdate() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Autoupdate)).get(fc.getControlServerValue(keys.Autoupdate))
 }
 
-func (fc *FlagController) SetNotaryServerURL(url string) error {
-	return fc.setControlServerValue(keys.NotaryServerURL, []byte(url))
-}
-func (fc *FlagController) NotaryServerURL() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryServerURL),
-	).get(fc.getControlServerValue(keys.NotaryServerURL))
-}
-
 func (fc *FlagController) SetTufServerURL(url string) error {
 	return fc.setControlServerValue(keys.TufServerURL, []byte(url))
 }
@@ -469,15 +460,6 @@ func (fc *FlagController) UpdateChannel() string {
 		WithSanitizer(autoupdate.SanitizeUpdateChannel),
 		WithDefaultString(string(fc.cmdLineOpts.UpdateChannel)),
 	).get(fc.getControlServerValue(keys.UpdateChannel))
-}
-
-func (fc *FlagController) SetNotaryPrefix(prefix string) error {
-	return fc.setControlServerValue(keys.NotaryPrefix, []byte(prefix))
-}
-func (fc *FlagController) NotaryPrefix() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryPrefix),
-	).get(fc.getControlServerValue(keys.NotaryPrefix))
 }
 
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {

@@ -255,8 +255,6 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		KolideServerURL:                 randomHostname,
 		LoggingInterval:                 time.Duration(randomInt) * time.Second,
 		MirrorServerURL:                 "https://dl.kolide.co",
-		NotaryPrefix:                    "kolide",
-		NotaryServerURL:                 "https://notary.kolide.co",
 		TufServerURL:                    "https://tuf.kolide.com",
 		OsquerydPath:                    windowsAddExe("/dev/null"),
 		OsqueryHealthcheckStartupDelay:  10 * time.Minute,
