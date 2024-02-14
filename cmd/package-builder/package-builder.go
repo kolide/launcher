@@ -149,20 +149,15 @@ func runMake(args []string) error {
 			env.String("TARGETS", defaultTargets()),
 			"Target platforms to build. Specified in the form platform-init-package",
 		)
-		flNotaryURL = flagset.String(
-			"notary_url",
-			env.String("NOTARY_URL", ""),
-			"The Notary update server",
+		flTufURL = flagset.String(
+			"tuf_url",
+			env.String("TUF_URL", ""),
+			"The TUF update server",
 		)
 		flMirrorURL = flagset.String(
 			"mirror_url",
 			env.String("MIRROR_URL", ""),
 			"The mirror server for autoupdates",
-		)
-		flNotaryPrefix = flagset.String(
-			"notary_prefix",
-			env.String("NOTARY_PREFIX", ""),
-			"The prefix for Notary path that contains the collections",
 		)
 		flWixPath = flagset.String(
 			"wix_path",
@@ -248,9 +243,8 @@ func runMake(args []string) error {
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
 		CacheDir:          cacheDir,
-		NotaryURL:         *flNotaryURL,
+		TufServerURL:      *flTufURL,
 		MirrorURL:         *flMirrorURL,
-		NotaryPrefix:      *flNotaryPrefix,
 		WixPath:           *flWixPath,
 		WixSkipCleanup:    *flWixSkipCleanup,
 		DisableService:    *flDisableService,

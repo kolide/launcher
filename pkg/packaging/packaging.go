@@ -50,9 +50,8 @@ type PackageOptions struct {
 	CertPins          string
 	RootPEM           string
 	CacheDir          string
-	NotaryURL         string
+	TufServerURL      string
 	MirrorURL         string
-	NotaryPrefix      string
 	WixPath           string
 	MSIUI             bool
 	WixSkipCleanup    bool
@@ -157,16 +156,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherBoolFlags = append(launcherBoolFlags, "insecure")
 	}
 
-	if p.NotaryURL != "" {
-		launcherMapFlags["notary_url"] = p.NotaryURL
+	if p.TufServerURL != "" {
+		launcherMapFlags["tuf_url"] = p.TufServerURL
 	}
 
 	if p.MirrorURL != "" {
 		launcherMapFlags["mirror_url"] = p.MirrorURL
-	}
-
-	if p.NotaryPrefix != "" {
-		launcherMapFlags["notary_prefix"] = p.NotaryPrefix
 	}
 
 	if p.RootPEM != "" {
