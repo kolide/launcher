@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"runtime"
@@ -11,8 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
+
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -22,7 +24,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
-	"github.com/osquery/osquery-go/plugin/logger"
+	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -45,115 +47,109 @@ const (
 type Runner struct {
 	instance     *OsqueryInstance
 	instanceLock sync.Mutex
+	slogger      *slog.Logger
+	knapsack     types.Knapsack
 	shutdown     chan struct{}
 	interrupted  bool
 	opts         []OsqueryInstanceOption
 }
 
-// LaunchInstance will launch an instance of osqueryd via a very configurable
-// API as defined by the various OsqueryInstanceOption functional options. The
-// returned instance should be shut down via the Shutdown() method.
-// For example, a more customized caller might do something like the following:
-//
-//	  instance, err := LaunchInstance(
-//	    WithOsquerydBinary("/usr/local/bin/osqueryd"),
-//	    WithRootDirectory("/var/foobar"),
-//	    WithConfigPluginFlag("custom"),
-//			 WithOsqueryExtensionPlugins(
-//			 	 config.NewPlugin("custom", custom.GenerateConfigs),
-//			   logger.NewPlugin("custom", custom.LogString),
-//			 	 tables.NewPlugin("foobar", custom.FoobarColumns, custom.FoobarGenerate),
-//	    ),
-//	  )
-func LaunchInstance(cancel context.CancelFunc, opts ...OsqueryInstanceOption) (*Runner, error) {
+func New(k types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
 	runner := newRunner(opts...)
-	if err := runner.Start(cancel); err != nil {
-		return nil, err
-	}
-	return runner, nil
-}
+	runner.slogger = k.Slogger().With("component", "osquery_runner")
+	runner.knapsack = k
 
-// LaunchUnstartedInstance sets up a osqueryd instance similar to LaunchInstance, but gives the caller control over
-// when the instance will run. Useful for controlling startup and shutdown goroutines.
-func LaunchUnstartedInstance(opts ...OsqueryInstanceOption) *Runner {
-	runner := newRunner(opts...)
-	return runner
-}
-
-func (r *Runner) Start(cancel context.CancelFunc) error {
-	if err := r.launchOsqueryInstance(); err != nil {
-		return fmt.Errorf("starting instance: %w", err)
-	}
-	r.instance.knapsack.RegisterChangeObserver(r,
+	k.RegisterChangeObserver(runner,
 		keys.WatchdogEnabled, keys.WatchdogMemoryLimitMB, keys.WatchdogUtilizationLimitPercent, keys.WatchdogDelaySec,
 	)
 
-	go func() {
-		// This loop waits for the completion of the async routines,
-		// and either restarts the instance (if Shutdown was not
-		// called), or stops (if Shutdown was called).
-		for {
-			// Wait for async processes to exit
-			<-r.instance.doneCtx.Done()
-			level.Info(r.instance.logger).Log("msg", "osquery instance exited")
+	return runner
+}
 
-			select {
-			case <-r.shutdown:
-				// Intentional shutdown, this loop can exit
-				if err := r.instance.stats.Exited(nil); err != nil {
-					level.Info(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
-				}
-				cancel() // let the extension know to shut down
-				return
-			default:
-				// Don't block
-			}
+func (r *Runner) Run() error {
+	if err := r.launchOsqueryInstance(); err != nil {
+		return fmt.Errorf("starting instance: %w", err)
+	}
 
-			// Error case
-			err := r.instance.errgroup.Wait()
-			level.Info(r.instance.logger).Log(
-				"msg", "unexpected restart of instance",
-				"err", err,
-			)
+	// This loop waits for the completion of the async routines,
+	// and either restarts the instance (if Shutdown was not
+	// called), or stops (if Shutdown was called).
+	for {
+		// Wait for async processes to exit
+		<-r.instance.doneCtx.Done()
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"osquery instance exited",
+		)
 
-			if err := r.instance.stats.Exited(err); err != nil {
-				level.Info(r.instance.logger).Log("msg", "error recording osquery instance exit to history", "err", err)
-			}
-
-			r.instanceLock.Lock()
-			opts := r.instance.opts
-			r.instance = newInstance()
-			r.instance.opts = opts
-			for _, opt := range r.opts {
-				opt(r.instance)
-			}
-			if err := r.launchOsqueryInstance(); err != nil {
-				level.Info(r.instance.logger).Log(
-					"msg", "fatal error restarting instance, shutting down",
+		select {
+		case <-r.shutdown:
+			// Intentional shutdown, this loop can exit
+			if err := r.instance.stats.Exited(nil); err != nil {
+				r.slogger.Log(context.TODO(), slog.LevelWarn,
+					"error recording osquery instance exit to history",
 					"err", err,
 				)
-				r.instanceLock.Unlock()
-				if err := r.Shutdown(); err != nil {
-					level.Error(r.instance.logger).Log(
-						"msg", "could not perform shutdown",
-						"err", err,
-					)
-				}
-				cancel() // let the extension know to shut down
-				return
+			}
+			return nil
+		default:
+			// Don't block
+		}
+
+		// Error case -- osquery instance shut down and needs to be restarted
+		err := r.instance.errgroup.Wait()
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"unexpected restart of instance",
+			"err", err,
+		)
+
+		if err := r.instance.stats.Exited(err); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelWarn,
+				"error recording osquery instance exit to history",
+				"err", err,
+			)
+		}
+
+		r.instanceLock.Lock()
+		opts := r.instance.opts
+		r.instance = newInstance()
+		r.instance.opts = opts
+		for _, opt := range r.opts {
+			opt(r.instance)
+		}
+		if err := r.launchOsqueryInstance(); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelWarn,
+				"fatal error restarting instance, shutting down",
+				"err", err,
+			)
+			r.instanceLock.Unlock()
+			if err := r.Shutdown(); err != nil {
+				r.slogger.Log(context.TODO(), slog.LevelWarn,
+					"could not perform shutdown",
+					"err", err,
+				)
 			}
 
-			r.instanceLock.Unlock()
-
+			// Failed to restart instance -- exit rungroup so launcher can reload
+			return fmt.Errorf("restarting instance after unexpected exit: %w", err)
 		}
-	}()
-	return nil
+
+		r.instanceLock.Unlock()
+	}
 }
 
 func (r *Runner) Query(query string) ([]map[string]string, error) {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	return r.instance.Query(query)
+}
+
+func (r *Runner) Interrupt(_ error) {
+	if err := r.Shutdown(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not shut down runner on interrupt",
+			"err", err,
+		)
+	}
 }
 
 // Shutdown instructs the runner to permanently stop the running instance (no
@@ -179,17 +175,25 @@ func (r *Runner) Shutdown() error {
 // that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb,
 // and watchdog_utilization_limit_percent.
 func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
-	level.Debug(r.instance.logger).Log("msg", "control server flags changed, restarting instance to apply", "flags", fmt.Sprintf("%+v", flagKeys))
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"control server flags changed, restarting instance to apply",
+		"flags", fmt.Sprintf("%+v", flagKeys),
+	)
 
 	if err := r.Restart(); err != nil {
-		level.Error(r.instance.logger).Log("msg", "could not restart osquery instance after flag change")
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"could not restart osquery instance after flag change",
+			"err", err,
+		)
 	}
 }
 
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
 func (r *Runner) Restart() error {
-	level.Debug(r.instance.logger).Log("msg", "runner.Restart called")
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"runner.Restart called",
+	)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	// Cancelling will cause all of the cleanup routines to execute, and a
@@ -256,8 +260,8 @@ func (r *Runner) launchOsqueryInstance() error {
 		// The extensions files should be owned by the process's UID or by root.
 		// Osquery will refuse to load the extension otherwise.
 		if err := ensureProperPermissions(o, path); err != nil {
-			level.Info(o.logger).Log(
-				"msg", "unable to ensure proper permissions on extension path",
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"unable to ensure proper permissions on extension path",
 				"path", path,
 				"err", err,
 			)
@@ -291,10 +295,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	// If a logger plugin has not been set by the caller, we set a logger
 	// plugin that outputs logs to the default application logger.
 	if o.opts.loggerPluginFlag == "" {
-		logString := func(ctx context.Context, typ logger.LogType, logText string) error {
+		logString := func(ctx context.Context, typ osquerylogger.LogType, logText string) error {
 			return nil
 		}
-		o.opts.extensionPlugins = append(o.opts.extensionPlugins, logger.NewPlugin("internal_noop", logString))
+		o.opts.extensionPlugins = append(o.opts.extensionPlugins, osquerylogger.NewPlugin("internal_noop", logString))
 		o.opts.loggerPluginFlag = "internal_noop"
 	}
 
@@ -326,8 +330,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	var currentOsquerydBinaryPath string
 	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, o.logger)
 	if err != nil {
-		level.Debug(o.logger).Log(
-			"msg", "could not get latest version of osqueryd from new autoupdate library, falling back",
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"could not get latest version of osqueryd from new autoupdate library, falling back",
 			"err", err,
 		)
 		currentOsquerydBinaryPath = autoupdate.FindNewest(
@@ -352,17 +356,17 @@ func (r *Runner) launchOsqueryInstance() error {
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	o.cmd.SysProcAttr = setpgid()
 
-	level.Info(o.logger).Log(
-		"msg", "launching osqueryd",
-		"arg0", o.cmd.Path,
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"launching osqueryd",
+		"path", o.cmd.Path,
 		"args", strings.Join(o.cmd.Args, " "),
 	)
 
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
 	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
-		level.Info(o.logger).Log(
-			"msg", "error removing osquery extension socket",
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"error removing osquery extension socket",
 			"path", paths.extensionSocketPath,
 			"err", err,
 		)
@@ -376,17 +380,22 @@ func (r *Runner) launchOsqueryInstance() error {
 		// update system and falling back to an earlier version.
 		msgPairs := append(
 			getOsqueryInfoForLog(o.cmd.Path),
-			"msg", "Fatal error starting osquery. Could not exec.",
 			"err", err,
 		)
 
-		level.Info(o.logger).Log(msgPairs...)
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"fatal error starting osquery -- could not exec.",
+			msgPairs...,
+		)
 		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
 	span.AddEvent("launched_osqueryd")
-	level.Info(o.logger).Log("msg", "launched osquery process", "osqueryd_pid", o.cmd.Process.Pid)
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"launched osquery process",
+		"osqueryd_pid", o.cmd.Process.Pid,
+	)
 
 	// wait for osquery to create the socket before moving on,
 	// this is intended to serve as a kind of health check
@@ -395,7 +404,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	if err := backoff.WaitFor(func() error {
 		_, err := os.Stat(paths.extensionSocketPath)
 		if err != nil {
-			level.Debug(o.logger).Log("msg", "osquery extension socket not created yet ... will retry", "path", paths.extensionSocketPath)
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"osquery extension socket not created yet ... will retry",
+				"path", paths.extensionSocketPath,
+			)
 		}
 		return err
 	}, 1*time.Minute, 1*time.Second); err != nil {
@@ -407,7 +419,10 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	stats, err := history.NewInstance()
 	if err != nil {
-		level.Info(o.logger).Log("msg", fmt.Sprint("osquery instance history error: ", err.Error()))
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"could not create new osquery instance history",
+			"err", err,
+		)
 	}
 	o.stats = stats
 
@@ -415,39 +430,56 @@ func (r *Runner) launchOsqueryInstance() error {
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "monitor osquery process")
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "monitor osquery process",
+		)
 
 		err := o.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
-			level.Info(o.logger).Log("msg", "osquery exited successfully")
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"osquery exited successfully",
+			)
 			// TODO: should this return nil?
 			return errors.New("osquery process exited successfully")
 		default:
 			msgPairs := append(
 				getOsqueryInfoForLog(o.cmd.Path),
-				"msg", "Error running osquery command",
 				"err", err,
 			)
 
-			level.Info(o.logger).Log(msgPairs...)
+			r.slogger.Log(ctx, slog.LevelWarn,
+				"error running osquery command",
+				msgPairs...,
+			)
 			return fmt.Errorf("running osqueryd command: %w", err)
 		}
 	})
 
 	// Kill osquery process on shutdown
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "kill osquery process on shutdown")
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "kill osquery process on shutdown",
+		)
 
 		<-o.doneCtx.Done()
-		level.Debug(o.logger).Log("msg", "Starting osquery shutdown")
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"starting osquery shutdown",
+		)
 		if o.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(o.cmd); err != nil {
 				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-					level.Debug(o.logger).Log("msg", "tried to stop osquery, but process already gone")
+					r.slogger.Log(ctx, slog.LevelDebug,
+						"tried to stop osquery, but process already gone",
+					)
 				} else {
-					level.Info(o.logger).Log("msg", "killing osquery process", "err", err)
+					r.slogger.Log(ctx, slog.LevelWarn,
+						"error killing osquery process",
+						"err", err,
+					)
 				}
 			}
 		}
@@ -478,7 +510,10 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	if len(o.opts.extensionPlugins) > 0 {
 		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.extensionManagerClient, o.opts.extensionPlugins); err != nil {
-			level.Info(o.logger).Log("msg", "Unable to create initial extension server. Stopping", "err", err)
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"unable to create initial extension server, stopping",
+				"err", err,
+			)
 			traces.SetError(span, fmt.Errorf("could not create an extension server: %w", err))
 			return fmt.Errorf("could not create an extension server: %w", err)
 		}
@@ -486,7 +521,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	if err := o.stats.Connected(o); err != nil {
-		level.Info(o.logger).Log("msg", "osquery instance history", "error", err)
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"could not set connection time for osquery instance history",
+			"err", err,
+		)
 	}
 
 	// Now spawn an extension manage to for the tables. We need to
@@ -497,7 +535,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	// TODO: Consider chunking, if we find we can only have so
 	// many tables per extension manager
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "kolide extension manager server launch")
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "kolide extension manager server launch",
+		)
 
 		plugins := table.PlatformTables(o.logger, currentOsquerydBinaryPath)
 
@@ -506,7 +547,10 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 
 		if err := o.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, o.extensionManagerClient, plugins); err != nil {
-			level.Info(o.logger).Log("msg", "Unable to create tables extension server. Stopping", "err", err)
+			r.slogger.Log(ctx, slog.LevelWarn,
+				"unable to create tables extension server, stopping",
+				"err", err,
+			)
 			return fmt.Errorf("could not create a table extension server: %w", err)
 		}
 		return nil
@@ -514,13 +558,20 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "health check on interval")
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "health check on interval",
+		)
 
 		if o.knapsack != nil && o.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
-			level.Debug(o.logger).Log("msg", "entering delay before starting osquery healthchecks")
+			r.slogger.Log(ctx, slog.LevelDebug,
+				"entering delay before starting osquery healthchecks",
+			)
 			select {
 			case <-time.After(o.knapsack.OsqueryHealthcheckStartupDelay()):
-				level.Debug(o.logger).Log("msg", "exiting delay before starting osquery healthchecks")
+				r.slogger.Log(ctx, slog.LevelDebug,
+					"exiting delay before starting osquery healthchecks",
+				)
 			case <-o.doneCtx.Done():
 				return o.doneCtx.Err()
 			}
@@ -550,17 +601,28 @@ func (r *Runner) launchOsqueryInstance() error {
 					if err == nil {
 						// err was nil, clear failed attempts
 						if i > 1 {
-							level.Debug(o.logger).Log("msg", "Health check passed. Clearing error", "attempt", i)
+							r.slogger.Log(ctx, slog.LevelDebug,
+								"healthcheck passed, clearing error",
+								"attempt", i,
+							)
 						}
 						break
 					}
 
 					if i == maxHealthChecks {
-						level.Info(o.logger).Log("msg", "Health check failed. Giving up", "attempt", i, "err", err)
+						r.slogger.Log(ctx, slog.LevelInfo,
+							"healthcheck failed, giving up",
+							"attempt", i,
+							"err", err,
+						)
 						return fmt.Errorf("health check failed: %w", err)
 					}
 
-					level.Debug(o.logger).Log("msg", "Health check failed. Will retry", "attempt", i, "err", err)
+					r.slogger.Log(ctx, slog.LevelDebug,
+						"healthcheck failed, will retry",
+						"attempt", i,
+						"err", err,
+					)
 					time.Sleep(1 * time.Second)
 				}
 			}
@@ -569,7 +631,10 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	// Cleanup temp dir
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "cleanup temp dir")
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "cleanup temp dir",
+		)
 
 		<-o.doneCtx.Done()
 		if o.usingTempDir && o.rmRootDirectory != nil {
