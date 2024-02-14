@@ -32,7 +32,6 @@ type autoupdateConfig struct {
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
-// For now, it is only available when launcher is on the nightly update channel.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
 	logger = log.With(logger, "component", "tuf_library_lookup")
 	cfg, err := getAutoupdateConfig(os.Args[1:])

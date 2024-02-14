@@ -17,7 +17,6 @@ import (
 func main() {
 	buildAll := strings.Join([]string{
 		"deps-go",
-		"install-tools",
 	}, ",")
 
 	fs := flag.NewFlagSet("make", flag.ExitOnError)

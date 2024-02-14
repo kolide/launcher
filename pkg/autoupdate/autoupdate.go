@@ -26,7 +26,5 @@ func SanitizeUpdateChannel(value string) string {
 }
 
 const (
-	DefaultMirror       = "https://dl.kolide.co"
-	DefaultNotary       = "https://notary.kolide.co"
-	DefaultNotaryPrefix = "kolide"
+	DefaultMirror = "https://dl.kolide.co"
 )

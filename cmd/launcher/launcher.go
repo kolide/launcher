@@ -487,9 +487,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
-	// If autoupdating is enabled, run the new autoupdater
+	// If autoupdating is enabled, run the autoupdater
 	if k.Autoupdate() {
-		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 30 * time.Second
 		mirrorClient := http.DefaultClient

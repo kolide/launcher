@@ -79,7 +79,7 @@ type Options struct {
 	Autoupdate bool
 	// TufServerURL is the URL for the tuf server.
 	TufServerURL string
-	// MirrorServerURL is the URL for the Notary mirror.
+	// MirrorServerURL is the URL for the TUF mirror.
 	MirrorServerURL string
 	// AutoupdateInterval is the interval at which Launcher will check for
 	// updates.
@@ -265,8 +265,8 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.Bool("control", false, "DEPRECATED")
 		_ = flagset.String("control_hostname", "", "DEPRECATED")
 		_ = flagset.Bool("disable_control_tls", false, "DEPRECATED")
-		_ = flagset.String("notary_url", autoupdate.DefaultNotary, "DEPRECATED")
-		_ = flagset.String("notary_prefix", autoupdate.DefaultNotaryPrefix, "DEPRECATED")
+		_ = flagset.String("notary_url", "", "DEPRECATED")
+		_ = flagset.String("notary_prefix", "", "DEPRECATED")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -505,11 +505,9 @@ func developerUsage(flagset *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("logging_interval")
 	fmt.Fprintf(os.Stderr, "\n")
-	printOpt("notary_url")
 	printOpt("mirror_url")
 	printOpt("autoupdate_interval")
 	printOpt("update_channel")
-	printOpt("notary_prefix")
 	fmt.Fprintf(os.Stderr, "\n")
 	printOpt("control_get_shells_interval")
 	fmt.Fprintf(os.Stderr, "\n")

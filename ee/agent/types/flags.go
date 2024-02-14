@@ -157,7 +157,7 @@ type Flags interface {
 	SetTufServerURL(url string) error
 	TufServerURL() string
 
-	// MirrorServerURL is the URL for the Notary mirror.
+	// MirrorServerURL is the URL for the TUF mirror.
 	SetMirrorServerURL(url string) error
 	MirrorServerURL() string
 

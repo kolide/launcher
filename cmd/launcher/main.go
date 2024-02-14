@@ -45,14 +45,6 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	// If there's a newer version of launcher on disk, use it.
-	// This does not call DeleteOldUpdates, on the theory that
-	// it's better left to the service to handle cleanup. This is
-	// a straight forward exec.
-	//
-	// launcher is _also_ called when we're checking update
-	// validity (with autoupdate.checkExecutable). This is
-	// somewhat awkward as we end up with extra call layers.
-	//
 	// Allow a caller to set `LAUNCHER_SKIP_UPDATES` as a way to
 	// skip exec'ing an update. This helps prevent launcher from
 	// fork-bombing itself. This is an ENV, because there's no
