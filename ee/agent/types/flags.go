@@ -153,10 +153,6 @@ type Flags interface {
 	SetAutoupdate(enabled bool) error
 	Autoupdate() bool
 
-	// NotaryServerURL is the URL for the Notary server.
-	SetNotaryServerURL(url string) error
-	NotaryServerURL() string
-
 	// TufServerURL is the URL for the tuf server.
 	SetTufServerURL(url string) error
 	TufServerURL() string
@@ -172,10 +168,6 @@ type Flags interface {
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 	SetUpdateChannel(channel string) error
 	UpdateChannel() string
-
-	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the Notary server
-	SetNotaryPrefix(prefix string) error
-	NotaryPrefix() string
 
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	SetAutoupdateInitialDelay(delay time.Duration) error
