@@ -50,6 +50,7 @@ type PackageOptions struct {
 	CertPins          string
 	RootPEM           string
 	CacheDir          string
+	TufServerURL      string
 	MirrorURL         string
 	WixPath           string
 	MSIUI             bool
@@ -153,6 +154,10 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	if p.Insecure {
 		launcherBoolFlags = append(launcherBoolFlags, "insecure")
+	}
+
+	if p.TufServerURL != "" {
+		launcherMapFlags["tuf_url"] = p.TufServerURL
 	}
 
 	if p.MirrorURL != "" {

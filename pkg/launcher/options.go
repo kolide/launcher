@@ -77,8 +77,6 @@ type Options struct {
 
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
-	// NotaryServerURL is the URL for the deprecated Notary server.
-	NotaryServerURL string
 	// TufServerURL is the URL for the tuf server.
 	TufServerURL string
 	// MirrorServerURL is the URL for the TUF mirror.
@@ -88,8 +86,6 @@ type Options struct {
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
 	UpdateChannel autoupdate.UpdateChannel
-	// NotaryPrefix is the path prefix used to store launcher and osqueryd binaries on the deprecated Notary server
-	NotaryPrefix string
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
@@ -268,9 +264,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
 		_ = flagset.Bool("control", false, "DEPRECATED")
 		_ = flagset.String("control_hostname", "", "DEPRECATED")
-		_ = flagset.Bool("disable_control_tls", false, "Disable TLS encryption for the control features")
-		_ = flagset.String("notary_url", "", "The deprecated Notary update server")
-		_ = flagset.String("notary_prefix", "", "The prefix for Notary path that contains the collections")
+		_ = flagset.Bool("disable_control_tls", false, "DEPRECATED")
+		_ = flagset.String("notary_url", "", "DEPRECATED")
+		_ = flagset.String("notary_prefix", "", "DEPRECATED")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")

@@ -149,6 +149,11 @@ func runMake(args []string) error {
 			env.String("TARGETS", defaultTargets()),
 			"Target platforms to build. Specified in the form platform-init-package",
 		)
+		flTufURL = flagset.String(
+			"tuf_url",
+			env.String("TUF_URL", ""),
+			"The TUF update server",
+		)
 		flMirrorURL = flagset.String(
 			"mirror_url",
 			env.String("MIRROR_URL", ""),
@@ -238,6 +243,7 @@ func runMake(args []string) error {
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
 		CacheDir:          cacheDir,
+		TufServerURL:      *flTufURL,
 		MirrorURL:         *flMirrorURL,
 		WixPath:           *flWixPath,
 		WixSkipCleanup:    *flWixSkipCleanup,
