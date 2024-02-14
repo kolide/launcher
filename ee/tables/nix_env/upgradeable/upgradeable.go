@@ -26,8 +26,8 @@ import (
 const allowedCharacters = "0123456789"
 
 type Table struct {
-	logger    log.Logger
-	execCC    allowedcmd.AllowedCommand
+	logger log.Logger
+	execCC allowedcmd.AllowedCommand
 }
 
 func TablePlugin(logger log.Logger) *table.Plugin {
@@ -36,8 +36,8 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger:    logger,
-		execCC:    allowedcmd.NixEnv,
+		logger: logger,
+		execCC: allowedcmd.NixEnv,
 	}
 
 	return table.NewPlugin("kolide_nix_upgradeable", columns, t.generate)
