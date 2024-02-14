@@ -194,14 +194,14 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}()
 
 	if runtime.GOOS == "darwin" {
-		osversion, err := osversion()
+		currentOsVersion, err := osversion()
 		if err != nil {
 			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"getting os version",
 				"err", err,
 			)
 		}
-		runner.osVersion = osversion
+		runner.osVersion = currentOsVersion
 	}
 
 	setInstance(runner)
@@ -880,7 +880,7 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 		return
 	}
 
-	osVersion, err := osversion()
+	currentOsVersion, err := osversion()
 	if err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelError,
 			"getting os version",
@@ -889,13 +889,13 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 		return
 	}
 
-	if osVersion != r.osVersion {
+	if currentOsVersion != r.osVersion {
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"os version changed, restarting desktop",
 			"old", r.osVersion,
-			"new", osVersion,
+			"new", currentOsVersion,
 		)
-		r.osVersion = osVersion
+		r.osVersion = currentOsVersion
 		r.killDesktopProcesses()
 	}
 }
