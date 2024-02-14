@@ -11,10 +11,6 @@ type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
 
-	// AutoloadedExtensions to load with osquery, expected to be in same
-	// directory as launcher binary.
-	AutoloadedExtensions() []string
-
 	// KolideServerURL is the URL of the management server to connect to.
 	SetKolideServerURL(url string) error
 	KolideServerURL() string

@@ -153,10 +153,6 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 	fc.overrides[key].Start(key, value, duration, overrideExpired)
 }
 
-func (fc *FlagController) AutoloadedExtensions() []string {
-	return fc.cmdLineOpts.AutoloadedExtensions
-}
-
 func (fc *FlagController) SetKolideServerURL(url string) error {
 	return fc.setControlServerValue(keys.KolideServerURL, []byte(url))
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
@@ -214,14 +213,6 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 	}
 }
 
-// WithAutoloadedExtensions defines a list of extensions to load
-// via the osquery autoloading.
-func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.autoloadedExtensions = append(i.opts.autoloadedExtensions, extensions...)
-	}
-}
-
 func WithKnapsack(k types.Knapsack) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.knapsack = k
@@ -317,7 +308,6 @@ type osqueryOptions struct {
 	configPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
-	autoloadedExtensions  []string
 	extensionSocketPath   string
 	enrollSecretPath      string
 	loggerPluginFlag      string
@@ -344,7 +334,7 @@ func (o osqueryOptions) requiredExtensions() []string {
 	extensionsMap := make(map[string]bool)
 	requiredExtensions := make([]string, 0)
 
-	for _, extension := range append([]string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag}, o.autoloadedExtensions...) {
+	for _, extension := range []string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag} {
 		// skip the osquery build-ins, since requiring them will cause osquery to needlessly wait.
 		if extension == "tls" {
 			continue
@@ -384,7 +374,6 @@ type osqueryFilePaths struct {
 	databasePath          string
 	extensionAutoloadPath string
 	extensionSocketPath   string
-	extensionPaths        []string
 	pidfilePath           string
 }
 
@@ -409,7 +398,6 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		augeasPath:            filepath.Join(opts.rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
-		extensionPaths:        make([]string, len(opts.autoloadedExtensions)),
 	}
 
 	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
@@ -417,41 +405,6 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		return nil, fmt.Errorf("creating autoload file: %w", err)
 	}
 	defer osqueryAutoloadFile.Close()
-
-	if len(opts.autoloadedExtensions) == 0 {
-		return osqueryFilePaths, nil
-	}
-
-	// Determine the path to the extension
-	exPath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("finding path of launcher executable: %w", err)
-	}
-
-	for index, extension := range opts.autoloadedExtensions {
-		// first see if we just got a file name and check to see if it exists in the executable directory
-		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
-
-		if _, err := os.Stat(extensionPath); err != nil {
-			// if we got an error, try the raw flag
-			extensionPath = extension
-
-			if _, err := os.Stat(extensionPath); err != nil {
-				if os.IsNotExist(err) {
-					return nil, fmt.Errorf("extension path does not exist: %s: %w", extension, err)
-				} else {
-					return nil, fmt.Errorf("could not stat extension path: %w", err)
-				}
-			}
-		}
-
-		osqueryFilePaths.extensionPaths[index] = extensionPath
-
-		_, err := osqueryAutoloadFile.WriteString(fmt.Sprintf("%s\n", extensionPath))
-		if err != nil {
-			return nil, fmt.Errorf("writing to autoload file: %w", err)
-		}
-	}
 
 	return osqueryFilePaths, nil
 }

@@ -52,22 +52,6 @@ func (_m *Knapsack) AgentFlagsStore() types.GetterSetterDeleterIteratorUpdater {
 	return r0
 }
 
-// AutoloadedExtensions provides a mock function with given fields:
-func (_m *Knapsack) AutoloadedExtensions() []string {
-	ret := _m.Called()
-
-	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-
-	return r0
-}
-
 // Autoupdate provides a mock function with given fields:
 func (_m *Knapsack) Autoupdate() bool {
 	ret := _m.Called()

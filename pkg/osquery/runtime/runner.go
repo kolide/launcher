@@ -256,18 +256,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
-	for _, path := range paths.extensionPaths {
-		// The extensions files should be owned by the process's UID or by root.
-		// Osquery will refuse to load the extension otherwise.
-		if err := ensureProperPermissions(o, path); err != nil {
-			r.slogger.Log(ctx, slog.LevelInfo,
-				"unable to ensure proper permissions on extension path",
-				"path", path,
-				"err", err,
-			)
-		}
-	}
-
 	// Populate augeas lenses, if requested
 	if o.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
