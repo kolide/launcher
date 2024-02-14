@@ -44,6 +44,8 @@ type Extension struct {
 	done          chan struct{}
 	interrupted   bool
 	slogger       *slog.Logger
+
+	logPublicationState *logPublicationState
 }
 
 const (
@@ -146,12 +148,13 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	}
 
 	return &Extension{
-		slogger:       slogger,
-		serviceClient: client,
-		knapsack:      k,
-		NodeKey:       nodekey,
-		Opts:          opts,
-		done:          make(chan struct{}),
+		slogger:             slogger,
+		serviceClient:       client,
+		knapsack:            k,
+		NodeKey:             nodekey,
+		Opts:                opts,
+		done:                make(chan struct{}),
+		logPublicationState: NewLogPublicationState(opts.MaxBytesPerBatch),
 	}, nil
 }
 
@@ -701,6 +704,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
+	batchTotalBytes := 0
 	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
@@ -714,7 +718,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			// 3. Else append it
 			//
 			// Note that (1) must come first, otherwise (2) will always trigger.
-			if len(v) > e.Opts.MaxBytesPerBatch {
+			if e.logPublicationState.exceedsCurrentBatchThreshold(len(v)) {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
 				e.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -724,8 +728,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+			} else if e.logPublicationState.exceedsCurrentBatchThreshold(totalBytes + len(v)) {
 				// Buffer is filled. Break the loop and come back later.
+				batchTotalBytes = totalBytes
 				break
 			} else {
 				logs = append(logs, string(v))
@@ -756,6 +761,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
+	e.logPublicationState.addPendingBatch(batchTotalBytes)
 	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
@@ -779,31 +785,35 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
+	invalid = invalid || isNodeInvalidErr(err)
+	// publication was successful- update logPublicationState and move on
+	if !invalid && err == nil {
+		// todo inform lps of success and batch size
+		e.logPublicationState.noteBatchComplete(false)
+		return nil
+	}
+
+	//
+	if err != nil {
+		// todo inform lps of error and batch size
 		return fmt.Errorf("transport error sending logs: %w", err)
 	}
 
-	if invalid {
-		if !reenroll {
-			return errors.New("enrollment invalid, reenroll disabled")
-		}
-
-		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx)
-		if err != nil {
-			return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
-		}
-		if invalid {
-			return errors.New("enrollment invalid, reenrollment invalid")
-		}
-
-		// Don't attempt reenroll after first attempt
-		return e.writeLogsWithReenroll(ctx, typ, logs, false)
+	if !reenroll {
+		return errors.New("enrollment invalid, reenroll disabled")
 	}
 
-	return nil
+	e.RequireReenroll(ctx)
+	_, invalid, err = e.Enroll(ctx)
+	if err != nil {
+		return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
+	}
+	if invalid {
+		return errors.New("enrollment invalid, reenrollment invalid")
+	}
+
+	// Don't attempt reenroll after first attempt
+	return e.writeLogsWithReenroll(ctx, typ, logs, false)
 }
 
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
@@ -976,6 +986,14 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 
 func minInt(a, b int) int {
 	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
 		return a
 	}
 
