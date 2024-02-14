@@ -3,15 +3,11 @@ package make
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/stretchr/testify/require"
@@ -263,35 +259,4 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 		fmt.Fprintf(os.Stderr, "Can't mock, unknown command(%q) args(%q) -- Fix TestHelperProcess", cmd, args)
 		os.Exit(2)
 	}
-}
-
-func Test_bootstrapFromNotary_retryOnTimeout(t *testing.T) {
-	t.Parallel()
-
-	testGun := "kolide/test"
-	expectedFirstRequestPath := fmt.Sprintf("/v2/%s/_trust/tuf/root.json", testGun)
-
-	testNotaryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, expectedFirstRequestPath, r.URL.String())
-
-		// Sleep for longer than the timeout before serving a file in response
-		time.Sleep(200 * time.Millisecond)
-
-		// Empty root.json file
-		w.Write([]byte("{}"))
-	}))
-
-	// Make sure we close the server at the end of our test
-	t.Cleanup(func() {
-		testNotaryServer.Close()
-	})
-
-	err := bootstrapFromNotary(t.TempDir(), testNotaryServer.URL, t.TempDir(), testGun, 100*time.Millisecond, 1*time.Second)
-	require.NotNil(t, err, "expected timeout during bootstrap")
-
-	// Confirm we made (more or less) the expected number of attempts
-	eightOrMoreAttempts := strings.Contains(err.Error(), "timeout after 10s (8 attempts)") ||
-		strings.Contains(err.Error(), "timeout after 1s (9 attempts)") ||
-		strings.Contains(err.Error(), "timeout after 1s (10 attempts)")
-	require.True(t, eightOrMoreAttempts, "expected at least 8 attempts", err.Error())
 }

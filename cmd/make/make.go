@@ -87,8 +87,6 @@ func main() {
 
 	targetSet := map[string]func(context.Context) error{
 		"deps-go":         make.New(opts...).DepsGo,
-		"install-tools":   make.New(opts...).InstallTools,
-		"generate-tuf":    make.New(opts...).GenerateTUF,
 		"launcher":        make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher", fakeName("launcher", *flFakeData)),
 		"tables.ext":      make.New(optsMaybeCgo...).BuildCmd("./cmd/launcher.ext", "tables.ext"),
 		"grpc.ext":        make.New(optsMaybeCgo...).BuildCmd("./cmd/grpc.ext", "grpc.ext"),
