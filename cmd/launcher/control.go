@@ -12,7 +12,7 @@ import (
 )
 
 func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClient, error) {
-	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+	k.Slogger().Log(ctx, slog.LevelDebug,
 		"creating control http client",
 	)
 
@@ -35,7 +35,7 @@ func createControlService(ctx context.Context, store types.GetterSetter, k types
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+	k.Slogger().Log(ctx, slog.LevelDebug,
 		"creating control service",
 	)
 

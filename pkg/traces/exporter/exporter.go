@@ -10,7 +10,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
@@ -115,7 +114,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 	return t, nil
 }
 
-func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
+func (t *TraceExporter) SetOsqueryClient(client querier) {
 	t.osqueryClient = client
 
 	go t.addAttributesFromOsquery()
