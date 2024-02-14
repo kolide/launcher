@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,9 +8,14 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
@@ -49,11 +53,17 @@ func runSocket(args []string) error {
 		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil)...))
 	}
 
-	_, cancel := context.WithCancel(context.Background())
-	runner, err := runtime.LaunchInstance(cancel, opts...)
+	// were passing an empty array here just to get the default options
+	cmdlineopts, err := launcher.ParseOptions("socket", make([]string, 0))
 	if err != nil {
-		return fmt.Errorf("creating osquery instance: %w", err)
+		return err
 	}
+	logger := log.NewLogfmtLogger(os.Stdout)
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(cmdlineopts)}
+	flagController := flags.NewFlagController(logger, inmemory.NewStore(), fcOpts...)
+	k := knapsack.New(nil, flagController, nil, nil, nil)
+	runner := runtime.New(k, opts...)
+	go runner.Run()
 
 	fmt.Println(*flPath)
 
