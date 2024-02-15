@@ -1,13 +1,10 @@
 package dataflattentable
 
 import (
-	"bytes"
 	"context"
 
-	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -64,7 +61,7 @@ func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSou
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	execBytes, err := t.exec(ctx)
+	execBytes, err := tablehelpers.Exec(ctx, t.logger, 50, t.cmdGen, t.execArgs, false)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
@@ -93,31 +90,4 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 	}
 
 	return results, nil
-}
-
-func (t *Table) exec(ctx context.Context) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 50*time.Second)
-	defer cancel()
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	cmd, err := t.cmdGen(ctx, t.execArgs...)
-	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling %s", "args", cmd.String())
-
-	if err := cmd.Run(); os.IsNotExist(err) {
-		return nil, fmt.Errorf("command %s not found: %w", cmd.Path, err)
-	} else if err != nil {
-		return nil, fmt.Errorf("calling %s. Got: %s: %w", cmd.Path, stderr.String(), err)
-	}
-
-	// success!
-	return stdout.Bytes(), nil
 }
