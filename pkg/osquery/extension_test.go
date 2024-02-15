@@ -58,7 +58,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.New().Logger)
-	m.On("EnrollSecret").Maybe().Return("enroll_secret")
+	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	return m
 }
 
@@ -68,7 +68,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.New().Logger)
-	m.On("EnrollSecret").Maybe().Return("")
+	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 
 	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
@@ -217,7 +217,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("Slogger").Return(multislogger.New().Logger)
 	expectedEnrollSecret := "foo_secret"
-	k.On("EnrollSecret").Maybe().Return(expectedEnrollSecret)
+	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
@@ -355,8 +355,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("Slogger").Return(multislogger.New().Logger)
-	k.On("EnrollSecret").Return("")
-	k.On("EnrollSecretPath").Return("")
+	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 
 	e, err := NewExtension(context.TODO(), s, k, ExtensionOpts{})
 	require.Nil(t, err)
@@ -533,7 +532,7 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("BboltDB").Return(db)
 	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
-	k.On("EnrollSecret").Maybe().Return("enroll_secret")
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
@@ -572,7 +571,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("BboltDB").Return(db)
 	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
-	k.On("EnrollSecret").Maybe().Return("enroll_secret")
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
@@ -642,7 +641,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.New().Logger)
-	k.On("EnrollSecret").Maybe().Return("enroll_secret")
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
@@ -1039,7 +1038,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.New().Logger)
-	k.On("EnrollSecret").Return("enroll_secret")
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)

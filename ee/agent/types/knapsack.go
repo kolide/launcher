@@ -11,4 +11,6 @@ type Knapsack interface {
 	Slogger
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
 	LatestOsquerydPath(ctx context.Context) string
+	// ReadEnrollSecret returns the enroll secret value, checking in various locations.
+	ReadEnrollSecret() (string, error)
 }

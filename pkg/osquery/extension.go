@@ -402,7 +402,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("starting_enrollment")
 
-	enrollSecret, err := e.readEnrollSecret(ctx)
+	enrollSecret, err := e.knapsack.ReadEnrollSecret()
 	if err != nil {
 		return "", true, fmt.Errorf("could not read enroll secret: %w", err)
 	}
@@ -481,26 +481,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 func (e *Extension) enrolled() bool {
 	return e.NodeKey != ""
-}
-
-// readEnrollSecret checks knapsack's flags to find the correct enroll secret location.
-func (e *Extension) readEnrollSecret(ctx context.Context) (string, error) {
-	_, span := traces.StartSpan(ctx)
-	defer span.End()
-
-	if e.knapsack.EnrollSecret() != "" {
-		return e.knapsack.EnrollSecret(), nil
-	}
-
-	if e.knapsack.EnrollSecretPath() != "" {
-		content, err := os.ReadFile(e.knapsack.EnrollSecretPath())
-		if err != nil {
-			return "", fmt.Errorf("could not read enroll secret path %s: %w", e.knapsack.EnrollSecretPath(), err)
-		}
-		return string(bytes.TrimSpace(content)), nil
-	}
-
-	return "", errors.New("enroll secret not set")
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the
