@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -20,23 +18,10 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	defer span.End()
 
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-	slogger := k.Slogger().With("component", "osquery_extension_actor")
-
-	// read the enroll secret, if either it or the path has been specified
-	var enrollSecret string
-	if k.EnrollSecret() != "" {
-		enrollSecret = k.EnrollSecret()
-	} else if k.EnrollSecretPath() != "" {
-		content, err := os.ReadFile(k.EnrollSecretPath())
-		if err != nil {
-			return nil, fmt.Errorf("could not read enroll_secret_path: %s: %w", k.EnrollSecretPath(), err)
-		}
-		enrollSecret = string(bytes.TrimSpace(content))
-	}
+	slogger := k.Slogger().With("component", "osquery_extension_creator")
 
 	// create the osquery extension
 	extOpts := osquery.ExtensionOpts{
-		EnrollSecret:                      enrollSecret,
 		Logger:                            logger, // Preserved only for temporary use in agent.SetupKeys
 		LoggingInterval:                   k.LoggingInterval(),
 		RunDifferentialQueriesImmediately: k.EnableInitialRunner(),
@@ -66,5 +51,22 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	}
 
 	// create the extension
-	return osquery.NewExtension(ctx, launcherClient, k, extOpts)
+	ext, err := osquery.NewExtension(ctx, launcherClient, k, extOpts)
+	if err != nil {
+		return nil, fmt.Errorf("creating new extension: %w", err)
+	}
+
+	// Immediately attempt enrollment in the background
+	go func() {
+		_, nodeInvalid, err := ext.Enroll(ctx)
+		if nodeInvalid || err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"could not perform initial attempt at enrollment, will retry later",
+				"node_invalid", nodeInvalid,
+				"err", err,
+			)
+		}
+	}()
+
+	return ext, nil
 }
