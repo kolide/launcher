@@ -12,7 +12,6 @@ const launcherAutoupdateConfigTableName = "kolide_launcher_autoupdate_config"
 func LauncherAutoupdateConfigTable(flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("autoupdate"),
-		table.TextColumn("notary_server_url"),
 		table.TextColumn("mirror_server_url"),
 		table.TextColumn("tuf_server_url"),
 		table.TextColumn("autoupdate_interval"),
@@ -35,7 +34,6 @@ func generateLauncherAutoupdateConfigTable(flags types.Flags) table.GenerateFunc
 		return []map[string]string{
 			{
 				"autoupdate":          boolToString(flags.Autoupdate()),
-				"notary_server_url":   flags.NotaryServerURL(),
 				"mirror_server_url":   flags.MirrorServerURL(),
 				"tuf_server_url":      flags.TufServerURL(),
 				"autoupdate_interval": flags.AutoupdateInterval().String(),

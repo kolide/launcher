@@ -18,7 +18,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	_, cancel := context.WithCancel(context.TODO())
 	sigListener := newSignalListener(sigChannel, cancel, log.NewNopLogger())
 
-	// Let the autoupdater run for a bit
+	// Let the signal listener run for a bit
 	go sigListener.Execute()
 	time.Sleep(3 * time.Second)
 	sigListener.Interrupt(errors.New("test error"))

@@ -4,7 +4,6 @@
 package secedit
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -96,28 +94,14 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	defer os.RemoveAll(dir)
 
 	dst := filepath.Join(dir, "tmpfile.ini")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 
 	args := []string{"/export", "/cfg", dst}
 	if mergedPolicy {
 		args = append(args, "/mergedpolicy")
 	}
 
-	cmd, err := allowedcmd.Secedit(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating secedit command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling secedit", "args", cmd.Args)
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling secedit. Got: %s: %w", stderr.String(), err)
+	if out, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Secedit, args, true); err != nil {
+		return nil, fmt.Errorf("calling secedit. Got: %s: %w", string(out), err)
 	}
 
 	file, err := os.Open(dst)

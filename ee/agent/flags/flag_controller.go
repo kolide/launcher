@@ -153,10 +153,6 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 	fc.overrides[key].Start(key, value, duration, overrideExpired)
 }
 
-func (fc *FlagController) AutoloadedExtensions() []string {
-	return fc.cmdLineOpts.AutoloadedExtensions
-}
-
 func (fc *FlagController) SetKolideServerURL(url string) error {
 	return fc.setControlServerValue(keys.KolideServerURL, []byte(url))
 }
@@ -423,15 +419,6 @@ func (fc *FlagController) Autoupdate() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Autoupdate)).get(fc.getControlServerValue(keys.Autoupdate))
 }
 
-func (fc *FlagController) SetNotaryServerURL(url string) error {
-	return fc.setControlServerValue(keys.NotaryServerURL, []byte(url))
-}
-func (fc *FlagController) NotaryServerURL() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryServerURL),
-	).get(fc.getControlServerValue(keys.NotaryServerURL))
-}
-
 func (fc *FlagController) SetTufServerURL(url string) error {
 	return fc.setControlServerValue(keys.TufServerURL, []byte(url))
 }
@@ -471,15 +458,6 @@ func (fc *FlagController) UpdateChannel() string {
 	).get(fc.getControlServerValue(keys.UpdateChannel))
 }
 
-func (fc *FlagController) SetNotaryPrefix(prefix string) error {
-	return fc.setControlServerValue(keys.NotaryPrefix, []byte(prefix))
-}
-func (fc *FlagController) NotaryPrefix() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryPrefix),
-	).get(fc.getControlServerValue(keys.NotaryPrefix))
-}
-
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
@@ -498,15 +476,6 @@ func (fc *FlagController) UpdateDirectory() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
-}
-
-func (fc *FlagController) SetUseTUFAutoupdater(enabled bool) error {
-	return fc.setControlServerValue(keys.UseTUFAutoupdater, boolToBytes(enabled))
-}
-func (fc *FlagController) UseTUFAutoupdater() bool {
-	return NewBoolFlagValue(
-		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.UseTUFAutoupdater))
 }
 
 func (fc *FlagController) SetExportTraces(enabled bool) error {

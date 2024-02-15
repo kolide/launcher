@@ -11,16 +11,12 @@ package make
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -31,15 +27,9 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 
-	"github.com/theupdateframework/notary/client"
-	"github.com/theupdateframework/notary/trustpinning"
-	"github.com/theupdateframework/notary/tuf/data"
 	"go.opencensus.io/trace"
-	"golang.org/x/sync/errgroup"
 )
 
 type Builder struct {
@@ -271,222 +261,6 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 		"msg", "Finished",
 		"output", string(out),
 	)
-
-	return nil
-}
-
-func (b *Builder) InstallTools(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "make.InstallTools")
-	defer span.End()
-
-	logger := ctxlog.FromContext(ctx)
-
-	level.Debug(logger).Log(
-		"cmd", "Install Tools",
-		"msg", "Starting",
-	)
-
-	cmd := b.execCC(
-		ctx,
-		"go", "list",
-		"-tags", "tools",
-		"-json",
-		"./pkg/tools",
-	)
-	cmd.Env = append(cmd.Env, b.cmdEnv...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("create stdout pipe for go list command: %w", err)
-	}
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("run go list command, %s: %w", stderr, err)
-	}
-
-	var list struct {
-		Imports []string
-	}
-	if err := json.NewDecoder(stdout).Decode(&list); err != nil {
-		return fmt.Errorf("decode go list output: %w", err)
-	}
-
-	var g errgroup.Group
-	for _, toolPath := range list.Imports {
-		toolPath := toolPath
-		_, tool := path.Split(toolPath)
-		path, err := exec.LookPath(tool)
-		if err == nil {
-			level.Debug(ctxlog.FromContext(ctx)).Log(
-				"target", "install tools",
-				"tool", tool,
-				"exists", true,
-				"path", path,
-			)
-			continue
-		}
-
-		g.Go(func() error {
-			return b.installTool(ctx, toolPath)
-		})
-	}
-	err = g.Wait()
-
-	level.Debug(logger).Log(
-		"cmd", "Install Tools",
-		"msg", "Finished",
-	)
-
-	if err != nil {
-		return fmt.Errorf("install tools: %w", err)
-	}
-
-	return nil
-}
-
-func (b *Builder) installTool(ctx context.Context, importPath string) error {
-	ctx, span := trace.StartSpan(ctx, "make.installTool")
-	defer span.End()
-
-	cmd := b.execCC(ctx, "go", "install", importPath)
-	cmd.Env = append(cmd.Env, b.cmdEnv...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("run go install %s, output=%s: %w", importPath, out, err)
-	}
-	level.Debug(ctxlog.FromContext(ctx)).Log("target", "install tool", "import_path", importPath, "output", string(out))
-	return nil
-}
-
-func (b *Builder) GenerateTUF(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "make.GenerateTUF")
-	defer span.End()
-
-	// First, we generate a bindata file from an empty directory so that the symbols
-	// are present (Asset, AssetDir, etc). Once the symbols are present, we can run
-	// the generate_tuf.go tool to generate actual TUF metadata. Finally, we recreate
-	// the bindata file with the real TUF metadata.
-	dir, err := os.MkdirTemp("", "bootstrap-launcher-bindata")
-	if err != nil {
-		return fmt.Errorf("create empty dir for bindata: %w", err)
-	}
-	defer os.RemoveAll(dir)
-
-	if err := b.execBindata(ctx, dir); err != nil {
-		return fmt.Errorf("exec bindata for empty dir: %w", err)
-	}
-
-	binaryTargets := []string{ // binaries that are autoupdated.
-		"osqueryd",
-		"launcher",
-	}
-
-	// previous this depended on fs.Gopath to find the templated
-	// notary files. As not everyone uses gopath, we make
-	// assuptions about how this is called to find the template dir.
-	// https://github.com/kolide/launcher/pull/503 is a better route.
-	_, myFilename, _, _ := runtime.Caller(1)
-	notaryConfigDir := filepath.Join(filepath.Dir(myFilename), "..", "..", "tools", "notary", "config")
-	notaryConfigFile, err := os.Open(filepath.Join(notaryConfigDir, "config.json"))
-	if err != nil {
-		return fmt.Errorf("opening notary config file: %w", err)
-	}
-	defer notaryConfigFile.Close()
-	var conf struct {
-		RemoteServer struct {
-			URL string `json:"url"`
-		} `json:"remote_server"`
-	}
-	if err = json.NewDecoder(notaryConfigFile).Decode(&conf); err != nil {
-		return fmt.Errorf("decoding notary config file: %w", err)
-	}
-
-	for _, t := range binaryTargets {
-		level.Debug(ctxlog.FromContext(ctx)).Log("target", "generate-tuf", "msg", "bootstrap notary", "binary", t, "remote_server_url", conf.RemoteServer.URL)
-		gun := path.Join("kolide", t)
-		localRepo := filepath.Join("pkg", "autoupdate", "assets", fmt.Sprintf("%s-tuf", t))
-		if err := os.MkdirAll(localRepo, 0755); err != nil {
-			return fmt.Errorf("make autoupdate dir %s: %w", localRepo, err)
-		}
-
-		if err := bootstrapFromNotary(notaryConfigDir, conf.RemoteServer.URL, localRepo, gun, 30*time.Second, 5*time.Minute); err != nil {
-			return fmt.Errorf("bootstrap notary GUN %s: %w", gun, err)
-		}
-	}
-
-	if err := b.execBindata(ctx, "pkg/autoupdate/assets/..."); err != nil {
-		return fmt.Errorf("exec bindata for autoupdate assets: %w", err)
-	}
-
-	return nil
-}
-
-func (b *Builder) execBindata(ctx context.Context, dir string) error {
-	ctx, span := trace.StartSpan(ctx, "make.execBindata")
-	defer span.End()
-
-	cmd := b.execCC(
-		ctx,
-		"go-bindata",
-		"-o", "pkg/autoupdate/bindata.go",
-		"-pkg", "autoupdate",
-		dir,
-	)
-	// 	cmd.Env = append(cmd.Env, b.cmdEnv...)
-	out, err := cmd.CombinedOutput()
-
-	if err != nil {
-		return fmt.Errorf("run bindata for dir %s, output=%s: %w", dir, out, err)
-	}
-
-	return nil
-}
-
-func bootstrapFromNotary(notaryConfigDir, remoteServerURL, localRepo, gun string, retryTimeout time.Duration, bootstrapTimeout time.Duration) error {
-	passwordRetrieverFn := func(key, alias string, createNew bool, attempts int) (pass string, giveUp bool, err error) {
-		pass = os.Getenv(key)
-		if pass == "" {
-			err = fmt.Errorf("missing pass phrase env var %q", key)
-		}
-		return pass, giveUp, err
-	}
-
-	// Safely fetch and validate all TUF metadata from remote Notary server.
-	dialCtx := (&net.Dialer{
-		Timeout:   retryTimeout,
-		KeepAlive: 30 * time.Second,
-	}).DialContext
-	repo, err := client.NewFileCachedRepository(
-		notaryConfigDir,
-		data.GUN(gun),
-		remoteServerURL,
-		&http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			DialContext:           dialCtx,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: retryTimeout,
-		},
-		passwordRetrieverFn,
-		trustpinning.TrustPinConfig{},
-	)
-	if err != nil {
-		return fmt.Errorf("create an instance of the TUF repository: %w", err)
-	}
-
-	if err := backoff.WaitFor(func() error {
-		if _, err := repo.GetAllTargetMetadataByName(""); err != nil {
-			return fmt.Errorf("getting all target metadata: %w", err)
-		}
-		return nil
-	}, bootstrapTimeout, retryTimeout); err != nil {
-		return err
-	}
-
-	// Stage TUF metadata and create bindata from it so it can be distributed as part of the Launcher executable
-	source := filepath.Join(notaryConfigDir, "tuf", gun, "metadata")
-	if err := fsutil.CopyDir(source, localRepo); err != nil {
-		return fmt.Errorf("copying TUF repo metadata: %w", err)
-	}
 
 	return nil
 }

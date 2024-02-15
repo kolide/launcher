@@ -233,12 +233,11 @@ func getArgsAndResponse() (map[string]string, *Options) {
 
 	// includes both `-` and `--` for variety.
 	args := map[string]string{
-		"--hostname":            randomHostname,
-		"-autoupdate_interval":  "48h",
-		"-logging_interval":     fmt.Sprintf("%ds", randomInt),
-		"-osqueryd_path":        windowsAddExe("/dev/null"),
-		"-transport":            "grpc",
-		"-autoloaded_extension": "some-extension.ext",
+		"--hostname":           randomHostname,
+		"-autoupdate_interval": "48h",
+		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
+		"-osqueryd_path":       windowsAddExe("/dev/null"),
+		"-transport":           "grpc",
 	}
 
 	opts := &Options{
@@ -255,14 +254,11 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		KolideServerURL:                 randomHostname,
 		LoggingInterval:                 time.Duration(randomInt) * time.Second,
 		MirrorServerURL:                 "https://dl.kolide.co",
-		NotaryPrefix:                    "kolide",
-		NotaryServerURL:                 "https://notary.kolide.co",
 		TufServerURL:                    "https://tuf.kolide.com",
 		OsquerydPath:                    windowsAddExe("/dev/null"),
 		OsqueryHealthcheckStartupDelay:  10 * time.Minute,
 		Transport:                       "grpc",
 		UpdateChannel:                   "stable",
-		AutoloadedExtensions:            []string{"some-extension.ext"},
 		DelayStart:                      0 * time.Second,
 		WatchdogEnabled:                 false,
 		WatchdogDelaySec:                120,

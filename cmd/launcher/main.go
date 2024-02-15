@@ -45,41 +45,12 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	// If there's a newer version of launcher on disk, use it.
-	// This does not call DeleteOldUpdates, on the theory that
-	// it's better left to the service to handle cleanup. This is
-	// a straight forward exec.
-	//
-	// launcher is _also_ called when we're checking update
-	// validity (with autoupdate.checkExecutable). This is
-	// somewhat awkward as we end up with extra call layers.
-	//
 	// Allow a caller to set `LAUNCHER_SKIP_UPDATES` as a way to
 	// skip exec'ing an update. This helps prevent launcher from
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		if tuf.ShouldUseNewAutoupdater(ctx) {
-			runNewerLauncherIfAvailable(ctx, logger)
-		} else {
-			newerBinary, err := autoupdate.FindNewestSelf(ctx)
-			if err != nil {
-				logutil.Fatal(logger, err, "checking for updated version")
-			}
-
-			if newerBinary != "" {
-				level.Debug(logger).Log(
-					"msg", "preparing to exec new binary",
-					"oldVersion", version.Version().Version,
-					"newBinary", newerBinary,
-				)
-				if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
-					logutil.Fatal(logger, err, "exec")
-				}
-				panic("how")
-			}
-
-			level.Debug(logger).Log("msg", "Nothing new")
-		}
+		runNewerLauncherIfAvailable(ctx, logger)
 	}
 
 	// if the launcher is being ran with a positional argument,
