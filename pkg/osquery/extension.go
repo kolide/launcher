@@ -76,9 +76,6 @@ const (
 
 // ExtensionOpts is options to be passed in NewExtension
 type ExtensionOpts struct {
-	// EnrollSecret is the (mandatory) enroll secret used for
-	// enrolling with the server.
-	EnrollSecret string
 	// MaxBytesPerBatch is the maximum number of bytes that should be sent in
 	// one batch logging request. Any log larger than this will be dropped.
 	MaxBytesPerBatch int
@@ -111,10 +108,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	defer span.End()
 
 	slogger := k.Slogger().With("component", "osquery_extension")
-
-	if opts.EnrollSecret == "" {
-		return nil, errors.New("empty enroll secret")
-	}
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -409,6 +402,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("starting_enrollment")
 
+	enrollSecret, err := e.knapsack.ReadEnrollSecret()
+	if err != nil {
+		return "", true, fmt.Errorf("could not read enroll secret: %w", err)
+	}
+
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
@@ -448,7 +446,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
@@ -481,6 +479,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	return e.NodeKey, false, nil
 }
 
+func (e *Extension) enrolled() bool {
+	return e.NodeKey != ""
+}
+
 // RequireReenroll clears the existing node key information, ensuring that the
 // next call to Enroll will cause the enrollment process to take place.
 func (e *Extension) RequireReenroll(ctx context.Context) {
@@ -507,6 +509,10 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
+			if !e.enrolled() {
+				// Not enrolled yet -- return an empty config
+				return map[string]string{"config": "{}"}, nil
+			}
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
 		}
 		config = string(confBytes)

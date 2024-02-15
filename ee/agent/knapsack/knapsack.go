@@ -1,7 +1,11 @@
 package knapsack
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"os"
 
 	"log/slog"
 
@@ -143,4 +147,20 @@ func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	}
 
 	return latestBin.Path
+}
+
+func (k *knapsack) ReadEnrollSecret() (string, error) {
+	if k.EnrollSecret() != "" {
+		return k.EnrollSecret(), nil
+	}
+
+	if k.EnrollSecretPath() != "" {
+		content, err := os.ReadFile(k.EnrollSecretPath())
+		if err != nil {
+			return "", fmt.Errorf("could not read enroll secret path %s: %w", k.EnrollSecretPath(), err)
+		}
+		return string(bytes.TrimSpace(content)), nil
+	}
+
+	return "", errors.New("enroll secret not set")
 }

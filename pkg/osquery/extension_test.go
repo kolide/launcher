@@ -58,16 +58,22 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.New().Logger)
+	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	return m
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m := mocks.NewKnapsack(t)
+	m.On("OsquerydPath").Maybe().Return("")
+	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.New().Logger)
+	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 
+	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
-	assert.NotNil(t, err)
-	assert.Nil(t, e)
+	assert.Nil(t, err)
+	assert.NotNil(t, e)
 }
 
 func TestNewExtensionDatabaseError(t *testing.T) {
@@ -95,7 +101,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	m.On("ConfigStore").Return(agentbbolt.NewStore(log.NewNopLogger(), db, storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.New().Logger).Maybe()
 
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
@@ -105,7 +111,7 @@ func TestGetHostIdentifier(t *testing.T) {
 	defer cleanup()
 
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	ident, err := e.getHostIdentifier()
@@ -120,7 +126,7 @@ func TestGetHostIdentifier(t *testing.T) {
 	db, cleanup = makeTempDB(t)
 	defer cleanup()
 	k = makeKnapsack(t, db)
-	e, err = NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err = NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	ident, err = e.getHostIdentifier()
@@ -135,7 +141,7 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// Put garbage UUID in DB
@@ -164,7 +170,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -184,7 +190,7 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	k := makeKnapsack(t, db)
 	defer cleanup()
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -204,11 +210,16 @@ func TestExtensionEnroll(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("Slogger").Return(multislogger.New().Logger)
 	expectedEnrollSecret := "foo_secret"
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
+	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -227,7 +238,7 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: expectedEnrollSecret})
+	e, err = NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
 	key, invalid, err = e.Enroll(context.Background())
@@ -260,7 +271,8 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	k.ConfigStore().Set([]byte(nodeKeyKey), []byte("some_node_key"))
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -281,7 +293,7 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -318,7 +330,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -328,6 +340,39 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	assert.Nil(t, configs)
 	assert.NotNil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
+}
+
+func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
+	s := &mock.KolideService{
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
+			// Returns node_invalid
+			return "", true, nil
+		},
+	}
+
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+
+	e, err := NewExtension(context.TODO(), s, k, ExtensionOpts{})
+	require.Nil(t, err)
+
+	configs, err := e.GenerateConfigs(context.Background())
+	assert.NotNil(t, configs)
+	assert.Equal(t, map[string]string{"config": "{}"}, configs)
+	assert.Nil(t, err)
+
+	// Should have tried to request config
+	assert.True(t, s.RequestConfigFuncInvoked)
+
+	// On node invalid response, should attempt to retrieve enroll secret
+	k.AssertExpectations(t)
+
+	// Since we can't retrieve the enroll secret, we shouldn't attempt to enroll yet
+	assert.False(t, s.RequestEnrollmentFuncInvoked)
 }
 
 func TestExtensionGenerateConfigs(t *testing.T) {
@@ -341,7 +386,7 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -360,7 +405,7 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
@@ -384,7 +429,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -413,7 +458,7 @@ func TestExtensionWriteLogs(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = expectedNodeKey
 
@@ -487,8 +532,9 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("BboltDB").Return(db)
 	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// No buffered logs should result in success and no remote action being
@@ -525,8 +571,9 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("BboltDB").Return(db)
 	k.On("Slogger").Return(multislogger.New().Logger).Maybe()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
@@ -594,8 +641,9 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
@@ -640,7 +688,6 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		EnrollSecret:     "enroll_secret",
 		MaxBytesPerBatch: 100,
 	})
 	require.Nil(t, err)
@@ -714,7 +761,6 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("Slogger").Return(multislogger.New().Logger)
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		EnrollSecret:     "enroll_secret",
 		MaxBytesPerBatch: 15,
 	})
 	require.Nil(t, err)
@@ -799,7 +845,6 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		EnrollSecret:     "enroll_secret",
 		MaxBytesPerBatch: 200,
 		Clock:            mockClock,
 		LoggingInterval:  expectedLoggingInterval,
@@ -928,7 +973,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("Slogger").Return(multislogger.New().Logger)
 
 	max := 10
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret", MaxBufferedLogs: max})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBufferedLogs: max})
 	require.Nil(t, err)
 
 	var expectedStatusLogs, expectedResultLogs []string
@@ -965,7 +1010,7 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
@@ -993,8 +1038,9 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -1022,7 +1068,7 @@ func TestExtensionGetQueries(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
@@ -1041,7 +1087,7 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	err = e.WriteResults(context.Background(), []distributed.Result{})
@@ -1065,7 +1111,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -1088,7 +1134,7 @@ func TestExtensionWriteResults(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.Nil(t, err)
 
 	expectedResults := []distributed.Result{
@@ -1116,7 +1162,7 @@ func TestLauncherRsaKeys(t *testing.T) {
 	k.On("ConfigStore").Return(configStore)
 	k.On("Slogger").Return(multislogger.New().Logger)
 
-	_, err = NewExtension(context.TODO(), m, k, ExtensionOpts{EnrollSecret: "enroll_secret"})
+	_, err = NewExtension(context.TODO(), m, k, ExtensionOpts{})
 	require.NoError(t, err)
 
 	key, err := PrivateRSAKeyFromDB(configStore)
