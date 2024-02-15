@@ -348,7 +348,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			kolidelog.WithLevel(slog.LevelInfo),
 		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithAutoloadedExtensions(k.AutoloadedExtensions()...),
 		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
 		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
 		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),

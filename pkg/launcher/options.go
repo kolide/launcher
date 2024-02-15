@@ -21,9 +21,6 @@ import (
 
 // Options is the set of options that may be configured for Launcher.
 type Options struct {
-	// AutoloadedExtensions to load with osquery, expected to be in same
-	// directory as launcher binary.
-	AutoloadedExtensions []string
 	// KolideServerURL is the URL of the management server to connect to.
 	KolideServerURL string
 	// KolideHosted true if using Kolide SaaS settings
@@ -205,7 +202,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 	var (
 		// Primary options
-		flAutoloadedExtensions            ArrayFlags
 		flCertPins                        = flagset.String("cert_pins", "", "Comma separated, hex encoded SHA256 hashes of pinned subject public key info")
 		flControlRequestInterval          = flagset.Duration("control_request_interval", 60*time.Second, "The interval at which the control server requests will be made")
 		flEnrollSecret                    = flagset.String("enroll_secret", "", "The enroll secret that is used in your environment")
@@ -270,7 +266,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
-	flagset.Var(&flAutoloadedExtensions, "autoloaded_extension", "extension paths to autoload, filename without path may be used in same directory as launcher")
+
+	// Deprecated array
+	flagset.Var(&ArrayFlags{}, "autoloaded_extension", "DEPRECATED")
 
 	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
@@ -393,7 +391,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		LocalDevelopmentPath:               *flLocalDevelopmentPath,
 		TraceIngestServerURL:               *flTraceIngestServerURL,
 		DisableTraceIngestTLS:              *flDisableIngestTLS,
-		AutoloadedExtensions:               flAutoloadedExtensions,
 		IAmBreakingEELicense:               *flIAmBreakingEELicense,
 		InsecureTLS:                        *flInsecureTLS,
 		InsecureTransport:                  *flInsecureTransport,
