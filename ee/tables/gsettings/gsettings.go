@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/user"
 	"strconv"
@@ -17,8 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -30,13 +29,13 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 type gsettingsExecer func(ctx context.Context, username string, buf *bytes.Buffer) error
 
 type GsettingsValues struct {
-	logger   log.Logger
+	slogger  *slog.Logger
 	getBytes gsettingsExecer
 }
 
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
-func Settings(logger log.Logger) *table.Plugin {
+func Settings(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
@@ -45,7 +44,7 @@ func Settings(logger log.Logger) *table.Plugin {
 	}
 
 	t := &GsettingsValues{
-		logger:   logger,
+		slogger:  slogger.With("table", "kolide_gsettings"),
 		getBytes: execGsettings,
 	}
 
@@ -64,15 +63,15 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 
 		err := t.getBytes(ctx, username, &output)
 		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "error getting bytes for user",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error getting bytes for user",
 				"username", username,
 				"err", err,
 			)
 			continue
 		}
 
-		user_results := t.parse(username, &output)
+		user_results := t.parse(ctx, username, &output)
 		results = append(results, user_results...)
 	}
 
@@ -146,7 +145,7 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 	return nil
 }
 
-func (t *GsettingsValues) parse(username string, input io.Reader) []map[string]string {
+func (t *GsettingsValues) parse(ctx context.Context, username string, input io.Reader) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)
@@ -159,8 +158,8 @@ func (t *GsettingsValues) parse(username string, input io.Reader) []map[string]s
 
 		parts := strings.SplitN(line, " ", 3)
 		if len(parts) < 3 {
-			level.Error(t.logger).Log(
-				"msg", "unable to process line, not enough segments",
+			t.slogger.Log(ctx, slog.LevelError,
+				"unable to process line, not enough segments",
 				"line", line,
 			)
 			continue
@@ -175,7 +174,10 @@ func (t *GsettingsValues) parse(username string, input io.Reader) []map[string]s
 	}
 
 	if err := scanner.Err(); err != nil {
-		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"scanner error",
+			"err", err,
+		)
 	}
 
 	return results

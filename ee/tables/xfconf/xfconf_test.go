@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,8 @@ func Test_getUserConfig(t *testing.T) {
 	tmpDefaultDir, tmpUserDir := setUpConfigFiles(t)
 
 	xfconf := xfconfTable{
-		logger: log.NewNopLogger(),
+		logger:  log.NewNopLogger(),
+		slogger: multislogger.New().Logger,
 	}
 
 	testUsername := "testUser"

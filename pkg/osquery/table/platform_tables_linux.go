@@ -33,16 +33,16 @@ import (
 
 func platformSpecificTables(slogger *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		cryptsetup.TablePlugin(logger),
-		gsettings.Settings(logger),
-		gsettings.Metadata(logger),
-		nix_env_upgradeable.TablePlugin(logger),
-		secureboot.TablePlugin(logger),
-		xrdb.TablePlugin(logger),
-		fscrypt_info.TablePlugin(logger),
-		falcon_kernel_check.TablePlugin(logger),
-		falconctl.NewFalconctlOptionTable(logger),
-		xfconf.TablePlugin(logger),
+		cryptsetup.TablePlugin(slogger, logger),
+		gsettings.Settings(slogger),
+		gsettings.Metadata(slogger),
+		nix_env_upgradeable.TablePlugin(slogger, logger),
+		secureboot.TablePlugin(slogger),
+		xrdb.TablePlugin(slogger),
+		fscrypt_info.TablePlugin(slogger),
+		falcon_kernel_check.TablePlugin(slogger, logger),
+		falconctl.NewFalconctlOptionTable(slogger, logger),
+		xfconf.TablePlugin(slogger, logger),
 
 		dataflattentable.TablePluginExec(logger,
 			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
