@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -22,9 +21,9 @@ var chromeLocalStateDirs = map[string][]string{
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var chromeLocalStateDirDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeUserProfiles(logger log.Logger) *table.Plugin {
+func ChromeUserProfiles(slogger *slog.Logger) *table.Plugin {
 	c := &chromeUserProfilesTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_chrome_user_profiles"),
 	}
 
 	columns := []table.ColumnDefinition{
@@ -38,7 +37,7 @@ func ChromeUserProfiles(logger log.Logger) *table.Plugin {
 }
 
 type chromeUserProfilesTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 type chromeLocalState struct {
@@ -84,10 +83,10 @@ func (c *chromeUserProfilesTable) generate(ctx context.Context, queryContext tab
 
 	var results []map[string]string
 	for _, localStateFilePath := range osChromeLocalStateDirs {
-		userFiles, err := findFileInUserDirs(filepath.Join(localStateFilePath, "Local State"), c.logger)
+		userFiles, err := findFileInUserDirs(filepath.Join(localStateFilePath, "Local State"), c.slogger)
 		if err != nil {
-			level.Info(c.logger).Log(
-				"msg", "Finding chrome local state file",
+			c.slogger.Log(ctx, slog.LevelInfo,
+				"finding chrome local state file",
 				"path", localStateFilePath,
 				"err", err,
 			)
@@ -96,8 +95,8 @@ func (c *chromeUserProfilesTable) generate(ctx context.Context, queryContext tab
 		for _, file := range userFiles {
 			res, err := c.generateForPath(ctx, file)
 			if err != nil {
-				level.Info(c.logger).Log(
-					"msg", "Generating user profile result",
+				c.slogger.Log(ctx, slog.LevelInfo,
+					"generating user profile result",
 					"path", file.path,
 					"err", err,
 				)

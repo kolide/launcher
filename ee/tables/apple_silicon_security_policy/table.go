@@ -6,10 +6,10 @@ package apple_silicon_security_policy
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -20,16 +20,18 @@ import (
 const bootPolicyUtilArgs = "--display-all-policies"
 
 type Table struct {
-	logger log.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_apple_silicon_security_policy"
 
 	t := &Table{
-		logger: log.With(logger, "table", tableName),
+		slogger: slogger.With("table", tableName),
+		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generate)
@@ -40,12 +42,17 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs}, false)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "bputil failed", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"bputil failed",
+			"err", err,
+		)
 		return nil, nil
 	}
 
 	if len(output) == 0 {
-		level.Info(t.logger).Log("msg", "No bputil data to parse")
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"no bputil data to parse",
+		)
 		return nil, nil
 	}
 
@@ -54,7 +61,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Error flattening data", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error flattening data",
+				"err", err,
+			)
 			return nil, nil
 		}
 		results = append(results, dataflattentable.ToMap(flattened, dataQuery, nil)...)

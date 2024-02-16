@@ -13,11 +13,11 @@ import (
 )
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -27,13 +27,14 @@ import (
 var productsData []map[string]interface{}
 var cachedTime time.Time
 
-func AvailableProducts(logger log.Logger) *table.Plugin {
+func AvailableProducts(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_macos_available_products"
 
 	t := &Table{
-		logger: log.With(logger, "table", tableName),
+		slogger: slogger.With("table", tableName),
+		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generateAvailableProducts)
@@ -47,7 +48,10 @@ func (t *Table) generateAvailableProducts(ctx context.Context, queryContext tabl
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Error flattening data", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error flattening data",
+				"err", err,
+			)
 			return nil, nil
 		}
 		results = append(results, dataflattentable.ToMap(flattened, dataQuery, nil)...)

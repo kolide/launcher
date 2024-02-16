@@ -4,6 +4,7 @@
 package mdmclient
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,7 +52,7 @@ func TestTransformOutput(t *testing.T) {
 			input, err := os.ReadFile(filepath.Join("testdata", tt.in))
 			require.NoError(t, err, "read input file")
 
-			output, err := table.flattenOutput("", input)
+			output, err := table.flattenOutput(context.TODO(), "", input)
 			require.NoError(t, err, "flatten")
 			require.Equal(t, tt.expectedRows, len(output))
 

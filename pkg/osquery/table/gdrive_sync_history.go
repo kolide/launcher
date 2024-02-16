@@ -4,20 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncHistoryInfo(logger log.Logger) *table.Plugin {
+func GDriveSyncHistoryInfo(slogger *slog.Logger) *table.Plugin {
 	g := &GDriveSyncHistory{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_gdrive_sync_history"),
 	}
 	columns := []table.ColumnDefinition{
 		table.TextColumn("inode"),
@@ -29,7 +27,7 @@ func GDriveSyncHistoryInfo(logger log.Logger) *table.Plugin {
 }
 
 type GDriveSyncHistory struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
@@ -85,7 +83,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	files, err := findFileInUserDirs("Library/Application Support/Google/Drive/user_default/snapshot.db", g.logger)
+	files, err := findFileInUserDirs("Library/Application Support/Google/Drive/user_default/snapshot.db", g.slogger)
 	if err != nil {
 		return nil, fmt.Errorf("find gdrive sync history sqlite DBs: %w", err)
 	}
@@ -94,8 +92,8 @@ func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.Que
 	for _, file := range files {
 		res, err := g.generateForPath(ctx, file.path)
 		if err != nil {
-			level.Info(g.logger).Log(
-				"msg", "Generating gdrive history result",
+			g.slogger.Log(ctx, slog.LevelInfo,
+				"generating gdrive history result",
 				"path", file.path,
 				"err", err,
 			)

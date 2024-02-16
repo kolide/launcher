@@ -4,19 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncConfig(logger log.Logger) *table.Plugin {
+func GDriveSyncConfig(slogger *slog.Logger) *table.Plugin {
 	g := &gdrive{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_gdrive_sync_config"),
 	}
 
 	columns := []table.ColumnDefinition{
@@ -27,7 +26,7 @@ func GDriveSyncConfig(logger log.Logger) *table.Plugin {
 }
 
 type gdrive struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
@@ -89,7 +88,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 }
 
 func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	files, err := findFileInUserDirs("/Library/Application Support/Google/Drive/user_default/sync_config.db", g.logger)
+	files, err := findFileInUserDirs("/Library/Application Support/Google/Drive/user_default/sync_config.db", g.slogger)
 	if err != nil {
 		return nil, fmt.Errorf("find gdrive sync config sqlite DBs: %w", err)
 	}
@@ -98,8 +97,8 @@ func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) 
 	for _, file := range files {
 		res, err := g.generateForPath(ctx, file.path)
 		if err != nil {
-			level.Info(g.logger).Log(
-				"msg", "Generating gdrive sync result",
+			g.slogger.Log(ctx, slog.LevelInfo,
+				"generating gdrive sync result",
 				"path", file.path,
 				"err", err,
 			)

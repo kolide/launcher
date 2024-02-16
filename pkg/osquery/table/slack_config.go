@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -29,7 +28,7 @@ var slackConfigDirs = map[string][]string{
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var slackConfigDirDefault = []string{".config/Slack"}
 
-func SlackConfig(logger log.Logger) *table.Plugin {
+func SlackConfig(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("team_id"),
 		table.TextColumn("team_name"),
@@ -40,14 +39,14 @@ func SlackConfig(logger log.Logger) *table.Plugin {
 	}
 
 	t := &SlackConfigTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_slack_config"),
 	}
 
 	return table.NewPlugin("kolide_slack_config", columns, t.generate)
 }
 
 type SlackConfigTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 type slackTeamsFile map[string]struct {
@@ -102,10 +101,10 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 		osProfileDirs = slackConfigDirDefault
 	}
 	for _, profileDir := range osProfileDirs {
-		files, err := findFileInUserDirs(filepath.Join(profileDir, "storage/slack-teams"), t.logger)
+		files, err := findFileInUserDirs(filepath.Join(profileDir, "storage/slack-teams"), t.slogger)
 		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "Finding slack teams json",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"finding slack teams json",
 				"path", profileDir,
 				"err", err,
 			)
@@ -114,8 +113,8 @@ func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.Quer
 		for _, file := range files {
 			res, err := t.generateForPath(ctx, file)
 			if err != nil {
-				level.Info(t.logger).Log(
-					"msg", "Generating slack team result",
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"generating slack team result",
 					"path", file.path,
 					"err", err,
 				)
