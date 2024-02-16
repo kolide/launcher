@@ -6,8 +6,8 @@ package fscrypt_info
 import (
 	"context"
 	"errors"
+	"log/slog"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -27,8 +27,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for i, dirpath := range paths {
 		info, err := GetInfo(dirpath)
 		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "error getting fscrypt info",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error getting fscrypt info",
 				"path", dirpath,
 				"err", err,
 			)

@@ -6,10 +6,10 @@ package cryptsetup
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -20,18 +20,20 @@ import (
 const allowedNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/_"
 
 type Table struct {
-	logger log.Logger
-	name   string
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for use in dataflattentable/tablehelpers.Exec temporarily
+	name    string
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("name"),
 	)
 
 	t := &Table{
-		logger: logger,
-		name:   "kolide_cryptsetup_status",
+		slogger: slogger.With("table", "kolide_cryptsetup_status"),
+		logger:  logger,
+		name:    "kolide_cryptsetup_status",
 	}
 
 	return table.NewPlugin(t.name, columns, t.generate)
@@ -52,20 +54,31 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, name := range requestedNames {
 		output, err := tablehelpers.Exec(ctx, t.logger, 15, allowedcmd.Cryptsetup, []string{"--readonly", "status", name}, false)
 		if err != nil {
-			level.Debug(t.logger).Log("msg", "Error execing for status", "name", name, "err", err)
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"error execing for status",
+				"name", name,
+				"err", err,
+			)
 			continue
 		}
 
 		status, err := parseStatus(output)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Error parsing status", "name", name, "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error parsing status",
+				"name", name,
+				"err", err,
+			)
 			continue
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			flatData, err := t.flattenOutput(dataQuery, status)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
 				continue
 			}
 

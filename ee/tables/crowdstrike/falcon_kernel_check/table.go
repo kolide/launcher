@@ -6,20 +6,21 @@ package falcon_kernel_check
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in tablehelpers.Exec
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("kernel"),
 		table.IntegerColumn("supported"),
@@ -29,7 +30,8 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	tableName := "kolide_falcon_kernel_check"
 
 	t := &Table{
-		logger: log.With(logger, "table", tableName),
+		slogger: slogger.With("table", tableName),
+		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generate)
@@ -38,13 +40,19 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	output, err := tablehelpers.Exec(ctx, t.logger, 5, allowedcmd.FalconKernelCheck, []string{}, false)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "exec failed", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"exec failed",
+			"err", err,
+		)
 		return nil, err
 	}
 
 	status, err := parseStatus(string(output))
 	if err != nil {
-		level.Info(t.logger).Log("msg", "Error parsing exec status", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"error parsing exec status",
+			"err", err,
+		)
 		return nil, err
 	}
 

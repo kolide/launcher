@@ -4,14 +4,16 @@
 package falconctl
 
 import (
-	"bytes"
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,9 +64,10 @@ func TestOptionRestrictions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes bytes.Buffer
+			var logBytes threadsafebuffer.ThreadSafeBuffer
 
 			testTable := &falconctlOptionsTable{
+				slogger:  multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug})).Logger,
 				logger:   log.NewLogfmtLogger(&logBytes),
 				execFunc: noopExec,
 			}

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/user"
 	"strconv"
@@ -17,8 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -31,11 +30,11 @@ const allowedDisplayCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST
 type execer func(ctx context.Context, display, username string, buf *bytes.Buffer) error
 
 type XRDBSettings struct {
-	logger   log.Logger
+	slogger  *slog.Logger
 	getBytes execer
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
@@ -44,7 +43,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	}
 
 	t := &XRDBSettings{
-		logger:   logger,
+		slogger:  slogger.With("table", "kolide_xrdb"),
 		getBytes: execXRDB,
 	}
 
@@ -69,14 +68,14 @@ func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryCon
 
 			err := t.getBytes(ctx, display, username, &output)
 			if err != nil {
-				level.Info(t.logger).Log(
-					"msg", "error getting bytes for user",
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"error getting bytes for user",
 					"username", username,
 					"err", err,
 				)
 				continue
 			}
-			user_results := t.parse(display, username, &output)
+			user_results := t.parse(ctx, display, username, &output)
 			results = append(results, user_results...)
 		}
 	}
@@ -146,7 +145,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 	return nil
 }
 
-func (t *XRDBSettings) parse(display, username string, input io.Reader) []map[string]string {
+func (t *XRDBSettings) parse(ctx context.Context, display, username string, input io.Reader) []map[string]string {
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)
@@ -159,8 +158,8 @@ func (t *XRDBSettings) parse(display, username string, input io.Reader) []map[st
 
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) < 2 {
-			level.Error(t.logger).Log(
-				"msg", "unable to process line, not enough segments",
+			t.slogger.Log(ctx, slog.LevelError,
+				"unable to process line, not enough segments",
 				"line", line,
 			)
 			continue
@@ -175,7 +174,10 @@ func (t *XRDBSettings) parse(display, username string, input io.Reader) []map[st
 	}
 
 	if err := scanner.Err(); err != nil {
-		level.Debug(t.logger).Log("msg", "scanner error", "err", err)
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"scanner error",
+			"err", err,
+		)
 	}
 
 	return results

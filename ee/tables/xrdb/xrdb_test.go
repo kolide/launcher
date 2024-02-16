@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -86,7 +86,7 @@ func TestXrdbParse(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		table := XRDBSettings{
-			logger: log.NewNopLogger(),
+			slogger: multislogger.New().Logger,
 			getBytes: func(ctx context.Context, display, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)

@@ -9,12 +9,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -22,13 +21,13 @@ import (
 )
 
 type GsettingsMetadata struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	cmdRunner func(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error
 }
 
 // Metadata returns a table plugin for querying metadata about specific keys in
 // specific schemas
-func Metadata(logger log.Logger) *table.Plugin {
+func Metadata(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
 		table.TextColumn("schema"),
@@ -38,7 +37,7 @@ func Metadata(logger log.Logger) *table.Plugin {
 	}
 
 	t := &GsettingsMetadata{
-		logger:    logger,
+		slogger:   slogger.With("table", "kolide_gsettings_metadata"),
 		cmdRunner: execGsettingsCommand,
 	}
 
@@ -56,8 +55,8 @@ func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.Que
 	for _, schema := range schemas {
 		descriptions, err := t.gsettingsDescribeForSchema(ctx, schema)
 		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "error describing keys for schema",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error describing keys for schema",
 				"schema", schema,
 				"err", err,
 			)
@@ -105,8 +104,8 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 	for _, k := range keys {
 		desc, err := t.describeKey(ctx, schema, k, dir)
 		if err != nil {
-			level.Info(t.logger).Log(
-				"msg", "error describing key",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error describing key",
 				"key", k,
 				"schema", schema,
 				"err", err,
@@ -139,7 +138,10 @@ func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string)
 	}
 
 	if err := scanner.Err(); err != nil {
-		level.Info(t.logger).Log("msg", "scanner error", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"scanner error",
+			"err", err,
+		)
 	}
 
 	return keys, nil
