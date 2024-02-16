@@ -8,12 +8,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -37,16 +37,18 @@ var pwshScript []byte
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
 type Table struct {
-	logger   log.Logger
+	slogger  *slog.Logger
+	logger   log.Logger // preserved only for use in dataflattentable temporarily
 	getBytes execer
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
+		slogger:  slogger.With("table", "kolide_wifi_networks"),
 		logger:   logger,
-		getBytes: execPwsh(logger),
+		getBytes: execPwsh(slogger),
 	}
 
 	return table.NewPlugin("kolide_wifi_networks", columns, t.generate)
@@ -69,7 +71,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
 }
 
-func execPwsh(logger log.Logger) execer {
+func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
 		// MS requires interfaces to complete network scans in <4 seconds, but
 		// that appears not to be consistent
@@ -106,7 +108,11 @@ func execPwsh(logger log.Logger) execer {
 		// successful execution code.
 		if err != nil || errOutput != "" {
 			// if there is an error, inspect the contents of stdout
-			level.Debug(logger).Log("msg", "error execing, inspecting stdout contents", "stdout", buf.String())
+			slogger.Log(ctx, slog.LevelDebug,
+				"error execing, inspecting stdout contents",
+				"stdout", buf.String(),
+				"err", err,
+			)
 
 			if err == nil {
 				err = fmt.Errorf("exec succeeded, but emitted to stderr")
