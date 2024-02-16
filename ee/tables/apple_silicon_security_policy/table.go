@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -20,18 +19,16 @@ import (
 const bootPolicyUtilArgs = "--display-all-policies"
 
 type Table struct {
-	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_apple_silicon_security_policy"
 
 	t := &Table{
 		slogger: slogger.With("table", tableName),
-		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generate)
@@ -40,7 +37,7 @@ func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs}, false)
+	output, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs}, false)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"bputil failed",
@@ -59,7 +56,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	data := parseBootPoliciesOutput(bytes.NewReader(output))
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(data, dataflatten.WithSlogger(t.slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"error flattening data",

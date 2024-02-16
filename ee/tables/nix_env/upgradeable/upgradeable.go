@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -26,18 +25,16 @@ const allowedCharacters = "0123456789"
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in dataflattentable/etc
 	execCC  allowedcmd.AllowedCommand
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("uid"),
 	)
 
 	t := &Table{
 		slogger: slogger.With("table", "kolide_nix_upgradeable"),
-		logger:  logger,
 		execCC:  allowedcmd.NixEnv,
 	}
 
@@ -65,7 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			}
 
 			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithLogger(t.logger),
+				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 

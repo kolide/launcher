@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -24,16 +23,14 @@ import (
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns()
 
 	t := &Table{
 		slogger: slogger.With("table", "kolide_dsim_default_associations"),
-		logger:  logger,
 	}
 
 	return table.NewPlugin("kolide_dsim_default_associations", columns, t.generate)
@@ -53,7 +50,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
-			dataflatten.WithLogger(t.logger),
+			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 

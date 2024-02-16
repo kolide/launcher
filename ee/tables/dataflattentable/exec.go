@@ -2,12 +2,11 @@ package dataflattentable
 
 import (
 	"context"
+	"log/slog"
 
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -25,11 +24,11 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
-		logger:            level.NewFilter(logger, level.AllowInfo()),
+		slogger:           slogger.With("table", tableName),
 		tableName:         tableName,
 		cmdGen:            cmdGen,
 		execArgs:          execArgs,
@@ -61,7 +60,7 @@ func TablePluginExec(logger log.Logger, tableName string, dataSourceType DataSou
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	execBytes, err := tablehelpers.Exec(ctx, t.logger, 50, t.cmdGen, t.execArgs, false)
+	execBytes, err := tablehelpers.Exec(ctx, t.slogger, 50, t.cmdGen, t.execArgs, false)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
@@ -70,19 +69,25 @@ func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContex
 
 		// If the exec failed for some reason, it's probably better to return no results, and log the,
 		// error. Returning an error here will cause a table failure, and thus break joins
-		level.Info(t.logger).Log("msg", "failed to exec", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"failed to exec",
+			"err", err,
+		)
 		return nil, nil
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
-			dataflatten.WithLogger(t.logger),
+			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 
 		flattened, err := t.flattenBytesFunc(execBytes, flattenOpts...)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"failure flattening output",
+				"err", err,
+			)
 			continue
 		}
 

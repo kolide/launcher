@@ -13,14 +13,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type spotlightTable struct {
-	logger  log.Logger // preserved only temporarily for tablehelpers.Exec usage
 	slogger *slog.Logger
 }
 
@@ -32,14 +30,13 @@ Example Query:
 	AS f JOIN kolide_spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
 */
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
 	}
 
 	t := &spotlightTable{
-		logger:  logger,
 		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
@@ -60,7 +57,7 @@ func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryC
 		query = []string{where}
 	}
 
-	out, err := tablehelpers.Exec(ctx, t.logger, 120, allowedcmd.Mdfind, query, false)
+	out, err := tablehelpers.Exec(ctx, t.slogger, 120, allowedcmd.Mdfind, query, false)
 	if err != nil {
 		return nil, fmt.Errorf("call mdfind: %w", err)
 	}

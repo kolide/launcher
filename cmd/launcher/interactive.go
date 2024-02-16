@@ -80,7 +80,7 @@ func runInteractive(args []string) error {
 		flOsqueryFlags = append(flOsqueryFlags, fmt.Sprintf("tls_server_certs=%s", certs))
 	}
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(logger, rootDir, osquerydPath, flOsqueryFlags)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}

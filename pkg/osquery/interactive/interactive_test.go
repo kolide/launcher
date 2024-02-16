@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
@@ -84,7 +83,7 @@ func TestProc(t *testing.T) {
 			require.NoError(t, downloadOsquery(rootDir))
 			osquerydPath := filepath.Join(rootDir, "osqueryd")
 
-			proc, _, err := StartProcess(log.NewNopLogger(), rootDir, osquerydPath, tt.osqueryFlags)
+			proc, _, err := StartProcess(rootDir, osquerydPath, tt.osqueryFlags)
 
 			if tt.errContainsStr != "" {
 				require.Error(t, err)

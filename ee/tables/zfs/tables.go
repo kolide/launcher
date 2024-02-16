@@ -12,7 +12,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -23,7 +22,6 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in tablehelpers.Exec
 	cmd     allowedcmd.AllowedCommand
 }
 
@@ -36,20 +34,18 @@ func columns() []table.ColumnDefinition {
 	}
 }
 
-func ZfsPropertiesPlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func ZfsPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger: slogger.With("table", "kolide_zfs_properties"),
-		logger:  logger,
 		cmd:     allowedcmd.Zfs,
 	}
 
 	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
 }
 
-func ZpoolPropertiesPlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func ZpoolPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger: slogger.With("table", "kolide_zpool_properties"),
-		logger:  logger,
 		cmd:     allowedcmd.Zpool,
 	}
 
@@ -77,7 +73,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	args = append(args, names...)
 
-	output, err := tablehelpers.Exec(ctx, t.logger, 15, t.cmd, args, false)
+	output, err := tablehelpers.Exec(ctx, t.slogger, 15, t.cmd, args, false)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +42,7 @@ func TestTransformOutput(t *testing.T) {
 		},
 	}
 
-	table := Table{logger: log.NewNopLogger()}
+	table := Table{slogger: multislogger.New().Logger}
 
 	for _, tt := range tests {
 		tt := tt

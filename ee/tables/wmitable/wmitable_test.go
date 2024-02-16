@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +16,7 @@ import (
 func TestQueries(t *testing.T) {
 	t.Parallel()
 
-	wmiTable := Table{logger: log.NewNopLogger(), slogger: multislogger.New().Logger}
+	wmiTable := Table{slogger: multislogger.New().Logger}
 
 	var tests = []struct {
 		name        string

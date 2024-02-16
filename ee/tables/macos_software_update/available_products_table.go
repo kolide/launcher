@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -27,14 +26,13 @@ import (
 var productsData []map[string]interface{}
 var cachedTime time.Time
 
-func AvailableProducts(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func AvailableProducts(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_macos_available_products"
 
 	t := &Table{
 		slogger: slogger.With("table", tableName),
-		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generateAvailableProducts)
@@ -46,7 +44,7 @@ func (t *Table) generateAvailableProducts(ctx context.Context, queryContext tabl
 	data := getProducts()
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(data, dataflatten.WithSlogger(t.slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"error flattening data",

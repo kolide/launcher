@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -27,17 +26,15 @@ import (
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
 	)
 
 	t := &Table{
 		slogger: slogger.With("table", "kolide_secedit"),
-		logger:  logger,
 	}
 
 	return table.NewPlugin("kolide_secedit", columns, t.generate)
@@ -87,7 +84,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
@@ -111,7 +108,7 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 		args = append(args, "/mergedpolicy")
 	}
 
-	if out, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Secedit, args, true); err != nil {
+	if out, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Secedit, args, true); err != nil {
 		return nil, fmt.Errorf("calling secedit. Got: %s: %w", string(out), err)
 	}
 

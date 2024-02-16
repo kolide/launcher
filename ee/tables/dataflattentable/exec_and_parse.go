@@ -2,11 +2,10 @@ package dataflattentable
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -21,7 +20,7 @@ type bytesFlattener interface {
 
 // execTableV2 is the next iteration of the dataflattentable wrapper. Aim to migrate exec based tables to this.
 type execTableV2 struct {
-	logger         log.Logger
+	slogger        *slog.Logger
 	tableName      string
 	flattener      bytesFlattener
 	timeoutSeconds int
@@ -51,9 +50,9 @@ func WithIncludeStderr() execTableV2Opt {
 	}
 }
 
-func NewExecAndParseTable(logger log.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
+func NewExecAndParseTable(slogger *slog.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
-		logger:         level.NewFilter(log.With(logger, "table", tableName), level.AllowInfo()),
+		slogger:        slogger.With("table", tableName),
 		tableName:      tableName,
 		flattener:      flattenerFromParser(p),
 		timeoutSeconds: 30,
@@ -66,7 +65,7 @@ func NewExecAndParseTable(logger log.Logger, tableName string, p parser, cmd all
 	}
 
 	if t.tabledebug {
-		level.NewFilter(log.With(logger, "table", tableName), level.AllowDebug())
+		// TODO RM
 	}
 
 	return table.NewPlugin(t.tableName, Columns(), t.generate)
@@ -78,26 +77,32 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	var results []map[string]string
 
-	execOutput, err := tablehelpers.Exec(ctx, t.logger, t.timeoutSeconds, t.cmd, t.execArgs, t.includeStderr)
+	execOutput, err := tablehelpers.Exec(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, t.includeStderr)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
 		}
 		traces.SetError(span, err)
-		level.Info(t.logger).Log("msg", "exec failed", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"exec failed",
+			"err", err,
+		)
 		return nil, nil
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
-			dataflatten.WithLogger(t.logger),
+			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 
 		flattened, err := t.flattener.FlattenBytes(execOutput, flattenOpts...)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"failure flattening output",
+				"err", err,
+			)
 			continue
 		}
 

@@ -7,14 +7,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_generateRecommendedUpdatesHappyPath(t *testing.T) {
 	t.Parallel()
-	table := Table{logger: log.NewNopLogger()}
+	table := Table{slogger: multislogger.New().Logger}
 
 	_, err := table.generate(context.Background(), tablehelpers.MockQueryContext(nil))
 

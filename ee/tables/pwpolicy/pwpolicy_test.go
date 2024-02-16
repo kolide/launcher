@@ -9,7 +9,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +45,6 @@ func TestQueries(t *testing.T) {
 		tt := tt
 		testTable := &Table{
 			slogger: multislogger.New().Logger,
-			logger:  log.NewNopLogger(),
 			execCC:  execFaker(tt.file),
 		}
 

@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -29,21 +28,18 @@ const (
 
 type Table struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved only for temporary use in dataflattentable
 	queryFunc queryFuncType
 	name      string
 }
 
-func TablePlugin(mode tableMode, slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(mode tableMode, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
 		table.IntegerColumn("is_default"),
 	)
 
-	t := &Table{
-		logger: logger,
-	}
+	t := &Table{}
 
 	switch mode {
 	case UpdatesTable:
@@ -129,7 +125,7 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 
 func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

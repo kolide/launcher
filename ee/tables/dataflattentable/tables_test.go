@@ -8,9 +8,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,13 +20,13 @@ import (
 func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	t.Parallel()
 
-	logger := log.NewNopLogger()
+	slogger := multislogger.New().Logger
 
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": {logger: logger, flattenFileFunc: dataflatten.PlistFile},
-		"xml":   {logger: logger, flattenFileFunc: dataflatten.PlistFile},
-		"json":  {logger: logger, flattenFileFunc: dataflatten.JsonFile},
+		"plist": {slogger: slogger, flattenFileFunc: dataflatten.PlistFile},
+		"xml":   {slogger: slogger, flattenFileFunc: dataflatten.PlistFile},
+		"json":  {slogger: slogger, flattenFileFunc: dataflatten.JsonFile},
 	}
 
 	var tests = []struct {
@@ -85,7 +85,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 func TestDataFlattenTables(t *testing.T) {
 	t.Parallel()
 
-	logger := log.NewNopLogger()
+	slogger := multislogger.New().Logger
 
 	var tests = []struct {
 		testTables   map[string]Table
@@ -96,18 +96,18 @@ func TestDataFlattenTables(t *testing.T) {
 	}{
 		// xml
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {slogger: slogger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			expectedRows: 6,
 		},
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {slogger: slogger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"simple/Items"},
 			expectedRows: 3,
 		},
 		{
-			testTables:   map[string]Table{"xml": {logger: logger, flattenFileFunc: dataflatten.XmlFile}},
+			testTables:   map[string]Table{"xml": {slogger: slogger, flattenFileFunc: dataflatten.XmlFile}},
 			testFile:     path.Join("testdata", "simple.xml"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,
@@ -115,18 +115,18 @@ func TestDataFlattenTables(t *testing.T) {
 
 		// ini
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {slogger: slogger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			expectedRows: 87,
 		},
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {slogger: slogger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"Registry Values"},
 			expectedRows: 59,
 		},
 		{
-			testTables:   map[string]Table{"ini": {logger: logger, flattenFileFunc: dataflatten.IniFile}},
+			testTables:   map[string]Table{"ini": {slogger: slogger, flattenFileFunc: dataflatten.IniFile}},
 			testFile:     path.Join("testdata", "secdata.ini"),
 			queries:      []string{"this/does/not/exist"},
 			expectNoData: true,

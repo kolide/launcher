@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -39,23 +38,21 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, log.Logger, int, allowedcmd.AllowedCommand, []string, bool) ([]byte, error)
+type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, bool) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved temporarily for use in dataflattentables/tablehelpers
 	tableName string
 	execFunc  execFunc
 }
 
-func NewFalconctlOptionTable(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("options"),
 	)
 
 	t := &falconctlOptionsTable{
 		slogger:   slogger.With("table", "kolide_falconctl_options"),
-		logger:    log.With(logger, "table", "kolide_falconctl_options"),
 		tableName: "kolide_falconctl_options",
 		execFunc:  tablehelpers.Exec,
 	}
@@ -95,7 +92,7 @@ OUTER:
 		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
-		output, err := t.execFunc(ctx, t.logger, 30, allowedcmd.Falconctl, args, false)
+		output, err := t.execFunc(ctx, t.slogger, 30, allowedcmd.Falconctl, args, false)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"exec failed",
@@ -131,7 +128,7 @@ OUTER:
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithLogger(t.logger),
+				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 

@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -38,16 +37,14 @@ type execer func(ctx context.Context, buf *bytes.Buffer) error
 
 type Table struct {
 	slogger  *slog.Logger
-	logger   log.Logger // preserved only for use in dataflattentable temporarily
 	getBytes execer
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
 		slogger:  slogger.With("table", "kolide_wifi_networks"),
-		logger:   logger,
 		getBytes: execPwsh(slogger),
 	}
 
@@ -63,7 +60,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if err := t.getBytes(ctx, &output); err != nil {
 		return results, fmt.Errorf("getting raw data: %w", err)
 	}
-	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
+	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithSlogger(t.slogger))
 	if err != nil {
 		return results, fmt.Errorf("flattening json output: %w", err)
 	}
