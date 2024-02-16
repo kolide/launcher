@@ -20,8 +20,8 @@ package osquery_user_exec_table
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -31,20 +31,20 @@ const (
 )
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	osqueryd  string
 	query     string
 	tablename string
 }
 
 func TablePlugin(
-	logger log.Logger, tablename string, osqueryd string,
+	slogger *slog.Logger, tablename string, osqueryd string,
 	osqueryQuery string, columns []table.ColumnDefinition,
 ) *table.Plugin {
 	columns = append(columns, table.TextColumn("user"))
 
 	t := &Table{
-		logger:    logger,
+		slogger:   slogger.With("table", tablename),
 		osqueryd:  osqueryd,
 		query:     osqueryQuery,
 		tablename: tablename,
@@ -65,7 +65,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, user := range users {
-		osqueryResults, err := tablehelpers.ExecOsqueryLaunchctlParsed(ctx, t.logger, 5, user, t.osqueryd, t.query)
+		osqueryResults, err := tablehelpers.ExecOsqueryLaunchctlParsed(ctx, t.slogger, 5, user, t.osqueryd, t.query)
 		if err != nil {
 			continue
 		}

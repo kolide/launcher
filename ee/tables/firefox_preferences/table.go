@@ -3,13 +3,11 @@ package firefox_preferences
 import (
 	"bufio"
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -17,8 +15,8 @@ import (
 )
 
 type Table struct {
-	name   string
-	logger log.Logger
+	name    string
+	slogger *slog.Logger
 }
 
 const tableName = "kolide_firefox_preferences"
@@ -35,14 +33,14 @@ const tableName = "kolide_firefox_preferences"
 // https://github.com/hansmi/go-mozpref
 var re = regexp.MustCompile(`^user_pref\("([^,]+)",\s*"?(.*?)"?\);$`)
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("path"),
 	)
 
 	t := &Table{
-		name:   tableName,
-		logger: logger,
+		name:    tableName,
+		slogger: slogger.With("table", tableName),
 	}
 
 	return table.NewPlugin(t.name, columns, t.generate)
@@ -54,9 +52,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	filePaths := tablehelpers.GetConstraints(queryContext, "path")
 
 	if len(filePaths) == 0 {
-		level.Info(t.logger).Log(
-			"msg", fmt.Sprintf("no path provided to %s", tableName),
-			"table", tableName,
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"no path provided",
 		)
 		return results, nil
 	}
@@ -69,9 +66,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			file, err := os.Open(filePath)
 			if err != nil {
-				level.Info(t.logger).Log(
-					"msg", "failed to open file",
-					"table", tableName,
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failed to open file",
 					"path", filePath,
 					"err", err,
 				)
@@ -103,9 +99,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
 			if err != nil {
-				level.Debug(t.logger).Log(
-					"msg", "failed to flatten data for path",
-					"table", tableName,
+				t.slogger.Log(ctx, slog.LevelDebug,
+					"failed to flatten data for path",
 					"path", filePath,
 					"err", err,
 				)

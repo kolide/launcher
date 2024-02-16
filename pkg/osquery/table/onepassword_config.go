@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -25,7 +24,7 @@ var onepasswordDataFiles = map[string][]string{
 	},
 }
 
-func OnePasswordAccounts(logger log.Logger) *table.Plugin {
+func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
@@ -37,14 +36,14 @@ func OnePasswordAccounts(logger log.Logger) *table.Plugin {
 	}
 
 	o := &onePasswordAccountsTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
 	return table.NewPlugin("kolide_onepassword_accounts", columns, o.generate)
 }
 
 type onePasswordAccountsTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 // generate the onepassword account info results given the path to a
@@ -100,10 +99,10 @@ func (o *onePasswordAccountsTable) generate(ctx context.Context, queryContext ta
 	}
 
 	for _, dataFilePath := range osDataFiles {
-		files, err := findFileInUserDirs(dataFilePath, o.logger)
+		files, err := findFileInUserDirs(dataFilePath, o.slogger)
 		if err != nil {
-			level.Info(o.logger).Log(
-				"msg", "Find 1password sqlite DBs",
+			o.slogger.Log(ctx, slog.LevelInfo,
+				"find 1password sqlite DBs",
 				"path", dataFilePath,
 				"err", err,
 			)
@@ -113,8 +112,8 @@ func (o *onePasswordAccountsTable) generate(ctx context.Context, queryContext ta
 		for _, file := range files {
 			res, err := o.generateForPath(ctx, file)
 			if err != nil {
-				level.Info(o.logger).Log(
-					"msg", "Generating onepassword result",
+				o.slogger.Log(ctx, slog.LevelInfo,
+					"generating onepassword result",
 					"path", file.path,
 					"err", err,
 				)

@@ -528,7 +528,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			"errgroup", "kolide extension manager server launch",
 		)
 
-		plugins := table.PlatformTables(o.logger, currentOsquerydBinaryPath)
+		plugins := table.PlatformTables(r.knapsack.Slogger().With("component", "platform_tables"), o.logger, currentOsquerydBinaryPath)
 
 		if len(plugins) == 0 {
 			return nil

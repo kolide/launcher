@@ -3,10 +3,10 @@ package dev_table_tooling
 import (
 	"context"
 	"encoding/base64"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -20,10 +20,11 @@ type allowedCommand struct {
 }
 
 type Table struct {
-	logger log.Logger
+	logger  log.Logger // preserved temporarily only for tablehelpers.Exec usage
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("args"),
@@ -34,7 +35,8 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	tableName := "kolide_dev_table_tooling"
 
 	t := &Table{
-		logger: log.With(logger, "table", tableName),
+		slogger: slogger.With("table", tableName),
+		logger:  log.With(logger, "table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generate)
@@ -45,14 +47,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, name := range tablehelpers.GetConstraints(queryContext, "name", tablehelpers.WithDefaults("")) {
 		if name == "" {
-			level.Info(t.logger).Log("msg", "Command name must not be blank")
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"received blank command name, skipping",
+			)
 			continue
 		}
 
 		cmd, ok := allowedCommands[name]
 
 		if !ok {
-			level.Info(t.logger).Log("msg", "Command not allowed", "name", name)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"command not allowed",
+				"name", name,
+			)
 			continue
 		}
 
@@ -64,7 +71,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		if output, err := tablehelpers.Exec(ctx, t.logger, 30, cmd.bin, cmd.args, false); err != nil {
-			level.Info(t.logger).Log("msg", "execution failed", "name", name, "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"execution failed",
+				"name", name,
+				"err", err,
+			)
 			result["error"] = err.Error()
 		} else {
 			result["output"] = base64.StdEncoding.EncodeToString(output)

@@ -1,6 +1,8 @@
 package table
 
 import (
+	"log/slog"
+
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
@@ -35,32 +37,32 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func PlatformTables(slogger *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
-		ChromeLoginDataEmails(logger),
-		ChromeUserProfiles(logger),
-		KeyInfo(logger),
-		OnePasswordAccounts(logger),
-		SlackConfig(logger),
-		SshKeys(logger),
-		cryptoinfotable.TablePlugin(logger),
-		dev_table_tooling.TablePlugin(logger),
-		firefox_preferences.TablePlugin(logger),
+		ChromeLoginDataEmails(slogger),
+		ChromeUserProfiles(slogger),
+		KeyInfo(slogger),
+		OnePasswordAccounts(slogger),
+		SlackConfig(slogger),
+		SshKeys(slogger),
+		cryptoinfotable.TablePlugin(slogger, logger),
+		dev_table_tooling.TablePlugin(slogger, logger),
+		firefox_preferences.TablePlugin(slogger),
 		dataflattentable.TablePluginExec(logger,
 			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
 		dataflattentable.TablePluginExec(logger,
 			"kolide_zerotier_networks", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listnetworks"}),
 		dataflattentable.TablePluginExec(logger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listpeers"}),
-		tdebug.LauncherGcInfo(logger),
+		tdebug.LauncherGcInfo(slogger, logger),
 	}
 
 	// The dataflatten tables
 	tables = append(tables, dataflattentable.AllTablePlugins(logger)...)
 
 	// add in the platform specific ones (as denoted by build tags)
-	tables = append(tables, platformSpecificTables(logger, currentOsquerydBinaryPath)...)
+	tables = append(tables, platformSpecificTables(slogger, logger, currentOsquerydBinaryPath)...)
 
 	return tables
 }

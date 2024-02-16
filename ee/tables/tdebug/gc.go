@@ -4,15 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"runtime/debug"
 	"strings"
 
+	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -21,15 +20,17 @@ const (
 )
 
 type gcTable struct {
-	logger log.Logger
-	stats  debug.GCStats
+	logger  log.Logger // preserved only for temporary dataflattentable use
+	slogger *slog.Logger
+	stats   debug.GCStats
 }
 
-func LauncherGcInfo(logger log.Logger) *table.Plugin {
+func LauncherGcInfo(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &gcTable{
-		logger: logger,
+		logger:  logger,
+		slogger: slogger.With("table", gcTableName),
 	}
 
 	return table.NewPlugin(gcTableName, columns, t.generate)
@@ -61,7 +62,10 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "gc flatten failed", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"gc flatten failed",
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, dataflattentable.ToMap(flatData, dataQuery, nil)...)

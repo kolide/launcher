@@ -5,22 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/user"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
-
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDUserConfig(logger log.Logger) *table.Plugin {
+func TouchIDUserConfig(slogger *slog.Logger) *table.Plugin {
 	t := &touchIDUserConfigTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_touchid_user_config"),
 	}
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("uid"),
@@ -35,15 +33,14 @@ func TouchIDUserConfig(logger log.Logger) *table.Plugin {
 }
 
 type touchIDUserConfigTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	q := queryContext.Constraints["uid"]
 	if len(q.Constraints) == 0 {
-		level.Debug(t.logger).Log(
-			"msg", "The touchid_user_config table requires that you specify a constraint WHERE uid =",
-			"err", "no constraints",
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"table requires a uid constraint, but none provided",
 		)
 		return nil, errors.New("The touchid_user_config table requires that you specify a constraint WHERE uid =")
 	}
@@ -55,8 +52,8 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		// Verify the user exists on the system before proceeding
 		_, err := user.LookupId(constraint.Expression)
 		if err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "nonexistant user",
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"nonexistent user",
 				"uid", constraint.Expression,
 				"err", err,
 			)
@@ -67,8 +64,8 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		// Get the user's TouchID config
 		configOutput, err := runCommandContext(ctx, uid, allowedcmd.Bioutil, "-r")
 		if err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "could not run bioutil -r",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"could not run bioutil -r",
 				"uid", uid,
 				"err", err,
 			)
@@ -86,10 +83,10 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 			effectiveUnlock = configSplit[4][1:2]
 			effectiveApplePay = configSplit[5][1:2]
 		} else {
-			level.Debug(t.logger).Log(
-				"msg", configOutput,
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"bioutil -r returned unexpected output",
 				"uid", uid,
-				"err", "bioutil -r returned unexpected output",
+				"output", configOutput,
 			)
 			continue
 		}
@@ -97,8 +94,8 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		// Grab the fingerprint count
 		countOutStr, err := runCommandContext(ctx, uid, allowedcmd.Bioutil, "-c")
 		if err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "could not run bioutil -c",
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"could not run bioutil -c",
 				"uid", uid,
 				"err", err,
 			)

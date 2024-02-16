@@ -9,10 +9,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -25,28 +25,31 @@ var (
 )
 
 type Table struct {
-	name   string
-	logger log.Logger
+	name    string
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
 const tableName = "kolide_airport_util"
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("option"),
 	)
 
 	t := &Table{
-		name:   tableName,
-		logger: logger,
+		name:    tableName,
+		slogger: slogger.With("name", tableName),
+		logger:  logger,
 	}
 
 	return table.NewPlugin(t.name, columns, t.generate)
 }
 
 type airportExecutor struct {
-	ctx    context.Context // nolint:containedctx
-	logger log.Logger
+	ctx     context.Context // nolint:containedctx
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
@@ -60,14 +63,15 @@ type executor interface {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 
 	airportExecutor := &airportExecutor{
-		ctx:    ctx,
-		logger: t.logger,
+		ctx:     ctx,
+		slogger: t.slogger,
+		logger:  t.logger,
 	}
 
-	return generateAirportData(queryContext, airportExecutor, t.logger)
+	return generateAirportData(queryContext, airportExecutor, t.slogger, t.logger)
 }
 
-func generateAirportData(queryContext table.QueryContext, airportExecutor executor, logger log.Logger) ([]map[string]string, error) {
+func generateAirportData(queryContext table.QueryContext, airportExecutor executor, slogger *slog.Logger, logger log.Logger) ([]map[string]string, error) {
 	options := tablehelpers.GetConstraints(queryContext, "option", tablehelpers.WithAllowedValues(allowedOptions))
 
 	if len(options) == 0 {
@@ -78,13 +82,21 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 	for _, option := range options {
 		airportOutput, err := airportExecutor.Exec(option)
 		if err != nil {
-			level.Debug(logger).Log("msg", "Error execing airport", "option", option, "err", err)
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"error execing airport",
+				"option", option,
+				"err", err,
+			)
 			continue
 		}
 
-		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, logger)
+		optionResult, err := processAirportOutput(bytes.NewReader(airportOutput), option, queryContext, slogger, logger)
 		if err != nil {
-			level.Debug(logger).Log("msg", "Error processing airport output", "option", option, "err", err)
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"error processing airport output",
+				"option", option,
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, optionResult...)
@@ -93,7 +105,7 @@ func generateAirportData(queryContext table.QueryContext, airportExecutor execut
 	return results, nil
 }
 
-func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, logger log.Logger) ([]map[string]string, error) {
+func processAirportOutput(airportOutput io.Reader, option string, queryContext table.QueryContext, slogger *slog.Logger, logger log.Logger) ([]map[string]string, error) {
 	var results []map[string]string
 
 	var unmarshalledOutput []map[string]interface{}

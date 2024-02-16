@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,8 +45,9 @@ func TestQueries(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		testTable := &Table{
-			logger: log.NewNopLogger(),
-			execCC: execFaker(tt.file),
+			slogger: multislogger.New().Logger,
+			logger:  log.NewNopLogger(),
+			execCC:  execFaker(tt.file),
 		}
 
 		testName := tt.file + "/" + tt.name

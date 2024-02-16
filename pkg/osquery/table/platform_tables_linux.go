@@ -4,6 +4,8 @@
 package table
 
 import (
+	"log/slog"
+
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/crowdstrike/falcon_kernel_check"
@@ -21,7 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/simple_array"
 	"github.com/kolide/launcher/ee/tables/fscrypt_info"
 	"github.com/kolide/launcher/ee/tables/gsettings"
-	"github.com/kolide/launcher/ee/tables/nix_env/upgradeable"
+	nix_env_upgradeable "github.com/kolide/launcher/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/ee/tables/secureboot"
 	"github.com/kolide/launcher/ee/tables/xfconf"
 	"github.com/kolide/launcher/ee/tables/xrdb"
@@ -29,7 +31,7 @@ import (
 	osquery "github.com/osquery/osquery-go"
 )
 
-func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformSpecificTables(slogger *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		cryptsetup.TablePlugin(logger),
 		gsettings.Settings(logger),
@@ -63,7 +65,7 @@ func platformSpecificTables(logger log.Logger, currentOsquerydBinaryPath string)
 		dataflattentable.NewExecAndParseTable(logger, "kolide_rpm_version_info", rpm.Parser, allowedcmd.Rpm, []string{"-qai"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.TablePluginExec(logger, "kolide_nftables", dataflattentable.JsonType, allowedcmd.Nftables, []string{"-jat", "list", "ruleset"}), // -j (json) -a (show object handles) -t (terse, omit set contents)
-		zfs.ZfsPropertiesPlugin(logger),
-		zfs.ZpoolPropertiesPlugin(logger),
+		zfs.ZfsPropertiesPlugin(slogger, logger),
+		zfs.ZpoolPropertiesPlugin(slogger, logger),
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
@@ -19,7 +20,8 @@ import (
 )
 
 type spotlightTable struct {
-	logger log.Logger
+	logger  log.Logger // preserved only temporarily for tablehelpers.Exec usage
+	slogger *slog.Logger
 }
 
 /*
@@ -30,14 +32,15 @@ Example Query:
 	AS f JOIN kolide_spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
 */
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
 	}
 
 	t := &spotlightTable{
-		logger: logger,
+		logger:  logger,
+		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
 	return table.NewPlugin("kolide_spotlight", columns, t.generate)

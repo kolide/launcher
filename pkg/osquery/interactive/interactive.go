@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/augeas"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
@@ -117,7 +118,7 @@ func loadExtensions(logger log.Logger, socketPath string, osquerydPath string) (
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
-	extensionManagerServer.RegisterPlugin(table.PlatformTables(logger, osquerydPath)...)
+	extensionManagerServer.RegisterPlugin(table.PlatformTables(multislogger.New().Logger, logger, osquerydPath)...)
 
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
