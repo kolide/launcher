@@ -6,27 +6,28 @@ package wmitable
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/wmi"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("namespace"),
@@ -36,7 +37,8 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger: level.NewFilter(logger),
+		logger:  level.NewFilter(logger),
+		slogger: slogger.With("table", "kolide_wmi"),
 	}
 
 	return table.NewPlugin("kolide_wmi", columns, t.generate)
@@ -97,19 +99,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 					wmiResults, err := wmi.Query(ctx, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
 					if err != nil {
-						level.Info(t.logger).Log(
-							"msg", "wmi query failure",
+						t.slogger.Log(ctx, slog.LevelInfo,
+							"wmi query failure",
 							"err", err,
 							"class", class,
 							"properties", rawProperties,
 							"namespace", ns,
-							"whereClause", whereClause,
+							"where_clause", whereClause,
 						)
 						continue
 					}
 
 					for _, dataQuery := range flattenQueries {
-						results = append(results, t.flattenRowsFromWmi(dataQuery, wmiResults, class, rawProperties, ns, whereClause)...)
+						results = append(results, t.flattenRowsFromWmi(ctx, dataQuery, wmiResults, class, rawProperties, ns, whereClause)...)
 					}
 				}
 			}
@@ -119,7 +121,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
+func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithLogger(t.logger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
@@ -134,7 +136,10 @@ func (t *Table) flattenRowsFromWmi(dataQuery string, wmiResults []map[string]int
 
 	flatData, err := dataflatten.Flatten(resultsCasted, flattenOpts...)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"failure flattening output",
+			"err", err,
+		)
 		return nil
 	}
 

@@ -7,13 +7,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -26,16 +26,18 @@ import (
 )
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
 	)
 
 	t := &Table{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_secedit"),
+		logger:  logger,
 	}
 
 	return table.NewPlugin("kolide_secedit", columns, t.generate)
@@ -47,20 +49,29 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, mergedpolicy := range tablehelpers.GetConstraints(queryContext, "mergedpolicy", tablehelpers.WithDefaults("false")) {
 		useMergedPolicy, err := strconv.ParseBool(mergedpolicy)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Cannot convert mergedpolicy constraint into a boolean value. Try passing \"true\"", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"cannot convert mergedpolicy constraint into a boolean value",
+				"err", err,
+			)
 			continue
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			secEditResults, err := t.execSecedit(ctx, useMergedPolicy)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "secedit failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"secedit failed",
+					"err", err,
+				)
 				continue
 			}
 
 			flatData, err := t.flattenOutput(dataQuery, secEditResults)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
 				continue
 			}
 

@@ -18,15 +18,15 @@ import (
 	osquery "github.com/osquery/osquery-go"
 )
 
-func platformSpecificTables(_ *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformSpecificTables(slogger *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		ProgramIcons(),
-		dsim_default_associations.TablePlugin(logger),
-		secedit.TablePlugin(logger),
-		wifi_networks.TablePlugin(logger),
-		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, logger),
-		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, logger),
-		wmitable.TablePlugin(logger),
+		dsim_default_associations.TablePlugin(slogger, logger),
+		secedit.TablePlugin(slogger, logger),
+		wifi_networks.TablePlugin(slogger, logger),
+		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, slogger, logger),
+		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, slogger, logger),
+		wmitable.TablePlugin(slogger, logger),
 		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
 	}
 }
