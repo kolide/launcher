@@ -2,6 +2,7 @@ package interactive
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/augeas"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
@@ -17,7 +17,7 @@ import (
 
 const extensionName = "com.kolide.launcher_interactive"
 
-func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
+func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
 
 	if err := os.MkdirAll(rootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
@@ -58,7 +58,7 @@ func StartProcess(rootDir, osquerydPath string, osqueryFlags []string) (*os.Proc
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
-	extensionServer, err := loadExtensions(socketPath, osquerydPath)
+	extensionServer, err := loadExtensions(slogger, socketPath, osquerydPath)
 	if err != nil {
 		err = fmt.Errorf("error loading extensions: %w", err)
 
@@ -100,7 +100,7 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 	return flags
 }
 
-func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
+func loadExtensions(slogger *slog.Logger, socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
 	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
@@ -117,7 +117,7 @@ func loadExtensions(socketPath string, osquerydPath string) (*osquery.ExtensionM
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
-	extensionManagerServer.RegisterPlugin(table.PlatformTables(multislogger.New().Logger, osquerydPath)...)
+	extensionManagerServer.RegisterPlugin(table.PlatformTables(slogger, osquerydPath)...)
 
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
