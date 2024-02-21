@@ -704,7 +704,6 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	batchTotalBytes := 0
 	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
@@ -730,7 +729,6 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 				)
 			} else if e.logPublicationState.exceedsCurrentBatchThreshold(totalBytes + len(v)) {
 				// Buffer is filled. Break the loop and come back later.
-				batchTotalBytes = totalBytes
 				break
 			} else {
 				logs = append(logs, string(v))
@@ -761,7 +759,6 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
-	e.logPublicationState.addPendingBatch(batchTotalBytes)
 	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
@@ -789,7 +786,7 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	// publication was successful- update logPublicationState and move on
 	if !invalid && err == nil {
 		// todo inform lps of success and batch size
-		e.logPublicationState.noteBatchComplete(false)
+		e.logPublicationState.recordBatchSuccess(logs)
 		return nil
 	}
 

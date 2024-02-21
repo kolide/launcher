@@ -1,8 +1,18 @@
 package osquery
 
+import (
+	"container/list"
+)
+
 const (
-	// set minimum batch size to 0.5 mb as lower bound for correction
+	// minBytesPerBatch sets the minimum batch size to 0.5mb as lower bound for correction
 	minBytesPerBatch = 524288
+	// batchIncrementAmount (0.5mb) is the incremental increase amount for the target batch
+	// size when previous runs have been successful
+	batchIncrementAmount = 524288
+
+	// batchHistoryLen is the number of logPublicationBatches to retain in our publishedBatches linked list
+	batchHistoryLen = 15
 )
 
 // logPublicationState holds stateful logic to influence the log batch publication size
@@ -13,10 +23,9 @@ type (
 	logPublicationState struct {
 		// maxBytesPerBatch is passed in from the extension opts and respected
 		// as a fixed upper limit for batch size, regardless of publication success/failure rates
-		maxBytesPerBatch            int
-		currentMaxBytesPerBatch     int
-		currentPendingBatch         *logPublicationBatch
-		publishedBatches            []*logPublicationBatch
+		maxBytesPerBatch        int
+		currentMaxBytesPerBatch int
+		publishedBatches        *list.List
 	}
 
 	logPublicationBatch struct {
@@ -29,7 +38,7 @@ func NewLogPublicationState(maxBytesPerBatch int) *logPublicationState {
 	return &logPublicationState{
 		maxBytesPerBatch:        maxBytesPerBatch,
 		currentMaxBytesPerBatch: maxBytesPerBatch,
-		publishedBatches:        make([]*logPublicationBatch, 0),
+		publishedBatches:        list.New(),
 	}
 }
 
@@ -37,23 +46,25 @@ func (lps *logPublicationState) exceedsCurrentBatchThreshold(amountBytes int) bo
 	return amountBytes > lps.currentMaxBytesPerBatch
 }
 
-func (lps *logPublicationState) addPendingBatch(amountBytes int) {
-	lps.currentPendingBatch = &logPublicationBatch{
-		batchSizeBytes: amountBytes,
-	}
+func (lps *logPublicationState) recordBatchSuccess(logs []string) {
+	lps.recordBatch(logs, false)
+	lps.increaseBatchThreshold()
 }
 
-func (lps *logPublicationState) noteBatchComplete(timedOut bool) {
-	lps.currentPendingBatch.timedOut = timedOut
-	lps.publishedBatches = append(lps.publishedBatches, lps.currentPendingBatch)
-	if len(lps.publishedBatches) > 10 {
-		lps.publishedBatches = lps.publishedBatches[1:]
+func (lps *logPublicationState) recordBatchTimedOut(logs []string) {
+	lps.recordBatch(logs, true)
+	lps.reduceBatchThreshold()
+}
+
+func (lps *logPublicationState) recordBatch(logs []string, timedOut bool) {
+	newLogBatch := &logPublicationBatch{
+		batchSizeBytes: logBatchSize(logs),
+		timedOut: timedOut,
 	}
 
-	if timedOut {
-		lps.reduceBatchThreshold()
-	} else {
-		lps.increaseBatchThreshold()
+	lps.publishedBatches.PushBack(newLogBatch)
+	if lps.publishedBatches.Len() > batchHistoryLen {
+		lps.publishedBatches.Remove(lps.publishedBatches.Front())
 	}
 }
 
@@ -73,4 +84,14 @@ func (lps *logPublicationState) increaseBatchThreshold() {
 
 	newTargetThreshold := lps.currentMaxBytesPerBatch * 2
 	lps.currentMaxBytesPerBatch = minInt(newTargetThreshold, lps.maxBytesPerBatch)
+}
+
+// logBatchSize determines the total batch size attempted given the published log batch
+func logBatchSize(logs []string) int {
+	totalBatchSize := 0
+	for _, log := range logs {
+		totalBatchSize += len(log)
+	}
+
+	return totalBatchSize
 }
