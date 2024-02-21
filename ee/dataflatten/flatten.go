@@ -211,6 +211,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				if !ok {
 					innerslogger.Log(context.TODO(), fl.logLevel,
 						"keyName not in map",
+						"key_name", keyName,
 					)
 					continue
 				}
