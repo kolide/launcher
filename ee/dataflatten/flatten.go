@@ -67,6 +67,7 @@ import (
 // It can optionally filtering and rewriting.
 type Flattener struct {
 	debugLogging      bool
+	logLevel          slog.Level // the level that logs should be logged at
 	expandNestedPlist bool
 	includeNestedRaw  bool
 	includeNils       bool
@@ -76,6 +77,10 @@ type Flattener struct {
 	queryWildcard     string
 	rows              []Row
 }
+
+// levelFlattenDebug is a log level below debug, so that we discard debugging logs
+// that we only want for development purposes.
+const levelFlattenDebug = slog.LevelDebug - 1
 
 type FlattenOpts func(*Flattener)
 
@@ -132,6 +137,7 @@ func WithQuery(q []string) FlattenOpts {
 func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 	fl := &Flattener{
 		rows:            []Row{},
+		logLevel:        levelFlattenDebug, // by default, log at a level below debug
 		slogger:         multislogger.New().Logger,
 		queryWildcard:   `*`,
 		queryKeyDenoter: `#`,
@@ -141,8 +147,8 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 		opt(fl)
 	}
 
-	if !fl.debugLogging {
-		// TODO RM
+	if fl.debugLogging {
+		fl.logLevel = slog.LevelDebug
 	}
 
 	if err := fl.descend([]string{}, data, 0); err != nil {
@@ -168,7 +174,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	case []interface{}:
 		for i, e := range v {
 			pathKey := strconv.Itoa(i)
-			slogger.Log(context.TODO(), slog.LevelDebug,
+			slogger.Log(context.TODO(), fl.logLevel,
 				"checking an array",
 				"index_str", pathKey,
 			)
@@ -188,13 +194,13 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				keyName := keyQuery[0]
 
 				innerslogger := slogger.With("array_key_name", keyName)
-				innerslogger.Log(context.TODO(), slog.LevelDebug,
+				innerslogger.Log(context.TODO(), fl.logLevel,
 					"attempting to coerce array into map",
 				)
 
 				e, ok := e.(map[string]interface{})
 				if !ok {
-					innerslogger.Log(context.TODO(), slog.LevelDebug,
+					innerslogger.Log(context.TODO(), fl.logLevel,
 						"can't coerce into map",
 					)
 					continue
@@ -203,7 +209,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 				// Is keyName in this array?
 				val, ok := e[keyName]
 				if !ok {
-					innerslogger.Log(context.TODO(), slog.LevelDebug,
+					innerslogger.Log(context.TODO(), fl.logLevel,
 						"keyName not in map",
 					)
 					continue
@@ -211,7 +217,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 
 				pathKey, ok = val.(string)
 				if !ok {
-					innerslogger.Log(context.TODO(), slog.LevelDebug,
+					innerslogger.Log(context.TODO(), fl.logLevel,
 						"can't coerce pathKey val into string",
 					)
 					continue
@@ -221,7 +227,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 
 			if !(isQueryMatched || fl.queryMatchArrayElement(e, i, queryTerm)) {
-				slogger.Log(context.TODO(), slog.LevelDebug,
+				slogger.Log(context.TODO(), fl.logLevel,
 					"query not matched",
 				)
 				continue
@@ -232,7 +238,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 		}
 	case map[string]interface{}:
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), fl.logLevel,
 			"checking a map",
 		)
 		for k, e := range v {
@@ -247,7 +253,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 			}
 		}
 	case []map[string]interface{}:
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), fl.logLevel,
 			"checking an array of maps",
 		)
 		for i, e := range v {
@@ -258,7 +264,7 @@ func (fl *Flattener) descend(path []string, data interface{}, depth int) error {
 	case nil:
 		// Because we want to filter nils out, we do _not_ examine isQueryMatched here
 		if !(fl.queryMatchNil(queryTerm)) {
-			slogger.Log(context.TODO(), slog.LevelDebug,
+			slogger.Log(context.TODO(), fl.logLevel,
 				"query not matched",
 			)
 			return nil
@@ -289,7 +295,7 @@ func (fl *Flattener) handleStringLike(slogger *slog.Logger, path []string, v int
 	}
 
 	if !(isQueryMatched || fl.queryMatchString(stringValue, queryTerm)) {
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), fl.logLevel,
 			"query not matched",
 		)
 		return nil
@@ -321,7 +327,7 @@ func (fl *Flattener) descendMaybePlist(path []string, data []byte, depth int) er
 	}
 
 	// Looks like a plist. Try parsing it
-	slogger.Log(context.TODO(), slog.LevelDebug,
+	slogger.Log(context.TODO(), fl.logLevel,
 		"parsing inner plist",
 	)
 
@@ -383,13 +389,13 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 
 	// If the queryTerm is an int, then we expect to match the index
 	if queryIndex, err := strconv.Atoi(queryTerm); err == nil {
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), fl.logLevel,
 			"using numeric index comparison",
 		)
 		return queryIndex == arrIndex
 	}
 
-	slogger.Log(context.TODO(), slog.LevelDebug,
+	slogger.Log(context.TODO(), fl.logLevel,
 		"checking data type",
 	)
 

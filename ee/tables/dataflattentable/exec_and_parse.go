@@ -64,10 +64,6 @@ func NewExecAndParseTable(slogger *slog.Logger, tableName string, p parser, cmd 
 		opt(t)
 	}
 
-	if t.tabledebug {
-		// TODO RM
-	}
-
 	return table.NewPlugin(t.tableName, Columns(), t.generate)
 }
 
@@ -95,6 +91,9 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		flattenOpts := []dataflatten.FlattenOpts{
 			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+		}
+		if t.tabledebug {
+			flattenOpts = append(flattenOpts, dataflatten.WithDebugLogging())
 		}
 
 		flattened, err := t.flattener.FlattenBytes(execOutput, flattenOpts...)
