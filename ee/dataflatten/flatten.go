@@ -110,10 +110,10 @@ func WithSlogger(slogger *slog.Logger) FlattenOpts {
 	}
 }
 
-// WithDebugLogging enables debug logging. With debug logs,
-// dataflatten is very verbose. This can overwhelm the other launcher
-// logs. As we're not generally debugging this library, the default is
-// to not enable debug logging.
+// WithDebugLogging enables debug logging intended for development use.
+// With debug logs, dataflatten is very verbose. This can overwhelm the
+// other launcher logs. As we're not generally debugging this library,
+// the default is to not enable debug logging.
 func WithDebugLogging() FlattenOpts {
 	return func(fl *Flattener) {
 		fl.debugLogging = true
