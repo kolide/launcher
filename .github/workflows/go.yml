@@ -30,7 +30,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v3
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -54,9 +54,6 @@ jobs:
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
-
-    - name: Get dependencies
-      run: make deps
 
     - name: Run govulncheck
       run: go install golang.org/x/vuln/cmd/govulncheck@v1.0.1; govulncheck ./...
