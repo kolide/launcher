@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"os/user"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -25,18 +25,20 @@ import (
 const allowedCharacters = "0123456789"
 
 type Table struct {
-	logger log.Logger
-	execCC allowedcmd.AllowedCommand
+	slogger *slog.Logger
+	logger  log.Logger // preserved only for temporary use in dataflattentable/etc
+	execCC  allowedcmd.AllowedCommand
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("uid"),
 	)
 
 	t := &Table{
-		logger: logger,
-		execCC: allowedcmd.NixEnv,
+		slogger: slogger.With("table", "kolide_nix_upgradeable"),
+		logger:  logger,
+		execCC:  allowedcmd.NixEnv,
 	}
 
 	return table.NewPlugin("kolide_nix_upgradeable", columns, t.generate)
@@ -54,7 +56,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			output, err := t.getUserPackages(ctx, uid)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "failure querying user installed packages", "err", err, "target_uid", uid)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failure querying user installed packages",
+					"err", err,
+					"target_uid", uid,
+				)
 				continue
 			}
 
@@ -65,7 +71,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			flattened, err := dataflatten.Xml(output, flattenOpts...)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failure flattening output",
+					"err", err,
+				)
 				continue
 			}
 

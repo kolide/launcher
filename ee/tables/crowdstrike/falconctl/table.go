@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -42,17 +42,19 @@ var (
 type execFunc func(context.Context, log.Logger, int, allowedcmd.AllowedCommand, []string, bool) ([]byte, error)
 
 type falconctlOptionsTable struct {
-	logger    log.Logger
+	slogger   *slog.Logger
+	logger    log.Logger // preserved temporarily for use in dataflattentables/tablehelpers
 	tableName string
 	execFunc  execFunc
 }
 
-func NewFalconctlOptionTable(logger log.Logger) *table.Plugin {
+func NewFalconctlOptionTable(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("options"),
 	)
 
 	t := &falconctlOptionsTable{
+		slogger:   slogger.With("table", "kolide_falconctl_options"),
 		logger:    log.With(logger, "table", "kolide_falconctl_options"),
 		tableName: "kolide_falconctl_options",
 		execFunc:  tablehelpers.Exec,
@@ -79,7 +81,10 @@ OUTER:
 		for _, option := range options {
 			option = strings.Trim(option, " ")
 			if !optionAllowed(option) {
-				level.Info(t.logger).Log("msg", "requested option not allowed", "option", option)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"requested option not allowed",
+					"option", option,
+				)
 				continue OUTER
 			}
 		}
@@ -92,14 +97,20 @@ OUTER:
 
 		output, err := t.execFunc(ctx, t.logger, 30, allowedcmd.Falconctl, args, false)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "exec failed", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"exec failed",
+				"err", err,
+			)
 			synthesizedData := map[string]string{
 				"_error": fmt.Sprintf("falconctl parse failure: %s", err),
 			}
 
 			flattened, err := dataflatten.Flatten(synthesizedData)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failure flattening output",
+					"err", err,
+				)
 				continue
 			}
 
@@ -109,7 +120,10 @@ OUTER:
 
 		parsed, err := parseOptions(bytes.NewReader(output))
 		if err != nil {
-			level.Info(t.logger).Log("msg", "parse failed", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"parse failed",
+				"err", err,
+			)
 			parsed = map[string]string{
 				"_error": fmt.Sprintf("falconctl parse failure: %s", err),
 			}
@@ -123,7 +137,10 @@ OUTER:
 
 			flattened, err := dataflatten.Flatten(parsed, flattenOpts...)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "failure flattening output", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failure flattening output",
+					"err", err,
+				)
 				continue
 			}
 

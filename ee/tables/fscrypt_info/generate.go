@@ -6,16 +6,14 @@ package fscrypt_info
 import (
 	"context"
 	"errors"
-	"runtime"
+	"log/slog"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	level.Info(t.logger).Log(
-		"msg", tableName+" is only supported on linux",
-		"goos", runtime.GOOS,
+	t.slogger.Log(ctx, slog.LevelInfo,
+		"table only supported on linux",
 	)
 	return nil, errors.New("Platform Unsupported")
 }
