@@ -55,8 +55,8 @@ jobs:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
 
-    - name: Run govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@v1.0.1; govulncheck ./...
+    - name: Get dependencies
+      run: make deps
 
     - name: Set up zig
       if: ${{ contains(matrix.os, 'ubuntu') }}
@@ -77,6 +77,9 @@ jobs:
     - name: App Bundle
       run: make github-launcherapp
       if: ${{ contains(matrix.os, 'macos') }}
+
+    - name: Run govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.0.1; govulncheck ./...
 
     - name: Test
       run: make test
