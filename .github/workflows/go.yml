@@ -66,7 +66,9 @@ jobs:
       uses: goto-bus-stop/setup-zig@v2
 
     - name: Build
-      run: make -j2 github-build
+      run: |
+        make build_launcher_noop_amd64
+        make build_launcher_noop_arm64
 
     - name: Check macOS build target
       if: contains(matrix.os, 'macos')
