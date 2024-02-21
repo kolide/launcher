@@ -66,7 +66,9 @@ jobs:
       uses: goto-bus-stop/setup-zig@v2
 
     - name: Build
-      run: make -j2 github-build
+      run: |
+        go clean -cache
+        make -j2 github-build
 
     - name: Check macOS build target
       if: contains(matrix.os, 'macos')
