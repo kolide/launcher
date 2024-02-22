@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
@@ -44,13 +43,18 @@ func main() {
 
 	ctx = ctxlog.NewContext(ctx, logger)
 
+	// set up system slogger to write to os logs
+	systemSlogger := multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
 	// If there's a newer version of launcher on disk, use it.
 	// Allow a caller to set `LAUNCHER_SKIP_UPDATES` as a way to
 	// skip exec'ing an update. This helps prevent launcher from
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
-		runNewerLauncherIfAvailable(ctx, logger)
+		runNewerLauncherIfAvailable(ctx, systemSlogger.Logger)
 	}
 
 	// if the launcher is being ran with a positional argument,
@@ -70,11 +74,6 @@ func main() {
 
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
-
-	// set up system slogger to write to os logs
-	systemSlogger := multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 
 	// set up slogger for internal launcher logging
 	slogger := multislogger.New()
@@ -118,7 +117,7 @@ func main() {
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
 		if tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
-			runNewerLauncherIfAvailable(ctx, logger)
+			runNewerLauncherIfAvailable(ctx, slogger.Logger)
 		} else {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			logutil.Fatal(logger, err, "run launcher")
@@ -167,11 +166,11 @@ func runSubcommands() error {
 
 // runNewerLauncherIfAvailable checks the autoupdate library for a newer version
 // of launcher than the currently-running one. If found, it will exec that version.
-func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
-	newerBinary, err := latestLauncherPath(ctx, logger)
+func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
+	newerBinary, err := latestLauncherPath(ctx, slogger)
 	if err != nil {
-		level.Error(logger).Log(
-			"msg", "could not check out latest launcher, will fall back to old autoupdate library",
+		slogger.Log(ctx, slog.LevelError,
+			"could not check out latest launcher, will fall back to old autoupdate library",
 			"err", err,
 		)
 
@@ -183,35 +182,46 @@ func runNewerLauncherIfAvailable(ctx context.Context, logger log.Logger) {
 	}
 
 	if newerBinary == "" {
-		level.Info(logger).Log("msg", "nothing newer")
+		slogger.Log(ctx, slog.LevelInfo,
+			"nothing newer",
+		)
 		return
 	}
 
-	level.Info(logger).Log(
-		"msg", "preparing to exec new binary",
+	slogger.Log(ctx, slog.LevelInfo,
+		"preparing to exec new binary",
 		"old_version", version.Version().Version,
 		"new_binary", newerBinary,
 	)
 
 	if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
-		logutil.Fatal(logger, "msg", "error execing newer version of launcher", "new_binary", newerBinary, "err", err)
+		slogger.Log(ctx, slog.LevelError,
+			"error execing newer version of launcher",
+			"new_binary", newerBinary,
+			"err", err,
+		)
+		os.Exit(1)
 	}
 
-	logutil.Fatal(logger, "msg", "execing newer version of launcher exited unexpectedly without error", "new_binary", newerBinary)
+	slogger.Log(ctx, slog.LevelError,
+		"execing newer version of launcher exited unexpectedly without error",
+		"new_binary", newerBinary,
+	)
+	os.Exit(1)
 }
 
 // latestLauncherPath looks for the latest version of launcher in the new autoupdate library,
 // falling back to the old library if necessary.
-func latestLauncherPath(ctx context.Context, logger log.Logger) (string, error) {
-	newerBinary, err := tuf.CheckOutLatestWithoutConfig("launcher", logger)
+func latestLauncherPath(ctx context.Context, slogger *slog.Logger) (string, error) {
+	newerBinary, err := tuf.CheckOutLatestWithoutConfig("launcher", slogger)
 	if err != nil {
 		return "", fmt.Errorf("checking out latest launcher: %w", err)
 	}
 
 	currentPath, _ := os.Executable()
 	if newerBinary.Version != version.Version().Version && newerBinary.Path != currentPath {
-		level.Info(logger).Log(
-			"msg", "got new version of launcher to run",
+		slogger.Log(ctx, slog.LevelInfo,
+			"got new version of launcher to run",
 			"old_version", version.Version().Version,
 			"new_binary_version", newerBinary.Version,
 			"new_binary_path", newerBinary.Path,

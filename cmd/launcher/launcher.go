@@ -328,7 +328,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		osqueryruntime.WithOsquerydBinary(k.OsquerydPath()),
 		osqueryruntime.WithRootDirectory(k.RootDirectory()),
 		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
-		osqueryruntime.WithLogger(logger),
+		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
 		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
 		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
 		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(

@@ -9,7 +9,6 @@ import (
 
 	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
@@ -141,7 +140,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 }
 
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
-	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
+	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
 		return autoupdate.FindNewest(ctx, k.OsquerydPath())
 	}

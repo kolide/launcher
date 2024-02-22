@@ -670,7 +670,7 @@ func TestOsquerySlowStart(t *testing.T) {
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithLogger(log.NewLogfmtLogger(&logBytes)),
+		WithSlogger(slogger.Logger),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
 			if err != nil {

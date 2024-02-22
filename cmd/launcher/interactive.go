@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/tuf"
@@ -34,8 +33,6 @@ func runInteractive(args []string) error {
 		return err
 	}
 
-	logger := logutil.NewServerLogger(*flDebug)
-
 	slogLevel := slog.LevelInfo
 	if *flDebug {
 		slogLevel = slog.LevelDebug
@@ -47,7 +44,7 @@ func runInteractive(args []string) error {
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
-		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", logger)
+		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", slogger)
 		if err != nil {
 			osquerydPath = launcher.FindOsquery()
 			if osquerydPath == "" {
