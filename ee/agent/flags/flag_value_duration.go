@@ -1,12 +1,12 @@
 package flags
 
 import (
+	"context"
+	"log/slog"
 	"math"
 	"strconv"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 )
 
@@ -37,7 +37,7 @@ func WithMax(max time.Duration) durationOption {
 }
 
 type durationFlagValue struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	key        keys.FlagKey
 	override   FlagValueOverride
 	defaultVal int64
@@ -45,12 +45,12 @@ type durationFlagValue struct {
 	max        int64
 }
 
-func NewDurationFlagValue(logger log.Logger, key keys.FlagKey, opts ...durationOption) *durationFlagValue {
+func NewDurationFlagValue(slogger *slog.Logger, key keys.FlagKey, opts ...durationOption) *durationFlagValue {
 	d := &durationFlagValue{
-		logger: logger,
-		key:    key,
-		min:    math.MinInt64,
-		max:    math.MaxInt64,
+		slogger: slogger,
+		key:     key,
+		min:     math.MinInt64,
+		max:     math.MaxInt64,
 	}
 
 	for _, opt := range opts {
@@ -69,7 +69,11 @@ func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 		if err == nil {
 			int64Value = parsedInt
 		} else {
-			level.Debug(d.logger).Log("msg", "failed to convert stored duration flag value", "key", d.key, "err", err)
+			d.slogger.Log(context.TODO(), slog.LevelDebug,
+				"failed to convert stored duration flag value",
+				"key", d.key,
+				"err", err,
+			)
 		}
 	}
 

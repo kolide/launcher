@@ -3,9 +3,9 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/flags/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +84,7 @@ func TestFloat64FlagValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := NewFloat64FlagValue(log.NewNopLogger(), keys.ControlRequestInterval, tt.options...)
+			d := NewFloat64FlagValue(multislogger.New().Logger, keys.ControlRequestInterval, tt.options...)
 			require.NotNil(t, d)
 
 			val := d.get(tt.controlServerValue)

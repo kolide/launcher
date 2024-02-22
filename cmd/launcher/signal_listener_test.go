@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	sigChannel := make(chan os.Signal, 1)
 	_, cancel := context.WithCancel(context.TODO())
-	sigListener := newSignalListener(sigChannel, cancel, log.NewNopLogger())
+	sigListener := newSignalListener(sigChannel, cancel, multislogger.New().Logger)
 
 	// Let the signal listener run for a bit
 	go sigListener.Execute()
