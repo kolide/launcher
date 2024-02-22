@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,7 +45,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.New().Logger)
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -72,7 +72,7 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.New().Logger)
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)

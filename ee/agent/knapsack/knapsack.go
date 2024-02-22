@@ -9,7 +9,6 @@ import (
 
 	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
@@ -43,6 +42,13 @@ type knapsack struct {
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
+	if slogger == nil {
+		slogger = multislogger.New()
+	}
+	if systemSlogger == nil {
+		systemSlogger = multislogger.New()
+	}
+
 	k := &knapsack{
 		db:            db,
 		flags:         flags,
@@ -141,7 +147,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 }
 
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
-	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), log.NewNopLogger())
+	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
 		return autoupdate.FindNewest(ctx, k.OsquerydPath())
 	}

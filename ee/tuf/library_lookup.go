@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/traces"
@@ -32,8 +31,8 @@ type autoupdateConfig struct {
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
-func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) (*BinaryUpdateInfo, error) {
-	logger = log.With(logger, "component", "tuf_library_lookup")
+func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+	slogger = slogger.With("component", "tuf_library_lookup")
 	cfg, err := getAutoupdateConfig(os.Args[1:])
 	if err != nil {
 		return nil, fmt.Errorf("could not get autoupdate config: %w", err)
@@ -44,7 +43,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, logger log.Logger) 
 		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
 	}
 
-	return CheckOutLatest(context.Background(), binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, logger)
+	return CheckOutLatest(context.Background(), binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, slogger)
 }
 
 // getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library
@@ -141,7 +140,7 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, logger log.Logger) (*BinaryUpdateInfo, error) {
+func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
 	ctx, span := traces.StartSpan(ctx, "binary", string(binary))
 	defer span.End()
 
@@ -152,11 +151,18 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 	update, err := findExecutableFromRelease(ctx, binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
 	if err == nil {
 		span.AddEvent("found_latest_from_release")
-		level.Info(logger).Log("msg", "found executable matching current release", "executable_path", update.Path, "executable_version", update.Version)
+		slogger.Log(ctx, slog.LevelInfo,
+			"found executable matching current release",
+			"executable_path", update.Path,
+			"executable_version", update.Version,
+		)
 		return update, nil
 	}
 
-	level.Info(logger).Log("msg", "could not find executable matching current release", "err", err)
+	slogger.Log(ctx, slog.LevelInfo,
+		"could not find executable matching current release",
+		"err", err,
+	)
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
