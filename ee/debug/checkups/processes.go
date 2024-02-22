@@ -56,6 +56,13 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		exe, _ := p.Exe()
 		if strings.Contains(strings.ToLower(exe), "kolide") {
 			c.kolideCount += 1
+
+			// Grab ENV vars if available -- we ignore the error because we expect
+			// this function to return `ErrNotImplementedError` on darwin
+			if envVars, err := p.EnvironWithContext(ctx); err == nil {
+				pMap["env"] = strings.Join(envVars, " ")
+			}
+
 			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
 
 			if !c.kolideRunningAsRoot {
