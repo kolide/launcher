@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/airport/mocks"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -101,7 +100,7 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 				constraints["query"] = []string{tt.query}
 			}
 
-			got, err := generateAirportData(tablehelpers.MockQueryContext(constraints), executor, multislogger.New().Logger, log.NewNopLogger())
+			got, err := generateAirportData(tablehelpers.MockQueryContext(constraints), executor, multislogger.New().Logger)
 			require.NoError(t, err)
 
 			executor.AssertExpectations(t)
@@ -219,7 +218,7 @@ func Test_generateAirportData_EdgeCases(t *testing.T) {
 
 			executor.On("Exec", mock.Anything).Return(tt.execReturn()).Once()
 
-			got, err := generateAirportData(tt.args.queryContext, executor, multislogger.New().Logger, log.NewNopLogger())
+			got, err := generateAirportData(tt.args.queryContext, executor, multislogger.New().Logger)
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
 		})

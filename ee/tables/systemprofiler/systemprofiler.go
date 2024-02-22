@@ -44,8 +44,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -79,11 +77,10 @@ type Result struct {
 
 type Table struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("parentdatatype"),
 		table.TextColumn("datatype"),
@@ -92,7 +89,6 @@ func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_system_profiler"),
-		logger:    level.NewFilter(logger, level.AllowInfo()),
 		tableName: "kolide_system_profiler",
 	}
 
@@ -159,7 +155,7 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

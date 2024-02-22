@@ -6,7 +6,6 @@ package table
 import (
 	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/dsim_default_associations"
@@ -18,15 +17,15 @@ import (
 	osquery "github.com/osquery/osquery-go"
 )
 
-func platformSpecificTables(slogger *slog.Logger, logger log.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		ProgramIcons(),
-		dsim_default_associations.TablePlugin(slogger, logger),
-		secedit.TablePlugin(slogger, logger),
-		wifi_networks.TablePlugin(slogger, logger),
-		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, slogger, logger),
-		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, slogger, logger),
-		wmitable.TablePlugin(slogger, logger),
-		dataflattentable.NewExecAndParseTable(logger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
+		dsim_default_associations.TablePlugin(slogger),
+		secedit.TablePlugin(slogger),
+		wifi_networks.TablePlugin(slogger),
+		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, slogger),
+		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, slogger),
+		wmitable.TablePlugin(slogger),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
 	}
 }

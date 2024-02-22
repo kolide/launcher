@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -21,18 +20,16 @@ const allowedNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVW
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for use in dataflattentable/tablehelpers.Exec temporarily
 	name    string
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("name"),
 	)
 
 	t := &Table{
 		slogger: slogger.With("table", "kolide_cryptsetup_status"),
-		logger:  logger,
 		name:    "kolide_cryptsetup_status",
 	}
 
@@ -44,7 +41,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	requestedNames := tablehelpers.GetConstraints(queryContext, "name",
 		tablehelpers.WithAllowedCharacters(allowedNameCharacters),
-		tablehelpers.WithLogger(t.logger),
+		tablehelpers.WithSlogger(t.slogger),
 	)
 
 	if len(requestedNames) == 0 {
@@ -52,7 +49,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	for _, name := range requestedNames {
-		output, err := tablehelpers.Exec(ctx, t.logger, 15, allowedcmd.Cryptsetup, []string{"--readonly", "status", name}, false)
+		output, err := tablehelpers.Exec(ctx, t.slogger, 15, allowedcmd.Cryptsetup, []string{"--readonly", "status", name}, false)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"error execing for status",
@@ -93,7 +90,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenOutput(dataQuery string, status map[string]interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -29,13 +28,11 @@ var xfconfChannelXmlPath string = filepath.Join("xfce4", "xfconf", "xfce-perchan
 
 type xfconfTable struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved temporarily for use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	t := &xfconfTable{
 		slogger: slogger.With("table", "kolide_xfconf"),
-		logger:  logger,
 	}
 
 	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
@@ -191,7 +188,7 @@ func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[st
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

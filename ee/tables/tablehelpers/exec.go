@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -27,7 +26,7 @@ import (
 // `possibleBins` can be either a list of command names, or a list of paths to commands.
 // Where reasonable, `possibleBins` should be command names only, so that we can perform
 // lookup against PATH.
-func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
+func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -53,8 +52,8 @@ func Exec(ctx context.Context, logger log.Logger, timeoutSeconds int, execCmd al
 		cmd.Stderr = &stderr
 	}
 
-	level.Debug(logger).Log(
-		"msg", "execing",
+	slogger.Log(ctx, slog.LevelDebug,
+		"execing",
 		"cmd", cmd.String(),
 	)
 

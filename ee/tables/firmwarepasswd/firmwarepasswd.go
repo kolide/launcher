@@ -11,37 +11,36 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type Table struct {
-	logger log.Logger
-	parser *OutputParser
+	slogger *slog.Logger
+	parser  *OutputParser
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("option_roms_allowed"),
 		table.IntegerColumn("password_enabled"),
 		table.TextColumn("mode"),
 	}
 
-	t := New(logger)
+	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
 	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
 
 }
 
-func New(logger log.Logger) *Table {
-	parser := NewParser(logger,
+func New(slogger *slog.Logger) *Table {
+	parser := NewParser(slogger,
 		[]Matcher{
 			{
 				Match:   func(in string) bool { return strings.HasPrefix(in, "Password Enabled: ") },
@@ -61,8 +60,8 @@ func New(logger log.Logger) *Table {
 		})
 
 	return &Table{
-		logger: level.NewFilter(logger, level.AllowInfo()),
-		parser: parser,
+		slogger: slogger,
+		parser:  parser,
 	}
 
 }
@@ -73,8 +72,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, mode := range []string{"-check", "-mode"} {
 		output := new(bytes.Buffer)
 		if err := t.runFirmwarepasswd(ctx, mode, output); err != nil {
-			level.Info(t.logger).Log(
-				"msg", "Error running firmware password",
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error running firmware password",
 				"command", mode,
 				"err", err,
 			)
@@ -118,8 +117,8 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 	cmd.Stdout = output
 
 	if err := cmd.Run(); err != nil {
-		level.Debug(t.logger).Log(
-			"msg", "Error running firmwarepasswd",
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"error running firmwarepasswd",
 			"stderr", strings.TrimSpace(stderr.String()),
 			"stdout", strings.TrimSpace(output.String()),
 			"err", err,

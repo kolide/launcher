@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,7 +32,7 @@ func TestExec(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	logger := log.NewNopLogger()
+	slogger := multislogger.New().Logger
 
 	for _, tt := range tests {
 		tt := tt
@@ -42,7 +42,7 @@ func TestExec(t *testing.T) {
 			if tt.timeout == 0 {
 				tt.timeout = 30
 			}
-			output, err := Exec(ctx, logger, tt.timeout, tt.bin, tt.args, false)
+			output, err := Exec(ctx, slogger, tt.timeout, tt.bin, tt.args, false)
 			if tt.err {
 				assert.Error(t, err)
 				assert.Empty(t, output)

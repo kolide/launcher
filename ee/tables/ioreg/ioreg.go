@@ -14,7 +14,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -26,11 +25,10 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 
 type Table struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		// ioreg input options. These match the ioreg
@@ -45,7 +43,6 @@ func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_ioreg"),
-		logger:    logger,
 		tableName: "kolide_ioreg",
 	}
 
@@ -58,7 +55,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	gcOpts := []tablehelpers.GetConstraintOpts{
 		tablehelpers.WithDefaults(""),
 		tablehelpers.WithAllowedCharacters(allowedCharacters),
-		tablehelpers.WithLogger(t.logger),
+		tablehelpers.WithSlogger(t.slogger),
 	}
 
 	for _, ioC := range tablehelpers.GetConstraints(queryContext, "c", gcOpts...) {
@@ -105,7 +102,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 								// Finally, an inner loop
 
-								ioregOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Ioreg, ioregArgs, false)
+								ioregOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Ioreg, ioregArgs, false)
 								if err != nil {
 									t.slogger.Log(ctx, slog.LevelInfo,
 										"ioreg failed",
@@ -146,7 +143,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

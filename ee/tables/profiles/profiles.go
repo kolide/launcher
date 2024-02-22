@@ -18,7 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -38,11 +37,10 @@ var (
 
 type Table struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	// profiles options. See `man profiles`. These may not be needed,
 	// we use `show -all` as the default, and it probably covers
 	// everything.
@@ -54,7 +52,6 @@ func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_profiles"),
-		logger:    logger,
 		tableName: "kolide_profiles",
 	}
 
@@ -104,7 +101,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, fmt.Errorf("Unknown user argument: %s", user)
 					}
 
-					output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Profiles, profileArgs, false)
+					output, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Profiles, profileArgs, false)
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo,
 							"ioreg exec failed",
@@ -121,7 +118,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					}
 
 					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithLogger(t.logger),
+						dataflatten.WithSlogger(t.slogger),
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}
 

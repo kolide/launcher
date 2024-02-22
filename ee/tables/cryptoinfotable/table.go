@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/cryptoinfo"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -19,19 +18,17 @@ import (
 )
 
 type Table struct {
-	logger  log.Logger // preserved only temporarily for dataflattentable usage
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("passphrase"),
 		table.TextColumn("path"),
 	)
 
 	t := &Table{
-		slogger: slogger,
-		logger:  logger,
+		slogger: slogger.With("table", "kolide_cryptinfo"),
 	}
 
 	return table.NewPlugin("kolide_cryptoinfo", columns, t.generate)
@@ -62,7 +59,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				for _, passphrase := range tablehelpers.GetConstraints(queryContext, "passphrase", tablehelpers.WithDefaults("")) {
 
 					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithLogger(t.logger),
+						dataflatten.WithSlogger(t.slogger),
 						dataflatten.WithNestedPlist(),
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}

@@ -8,7 +8,6 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -20,16 +19,14 @@ const (
 )
 
 type gcTable struct {
-	logger  log.Logger // preserved only for temporary dataflattentable use
 	slogger *slog.Logger
 	stats   debug.GCStats
 }
 
-func LauncherGcInfo(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func LauncherGcInfo(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &gcTable{
-		logger:  logger,
 		slogger: slogger.With("table", gcTableName),
 	}
 
@@ -58,7 +55,7 @@ func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext)
 
 		flatData, err := dataflatten.Json(
 			jsonBytes,
-			dataflatten.WithLogger(t.logger),
+			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		)
 		if err != nil {

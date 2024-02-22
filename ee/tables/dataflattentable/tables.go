@@ -3,11 +3,10 @@ package dataflattentable
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -29,7 +28,7 @@ const (
 )
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 
 	flattenFileFunc  func(string, ...dataflatten.FlattenOpts) ([]dataflatten.Row, error)
@@ -42,23 +41,21 @@ type Table struct {
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.
-func AllTablePlugins(logger log.Logger) []osquery.OsqueryPlugin {
+func AllTablePlugins(slogger *slog.Logger) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		TablePlugin(logger, JsonType),
-		TablePlugin(logger, XmlType),
-		TablePlugin(logger, IniType),
-		TablePlugin(logger, PlistType),
-		TablePlugin(logger, JsonlType),
-		TablePlugin(logger, JWTType),
+		TablePlugin(slogger, JsonType),
+		TablePlugin(slogger, XmlType),
+		TablePlugin(slogger, IniType),
+		TablePlugin(slogger, PlistType),
+		TablePlugin(slogger, JsonlType),
+		TablePlugin(slogger, JWTType),
 	}
 }
 
-func TablePlugin(logger log.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
+func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
 	columns := Columns(table.TextColumn("path"))
 
-	t := &Table{
-		logger: logger,
-	}
+	t := &Table{}
 
 	switch dataSourceType {
 	case PlistType:
@@ -83,6 +80,8 @@ func TablePlugin(logger log.Logger, dataSourceType DataSourceType) osquery.Osque
 		panic("Unknown data source type")
 	}
 
+	t.slogger = slogger.With("table", t.tableName)
+
 	return table.NewPlugin(t.tableName, columns, t.generate)
 
 }
@@ -105,10 +104,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, filePath := range filePaths {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-				subresults, err := t.generatePath(filePath, dataQuery)
+				subresults, err := t.generatePath(ctx, filePath, dataQuery)
 				if err != nil {
-					level.Info(t.logger).Log(
-						"msg", "failed to get data for path",
+					t.slogger.Log(ctx, slog.LevelInfo,
+						"failed to get data for path",
 						"path", filePath,
 						"err", err,
 					)
@@ -122,16 +121,19 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) generatePath(filePath string, dataQuery string) ([]map[string]string, error) {
+func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string) ([]map[string]string, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithNestedPlist(),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	data, err := t.flattenFileFunc(filePath, flattenOpts...)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "failure parsing file", "file", filePath)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"failure parsing file",
+			"file", filePath,
+		)
 		return nil, fmt.Errorf("parsing data: %w", err)
 	}
 

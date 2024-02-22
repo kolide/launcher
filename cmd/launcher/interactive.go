@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
@@ -33,6 +35,15 @@ func runInteractive(args []string) error {
 	}
 
 	logger := logutil.NewServerLogger(*flDebug)
+
+	slogLevel := slog.LevelInfo
+	if *flDebug {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogger := multislogger.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slogLevel,
+	})).Logger
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
@@ -80,7 +91,7 @@ func runInteractive(args []string) error {
 		flOsqueryFlags = append(flOsqueryFlags, fmt.Sprintf("tls_server_certs=%s", certs))
 	}
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(logger, rootDir, osquerydPath, flOsqueryFlags)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(slogger, rootDir, osquerydPath, flOsqueryFlags)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}

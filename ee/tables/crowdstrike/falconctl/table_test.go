@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -68,7 +67,6 @@ func TestOptionRestrictions(t *testing.T) {
 
 			testTable := &falconctlOptionsTable{
 				slogger:  multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug})).Logger,
-				logger:   log.NewLogfmtLogger(&logBytes),
 				execFunc: noopExec,
 			}
 
@@ -88,7 +86,7 @@ func TestOptionRestrictions(t *testing.T) {
 	}
 }
 
-func noopExec(_ context.Context, log log.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool) ([]byte, error) {
-	log.Log("exec", "exec-in-test", "args", strings.Join(args, " "))
+func noopExec(ctx context.Context, slogger *slog.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool) ([]byte, error) {
+	slogger.Log(ctx, slog.LevelInfo, "exec-in-test", "args", strings.Join(args, " "))
 	return []byte{}, nil
 }

@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -19,24 +18,22 @@ import (
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in tablehelpers.Exec
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("status"),
 	}
 
 	t := &Table{
 		slogger: slogger.With("table", "kolide_filevault"),
-		logger:  logger,
 	}
 
 	return table.NewPlugin("kolide_filevault", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.logger, 10, allowedcmd.Fdesetup, []string{"status"}, false)
+	output, err := tablehelpers.Exec(ctx, t.slogger, 10, allowedcmd.Fdesetup, []string{"status"}, false)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"fdesetup failed",

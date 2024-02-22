@@ -10,13 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/wmi"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,10 +21,9 @@ const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0
 
 type Table struct {
 	slogger *slog.Logger
-	logger  log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("namespace"),
@@ -37,7 +33,6 @@ func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger:  level.NewFilter(logger),
 		slogger: slogger.With("table", "kolide_wmi"),
 	}
 
@@ -94,9 +89,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 					defer cancel()
 
-					// Add a logger in
-					ctx = ctxlog.NewContext(ctx, t.logger)
-
 					wmiResults, err := wmi.Query(ctx, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo,
@@ -123,7 +115,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

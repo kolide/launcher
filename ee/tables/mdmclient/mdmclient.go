@@ -14,7 +14,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -50,18 +49,16 @@ var lengthBytesRegex = regexp.MustCompile(`{length = (\d+,) bytes = (0[xX][0-9a-
 
 type Table struct {
 	slogger   *slog.Logger
-	logger    log.Logger // preserved only for temporary use in dataflattentable and tablehelpers.Exec
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger, logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("command"),
 	)
 
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_mdmclient"),
-		logger:    logger,
 		tableName: "kolide_mdmclient",
 	}
 
@@ -73,7 +70,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	gcOpts := []tablehelpers.GetConstraintOpts{
 		tablehelpers.WithAllowedCharacters(allowedCharacters),
-		tablehelpers.WithLogger(t.logger),
+		tablehelpers.WithSlogger(t.slogger),
 		tablehelpers.WithDefaults(""),
 	}
 
@@ -94,7 +91,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"mdmclient failed",
@@ -133,7 +130,7 @@ func (t *Table) flattenOutput(ctx context.Context, dataQuery string, systemOutpu
 	}
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
