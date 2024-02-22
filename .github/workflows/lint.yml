@@ -1,4 +1,4 @@
-name: govulncheck
+name: lint
 
 on:
   push:
@@ -10,6 +10,33 @@ on:
 
 
 jobs:
+  golangci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+
+      - run: make deps
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          skip-pkg-cache: true
+
+      # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
+      - name: golangci-lint
+        if: ${{ always() }}
+        run: golangci-lint run
   govulncheck:
     strategy:
       fail-fast: false
@@ -30,9 +57,10 @@ jobs:
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
   # one.
-  govulncheck_mergeable:
+  lint_mergeable:
     runs-on: ubuntu-latest
     steps:
       - run: true
     needs:
+      - golangci
       - govulncheck
