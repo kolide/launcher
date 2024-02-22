@@ -42,6 +42,13 @@ type knapsack struct {
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
+	if slogger == nil {
+		slogger = multislogger.New()
+	}
+	if systemSlogger == nil {
+		systemSlogger = multislogger.New()
+	}
+
 	k := &knapsack{
 		db:            db,
 		flags:         flags,
@@ -140,11 +147,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 }
 
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
-	slogger := k.Slogger()
-	if slogger == nil {
-		slogger = multislogger.New().Logger
-	}
-	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), slogger)
+	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
 		return autoupdate.FindNewest(ctx, k.OsquerydPath())
 	}
