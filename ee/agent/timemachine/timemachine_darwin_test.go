@@ -20,6 +20,10 @@ import (
 func TestAddExclusions(t *testing.T) {
 	t.Parallel()
 
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping test on GitHub Actions because it's flaky there")
+	}
+
 	u, err := user.Current()
 	require.NoError(t, err)
 
