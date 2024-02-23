@@ -12,7 +12,7 @@ import (
 func TestSetupLocalDbKey(t *testing.T) {
 	t.Parallel()
 
-	slogger := multislogger.New().Logger
+	slogger := multislogger.NewNopLogger()
 	store, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
 

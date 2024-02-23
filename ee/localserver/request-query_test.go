@@ -55,9 +55,9 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -221,9 +221,9 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)

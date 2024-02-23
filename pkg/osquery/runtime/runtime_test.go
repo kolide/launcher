@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	s, err := storageci.NewStore(nil, multislogger.New().Logger, storage.OsqueryHistoryInstanceStore.String())
+	s, err := storageci.NewStore(nil, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
 	if err != nil {
 		fmt.Println("Failed to make new store")
 		os.Exit(1)
@@ -298,7 +298,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	runner := New(
@@ -322,7 +322,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	runner := New(
 		k,
@@ -354,7 +354,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Start the runner
 	runner := New(
@@ -446,7 +446,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	runner := New(
 		k,
@@ -474,7 +474,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	runner := New(
 		k,
@@ -529,7 +529,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	runner := New(
 		k,
@@ -620,7 +620,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(
@@ -714,7 +714,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	runner = New(
 		k,

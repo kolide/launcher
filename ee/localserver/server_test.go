@@ -19,14 +19,16 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	c, err := storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String())
+	slogger := multislogger.NewNopLogger()
+
+	c, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
 	require.NoError(t, osquery.SetupLauncherKeys(c))
 
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("ConfigStore").Return(c)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(slogger)
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown

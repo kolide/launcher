@@ -50,6 +50,11 @@ func New(h ...slog.Handler) *MultiSlogger {
 	return ms
 }
 
+// NewNopLogger returns a slogger with no handlers, discarding all logs.
+func NewNopLogger() *slog.Logger {
+	return New().Logger
+}
+
 // AddHandler adds a handler to the multislogger, this creates a branch new
 // slog.Logger under the the hood, and overwrites old Logger memory address,
 // this means any attributes added with Logger.With will be lost

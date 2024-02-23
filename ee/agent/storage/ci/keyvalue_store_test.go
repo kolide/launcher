@@ -16,7 +16,7 @@ import (
 
 func getStores(t *testing.T) []types.KVStore {
 	db := SetupDB(t)
-	bboltStore, err := agentbbolt.NewStore(multislogger.New().Logger, db, "test_bucket")
+	bboltStore, err := agentbbolt.NewStore(multislogger.NewNopLogger(), db, "test_bucket")
 	require.NoError(t, err)
 
 	stores := []types.KVStore{

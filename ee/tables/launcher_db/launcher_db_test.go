@@ -72,7 +72,7 @@ func Test_generateLauncherDbTable(t *testing.T) {
 }
 
 func setupStorage(t *testing.T, values map[string]string) types.KVStore {
-	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.ServerProvidedDataStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
 	require.NoError(t, err)
 
 	// add the values to the bucket

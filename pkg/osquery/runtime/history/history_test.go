@@ -220,7 +220,7 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) { // nolint:paralleltest
 
 // setupStorage creates storage and seeds it with the given instances.
 func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
-	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.OsqueryHistoryInstanceStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
 	require.NoError(t, err)
 
 	json, err := json.Marshal(seedInstances)

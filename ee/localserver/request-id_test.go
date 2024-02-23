@@ -24,7 +24,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
-	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
+	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 
 	var logBytes bytes.Buffer
