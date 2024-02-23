@@ -1,16 +1,15 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -21,8 +20,8 @@ type (
 	// subsystem. whenever new data is received, it will rewrite the metadata.json
 	// and metadata.plist files to our root install directory
 	metadataWriter struct {
-		logger log.Logger
-		k      types.Knapsack
+		slogger *slog.Logger
+		k       types.Knapsack
 	}
 	metadata struct {
 		DeviceId           string `json:"device_id" plist:"device_id"`
@@ -33,21 +32,27 @@ type (
 	}
 )
 
-func NewMetadataWriter(logger log.Logger, k types.Knapsack) *metadataWriter {
+func NewMetadataWriter(slogger *slog.Logger, k types.Knapsack) *metadataWriter {
 	return &metadataWriter{
-		logger: logger,
-		k:      k,
+		slogger: slogger.With("component", "metadata_writer"),
+		k:       k,
 	}
 }
 
 func (mw *metadataWriter) Ping() {
 	metadata := newMetadataTemplate()
 	if err := mw.populateLatestServerData(metadata); err != nil {
-		level.Debug(mw.logger).Log("msg", "unable to collect latest server data, metadata files will be incomplete", "err", err)
+		mw.slogger.Log(context.TODO(), slog.LevelDebug,
+			"unable to collect latest server data, metadata files will be incomplete",
+			"err", err,
+		)
 	}
 
 	if err := mw.recordMetadata(metadata); err != nil {
-		level.Debug(mw.logger).Log("msg", "unable to write out metadata files", "err", err)
+		mw.slogger.Log(context.TODO(), slog.LevelDebug,
+			"unable to write out metadata files",
+			"err", err,
+		)
 	}
 }
 
@@ -106,8 +111,9 @@ func (mw *metadataWriter) recordMetadata(metadata *metadata) error {
 func (mw *metadataWriter) getServerDataValue(store types.GetterSetterDeleterIteratorUpdater, key string) string {
 	val, err := store.Get([]byte(key))
 	if err != nil {
-		level.Debug(mw.logger).Log(
-			"msg", fmt.Sprintf("unable to collect value for %s from server_data, will re-attempt on next update", key),
+		mw.slogger.Log(context.TODO(), slog.LevelDebug,
+			"unable to collect value for key from server_data, will re-attempt on next update",
+			"key", key,
 			"err", err,
 		)
 
@@ -115,8 +121,9 @@ func (mw *metadataWriter) getServerDataValue(store types.GetterSetterDeleterIter
 	}
 
 	if string(val) == "" {
-		level.Debug(mw.logger).Log(
-			"msg", fmt.Sprintf("server_data was missing value for %s, will re-attempt on next update", key),
+		mw.slogger.Log(context.TODO(), slog.LevelDebug,
+			"server_data was missing value for key, will re-attempt on next update",
+			"key", key,
 			"err", err,
 		)
 

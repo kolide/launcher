@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
@@ -58,9 +59,11 @@ func runSocket(args []string) error {
 	if err != nil {
 		return err
 	}
-	logger := log.NewLogfmtLogger(os.Stdout)
+	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})).Logger
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(cmdlineopts)}
-	flagController := flags.NewFlagController(logger, inmemory.NewStore(), fcOpts...)
+	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 	runner := runtime.New(k, opts...)
 	go runner.Run()

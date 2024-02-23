@@ -3,30 +3,24 @@ package checkups
 import (
 	"context"
 	"io"
+	"log/slog"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-// logger is an interface that allows mocking of logger
 type (
-	logger interface {
-		Log(keyvals ...interface{}) error
-	}
-
 	logCheckPointer struct {
-		logger      logger
+		slogger     *slog.Logger
 		knapsack    types.Knapsack
 		interrupt   chan struct{}
 		interrupted bool
 	}
 )
 
-func NewCheckupLogger(logger logger, k types.Knapsack) *logCheckPointer {
+func NewCheckupLogger(slogger *slog.Logger, k types.Knapsack) *logCheckPointer {
 	return &logCheckPointer{
-		logger:    log.With(logger, "component", "log checkpoint"),
+		slogger:   slogger.With("component", "log_checkpoint"),
 		knapsack:  k,
 		interrupt: make(chan struct{}, 1),
 	}
@@ -45,7 +39,9 @@ func (c *logCheckPointer) Run() error {
 		case <-ticker.C:
 			continue
 		case <-c.interrupt:
-			level.Debug(c.logger).Log("msg", "interrupt received, exiting execute loop")
+			c.slogger.Log(context.TODO(), slog.LevelDebug,
+				"interrupt received, exiting execute loop",
+			)
 			return nil
 		}
 	}
@@ -68,7 +64,8 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
 
-		level.Debug(c.logger).Log(
+		c.slogger.Log(ctx, slog.LevelDebug,
+			"ran checkup",
 			"checkup", checkup.Name(),
 			"summary", checkup.Summary(),
 			"data", checkup.Data(),

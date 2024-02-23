@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,7 +36,7 @@ func TestControllerBoolFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			var value bool
@@ -111,7 +112,7 @@ func TestControllerStringFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			var value string
@@ -235,7 +236,7 @@ func TestControllerDurationFlags(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			for i, valueToSet := range tt.valuesToSet {
@@ -268,7 +269,7 @@ func TestControllerNotify(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
@@ -306,7 +307,7 @@ func TestControllerUpdate(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
@@ -347,7 +348,7 @@ func TestControllerOverride(t *testing.T) {
 
 			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
 			require.NoError(t, err)
-			fc := NewFlagController(log.NewNopLogger(), store)
+			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)

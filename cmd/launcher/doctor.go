@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 
-	"github.com/go-kit/kit/log"
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 func runDoctor(args []string) error {
@@ -27,8 +27,17 @@ func runDoctor(args []string) error {
 	}
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	logger := log.With(logutil.NewCLILogger(true), "caller", log.DefaultCaller)
-	flagController := flags.NewFlagController(logger, nil, fcOpts...)
+
+	slogLevel := slog.LevelInfo
+	if opts.Debug {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slogLevel,
+	})).Logger
+
+	flagController := flags.NewFlagController(slogger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 
 	w := os.Stdout //tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
