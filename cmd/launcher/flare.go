@@ -5,12 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -18,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/debug/checkups"
 	"github.com/kolide/launcher/ee/debug/shipper"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -49,9 +49,17 @@ func runFlare(args []string) error {
 		return err
 	}
 
-	logger := log.NewLogfmtLogger(os.Stdout)
+	slogLevel := slog.LevelInfo
+	if opts.Debug {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slogLevel,
+	})).Logger
+
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, inmemory.NewStore(), fcOpts...)
+	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)
 
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 	ctx := context.Background()
@@ -70,7 +78,7 @@ func runFlare(args []string) error {
 			return err
 		}
 		flareDest = shipper
-		successMessage = "Flare uploaded successfully"
+		successMessage = "flare uploaded successfully"
 	case "local":
 		reportName := fmt.Sprintf("kolide_agent_flare_report_%s.zip", ulid.New())
 		reportPath := filepath.Join(*flOutputDir, reportName)
@@ -81,16 +89,20 @@ func runFlare(args []string) error {
 		}
 		defer flareFile.Close()
 		flareDest = flareFile
-		successMessage = "Flare saved locally"
+		successMessage = "flare saved locally"
 	default:
 		return fmt.Errorf(`invalid save option: %s, expected "local" or "upload"`, *flSave)
-
 	}
 
 	if err := checkups.RunFlare(ctx, k, flareDest, checkups.StandaloneEnviroment); err != nil {
 		return err
 	}
 
-	level.Info(logger).Log("msg", successMessage, "file", flareDest.Name())
+	slogger.Log(ctx, slog.LevelInfo,
+		"flare creation complete",
+		"status", successMessage,
+		"file", flareDest.Name(),
+	)
+
 	return nil
 }

@@ -186,7 +186,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
+	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
@@ -275,7 +275,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	sigChannel := make(chan os.Signal, 1)
 
 	// Add a rungroup to catch things on the sigChannel
-	signalListener := newSignalListener(sigChannel, cancel, logger)
+	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
 	// For now, remediation is not performed -- we only log the hardware change.
@@ -450,7 +450,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
 		}
 
-		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
+		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"unable to set up metadata writer",
 				"err", err,

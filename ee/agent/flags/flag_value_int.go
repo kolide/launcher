@@ -1,11 +1,11 @@
 package flags
 
 import (
+	"context"
+	"log/slog"
 	"math"
 	"strconv"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 )
 
@@ -36,7 +36,7 @@ func WithIntValueMax(max int) intOption {
 }
 
 type intFlagValue struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	key        keys.FlagKey
 	override   FlagValueOverride
 	defaultVal int
@@ -44,12 +44,12 @@ type intFlagValue struct {
 	max        int
 }
 
-func NewIntFlagValue(logger log.Logger, key keys.FlagKey, opts ...intOption) *intFlagValue {
+func NewIntFlagValue(slogger *slog.Logger, key keys.FlagKey, opts ...intOption) *intFlagValue {
 	i := &intFlagValue{
-		logger: logger,
-		key:    key,
-		min:    -1 * math.MaxInt,
-		max:    math.MaxInt,
+		slogger: slogger,
+		key:     key,
+		min:     -1 * math.MaxInt,
+		max:     math.MaxInt,
 	}
 
 	for _, opt := range opts {
@@ -68,7 +68,11 @@ func (i *intFlagValue) get(controlServerValue []byte) int {
 		if err == nil {
 			intValue = parsedInt
 		} else {
-			level.Debug(i.logger).Log("msg", "failed to convert stored int flag value", "key", i.key, "err", err)
+			i.slogger.Log(context.TODO(), slog.LevelDebug,
+				"failed to convert stored int flag value",
+				"key", i.key,
+				"err", err,
+			)
 		}
 	}
 

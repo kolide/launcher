@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/flags/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,7 +73,7 @@ func TestFlagValueDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := NewDurationFlagValue(log.NewNopLogger(), keys.ControlRequestInterval, tt.options...)
+			d := NewDurationFlagValue(multislogger.New().Logger, keys.ControlRequestInterval, tt.options...)
 			require.NotNil(t, d)
 
 			val := d.get(tt.controlServerValue)
