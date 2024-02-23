@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -45,7 +44,7 @@ func TestUninstall(t *testing.T) {
 			// create 3 stores with 3 items each
 			stores := map[storage.Store]types.KVStore{}
 			for i := 0; i < 3; i++ {
-				store, err := storageci.NewStore(t, log.NewNopLogger(), ulid.New())
+				store, err := storageci.NewStore(t, multislogger.New().Logger, ulid.New())
 				require.NoError(t, err)
 
 				for j := 0; j < 3; j++ {

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -20,7 +19,7 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	c, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+	c, err := storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String())
 	require.NoError(t, err)
 	require.NoError(t, osquery.SetupLauncherKeys(c))
 

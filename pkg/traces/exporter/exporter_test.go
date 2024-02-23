@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -704,13 +703,13 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 }
 
 func testServerProvidedDataStore(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.ServerProvidedDataStore.String())
 	require.NoError(t, err)
 	return s
 }
 
 func testTokenStore(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.TokenStore.String())
+	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.TokenStore.String())
 	require.NoError(t, err)
 	return s
 }

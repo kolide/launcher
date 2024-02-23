@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -56,7 +55,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
@@ -222,7 +221,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 

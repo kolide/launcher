@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -34,7 +33,7 @@ func TestControllerBoolFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
@@ -110,7 +109,7 @@ func TestControllerStringFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
@@ -234,7 +233,7 @@ func TestControllerDurationFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
@@ -267,7 +266,7 @@ func TestControllerNotify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
@@ -305,7 +304,7 @@ func TestControllerUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)
@@ -346,7 +345,7 @@ func TestControllerOverride(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store, err := storageci.NewStore(t, log.NewNopLogger(), storage.AgentFlagsStore.String())
+			store, err := storageci.NewStore(t, multislogger.New().Logger, storage.AgentFlagsStore.String())
 			require.NoError(t, err)
 			fc := NewFlagController(multislogger.New().Logger, store)
 			assert.NotNil(t, fc)

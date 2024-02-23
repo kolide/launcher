@@ -1,10 +1,10 @@
 package agentbbolt
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"go.etcd.io/bbolt"
 )
 
@@ -28,12 +28,12 @@ func NewNoBucketError(bucketName string) NoBucketError {
 }
 
 type bboltKeyValueStore struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	db         *bbolt.DB
 	bucketName string
 }
 
-func NewStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+func NewStore(slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
 	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
@@ -48,7 +48,7 @@ func NewStore(logger log.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValu
 	}
 
 	m := &bboltKeyValueStore{
-		logger:     log.With(logger, "bucket", bucketName),
+		slogger:    slogger.With("bucket", bucketName),
 		db:         db,
 		bucketName: bucketName,
 	}
@@ -170,8 +170,8 @@ func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error)
 		for key, value := range kvPairs {
 			if err := b.Put([]byte(key), []byte(value)); err != nil {
 				// Log errors but continue processing the remaining key-values
-				level.Error(s.logger).Log(
-					"msg", "failed to store key-value in bucket",
+				s.slogger.Log(context.TODO(), slog.LevelError,
+					"failed to store key-value in bucket",
 					"key", key,
 					"err", err,
 				)
@@ -205,8 +205,8 @@ func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error)
 			// Key exists in the bucket but not in kvPairs, delete it
 			if err := b.Delete(key); err != nil {
 				// Log errors but ignore the failure
-				level.Error(s.logger).Log(
-					"msg", "failed to remove key from bucket",
+				s.slogger.Log(context.TODO(), slog.LevelError,
+					"failed to remove key from bucket",
 					"key", key,
 					"err", err,
 				)

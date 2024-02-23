@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -797,7 +796,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.AutoupdateErrorsStore.String())
+	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.AutoupdateErrorsStore.String())
 	require.NoError(t, err)
 	return s
 }

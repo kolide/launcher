@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -354,7 +353,7 @@ func TestActionQueue_HandlesMalformedActions(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ControlServerActionsStore.String())
+	s, err := storageci.NewStore(t, multislogger.New().Logger, storage.ControlServerActionsStore.String())
 	require.NoError(t, err)
 	return s
 }

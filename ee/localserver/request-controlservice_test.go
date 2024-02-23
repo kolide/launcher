@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -22,7 +21,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 
 	defaultMockKnapsack := func() types.Knapsack {
 		m := mocks.NewKnapsack(t)
-		m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+		m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(multislogger.New().Logger)
 		return m
@@ -46,7 +45,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			expectedInterval: 250 * time.Millisecond,
 			mockKnapsack: func() types.Knapsack {
 				m := mocks.NewKnapsack(t)
-				m.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+				m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.New().Logger, storage.ConfigStore.String()))
 				m.On("KolideServerURL").Return("localhost")
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(multislogger.New().Logger)

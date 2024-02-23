@@ -58,7 +58,7 @@ func TestLogShipper(t *testing.T) {
 			// no device identifying attributes
 			logIngestUrl := "https://example.com"
 			knapsack.On("LogIngestServerURL").Return(logIngestUrl).Times(4)
-			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, log.NewNopLogger(), "test")).Once()
+			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, multislogger.New().Logger, "test")).Once()
 			ls.Ping()
 			require.False(t, ls.isShippingStarted, "shipping should not have stared since there are no device identifying attributes")
 			require.Equal(t, authToken, ls.sender.authtoken)
@@ -208,7 +208,7 @@ var deviceIdentifyingAttributes = map[string]string{
 }
 
 func testKVStore(t *testing.T, name string) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), name)
+	s, err := storageci.NewStore(t, multislogger.New().Logger, name)
 
 	for k, v := range deviceIdentifyingAttributes {
 		s.Set([]byte(k), []byte(v))

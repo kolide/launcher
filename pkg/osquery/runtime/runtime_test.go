@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -47,7 +46,7 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	s, err := storageci.NewStore(nil, log.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
+	s, err := storageci.NewStore(nil, multislogger.New().Logger, storage.OsqueryHistoryInstanceStore.String())
 	if err != nil {
 		fmt.Println("Failed to make new store")
 		os.Exit(1)
