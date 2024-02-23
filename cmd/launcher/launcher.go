@@ -267,7 +267,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
-	checkpointer := checkups.NewCheckupLogger(logger, k)
+	checkpointer := checkups.NewCheckupLogger(slogger, k)
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
