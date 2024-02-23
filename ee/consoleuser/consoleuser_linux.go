@@ -13,9 +13,10 @@ import (
 )
 
 type listSessionsResult []struct {
-	Session string `json:"session"`
-	UID     int    `json:"uid"`
-	Seat    string `json:"seat"`
+	Session  string `json:"session"`
+	UID      int    `json:"uid"`
+	Username string `json:"user"`
+	Seat     string `json:"seat"`
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
@@ -38,7 +39,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	for _, s := range sessions {
 		// generally human users start at 1000 on linux. 65534 is reserved for https://wiki.ubuntu.com/nobody,
 		// which we don't want to count as a current user.
-		if s.UID < 1000 || s.UID == 65534 {
+		if s.UID < 1000 || s.UID == 65534 || s.Username == "nobody" {
 			continue
 		}
 
