@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +29,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Autoupdate").Return(true).Maybe()
 	mockKnapsack.On("LatestOsquerydPath").Return("").Maybe()
 	mockKnapsack.On("ServerProvidedDataStore").Return(nil).Maybe()
-	checkupLogger := NewCheckupLogger(log.NewNopLogger(), mockKnapsack)
+	checkupLogger := NewCheckupLogger(multislogger.New().Logger, mockKnapsack)
 	mockKnapsack.AssertExpectations(t)
 
 	// Start and then interrupt

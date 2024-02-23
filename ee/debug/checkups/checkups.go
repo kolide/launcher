@@ -22,13 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -201,18 +200,19 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 	}
 }
 
-func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolint:unused
+func logCheckup(ctx context.Context, c checkupInt, slogger *slog.Logger) { // nolint:unused
 	if err := c.Run(ctx, io.Discard); err != nil {
-		level.Debug(logger).Log(
+		slogger.Log(ctx, slog.LevelDebug,
+			"error running checkup",
 			"name", c.Name(),
-			"msg", "error running checkup",
 			"err", err,
 			"status", Erroring,
 		)
 		return
 	}
 
-	level.Debug(logger).Log(
+	slogger.Log(ctx, slog.LevelDebug,
+		"ran checkup",
 		"name", c.Name(),
 		"msg", c.Summary(),
 		"status", c.Status(),
