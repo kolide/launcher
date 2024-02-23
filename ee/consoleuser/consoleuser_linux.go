@@ -36,8 +36,9 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 
 	var uids []string
 	for _, s := range sessions {
-		// generally human users start at 1000 on linux
-		if s.UID < 1000 {
+		// generally human users start at 1000 on linux. 65534 is reserved for https://wiki.ubuntu.com/nobody,
+		// which we don't want to count as a current user.
+		if s.UID < 1000 || s.UID == 65534 {
 			continue
 		}
 
