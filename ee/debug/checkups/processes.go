@@ -59,9 +59,7 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 
 			// Grab ENV vars if available -- we ignore the error because we expect
 			// this function to return `ErrNotImplementedError` on darwin
-			if envVars, err := p.EnvironWithContext(ctx); err == nil {
-				pMap["env"] = strings.Join(envVars, " ")
-			}
+			pMap["env"] = naIfError(p.EnvironWithContext(ctx))
 
 			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
 
