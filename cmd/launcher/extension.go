@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -17,12 +15,10 @@ func createExtensionRuntime(ctx context.Context, k types.Knapsack, launcherClien
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
 	slogger := k.Slogger().With("component", "osquery_extension_creator")
 
 	// create the osquery extension
 	extOpts := osquery.ExtensionOpts{
-		Logger:                            logger, // Preserved only for temporary use in agent.SetupKeys
 		LoggingInterval:                   k.LoggingInterval(),
 		RunDifferentialQueriesImmediately: k.EnableInitialRunner(),
 	}

@@ -180,7 +180,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
-	stores, err := agentbbolt.MakeStores(ctx, logger, db)
+	stores, err := agentbbolt.MakeStores(ctx, slogger, db)
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
 	}

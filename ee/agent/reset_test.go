@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/krypto/pkg/echelper"
@@ -252,15 +251,17 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			// the tests and they will continue to validate expected behavior.
 			tt.expectDatabaseWipe = false
 
+			slogger := multislogger.NewNopLogger()
+
 			// Set up dependencies: data store for hardware-identifying data
-			testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
+			testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 			require.NoError(t, err, "could not create test host data store")
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
-			testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
-			testServerProvidedDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+			testServerProvidedDataStore, err := storageci.NewStore(t, slogger, storage.ServerProvidedDataStore.String())
 			require.NoError(t, err, "could not create test server provided data store")
 			mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore).Maybe()
 			mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
@@ -270,7 +271,6 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			}).Maybe()
 
 			// Set up logger
-			slogger := multislogger.New().Logger
 			mockKnapsack.On("Slogger").Return(slogger)
 
 			// Set up dependencies: ensure that retrieved hardware data matches expectations
@@ -431,15 +431,17 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 
 	t.Skip("un-skip test once we decide to reset the database on hardware change")
 
+	slogger := multislogger.NewNopLogger()
+
 	// Set up dependencies: data store for hardware-identifying data
-	testHostDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.PersistentHostDataStore.String())
+	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
 	require.NoError(t, err, "could not create test host data store")
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
-	testConfigStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err, "could not create test config store")
 	mockKnapsack.On("ConfigStore").Return(testConfigStore)
-	testServerProvidedDataStore, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	testServerProvidedDataStore, err := storageci.NewStore(t, slogger, storage.ServerProvidedDataStore.String())
 	require.NoError(t, err, "could not create test server provided data store")
 	mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore)
 	mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
@@ -449,7 +451,6 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	})
 
 	// Set up logger
-	slogger := multislogger.New().Logger
 	mockKnapsack.On("Slogger").Return(slogger)
 
 	// Set up dependencies: ensure that retrieved hardware data matches expectations

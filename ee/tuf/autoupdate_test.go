@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -41,7 +40,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -393,7 +392,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -519,7 +518,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 			mockQuerier := newMockQuerier(t)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -585,7 +584,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockQuerier := newMockQuerier(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -646,7 +645,7 @@ func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) 
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		slogger:   multislogger.New().Logger,
+		slogger:   multislogger.NewNopLogger(),
 		osquerier: mockQuerier,
 	}
 
@@ -662,7 +661,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		slogger:   multislogger.New().Logger,
+		slogger:   multislogger.NewNopLogger(),
 		osquerier: mockQuerier,
 	}
 
@@ -681,7 +680,7 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 
 	mockQuerier := newMockQuerier(t)
 	autoupdater := &TufAutoupdater{
-		slogger:                multislogger.New().Logger,
+		slogger:                multislogger.NewNopLogger(),
 		osquerier:              mockQuerier,
 		osquerierRetryInterval: 1 * time.Millisecond,
 	}
@@ -711,7 +710,7 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockQuerier := newMockQuerier(t)
 
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
@@ -758,7 +757,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 
 	autoupdater := &TufAutoupdater{
 		store:   setupStorage(t),
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	// Add one legitimate timestamp
@@ -797,7 +796,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.AutoupdateErrorsStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AutoupdateErrorsStore.String())
 	require.NoError(t, err)
 	return s
 }

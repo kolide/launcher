@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -86,12 +85,6 @@ type ExtensionOpts struct {
 	// default it will be a normal realtime clock, but a mock clock can be
 	// passed with clock.NewMockClock() for testing purposes.
 	Clock clock.Clock
-	// Logger is the logger that the extension should use. This is for
-	// logging about the launcher, and not for logging osquery results.
-	// Logging should be done through the knapsack slogger -- this is
-	// preserved only for temporary use in call to agent.SetupKeys until
-	// we move that over to using the slogger too.
-	Logger log.Logger
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
@@ -121,10 +114,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		opts.Clock = clock.DefaultClock{}
 	}
 
-	if opts.Logger == nil {
-		opts.Logger = log.NewNopLogger()
-	}
-
 	if opts.MaxBufferedLogs == 0 {
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
@@ -135,7 +124,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, configStore); err != nil {
+	if err := agent.SetupKeys(slogger, configStore); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
