@@ -18,7 +18,7 @@ func main() {
 }
 
 func testIdentifyFile(path string) error {
-	kIdentifer, _ := keyidentifier.New(keyidentifier.WithSlogger(multislogger.New().Logger))
+	kIdentifer, _ := keyidentifier.New(keyidentifier.WithSlogger(multislogger.NewNopLogger()))
 
 	ki, err := kIdentifer.IdentifyFile(path)
 	if err != nil {
