@@ -121,7 +121,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 
 	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
 		"pem decoded",
-		"block type", block.Type,
+		"block_type", block.Type,
 	)
 
 	switch block.Type {
@@ -182,7 +182,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 	// Unmatched. return what we have
 	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
 		"pem failed to match block type",
-		"type", block.Type,
+		"block_type", block.Type,
 	)
 	return ki, nil
 }
