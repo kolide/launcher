@@ -16,7 +16,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -322,11 +321,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 // FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
 // to respond to changes to autoupdate-related settings.
 func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if !slices.Contains(flagKeys, keys.UpdateChannel) {
-		return
-	}
-
-	// No change
+	// No change -- this is the only setting we currently care about.
 	if ta.updateChannel == ta.knapsack.UpdateChannel() {
 		return
 	}
