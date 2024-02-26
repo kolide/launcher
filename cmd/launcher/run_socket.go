@@ -60,7 +60,8 @@ func runSocket(args []string) error {
 		return err
 	}
 	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level:     slog.LevelDebug,
+		AddSource: true,
 	})).Logger
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(cmdlineopts)}
 	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)

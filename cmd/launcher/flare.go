@@ -55,7 +55,8 @@ func runFlare(args []string) error {
 	}
 
 	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slogLevel,
+		Level:     slogLevel,
+		AddSource: true,
 	})).Logger
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
