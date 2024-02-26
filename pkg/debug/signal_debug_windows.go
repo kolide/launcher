@@ -3,10 +3,8 @@
 
 package debug
 
-import (
-	"github.com/go-kit/kit/log"
-)
+import "log/slog"
 
-func AttachDebugHandler(addrPath string, logger log.Logger) {
+func AttachDebugHandler(addrPath string, slogger *slog.Logger) {
 	// TODO: noop for now
 }

@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	p, err := New(context.TODO(), typesmocks.NewKnapsack(t), log.NewNopLogger())
+	p, err := New(context.TODO(), typesmocks.NewKnapsack(t), multislogger.NewNopLogger())
 	require.NoError(t, err)
 
 	// Start and then interrupt

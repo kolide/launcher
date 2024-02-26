@@ -39,7 +39,8 @@ func runInteractive(args []string) error {
 	}
 
 	slogger := multislogger.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slogLevel,
+		Level:     slogLevel,
+		AddSource: true,
 	})).Logger
 
 	osquerydPath := *flOsquerydPath

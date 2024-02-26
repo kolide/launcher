@@ -89,7 +89,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 					defer cancel()
 
-					wmiResults, err := wmi.Query(ctx, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
+					wmiResults, err := wmi.Query(ctx, t.slogger, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo,
 							"wmi query failure",

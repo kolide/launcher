@@ -3,9 +3,8 @@ package tablehelpers
 import (
 	"bufio"
 	"bytes"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"context"
+	"log/slog"
 )
 
 type Matcher struct {
@@ -16,13 +15,13 @@ type Matcher struct {
 
 type OutputParser struct {
 	matchers []Matcher
-	logger   log.Logger
+	slogger  *slog.Logger
 }
 
-func NewParser(logger log.Logger, matchers []Matcher) *OutputParser {
+func NewParser(slogger *slog.Logger, matchers []Matcher) *OutputParser {
 	p := &OutputParser{
 		matchers: matchers,
-		logger:   logger,
+		slogger:  slogger,
 	}
 	return p
 }
@@ -45,8 +44,8 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 			if m.Match(line) {
 				key, err := m.KeyFunc(line)
 				if err != nil {
-					level.Debug(p.logger).Log(
-						"msg", "key match failed",
+					p.slogger.Log(context.TODO(), slog.LevelDebug,
+						"key match failed",
 						"line", line,
 						"err", err,
 					)
@@ -55,8 +54,8 @@ func (p *OutputParser) Parse(input *bytes.Buffer) map[string]string {
 
 				val, err := m.ValFunc(line)
 				if err != nil {
-					level.Debug(p.logger).Log(
-						"msg", "value match failed",
+					p.slogger.Log(context.TODO(), slog.LevelDebug,
+						"value match failed",
 						"line", line,
 						"err", err,
 					)
@@ -89,8 +88,8 @@ func (p *OutputParser) ParseMultiple(input *bytes.Buffer) []map[string]string {
 			if m.Match(line) {
 				key, err := m.KeyFunc(line)
 				if err != nil {
-					level.Debug(p.logger).Log(
-						"msg", "key match failed",
+					p.slogger.Log(context.TODO(), slog.LevelDebug,
+						"key match failed",
 						"line", line,
 						"err", err,
 					)
@@ -99,8 +98,8 @@ func (p *OutputParser) ParseMultiple(input *bytes.Buffer) []map[string]string {
 
 				val, err := m.ValFunc(line)
 				if err != nil {
-					level.Debug(p.logger).Log(
-						"msg", "value match failed",
+					p.slogger.Log(context.TODO(), slog.LevelDebug,
+						"value match failed",
 						"line", line,
 						"err", err,
 					)
@@ -113,14 +112,20 @@ func (p *OutputParser) ParseMultiple(input *bytes.Buffer) []map[string]string {
 		}
 
 		if len(row) == 0 {
-			level.Debug(p.logger).Log("msg", "No matched keys", "line", line)
+			p.slogger.Log(context.TODO(), slog.LevelDebug,
+				"no matched keys",
+				"line", line,
+			)
 			continue
 		}
 		results = append(results, row)
 
 	}
 	if err := scanner.Err(); err != nil {
-		level.Debug(p.logger).Log("msg", "scanner error", "err", err)
+		p.slogger.Log(context.TODO(), slog.LevelDebug,
+			"scanner error",
+			"err", err,
+		)
 	}
 	return results
 }

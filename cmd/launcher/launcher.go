@@ -160,7 +160,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
-	debug.AttachDebugHandler(debugAddrPath, logger)
+	debug.AttachDebugHandler(debugAddrPath, slogger)
 	defer os.Remove(debugAddrPath)
 
 	// open the database for storing launcher data, we do it here
@@ -281,7 +281,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// For now, remediation is not performed -- we only log the hardware change.
 	agent.DetectAndRemediateHardwareChange(ctx, k)
 
-	powerEventWatcher, err := powereventwatcher.New(ctx, k, log.With(logger, "component", "power_event_watcher"))
+	powerEventWatcher, err := powereventwatcher.New(ctx, k, slogger)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"could not init power event watcher",
