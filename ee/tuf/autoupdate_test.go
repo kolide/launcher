@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -41,6 +42,8 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 
 	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -79,6 +82,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -169,6 +173,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -243,6 +248,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -328,6 +334,8 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -393,6 +401,8 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -519,6 +529,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 			mockQuerier := newMockQuerier(t)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -585,6 +596,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -638,6 +650,63 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
+}
+
+func TestFlagsChanged(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testReleaseVersion := "2.2.3"
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
+	mockQuerier := newMockQuerier(t)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
+
+	// Start out on beta channel, then swap to nightly
+	mockKnapsack.On("UpdateChannel").Return("beta").Once()
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+	require.Equal(t, "beta", autoupdater.updateChannel)
+
+	// Update the metadata client with our test root JSON
+	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+
+	// Get metadata for each release
+	_, err = autoupdater.metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+
+	// Expect that we attempt to update the library
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	currentOsqueryVersion := "1.1.1"
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockLibraryManager.On("Available", binaryOsqueryd, fmt.Sprintf("%s-%s.tar.gz", binaryOsqueryd, testReleaseVersion)).Return(false)
+	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockLibraryManager.On("Available", binaryLauncher, fmt.Sprintf("%s-%s.tar.gz", binaryLauncher, testReleaseVersion)).Return(false)
+	mockLibraryManager.On("AddToLibrary", binaryLauncher, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	// Notify that flags changed
+	autoupdater.FlagsChanged(keys.UpdateChannel)
+
+	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
+	mockLibraryManager.AssertExpectations(t)
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+
+	// Confirm we're on the expected update channel
+	require.Equal(t, "nightly", autoupdater.updateChannel)
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
@@ -711,6 +780,8 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Return()
 	mockQuerier := newMockQuerier(t)
 
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)

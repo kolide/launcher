@@ -16,11 +16,13 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/traces"
 	client "github.com/theupdateframework/go-tuf/client"
@@ -86,6 +88,7 @@ type TufAutoupdater struct {
 	osquerierRetryInterval time.Duration
 	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	updateChannel          string
 	updateLock             *sync.Mutex
 	interrupt              chan struct{}
 	interrupted            bool
@@ -115,6 +118,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		interrupt:              make(chan struct{}, 1),
 		signalRestart:          make(chan error, 1),
 		store:                  k.AutoupdateErrorsStore(),
+		updateChannel:          k.UpdateChannel(),
 		updateLock:             &sync.Mutex{},
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -141,6 +145,9 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	if err != nil {
 		return nil, fmt.Errorf("could not init update library manager: %w", err)
 	}
+
+	// Subscribe to changes in update-related flags
+	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel)
 
 	return ta, nil
 }
@@ -312,6 +319,36 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 	return nil
 }
 
+// FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
+// to respond to changes to autoupdate-related settings.
+func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
+	if !slices.Contains(flagKeys, keys.UpdateChannel) {
+		return
+	}
+
+	// No change
+	if ta.updateChannel == ta.knapsack.UpdateChannel() {
+		return
+	}
+
+	// Update channel has changed -- update it, then check to see if we
+	// need to switch versions
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"control server sent down new update channel value",
+		"new_channel", ta.knapsack.UpdateChannel(),
+		"old_channel", ta.updateChannel,
+	)
+	ta.updateChannel = ta.knapsack.UpdateChannel()
+	if err := ta.checkForUpdate(binaries); err != nil {
+		ta.storeError(err)
+		ta.slogger.Log(context.TODO(), slog.LevelError,
+			"error checking for update after switching update channels",
+			"new_channel", ta.updateChannel,
+			"err", err,
+		)
+	}
+}
+
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
 // and then asks the update library manager to tidy the update library.
 func (ta *TufAutoupdater) tidyLibrary() {
@@ -462,7 +499,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := findRelease(context.Background(), binary, targets, ta.knapsack.UpdateChannel())
+	release, releaseMetadata, err := findRelease(context.Background(), binary, targets, ta.updateChannel)
 	if err != nil {
 		return "", fmt.Errorf("could not find release: %w", err)
 	}

@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/traces"
@@ -32,6 +34,9 @@ type autoupdateConfig struct {
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	slogger = slogger.With("component", "tuf_library_lookup")
 	cfg, err := getAutoupdateConfig(os.Args[1:])
 	if err != nil {
@@ -43,7 +48,39 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
 	}
 
-	return CheckOutLatest(context.Background(), binary, cfg.rootDirectory, cfg.updateDirectory, cfg.channel, slogger)
+	// Get update channel from startup settings
+	updateChannel, err := getUpdateChannelFromStartupSettings(ctx, cfg.rootDirectory)
+	if err != nil {
+		slogger.Log(ctx, slog.LevelWarn,
+			"could not get update channel from startup settings, falling back to config value instead",
+			"config_update_channel", cfg.channel,
+			"err", err,
+		)
+		updateChannel = cfg.channel
+	}
+
+	return CheckOutLatest(ctx, binary, cfg.rootDirectory, cfg.updateDirectory, updateChannel, slogger)
+}
+
+// getUpdateChannelFromStartupSettings queries the startup settings database to fetch the desired
+// update channel. This accounts for e.g. the control server sending down a particular value for
+// the update channel, overriding the config file.
+func getUpdateChannelFromStartupSettings(ctx context.Context, rootDirectory string) (string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	r, err := startupsettings.OpenReader(ctx, rootDirectory)
+	if err != nil {
+		return "", fmt.Errorf("opening startupsettings reader: %w", err)
+	}
+	defer r.Close()
+
+	updateChannel, err := r.Get(keys.UpdateChannel.String())
+	if err != nil {
+		return "", fmt.Errorf("getting update channel from startupsettings: %w", err)
+	}
+
+	return updateChannel, nil
 }
 
 // getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library

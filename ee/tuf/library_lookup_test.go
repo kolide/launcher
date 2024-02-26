@@ -7,10 +7,42 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_getUpdateChannelFromStartupSettings(t *testing.T) {
+	t.Parallel()
+
+	expectedChannel := "beta"
+
+	// Set up an override for the channel in the startupsettings db
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte(expectedChannel)), "setting key")
+	require.NoError(t, store.Close(), "closing test db")
+
+	actualChannel, err := getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.NoError(t, err, "did not expect error getting update channel from startup settings")
+	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
+}
+
+func Test_getUpdateChannelFromStartupSettings_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// Create a startupsettings db but don't set anything in it
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Close(), "closing test db")
+
+	_, err = getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.Error(t, err, "should not have been able to get update channel when it is not set")
+}
 
 func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	t.Parallel()
@@ -45,7 +77,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.New().Logger)
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -72,7 +104,7 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.New().Logger)
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
