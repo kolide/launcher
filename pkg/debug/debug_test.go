@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ func TestStartDebugServer(t *testing.T) {
 	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
-	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
+	serv, err := startDebugServer(tokenFile.Name(), multislogger.NewNopLogger())
 	require.Nil(t, err)
 
 	url := getDebugURL(t, tokenFile.Name())
@@ -46,7 +46,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
-	serv, err := startDebugServer(tokenFile.Name(), log.NewNopLogger())
+	serv, err := startDebugServer(tokenFile.Name(), multislogger.NewNopLogger())
 	require.Nil(t, err)
 
 	url := getDebugURL(t, tokenFile.Name())
@@ -65,7 +65,7 @@ func TestAttachDebugHandler(t *testing.T) {
 	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
 	require.Nil(t, err)
 
-	AttachDebugHandler(tokenFile.Name(), log.NewNopLogger())
+	AttachDebugHandler(tokenFile.Name(), multislogger.NewNopLogger())
 
 	// Start server
 	syscall.Kill(syscall.Getpid(), debugSignal)

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 }
 
 func testIdentifyFile(path string) error {
-	kIdentifer, _ := keyidentifier.New(keyidentifier.WithLogger(logutil.NewCLILogger(true)))
+	kIdentifer, _ := keyidentifier.New(keyidentifier.WithSlogger(multislogger.New().Logger))
 
 	ki, err := kIdentifer.IdentifyFile(path)
 	if err != nil {

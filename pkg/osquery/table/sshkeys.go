@@ -37,7 +37,7 @@ func SshKeys(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("fingerprint_md5"),
 	}
 
-	// we don't want the logging in osquery, so don't instantiate WithLogger()
+	// we don't want the logging in osquery, so don't instantiate WithSlogger()
 	kIdentifer, err := keyidentifier.New()
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelInfo,

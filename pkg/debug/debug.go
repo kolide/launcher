@@ -4,8 +4,10 @@
 package debug
 
 import (
+	"context"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net"
 	"net/http"
 	nhpprof "net/http/pprof"
@@ -14,14 +16,12 @@ import (
 	"runtime/pprof"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/google/uuid"
 )
 
 const debugPrefix = "/debug/"
 
-func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) {
+func startDebugServer(addrPath string, slogger *slog.Logger) (*http.Server, error) {
 	// Generate new (random) token to use for debug server auth
 	token, err := uuid.NewRandom()
 	if err != nil {
@@ -30,7 +30,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 
 	// Start the debug server
 	r := http.NewServeMux()
-	registerAuthHandler(token.String(), r, logger)
+	registerAuthHandler(token.String(), r, slogger)
 	serv := http.Server{
 		Handler: r,
 	}
@@ -44,7 +44,9 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 
 	go func() {
 		if err := serv.Serve(listener); err != nil && err != http.ErrServerClosed {
-			level.Info(logger).Log("msg", "debug server failed", "err", err)
+			slogger.Log(context.TODO(), slog.LevelInfo,
+				"debug server failed", "err", err,
+			)
 		}
 	}()
 
@@ -60,8 +62,8 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 		return nil, fmt.Errorf("writing debug address: %w", err)
 	}
 
-	level.Info(logger).Log(
-		"msg", "debug server started",
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"debug server started",
 		"addr", addr,
 	)
 
@@ -69,7 +71,7 @@ func startDebugServer(addrPath string, logger log.Logger) (*http.Server, error) 
 }
 
 // The below handler code is adapted from MIT licensed github.com/e-dard/netbug
-func handler(token string, logger log.Logger) http.HandlerFunc {
+func handler(token string, slogger *slog.Logger) http.HandlerFunc {
 	info := struct {
 		Profiles []*pprof.Profile
 		Token    string
@@ -84,8 +86,8 @@ func handler(token string, logger log.Logger) http.HandlerFunc {
 		case "":
 			// Index page.
 			if err := indexTmpl.Execute(w, info); err != nil {
-				level.Info(logger).Log(
-					"msg", "error rendering debug template",
+				slogger.Log(r.Context(), slog.LevelInfo,
+					"error rendering debug template",
 					"err", err,
 				)
 				return
@@ -105,18 +107,18 @@ func handler(token string, logger log.Logger) http.HandlerFunc {
 	}
 }
 
-func authHandler(token string, logger log.Logger) http.HandlerFunc {
+func authHandler(token string, slogger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.FormValue("token") == token {
-			handler(token, logger).ServeHTTP(w, r)
+			handler(token, slogger).ServeHTTP(w, r)
 		} else {
 			http.Error(w, "Request must include valid token.", http.StatusUnauthorized)
 		}
 	}
 }
 
-func registerAuthHandler(token string, mux *http.ServeMux, logger log.Logger) {
-	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, authHandler(token, logger)))
+func registerAuthHandler(token string, mux *http.ServeMux, slogger *slog.Logger) {
+	mux.Handle(debugPrefix, http.StripPrefix(debugPrefix, authHandler(token, slogger)))
 }
 
 var indexTmpl = template.Must(template.New("index").Parse(`<html>
