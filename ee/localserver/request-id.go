@@ -18,7 +18,7 @@ type identifiers struct {
 	HardwareSerial string
 }
 
-type RequestIdsResponse struct {
+type requestIdsResponse struct {
 	RequestId string
 	identifiers
 	Nonce     string
@@ -66,7 +66,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
-	response := RequestIdsResponse{
+	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
 	}

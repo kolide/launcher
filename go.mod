@@ -16,7 +16,6 @@ require (
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
 	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121
-	github.com/kolide/updater v0.0.0-20190315001611-15bbc19b5b80
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
