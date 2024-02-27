@@ -10,11 +10,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -49,17 +48,17 @@ var headerRegex = regexp.MustCompile(`^=== CPF_GetInstalledProfiles === \(<Devic
 var lengthBytesRegex = regexp.MustCompile(`{length = (\d+,) bytes = (0[xX][0-9a-fA-F\.\s]+)}`)
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("command"),
 	)
 
 	t := &Table{
-		logger:    logger,
+		slogger:   slogger.With("table", "kolide_mdmclient"),
 		tableName: "kolide_mdmclient",
 	}
 
@@ -71,32 +70,42 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	gcOpts := []tablehelpers.GetConstraintOpts{
 		tablehelpers.WithAllowedCharacters(allowedCharacters),
-		tablehelpers.WithLogger(t.logger),
+		tablehelpers.WithSlogger(t.slogger),
 		tablehelpers.WithDefaults(""),
 	}
 
 	for _, mdmclientCommand := range tablehelpers.GetConstraints(queryContext, "command", gcOpts...) {
 		if mdmclientCommand == "" {
-			level.Info(t.logger).Log("msg", "command must not be blank")
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"command must not be blank",
+			)
 			continue
 		}
 
 		if !strings.HasPrefix(mdmclientCommand, "Query") {
-			level.Info(t.logger).Log("msg", "Only Query commands are supported")
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"only Query commands are supported",
+			)
 			continue
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "mdmclient failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"mdmclient failed",
+					"err", err,
+				)
 				continue
 			}
 
-			flatData, err := t.flattenOutput(dataQuery, mdmclientOutput)
+			flatData, err := t.flattenOutput(ctx, dataQuery, mdmclientOutput)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
 				continue
 			}
 
@@ -110,15 +119,18 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(ctx context.Context, dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
 	converted, err := t.transformOutput(systemOutput)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "converting mdmclient output", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"converting mdmclient output",
+			"err", err,
+		)
 		return nil, fmt.Errorf("converting: %w", err)
 	}
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

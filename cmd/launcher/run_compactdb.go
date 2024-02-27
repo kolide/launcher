@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"log/slog"
+	"os"
 	"path/filepath"
 
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 func runCompactDb(args []string) error {
@@ -17,11 +19,19 @@ func runCompactDb(args []string) error {
 	}
 
 	if opts.RootDirectory == "" {
-		return errors.New("No root directory specified")
+		return errors.New("no root directory specified")
 	}
 
 	// relevel
-	logger := logutil.NewServerLogger(opts.Debug)
+	slogLevel := slog.LevelInfo
+	if opts.Debug {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slogLevel,
+		AddSource: true,
+	})).Logger
 
 	boltPath := filepath.Join(opts.RootDirectory, "launcher.db")
 
@@ -30,7 +40,10 @@ func runCompactDb(args []string) error {
 		return err
 	}
 
-	level.Info(logger).Log("msg", "Done compacting. Safe to remove old db", "path", oldDbPath)
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"done compacting, safe to remove old db",
+		"path", oldDbPath,
+	)
 
 	return nil
 }

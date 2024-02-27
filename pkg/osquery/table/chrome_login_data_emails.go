@@ -4,13 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -22,9 +21,9 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeLoginDataEmails(logger log.Logger) *table.Plugin {
+func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_chrome_login_data_emails"),
 	}
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
@@ -35,7 +34,7 @@ func ChromeLoginDataEmails(logger log.Logger) *table.Plugin {
 }
 
 type ChromeLoginDataEmailsTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
@@ -92,10 +91,10 @@ func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext 
 	}
 
 	for _, profileDir := range osProfileDirs {
-		files, err := findFileInUserDirs(filepath.Join(profileDir, "*/Login Data"), c.logger)
+		files, err := findFileInUserDirs(filepath.Join(profileDir, "*/Login Data"), c.slogger)
 		if err != nil {
-			level.Info(c.logger).Log(
-				"msg", "Find chrome login data sqlite DBs",
+			c.slogger.Log(ctx, slog.LevelInfo,
+				"finding chrome login data sqlite DBs",
 				"path", profileDir,
 				"err", err,
 			)
@@ -105,8 +104,8 @@ func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext 
 		for _, file := range files {
 			res, err := c.generateForPath(ctx, file)
 			if err != nil {
-				level.Info(c.logger).Log(
-					"msg", "Generating chrome keychain result",
+				c.slogger.Log(ctx, slog.LevelInfo,
+					"generating chrome keychain result",
 					"path", file.path,
 					"err", err,
 				)

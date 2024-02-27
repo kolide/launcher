@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // startupSettingsWriter records agent flags and their current values,
@@ -25,6 +25,9 @@ type startupSettingsWriter struct {
 // OpenWriter returns a new startup settings writer, creating and initializing
 // the database if necessary.
 func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.StartupSettingsStore)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", knapsack.RootDirectory(), err)
@@ -34,8 +37,7 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
-			keys.UpdateChannel:     func() string { return knapsack.UpdateChannel() },
-			keys.UseTUFAutoupdater: func() string { return flags.BoolToString(knapsack.UseTUFAutoupdater()) },
+			keys.UpdateChannel: func() string { return knapsack.UpdateChannel() },
 		},
 	}
 

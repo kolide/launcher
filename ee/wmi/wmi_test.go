@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +15,6 @@ import (
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
-	// If you want a logger for debugging, add it in to the ctx
 	ctx := context.TODO()
 
 	var tests = []struct {
@@ -130,7 +130,7 @@ func TestQuery(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 
-			rows, err := Query(ctx, tt.class, tt.properties, tt.options...)
+			rows, err := Query(ctx, multislogger.NewNopLogger(), tt.class, tt.properties, tt.options...)
 			if tt.err {
 				require.Error(t, err)
 				return

@@ -2,20 +2,19 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesMocks.NewKnapsack(t)
-	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 
 	var logBytes bytes.Buffer
@@ -54,21 +53,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	// convert the response to a struct
 	var response RequestIdsResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
-
-	// in the current CI environment (GitHub Actions) the linux runner
-	// does not have a console user, so we expect an empty list
-	if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
-		assert.Empty(t, response.ConsoleUsers)
-		return
-	}
-
-	assert.GreaterOrEqual(t, len(response.ConsoleUsers), 1, "should have at least one console user")
 }
 
 func testServer(t *testing.T, k types.Knapsack) *localServer {
 	require.NoError(t, osquery.SetupLauncherKeys(k.ConfigStore()))
 
-	server, err := New(k)
+	server, err := New(context.TODO(), k)
 	require.NoError(t, err)
 	return server
 }

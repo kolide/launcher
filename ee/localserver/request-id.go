@@ -1,19 +1,14 @@
 package localserver
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os/user"
-	"runtime"
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -25,10 +20,9 @@ type Identifiers struct {
 
 type RequestIdsResponse struct {
 	RequestId string
-	Identifiers
-	Nonce        string
-	Timestamp    time.Time
-	ConsoleUsers []*user.User
+	identifiers
+	Nonce     string
+	Timestamp time.Time
 }
 
 const (
@@ -78,19 +72,6 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	}
 	response.Identifiers = ls.identifiers
 
-	consoleUsers, err := consoleUsers()
-	if err != nil {
-		traces.SetError(span, err)
-		ls.slogger.Log(r.Context(), slog.LevelError,
-			"getting console users",
-			"err", err,
-		)
-
-		response.ConsoleUsers = []*user.User{}
-	} else {
-		response.ConsoleUsers = consoleUsers
-	}
-
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
 		traces.SetError(span, err)
@@ -103,35 +84,4 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Write(jsonBytes)
-}
-
-func consoleUsers() ([]*user.User, error) {
-	const maxDuration = 1 * time.Second
-	context, cancel := context.WithTimeout(context.Background(), maxDuration)
-	defer cancel()
-
-	var users []*user.User
-
-	return users, backoff.WaitFor(func() error {
-		uids, err := consoleuser.CurrentUids(context)
-		if err != nil {
-			return err
-		}
-
-		for _, uid := range uids {
-			var err error
-			var u *user.User
-			if runtime.GOOS == "windows" {
-				u, err = user.Lookup(uid)
-			} else {
-				u, err = user.LookupId(uid)
-			}
-			if err != nil {
-				return err
-			}
-
-			users = append(users, u)
-		}
-		return nil
-	}, maxDuration, 250*time.Millisecond)
 }

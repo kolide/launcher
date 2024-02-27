@@ -7,8 +7,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +34,7 @@ func Test_generate(t *testing.T) {
 		},
 	}
 
-	table := Table{logger: log.NewNopLogger()}
+	table := Table{slogger: multislogger.New().Logger}
 
 	for _, tt := range tests {
 		tt := tt

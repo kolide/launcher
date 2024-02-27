@@ -2,16 +2,17 @@ package keyidentifier
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -29,35 +30,35 @@ type KeyInfo struct {
 }
 
 // keyidentifier attempts to identify a key. It uses a set of
-// herusitics to try to guiess what kind, what size, and whether or
+// heuristics to try to guiess what kind, what size, and whether or
 // not it's encrypted.
 type KeyIdentifier struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 type Option func(*KeyIdentifier)
 
-func WithLogger(logger log.Logger) Option {
-	return func(kIdentifer *KeyIdentifier) {
-		kIdentifer.logger = logger
+func WithSlogger(slogger *slog.Logger) Option {
+	return func(kIdentifier *KeyIdentifier) {
+		kIdentifier.slogger = slogger.With("component", "key_identifier")
 	}
 }
 
 func New(opts ...Option) (*KeyIdentifier, error) {
-	kIdentifer := &KeyIdentifier{
-		logger: log.NewNopLogger(),
+	kIdentifier := &KeyIdentifier{
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	for _, opt := range opts {
-		opt(kIdentifer)
+		opt(kIdentifier)
 	}
 
-	return kIdentifer, nil
+	return kIdentifier, nil
 }
 
-func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
-	level.Debug(kIdentifer.logger).Log(
-		"msg", "starting a key identification",
+func (kIdentifier *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
+	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting a key identification",
 		"file", path,
 	)
 
@@ -66,7 +67,7 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 		return nil, fmt.Errorf("reading file %s: %w", path, err)
 	}
 
-	ki, err := kIdentifer.Identify(keyBytes)
+	ki, err := kIdentifier.Identify(keyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("identifying key: %w", err)
 	}
@@ -77,9 +78,9 @@ func (kIdentifer *KeyIdentifier) IdentifyFile(path string) (*KeyInfo, error) {
 // Identify uses a manually curated set of heuristics to determine
 // what kind of key something is. Generally speaking, we consider `err
 // == nil` as success, and throw away errors as unparsable keys.
-func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
-	level.Debug(kIdentifer.logger).Log(
-		"msg", "starting a key identification",
+func (kIdentifier *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
+	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting a key identification",
 		"file", "<bytestream>",
 	)
 
@@ -94,18 +95,18 @@ func (kIdentifer *KeyIdentifier) Identify(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	// If nothing else fits. treat it like a pem
-	if ki, err := kIdentifer.attemptPem(keyBytes); err == nil {
+	if ki, err := kIdentifier.attemptPem(keyBytes); err == nil {
 		return ki, nil
 	}
 
 	// Out of options
-	return nil, errors.New("Unable to parse key")
+	return nil, errors.New("unable to parse key")
 }
 
 // attemptPem tries to decode the pem, and then work with the key. It's
 // based on code from x/crypto's ssh.ParseRawPrivateKey, but more
 // flexible in handling encryption and formats.
-func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
+func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 	ki := &KeyInfo{
 		Format: "",
 		Parser: "attemptPem",
@@ -118,9 +119,9 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 
 	ki.Encrypted = boolPtr(pemEncryptedBlock(block))
 
-	level.Debug(kIdentifer.logger).Log(
-		"msg", "pem decoded",
-		"block type", block.Type,
+	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
+		"pem decoded",
+		"block_type", block.Type,
 	)
 
 	switch block.Type {
@@ -136,7 +137,7 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 
 	case "PRIVATE KEY":
 		// RFC5208 - https://tools.ietf.org/html/rfc5208
-		ki.Encrypted = boolPtr(x509.IsEncryptedPEMBlock(block))
+		ki.Encrypted = boolPtr(x509.IsEncryptedPEMBlock(block)) // nolint:staticcheck
 		if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
 			switch assertedKey := key.(type) {
 			case *rsa.PrivateKey:
@@ -156,8 +157,8 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 		if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
 			ki.Bits = key.PublicKey.Curve.Params().BitSize
 		} else {
-			level.Debug(kIdentifer.logger).Log(
-				"msg", "x509.ParseECPrivateKey failed to parse",
+			kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
+				"x509.ParseECPrivateKey failed to parse",
 				"err", err,
 			)
 		}
@@ -179,9 +180,9 @@ func (kIdentifer *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	// Unmatched. return what we have
-	level.Debug(kIdentifer.logger).Log(
-		"msg", "pem failed to match block type",
-		"type", block.Type,
+	kIdentifier.slogger.Log(context.TODO(), slog.LevelDebug,
+		"pem failed to match block type",
+		"block_type", block.Type,
 	)
 	return ki, nil
 }

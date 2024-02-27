@@ -39,7 +39,7 @@ func DefaultPath(path defaultPath) string {
 	if runtime.GOOS == "windows" {
 		switch path {
 		case RootDirectory:
-			return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data"
+			return "C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data"
 		case WindowsConfigDirectory:
 			return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf"
 		case BinDirectory:

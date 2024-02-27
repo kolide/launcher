@@ -1,11 +1,11 @@
 package flags
 
 import (
+	"context"
+	"log/slog"
 	"math"
 	"strconv"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 )
 
@@ -36,7 +36,7 @@ func WithFloat64ValueMax(max float64) float64Option {
 }
 
 type float64FlagValue struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	key        keys.FlagKey
 	override   FlagValueOverride
 	defaultVal float64
@@ -44,12 +44,12 @@ type float64FlagValue struct {
 	max        float64
 }
 
-func NewFloat64FlagValue(logger log.Logger, key keys.FlagKey, opts ...float64Option) *float64FlagValue {
+func NewFloat64FlagValue(slogger *slog.Logger, key keys.FlagKey, opts ...float64Option) *float64FlagValue {
 	f := &float64FlagValue{
-		logger: logger,
-		key:    key,
-		min:    -1 * math.MaxFloat64,
-		max:    math.MaxFloat64,
+		slogger: slogger,
+		key:     key,
+		min:     -1 * math.MaxFloat64,
+		max:     math.MaxFloat64,
 	}
 
 	for _, opt := range opts {
@@ -68,7 +68,11 @@ func (f *float64FlagValue) get(controlServerValue []byte) float64 {
 		if err == nil {
 			float64Value = parsedFloat
 		} else {
-			level.Debug(f.logger).Log("msg", "failed to convert stored float flag value", "key", f.key, "err", err)
+			f.slogger.Log(context.TODO(), slog.LevelDebug,
+				"failed to convert stored float flag value",
+				"key", f.key,
+				"err", err,
+			)
 		}
 	}
 

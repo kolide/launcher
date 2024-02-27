@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -46,7 +45,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	osqueryClient := mocks.NewQuerier(t)
 	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
@@ -58,7 +57,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 		},
 	}, nil)
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	traceExporter.SetOsqueryClient(osqueryClient)
 	require.NoError(t, err)
 
@@ -92,9 +91,9 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, nil)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -118,9 +117,7 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
-func TestInterrupt_Multiple(t *testing.T) {
-	t.Parallel()
-
+func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	tokenStore := testTokenStore(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(tokenStore)
@@ -131,9 +128,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack)
+	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
@@ -193,7 +190,7 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
 		osqueryClient:             mocks.NewQuerier(t),
-		slogger:                   multislogger.New().Logger,
+		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -247,7 +244,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  typesmocks.NewKnapsack(t),
 		osqueryClient:             osqueryClient,
-		slogger:                   multislogger.New().Logger,
+		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -294,7 +291,7 @@ func TestPing(t *testing.T) {
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
 		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-		slogger:                   multislogger.New().Logger,
+		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: clientAuthenticator,
@@ -384,7 +381,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				slogger:                   multislogger.New().Logger,
+				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -458,7 +455,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				slogger:                   multislogger.New().Logger,
+				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -528,7 +525,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				slogger:                   multislogger.New().Logger,
+				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -603,7 +600,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				slogger:                   multislogger.New().Logger,
+				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: clientAuthenticator,
@@ -678,7 +675,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				osqueryClient:             osqueryClient,
-				slogger:                   multislogger.New().Logger,
+				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
 				ingestClientAuthenticator: newClientAuthenticator("test token", false),
@@ -706,13 +703,13 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 }
 
 func testServerProvidedDataStore(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ServerProvidedDataStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ServerProvidedDataStore.String())
 	require.NoError(t, err)
 	return s
 }
 
 func testTokenStore(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.TokenStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
 	require.NoError(t, err)
 	return s
 }

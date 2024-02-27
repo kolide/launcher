@@ -4,14 +4,15 @@
 package powereventwatcher
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
+	"log/slog"
 	"syscall"
 	"unsafe"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -26,7 +27,7 @@ type (
 	}
 
 	powerEventWatcher struct {
-		logger                  log.Logger
+		slogger                 *slog.Logger
 		knapsack                types.Knapsack
 		subscriptionHandle      uintptr
 		subscribeProcedure      *syscall.LazyProc
@@ -46,11 +47,14 @@ const (
 )
 
 // New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func New(k types.Knapsack, logger log.Logger) (*powerEventWatcher, error) {
+func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEventWatcher, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")
 
 	p := &powerEventWatcher{
-		logger:                  logger,
+		slogger:                 slogger.With("component", "power_event_watcher"),
 		knapsack:                k,
 		subscribeProcedure:      evtApi.NewProc("EvtSubscribe"),
 		unsubscribeProcedure:    evtApi.NewProc("EvtClose"),
@@ -112,7 +116,12 @@ func (p *powerEventWatcher) Interrupt(_ error) {
 
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)
-	level.Debug(p.logger).Log("msg", "unsubscribed from power events", "ret", fmt.Sprintf("%+v", ret), "last_err", err)
+
+	p.slogger.Log(context.TODO(), slog.LevelDebug,
+		"unsubscribed from power events",
+		"ret", fmt.Sprintf("%+v", ret),
+		"last_err", err,
+	)
 
 	p.interrupt <- struct{}{}
 }
@@ -121,7 +130,10 @@ func (p *powerEventWatcher) Interrupt(_ error) {
 func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle uintptr) uintptr {
 	var ret uintptr // We never do anything with this and neither does Windows -- it's here to satisfy the interface
 	if action == 0 {
-		level.Debug(p.logger).Log("msg", "received EvtSubscribeActionError when watching power events", "err_code", uint32(eventHandle))
+		p.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received EvtSubscribeActionError when watching power events",
+			"err_code", uint32(eventHandle),
+		)
 		return ret
 	}
 
@@ -142,7 +154,10 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		uintptr(unsafe.Pointer(&propertyCount)), // PropertyCount -- modified by call: only matters if we used EvtRenderEventValues
 	)
 	if err != nil && err.Error() != operationSuccessfulMsg {
-		level.Debug(p.logger).Log("msg", "error calling EvtRender to get event details", "last_err", err)
+		p.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error calling EvtRender to get event details",
+			"last_err", err,
+		)
 		return ret
 	}
 
@@ -159,29 +174,51 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 	decoder := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder()
 	utf8bytes, err := decoder.Bytes(buf)
 	if err != nil {
-		level.Debug(p.logger).Log("msg", "error decoding from utf16 to utf8", "err", err)
+		p.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error decoding from utf16 to utf8",
+			"err", err,
+		)
 		return ret
 	}
 
 	var e eventLogEntry
 	if err := xml.Unmarshal(utf8bytes, &e); err != nil {
-		level.Debug(p.logger).Log("msg", "error unmarshalling event log entry", "err", err)
+		p.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error unmarshalling event log entry",
+			"err", err,
+		)
 		return ret
 	}
 
 	switch e.System.EventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
-		level.Debug(p.logger).Log("msg", "system is sleeping", "event_id", e.System.EventID)
+		p.slogger.Log(context.TODO(), slog.LevelDebug,
+			"system is sleeping",
+			"event_id", e.System.EventID,
+		)
 		if err := p.knapsack.SetInModernStandby(true); err != nil {
-			level.Debug(p.logger).Log("msg", "could not disable osquery healthchecks on system sleep", "err", err)
+			p.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not enable osquery healthchecks on system sleep",
+				"err", err,
+			)
 		}
 	case eventIdExitingModernStandby:
-		level.Debug(p.logger).Log("msg", "system is waking", "event_id", e.System.EventID)
+		p.slogger.Log(context.TODO(), slog.LevelDebug,
+			"system is waking",
+			"event_id", e.System.EventID,
+		)
 		if err := p.knapsack.SetInModernStandby(false); err != nil {
-			level.Debug(p.logger).Log("msg", "could not enable osquery healthchecks on system wake", "err", err)
+			p.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not enable osquery healthchecks on system wake",
+				"err", err,
+			)
 		}
 	default:
-		level.Debug(p.logger).Log("msg", "received unexpected event ID in log", "event_id", e.System.EventID, "raw_event", string(utf8bytes))
+		p.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received unexpected event ID in log",
+			"event_id", e.System.EventID,
+			"raw_event", string(utf8bytes),
+		)
 	}
 
 	return ret

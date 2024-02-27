@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -54,7 +53,7 @@ func TestActionQueue_HandlesDuplicates(t *testing.T) {
 	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActor)
@@ -95,7 +94,7 @@ func TestActionQueue_ChecksOldNotificationStore(t *testing.T) {
 	mockActor.On("Do", mock.Anything).Return(nil).Once()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	actionqueue := New(mockKnapsack, WithOldNotificationsStore(oldNotificationStore))
 
@@ -153,7 +152,7 @@ func TestActionQueue_HandlesMultipleActorTypes(t *testing.T) {
 	anotherMockActor.On("Do", mock.Anything).Return(nil).Twice()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	actionqueue := New(mockKnapsack)
 
@@ -190,7 +189,7 @@ func TestActionQueue_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T
 	mockActor.On("Do", mock.Anything).Return(nil).NotBefore(errorCall).Once()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Call Do and assert our expectations about completed actions
 	actionqueue := New(mockKnapsack)
@@ -268,7 +267,7 @@ func TestStopCleanup_Multiple(t *testing.T) {
 	mockActor := mocks.NewActor(t)
 	store := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	actionQueue := New(
 		mockKnapsack,
 		WithStore(store),
@@ -346,7 +345,7 @@ func TestActionQueue_HandlesMalformedActions(t *testing.T) {
 	mockActioner.On("Do", bytes.NewReader(goodActionRaw)).Return(nil)
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActioner)
@@ -354,7 +353,7 @@ func TestActionQueue_HandlesMalformedActions(t *testing.T) {
 }
 
 func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), storage.ControlServerActionsStore.String())
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ControlServerActionsStore.String())
 	require.NoError(t, err)
 	return s
 }

@@ -134,6 +134,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			r, err := New(
 				mockKnapsack,
+				nil,
 				WithExecutablePath(executablePath),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
@@ -299,7 +300,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			dir := t.TempDir()
-			r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
+			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -333,7 +334,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	dir := t.TempDir()
-	r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))
@@ -370,6 +371,7 @@ func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 
 	// sanity check that files got created
 	count, err := countFilesWithPrefix(socketDir, "")
+	require.NoError(t, err)
 	require.Equal(t, 4, count)
 
 	// calling set up socket path should remove the fake socket files

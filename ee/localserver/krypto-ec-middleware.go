@@ -205,7 +205,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			)
 		} else if callbackReq != nil {
 			defer func() {
-				if kolideSessionId != nil && len(kolideSessionId) > 0 {
+				if len(kolideSessionId) > 0 {
 					callbackReq = callbackReq.WithContext(
 						// adding the current request context will cause this to be cancelled before it sends
 						// so just add the session id manually

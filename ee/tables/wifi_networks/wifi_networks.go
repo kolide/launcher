@@ -8,12 +8,11 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -37,23 +36,23 @@ var pwshScript []byte
 type execer func(ctx context.Context, buf *bytes.Buffer) error
 
 type Table struct {
-	logger   log.Logger
+	slogger  *slog.Logger
 	getBytes execer
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
-		logger:   logger,
-		getBytes: execPwsh(logger),
+		slogger:  slogger.With("table", "kolide_wifi_networks"),
+		getBytes: execPwsh(slogger),
 	}
 
 	return table.NewPlugin("kolide_wifi_networks", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var results []map[string]string
 	var output bytes.Buffer
@@ -61,7 +60,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if err := t.getBytes(ctx, &output); err != nil {
 		return results, fmt.Errorf("getting raw data: %w", err)
 	}
-	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithLogger(t.logger))
+	rows, err := dataflatten.Json(output.Bytes(), dataflatten.WithSlogger(t.slogger))
 	if err != nil {
 		return results, fmt.Errorf("flattening json output: %w", err)
 	}
@@ -69,7 +68,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return append(results, dataflattentable.ToMap(rows, "", nil)...), nil
 }
 
-func execPwsh(logger log.Logger) execer {
+func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
 		// MS requires interfaces to complete network scans in <4 seconds, but
 		// that appears not to be consistent
@@ -106,7 +105,11 @@ func execPwsh(logger log.Logger) execer {
 		// successful execution code.
 		if err != nil || errOutput != "" {
 			// if there is an error, inspect the contents of stdout
-			level.Debug(logger).Log("msg", "error execing, inspecting stdout contents", "stdout", buf.String())
+			slogger.Log(ctx, slog.LevelDebug,
+				"error execing, inspecting stdout contents",
+				"stdout", buf.String(),
+				"err", err,
+			)
 
 			if err == nil {
 				err = fmt.Errorf("exec succeeded, but emitted to stderr")

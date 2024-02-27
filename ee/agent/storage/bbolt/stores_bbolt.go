@@ -1,17 +1,21 @@
 package agentbbolt
 
 import (
+	"context"
 	"fmt"
-
-	"github.com/go-kit/kit/log"
+	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	"go.etcd.io/bbolt"
 )
 
 // MakeStores creates all the KVStores used by launcher
-func MakeStores(logger log.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
+func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	stores := make(map[storage.Store]types.KVStore)
 
 	var storeNames = []storage.Store{
@@ -31,7 +35,7 @@ func MakeStores(logger log.Logger, db *bbolt.DB) (map[storage.Store]types.KVStor
 	}
 
 	for _, storeName := range storeNames {
-		store, err := NewStore(logger, db, storeName.String())
+		store, err := NewStore(slogger, db, storeName.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create '%s' KVStore: %w", storeName, err)
 		}

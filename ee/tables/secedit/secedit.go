@@ -4,18 +4,15 @@
 package secedit
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -28,16 +25,16 @@ import (
 )
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
 	)
 
 	t := &Table{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_secedit"),
 	}
 
 	return table.NewPlugin("kolide_secedit", columns, t.generate)
@@ -49,20 +46,29 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, mergedpolicy := range tablehelpers.GetConstraints(queryContext, "mergedpolicy", tablehelpers.WithDefaults("false")) {
 		useMergedPolicy, err := strconv.ParseBool(mergedpolicy)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Cannot convert mergedpolicy constraint into a boolean value. Try passing \"true\"", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"cannot convert mergedpolicy constraint into a boolean value",
+				"err", err,
+			)
 			continue
 		}
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			secEditResults, err := t.execSecedit(ctx, useMergedPolicy)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "secedit failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"secedit failed",
+					"err", err,
+				)
 				continue
 			}
 
 			flatData, err := t.flattenOutput(dataQuery, secEditResults)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
 				continue
 			}
 
@@ -78,7 +84,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
@@ -96,28 +102,14 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 	defer os.RemoveAll(dir)
 
 	dst := filepath.Join(dir, "tmpfile.ini")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
 
 	args := []string{"/export", "/cfg", dst}
 	if mergedPolicy {
 		args = append(args, "/mergedpolicy")
 	}
 
-	cmd, err := allowedcmd.Secedit(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating secedit command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	level.Debug(t.logger).Log("msg", "calling secedit", "args", cmd.Args)
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling secedit. Got: %s: %w", stderr.String(), err)
+	if out, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Secedit, args, true); err != nil {
+		return nil, fmt.Errorf("calling secedit. Got: %s: %w", string(out), err)
 	}
 
 	file, err := os.Open(dst)

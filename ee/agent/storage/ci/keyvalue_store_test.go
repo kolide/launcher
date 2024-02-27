@@ -6,18 +6,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func getStores(t *testing.T) []types.KVStore {
-	logger := log.NewNopLogger()
 	db := SetupDB(t)
-	bboltStore, err := agentbbolt.NewStore(logger, db, "test_bucket")
+	bboltStore, err := agentbbolt.NewStore(multislogger.NewNopLogger(), db, "test_bucket")
 	require.NoError(t, err)
 
 	stores := []types.KVStore{

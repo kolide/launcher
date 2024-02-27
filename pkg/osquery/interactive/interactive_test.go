@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
 )
@@ -83,7 +84,7 @@ func TestProc(t *testing.T) {
 			require.NoError(t, downloadOsquery(rootDir))
 			osquerydPath := filepath.Join(rootDir, "osqueryd")
 
-			proc, _, err := StartProcess(rootDir, osquerydPath, tt.osqueryFlags)
+			proc, _, err := StartProcess(multislogger.New().Logger, rootDir, osquerydPath, tt.osqueryFlags)
 
 			if tt.errContainsStr != "" {
 				require.Error(t, err)

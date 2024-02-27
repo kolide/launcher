@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"runtime"
 	"sync"
 	"time"
 
-	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
@@ -64,29 +62,17 @@ type TraceExporter struct {
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, k types.Knapsack) (*TraceExporter, error) {
-	// Set all the attributes that we know we can get first
-	attrs := []attribute.KeyValue{
-		semconv.ServiceName(applicationName),
-		semconv.ServiceVersion(version.Version().Version),
-	}
-
-	if archAttr, ok := archAttributeMap[runtime.GOARCH]; ok {
-		attrs = append(attrs, archAttr)
-	}
+func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TraceExporter, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
-
 	ctx, cancel := context.WithCancel(ctx)
 
 	t := &TraceExporter{
-		providerLock: sync.Mutex{},
-		bufSpanProcessor: &bufspanprocessor.BufSpanProcessor{
-			MaxBufferedSpans: 500,
-		},
+		providerLock:              sync.Mutex{},
 		knapsack:                  k,
 		slogger:                   k.Slogger().With("component", "trace_exporter"),
-		attrs:                     attrs,
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableTraceIngestTLS()),
 		ingestAuthToken:           string(currentToken),
@@ -97,6 +83,17 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack) (*TraceExporter, er
 		batchTimeout:              k.TraceBatchTimeout(),
 		ctx:                       ctx,
 		cancel:                    cancel,
+	}
+
+	if initialTraceBuffer != nil {
+		t.provider = initialTraceBuffer.provider
+		t.bufSpanProcessor = initialTraceBuffer.bufSpanProcessor
+		t.attrs = initialTraceBuffer.attrs
+	} else {
+		t.bufSpanProcessor = &bufspanprocessor.BufSpanProcessor{
+			MaxBufferedSpans: 500,
+		}
+		t.attrs = initialAttrs()
 	}
 
 	// Observe changes to trace configuration to know when to start/stop exporting, and when
@@ -114,27 +111,13 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack) (*TraceExporter, er
 
 	t.addDeviceIdentifyingAttributes()
 
-	// Set the provider with as many resource attributes as we can get immediately
-	t.setNewGlobalProvider(true)
-
 	return t, nil
 }
 
-func (t *TraceExporter) SetOsqueryClient(client osquery.Querier) {
+func (t *TraceExporter) SetOsqueryClient(client querier) {
 	t.osqueryClient = client
 
-	// In the background, wait for osquery to be ready so that we can fetch more resource
-	// attributes for our traces, then replace the provider with a new one.
-	go func() {
-		t.addAttributesFromOsquery()
-
-		// we don't want to rebuild the exporter here because we may drop
-		// buffered spans, so we just replace the provider
-		t.setNewGlobalProvider(false)
-		t.slogger.Log(context.TODO(), slog.LevelDebug,
-			"successfully replaced global provider after adding osquery attributes",
-		)
-	}()
+	go t.addAttributesFromOsquery()
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -320,9 +303,15 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.ingestUrl = t.knapsack.TraceIngestServerURL()
 }
 
-// Execute is a no-op -- the exporter is already running in the background. The TraceExporter
-// otherwise only responds to control server events.
+// Execute begins exporting traces, if exporting is enabled.
 func (t *TraceExporter) Execute() error {
+	if t.enabled {
+		t.setNewGlobalProvider(true)
+		t.slogger.Log(context.TODO(), slog.LevelDebug,
+			"successfully replaced global provider after adding more attributes",
+		)
+	}
+
 	<-t.ctx.Done()
 	return nil
 }

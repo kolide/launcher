@@ -7,13 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -28,12 +27,12 @@ import (
 var xfconfChannelXmlPath string = filepath.Join("xfce4", "xfconf", "xfce-perchannel-xml")
 
 type xfconfTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	t := &xfconfTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_xfconf"),
 	}
 
 	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
@@ -57,8 +56,8 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 	for _, username := range users {
 		u, err := user.Lookup(username)
 		if err != nil {
-			level.Warn(t.logger).Log(
-				"msg", "could not find user by username",
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"could not find user by username",
 				"username", username,
 				"err", err,
 			)
@@ -67,8 +66,8 @@ func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryCont
 
 		userRows, err := t.generateForUser(u, queryContext, defaultConfig)
 		if err != nil {
-			level.Warn(t.logger).Log(
-				"msg", "could not generate config for user",
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"could not generate config for user",
 				"username", username,
 				"err", err,
 			)
@@ -189,7 +188,7 @@ func (t *xfconfTable) getCombinedFlattenedConfig(u *user.User, userConfig map[st
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

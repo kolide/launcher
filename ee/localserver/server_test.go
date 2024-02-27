@@ -1,11 +1,11 @@
 package localserver
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -19,14 +19,16 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	c, err := storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String())
+	slogger := multislogger.NewNopLogger()
+
+	c, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
 	require.NoError(t, osquery.SetupLauncherKeys(c))
 
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("ConfigStore").Return(c)
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(slogger)
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
@@ -34,7 +36,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	recalculateInterval = 100 * time.Millisecond
 
 	// Create the localserver
-	ls, err := New(k)
+	ls, err := New(context.TODO(), k)
 	require.NoError(t, err)
 
 	// Set the querier

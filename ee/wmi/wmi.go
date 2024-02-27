@@ -35,13 +35,10 @@ package wmi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
 	"github.com/scjalliance/comshim"
 )
 
@@ -113,9 +110,8 @@ func WithWhere(whereClause string) Option {
 	}
 }
 
-func Query(ctx context.Context, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", "wmi.Query")
-	handler := NewOleHandler(ctx, properties)
+func Query(ctx context.Context, slogger *slog.Logger, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
+	handler := NewOleHandler(ctx, slogger, properties)
 
 	// settings
 	qs := &querySettings{}
@@ -160,7 +156,10 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 	service := serviceRaw.ToIDispatch()
 	defer service.Release()
 
-	level.Debug(logger).Log("msg", "Running WMI query", "query", queryString)
+	slogger.Log(ctx, slog.LevelDebug,
+		"running WMI query",
+		"query", queryString,
+	)
 
 	// result is a SWBemObjectSet
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString)
@@ -180,14 +179,14 @@ func Query(ctx context.Context, className string, properties []string, opts ...O
 }
 
 type oleHandler struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	results    []map[string]interface{}
 	properties []string
 }
 
-func NewOleHandler(ctx context.Context, properties []string) *oleHandler {
+func NewOleHandler(ctx context.Context, slogger *slog.Logger, properties []string) *oleHandler {
 	return &oleHandler{
-		logger:     log.With(ctxlog.FromContext(ctx), "caller", "oleHandler"),
+		slogger:    slogger.With("component", "ole_handler"),
 		properties: properties,
 		results:    []map[string]interface{}{},
 	}
@@ -202,7 +201,11 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 	for _, p := range oh.properties {
 		val, err := oleutil.GetProperty(item, p)
 		if err != nil {
-			level.Debug(oh.logger).Log("msg", "Got error looking for property", "property", p, "err", err)
+			oh.slogger.Log(context.TODO(), slog.LevelDebug,
+				"got error looking for property",
+				"property", p,
+				"err", err,
+			)
 			continue
 		}
 		defer val.Clear()

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -20,11 +19,9 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
-	"github.com/kolide/launcher/cmd/launcher/internal/updater"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -37,12 +34,14 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/debug"
@@ -52,10 +51,16 @@ import (
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
+	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
+	"github.com/osquery/osquery-go/plugin/config"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 
 	"go.etcd.io/bbolt"
 )
@@ -72,6 +77,9 @@ const (
 // rungroups with the various options, and goes! If autoupdate is
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
+	initialTraceBuffer := exporter.NewInitialTraceBuffer()
+	ctx, startupSpan := traces.StartSpan(ctx)
+
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
 	logger := ctxlog.FromContext(ctx)
@@ -85,6 +93,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"delay_start", opts.DelayStart.String(),
 		)
 		time.Sleep(opts.DelayStart)
+		startupSpan.AddEvent("delay_start_completed")
 	}
 
 	slogger.Log(ctx, slog.LevelDebug,
@@ -111,6 +120,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	}
+	startupSpan.AddEvent("dns_lookup_completed")
 
 	// determine the root directory, create one if it's not provided
 	rootDirectory := opts.RootDirectory
@@ -143,13 +153,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			return fmt.Errorf("chmodding root directory parent: %w", err)
 		}
 	}
+	startupSpan.AddEvent("root_directory_created")
 
 	if _, err := osquery.DetectPlatform(); err != nil {
 		return fmt.Errorf("detecting platform: %w", err)
 	}
 
 	debugAddrPath := filepath.Join(rootDirectory, "debug_addr")
-	debug.AttachDebugHandler(debugAddrPath, logger)
+	debug.AttachDebugHandler(debugAddrPath, slogger)
 	defer os.Remove(debugAddrPath)
 
 	// open the database for storing launcher data, we do it here
@@ -163,21 +174,20 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("open launcher db: %w", err)
 	}
 	defer db.Close()
+	startupSpan.AddEvent("database_opened")
 
 	if err := writePidFile(filepath.Join(rootDirectory, "launcher.pid")); err != nil {
 		return fmt.Errorf("write launcher pid to file: %w", err)
 	}
 
-	stores, err := agentbbolt.MakeStores(logger, db)
+	stores, err := agentbbolt.MakeStores(ctx, slogger, db)
 	if err != nil {
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(logger, stores[storage.AgentFlagsStore], fcOpts...)
+	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
-	// reassign slogger to knapsack slogger to get launcher run id added to slogger
-	slogger = k.Slogger()
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
@@ -191,13 +201,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(logger)
+	runGroup := rungroup.NewRunGroup(slogger)
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
 	var traceExporter *exporter.TraceExporter
 	if k.ControlServerURL() != "" {
+		startupSpan.AddEvent("log_shipper_init_start")
 
 		initialDebugDuration := 10 * time.Minute
 
@@ -211,12 +222,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		logger = teelogger.New(logger, logShipper)
 		logger = log.With(logger, "caller", log.Caller(5))
 		k.AddSlogHandler(logShipper.SlogHandler())
+
 		ctx = ctxlog.NewContext(ctx, logger) // Set the logger back in the ctx
 
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k)
+		traceExporter, err = exporter.NewTraceExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"could not set up trace exporter",
@@ -225,6 +237,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		} else {
 			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
 		}
+
+		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
 	s, err := startupsettings.OpenWriter(ctx, k)
@@ -233,22 +247,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 	defer s.Close()
 
-	// construct the appropriate http client based on security settings
-	httpClient := http.DefaultClient
-	if k.InsecureTLS() {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup
-	internal.RecordLauncherVersion(rootDirectory)
+	internal.RecordLauncherVersion(ctx, rootDirectory)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -264,21 +266,22 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
-	checkpointer := checkups.NewCheckupLogger(logger, k)
-	checkpointer.Once(ctx)
+	// The checkpointer can take up to 5 seconds to run, so do this in the background.
+	checkpointer := checkups.NewCheckupLogger(slogger, k)
+	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
 
 	// Add a rungroup to catch things on the sigChannel
-	signalListener := newSignalListener(sigChannel, cancel, logger)
+	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
 	// For now, remediation is not performed -- we only log the hardware change.
 	agent.DetectAndRemediateHardwareChange(ctx, k)
 
-	powerEventWatcher, err := powereventwatcher.New(k, log.With(logger, "component", "power_event_watcher"))
+	powerEventWatcher, err := powereventwatcher.New(ctx, k, slogger)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"could not init power event watcher",
@@ -312,25 +315,66 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
-	// create the osquery extension for launcher. This is where osquery itself is launched.
-	extension, runnerRestart, runnerShutdown, err := createExtensionRuntime(ctx, k, client)
+	// create the osquery extension
+	extension, err := createExtensionRuntime(ctx, k, client)
 	if err != nil {
 		return fmt.Errorf("create extension with runtime: %w", err)
 	}
-	runGroup.Add("osqueryExtension", extension.Execute, extension.Interrupt)
+	runGroup.Add("osqueryExtension", extension.Execute, extension.Shutdown)
+	// create the runner that will launch osquery
+	osqueryRunner := osqueryruntime.New(
+		k,
+		osqueryruntime.WithKnapsack(k),
+		osqueryruntime.WithOsquerydBinary(k.OsquerydPath()),
+		osqueryruntime.WithRootDirectory(k.RootDirectory()),
+		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
+		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
+		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
+		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
+		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
+			k.Slogger().With(
+				"component", "osquery",
+				"osqlevel", "stdout",
+			),
+			k.RootDirectory(),
+			kolidelog.WithLevel(slog.LevelDebug),
+		)),
+		osqueryruntime.WithStderr(kolidelog.NewOsqueryLogAdapter(
+			k.Slogger().With(
+				"component", "osquery",
+				"osqlevel", "stderr",
+			),
+			k.RootDirectory(),
+			kolidelog.WithLevel(slog.LevelInfo),
+		)),
+		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
+		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
+		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
+		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
+		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
+		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),
+		osqueryruntime.WithOsqueryExtensionPlugins(
+			config.NewPlugin("kolide_grpc", extension.GenerateConfigs),
+			distributed.NewPlugin("kolide_grpc", extension.GetQueries, extension.WriteResults),
+			osquerylogger.NewPlugin("kolide_grpc", extension.LogString),
+		),
+	)
+	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
 
 	versionInfo := version.Version()
-	k.SystemSlogger().Info("started kolide launcher",
+	k.SystemSlogger().Log(ctx, slog.LevelInfo,
+		"started kolide launcher",
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
 
 	if traceExporter != nil {
-		traceExporter.SetOsqueryClient(extension)
+		traceExporter.SetOsqueryClient(osqueryRunner)
 	}
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
+	var actionsQueue *actionqueue.ActionQueue
 	if k.ControlServerURL() == "" {
 		slogger.Log(ctx, slog.LevelDebug,
 			"control server URL not set, will not create control service",
@@ -349,6 +393,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		runner, err = desktopRunner.New(
 			k,
+			controlService,
 			desktopRunner.WithAuthToken(ulid.New()),
 			desktopRunner.WithUsersFilesRoot(rootDirectory),
 		)
@@ -360,7 +405,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
 
 		// create an action queue for all other action style commands
-		actionsQueue := actionqueue.New(
+		actionsQueue = actionqueue.New(
 			k,
 			actionqueue.WithContext(ctx),
 			actionqueue.WithStore(k.ControlServerActionsStore()),
@@ -371,7 +416,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		// register accelerate control consumer
 		actionsQueue.RegisterActor(acceleratecontrolconsumer.AccelerateControlSubsystem, acceleratecontrolconsumer.New(k))
-
+		// register uninstall consumer
+		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(k))
 		// register flare consumer
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
 
@@ -404,7 +450,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
 		}
 
-		if metadataWriter := internal.NewMetadataWriter(logger, k); metadataWriter == nil {
+		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
 			slogger.Log(ctx, slog.LevelDebug,
 				"unable to set up metadata writer",
 				"err", err,
@@ -424,6 +470,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	runLocalServer := runEECode
 	if runLocalServer {
 		ls, err := localserver.New(
+			ctx,
 			k,
 		)
 
@@ -435,89 +482,35 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			)
 		}
 
-		ls.SetQuerier(extension)
+		ls.SetQuerier(osqueryRunner)
 		runGroup.Add("localserver", ls.Start, ls.Interrupt)
 	}
 
-	// If autoupdating is enabled, run the new autoupdater
+	// If autoupdating is enabled, run the autoupdater
 	if k.Autoupdate() {
-		// Create a new TUF autoupdater
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 30 * time.Second
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
+			ctx,
 			k,
 			metadataClient,
 			mirrorClient,
-			extension,
-			tuf.WithOsqueryRestart(runnerRestart),
+			osqueryRunner,
+			tuf.WithOsqueryRestart(osqueryRunner.Restart),
 		)
 		if err != nil {
 			return fmt.Errorf("creating TUF autoupdater updater: %w", err)
 		}
 
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
+		if actionsQueue != nil {
+			actionsQueue.RegisterActor(tuf.AutoupdateSubsystemName, tufAutoupdater)
+		}
 	}
 
-	// Run the legacy autoupdater only if autoupdating is enabled and the new autoupdater
-	// is not yet in use.
-	if k.Autoupdate() && !k.UseTUFAutoupdater() {
-		osqueryUpdaterconfig := &updater.UpdaterConfig{
-			Logger:             logger,
-			RootDirectory:      rootDirectory,
-			AutoupdateInterval: k.AutoupdateInterval(),
-			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
-			NotaryURL:          k.NotaryServerURL(),
-			MirrorURL:          k.MirrorServerURL(),
-			NotaryPrefix:       k.NotaryPrefix(),
-			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay() + k.AutoupdateInterval()/2,
-			SigChannel:         sigChannel,
-		}
-
-		// create an updater for osquery
-		osqueryLegacyUpdater, err := updater.NewUpdater(ctx, opts.OsquerydPath, runnerRestart, osqueryUpdaterconfig)
-		if err != nil {
-			return fmt.Errorf("create osquery updater: %w", err)
-		}
-		runGroup.Add("osqueryLegacyAutoupdater", osqueryLegacyUpdater.Execute, osqueryLegacyUpdater.Interrupt)
-
-		launcherUpdaterconfig := &updater.UpdaterConfig{
-			Logger:             logger,
-			RootDirectory:      rootDirectory,
-			AutoupdateInterval: k.AutoupdateInterval(),
-			UpdateChannel:      autoupdate.UpdateChannel(k.UpdateChannel()),
-			NotaryURL:          k.NotaryServerURL(),
-			MirrorURL:          k.MirrorServerURL(),
-			NotaryPrefix:       k.NotaryPrefix(),
-			HTTPClient:         httpClient,
-			InitialDelay:       k.AutoupdateInitialDelay(),
-			SigChannel:         sigChannel,
-		}
-
-		// create an updater for launcher
-		launcherPath, err := os.Executable()
-		if err != nil {
-			logutil.Fatal(logger, "err", err)
-		}
-		launcherLegacyUpdater, err := updater.NewUpdater(
-			ctx,
-			launcherPath,
-			updater.UpdateFinalizer(logger, func() error {
-				// stop desktop on auto updates
-				if runner != nil {
-					runner.Interrupt(nil)
-				}
-				return runnerShutdown()
-			}),
-			launcherUpdaterconfig,
-		)
-		if err != nil {
-			return fmt.Errorf("create launcher updater: %w", err)
-		}
-		runGroup.Add("launcherLegacyAutoupdater", launcherLegacyUpdater.Execute, launcherLegacyUpdater.Interrupt)
-	}
+	startupSpan.End()
 
 	if err := runGroup.Run(); err != nil {
 		return fmt.Errorf("run service: %w", err)

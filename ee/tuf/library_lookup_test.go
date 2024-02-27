@@ -7,12 +7,42 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_getUpdateChannelFromStartupSettings(t *testing.T) {
+	t.Parallel()
+
+	expectedChannel := "beta"
+
+	// Set up an override for the channel in the startupsettings db
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte(expectedChannel)), "setting key")
+	require.NoError(t, store.Close(), "closing test db")
+
+	actualChannel, err := getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.NoError(t, err, "did not expect error getting update channel from startup settings")
+	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
+}
+
+func Test_getUpdateChannelFromStartupSettings_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// Create a startupsettings db but don't set anything in it
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Close(), "closing test db")
+
+	_, err = getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.Error(t, err, "should not have been able to get update channel when it is not set")
+}
 
 func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	t.Parallel()
@@ -46,14 +76,8 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			tufci.CopyBinary(t, tooRecentPath)
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
-			// Ensure we actually use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -79,39 +103,11 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not make test binary")
 
-			// Ensure we actually use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
-		})
-	}
-}
-
-func TestCheckOutLatest_NotAvailableWhenNewAutoupdaterNotEnabled(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
-			rootDir := t.TempDir()
-
-			// Ensure we do not use the new autoupdater
-			store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-			require.NoError(t, err, "setting up db connection")
-			require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("")), "setting key")
-			require.NoError(t, store.Close(), "closing test db")
-
-			_, err = CheckOutLatest(context.TODO(), binary, rootDir, "", "stable", log.NewNopLogger())
-			require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
 		})
 	}
 }
@@ -141,7 +137,7 @@ func Test_mostRecentVersion(t *testing.T) {
 			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, secondVersionPath, latest.Path)
 			require.Equal(t, secondVersion, latest.Version)
@@ -173,7 +169,7 @@ func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			os.WriteFile(secondVersionPath, []byte{}, 0755)
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, latest.Path)
 			require.Equal(t, firstVersion, latest.Version)
@@ -192,41 +188,43 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 			// Create update directories
 			testBaseDir := t.TempDir()
 
-			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.Error(t, err, "should have returned error when there are no available updates")
 		})
 	}
 }
 
-func Test_usingNewAutoupdater_DatabaseNotExist(t *testing.T) {
+func Test_mostRecentVersion_requiresLauncher_v1_4_1(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, false, usingNewAutoupdater(context.TODO(), t.TempDir()))
+	testBaseDir := t.TempDir()
+
+	// Create a version in the update library that is too old
+	firstVersionTarget := "launcher-1.2.3.tar.gz"
+	firstVersionPath, _ := pathToTargetVersionExecutable(binaryLauncher, firstVersionTarget, testBaseDir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+	tufci.CopyBinary(t, firstVersionPath)
+	require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+	_, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	require.Error(t, err, "should not select launcher version under v1.4.1")
 }
 
-func Test_usingNewAutoupdater_FlagNotSet(t *testing.T) {
+func Test_mostRecentVersion_acceptsLauncher_v1_4_1(t *testing.T) {
 	t.Parallel()
 
-	tempRootDir := t.TempDir()
+	testBaseDir := t.TempDir()
 
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, store.Close(), "closing test db")
+	// Create a version in the update library that is too old
+	firstVersionTarget := "launcher-1.4.1.tar.gz"
+	firstVersionPath, _ := pathToTargetVersionExecutable(binaryLauncher, firstVersionTarget, testBaseDir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+	tufci.CopyBinary(t, firstVersionPath)
+	require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
-	require.Equal(t, false, usingNewAutoupdater(context.TODO(), tempRootDir))
-}
-
-func Test_usingNewAutoupdater_FlagSet(t *testing.T) {
-	t.Parallel()
-
-	tempRootDir := t.TempDir()
-
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, store.Set([]byte(keys.UseTUFAutoupdater.String()), []byte("enabled")), "setting key")
-	require.NoError(t, store.Close(), "closing test db")
-
-	require.Equal(t, true, usingNewAutoupdater(context.TODO(), tempRootDir))
+	latest, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	require.NoError(t, err, "should be able to select launcher version equal to v1.4.1")
+	require.Equal(t, firstVersionPath, latest.Path)
 }
 
 func Test_getAutoupdateConfig_ConfigFlagSet(t *testing.T) {

@@ -5,26 +5,24 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
 func runInteractive(args []string) error {
 	flagset := flag.NewFlagSet("interactive", flag.ExitOnError)
 	var (
-		flOsquerydPath = flagset.String(
-			"osqueryd_path",
-			"",
-			"The path to the oqueryd binary",
-		)
+		flDebug        = flagset.Bool("debug", false, "enable debug logging")
+		flOsquerydPath = flagset.String("osqueryd_path", "", "The path to the oqueryd binary")
 		flOsqueryFlags launcher.ArrayFlags
 	)
 
@@ -35,9 +33,19 @@ func runInteractive(args []string) error {
 		return err
 	}
 
+	slogLevel := slog.LevelInfo
+	if *flDebug {
+		slogLevel = slog.LevelDebug
+	}
+
+	slogger := multislogger.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level:     slogLevel,
+		AddSource: true,
+	})).Logger
+
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
-		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", log.NewNopLogger())
+		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", slogger)
 		if err != nil {
 			osquerydPath = launcher.FindOsquery()
 			if osquerydPath == "" {
@@ -81,7 +89,7 @@ func runInteractive(args []string) error {
 		flOsqueryFlags = append(flOsqueryFlags, fmt.Sprintf("tls_server_certs=%s", certs))
 	}
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(rootDir, osquerydPath, flOsqueryFlags)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(slogger, rootDir, osquerydPath, flOsqueryFlags)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}

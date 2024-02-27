@@ -106,7 +106,7 @@ func TestFindBaseDir(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		require.Equal(t, tt.out, FindBaseDir(tt.in), "input: %s", tt.in)
+		require.Equal(t, tt.out, findBaseDir(tt.in), "input: %s", tt.in)
 	}
 }
 

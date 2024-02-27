@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +50,7 @@ func TestParser(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		parser := New(log.NewNopLogger()).parser
+		parser := New(multislogger.New().Logger).parser
 
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()

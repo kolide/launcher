@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -12,6 +12,11 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
@@ -49,17 +54,26 @@ func runSocket(args []string) error {
 		opts = append(opts, runtime.WithOsqueryExtensionPlugins(table.LauncherTables(nil)...))
 	}
 
-	_, cancel := context.WithCancel(context.Background())
-	runner, err := runtime.LaunchInstance(cancel, opts...)
+	// were passing an empty array here just to get the default options
+	cmdlineopts, err := launcher.ParseOptions("socket", make([]string, 0))
 	if err != nil {
-		return fmt.Errorf("creating osquery instance: %w", err)
+		return err
 	}
+	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	})).Logger
+	fcOpts := []flags.Option{flags.WithCmdLineOpts(cmdlineopts)}
+	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)
+	k := knapsack.New(nil, flagController, nil, nil, nil)
+	runner := runtime.New(k, opts...)
+	go runner.Run()
 
 	fmt.Println(*flPath)
 
 	// Wait forever
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, os.Kill, syscall.Signal(15))
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.Signal(15))
 	<-sig
 
 	// allow for graceful termination.

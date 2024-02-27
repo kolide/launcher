@@ -1,12 +1,12 @@
 package keys
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -26,14 +26,21 @@ func (k dbKey) Type() string {
 	return "local"
 }
 
-func SetupLocalDbKey(logger log.Logger, store types.GetterSetter) (*dbKey, error) {
+func SetupLocalDbKey(slogger *slog.Logger, store types.GetterSetter) (*dbKey, error) {
 	if key, err := fetchKey(store); key != nil && err == nil {
-		level.Info(logger).Log("msg", "found local key in database")
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"found local key in database",
+		)
 		return &dbKey{key}, nil
 	} else if err != nil {
-		level.Info(logger).Log("msg", "Failed to parse key, regenerating", "err", err)
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"failed to parse key, regenerating",
+			"err", err,
+		)
 	} else if key == nil {
-		level.Info(logger).Log("msg", "No key found, generating new key")
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"no key found, generating new key",
+		)
 	}
 
 	// Time to regenerate!

@@ -62,6 +62,10 @@ func Ip(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/ip", arg...)
 }
 
+func Journalctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/journalctl", arg...)
+}
+
 func Loginctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/loginctl", arg...)
 }
@@ -84,7 +88,11 @@ func Lsof(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func NixEnv(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, "/nix/var/nix/profiles/default/bin/nix-env", arg...)
+	return validatedCommand(ctx, "/run/current-system/sw/bin/nix-env", arg...)
+}
+
+func Nftables(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/sbin/nft", arg...)
 }
 
 func Nmcli(ctx context.Context, arg ...string) (*exec.Cmd, error) {
@@ -126,6 +134,10 @@ func Rpm(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 
 func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
+}
+
+func Ws1HubUtil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/opt/vmware/ws1-hub/bin/ws1HubUtil", arg...)
 }
 
 func XdgOpen(ctx context.Context, arg ...string) (*exec.Cmd, error) {

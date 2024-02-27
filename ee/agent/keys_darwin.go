@@ -5,13 +5,13 @@ package agent
 
 import (
 	"errors"
+	"log/slog"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
 // nolint:unused
-func setupHardwareKeys(logger log.Logger, store types.GetterSetterDeleter) (keyInt, error) {
+func setupHardwareKeys(slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
 	// We're seeing issues where launcher hangs (and does not complete startup) on the
 	// Sonoma Beta 2 release when trying to interact with the secure enclave below, on
 	// CreateKey. Since we don't expect this to work at the moment anyway, we are

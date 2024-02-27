@@ -40,11 +40,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -77,11 +76,11 @@ type Result struct {
 }
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("parentdatatype"),
 		table.TextColumn("datatype"),
@@ -89,7 +88,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger:    level.NewFilter(logger, level.AllowInfo()),
+		slogger:   slogger.With("table", "kolide_system_profiler"),
 		tableName: "kolide_system_profiler",
 	}
 
@@ -121,7 +120,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var detailLevel string
 	if q, ok := queryContext.Constraints["detaillevel"]; ok && len(q.Constraints) != 0 {
 		if len(q.Constraints) > 1 {
-			level.Info(t.logger).Log("msg", "WARNING: Only using the first detaillevel request")
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"received multiple detaillevel constraints, only using the first one",
+			)
 		}
 
 		dl := q.Constraints[0].Expression
@@ -141,26 +142,29 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if q, ok := queryContext.Constraints["query"]; ok && len(q.Constraints) != 0 {
 		for _, constraint := range q.Constraints {
 			dataQuery := constraint.Expression
-			results = append(results, t.getRowsFromOutput(dataQuery, detailLevel, systemProfilerOutput)...)
+			results = append(results, t.getRowsFromOutput(ctx, dataQuery, detailLevel, systemProfilerOutput)...)
 		}
 	} else {
-		results = append(results, t.getRowsFromOutput("", detailLevel, systemProfilerOutput)...)
+		results = append(results, t.getRowsFromOutput(ctx, "", detailLevel, systemProfilerOutput)...)
 	}
 
 	return results, nil
 }
 
-func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
+func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 
 	var systemProfilerResults []Result
 	if err := plist.Unmarshal(systemProfilerOutput, &systemProfilerResults); err != nil {
-		level.Info(t.logger).Log("msg", "error unmarshalling system_profile output", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"error unmarshalling system_profile output",
+			"err", err,
+		)
 		return nil
 	}
 
@@ -170,7 +174,10 @@ func (t *Table) getRowsFromOutput(dataQuery, detailLevel string, systemProfilerO
 
 		flatData, err := dataflatten.Flatten(systemProfilerResult.Items, flattenOpts...)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "failure flattening system_profile output", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"failure flattening system_profile output",
+				"err", err,
+			)
 			continue
 		}
 
@@ -212,10 +219,13 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	level.Debug(t.logger).Log("msg", "calling system_profiler", "args", cmd.Args)
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling system_profiler",
+		"args", cmd.Args,
+	)
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil

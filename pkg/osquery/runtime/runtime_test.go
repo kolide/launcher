@@ -5,7 +5,9 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,13 +18,13 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -44,7 +46,11 @@ func TestMain(m *testing.M) {
 	}
 	defer rmBinDirectory()
 
-	s, err := storageci.NewStore(nil, log.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
+	s, err := storageci.NewStore(nil, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
+	if err != nil {
+		fmt.Println("Failed to make new store")
+		os.Exit(1)
+	}
 	if err := history.InitHistory(s); err != nil {
 		fmt.Println("Failed to init history")
 		os.Exit(1)
@@ -92,52 +98,6 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
 	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
-}
-
-func TestCalculateOsqueryPathsWithAutoloadedExtensions(t *testing.T) {
-	t.Parallel()
-	binDir, err := getBinDir()
-	require.NoError(t, err)
-
-	extensionPaths := make([]string, 0)
-
-	for _, extension := range []string{"extensionInExecDir1", "extensionInExecDir2"} {
-		// create file at each extension path
-		extensionPath := filepath.Join(binDir, extension)
-		require.NoError(t, os.WriteFile(extensionPath, []byte("{}"), 0644))
-		extensionPaths = append(extensionPaths, extensionPath)
-	}
-
-	nonExecDir := t.TempDir()
-	for _, extension := range []string{"extensionNotInExecDir1", "extensionNotInExecDir2"} {
-		// create file at each extension path
-		extensionPath := filepath.Join(nonExecDir, extension)
-		require.NoError(t, os.WriteFile(extensionPath, []byte("{}"), 0644))
-		extensionPaths = append(extensionPaths, extensionPath)
-	}
-
-	paths, err := calculateOsqueryPaths(osqueryOptions{
-		rootDirectory:        binDir,
-		autoloadedExtensions: []string{"extensionInExecDir1", "extensionInExecDir2", filepath.Join(nonExecDir, "extensionNotInExecDir1"), filepath.Join(nonExecDir, "extensionNotInExecDir2")},
-	})
-
-	require.NoError(t, err)
-
-	// ensure that all of our resulting artifact files are in the rootDir that we
-	// dictated
-	require.Equal(t, binDir, filepath.Dir(paths.pidfilePath))
-	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
-	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
-	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
-
-	osqueryAutoloadFilePath := filepath.Join(binDir, "osquery.autoload")
-	// read each line of the autoload file into a string array
-	bytes, err := os.ReadFile(osqueryAutoloadFilePath)
-	require.NoError(t, err)
-	autoloadFileLines := strings.Split(string(bytes), "\n")
-
-	// add empty string to extensions path array so it matches the last line of autoloaded file
-	assert.ElementsMatch(t, append(extensionPaths, ""), autoloadFileLines)
 }
 
 func TestCreateOsqueryCommand(t *testing.T) {
@@ -338,15 +298,16 @@ func TestBadBinaryPath(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary("/foobar"),
 	)
-	assert.Error(t, err)
-	assert.Nil(t, runner)
+	assert.Error(t, runner.Run())
 
 	k.AssertExpectations(t)
 }
@@ -361,17 +322,20 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
 	)
-	require.NoError(t, err)
+	go runner.Run()
+	waitHealthy(t, runner)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
+
+	runner.Interrupt(errors.New("test error"))
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -390,16 +354,21 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	// Start the runner
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
 	)
-	require.NoError(t, err)
+	go runner.Run()
+
+	// Wait for the instance to start
+	time.Sleep(2 * time.Second)
+	waitHealthy(t, runner)
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
@@ -453,6 +422,8 @@ func TestFlagsChanged(t *testing.T) {
 	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
 
 	k.AssertExpectations(t)
+
+	runner.Interrupt(errors.New("test error"))
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
@@ -475,15 +446,15 @@ func TestSimplePath(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
-	require.NoError(t, err)
+	go runner.Run()
 
 	waitHealthy(t, runner)
 
@@ -503,15 +474,15 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
-	require.NoError(t, err)
+	go runner.Run()
 
 	waitHealthy(t, runner)
 
@@ -558,14 +529,15 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
+	go runner.Run()
 	require.NoError(t, err)
 
 	waitHealthy(t, runner)
@@ -648,17 +620,17 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
-	require.NoError(t, err)
+	go runner.Run()
 
 	waitHealthy(t, runner)
 
@@ -673,6 +645,8 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
+
+	require.NoError(t, runner.Shutdown())
 }
 
 func TestOsquerySlowStart(t *testing.T) {
@@ -687,14 +661,15 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	k.On("Slogger").Return(slogger.Logger)
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err := LaunchInstance(
-		cancel,
+	runner := New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithLogger(log.NewLogfmtLogger(&logBytes)),
+		WithSlogger(slogger.Logger),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
 			if err != nil {
@@ -710,7 +685,7 @@ func TestOsquerySlowStart(t *testing.T) {
 			return nil
 		}),
 	)
-	require.NoError(t, err)
+	go runner.Run()
 	waitHealthy(t, runner)
 
 	// ensure that we actually had to wait on the socket
@@ -739,15 +714,15 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, cancel := context.WithCancel(context.TODO())
-	runner, err = LaunchInstance(
-		cancel,
+	runner = New(
+		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
-	require.NoError(t, err)
+	go runner.Run()
 	waitHealthy(t, runner)
 
 	osqueryPID := runner.instance.cmd.Process.Pid

@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/certs"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
@@ -63,7 +64,10 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(k types.Knapsack) (*localServer, error) {
+func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ls := &localServer{
 		slogger:               k.Slogger().With("component", "localserver"),
 		knapsack:              k,

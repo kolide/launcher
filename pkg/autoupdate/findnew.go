@@ -251,7 +251,7 @@ func FindNewest(ctx context.Context, fullBinaryPath string, opts ...newestOption
 func getUpdateDir(fullBinaryPath string) string {
 	if strings.Contains(fullBinaryPath, ".app") {
 		binary := filepath.Base(fullBinaryPath)
-		return filepath.Join(FindBaseDir(fullBinaryPath), binary+updateDirSuffix)
+		return filepath.Join(findBaseDir(fullBinaryPath), binary+updateDirSuffix)
 	}
 
 	// These are cases that shouldn't really happen. But, this is
@@ -317,10 +317,10 @@ func getPossibleUpdates(ctx context.Context, updateDir, binaryName string) ([]st
 	return possibleUpdates, nil
 }
 
-// FindBaseDir takes a binary path, that may or may not include the
+// findBaseDir takes a binary path, that may or may not include the
 // update directory, and returns the base directory. It's used by the
 // launcher runtime in finding the various binaries.
-func FindBaseDir(path string) string {
+func findBaseDir(path string) string {
 	if path == "" {
 		return ""
 	}

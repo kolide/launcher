@@ -8,10 +8,11 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClient, error) {
-	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+	k.Slogger().Log(ctx, slog.LevelDebug,
 		"creating control http client",
 	)
 
@@ -31,7 +32,10 @@ func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClien
 }
 
 func createControlService(ctx context.Context, store types.GetterSetter, k types.Knapsack) (*control.ControlService, error) {
-	k.Slogger().Log(context.TODO(), slog.LevelDebug,
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	k.Slogger().Log(ctx, slog.LevelDebug,
 		"creating control service",
 	)
 

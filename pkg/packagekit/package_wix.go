@@ -18,6 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"go.opencensus.io/trace"
 )
@@ -123,7 +125,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		launcherService := wix.NewService("launcher.exe",
 			// Ensure that the service does not start until DNS is available, to avoid unrecoverable DNS failures in launcher.
 			wix.WithServiceDependency("Dnscache"),
-			wix.ServiceName(fmt.Sprintf("Launcher%sSvc", strings.Title(po.Identifier))),
+			wix.ServiceName(fmt.Sprintf("Launcher%sSvc", cases.Title(language.Und, cases.NoLower).String(po.Identifier))),
 			wix.ServiceArgs([]string{"svc", "-config", po.FlagFile}),
 			wix.ServiceDescription(fmt.Sprintf("The Kolide Launcher (%s)", po.Identifier)),
 		)
@@ -135,7 +137,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		wixArgs = append(wixArgs, wix.WithService(launcherService))
 	}
 
-	wixTool, err := wix.New(po.Root, mainWxsContent.Bytes(), wixArgs...)
+	wixTool, err := wix.New(po.Root, po.Identifier, mainWxsContent.Bytes(), wixArgs...)
 	if err != nil {
 		return fmt.Errorf("making wixTool: %w", err)
 	}

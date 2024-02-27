@@ -1,12 +1,11 @@
 package table
 
 import (
+	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 )
 
 type findFile struct {
@@ -35,7 +34,7 @@ type userFileInfo struct {
 // findFileInUserDirs looks for the existence of a specified path as a
 // subdirectory of users' home directories. It does this by searching
 // likely paths
-func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) ([]userFileInfo, error) {
+func findFileInUserDirs(pattern string, slogger *slog.Logger, opts ...FindFileOpt) ([]userFileInfo, error) {
 	ff := &findFile{}
 
 	for _, opt := range opts {
@@ -45,9 +44,9 @@ func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) 
 	homedirRoots, ok := homeDirLocations[runtime.GOOS]
 	if !ok {
 		homedirRoots = homeDirDefaultLocation
-		level.Debug(logger).Log(
-			"msg", "platform not found using default",
-			"homeDirRoot", homedirRoots,
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"platform not found using default",
+			"home_dir_root", homedirRoots,
 		)
 	}
 
@@ -69,8 +68,8 @@ func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) 
 				fullPaths, err := filepath.Glob(userPathPattern)
 				if err != nil {
 					// skipping ErrBadPattern
-					level.Debug(logger).Log(
-						"msg", "bad file pattern",
+					slogger.Log(context.TODO(), slog.LevelDebug,
+						"bad file pattern",
 						"pattern", userPathPattern,
 					)
 					continue
@@ -95,8 +94,8 @@ func findFileInUserDirs(pattern string, logger log.Logger, opts ...FindFileOpt) 
 		fullPaths, err := filepath.Glob(userPathPattern)
 		if err != nil {
 			// skipping ErrBadPattern
-			level.Debug(logger).Log(
-				"msg", "bad file pattern",
+			slogger.Log(context.TODO(), slog.LevelDebug,
+				"bad file pattern",
 				"pattern", userPathPattern,
 			)
 			continue

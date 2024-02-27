@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -44,23 +43,7 @@ type Extension struct {
 	enrollMutex   sync.Mutex
 	done          chan struct{}
 	interrupted   bool
-	wg            sync.WaitGroup
 	slogger       *slog.Logger
-
-	initialRunner *initialRunner
-}
-
-// SetQuerier sets an osquery client on the extension, allowing
-// the extension to query the running osqueryd instance.
-func (e *Extension) SetQuerier(client Querier) {
-	if e.initialRunner != nil {
-		e.initialRunner.client = client
-	}
-}
-
-// Querier allows querying osquery.
-type Querier interface {
-	Query(sql string) ([]map[string]string, error)
 }
 
 const (
@@ -92,9 +75,6 @@ const (
 
 // ExtensionOpts is options to be passed in NewExtension
 type ExtensionOpts struct {
-	// EnrollSecret is the (mandatory) enroll secret used for
-	// enrolling with the server.
-	EnrollSecret string
 	// MaxBytesPerBatch is the maximum number of bytes that should be sent in
 	// one batch logging request. Any log larger than this will be dropped.
 	MaxBytesPerBatch int
@@ -105,12 +85,6 @@ type ExtensionOpts struct {
 	// default it will be a normal realtime clock, but a mock clock can be
 	// passed with clock.NewMockClock() for testing purposes.
 	Clock clock.Clock
-	// Logger is the logger that the extension should use. This is for
-	// logging about the launcher, and not for logging osquery results.
-	// Logging should be done through the knapsack slogger -- this is
-	// preserved only for temporary use in call to agent.SetupKeys until
-	// we move that over to using the slogger too.
-	Logger log.Logger
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
@@ -122,10 +96,11 @@ type ExtensionOpts struct {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
-	if opts.EnrollSecret == "" {
-		return nil, errors.New("empty enroll secret")
-	}
+func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	slogger := k.Slogger().With("component", "osquery_extension")
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -139,10 +114,6 @@ func NewExtension(client service.KolideService, k types.Knapsack, opts Extension
 		opts.Clock = clock.DefaultClock{}
 	}
 
-	if opts.Logger == nil {
-		opts.Logger = log.NewNopLogger()
-	}
-
 	if opts.MaxBufferedLogs == 0 {
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
@@ -153,61 +124,57 @@ func NewExtension(client service.KolideService, k types.Knapsack, opts Extension
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(opts.Logger, configStore); err != nil {
+	if err := agent.SetupKeys(slogger, configStore); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
-	}
-
-	identifier, err := IdentifierFromDB(configStore)
-	if err != nil {
-		return nil, fmt.Errorf("get host identifier from db when creating new extension: %w", err)
 	}
 
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
 			"err", err,
 		)
 		return nil, fmt.Errorf("reading nodekey from db: %w", err)
 	} else if nodekey == "" {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension did not find a nodekey. Likely first enroll",
 		)
 	} else {
-		k.Slogger().Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension found existing nodekey",
 		)
 	}
 
-	initialRunner := &initialRunner{
-		slogger:    k.Slogger().With("component", "initial_runner"),
-		identifier: identifier,
-		store:      k.InitialResultsStore(),
-		enabled:    opts.RunDifferentialQueriesImmediately,
-	}
-
 	return &Extension{
-		slogger:       k.Slogger().With("component", "osquery_extension"),
+		slogger:       slogger,
 		serviceClient: client,
 		knapsack:      k,
 		NodeKey:       nodekey,
 		Opts:          opts,
 		done:          make(chan struct{}),
-		initialRunner: initialRunner,
 	}, nil
 }
 
-// Start begins the goroutines responsible for background processing (currently
-// just the log buffer flushing routine). It should be shut down by calling the
-// Shutdown() method.
-func (e *Extension) Start() {
-	e.wg.Add(1)
-	go e.writeLogsLoopRunner()
+func (e *Extension) Execute() error {
+	// Process logs until shutdown
+	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
+	defer ticker.Stop()
+	for {
+		e.writeAndPurgeLogs()
+
+		// select to either exit or write another batch of logs
+		select {
+		case <-e.done:
+			return nil
+		case <-ticker.Chan():
+			// Resume loop
+		}
+	}
 }
 
 // Shutdown should be called to cleanup the resources and goroutines associated
 // with this extension.
-func (e *Extension) Shutdown() {
+func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if e.interrupted {
 		return
@@ -215,7 +182,6 @@ func (e *Extension) Shutdown() {
 	e.interrupted = true
 
 	close(e.done)
-	e.wg.Wait()
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
@@ -425,6 +391,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("starting_enrollment")
 
+	enrollSecret, err := e.knapsack.ReadEnrollSecret()
+	if err != nil {
+		return "", true, fmt.Errorf("could not read enroll secret: %w", err)
+	}
+
 	identifier, err := e.getHostIdentifier()
 	if err != nil {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
@@ -464,7 +435,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, e.Opts.EnrollSecret, identifier, enrollDetails)
+	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
 	if isNodeInvalidErr(err) {
 		invalid = true
 	} else if err != nil {
@@ -497,6 +468,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	return e.NodeKey, false, nil
 }
 
+func (e *Extension) enrolled() bool {
+	return e.NodeKey != ""
+}
+
 // RequireReenroll clears the existing node key information, ensuring that the
 // next call to Enroll will cause the enrollment process to take place.
 func (e *Extension) RequireReenroll(ctx context.Context) {
@@ -523,6 +498,10 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
+			if !e.enrolled() {
+				// Not enrolled yet -- return an empty config
+				return map[string]string{"config": "{}"}, nil
+			}
 			return nil, fmt.Errorf("loading config failed, no cached config: %w", err)
 		}
 		config = string(confBytes)
@@ -584,10 +563,6 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 		osqueryVerbose = false
 	}
 	config = e.setVerbose(config, osqueryVerbose)
-
-	if err := e.initialRunner.Execute(config, e.writeLogsWithReenroll); err != nil {
-		return "", fmt.Errorf("initial run results: %w", err)
-	}
 
 	return config, nil
 }
@@ -690,23 +665,6 @@ func (e *Extension) writeAndPurgeLogs() {
 				"type", typ.String(),
 				"err", err,
 			)
-		}
-	}
-}
-
-func (e *Extension) writeLogsLoopRunner() {
-	defer e.wg.Done()
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
-	defer ticker.Stop()
-	for {
-		e.writeAndPurgeLogs()
-
-		// select to either exit or write another batch of logs
-		select {
-		case <-e.done:
-			return
-		case <-ticker.Chan():
-			// Resume loop
 		}
 	}
 }
@@ -938,6 +896,9 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 	if isNodeInvalidErr(err) {
@@ -982,6 +943,9 @@ func (e *Extension) WriteResults(ctx context.Context, results []distributed.Resu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
 	if isNodeInvalidErr(err) {
 		invalid = true
@@ -1008,4 +972,12 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	}
 
 	return nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }

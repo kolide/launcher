@@ -15,10 +15,14 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 )
 
 func getEnrollDetails(ctx context.Context, osquerydPath string) (service.EnrollmentDetails, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var details service.EnrollmentDetails
 
 	// To facilitate manual testing around missing enrollment details,

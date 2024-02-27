@@ -37,7 +37,7 @@ func (a action) String() string {
 	return fmt.Sprintf("ID: %s; type: %s; valid until: %d", a.ID, a.Type, a.ValidUntil)
 }
 
-type actionqueue struct {
+type ActionQueue struct {
 	ctx                   context.Context // nolint:containedctx
 	actors                map[string]actor
 	store                 types.KVStore
@@ -47,34 +47,34 @@ type actionqueue struct {
 	cancel                context.CancelFunc
 }
 
-type actionqueueOption func(*actionqueue)
+type actionqueueOption func(*ActionQueue)
 
 func WithStore(store types.KVStore) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.store = store
 	}
 }
 
 func WithOldNotificationsStore(store types.KVStore) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.oldNotificationsStore = store
 	}
 }
 
 func WithCleanupInterval(cleanupInterval time.Duration) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.actionCleanupInterval = cleanupInterval
 	}
 }
 
 func WithContext(ctx context.Context) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.ctx = ctx
 	}
 }
 
-func New(k types.Knapsack, opts ...actionqueueOption) *actionqueue {
-	aq := &actionqueue{
+func New(k types.Knapsack, opts ...actionqueueOption) *ActionQueue {
+	aq := &ActionQueue{
 		ctx:                   context.Background(),
 		actors:                make(map[string]actor, 0),
 		actionCleanupInterval: defaultCleanupInterval,
@@ -92,7 +92,7 @@ func New(k types.Knapsack, opts ...actionqueueOption) *actionqueue {
 	return aq
 }
 
-func (aq *actionqueue) Update(data io.Reader) error {
+func (aq *ActionQueue) Update(data io.Reader) error {
 	// We want to unmarshal each action separately, so that we don't fail to send all actions
 	// if only some are malformed.
 	var rawActionsToProcess []json.RawMessage
@@ -139,16 +139,16 @@ func (aq *actionqueue) Update(data io.Reader) error {
 	return nil
 }
 
-func (aq *actionqueue) RegisterActor(actorType string, actorToRegister actor) {
+func (aq *ActionQueue) RegisterActor(actorType string, actorToRegister actor) {
 	aq.actors[actorType] = actorToRegister
 }
 
-func (aq *actionqueue) StartCleanup() error {
+func (aq *ActionQueue) StartCleanup() error {
 	aq.runCleanup()
 	return nil
 }
 
-func (aq *actionqueue) runCleanup() {
+func (aq *ActionQueue) runCleanup() {
 	ctx, cancel := context.WithCancel(aq.ctx)
 	aq.cancel = cancel
 
@@ -168,11 +168,11 @@ func (aq *actionqueue) runCleanup() {
 	}
 }
 
-func (aq *actionqueue) StopCleanup(err error) {
+func (aq *ActionQueue) StopCleanup(err error) {
 	aq.cancel()
 }
 
-func (aq *actionqueue) storeActionRecord(actionToStore action) {
+func (aq *ActionQueue) storeActionRecord(actionToStore action) {
 	rawAction, err := json.Marshal(actionToStore)
 	if err != nil {
 		aq.slogger.Log(context.TODO(), slog.LevelError,
@@ -190,7 +190,7 @@ func (aq *actionqueue) storeActionRecord(actionToStore action) {
 	}
 }
 
-func (aq *actionqueue) isActionNew(id string) bool {
+func (aq *ActionQueue) isActionNew(id string) bool {
 	completedActionRaw, err := aq.store.Get([]byte(id))
 	if err != nil {
 		aq.slogger.Log(context.TODO(), slog.LevelError,
@@ -232,7 +232,7 @@ func (aq *actionqueue) isActionNew(id string) bool {
 	return completedActionRaw == nil
 }
 
-func (aq *actionqueue) isActionValid(a action) bool {
+func (aq *ActionQueue) isActionValid(a action) bool {
 	if a.ID == "" {
 		aq.slogger.Log(context.TODO(), slog.LevelWarn,
 			"action ID is empty",
@@ -252,7 +252,7 @@ func (aq *actionqueue) isActionValid(a action) bool {
 	return a.ValidUntil > time.Now().Unix()
 }
 
-func (aq *actionqueue) actorForAction(a action) (actor, error) {
+func (aq *ActionQueue) actorForAction(a action) (actor, error) {
 	if len(aq.actors) == 0 {
 		return nil, errors.New("no actor registered")
 	}
@@ -269,7 +269,7 @@ func (aq *actionqueue) actorForAction(a action) (actor, error) {
 	return actor, nil
 }
 
-func (aq *actionqueue) cleanupActions() {
+func (aq *ActionQueue) cleanupActions() {
 	// Read through all keys in bucket to determine which ones are old enough to be deleted
 	keysToDelete := make([][]byte, 0)
 

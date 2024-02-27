@@ -2,6 +2,8 @@ package packaging
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +16,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
+	"github.com/theupdateframework/go-tuf/client"
+	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"go.opencensus.io/trace"
 )
 
@@ -24,7 +27,7 @@ import (
 // succeed.
 //
 // You must specify a localCacheDir, to reuse downloads
-func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version string, target Target) (string, error) {
+func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOrVersion string, target Target) (string, error) {
 	ctx, span := trace.StartSpan(ctx, "packaging.fetchbinary")
 	defer span.End()
 
@@ -32,22 +35,25 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
-		return "", errors.New("Empty cache dir argument")
+		return "", errors.New("empty cache dir argument")
 	}
 
-	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, version), binaryName)
-	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, target.Platform, version))
+	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, channelOrVersion), binaryName)
+	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, target.Platform, channelOrVersion))
 
 	// See if a local package exists on disk already. If so, return the cached path
 	if _, err := os.Stat(localBinaryPath); err == nil {
 		return localBinaryPath, nil
 	}
 
-	// If not we have to download the package. First, create download
-	// URI. Notary stores things by name, sans extension. So just strip
-	// it off.
+	// First, create download URI. The download mirror stores binaries by their name, without a file extension,
+	// so strip that off first.
 	baseName := strings.TrimSuffix(name, filepath.Ext(name))
-	url := fmt.Sprintf("https://dl.kolide.co/%s", dlTarPath(baseName, version, string(target.Platform)))
+	downloadPath, err := dlTarPath(baseName, channelOrVersion, string(target.Platform), string(target.Arch))
+	if err != nil {
+		return "", fmt.Errorf("could not get download path: %w", err)
+	}
+	url := fmt.Sprintf("https://dl.kolide.co/%s", downloadPath)
 
 	level.Debug(logger).Log(
 		"msg", "starting download",
@@ -69,7 +75,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("Failed download. Got http status %s", response.Status)
+		return "", fmt.Errorf("failed download, got http status %s", response.Status)
 	}
 
 	// Store it in cache
@@ -108,6 +114,81 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, version s
 	return localBinaryPath, nil
 }
 
-func dlTarPath(name, version, platform string) string {
-	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
+func dlTarPath(name, channelOrVersion, platform, arch string) (string, error) {
+	// Figure out if we're downloading a specific version or a channel
+	isChannel := channelOrVersion == "stable" || channelOrVersion == "beta" || channelOrVersion == "nightly" || channelOrVersion == "alpha"
+
+	if !isChannel {
+		// We're requesting a version, not a channel, so we already know where the download lives.
+		return dlTarPathFromVersion(name, channelOrVersion, platform, arch), nil
+	}
+
+	version, err := getReleaseVersionFromTufRepo(name, channelOrVersion, platform, arch)
+	if err != nil {
+		return "", fmt.Errorf("could not find release version for channel %s: %w", channelOrVersion, err)
+	}
+
+	return dlTarPathFromVersion(name, version, platform, arch), nil
+}
+
+func dlTarPathFromVersion(name, version, platform, arch string) string {
+	return path.Join("kolide", name, platform, arch, fmt.Sprintf("%s-%s.tar.gz", name, version))
+}
+
+//go:embed assets/tuf/root.json
+var rootJson []byte
+
+func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (string, error) {
+	tempDir, err := os.MkdirTemp(os.TempDir(), "tuf")
+	if err != nil {
+		return "", fmt.Errorf("making temp TUF dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Ensure that directory permissions are correct, otherwise TUF will fail to initialize. We cannot
+	// have permissions in excess of -rwxr-x---.
+	if err := os.Chmod(tempDir, 0750); err != nil {
+		return "", fmt.Errorf("chmodding local TUF directory %s: %w", tempDir, err)
+	}
+
+	// Set up our local store i.e. point to the directory in our filesystem
+	localStore, err := filejsonstore.NewFileJSONStore(tempDir)
+	if err != nil {
+		return "", fmt.Errorf("could not initialize local TUF store: %w", err)
+	}
+
+	// Set up our remote store i.e. tuf.kolide.com
+	remoteStore, err := client.HTTPRemoteStore("https://tuf.kolide.com", &client.HTTPRemoteOptions{
+		MetadataPath: "/repository",
+	}, http.DefaultClient)
+	if err != nil {
+		return "", fmt.Errorf("could not initialize remote TUF store: %w", err)
+	}
+
+	metadataClient := client.NewClient(localStore, remoteStore)
+	if err := metadataClient.Init(rootJson); err != nil {
+		return "", fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
+	}
+
+	if _, err := metadataClient.Update(); err != nil {
+		return "", fmt.Errorf("failed to update metadata: %w", err)
+	}
+
+	targetToFind := path.Join(binaryName, platform, arch, channel, "release.json")
+	foundTarget, err := metadataClient.Target(targetToFind)
+	if err != nil {
+		return "", fmt.Errorf("finding target metadata %s: %w", targetToFind, err)
+	}
+
+	var custom struct {
+		Target string `json:"target"`
+	}
+	if err := json.Unmarshal(*foundTarget.Custom, &custom); err != nil {
+		return "", fmt.Errorf("could not unmarshal release file custom metadata: %w", err)
+	}
+
+	targetFilename := filepath.Base(custom.Target)
+
+	// Target looks like <binary>-<version>.tar.gz -- strip off extension and binary name to get version
+	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, fmt.Sprintf(binaryName+"-")), ".tar.gz"), nil
 }
