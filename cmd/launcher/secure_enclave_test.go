@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,9 +17,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
-	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -115,12 +112,12 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	serverPubKeys[string(testServerPubKeyB64Der)] = &testServerPrivKey.PublicKey
 
 	someData := []byte(ulid.New())
-	challenge, _, err := challenge.Generate(testServerPrivKey, someData, someData, someData)
+	challengeBytes, _, err := challenge.Generate(testServerPrivKey, someData, someData, someData)
 	require.NoError(t, err)
 
 	requestBytes, err := msgpack.Marshal(secureenclavesigner.CreateKeyRequest{
 		SecureEnclaveRequest: secureenclavesigner.SecureEnclaveRequest{
-			Challenge:    challenge,
+			Challenge:    challengeBytes,
 			ServerPubKey: testServerPubKeyB64Der,
 		},
 	})
@@ -145,41 +142,15 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	require.NotNil(t, secureEnclavePubKey, "should be able to get public key")
 
-	// try to sign unrecognized data format
-	dataToSignBadFormat, err := json.Marshal(map[string]string{
-		"foo": "bar",
-	})
-	require.NoError(t, err)
-
 	signRequest := secureenclavesigner.SignRequest{
 		SecureEnclaveRequest: secureenclavesigner.SecureEnclaveRequest{
-			Challenge:    challenge,
+			Challenge:    challengeBytes,
 			ServerPubKey: testServerPubKeyB64Der,
 		},
-		Data:                dataToSignBadFormat,
 		SecureEnclavePubKey: createKeyResponse,
 	}
 
 	signRequestBytes := msgpackMustMarshall(t, signRequest)
-
-	pipeReader, pipeWriter, err = os.Pipe()
-	require.NoError(t, err)
-
-	os.Stdout = pipeWriter
-	require.Error(t, runSecureEnclave([]string{secureenclavesigner.SignCmd, base64.StdEncoding.EncodeToString(signRequestBytes)}),
-		"should get error for unrecognized data format")
-
-	require.NoError(t, pipeWriter.Close())
-
-	// try to sign with good format
-	dataToSignGoodFormat, err := json.Marshal(localserver.RequestIdsResponse{
-		RequestId: ulid.New(),
-	})
-	require.NoError(t, err)
-
-	signRequest.Data = dataToSignGoodFormat
-
-	signRequestBytes = msgpackMustMarshall(t, signRequest)
 
 	pipeReader, pipeWriter, err = os.Pipe()
 	require.NoError(t, err)
@@ -195,7 +166,10 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	sig, err := base64.StdEncoding.DecodeString(string(buf.Bytes()))
 	require.NoError(t, err)
 
-	require.NoError(t, echelper.VerifySignature(secureEnclavePubKey, dataToSignGoodFormat, sig))
+	c, err := challenge.UnmarshalChallenge(challengeBytes)
+	require.NoError(t, err)
+
+	require.NoError(t, echelper.VerifySignature(secureEnclavePubKey, c.Msg, sig))
 }
 
 func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest
@@ -296,66 +270,4 @@ func msgpackMustMarshall(t *testing.T, v interface{}) []byte {
 	b, err := msgpack.Marshal(v)
 	require.NoError(t, err)
 	return b
-}
-
-func Test_validateSecureEnclaveData(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		data    func() []byte
-		errFunc require.ErrorAssertionFunc
-	}{
-		{
-			name: "RequestIdsResponse",
-			data: func() []byte {
-				data, err := json.Marshal(localserver.RequestIdsResponse{
-					RequestId: ulid.New(),
-				})
-				require.NoError(t, err)
-				return data
-			},
-			errFunc: require.NoError,
-		},
-		{
-			name: "QueryResults",
-			data: func() []byte {
-				data, err := json.Marshal([]distributed.Result{
-					{
-						QueryName: "foo",
-					},
-				})
-				require.NoError(t, err)
-				return data
-			},
-			errFunc: require.NoError,
-		},
-		{
-			name: "unrecognized format",
-			data: func() []byte {
-				data, err := json.Marshal(map[string]string{
-					"RequestId":     ulid.New(),
-					"who_is_sneaky": "me",
-				})
-				require.NoError(t, err)
-				return data
-			},
-			errFunc: require.Error,
-		},
-		{
-			name: "not json",
-			data: func() []byte {
-				return []byte("blah_blah_blah")
-			},
-			errFunc: require.Error,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			tt.errFunc(t, validateSecureEnclaveData(tt.data()))
-		})
-	}
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type Identifiers struct {
+type identifiers struct {
 	UUID           string
 	InstanceId     string
 	HardwareSerial string
@@ -70,7 +70,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
 	}
-	response.Identifiers = ls.identifiers
+	response.identifiers = ls.identifiers
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {

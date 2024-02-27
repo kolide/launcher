@@ -27,8 +27,6 @@ const (
 
 type SignRequest struct {
 	SecureEnclaveRequest
-	// Data is the data to be signed
-	Data []byte `msgpack:"data"`
 	// SecureEnclavePubKey is the B64 encoded DER of the public key to be used to verify the signature
 	SecureEnclavePubKey []byte `msgpack:"secure_enclave_pub_key"`
 }
@@ -138,7 +136,6 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, data []byte, opts crypto.Si
 			Challenge:    ses.challenge,
 			ServerPubKey: ses.serverPubKeyB64Der,
 		},
-		Data:                data,
 		SecureEnclavePubKey: pubKeyBytes,
 	}
 

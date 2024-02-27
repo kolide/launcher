@@ -44,7 +44,7 @@ type localServer struct {
 	slogger      *slog.Logger
 	knapsack     types.Knapsack
 	srv          *http.Server
-	identifiers  Identifiers
+	identifiers  identifiers
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
 	querier      Querier

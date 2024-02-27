@@ -4,12 +4,10 @@
 package main
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,9 +17,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/ee/agent/certs"
-	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
-	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -100,7 +96,7 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack request: %w", err)
 	}
 
-	if err := verifySecureEnclaveChallenge(createKeyRequest.SecureEnclaveRequest); err != nil {
+	if _, err := extractVerifiedSecureEnclaveChallenge(createKeyRequest.SecureEnclaveRequest); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
@@ -129,12 +125,9 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack sign request: %w", err)
 	}
 
-	if err := verifySecureEnclaveChallenge(signRequest.SecureEnclaveRequest); err != nil {
+	challenge, err := extractVerifiedSecureEnclaveChallenge(signRequest.SecureEnclaveRequest)
+	if err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
-	}
-
-	if err := validateSecureEnclaveData(signRequest.Data); err != nil {
-		return fmt.Errorf("validating data: %w", err)
 	}
 
 	secureEnclavePubKey, err := echelper.PublicB64DerToEcdsaKey(signRequest.SecureEnclavePubKey)
@@ -147,11 +140,7 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("creating secure enclave signer: %w", err)
 	}
 
-	if err := validateSecureEnclaveData(signRequest.Data); err != nil {
-		return fmt.Errorf("validating data: %w", err)
-	}
-
-	digest, err := echelper.HashForSignature(signRequest.Data)
+	digest, err := echelper.HashForSignature(challenge.Msg)
 	if err != nil {
 		return fmt.Errorf("hashing data for signature: %w", err)
 	}
@@ -165,47 +154,27 @@ func signWithSecureEnclave(signRequestB64 string) error {
 	return nil
 }
 
-func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveRequest) error {
-	c, err := challenge.UnmarshalChallenge(request.Challenge)
+func extractVerifiedSecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveRequest) (*challenge.OuterChallenge, error) {
+	challengeUnmarshalled, err := challenge.UnmarshalChallenge(request.Challenge)
 	if err != nil {
-		return fmt.Errorf("unmarshaling challenge: %w", err)
+		return nil, fmt.Errorf("unmarshaling challenge: %w", err)
 	}
 
 	serverPubKey, ok := serverPubKeys[string(request.ServerPubKey)]
 	if !ok {
-		return errors.New("server public key not found")
+		return nil, errors.New("server public key not found")
 	}
 
-	if err := c.Verify(*serverPubKey); err != nil {
-		return fmt.Errorf("verifying challenge: %w", err)
+	if err := challengeUnmarshalled.Verify(*serverPubKey); err != nil {
+		return nil, fmt.Errorf("verifying challenge: %w", err)
 	}
 
 	// Check the timestamp, this prevents people from saving a challenge and then
 	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
-	timestampDelta := time.Now().Unix() - c.Timestamp()
+	timestampDelta := time.Now().Unix() - challengeUnmarshalled.Timestamp()
 	if timestampDelta > secureEnclaveTimestampValiditySeconds || timestampDelta < -secureEnclaveTimestampValiditySeconds {
-		return fmt.Errorf("timestamp delta %d is outside of validity range %d", timestampDelta, secureEnclaveTimestampValiditySeconds)
+		return nil, fmt.Errorf("timestamp delta %d is outside of validity range %d", timestampDelta, secureEnclaveTimestampValiditySeconds)
 	}
 
-	return nil
-}
-
-// validateSecureEnclaveData validates that the data is in a format that we expect to be signed,
-// currently these are the responses returned by local server.
-func validateSecureEnclaveData(data []byte) error {
-	if err := jsonStrictDecode(data, &localserver.RequestIdsResponse{}); err == nil {
-		return nil
-	}
-
-	if err := jsonStrictDecode(data, &[]distributed.Result{}); err == nil {
-		return nil
-	}
-
-	return errors.New("unrecognized data format")
-}
-
-func jsonStrictDecode(data []byte, v interface{}) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	return decoder.Decode(v)
+	return challengeUnmarshalled, nil
 }
