@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/exp/maps"
@@ -501,13 +501,7 @@ func (fc *FlagController) PinnedLauncherVersion() string {
 		WithOverrideString(fc.overrides[keys.PinnedLauncherVersion]),
 		WithDefaultString(""),
 		WithSanitizer(func(version string) string {
-			// We accept any valid semver -- the autoupdater will handle checking
-			// if the version actually exists at update time.
-			_, err := semver.NewVersion(version)
-			if err != nil {
-				return ""
-			}
-			return version
+			return tuf.SanitizePinnedVersion("launcher", version)
 		}),
 	).get(fc.getControlServerValue(keys.PinnedLauncherVersion))
 }
@@ -526,13 +520,7 @@ func (fc *FlagController) PinnedOsquerydVersion() string {
 		WithOverrideString(fc.overrides[keys.PinnedOsquerydVersion]),
 		WithDefaultString(""),
 		WithSanitizer(func(version string) string {
-			// We accept any valid semver -- the autoupdater will handle checking
-			// if the version actually exists at update time.
-			_, err := semver.NewVersion(version)
-			if err != nil {
-				return ""
-			}
-			return version
+			return tuf.SanitizePinnedVersion("osqueryd", version)
 		}),
 	).get(fc.getControlServerValue(keys.PinnedOsquerydVersion))
 }
