@@ -44,6 +44,8 @@ const (
 	UpdateChannel                   FlagKey = "update_channel"
 	AutoupdateInitialDelay          FlagKey = "autoupdater_initial_delay"
 	UpdateDirectory                 FlagKey = "update_directory"
+	PinnedLauncherVersion           FlagKey = "pinned_launcher_version"
+	PinnedOsquerydVersion           FlagKey = "pinned_osqueryd_version"
 	ExportTraces                    FlagKey = "export_traces"
 	TraceSamplingRate               FlagKey = "trace_sampling_rate"
 	TraceBatchTimeout               FlagKey = "trace_batch_timeout"

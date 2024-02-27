@@ -173,6 +173,14 @@ type Flags interface {
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
 
+	// PinnedLauncherVersion is the launcher version to lock the autoupdater to, rather than autoupdating via the update channel.
+	SetPinnedLauncherVersion(version string) error
+	PinnedLauncherVersion() string
+
+	// PinnedOsquerydVersion is the osqueryd version to lock the autoupdater to, rather than autoupdating via the update channel.
+	SetPinnedOsquerydVersion(version string) error
+	PinnedOsquerydVersion() string
+
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error
 	SetExportTracesOverride(value bool, duration time.Duration)

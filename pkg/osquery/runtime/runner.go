@@ -315,7 +315,7 @@ func (r *Runner) launchOsqueryInstance() error {
 	// FindNewest uses context as a way to get a logger, so we need to
 	// create and pass a ctxlog in.
 	var currentOsquerydBinaryPath string
-	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.opts.updateChannel, r.slogger)
+	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.knapsack.PinnedOsquerydVersion(), o.opts.updateChannel, r.slogger)
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelDebug,
 			"could not get latest version of osqueryd from new autoupdate library, falling back",

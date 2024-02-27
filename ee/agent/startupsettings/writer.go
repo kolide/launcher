@@ -37,12 +37,14 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
-			keys.UpdateChannel: func() string { return knapsack.UpdateChannel() },
+			keys.UpdateChannel:         func() string { return knapsack.UpdateChannel() },
+			keys.PinnedLauncherVersion: func() string { return knapsack.PinnedLauncherVersion() },
+			keys.PinnedOsquerydVersion: func() string { return knapsack.PinnedOsquerydVersion() },
 		},
 	}
 
 	// Attempt to ensure flags are up-to-date
-	if err := s.setFlags(ctx); err != nil {
+	if err := s.setFlags(); err != nil {
 		s.knapsack.Slogger().Log(ctx, slog.LevelWarn, "could not set flags", "err", err)
 	}
 
@@ -54,7 +56,7 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 }
 
 // setFlags updates the flags with their values from the agent flag data store.
-func (s *startupSettingsWriter) setFlags(ctx context.Context) error {
+func (s *startupSettingsWriter) setFlags() error {
 	updatedFlags := make(map[string]string)
 	for flag, getter := range s.storedFlags {
 		updatedFlags[flag.String()] = getter()
@@ -71,7 +73,7 @@ func (s *startupSettingsWriter) setFlags(ctx context.Context) error {
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
 func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if err := s.setFlags(context.Background()); err != nil {
+	if err := s.setFlags(); err != nil {
 		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
 			"could not set flags after change",
 			"err", err,

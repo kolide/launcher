@@ -14,34 +14,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_getUpdateChannelFromStartupSettings(t *testing.T) {
+func Test_getUpdateSettingsFromStartupSettings(t *testing.T) {
 	t.Parallel()
 
 	expectedChannel := "beta"
+	expectedPinnedVersion := "1.5.5"
 
 	// Set up an override for the channel in the startupsettings db
 	rootDir := t.TempDir()
 	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte(expectedChannel)), "setting key")
+	require.NoError(t, store.Set([]byte(keys.PinnedLauncherVersion.String()), []byte(expectedPinnedVersion)), "setting key")
+	require.NoError(t, store.Set([]byte(keys.PinnedOsquerydVersion.String()), []byte("5.5.5")), "setting key")
 	require.NoError(t, store.Close(), "closing test db")
 
-	actualChannel, err := getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
-	require.NoError(t, err, "did not expect error getting update channel from startup settings")
+	actualVersion, actualChannel, err := getUpdateSettingsFromStartupSettings(context.TODO(), "launcher", rootDir)
+	require.NoError(t, err, "did not expect error getting update settings from startup settings")
+	require.Equal(t, expectedPinnedVersion, actualVersion, "did not get expected version")
 	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
-}
-
-func Test_getUpdateChannelFromStartupSettings_NotFound(t *testing.T) {
-	t.Parallel()
-
-	// Create a startupsettings db but don't set anything in it
-	rootDir := t.TempDir()
-	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
-	require.NoError(t, err, "setting up db connection")
-	require.NoError(t, store.Close(), "closing test db")
-
-	_, err = getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
-	require.Error(t, err, "should not have been able to get update channel when it is not set")
 }
 
 func TestCheckOutLatest_withTufRepository(t *testing.T) {
@@ -77,7 +68,49 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "", "nightly", multislogger.NewNopLogger())
+			require.NoError(t, err, "unexpected error on checking out latest")
+			require.Equal(t, executablePath, latest.Path)
+			require.Equal(t, executableVersion, latest.Version)
+		})
+	}
+}
+
+func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
+	t.Parallel()
+
+	for _, binary := range binaries {
+		binary := binary
+		t.Run(string(binary), func(t *testing.T) {
+			t.Parallel()
+
+			// Set up an update library
+			rootDir := t.TempDir()
+			updateDir := DefaultLibraryDirectory(rootDir)
+
+			// Set up a local TUF repo
+			tufDir := LocalTufDirectory(rootDir)
+			require.NoError(t, os.MkdirAll(tufDir, 488))
+			pinnedVersion := tufci.NonReleaseVersion
+			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, pinnedVersion)
+			testReleaseVersion := "2.3.3"
+			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+
+			// Create a corresponding downloaded target for the pinned version
+			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+			tufci.CopyBinary(t, executablePath)
+			require.NoError(t, os.Chmod(executablePath, 0755))
+
+			// Make a more recent version that we should ignore since it isn't the pinned version
+			releaseTarget := fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)
+			releaseTargetPath, _ := pathToTargetVersionExecutable(binary, releaseTarget, updateDir)
+			require.NoError(t, os.MkdirAll(filepath.Dir(releaseTargetPath), 0755))
+			tufci.CopyBinary(t, releaseTargetPath)
+			require.NoError(t, os.Chmod(releaseTargetPath, 0755))
+
+			// Check it
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", pinnedVersion, "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -104,7 +137,7 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
