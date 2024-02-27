@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/pkg/autoupdate"
@@ -274,16 +273,12 @@ func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpda
 
 	// We rolled out TUF more broadly beginning in v1.4.1. Don't select versions earlier than that.
 	if binary == binaryLauncher && channel == "stable" {
-		recentVersion, err := semver.NewVersion(mostRecentVersionInLibraryRaw)
+		supportsTuf, err := launcherVersionSupportsTuf(mostRecentVersionInLibraryRaw)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse most recent version %s in launcher library: %w", recentVersion, err)
+			return nil, fmt.Errorf("could not determine if launcher version %s supports TUF: %w", mostRecentVersionInLibraryRaw, err)
 		}
-		startingVersion, err := semver.NewVersion("1.4.1")
-		if err != nil {
-			return nil, fmt.Errorf("could not parse required starting version for launcher binary: %w", err)
-		}
-		if recentVersion.LessThan(startingVersion) {
-			return nil, fmt.Errorf("most recent version %s for binary launcher is not newer than required v1.4.1", recentVersion)
+		if !supportsTuf {
+			return nil, fmt.Errorf("most recent version %s for binary launcher is not newer than required %s", mostRecentVersionInLibraryRaw, tufVersionMinimum.String())
 		}
 	}
 

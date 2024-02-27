@@ -943,66 +943,6 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	require.Equal(t, 1, keyCount, "cleanup routine did not clean up correct number of old errors")
 }
 
-func TestSanitizePinnedVersion(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name                     string
-		pinnedVersion            string
-		binary                   autoupdatableBinary
-		expectedSanitizedVersion string
-	}{
-		{
-			name:                     "osqueryd, valid version",
-			pinnedVersion:            "5.10.0",
-			binary:                   binaryOsqueryd,
-			expectedSanitizedVersion: "5.10.0",
-		},
-		{
-			name:                     "osqueryd, invalid version",
-			pinnedVersion:            "version five point ten point zero, please",
-			binary:                   binaryOsqueryd,
-			expectedSanitizedVersion: "",
-		},
-		{
-			name:                     "osqueryd, valid early version",
-			pinnedVersion:            "1.0.0",
-			binary:                   binaryOsqueryd,
-			expectedSanitizedVersion: "1.0.0",
-		},
-		{
-			name:                     "launcher, valid version",
-			pinnedVersion:            "1.6.3",
-			binary:                   binaryLauncher,
-			expectedSanitizedVersion: "1.6.3",
-		},
-		{
-			name:                     "launcher, invalid version",
-			pinnedVersion:            "alpha",
-			binary:                   binaryLauncher,
-			expectedSanitizedVersion: "",
-		},
-		{
-			name:                     "launcher, version too early",
-			pinnedVersion:            "1.5.3",
-			binary:                   binaryLauncher,
-			expectedSanitizedVersion: "",
-		},
-		{
-			name:                     "launcher, valid version at minimum",
-			pinnedVersion:            pinnedLauncherVersionMinimum.Original(),
-			binary:                   binaryLauncher,
-			expectedSanitizedVersion: pinnedLauncherVersionMinimum.Original(),
-		},
-	} {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, tt.expectedSanitizedVersion, SanitizePinnedVersion(tt.binary, tt.pinnedVersion))
-		})
-	}
-}
-
 func setupStorage(t *testing.T) types.KVStore {
 	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AutoupdateErrorsStore.String())
 	require.NoError(t, err)

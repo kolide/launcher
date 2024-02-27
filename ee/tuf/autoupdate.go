@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Masterminds/semver"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -711,27 +710,4 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 			"err", err,
 		)
 	}
-}
-
-var pinnedLauncherVersionMinimum = semver.MustParse("1.6.1")
-
-func SanitizePinnedVersion(binary autoupdatableBinary, version string) string {
-	parsedVersion, err := semver.NewVersion(version)
-	if err != nil {
-		// Invalid semver
-		return ""
-	}
-
-	// For osqueryd, we will accept any valid semver -- the autoupdater will validate
-	// that the version exists at update time.
-	if binary != binaryLauncher {
-		return version
-	}
-
-	// For launcher, we require that the version is at least greater than v1.6.1, the
-	// first version to support pinning versions.
-	if parsedVersion.LessThan(pinnedLauncherVersionMinimum) {
-		return ""
-	}
-	return version
 }

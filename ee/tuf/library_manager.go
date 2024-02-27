@@ -380,11 +380,3 @@ func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, ba
 
 	return versionsInLibraryStr, invalidVersions, nil
 }
-
-// versionFromTarget extracts the semantic version for an update from its filename.
-func versionFromTarget(binary autoupdatableBinary, targetFilename string) string {
-	// The target is in the form `launcher-0.13.6.tar.gz` -- trim the prefix and the file extension to return the version
-	prefixToTrim := fmt.Sprintf("%s-", binary)
-
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, prefixToTrim), ".tar.gz")
-}
