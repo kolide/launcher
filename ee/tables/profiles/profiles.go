@@ -13,12 +13,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -37,11 +36,11 @@ var (
 )
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	// profiles options. See `man profiles`. These may not be needed,
 	// we use `show -all` as the default, and it probably covers
 	// everything.
@@ -52,7 +51,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger:    logger,
+		slogger:   slogger.With("table", "kolide_profiles"),
 		tableName: "kolide_profiles",
 	}
 
@@ -102,25 +101,33 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						return nil, fmt.Errorf("Unknown user argument: %s", user)
 					}
 
-					output, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Profiles, profileArgs, false)
+					output, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Profiles, profileArgs, false)
 					if err != nil {
-						level.Info(t.logger).Log("msg", "ioreg exec failed", "err", err)
+						t.slogger.Log(ctx, slog.LevelInfo,
+							"ioreg exec failed",
+							"err", err,
+						)
 						continue
 					}
 
 					if bytes.Contains(output, []byte("requires root privileges")) {
-						level.Info(t.logger).Log("ioreg requires root privileges")
+						t.slogger.Log(ctx, slog.LevelInfo,
+							"ioreg requires root privileges",
+						)
 						continue
 					}
 
 					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithLogger(t.logger),
+						dataflatten.WithSlogger(t.slogger),
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}
 
 					flatData, err := dataflatten.PlistFile(outputFile, flattenOpts...)
 					if err != nil {
-						level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+						t.slogger.Log(ctx, slog.LevelInfo,
+							"flatten failed",
+							"err", err,
+						)
 						continue
 					}
 

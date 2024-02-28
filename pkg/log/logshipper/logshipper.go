@@ -191,10 +191,10 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	deviceInfo := make(map[string]string)
 
 	versionInfo := version.Version()
-	deviceInfo["version"] = versionInfo.Version
+	deviceInfo["launcher_version"] = versionInfo.Version
 	deviceInfo["os"] = runtime.GOOS
 
-	ls.shippingLogger = log.With(ls.shippingLogger, "version", versionInfo.Version)
+	ls.shippingLogger = log.With(ls.shippingLogger, "launcher_version", versionInfo.Version)
 
 	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
 		v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))
@@ -307,14 +307,16 @@ func (ls *LogShipper) updateLogShippingLevel() {
 	case "error":
 		ls.slogLevel.Set(slog.LevelError)
 	case "default":
-		ls.knapsack.Slogger().Error("unrecognized flag value for log shipping level",
+		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
+			"unrecognized flag value for log shipping level",
 			"flag_value", ls.knapsack.LogShippingLevel(),
 			"current_log_level", ls.slogLevel.String(),
 		)
 	}
 
 	if startingLevel != ls.slogLevel.Level() {
-		ls.knapsack.Slogger().Info("log shipping level changed",
+		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelInfo,
+			"log shipping level changed",
 			"old_log_level", startingLevel.String(),
 			"new_log_level", ls.slogLevel.Level().String(),
 			"send_interval", sendInterval.String(),

@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,8 +55,8 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		{
 			name: "happy path with signing keys and enroll secret",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
-				configStore := inmemory.NewStore(log.NewNopLogger())
-				agent.SetupKeys(log.NewNopLogger(), configStore)
+				configStore := inmemory.NewStore()
+				agent.SetupKeys(multislogger.NewNopLogger(), configStore)
 
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")

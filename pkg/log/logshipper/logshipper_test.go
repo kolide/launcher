@@ -58,7 +58,7 @@ func TestLogShipper(t *testing.T) {
 			// no device identifying attributes
 			logIngestUrl := "https://example.com"
 			knapsack.On("LogIngestServerURL").Return(logIngestUrl).Times(4)
-			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, log.NewNopLogger(), "test")).Once()
+			knapsack.On("ServerProvidedDataStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), "test")).Once()
 			ls.Ping()
 			require.False(t, ls.isShippingStarted, "shipping should not have stared since there are no device identifying attributes")
 			require.Equal(t, authToken, ls.sender.authtoken)
@@ -103,7 +103,7 @@ func TestLogShipper(t *testing.T) {
 
 			// update shipping level
 			knapsack.On("LogShippingLevel").Return("debug")
-			knapsack.On("Slogger").Return(multislogger.New().Logger)
+			knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			ls.Ping()
 			require.Equal(t, slog.LevelDebug.Level(), ls.slogLevel.Level(), "log shipper should set to debug")
 			require.Equal(t, authToken, ls.sender.authtoken)
@@ -137,7 +137,7 @@ func TestStop_Multiple(t *testing.T) {
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("LogShippingLevel").Return("debug")
-	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
@@ -192,7 +192,7 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("LogShippingLevel").Return("debug")
-	knapsack.On("Slogger").Return(multislogger.New().Logger)
+	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
@@ -208,7 +208,7 @@ var deviceIdentifyingAttributes = map[string]string{
 }
 
 func testKVStore(t *testing.T, name string) types.KVStore {
-	s, err := storageci.NewStore(t, log.NewNopLogger(), name)
+	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), name)
 
 	for k, v := range deviceIdentifyingAttributes {
 		s.Set([]byte(k), []byte(v))

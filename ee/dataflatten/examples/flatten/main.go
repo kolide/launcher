@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/kolide/kit/logutil"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 
@@ -40,12 +40,13 @@ func main() {
 		checkError(fmt.Errorf("parsing flags: %w", err))
 	}
 
-	logger := logutil.NewCLILogger(*flDebug)
-
 	opts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(logger),
+		dataflatten.WithSlogger(multislogger.New().Logger),
 		dataflatten.WithNestedPlist(),
 		dataflatten.WithQuery(strings.Split(*flQuery, `/`)),
+	}
+	if *flDebug {
+		opts = append(opts, dataflatten.WithDebugLogging())
 	}
 
 	rows := []dataflatten.Row{}
@@ -91,6 +92,4 @@ func main() {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", row.StringPath("/"), p, k, row.Value)
 	}
 	w.Flush()
-
-	return
 }

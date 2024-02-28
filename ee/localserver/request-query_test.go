@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -56,9 +55,9 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -74,6 +73,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			jsonBytes, err := json.Marshal(map[string]string{
 				"query": tt.query,
 			})
+			require.NoError(t, err)
 			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
 			require.NoError(t, err)
 
@@ -221,9 +221,9 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, log.NewNopLogger(), storage.ConfigStore.String()))
+			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
@@ -264,7 +264,6 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			}
 
 			require.Equal(t, mustMarshal(t, tt.expectedResult), rr.Body.Bytes())
-			return
 		})
 	}
 }

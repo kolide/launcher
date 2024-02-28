@@ -1,12 +1,13 @@
 package agent
 
 import (
+	"context"
 	"crypto"
 	"fmt"
+	"log/slog"
+	"runtime"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -28,19 +29,24 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
-	logger = log.With(logger, "component", "agentkeys")
+func SetupKeys(slogger *slog.Logger, store types.GetterSetterDeleter) error {
+	slogger = slogger.With("component", "agentkeys")
 
 	var err error
 
 	// Always setup a local key
-	localDbKeys, err = keys.SetupLocalDbKey(logger, store)
+	localDbKeys, err = keys.SetupLocalDbKey(slogger, store)
 	if err != nil {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
+	// Secure Enclave is not currently supported, so don't spend startup time waiting for it to work -- see keys_darwin.go for more details.
+	if runtime.GOOS == "darwin" {
+		return nil
+	}
+
 	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(logger, store)
+		hwKeys, err := setupHardwareKeys(slogger, store)
 		if err != nil {
 			return err
 		}
@@ -50,7 +56,10 @@ func SetupKeys(logger log.Logger, store types.GetterSetterDeleter) error {
 
 	if err != nil {
 		// Use of hardware keys is not fully implemented as of 2023-02-01, so log an error and move on
-		level.Info(logger).Log("msg", "failed to setting up hardware keys", "err", err)
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"failed setting up hardware keys",
+			"err", err,
+		)
 	}
 
 	return nil
@@ -98,7 +107,9 @@ func storeKeyData(store types.Setter, pri, pub []byte) error {
 // clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
 // nolint:unused
-func clearKeyData(logger log.Logger, deleter types.Deleter) {
-	level.Info(logger).Log("msg", "Clearing keys")
+func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"clearing keys",
+	)
 	_ = deleter.Delete([]byte(privateEccData), []byte(publicEccData))
 }

@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/url"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/ee/agent/types"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 )
 
 // Consumes notifications from control server
 type NotificationConsumer struct {
-	runner userProcessesRunner
-	logger log.Logger
+	runner  userProcessesRunner
+	slogger *slog.Logger
 }
 
 // The desktop runner fullfils this interface -- it exists for testing purposes.
@@ -31,18 +31,10 @@ const (
 
 type notificationConsumerOption func(*NotificationConsumer)
 
-func WithLogger(logger log.Logger) notificationConsumerOption {
-	return func(nc *NotificationConsumer) {
-		nc.logger = log.With(logger,
-			"component", NotificationSubsystem,
-		)
-	}
-}
-
-func NewNotifyConsumer(ctx context.Context, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
+func NewNotifyConsumer(ctx context.Context, k types.Knapsack, runner *desktopRunner.DesktopUsersProcessesRunner, opts ...notificationConsumerOption) (*NotificationConsumer, error) {
 	nc := &NotificationConsumer{
-		runner: runner,
-		logger: log.NewNopLogger(),
+		runner:  runner,
+		slogger: k.Slogger().With("component", NotificationSubsystem),
 	}
 
 	for _, opt := range opts {
@@ -59,7 +51,10 @@ func (nc *NotificationConsumer) Do(data io.Reader) error {
 
 	var notification notify.Notification
 	if err := json.NewDecoder(data).Decode(&notification); err != nil {
-		level.Debug(nc.logger).Log("msg", "received notification in unexpected format from K2, discarding", "err", err)
+		nc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received notification in unexpected format from K2, discarding",
+			"err", err,
+		)
 		return nil
 	}
 
@@ -75,11 +70,12 @@ func (nc *NotificationConsumer) notificationIsValid(notificationToCheck notify.N
 	if notificationToCheck.ActionUri != "" {
 		_, err := url.Parse(notificationToCheck.ActionUri)
 		if err != nil {
-			level.Debug(nc.logger).Log(
-				"msg", "received invalid action_uri from K2",
+			nc.slogger.Log(context.TODO(), slog.LevelWarn,
+				"received invalid action_uri from K2",
 				"notification_id", notificationToCheck.ID,
 				"action_uri", notificationToCheck.ActionUri,
-				"err", err)
+				"err", err,
+			)
 			return false
 		}
 	}

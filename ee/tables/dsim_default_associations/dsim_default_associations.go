@@ -7,13 +7,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -23,15 +22,15 @@ import (
 )
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns()
 
 	t := &Table{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_dsim_default_associations"),
 	}
 
 	return table.NewPlugin("kolide_dsim_default_associations", columns, t.generate)
@@ -42,19 +41,25 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	dismResults, err := t.execDism(ctx)
 	if err != nil {
-		level.Info(t.logger).Log("msg", "dism failed", "err", err)
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"dsim failed",
+			"err", err,
+		)
 		return results, err
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattenOpts := []dataflatten.FlattenOpts{
-			dataflatten.WithLogger(t.logger),
+			dataflatten.WithSlogger(t.slogger),
 			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 		}
 
 		rows, err := dataflatten.Xml(dismResults, flattenOpts...)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"flatten failed",
+				"err", err,
+			)
 			continue
 		}
 
@@ -90,7 +95,10 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	level.Debug(t.logger).Log("msg", "calling dism", "args", cmd.Args)
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling dsim",
+		"args", cmd.Args,
+	)
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)

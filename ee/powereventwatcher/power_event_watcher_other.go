@@ -4,8 +4,11 @@
 package powereventwatcher
 
 import (
-	"github.com/go-kit/kit/log"
+	"context"
+	"log/slog"
+
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type noOpPowerEventWatcher struct {
@@ -13,7 +16,10 @@ type noOpPowerEventWatcher struct {
 	interrupted bool
 }
 
-func New(_ types.Knapsack, _ log.Logger) (*noOpPowerEventWatcher, error) {
+func New(ctx context.Context, _ types.Knapsack, _ *slog.Logger) (*noOpPowerEventWatcher, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	return &noOpPowerEventWatcher{
 		interrupt: make(chan struct{}),
 	}, nil

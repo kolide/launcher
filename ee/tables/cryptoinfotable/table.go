@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/cryptoinfo"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -19,17 +18,17 @@ import (
 )
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("passphrase"),
 		table.TextColumn("path"),
 	)
 
 	t := &Table{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_cryptinfo"),
 	}
 
 	return table.NewPlugin("kolide_cryptoinfo", columns, t.generate)
@@ -48,7 +47,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		// We take globs in via the sql %, but glob needs *. So convert.
 		filePaths, err := filepath.Glob(strings.ReplaceAll(requestedPath, `%`, `*`))
 		if err != nil {
-			level.Info(t.logger).Log("msg", "bad file glob", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"bad file glob",
+				"err", err,
+			)
 			continue
 		}
 
@@ -57,15 +59,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				for _, passphrase := range tablehelpers.GetConstraints(queryContext, "passphrase", tablehelpers.WithDefaults("")) {
 
 					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithLogger(t.logger),
+						dataflatten.WithSlogger(t.slogger),
 						dataflatten.WithNestedPlist(),
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}
 
 					flatData, err := flattenCryptoInfo(filePath, passphrase, flattenOpts...)
 					if err != nil {
-						level.Info(t.logger).Log(
-							"msg", "failed to get data for path",
+						t.slogger.Log(ctx, slog.LevelInfo,
+							"failed to get data for path",
 							"path", filePath,
 							"err", err,
 						)

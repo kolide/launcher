@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
+	"github.com/pkg/errors"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -115,6 +116,12 @@ func runWindowsSvc(args []string) error {
 				"msg", "panic occurred in windows service",
 				"err", r,
 			)
+			if err, ok := r.(error); ok {
+				level.Info(logger).Log(
+					"msg", "panic stack trace",
+					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+				)
+			}
 			time.Sleep(time.Second)
 		}
 	}()

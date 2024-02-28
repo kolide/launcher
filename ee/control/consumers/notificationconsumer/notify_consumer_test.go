@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +29,8 @@ func TestUpdate_HappyPath(t *testing.T) {
 	mockNotifier := newNotifierMock()
 
 	testNc := &NotificationConsumer{
-		runner: mockNotifier,
-		logger: log.NewNopLogger(),
+		runner:  mockNotifier,
+		slogger: multislogger.New().Logger,
 	}
 
 	// Send one notification
@@ -64,8 +64,8 @@ func TestUpdate_HappyPath_NoAction(t *testing.T) {
 
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		runner: mockNotifier,
-		logger: log.NewNopLogger(),
+		runner:  mockNotifier,
+		slogger: multislogger.New().Logger,
 	}
 
 	// Send one notification that we haven't seen before
@@ -96,8 +96,8 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
-		runner: mockNotifier,
-		logger: log.NewNopLogger(),
+		runner:  mockNotifier,
+		slogger: multislogger.New().Logger,
 	}
 
 	tests := []struct {

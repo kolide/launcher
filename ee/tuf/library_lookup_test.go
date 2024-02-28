@@ -7,10 +7,42 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_getUpdateChannelFromStartupSettings(t *testing.T) {
+	t.Parallel()
+
+	expectedChannel := "beta"
+
+	// Set up an override for the channel in the startupsettings db
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte(expectedChannel)), "setting key")
+	require.NoError(t, store.Close(), "closing test db")
+
+	actualChannel, err := getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.NoError(t, err, "did not expect error getting update channel from startup settings")
+	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
+}
+
+func Test_getUpdateChannelFromStartupSettings_NotFound(t *testing.T) {
+	t.Parallel()
+
+	// Create a startupsettings db but don't set anything in it
+	rootDir := t.TempDir()
+	store, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, store.Close(), "closing test db")
+
+	_, err = getUpdateChannelFromStartupSettings(context.TODO(), rootDir)
+	require.Error(t, err, "should not have been able to get update channel when it is not set")
+}
 
 func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	t.Parallel()
@@ -45,7 +77,7 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.Chmod(tooRecentPath, 0755))
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
@@ -72,30 +104,11 @@ func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
 			require.NoError(t, err, "did not make test binary")
 
 			// Check it
-			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", log.NewNopLogger())
+			latest, err := CheckOutLatest(context.TODO(), binary, rootDir, "", "nightly", multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error on checking out latest")
 			require.Equal(t, executablePath, latest.Path)
 			require.Equal(t, executableVersion, latest.Version)
 		})
-	}
-}
-
-func TestCheckOutLatest_NotAvailableOnNonNightlyChannels(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
-		binary := binary
-		for _, channel := range []string{"beta", "stable"} {
-			channel := channel
-			t.Run(fmt.Sprintf("%s-%s", binary, channel), func(t *testing.T) {
-				t.Parallel()
-
-				rootDir := t.TempDir()
-
-				_, err := CheckOutLatest(context.TODO(), binary, rootDir, "", channel, log.NewNopLogger())
-				require.Error(t, err, "expected error when using new TUF lookup on channel that should be using legacy")
-			})
-		}
 	}
 }
 
@@ -124,7 +137,7 @@ func Test_mostRecentVersion(t *testing.T) {
 			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, secondVersionPath, latest.Path)
 			require.Equal(t, secondVersion, latest.Version)
@@ -156,7 +169,7 @@ func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			os.WriteFile(secondVersionPath, []byte{}, 0755)
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, latest.Path)
 			require.Equal(t, firstVersion, latest.Version)
@@ -175,44 +188,43 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 			// Create update directories
 			testBaseDir := t.TempDir()
 
-			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir)
+			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
 			require.Error(t, err, "should have returned error when there are no available updates")
 		})
 	}
 }
 
-func TestChannelUsesNewAutoupdater(t *testing.T) {
+func Test_mostRecentVersion_requiresLauncher_v1_4_1(t *testing.T) {
 	t.Parallel()
 
-	channelsForTest := []struct {
-		channelName        string
-		usesNewAutoupdater bool
-	}{
-		{
-			channelName:        "nightly",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "alpha",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "stable",
-			usesNewAutoupdater: false,
-		},
-		{
-			channelName:        "beta",
-			usesNewAutoupdater: true,
-		},
-		{
-			channelName:        "",
-			usesNewAutoupdater: false,
-		},
-	}
+	testBaseDir := t.TempDir()
 
-	for _, channel := range channelsForTest {
-		require.Equal(t, channel.usesNewAutoupdater, ChannelUsesNewAutoupdater(channel.channelName))
-	}
+	// Create a version in the update library that is too old
+	firstVersionTarget := "launcher-1.2.3.tar.gz"
+	firstVersionPath, _ := pathToTargetVersionExecutable(binaryLauncher, firstVersionTarget, testBaseDir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+	tufci.CopyBinary(t, firstVersionPath)
+	require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+	_, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	require.Error(t, err, "should not select launcher version under v1.4.1")
+}
+
+func Test_mostRecentVersion_acceptsLauncher_v1_4_1(t *testing.T) {
+	t.Parallel()
+
+	testBaseDir := t.TempDir()
+
+	// Create a version in the update library that is too old
+	firstVersionTarget := "launcher-1.4.1.tar.gz"
+	firstVersionPath, _ := pathToTargetVersionExecutable(binaryLauncher, firstVersionTarget, testBaseDir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(firstVersionPath), 0755))
+	tufci.CopyBinary(t, firstVersionPath)
+	require.NoError(t, os.Chmod(firstVersionPath, 0755))
+
+	latest, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	require.NoError(t, err, "should be able to select launcher version equal to v1.4.1")
+	require.Equal(t, firstVersionPath, latest.Path)
 }
 
 func Test_getAutoupdateConfig_ConfigFlagSet(t *testing.T) {
@@ -238,14 +250,24 @@ transport jsonrpc
 
 	require.NoError(t, os.WriteFile(configFilepath, []byte(fileContents), 0755), "expected to set up test config file")
 
-	cfg, err := getAutoupdateConfig([]string{"--config", configFilepath})
+	cfg1, err := getAutoupdateConfig([]string{"--config", configFilepath})
 	require.NoError(t, err, "expected no error getting autoupdate config")
 
-	require.NotNil(t, cfg, "expected valid autoupdate config")
-	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
-	require.Equal(t, "", cfg.updateDirectory, "update directory should not have been set")
-	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
-	require.Equal(t, "", cfg.localDevelopmentPath, "local development path should not have been set")
+	require.NotNil(t, cfg1, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg1.rootDirectory, "root directory is incorrect")
+	require.Equal(t, "", cfg1.updateDirectory, "update directory should not have been set")
+	require.Equal(t, testChannel, cfg1.channel, "channel is incorrect")
+	require.Equal(t, "", cfg1.localDevelopmentPath, "local development path should not have been set")
+
+	// Same thing, just one - instead of 2
+	cfg2, err := getAutoupdateConfig([]string{"-config", configFilepath})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg2, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg2.rootDirectory, "root directory is incorrect")
+	require.Equal(t, "", cfg2.updateDirectory, "update directory should not have been set")
+	require.Equal(t, testChannel, cfg2.channel, "channel is incorrect")
+	require.Equal(t, "", cfg2.localDevelopmentPath, "local development path should not have been set")
 }
 
 func Test_getAutoupdateConfig_ConfigFlagNotSet(t *testing.T) {
@@ -264,6 +286,32 @@ func Test_getAutoupdateConfig_ConfigFlagNotSet(t *testing.T) {
 		"--update_channel", testChannel,
 		"--localdev_path", testLocaldevPath,
 		"--transport", "jsonrpc",
+	})
+	require.NoError(t, err, "expected no error getting autoupdate config")
+
+	require.NotNil(t, cfg, "expected valid autoupdate config")
+	require.Equal(t, testRootDir, cfg.rootDirectory, "root directory is incorrect")
+	require.Equal(t, testUpdateDir, cfg.updateDirectory, "update directory is incorrect")
+	require.Equal(t, testChannel, cfg.channel, "channel is incorrect")
+	require.Equal(t, testLocaldevPath, cfg.localDevelopmentPath, "local development path is incorrect")
+}
+
+func Test_getAutoupdateConfig_ConfigFlagNotSet_SingleHyphen(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testUpdateDir := t.TempDir()
+	testChannel := "nightly"
+	testLocaldevPath := filepath.Join("some", "path", "to", "a", "local", "build")
+
+	cfg, err := getAutoupdateConfig([]string{
+		"-root_directory", testRootDir,
+		"-osquery_flag", "enable_watchdog_debug=true",
+		"-update_directory", testUpdateDir,
+		"-autoupdate",
+		"-update_channel", testChannel,
+		"-localdev_path", testLocaldevPath,
+		"-transport", "jsonrpc",
 	})
 	require.NoError(t, err, "expected no error getting autoupdate config")
 

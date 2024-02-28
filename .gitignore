@@ -21,12 +21,6 @@ test-cmds
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
-# TUF metadata
-pkg/autoupdate/assets/
-pkg/autoupdate/bindata.go
-tools/notary/config/private
-tools/notary/config/tuf
-
 # Generated assets
 pkg/packagekit/internal/assets.go
 pkg/packagekit/wix/internal/assets.go

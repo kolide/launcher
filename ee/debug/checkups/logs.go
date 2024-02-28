@@ -46,6 +46,7 @@ func (c *Logs) Run(_ context.Context, fullFH io.Writer) error {
 	defer logZip.Close()
 
 	matches, _ := filepath.Glob(filepath.Join(c.k.RootDirectory(), "debug*"))
+
 	for _, f := range matches {
 		out, err := logZip.Create(filepath.Base(f))
 		if err != nil {

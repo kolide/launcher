@@ -13,10 +13,9 @@ import (
 )
 import (
 	"context"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -26,16 +25,16 @@ import (
 var updatesData []map[string]interface{}
 
 type Table struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
-func RecommendedUpdates(logger log.Logger) *table.Plugin {
+func RecommendedUpdates(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_macos_recommended_updates"
 
 	t := &Table{
-		logger: log.With(logger, "table", tableName),
+		slogger: slogger.With("table", tableName),
 	}
 
 	return table.NewPlugin(tableName, columns, t.generate)
@@ -47,9 +46,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	data := getUpdates()
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flattened, err := dataflatten.Flatten(data, dataflatten.WithLogger(t.logger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
+		flattened, err := dataflatten.Flatten(data, dataflatten.WithSlogger(t.slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
 		if err != nil {
-			level.Info(t.logger).Log("msg", "Error flattening data", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"error flattening data",
+				"err", err,
+			)
 			return nil, nil
 		}
 		results = append(results, dataflattentable.ToMap(flattened, dataQuery, nil)...)

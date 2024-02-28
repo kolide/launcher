@@ -149,20 +149,15 @@ func runMake(args []string) error {
 			env.String("TARGETS", defaultTargets()),
 			"Target platforms to build. Specified in the form platform-init-package",
 		)
-		flNotaryURL = flagset.String(
-			"notary_url",
-			env.String("NOTARY_URL", ""),
-			"The Notary update server",
+		flTufURL = flagset.String(
+			"tuf_url",
+			env.String("TUF_URL", ""),
+			"The TUF update server",
 		)
 		flMirrorURL = flagset.String(
 			"mirror_url",
 			env.String("MIRROR_URL", ""),
 			"The mirror server for autoupdates",
-		)
-		flNotaryPrefix = flagset.String(
-			"notary_prefix",
-			env.String("NOTARY_PREFIX", ""),
-			"The prefix for Notary path that contains the collections",
 		)
 		flWixPath = flagset.String(
 			"wix_path",
@@ -208,7 +203,7 @@ func runMake(args []string) error {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if *flHostname == "" {
-		return errors.New("Hostname undefined")
+		return errors.New("hostname undefined")
 	}
 
 	// Validate that pinned certs are valid hex
@@ -248,9 +243,8 @@ func runMake(args []string) error {
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
 		CacheDir:          cacheDir,
-		NotaryURL:         *flNotaryURL,
+		TufServerURL:      *flTufURL,
 		MirrorURL:         *flMirrorURL,
-		NotaryPrefix:      *flNotaryPrefix,
 		WixPath:           *flWixPath,
 		WixSkipCleanup:    *flWixSkipCleanup,
 		DisableService:    *flDisableService,
@@ -261,7 +255,7 @@ func runMake(args []string) error {
 	// NOTE: if you are using docker-for-mac, you probably need to set the TMPDIR env to /tmp
 	if outputDir == "" {
 		var err error
-		outputDir, err = os.MkdirTemp("", fmt.Sprintf("launcher-package"))
+		outputDir, err = os.MkdirTemp("", "launcher-package")
 		if err != nil {
 			return fmt.Errorf("making output dir: %w", err)
 		}
@@ -279,7 +273,7 @@ func runMake(args []string) error {
 		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
 		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
 		if err != nil {
-			return fmt.Errorf("Failed to make package output file: %w", err)
+			return fmt.Errorf("failed to make package output file: %w", err)
 		}
 		defer outputFile.Close()
 

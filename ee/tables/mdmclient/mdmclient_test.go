@@ -4,11 +4,12 @@
 package mdmclient
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,7 +42,7 @@ func TestTransformOutput(t *testing.T) {
 		},
 	}
 
-	table := Table{logger: log.NewNopLogger()}
+	table := Table{slogger: multislogger.New().Logger}
 
 	for _, tt := range tests {
 		tt := tt
@@ -51,7 +52,7 @@ func TestTransformOutput(t *testing.T) {
 			input, err := os.ReadFile(filepath.Join("testdata", tt.in))
 			require.NoError(t, err, "read input file")
 
-			output, err := table.flattenOutput("", input)
+			output, err := table.flattenOutput(context.TODO(), "", input)
 			require.NoError(t, err, "flatten")
 			require.Equal(t, tt.expectedRows, len(output))
 

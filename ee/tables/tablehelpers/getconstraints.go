@@ -1,10 +1,11 @@
 package tablehelpers
 
 import (
+	"context"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -12,15 +13,15 @@ type constraintOptions struct {
 	allowedCharacters string
 	allowedValues     []string
 	defaults          []string
-	logger            log.Logger
+	slogger           *slog.Logger
 }
 
 type GetConstraintOpts func(*constraintOptions)
 
 // WithLogger sets the logger to use
-func WithLogger(logger log.Logger) GetConstraintOpts {
+func WithSlogger(slogger *slog.Logger) GetConstraintOpts {
 	return func(co *constraintOptions) {
-		co.logger = logger
+		co.slogger = slogger
 	}
 }
 
@@ -50,7 +51,7 @@ func WithAllowedValues(allowed []string) GetConstraintOpts {
 func GetConstraints(queryContext table.QueryContext, columnName string, opts ...GetConstraintOpts) []string {
 
 	co := &constraintOptions{
-		logger: log.NewNopLogger(),
+		slogger: multislogger.New().Logger,
 	}
 
 	for _, opt := range opts {
@@ -67,11 +68,12 @@ func GetConstraints(queryContext table.QueryContext, columnName string, opts ...
 	for _, c := range q.Constraints {
 		// No point in checking allowed characters, if we have an allowedValues. Just use it.
 		if len(co.allowedValues) == 0 && !co.OnlyAllowedCharacters(c.Expression) {
-			level.Info(co.logger).Log(
-				"msg", "Disallowed character in expression",
+			co.slogger.Log(context.TODO(), slog.LevelInfo,
+				"disallowed character in expression",
 				"column", columnName,
 				"expression", c.Expression,
 			)
+
 			continue
 		}
 
@@ -85,8 +87,8 @@ func GetConstraints(queryContext table.QueryContext, columnName string, opts ...
 			}
 
 			if skip {
-				level.Info(co.logger).Log(
-					"msg", "Disallowed value in expression",
+				co.slogger.Log(context.TODO(), slog.LevelInfo,
+					"disallowed character in expression",
 					"column", columnName,
 					"expression", c.Expression,
 				)

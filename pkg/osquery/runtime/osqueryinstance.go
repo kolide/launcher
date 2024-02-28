@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,12 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
@@ -136,11 +135,11 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 	}
 }
 
-// WithLogger is a functional option which allows the user to pass a log.Logger
+// WithSlogger is a functional option which allows the user to pass a *slog.Logger
 // to be used for logging osquery instance status.
-func WithLogger(logger log.Logger) OsqueryInstanceOption {
+func WithSlogger(slogger *slog.Logger) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
-		i.logger = logger
+		i.slogger = slogger
 	}
 }
 
@@ -214,14 +213,6 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 	}
 }
 
-// WithAutoloadedExtensions defines a list of extensions to load
-// via the osquery autoloading.
-func WithAutoloadedExtensions(extensions ...string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.autoloadedExtensions = append(i.opts.autoloadedExtensions, extensions...)
-	}
-}
-
 func WithKnapsack(k types.Knapsack) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.knapsack = k
@@ -231,8 +222,8 @@ func WithKnapsack(k types.Knapsack) OsqueryInstanceOption {
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	opts   osqueryOptions
-	logger log.Logger
+	opts    osqueryOptions
+	slogger *slog.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	errgroup                *errgroup.Group
@@ -317,7 +308,6 @@ type osqueryOptions struct {
 	configPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
-	autoloadedExtensions  []string
 	extensionSocketPath   string
 	enrollSecretPath      string
 	loggerPluginFlag      string
@@ -344,7 +334,7 @@ func (o osqueryOptions) requiredExtensions() []string {
 	extensionsMap := make(map[string]bool)
 	requiredExtensions := make([]string, 0)
 
-	for _, extension := range append([]string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag}, o.autoloadedExtensions...) {
+	for _, extension := range []string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag} {
 		// skip the osquery build-ins, since requiring them will cause osquery to needlessly wait.
 		if extension == "tls" {
 			continue
@@ -368,7 +358,7 @@ func newInstance() *OsqueryInstance {
 	i.cancel = cancel
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
-	i.logger = log.NewNopLogger()
+	i.slogger = multislogger.New().Logger
 
 	i.startFunc = func(cmd *exec.Cmd) error {
 		return cmd.Start()
@@ -384,7 +374,6 @@ type osqueryFilePaths struct {
 	databasePath          string
 	extensionAutoloadPath string
 	extensionSocketPath   string
-	extensionPaths        []string
 	pidfilePath           string
 }
 
@@ -409,7 +398,6 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		augeasPath:            filepath.Join(opts.rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
-		extensionPaths:        make([]string, len(opts.autoloadedExtensions)),
 	}
 
 	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
@@ -417,41 +405,6 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 		return nil, fmt.Errorf("creating autoload file: %w", err)
 	}
 	defer osqueryAutoloadFile.Close()
-
-	if len(opts.autoloadedExtensions) == 0 {
-		return osqueryFilePaths, nil
-	}
-
-	// Determine the path to the extension
-	exPath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("finding path of launcher executable: %w", err)
-	}
-
-	for index, extension := range opts.autoloadedExtensions {
-		// first see if we just got a file name and check to see if it exists in the executable directory
-		extensionPath := filepath.Join(autoupdate.FindBaseDir(exPath), extension)
-
-		if _, err := os.Stat(extensionPath); err != nil {
-			// if we got an error, try the raw flag
-			extensionPath = extension
-
-			if _, err := os.Stat(extensionPath); err != nil {
-				if os.IsNotExist(err) {
-					return nil, fmt.Errorf("extension path does not exist: %s: %w", extension, err)
-				} else {
-					return nil, fmt.Errorf("could not stat extension path: %w", err)
-				}
-			}
-		}
-
-		osqueryFilePaths.extensionPaths[index] = extensionPath
-
-		_, err := osqueryAutoloadFile.WriteString(fmt.Sprintf("%s\n", extensionPath))
-		if err != nil {
-			return nil, fmt.Errorf("writing to autoload file: %w", err)
-		}
-	}
 
 	return osqueryFilePaths, nil
 }
@@ -591,9 +544,10 @@ func (o *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
 func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin) error {
-	logger := log.With(o.logger, "extensionMangerServer", name)
-
-	level.Debug(logger).Log("msg", "Starting startOsqueryExtensionManagerServer")
+	o.slogger.Log(context.TODO(), slog.LevelDebug,
+		"starting startOsqueryExtensionManagerServer",
+		"extension_name", name,
+	)
 
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
@@ -606,7 +560,11 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
-		level.Debug(logger).Log("msg", "could not create an extension server", "err", err)
+		o.slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not create an extension server",
+			"extension_name", name,
+			"err", err,
+		)
 		return fmt.Errorf("could not create an extension server: %w", err)
 	}
 
@@ -619,10 +577,18 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	// Start!
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "run extension manager server", "extension_name", name)
+		defer o.slogger.Log(context.TODO(), slog.LevelDebug,
+			"exiting errgroup",
+			"errgroup", "run extension manager server",
+			"extension_name", name,
+		)
 
 		if err := extensionManagerServer.Start(); err != nil {
-			level.Info(logger).Log("msg", "Extension manager server startup got error", "err", err, "extension_name", name)
+			o.slogger.Log(context.TODO(), slog.LevelInfo,
+				"extension manager server startup got error",
+				"err", err,
+				"extension_name", name,
+			)
 			return fmt.Errorf("running extension server: %w", err)
 		}
 		return errors.New("extension manager server exited")
@@ -630,13 +596,23 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	// register a shutdown routine
 	o.errgroup.Go(func() error {
-		defer level.Info(o.logger).Log("msg", "exiting errgroup", "errgroup", "shut down extension manager server", "extension_name", name)
+		defer o.slogger.Log(context.TODO(), slog.LevelDebug,
+			"exiting errgroup",
+			"errgroup", "shut down extension manager server",
+			"extension_name", name,
+		)
 
 		<-o.doneCtx.Done()
-		level.Debug(logger).Log("msg", "Starting extension shutdown")
+
+		o.slogger.Log(context.TODO(), slog.LevelDebug,
+			"exiting errgroup",
+			"errgroup", "starting extension shutdown",
+			"extension_name", name,
+		)
+
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
-			level.Info(o.logger).Log(
-				"msg", "Got error while shutting down extension server",
+			o.slogger.Log(context.TODO(), slog.LevelInfo,
+				"got error while shutting down extension server",
 				"err", err,
 				"extension_name", name,
 			)
@@ -644,7 +620,10 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		return o.doneCtx.Err()
 	})
 
-	level.Debug(logger).Log("msg", "Clean finish startOsqueryExtensionManagerServer")
+	o.slogger.Log(context.TODO(), slog.LevelDebug,
+		"clean finish startOsqueryExtensionManagerServer",
+		"extension_name", name,
+	)
 
 	return nil
 }

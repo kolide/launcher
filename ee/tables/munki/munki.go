@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -27,7 +26,7 @@ func New() *MunkiInfo {
 	}
 }
 
-func (m *MunkiInfo) MunkiReport(logger log.Logger) *table.Plugin {
+func (m *MunkiInfo) MunkiReport() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("version"),
 		table.TextColumn("start_time"),
@@ -41,7 +40,7 @@ func (m *MunkiInfo) MunkiReport(logger log.Logger) *table.Plugin {
 	return table.NewPlugin("kolide_munki_report", columns, m.generateMunkiReport)
 }
 
-func (m *MunkiInfo) ManagedInstalls(logger log.Logger) *table.Plugin {
+func (m *MunkiInfo) ManagedInstalls() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("installed_version"),
 		table.TextColumn("installed"),

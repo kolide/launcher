@@ -56,6 +56,12 @@ func (c *Processes) Run(ctx context.Context, fullWriter io.Writer) error {
 		exe, _ := p.Exe()
 		if strings.Contains(strings.ToLower(exe), "kolide") {
 			c.kolideCount += 1
+
+			// Grab ENV vars -- available on windows/linux but not darwin;
+			// included primarily for troubleshooting browser opening issues
+			// on linux
+			pMap["env"] = naIfError(p.EnvironWithContext(ctx))
+
 			c.data[fmt.Sprintf("%d", p.Pid)] = pMap
 
 			if !c.kolideRunningAsRoot {

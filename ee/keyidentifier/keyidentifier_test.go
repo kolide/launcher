@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kolide/kit/logutil"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,12 +21,10 @@ type spec struct {
 func TestIdentifyFiles(t *testing.T) {
 	t.Parallel()
 
-	kIdentifier, err := New(WithLogger(logutil.NewCLILogger(true)))
+	kIdentifier, err := New(WithSlogger(multislogger.NewNopLogger()))
 	require.NoError(t, err)
 
-	testFiles := []string{}
-
-	testFiles, err = filepath.Glob("testdata/specs/*.json")
+	testFiles, err := filepath.Glob("testdata/specs/*.json")
 	require.NoError(t, err, "error in filepath.Glob")
 
 	for _, specPath := range testFiles {

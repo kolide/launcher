@@ -6,22 +6,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func getStores(t *testing.T) []types.KVStore {
-	logger := log.NewNopLogger()
 	db := SetupDB(t)
-	bboltStore, err := agentbbolt.NewStore(logger, db, "test_bucket")
+	bboltStore, err := agentbbolt.NewStore(multislogger.NewNopLogger(), db, "test_bucket")
 	require.NoError(t, err)
 
 	stores := []types.KVStore{
-		inmemory.NewStore(logger),
+		inmemory.NewStore(),
 		bboltStore,
 	}
 	return stores
@@ -151,6 +150,52 @@ func Test_Delete(t *testing.T) {
 				}
 				s.ForEach(rowFn)
 				assert.Equal(t, tt.expectedRecordCount, recordCount)
+			}
+		})
+	}
+}
+
+func Test_DeleteAll(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sets map[string]string
+	}{
+		{
+			name: "empty",
+			sets: map[string]string{},
+		},
+		{
+			name: "one value",
+			sets: map[string]string{"key1": "value1"},
+		},
+		{
+			name: "multiple values",
+			sets: map[string]string{"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, s := range getStores(t) {
+				for k, v := range tt.sets {
+					err := s.Set([]byte(k), []byte(v))
+					require.NoError(t, err)
+				}
+
+				require.NoError(t, s.DeleteAll())
+
+				// There should be no records, count and verify
+				var recordCount int
+				rowFn := func(k, v []byte) error {
+					recordCount = recordCount + 1
+					return nil
+				}
+				s.ForEach(rowFn)
+				assert.Equal(t, 0, recordCount)
 			}
 		})
 	}

@@ -13,14 +13,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 )
 
 // HTTPClient handles retrieving control data via HTTP
 type HTTPClient struct {
-	logger     log.Logger
 	addr       string
 	baseURL    *url.URL
 	client     *http.Client
@@ -44,13 +42,12 @@ type configResponse struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func NewControlHTTPClient(logger log.Logger, addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
 	}
 	c := &HTTPClient{
-		logger:  logger,
 		baseURL: baseURL,
 		client:  client,
 		addr:    addr,
@@ -151,6 +148,47 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 
 	reader := bytes.NewReader(dataRaw)
 	return reader, nil
+}
+
+// SendMessage sends a message to the server using JSON-RPC format
+func (c *HTTPClient) SendMessage(method string, params interface{}) error {
+	if c.token == "" {
+		return errors.New("token is nil, cannot send message to server")
+	}
+
+	bodyMap := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+	}
+
+	if params == nil {
+		delete(bodyMap, "params")
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return fmt.Errorf("could not marshal message body: %w", err)
+	}
+
+	const maxMessageSize = 1024
+	if len(body) > maxMessageSize {
+		return fmt.Errorf("message size %d exceeds maximum size %d", len(body), maxMessageSize)
+	}
+
+	dataReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("could not create server message: %w", err)
+	}
+
+	dataReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	dataReq.Header.Set("Content-Type", "application/json")
+	dataReq.Header.Set("Accept", "application/json")
+
+	// we don't care about the response here, just want to know
+	// if there was an error sending our request
+	_, err = c.do(dataReq)
+	return err
 }
 
 // TODO: this should probably just return a io.Reader

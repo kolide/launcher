@@ -1,15 +1,18 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
+	servermocks "github.com/kolide/launcher/ee/desktop/runner/server/mocks"
 	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +23,9 @@ func TestRootServer(t *testing.T) {
 	mockSack := mocks.NewKnapsack(t)
 	mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
 
-	monitorServer, err := New(log.NewNopLogger(), mockSack)
+	messenger := servermocks.NewMessenger(t)
+
+	monitorServer, err := New(multislogger.New().Logger, mockSack, messenger)
 	require.NoError(t, err)
 
 	go func() {
@@ -43,6 +48,28 @@ func TestRootServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, response.StatusCode)
 
+	response, err = client.Post(endpointUrl(monitorServer.Url(), MessageEndpoint), "application/json", nil)
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	response, err = client.Post(endpointUrl(monitorServer.Url(), MessageEndpoint), "application/json", bytes.NewReader([]byte(`{"method":""}`)))
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	messenger.On("SendMessage", "test", mock.Anything).Return(errors.New("some error")).Once()
+	response, err = client.Post(endpointUrl(monitorServer.Url(), MessageEndpoint), "application/json", bytes.NewReader([]byte(`{"method":"test"}`)))
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusInternalServerError, response.StatusCode)
+
+	messenger.On("SendMessage", "test", mock.Anything).Return(nil).Once()
+	response, err = client.Post(endpointUrl(monitorServer.Url(), MessageEndpoint), "application/json", bytes.NewReader([]byte(`{"method":"test"}`)))
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.StatusCode)
+
 	// deregister and make sure we get unauthorized status codes
 	monitorServer.DeRegisterClient("0")
 
@@ -52,6 +79,11 @@ func TestRootServer(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 
 	response, err = client.Get(endpointUrl(monitorServer.Url(), MenuOpenedEndpoint))
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
+
+	response, err = client.Post(endpointUrl(monitorServer.Url(), MessageEndpoint), "application/json", nil)
 	require.NoError(t, response.Body.Close())
 	require.NoError(t, err)
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)

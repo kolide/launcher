@@ -4,6 +4,7 @@
 package tuf
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
 	"golang.org/x/sys/windows"
@@ -27,7 +28,7 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(testBaseDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -63,7 +64,7 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 			t.Parallel()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, log.NewNopLogger())
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.New().Logger)
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.

@@ -3,18 +3,19 @@ package main
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
-	runnerServer, err := runnerserver.New(log.NewNopLogger(), nil)
+	runnerServer, err := runnerserver.New(multislogger.New().Logger, nil, nil)
 	require.NoError(t, err)
 
 	// register client and get token
@@ -23,8 +24,13 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	monitorInterval := 250 * time.Millisecond
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
 	go func() {
-		monitorParentProcess(log.NewLogfmtLogger(&logBytes), runnerServer.Url(), token, monitorInterval)
+		monitorParentProcess(slogger, runnerServer.Url(), token, monitorInterval)
 	}()
 
 	time.Sleep(monitorInterval * 2)

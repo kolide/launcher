@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 type (
@@ -196,14 +196,16 @@ func (tc *tufCheckup) selectedVersions() map[string]map[string]string {
 		"osqueryd": make(map[string]string),
 	}
 
-	if launcherVersion, err := tuf.CheckOutLatestWithoutConfig("launcher", log.NewNopLogger()); err != nil {
+	nopLogger := multislogger.New().Logger
+
+	if launcherVersion, err := tuf.CheckOutLatestWithoutConfig("launcher", nopLogger); err != nil {
 		selectedVersions["launcher"]["path"] = fmt.Sprintf("error checking out latest version: %v", err)
 	} else {
 		selectedVersions["launcher"]["path"] = launcherVersion.Path
 		selectedVersions["launcher"]["version"] = launcherVersion.Version
 	}
 
-	if osquerydVersion, err := tuf.CheckOutLatestWithoutConfig("osqueryd", log.NewNopLogger()); err != nil {
+	if osquerydVersion, err := tuf.CheckOutLatestWithoutConfig("osqueryd", nopLogger); err != nil {
 		selectedVersions["osqueryd"]["path"] = fmt.Sprintf("error checking out latest version: %v", err)
 	} else {
 		selectedVersions["osqueryd"]["path"] = osquerydVersion.Path

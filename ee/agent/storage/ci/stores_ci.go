@@ -2,10 +2,10 @@ package storageci
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"go.etcd.io/bbolt"
 
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -15,12 +15,13 @@ import (
 )
 
 // MakeStores creates all the KVStores used by launcher
-func MakeStores(t *testing.T, logger log.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
+func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
 	var storeNames = []storage.Store{
 		storage.AgentFlagsStore,
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
+		storage.PersistentHostDataStore,
 		storage.InitialResultsStore,
 		storage.ResultLogsStore,
 		storage.OsqueryHistoryInstanceStore,
@@ -31,27 +32,27 @@ func MakeStores(t *testing.T, logger log.Logger, db *bbolt.DB) (map[storage.Stor
 	}
 
 	if os.Getenv("CI") == "true" {
-		return makeInMemoryStores(t, logger, storeNames), nil
+		return makeInMemoryStores(t, storeNames), nil
 	}
 
-	return makeBboltStores(t, logger, db, storeNames)
+	return makeBboltStores(t, slogger, db, storeNames)
 }
 
-func makeInMemoryStores(t *testing.T, logger log.Logger, storeNames []storage.Store) map[storage.Store]types.KVStore {
+func makeInMemoryStores(t *testing.T, storeNames []storage.Store) map[storage.Store]types.KVStore {
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		stores[storeName] = inmemory.NewStore(logger)
+		stores[storeName] = inmemory.NewStore()
 	}
 
 	return stores
 }
 
-func makeBboltStores(t *testing.T, logger log.Logger, db *bbolt.DB, storeNames []storage.Store) (map[storage.Store]types.KVStore, error) {
+func makeBboltStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB, storeNames []storage.Store) (map[storage.Store]types.KVStore, error) {
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		store, err := agentbbolt.NewStore(logger, db, storeName.String())
+		store, err := agentbbolt.NewStore(slogger, db, storeName.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create '%s' KVStore: %w", storeName, err)
 		}

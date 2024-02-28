@@ -3,9 +3,9 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/flags/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +84,7 @@ func TestIntFlagValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := NewIntFlagValue(log.NewNopLogger(), keys.ControlRequestInterval, tt.options...)
+			d := NewIntFlagValue(multislogger.New().Logger, keys.ControlRequestInterval, tt.options...)
 			require.NotNil(t, d)
 
 			val := d.get(tt.controlServerValue)

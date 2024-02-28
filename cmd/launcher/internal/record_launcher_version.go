@@ -1,12 +1,14 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 const (
@@ -22,7 +24,10 @@ const (
 // Both launcher, and osquery, are based around there only being a
 // single instance of them running in a given root directory. As such,
 // this writes a single file, cleans up any old ones.
-func RecordLauncherVersion(rootDir string) error {
+func RecordLauncherVersion(ctx context.Context, rootDir string) error {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	verFile := makeFilePath(rootDir, version.Version().Version)
 
 	existingFiles, err := filepath.Glob(makeFilePath(rootDir, "*"))

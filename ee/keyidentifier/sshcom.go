@@ -85,7 +85,7 @@ func ParseSshComPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	case strings.HasPrefix(keyType, "dl-modp{sign{dsa"):
 		ki.Type = "ssh-dss"
 	default:
-		return nil, fmt.Errorf("Unknown key type: %s", keyType)
+		return nil, fmt.Errorf("unknown key type: %s", keyType)
 	}
 
 	return ki, nil

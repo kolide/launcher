@@ -13,11 +13,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -28,19 +27,19 @@ import (
 const pwpolicyCmd = "getaccountpolicies"
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 	execCC    allowedcmd.AllowedCommand
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("username"),
 	)
 
 	t := &Table{
-		logger:    logger,
+		slogger:   slogger.With("table", "kolide_pwpolicy"),
 		tableName: "kolide_pwpolicy",
 		execCC:    allowedcmd.Pwpolicy,
 	}
@@ -61,18 +60,24 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			pwPolicyOutput, err := t.execPwpolicy(ctx, pwpolicyArgs)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "pwpolicy failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"pwpolicy failed",
+					"err", err,
+				)
 				continue
 			}
 
 			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithLogger(t.logger),
+				dataflatten.WithSlogger(t.slogger),
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
 			flatData, err := dataflatten.Plist(pwPolicyOutput, flattenOpts...)
 			if err != nil {
-				level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
 				continue
 			}
 
@@ -101,10 +106,13 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	level.Debug(t.logger).Log("msg", "calling pwpolicy", "args", cmd.Args)
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling pwpolicy",
+		"args", cmd.Args,
+	)
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", stderr.String(), err)
 	}
 
 	// Remove first line of output because it always contains non-plist content

@@ -4,7 +4,7 @@
 
 Requirements:
 * Repository checkout (Not dependent on `$GOPATH`)
-* Recent go (currently depends on 1.16)
+* Recent go (currently depends on 1.21)
 * [`zig`](https://ziglang.org/) compiler, if and only if, cross compiling for linux
 
 Then, from your checkout, run:

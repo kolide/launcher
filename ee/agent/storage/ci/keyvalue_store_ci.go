@@ -2,11 +2,11 @@ package storageci
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -18,12 +18,12 @@ const (
 	dbTestFileName = "test.db"
 )
 
-func NewStore(t *testing.T, logger log.Logger, bucketName string) (types.KVStore, error) {
+func NewStore(t *testing.T, slogger *slog.Logger, bucketName string) (types.KVStore, error) {
 	if os.Getenv("CI") == "true" {
-		return inmemory.NewStore(logger), nil
+		return inmemory.NewStore(), nil
 	}
 
-	return agentbbolt.NewStore(logger, SetupDB(t), bucketName)
+	return agentbbolt.NewStore(slogger, SetupDB(t), bucketName)
 }
 
 // SetupDB is used for creating bbolt databases for testing

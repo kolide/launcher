@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/user"
@@ -13,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -113,6 +114,9 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			t.Parallel()
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
@@ -120,6 +124,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Slogger").Return(slogger)
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
@@ -129,7 +134,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			r, err := New(
 				mockKnapsack,
-				WithLogger(log.NewLogfmtLogger(&logBytes)),
+				nil,
 				WithExecutablePath(executablePath),
 				WithInterruptTimeout(time.Second*5),
 				WithAuthToken("test-auth-token"),
@@ -292,9 +297,10 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
+			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 			dir := t.TempDir()
-			r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
+			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
 			require.NoError(t, err)
 
 			if tt.err {
@@ -325,9 +331,10 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
+	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
 
 	dir := t.TempDir()
-	r, err := New(mockKnapsack, WithUsersFilesRoot(dir))
+	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
 	require.NoError(t, err)
 
 	require.Equal(t, 0, len(r.uidProcs))
@@ -364,6 +371,7 @@ func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 
 	// sanity check that files got created
 	count, err := countFilesWithPrefix(socketDir, "")
+	require.NoError(t, err)
 	require.Equal(t, 4, count)
 
 	// calling set up socket path should remove the fake socket files

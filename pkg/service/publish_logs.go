@@ -113,7 +113,7 @@ func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (inte
 func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(publishLogsResponse)
 	if !ok {
-		return encodeJSONResponse(nil, fmt.Errorf("Asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj))
+		return encodeJSONResponse(nil, fmt.Errorf("asserting result to *publishLogsResponse failed. Got %T, %+v", obj, obj))
 	}
 
 	b, err := json.Marshal(res)
@@ -179,7 +179,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			}
 		}
 
-		mw.knapsack.Slogger().Log(ctx, levelForError(err), message,
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishLogs",
 			"uuid", uuid,
 			"logType", logType,

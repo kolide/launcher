@@ -50,9 +50,8 @@ type PackageOptions struct {
 	CertPins          string
 	RootPEM           string
 	CacheDir          string
-	NotaryURL         string
+	TufServerURL      string
 	MirrorURL         string
-	NotaryPrefix      string
 	WixPath           string
 	MSIUI             bool
 	WixSkipCleanup    bool
@@ -107,7 +106,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	}
 	defer os.RemoveAll(p.packageRoot)
 
-	if p.scriptRoot, err = os.MkdirTemp("", fmt.Sprintf("package.scriptRoot")); err != nil {
+	if p.scriptRoot, err = os.MkdirTemp("", "package.scriptRoot"); err != nil {
 		return fmt.Errorf("unable to create temporary packaging root directory: %w", err)
 	}
 	defer os.RemoveAll(p.scriptRoot)
@@ -125,7 +124,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	launcherMapFlags := map[string]string{
 		"hostname":           p.Hostname,
-		"root_directory":     p.canonicalizePath(p.rootDir),
+		"root_directory":     p.canonicalizeRootDir(p.rootDir),
 		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
 		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
 	}
@@ -157,16 +156,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		launcherBoolFlags = append(launcherBoolFlags, "insecure")
 	}
 
-	if p.NotaryURL != "" {
-		launcherMapFlags["notary_url"] = p.NotaryURL
+	if p.TufServerURL != "" {
+		launcherMapFlags["tuf_url"] = p.TufServerURL
 	}
 
 	if p.MirrorURL != "" {
 		launcherMapFlags["mirror_url"] = p.MirrorURL
-	}
-
-	if p.NotaryPrefix != "" {
-		launcherMapFlags["notary_prefix"] = p.NotaryPrefix
 	}
 
 	if p.RootPEM != "" {
@@ -419,7 +414,7 @@ func (p *PackageOptions) makePackage(ctx context.Context) error {
 			return fmt.Errorf("packaging, target %s: %w", p.target.String(), err)
 		}
 	default:
-		return fmt.Errorf("Don't know how to package %s", p.target.String())
+		return fmt.Errorf("don't know how to package %s", p.target.String())
 	}
 
 	return nil
@@ -469,7 +464,7 @@ func (p *PackageOptions) renderLogrotateConfig(ctx context.Context) error {
 		return fmt.Errorf("making logrotate.d dir: %w", err)
 	}
 
-	logrotatePath := filepath.Join(p.packageRoot, logrotateDirectory, fmt.Sprintf("%s", p.Identifier))
+	logrotatePath := filepath.Join(p.packageRoot, logrotateDirectory, p.Identifier)
 	logrotateFile, err := os.Create(logrotatePath)
 	if err != nil {
 		return fmt.Errorf("creating logrotate conf file: %w", err)
@@ -510,7 +505,7 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 	}
 
 	if p.initOptions == nil {
-		return errors.New("Missing initOptions")
+		return errors.New("missing initOptions")
 	}
 
 	var dir string
@@ -554,7 +549,7 @@ func (p *PackageOptions) setupInit(ctx context.Context) error {
 		// Do nothing, this is handled in the packaging step.
 		return nil
 	default:
-		return fmt.Errorf("Unsupported launcher target %s", p.target.String())
+		return fmt.Errorf("unsupported launcher target %s", p.target.String())
 	}
 
 	p.initFile = filepath.Join(dir, file)
@@ -649,7 +644,7 @@ func (p *PackageOptions) setupPostinst(ctx context.Context) error {
 
 	postinstTemplate, err := assets.ReadFile(path.Join("assets", postinstTemplateName))
 	if err != nil {
-		return fmt.Errorf("Failed to get template named %s: %w", postinstTemplateName, err)
+		return fmt.Errorf("failed to get template named %s: %w", postinstTemplateName, err)
 	}
 
 	// installer info will be dumped into the filesystem
@@ -736,12 +731,19 @@ func (p *PackageOptions) setupDirectories() error {
 		// to take that into account for the guid generation.
 		p.binDir = filepath.Join("Launcher-"+p.Identifier, "bin")
 		p.confDir = filepath.Join("Launcher-"+p.Identifier, "conf")
+		// we handle the data directory setup differently for windows before final package generation,
+		// see wix/wix.go's setupDataDir method for additional context
 		p.rootDir = filepath.Join("Launcher-"+p.Identifier, "data")
 	default:
-		return fmt.Errorf("Unknown platform %s", string(p.target.Platform))
+		return fmt.Errorf("unknown platform %s", string(p.target.Platform))
 	}
 
 	for _, d := range []string{p.binDir, p.confDir, p.rootDir} {
+		// don't create the root (data) directory for windows before heat can run
+		if p.target.Platform == Windows && d == p.rootDir {
+			continue
+		}
+
 		if err := os.MkdirAll(filepath.Join(p.packageRoot, d), fsutil.DirMode); err != nil {
 			return fmt.Errorf("create dir (%s) for %s: %w", d, p.target.String(), err)
 		}
@@ -784,4 +786,16 @@ func (p *PackageOptions) canonicalizePath(path string) string {
 	}
 
 	return filepath.Join(`C:\Program Files\Kolide`, path)
+}
+
+// canonicalizeRootDir functions similarly to canonicalizePath above,
+// only impacting MSI targets. This is broken out from canonicalizePath
+// because for windows the full path to the root directory should be expanded
+// into ProgramData
+func (p *PackageOptions) canonicalizeRootDir(path string) string {
+	if p.target.Package != Msi {
+		return path
+	}
+
+	return filepath.Join(`C:\ProgramData\Kolide`, path)
 }

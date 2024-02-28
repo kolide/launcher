@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +30,7 @@ func TestTable(t *testing.T) {
 			t.Parallel()
 
 			table := Table{
-				logger:    log.NewNopLogger(),
+				slogger:   multislogger.New().Logger,
 				queryFunc: tt.queryFunc,
 			}
 

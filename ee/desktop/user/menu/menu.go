@@ -1,13 +1,13 @@
 package menu
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 )
 
@@ -22,6 +22,7 @@ const (
 	DefaultIcon             menuIcon = "default"
 	TriangleExclamationIcon menuIcon = "triangle-exclamation"
 	CircleXIcon             menuIcon = "circle-x"
+	CircleDotIcon           menuIcon = "circle-dot"
 )
 
 // MenuData encapsulates a menu bar icon and accessible menu items
@@ -56,14 +57,14 @@ type menuBuilder interface {
 
 // menu handles common functionality like retrieving menu data, and allows menu builders to provide their implementations
 type menu struct {
-	logger   log.Logger
+	slogger  *slog.Logger
 	hostname string
 	filePath string
 }
 
-func New(logger log.Logger, hostname, filePath string) *menu {
+func New(slogger *slog.Logger, hostname, filePath string) *menu {
 	m := &menu{
-		logger:   logger,
+		slogger:  slogger.With("component", "desktop_menu"),
 		hostname: hostname,
 		filePath: filePath,
 	}
@@ -84,12 +85,19 @@ func (m *menu) getMenuData() *MenuData {
 
 	menuFileBytes, err := os.ReadFile(m.filePath)
 	if err != nil {
-		level.Error(m.logger).Log("msg", "failed to read menu file", "path", m.filePath, "err", err)
+		m.slogger.Log(context.TODO(), slog.LevelError,
+			"failed to read menu file",
+			"path", m.filePath,
+			"err", err,
+		)
 		return &menu
 	}
 
 	if err := json.Unmarshal(menuFileBytes, &menu); err != nil {
-		level.Error(m.logger).Log("msg", "failed to unmarshal menu json", "err", err)
+		m.slogger.Log(context.TODO(), slog.LevelError,
+			"failed to unmarshal menu json",
+			"err", err,
+		)
 		return &menu
 	}
 

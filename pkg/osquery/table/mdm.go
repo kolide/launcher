@@ -10,13 +10,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-kit/kit/log"
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func MDMInfo(logger log.Logger) *table.Plugin {
+func MDMInfo() *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("enrolled"),
 		table.TextColumn("server_url"),

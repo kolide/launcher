@@ -3,20 +3,16 @@ package inmemory
 import (
 	"errors"
 	"sync"
-
-	"github.com/go-kit/kit/log"
 )
 
 type inMemoryKeyValueStore struct {
-	logger log.Logger
-	mu     sync.RWMutex
-	items  map[string][]byte
+	mu    sync.RWMutex
+	items map[string][]byte
 }
 
-func NewStore(logger log.Logger) *inMemoryKeyValueStore {
+func NewStore() *inMemoryKeyValueStore {
 	s := &inMemoryKeyValueStore{
-		logger: logger,
-		items:  make(map[string][]byte),
+		items: make(map[string][]byte),
 	}
 
 	return s
@@ -63,6 +59,17 @@ func (s *inMemoryKeyValueStore) Delete(keys ...[]byte) error {
 	return nil
 }
 
+func (s *inMemoryKeyValueStore) DeleteAll() error {
+	if s == nil {
+		return errors.New("store is nil")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	clear(s.items)
+	return nil
+}
+
 func (s *inMemoryKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil {
 		return errors.New("store is nil")
@@ -98,7 +105,7 @@ func (s *inMemoryKeyValueStore) Update(kvPairs map[string]string) ([]string, err
 
 	var deletedKeys []string
 
-	for key, _ := range s.items {
+	for key := range s.items {
 		if _, ok := kvPairs[key]; ok {
 			continue
 		}

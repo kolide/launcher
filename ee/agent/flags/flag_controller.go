@@ -1,13 +1,13 @@
 package flags
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/autoupdate"
@@ -18,7 +18,7 @@ import (
 // FlagController is responsible for retrieving flag values from the appropriate sources,
 // determining precedence, sanitizing flag values, and notifying observers of changes.
 type FlagController struct {
-	logger          log.Logger
+	slogger         *slog.Logger
 	cmdLineOpts     *launcher.Options
 	agentFlagsStore types.KVStore
 	overrideMutex   sync.RWMutex
@@ -27,9 +27,9 @@ type FlagController struct {
 	observersMutex  sync.RWMutex
 }
 
-func NewFlagController(logger log.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
+func NewFlagController(slogger *slog.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
 	fc := &FlagController{
-		logger:          log.With(logger, "component", "flag_controller"),
+		slogger:         slogger.With("component", "flag_controller"),
 		cmdLineOpts:     &launcher.Options{},
 		agentFlagsStore: agentFlagsStore,
 		observers:       make(map[types.FlagsChangeObserver][]keys.FlagKey),
@@ -52,7 +52,11 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 
 	value, err := fc.agentFlagsStore.Get([]byte(key))
 	if err != nil {
-		level.Debug(fc.logger).Log("msg", "failed to get control server key", "key", key, "err", err)
+		fc.slogger.Log(context.TODO(), slog.LevelDebug,
+			"failed to get control server key",
+			"key", key,
+			"err", err,
+		)
 		return nil
 	}
 
@@ -67,7 +71,11 @@ func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) 
 
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {
-		level.Debug(fc.logger).Log("msg", "failed to set control server key", "key", key, "err", err)
+		fc.slogger.Log(context.TODO(), slog.LevelDebug,
+			"failed to set control server key",
+			"key", key,
+			"err", err,
+		)
 		return err
 	}
 
@@ -123,8 +131,8 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 	fc.overrideMutex.Lock()
 	defer fc.overrideMutex.Unlock()
 
-	level.Info(fc.logger).Log(
-		"msg", "overriding flag",
+	fc.slogger.Log(context.TODO(), slog.LevelInfo,
+		"overriding flag",
 		"key", key,
 		"value", value,
 		"duration", duration,
@@ -151,10 +159,6 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 
 	// Start a new override, or re-start an existing one with a new value, duration, and expiration
 	fc.overrides[key].Start(key, value, duration, overrideExpired)
-}
-
-func (fc *FlagController) AutoloadedExtensions() []string {
-	return fc.cmdLineOpts.AutoloadedExtensions
 }
 
 func (fc *FlagController) SetKolideServerURL(url string) error {
@@ -211,7 +215,7 @@ func (fc *FlagController) SetLoggingInterval(interval time.Duration) error {
 	return fc.setControlServerValue(keys.LoggingInterval, durationToBytes(interval))
 }
 func (fc *FlagController) LoggingInterval() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.LoggingInterval,
+	return NewDurationFlagValue(fc.slogger, keys.LoggingInterval,
 		WithDefault(fc.cmdLineOpts.LoggingInterval),
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),
@@ -245,7 +249,7 @@ func (fc *FlagController) SetDesktopUpdateInterval(interval time.Duration) error
 	return fc.setControlServerValue(keys.DesktopUpdateInterval, durationToBytes(interval))
 }
 func (fc *FlagController) DesktopUpdateInterval() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.DesktopUpdateInterval,
+	return NewDurationFlagValue(fc.slogger, keys.DesktopUpdateInterval,
 		WithDefault(5*time.Second),
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),
@@ -256,7 +260,7 @@ func (fc *FlagController) SetDesktopMenuRefreshInterval(interval time.Duration) 
 	return fc.setControlServerValue(keys.DesktopMenuRefreshInterval, durationToBytes(interval))
 }
 func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.DesktopMenuRefreshInterval,
+	return NewDurationFlagValue(fc.slogger, keys.DesktopMenuRefreshInterval,
 		WithDefault(15*time.Minute),
 		WithMin(5*time.Minute),
 		WithMax(60*time.Minute),
@@ -296,7 +300,7 @@ func (fc *FlagController) ControlRequestInterval() time.Duration {
 	fc.overrideMutex.RLock()
 	defer fc.overrideMutex.RUnlock()
 
-	return NewDurationFlagValue(fc.logger, keys.ControlRequestInterval,
+	return NewDurationFlagValue(fc.slogger, keys.ControlRequestInterval,
 		WithOverride(fc.overrides[keys.ControlRequestInterval]),
 		WithDefault(fc.cmdLineOpts.ControlRequestInterval),
 		WithMin(5*time.Second),
@@ -367,7 +371,7 @@ func (fc *FlagController) SetWatchdogDelaySec(sec int) error {
 	return fc.setControlServerValue(keys.WatchdogDelaySec, intToBytes(sec))
 }
 func (fc *FlagController) WatchdogDelaySec() int {
-	return NewIntFlagValue(fc.logger, keys.WatchdogDelaySec,
+	return NewIntFlagValue(fc.slogger, keys.WatchdogDelaySec,
 		WithIntValueDefault(fc.cmdLineOpts.WatchdogDelaySec),
 		WithIntValueMin(0),
 		WithIntValueMax(600),
@@ -378,7 +382,7 @@ func (fc *FlagController) SetWatchdogMemoryLimitMB(limit int) error {
 	return fc.setControlServerValue(keys.WatchdogMemoryLimitMB, intToBytes(limit))
 }
 func (fc *FlagController) WatchdogMemoryLimitMB() int {
-	return NewIntFlagValue(fc.logger, keys.WatchdogMemoryLimitMB,
+	return NewIntFlagValue(fc.slogger, keys.WatchdogMemoryLimitMB,
 		WithIntValueDefault(fc.cmdLineOpts.WatchdogMemoryLimitMB),
 		WithIntValueMin(100),
 		WithIntValueMax(10000), // 10 GB appears to be the max that osquery will accept
@@ -389,7 +393,7 @@ func (fc *FlagController) SetWatchdogUtilizationLimitPercent(limit int) error {
 	return fc.setControlServerValue(keys.WatchdogUtilizationLimitPercent, intToBytes(limit))
 }
 func (fc *FlagController) WatchdogUtilizationLimitPercent() int {
-	return NewIntFlagValue(fc.logger, keys.WatchdogUtilizationLimitPercent,
+	return NewIntFlagValue(fc.slogger, keys.WatchdogUtilizationLimitPercent,
 		WithIntValueDefault(fc.cmdLineOpts.WatchdogUtilizationLimitPercent),
 		WithIntValueMin(5),
 		WithIntValueMax(100),
@@ -423,15 +427,6 @@ func (fc *FlagController) Autoupdate() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.Autoupdate)).get(fc.getControlServerValue(keys.Autoupdate))
 }
 
-func (fc *FlagController) SetNotaryServerURL(url string) error {
-	return fc.setControlServerValue(keys.NotaryServerURL, []byte(url))
-}
-func (fc *FlagController) NotaryServerURL() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryServerURL),
-	).get(fc.getControlServerValue(keys.NotaryServerURL))
-}
-
 func (fc *FlagController) SetTufServerURL(url string) error {
 	return fc.setControlServerValue(keys.TufServerURL, []byte(url))
 }
@@ -454,7 +449,7 @@ func (fc *FlagController) SetAutoupdateInterval(interval time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInterval, durationToBytes(interval))
 }
 func (fc *FlagController) AutoupdateInterval() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.AutoupdateInterval,
+	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInterval,
 		WithDefault(fc.cmdLineOpts.AutoupdateInterval),
 		WithMin(1*time.Minute),
 		WithMax(24*time.Hour),
@@ -471,20 +466,11 @@ func (fc *FlagController) UpdateChannel() string {
 	).get(fc.getControlServerValue(keys.UpdateChannel))
 }
 
-func (fc *FlagController) SetNotaryPrefix(prefix string) error {
-	return fc.setControlServerValue(keys.NotaryPrefix, []byte(prefix))
-}
-func (fc *FlagController) NotaryPrefix() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.NotaryPrefix),
-	).get(fc.getControlServerValue(keys.NotaryPrefix))
-}
-
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
 func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.AutoupdateInitialDelay,
+	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInitialDelay,
 		WithDefault(fc.cmdLineOpts.AutoupdateInitialDelay),
 		WithMin(5*time.Second),
 		WithMax(12*time.Hour),
@@ -498,15 +484,6 @@ func (fc *FlagController) UpdateDirectory() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
-}
-
-func (fc *FlagController) SetUseTUFAutoupdater(enabled bool) error {
-	return fc.setControlServerValue(keys.UseTUFAutoupdater, boolToBytes(enabled))
-}
-func (fc *FlagController) UseTUFAutoupdater() bool {
-	return NewBoolFlagValue(
-		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.UseTUFAutoupdater))
 }
 
 func (fc *FlagController) SetExportTraces(enabled bool) error {
@@ -529,7 +506,7 @@ func (fc *FlagController) SetTraceSamplingRateOverride(value float64, duration t
 	fc.overrideFlag(keys.TraceSamplingRate, duration, value)
 }
 func (fc *FlagController) TraceSamplingRate() float64 {
-	return NewFloat64FlagValue(fc.logger, keys.LoggingInterval,
+	return NewFloat64FlagValue(fc.slogger, keys.LoggingInterval,
 		WithFloat64ValueOverride(fc.overrides[keys.TraceSamplingRate]),
 		WithFloat64ValueDefault(fc.cmdLineOpts.TraceSamplingRate),
 		WithFloat64ValueMin(0.0),
@@ -541,7 +518,7 @@ func (fc *FlagController) SetTraceBatchTimeout(duration time.Duration) error {
 	return fc.setControlServerValue(keys.TraceBatchTimeout, durationToBytes(duration))
 }
 func (fc *FlagController) TraceBatchTimeout() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.TraceBatchTimeout,
+	return NewDurationFlagValue(fc.slogger, keys.TraceBatchTimeout,
 		WithDefault(1*time.Minute),
 		WithMin(5*time.Second),
 		WithMax(1*time.Hour),
@@ -616,7 +593,7 @@ func (fc *FlagController) SetOsqueryHealthcheckStartupDelay(delay time.Duration)
 	return fc.setControlServerValue(keys.OsqueryHealthcheckStartupDelay, durationToBytes(delay))
 }
 func (fc *FlagController) OsqueryHealthcheckStartupDelay() time.Duration {
-	return NewDurationFlagValue(fc.logger, keys.OsqueryHealthcheckStartupDelay,
+	return NewDurationFlagValue(fc.slogger, keys.OsqueryHealthcheckStartupDelay,
 		WithDefault(fc.cmdLineOpts.OsqueryHealthcheckStartupDelay),
 		WithMin(0*time.Second),
 		WithMax(1*time.Hour),

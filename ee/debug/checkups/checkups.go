@@ -22,13 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -99,6 +98,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
+		{&InitLogs{}, flareSupported},
 		{&BinaryDirectory{}, doctorSupported | flareSupported},
 		{&launchdCheckup{}, doctorSupported | flareSupported},
 		{&runtimeCheckup{}, flareSupported},
@@ -114,7 +114,6 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
 		{&dnsCheckup{k: k}, doctorSupported | flareSupported | logSupported},
-		{&notaryCheckup{k: k}, doctorSupported | flareSupported},
 		{&tufCheckup{k: k}, doctorSupported | flareSupported},
 		{&osqConfigConflictCheckup{}, doctorSupported | flareSupported},
 		{&serverDataCheckup{k: k}, doctorSupported | flareSupported | logSupported},
@@ -202,18 +201,19 @@ func flareCheckup(ctx context.Context, c checkupInt, combinedSummary io.Writer, 
 	}
 }
 
-func logCheckup(ctx context.Context, c checkupInt, logger log.Logger) { // nolint:unused
+func logCheckup(ctx context.Context, c checkupInt, slogger *slog.Logger) { // nolint:unused
 	if err := c.Run(ctx, io.Discard); err != nil {
-		level.Debug(logger).Log(
+		slogger.Log(ctx, slog.LevelDebug,
+			"error running checkup",
 			"name", c.Name(),
-			"msg", "error running checkup",
 			"err", err,
 			"status", Erroring,
 		)
 		return
 	}
 
-	level.Debug(logger).Log(
+	slogger.Log(ctx, slog.LevelDebug,
+		"ran checkup",
 		"name", c.Name(),
 		"msg", c.Summary(),
 		"status", c.Status(),

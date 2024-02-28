@@ -2,15 +2,16 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/ulid"
 )
 
@@ -19,15 +20,17 @@ import (
 type RunnerServer struct {
 	server                          *http.Server
 	listener                        net.Listener
-	logger                          log.Logger
+	slogger                         *slog.Logger
 	desktopProcAuthTokens           map[string]string
 	mutex                           sync.Mutex
 	controlRequestIntervalOverrider controlRequestIntervalOverrider
+	messenger                       Messenger
 }
 
 const (
 	HealthCheckEndpoint                = "/health"
 	MenuOpenedEndpoint                 = "/menuopened"
+	MessageEndpoint                    = "/message"
 	controlRequestAccelerationInterval = 5 * time.Second
 	controlRequestAcclerationDuration  = 1 * time.Minute
 )
@@ -36,7 +39,13 @@ type controlRequestIntervalOverrider interface {
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
 }
 
-func New(logger log.Logger, controlRequestIntervalOverrider controlRequestIntervalOverrider) (*RunnerServer, error) {
+type Messenger interface {
+	SendMessage(method string, params interface{}) error
+}
+
+func New(slogger *slog.Logger,
+	controlRequestIntervalOverrider controlRequestIntervalOverrider,
+	messenger Messenger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return nil, fmt.Errorf("creating net listener: %w", err)
@@ -44,14 +53,17 @@ func New(logger log.Logger, controlRequestIntervalOverrider controlRequestInterv
 
 	rs := &RunnerServer{
 		listener:                        listener,
-		logger:                          logger,
+		slogger:                         slogger,
 		desktopProcAuthTokens:           make(map[string]string),
 		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
+		messenger:                       messenger,
 	}
 
-	if rs.logger != nil {
-		rs.logger = log.With(rs.logger, "component", "desktop_runner_root_server")
+	if rs.slogger == nil {
+		return nil, errors.New("slogger cannot be nil")
 	}
+
+	rs.slogger = slogger.With("component", "desktop_runner_root_server")
 
 	mux := http.NewServeMux()
 
@@ -70,6 +82,8 @@ func New(logger log.Logger, controlRequestIntervalOverrider controlRequestInterv
 
 		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
+
+	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))
 
 	rs.server = &http.Server{
 		Handler: rs.authMiddleware(mux),
@@ -118,13 +132,17 @@ func (ms *RunnerServer) authMiddleware(next http.Handler) http.Handler {
 		authHeader := strings.Split(r.Header.Get("Authorization"), "Bearer ")
 
 		if len(authHeader) != 2 {
-			level.Debug(ms.logger).Log("msg", "malformed authorization header")
+			ms.slogger.Log(r.Context(), slog.LevelDebug,
+				"malformed authorization header",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		if !ms.isAuthTokenValid(authHeader[1]) {
-			level.Debug(ms.logger).Log("msg", "invalid desktop auth token")
+			ms.slogger.Log(r.Context(), slog.LevelDebug,
+				"invalid desktop auth token",
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -144,4 +162,53 @@ func (ms *RunnerServer) isAuthTokenValid(authToken string) bool {
 	}
 
 	return false
+}
+
+func (ms *RunnerServer) sendMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"no request body",
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	message := struct {
+		Method string      `json:"method"`
+		Params interface{} `json:"params"`
+	}{}
+
+	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"could not decode request body",
+			"err", err,
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if message.Method == "" {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"does not include method property",
+		)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := ms.messenger.SendMessage(message.Method, message.Params); err != nil {
+		ms.slogger.Log(r.Context(), slog.LevelError,
+			"error sending message",
+			"err", err,
+		)
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
 }

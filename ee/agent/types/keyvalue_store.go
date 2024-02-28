@@ -20,6 +20,8 @@ type Deleter interface {
 	// Delete removes a key.
 	// If the key does not exist then nothing is done and a nil error is returned.
 	Delete(keys ...[]byte) error
+	// DeleteAll removes all data from the store
+	DeleteAll() error
 }
 
 // Iterator is an interface for iterating data in a key/value store.
@@ -43,6 +45,18 @@ type Updater interface {
 type GetterSetter interface {
 	Getter
 	Setter
+}
+
+// GetterCloser extends the Getter interface with a Close method.
+type GetterCloser interface {
+	Getter
+	Close() error
+}
+
+// GetterUpdaterCloser groups the Get, Update, and Close methods.
+type GetterUpdaterCloser interface {
+	Updater
+	GetterCloser
 }
 
 // GetterSetterDeleter is an interface that groups the Get, Set, and Delete methods.

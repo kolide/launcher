@@ -7,10 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -34,54 +33,52 @@ type action struct {
 	ProcessedAt time.Time `json:"processed_at,omitempty"`
 }
 
-type actionqueue struct {
+func (a action) String() string {
+	return fmt.Sprintf("ID: %s; type: %s; valid until: %d", a.ID, a.Type, a.ValidUntil)
+}
+
+type ActionQueue struct {
 	ctx                   context.Context // nolint:containedctx
 	actors                map[string]actor
 	store                 types.KVStore
 	oldNotificationsStore types.KVStore
-	logger                log.Logger
+	slogger               *slog.Logger
 	actionCleanupInterval time.Duration
 	cancel                context.CancelFunc
 }
 
-type actionqueueOption func(*actionqueue)
-
-func WithLogger(logger log.Logger) actionqueueOption {
-	return func(aq *actionqueue) {
-		aq.logger = logger
-	}
-}
+type actionqueueOption func(*ActionQueue)
 
 func WithStore(store types.KVStore) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.store = store
 	}
 }
 
 func WithOldNotificationsStore(store types.KVStore) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.oldNotificationsStore = store
 	}
 }
 
 func WithCleanupInterval(cleanupInterval time.Duration) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.actionCleanupInterval = cleanupInterval
 	}
 }
 
 func WithContext(ctx context.Context) actionqueueOption {
-	return func(aq *actionqueue) {
+	return func(aq *ActionQueue) {
 		aq.ctx = ctx
 	}
 }
 
-func New(opts ...actionqueueOption) *actionqueue {
-	aq := &actionqueue{
+func New(k types.Knapsack, opts ...actionqueueOption) *ActionQueue {
+	aq := &ActionQueue{
 		ctx:                   context.Background(),
 		actors:                make(map[string]actor, 0),
 		actionCleanupInterval: defaultCleanupInterval,
-		logger:                log.NewNopLogger(),
+		slogger:               k.Slogger().With("component", "actionqueue"),
 	}
 
 	for _, opt := range opts {
@@ -89,15 +86,13 @@ func New(opts ...actionqueueOption) *actionqueue {
 	}
 
 	if aq.store == nil {
-		aq.store = inmemory.NewStore(aq.logger)
+		aq.store = inmemory.NewStore()
 	}
-
-	aq.logger = log.With(aq.logger, "component", "actionqueue")
 
 	return aq
 }
 
-func (aq *actionqueue) Update(data io.Reader) error {
+func (aq *ActionQueue) Update(data io.Reader) error {
 	// We want to unmarshal each action separately, so that we don't fail to send all actions
 	// if only some are malformed.
 	var rawActionsToProcess []json.RawMessage
@@ -108,7 +103,10 @@ func (aq *actionqueue) Update(data io.Reader) error {
 	for _, rawAction := range rawActionsToProcess {
 		var action action
 		if err := json.Unmarshal(rawAction, &action); err != nil {
-			level.Debug(aq.logger).Log("msg", "received action in unexpected format from K2, discarding", "err", err)
+			aq.slogger.Log(context.TODO(), slog.LevelWarn,
+				"received action in unexpected format from K2, discarding",
+				"err", err,
+			)
 			continue
 		}
 
@@ -118,12 +116,18 @@ func (aq *actionqueue) Update(data io.Reader) error {
 
 		actor, err := aq.actorForAction(action)
 		if err != nil {
-			level.Info(aq.logger).Log("msg", "getting actor for action", "err", err)
+			aq.slogger.Log(context.TODO(), slog.LevelInfo,
+				"getting actor for action",
+				"err", err,
+			)
 			continue
 		}
 
 		if err := actor.Do(bytes.NewReader(rawAction)); err != nil {
-			level.Info(aq.logger).Log("msg", "failed to do action with action, not marking action complete", "err", err)
+			aq.slogger.Log(context.TODO(), slog.LevelInfo,
+				"failed to do action with action, not marking action complete",
+				"err", err,
+			)
 			continue
 		}
 
@@ -135,16 +139,16 @@ func (aq *actionqueue) Update(data io.Reader) error {
 	return nil
 }
 
-func (aq *actionqueue) RegisterActor(actorType string, actorToRegister actor) {
+func (aq *ActionQueue) RegisterActor(actorType string, actorToRegister actor) {
 	aq.actors[actorType] = actorToRegister
 }
 
-func (aq *actionqueue) StartCleanup() error {
+func (aq *ActionQueue) StartCleanup() error {
 	aq.runCleanup()
 	return nil
 }
 
-func (aq *actionqueue) runCleanup() {
+func (aq *ActionQueue) runCleanup() {
 	ctx, cancel := context.WithCancel(aq.ctx)
 	aq.cancel = cancel
 
@@ -154,7 +158,9 @@ func (aq *actionqueue) runCleanup() {
 	for {
 		select {
 		case <-ctx.Done():
-			level.Debug(aq.logger).Log("msg", "action cleanup stopped due to context cancel")
+			aq.slogger.Log(context.TODO(), slog.LevelDebug,
+				"action cleanup stopped due to context cancel",
+			)
 			return
 		case <-t.C:
 			aq.cleanupActions()
@@ -162,26 +168,35 @@ func (aq *actionqueue) runCleanup() {
 	}
 }
 
-func (aq *actionqueue) StopCleanup(err error) {
+func (aq *ActionQueue) StopCleanup(err error) {
 	aq.cancel()
 }
 
-func (aq *actionqueue) storeActionRecord(actionToStore action) {
+func (aq *ActionQueue) storeActionRecord(actionToStore action) {
 	rawAction, err := json.Marshal(actionToStore)
 	if err != nil {
-		level.Error(aq.logger).Log("msg", "could not marshal complete action", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelError,
+			"could not marshal complete action",
+			"err", err,
+		)
 		return
 	}
 
 	if err := aq.store.Set([]byte(actionToStore.ID), rawAction); err != nil {
-		level.Debug(aq.logger).Log("msg", "could not mark action complete", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not mark action complete",
+			"err", err,
+		)
 	}
 }
 
-func (aq *actionqueue) isActionNew(id string) bool {
+func (aq *ActionQueue) isActionNew(id string) bool {
 	completedActionRaw, err := aq.store.Get([]byte(id))
 	if err != nil {
-		level.Error(aq.logger).Log("msg", "could not read action from bucket", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelError,
+			"could not read action from bucket",
+			"err", err,
+		)
 		return false
 	}
 
@@ -206,7 +221,10 @@ func (aq *actionqueue) isActionNew(id string) bool {
 
 	completedActionRaw, err = aq.oldNotificationsStore.Get([]byte(id))
 	if err != nil {
-		level.Error(aq.logger).Log("msg", "could not read action from old notifications store", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelError,
+			"could not read action from old notifications store",
+			"err", err,
+		)
 		return false
 	}
 
@@ -214,21 +232,27 @@ func (aq *actionqueue) isActionNew(id string) bool {
 	return completedActionRaw == nil
 }
 
-func (aq *actionqueue) isActionValid(a action) bool {
+func (aq *ActionQueue) isActionValid(a action) bool {
 	if a.ID == "" {
-		level.Info(aq.logger).Log("msg", "action ID is empty", "action", a)
+		aq.slogger.Log(context.TODO(), slog.LevelWarn,
+			"action ID is empty",
+			"action", a.String(),
+		)
 		return false
 	}
 
 	if a.ValidUntil <= 0 {
-		level.Info(aq.logger).Log("msg", "action valid until is empty", "action", a)
+		aq.slogger.Log(context.TODO(), slog.LevelWarn,
+			"action valid until is empty",
+			"action", a.String(),
+		)
 		return false
 	}
 
 	return a.ValidUntil > time.Now().Unix()
 }
 
-func (aq *actionqueue) actorForAction(a action) (actor, error) {
+func (aq *ActionQueue) actorForAction(a action) (actor, error) {
 	if len(aq.actors) == 0 {
 		return nil, errors.New("no actor registered")
 	}
@@ -245,7 +269,7 @@ func (aq *actionqueue) actorForAction(a action) (actor, error) {
 	return actor, nil
 }
 
-func (aq *actionqueue) cleanupActions() {
+func (aq *ActionQueue) cleanupActions() {
 	// Read through all keys in bucket to determine which ones are old enough to be deleted
 	keysToDelete := make([][]byte, 0)
 
@@ -261,11 +285,17 @@ func (aq *actionqueue) cleanupActions() {
 
 		return nil
 	}); err != nil {
-		level.Debug(aq.logger).Log("msg", "could not iterate over bucket items to determine which are expired", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not iterate over bucket items to determine which are expired",
+			"err", err,
+		)
 	}
 
 	// Delete all old keys
 	if err := aq.store.Delete(keysToDelete...); err != nil {
-		level.Debug(aq.logger).Log("msg", "could not delete old actions from bucket", "err", err)
+		aq.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not delete old actions from bucket",
+			"err", err,
+		)
 	}
 }

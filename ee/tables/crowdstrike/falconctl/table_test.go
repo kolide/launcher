@@ -4,14 +4,15 @@
 package falconctl
 
 import (
-	"bytes"
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,10 +63,10 @@ func TestOptionRestrictions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var logBytes bytes.Buffer
+			var logBytes threadsafebuffer.ThreadSafeBuffer
 
 			testTable := &falconctlOptionsTable{
-				logger:   log.NewLogfmtLogger(&logBytes),
+				slogger:  multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug})).Logger,
 				execFunc: noopExec,
 			}
 
@@ -85,7 +86,7 @@ func TestOptionRestrictions(t *testing.T) {
 	}
 }
 
-func noopExec(_ context.Context, log log.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool) ([]byte, error) {
-	log.Log("exec", "exec-in-test", "args", strings.Join(args, " "))
+func noopExec(ctx context.Context, slogger *slog.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool) ([]byte, error) {
+	slogger.Log(ctx, slog.LevelInfo, "exec-in-test", "args", strings.Join(args, " "))
 	return []byte{}, nil
 }

@@ -44,31 +44,29 @@ import (
 	"hash/crc64"
 	"image"
 	"image/png"
+	"log/slog"
 	"strings"
 	"unsafe"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
-
 	"golang.org/x/image/tiff"
 )
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
 
-func UserAvatar(logger log.Logger) *table.Plugin {
+func UserAvatar(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("thumbnail"),
 		table.TextColumn("hash"),
 	}
-	t := &userAvatarTable{logger: logger}
+	t := &userAvatarTable{slogger: slogger.With("table", "kolide_user_avatars")}
 	return table.NewPlugin("kolide_user_avatars", columns, t.generateAvatars)
 }
 
 type userAvatarTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
@@ -81,17 +79,15 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 		}
 	} else {
 		usernamesString := C.LocalUsers()
-		for _, posixName := range strings.Split(C.GoString(usernamesString), " ") {
-			usernames = append(usernames, posixName)
-		}
+		usernames = append(usernames, strings.Split(C.GoString(usernamesString), " ")...)
 	}
 
 	var results []map[string]string
 	for _, username := range usernames {
 		image, hash, err := getUserAvatar(username)
 		if err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "error getting user avatar",
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"error getting user avatar",
 				"err", err,
 			)
 			continue
@@ -105,8 +101,8 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 		defer encoder.Close()
 		thumbnail := resize.Thumbnail(150, 150, image, resize.Lanczos3)
 		if err := png.Encode(encoder, thumbnail); err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "error encoding resized user avatar to png",
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"error encoding resized user avatar to png",
 				"err", err,
 			)
 			continue

@@ -6,18 +6,17 @@ package notify
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/godbus/dbus/v5"
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 type dbusNotifier struct {
 	iconFilepath        string
-	logger              log.Logger
+	slogger             *slog.Logger
 	conn                *dbus.Conn
 	signal              chan *dbus.Signal
 	interrupt           chan struct{}
@@ -35,15 +34,18 @@ const (
 // the correct default browser.
 var browserLaunchers = []allowedcmd.AllowedCommand{allowedcmd.XdgOpen, allowedcmd.XWwwBrowser}
 
-func NewDesktopNotifier(logger log.Logger, iconFilepath string) *dbusNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *dbusNotifier {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		level.Warn(logger).Log("msg", "couldn't connect to dbus to start notifier listener, proceeding without it", "err", err)
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"couldn't connect to dbus to start notifier listener, proceeding without it",
+			"err", err,
+		)
 	}
 
 	return &dbusNotifier{
 		iconFilepath:        iconFilepath,
-		logger:              log.With(logger, "component", "desktop_notifier"),
+		slogger:             slogger.With("component", "desktop_notifier"),
 		conn:                conn,
 		signal:              make(chan *dbus.Signal),
 		interrupt:           make(chan struct{}),
@@ -58,12 +60,17 @@ func (d *dbusNotifier) Listen() error {
 			dbus.WithMatchObjectPath(notificationServiceObj),
 			dbus.WithMatchInterface(notificationServiceInterface),
 		); err != nil {
-			level.Error(d.logger).Log("msg", "couldn't add match signal", "err", err)
+			d.slogger.Log(context.TODO(), slog.LevelError,
+				"couldn't add match signal",
+				"err", err,
+			)
 			return fmt.Errorf("couldn't register to listen to signals in dbus: %w", err)
 		}
 		d.conn.Signal(d.signal)
 	} else {
-		level.Warn(d.logger).Log("msg", "cannot set up DBUS listener -- no connection to session bus")
+		d.slogger.Log(context.TODO(), slog.LevelWarn,
+			"cannot set up DBUS listener -- no connection to session bus",
+		)
 	}
 
 	for {
@@ -91,7 +98,11 @@ func (d *dbusNotifier) Listen() error {
 				defer cancel()
 				cmd, err := browserLauncher(ctx, actionUri)
 				if err != nil {
-					level.Warn(d.logger).Log("msg", "couldn't create command to start process", "err", err, "browser_launcher", browserLauncher)
+					d.slogger.Log(context.TODO(), slog.LevelWarn,
+						"couldn't create command to start process",
+						"err", err,
+						"browser_launcher", browserLauncher,
+					)
 					continue
 				}
 
@@ -99,7 +110,11 @@ func (d *dbusNotifier) Listen() error {
 				if err == nil {
 					break
 				}
-				level.Error(d.logger).Log("msg", "couldn't start process", "err", err, "browser_launcher", browserLauncher)
+				d.slogger.Log(context.TODO(), slog.LevelError,
+					"couldn't start process",
+					"err", err,
+					"browser_launcher", browserLauncher,
+				)
 			}
 
 		case <-d.interrupt:
@@ -130,7 +145,10 @@ func (d *dbusNotifier) SendNotification(n Notification) error {
 func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
-		level.Debug(d.logger).Log("msg", "could not connect to dbus, will try alternate method of notification", "err", err)
+		d.slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not connect to dbus, will try alternate method of notification",
+			"err", err,
+		)
 		return fmt.Errorf("could not connect to dbus: %w", err)
 	}
 
@@ -152,7 +170,10 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 		int32(0))                  // expire_timeout -- 0 means the notification will not expire
 
 	if call.Err != nil {
-		level.Error(d.logger).Log("msg", "could not send notification via dbus", "err", call.Err)
+		d.slogger.Log(context.TODO(), slog.LevelError,
+			"could not send notification via dbus",
+			"err", call.Err,
+		)
 		return fmt.Errorf("could not send notification via dbus: %w", call.Err)
 	}
 
@@ -160,7 +181,10 @@ func (d *dbusNotifier) sendNotificationViaDbus(n Notification) error {
 	// so we should be fine to only store these here.
 	var notificationId uint32
 	if err := call.Store(&notificationId); err != nil {
-		level.Warn(d.logger).Log("msg", "could not get notification ID from dbus call", "err", err)
+		d.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get notification ID from dbus call",
+			"err", err,
+		)
 	} else {
 		d.lock.Lock()
 		defer d.lock.Unlock()
@@ -187,7 +211,11 @@ func (d *dbusNotifier) sendNotificationViaNotifySend(n Notification) error {
 		return fmt.Errorf("creating command: %w", err)
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
-		level.Error(d.logger).Log("msg", "could not send notification via notify-send", "output", string(out), "err", err)
+		d.slogger.Log(context.TODO(), slog.LevelError,
+			"could not send notification via notify-send",
+			"output", string(out),
+			"err", err,
+		)
 		return fmt.Errorf("could not send notification via notify-send: %s: %w", string(out), err)
 	}
 

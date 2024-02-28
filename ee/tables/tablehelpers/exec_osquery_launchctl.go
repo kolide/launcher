@@ -8,18 +8,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/user"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
-func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
+func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
@@ -61,15 +60,15 @@ func ExecOsqueryLaunchctl(ctx context.Context, logger log.Logger, timeoutSeconds
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("running osquery. Got: '%s': %w", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("running osquery. Got: '%s': %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil
 
 }
 
-func ExecOsqueryLaunchctlParsed(ctx context.Context, logger log.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
-	outBytes, err := ExecOsqueryLaunchctl(ctx, logger, timeoutSeconds, username, osqueryPath, query)
+func ExecOsqueryLaunchctlParsed(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
+	outBytes, err := ExecOsqueryLaunchctl(ctx, timeoutSeconds, username, osqueryPath, query)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +76,8 @@ func ExecOsqueryLaunchctlParsed(ctx context.Context, logger log.Logger, timeoutS
 	var osqueryResults []map[string]string
 
 	if err := json.Unmarshal(outBytes, &osqueryResults); err != nil {
-		level.Info(logger).Log(
-			"msg", "error unmarshalling json",
+		slogger.Log(ctx, slog.LevelInfo,
+			"error unmarshalling json",
 			"err", err,
 			"stdout", string(outBytes),
 		)

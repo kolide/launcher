@@ -11,10 +11,9 @@ package ioreg
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -25,11 +24,11 @@ import (
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	tableName string
 }
 
-func TablePlugin(logger log.Logger) *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		// ioreg input options. These match the ioreg
@@ -43,7 +42,7 @@ func TablePlugin(logger log.Logger) *table.Plugin {
 	)
 
 	t := &Table{
-		logger:    logger,
+		slogger:   slogger.With("table", "kolide_ioreg"),
 		tableName: "kolide_ioreg",
 	}
 
@@ -56,7 +55,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	gcOpts := []tablehelpers.GetConstraintOpts{
 		tablehelpers.WithDefaults(""),
 		tablehelpers.WithAllowedCharacters(allowedCharacters),
-		tablehelpers.WithLogger(t.logger),
+		tablehelpers.WithSlogger(t.slogger),
 	}
 
 	for _, ioC := range tablehelpers.GetConstraints(queryContext, "c", gcOpts...) {
@@ -93,22 +92,31 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 							case "1":
 								ioregArgs = append(ioregArgs, "-r")
 							default:
-								level.Info(t.logger).Log("msg", "r should be blank, 0, or 1")
+								t.slogger.Log(ctx, slog.LevelInfo,
+									"r should be blank, 0, or 1",
+									"r_value", ioR,
+								)
 								continue
 							}
 
 							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 								// Finally, an inner loop
 
-								ioregOutput, err := tablehelpers.Exec(ctx, t.logger, 30, allowedcmd.Ioreg, ioregArgs, false)
+								ioregOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Ioreg, ioregArgs, false)
 								if err != nil {
-									level.Info(t.logger).Log("msg", "ioreg failed", "err", err)
+									t.slogger.Log(ctx, slog.LevelInfo,
+										"ioreg failed",
+										"err", err,
+									)
 									continue
 								}
 
 								flatData, err := t.flattenOutput(dataQuery, ioregOutput)
 								if err != nil {
-									level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+									t.slogger.Log(ctx, slog.LevelInfo,
+										"flatten failed",
+										"err", err,
+									)
 									continue
 								}
 
@@ -135,7 +143,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

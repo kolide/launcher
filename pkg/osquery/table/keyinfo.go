@@ -3,20 +3,19 @@ package table
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strconv"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/keyidentifier"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 type KeyInfoTable struct {
-	logger     log.Logger
+	slogger    *slog.Logger
 	kIdentifer *keyidentifier.KeyIdentifier
 }
 
-func KeyInfo(logger log.Logger) *table.Plugin {
+func KeyInfo(slogger *slog.Logger) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
@@ -27,18 +26,18 @@ func KeyInfo(logger log.Logger) *table.Plugin {
 		table.TextColumn("fingerprint_md5"),
 	}
 
-	// we don't want the logging in osquery, so don't instantiate WithLogger()
+	// we don't want the logging in osquery, so don't instantiate WithSlogger()
 	kIdentifer, err := keyidentifier.New()
 	if err != nil {
-		level.Info(logger).Log(
-			"msg", "Failed to create keyidentifier",
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"failed to create keyidentifier",
 			"err", err,
 		)
 		return nil
 	}
 
 	t := &KeyInfoTable{
-		logger:     logger,
+		slogger:    slogger.With("table", "kolide_keyinfo"),
 		kIdentifer: kIdentifer,
 	}
 
@@ -56,8 +55,8 @@ func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryCon
 	for _, constraint := range q.Constraints {
 		ki, err := t.kIdentifer.IdentifyFile(constraint.Expression)
 		if err != nil {
-			level.Debug(t.logger).Log(
-				"msg", "Failed to get keyinfo for file",
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"failed to get keyinfo for file",
 				"file", constraint.Expression,
 				"err", err,
 			)

@@ -7,11 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -28,21 +27,19 @@ const (
 )
 
 type Table struct {
-	logger    log.Logger
+	slogger   *slog.Logger
 	queryFunc queryFuncType
 	name      string
 }
 
-func TablePlugin(mode tableMode, logger log.Logger) *table.Plugin {
+func TablePlugin(mode tableMode, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
 		table.IntegerColumn("is_default"),
 	)
 
-	t := &Table{
-		logger: logger,
-	}
+	t := &Table{}
 
 	switch mode {
 	case UpdatesTable:
@@ -52,6 +49,8 @@ func TablePlugin(mode tableMode, logger log.Logger) *table.Plugin {
 		t.queryFunc = queryHistory
 		t.name = "kolide_windows_update_history"
 	}
+
+	t.slogger = slogger.With("name", t.name)
 
 	return table.NewPlugin(t.name, columns, t.generate)
 }
@@ -70,9 +69,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
-		result, err := t.searchLocale(locale, queryContext)
+		result, err := t.searchLocale(ctx, locale, queryContext)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "got error searching", "locale", locale, "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"got error searching",
+				"locale", locale,
+				"err", err,
+			)
 			continue
 		}
 		results = append(results, result...)
@@ -83,7 +86,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 }
 
-func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]map[string]string, error) {
+func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
 	comshim.Add(1)
 	defer comshim.Done()
 
@@ -102,7 +105,10 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flatData, err := t.flattenOutput(dataQuery, searchResults)
 		if err != nil {
-			level.Info(t.logger).Log("msg", "flatten failed", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"flatten failed",
+				"err", err,
+			)
 			continue
 		}
 
@@ -119,7 +125,7 @@ func (t *Table) searchLocale(locale string, queryContext table.QueryContext) ([]
 
 func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithLogger(t.logger),
+		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 	}
 

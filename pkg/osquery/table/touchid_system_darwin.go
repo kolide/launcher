@@ -4,19 +4,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDSystemConfig(logger log.Logger) *table.Plugin {
+func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
 	t := &touchIDSystemConfigTable{
-		logger: logger,
+		slogger: slogger.With("table", "kolide_touchid_system_config"),
 	}
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("touchid_compatible"),
@@ -29,7 +28,7 @@ func TouchIDSystemConfig(logger log.Logger) *table.Plugin {
 }
 
 type touchIDSystemConfigTable struct {
-	logger log.Logger
+	slogger *slog.Logger
 }
 
 // TouchIDSystemConfigGenerate will be called whenever the table is queried.
@@ -44,7 +43,10 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	var stdout bytes.Buffer
 	cmd, err := allowedcmd.SystemProfiler(ctx, "SPiBridgeDataType")
 	if err != nil {
-		level.Debug(t.logger).Log("msg", "could not create system_profiler command", "err", err)
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"could not create system_profiler command",
+			"err", err,
+		)
 		return results, nil
 	}
 	cmd.Stdout = &stdout
@@ -53,7 +55,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	}
 
 	r := regexp.MustCompile(` (?P<chip>T\d) `) // Matching on: Apple T[1|2] Security Chip
-	match := r.FindStringSubmatch(string(stdout.Bytes()))
+	match := r.FindStringSubmatch(stdout.String())
 	if len(match) == 0 {
 		secureEnclaveCPU = ""
 	} else {
@@ -64,14 +66,17 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	stdout.Reset()
 	cmd, err = allowedcmd.Bioutil(ctx, "-r", "-s")
 	if err != nil {
-		level.Debug(t.logger).Log("msg", "could not create bioutil command", "err", err)
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"could not create bioutil command",
+			"err", err,
+		)
 		return results, nil
 	}
 	cmd.Stdout = &stdout
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("calling bioutil for system configuration: %w", err)
 	}
-	configOutStr := string(stdout.Bytes())
+	configOutStr := stdout.String()
 	configSplit := strings.Split(configOutStr, ":")
 	if len(configSplit) >= 3 {
 		touchIDCompatible = "1"
