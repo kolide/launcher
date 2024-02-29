@@ -586,7 +586,7 @@ func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.Ta
 	defer span.End()
 
 	if pinnedVersion != "" {
-		target, targetMetadata, err := findTargetByVersion(context.Background(), binary, targets, pinnedVersion)
+		target, targetMetadata, err := findTargetByVersion(ctx, binary, targets, pinnedVersion)
 		if err == nil {
 			// Binary version found
 			return target, targetMetadata, nil
