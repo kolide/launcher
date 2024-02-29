@@ -490,9 +490,6 @@ func (fc *FlagController) UpdateDirectory() string {
 func (fc *FlagController) SetPinnedLauncherVersion(version string) error {
 	return fc.setControlServerValue(keys.PinnedLauncherVersion, []byte(version))
 }
-func (fc *FlagController) SetPinnedLauncherVersionOverride(version string, duration time.Duration) {
-	fc.overrideFlag(keys.PinnedLauncherVersion, duration, version)
-}
 func (fc *FlagController) PinnedLauncherVersion() string {
 	fc.overrideMutex.RLock()
 	defer fc.overrideMutex.RUnlock()
@@ -508,9 +505,6 @@ func (fc *FlagController) PinnedLauncherVersion() string {
 
 func (fc *FlagController) SetPinnedOsquerydVersion(version string) error {
 	return fc.setControlServerValue(keys.PinnedOsquerydVersion, []byte(version))
-}
-func (fc *FlagController) SetPinnedOsquerydVersionOverride(version string, duration time.Duration) {
-	fc.overrideFlag(keys.PinnedOsquerydVersion, duration, version)
 }
 func (fc *FlagController) PinnedOsquerydVersion() string {
 	fc.overrideMutex.RLock()
