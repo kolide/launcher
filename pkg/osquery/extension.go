@@ -36,15 +36,14 @@ import (
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey       string
-	Opts          ExtensionOpts
-	knapsack      types.Knapsack
-	serviceClient service.KolideService
-	enrollMutex   sync.Mutex
-	done          chan struct{}
-	interrupted   bool
-	slogger       *slog.Logger
-
+	NodeKey             string
+	Opts                ExtensionOpts
+	knapsack            types.Knapsack
+	serviceClient       service.KolideService
+	enrollMutex         sync.Mutex
+	done                chan struct{}
+	interrupted         bool
+	slogger             *slog.Logger
 	logPublicationState *logPublicationState
 }
 
