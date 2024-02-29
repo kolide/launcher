@@ -650,12 +650,14 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 // buffers.
 func (e *Extension) writeAndPurgeLogs() {
 	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
+		originalBatchState := e.logPublicationState.CurrentValues()
 		// Write logs
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
 			e.slogger.Log(context.TODO(), slog.LevelInfo,
 				"sending logs",
 				"type", typ.String(),
+				"attempted_publication_state", originalBatchState,
 				"err", err,
 			)
 		}
@@ -704,6 +706,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
+	bufferFilled := false
 	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
@@ -717,7 +720,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			// 3. Else append it
 			//
 			// Note that (1) must come first, otherwise (2) will always trigger.
-			if e.logPublicationState.exceedsCurrentBatchThreshold(len(v)) {
+			if e.logPublicationState.ExceedsCurrentBatchThreshold(len(v)) {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
 				e.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -727,8 +730,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
-			} else if e.logPublicationState.exceedsCurrentBatchThreshold(totalBytes + len(v)) {
+			} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes + len(v)) {
 				// Buffer is filled. Break the loop and come back later.
+				bufferFilled = true
 				break
 			} else {
 				logs = append(logs, string(v))
@@ -759,7 +763,14 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
-	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+	// inform the publication state tracking whether this batch should be used to
+	// determine the appropriate limit
+	e.logPublicationState.BeginBatch(time.Now(), bufferFilled)
+	publicationCtx := context.WithValue(context.Background(),
+		service.PublicationCtxKey,
+		e.logPublicationState.CurrentValues(),
+	)
+	err = e.writeLogsWithReenroll(publicationCtx, typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
 	}
@@ -783,16 +794,16 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
 	invalid = invalid || isNodeInvalidErr(err)
-	// publication was successful- update logPublicationState and move on
 	if !invalid && err == nil {
-		// todo inform lps of success and batch size
-		e.logPublicationState.recordBatchSuccess(logs)
+		// publication was successful- update logPublicationState and move on
+		e.logPublicationState.EndBatch(logs, true)
 		return nil
 	}
 
-	//
 	if err != nil {
-		// todo inform lps of error and batch size
+		// logPublicationState will determine whether this failure should impact
+		// the batch size limit based on the elapsed time
+		e.logPublicationState.EndBatch(logs, false)
 		return fmt.Errorf("transport error sending logs: %w", err)
 	}
 
