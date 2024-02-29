@@ -594,6 +594,34 @@ func (_m *Flags) OsquerydPath() string {
 	return r0
 }
 
+// PinnedLauncherVersion provides a mock function with given fields:
+func (_m *Flags) PinnedLauncherVersion() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// PinnedOsquerydVersion provides a mock function with given fields:
+func (_m *Flags) PinnedOsquerydVersion() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // RegisterChangeObserver provides a mock function with given fields: observer, flagKeys
 func (_m *Flags) RegisterChangeObserver(observer types.FlagsChangeObserver, flagKeys ...keys.FlagKey) {
 	_va := make([]interface{}, len(flagKeys))
@@ -992,6 +1020,34 @@ func (_m *Flags) SetOsqueryVerbose(verbose bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(verbose)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPinnedLauncherVersion provides a mock function with given fields: version
+func (_m *Flags) SetPinnedLauncherVersion(version string) error {
+	ret := _m.Called(version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPinnedOsquerydVersion provides a mock function with given fields: version
+func (_m *Flags) SetPinnedOsquerydVersion(version string) error {
+	ret := _m.Called(version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(version)
 	} else {
 		r0 = ret.Error(0)
 	}

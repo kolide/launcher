@@ -10,6 +10,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/exp/maps"
@@ -484,6 +485,38 @@ func (fc *FlagController) UpdateDirectory() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.UpdateDirectory),
 	).get(fc.getControlServerValue(keys.UpdateDirectory))
+}
+
+func (fc *FlagController) SetPinnedLauncherVersion(version string) error {
+	return fc.setControlServerValue(keys.PinnedLauncherVersion, []byte(version))
+}
+func (fc *FlagController) PinnedLauncherVersion() string {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return NewStringFlagValue(
+		WithOverrideString(fc.overrides[keys.PinnedLauncherVersion]),
+		WithDefaultString(""),
+		WithSanitizer(func(version string) string {
+			return tuf.SanitizePinnedVersion("launcher", version)
+		}),
+	).get(fc.getControlServerValue(keys.PinnedLauncherVersion))
+}
+
+func (fc *FlagController) SetPinnedOsquerydVersion(version string) error {
+	return fc.setControlServerValue(keys.PinnedOsquerydVersion, []byte(version))
+}
+func (fc *FlagController) PinnedOsquerydVersion() string {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return NewStringFlagValue(
+		WithOverrideString(fc.overrides[keys.PinnedOsquerydVersion]),
+		WithDefaultString(""),
+		WithSanitizer(func(version string) string {
+			return tuf.SanitizePinnedVersion("osqueryd", version)
+		}),
+	).get(fc.getControlServerValue(keys.PinnedOsquerydVersion))
 }
 
 func (fc *FlagController) SetExportTraces(enabled bool) error {

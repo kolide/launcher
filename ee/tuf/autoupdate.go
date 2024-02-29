@@ -16,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -88,6 +89,9 @@ type TufAutoupdater struct {
 	knapsack               types.Knapsack
 	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	updateChannel          string
+	pinnedVersions         map[autoupdatableBinary]string        // maps the binaries to their pinned versions
+	pinnedVersionGetters   map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
+	initialDelayLock       *sync.Mutex
 	updateLock             *sync.Mutex
 	interrupt              chan struct{}
 	interrupted            bool
@@ -113,11 +117,20 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	defer span.End()
 
 	ta := &TufAutoupdater{
-		knapsack:               k,
-		interrupt:              make(chan struct{}, 1),
-		signalRestart:          make(chan error, 1),
-		store:                  k.AutoupdateErrorsStore(),
-		updateChannel:          k.UpdateChannel(),
+		knapsack:      k,
+		interrupt:     make(chan struct{}, 1),
+		signalRestart: make(chan error, 1),
+		store:         k.AutoupdateErrorsStore(),
+		updateChannel: k.UpdateChannel(),
+		pinnedVersions: map[autoupdatableBinary]string{
+			binaryLauncher: k.PinnedLauncherVersion(), // empty string if not pinned
+			binaryOsqueryd: k.PinnedOsquerydVersion(), // ditto
+		},
+		pinnedVersionGetters: map[autoupdatableBinary]func() string{
+			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
+			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
+		},
+		initialDelayLock:       &sync.Mutex{},
 		updateLock:             &sync.Mutex{},
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -146,7 +159,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	}
 
 	// Subscribe to changes in update-related flags
-	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel)
+	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion)
 
 	return ta, nil
 }
@@ -205,15 +218,18 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
 	// Delay startup, if initial delay is set
+	ta.initialDelayLock.Lock() // prevent updates during delay
 	select {
 	case <-ta.interrupt:
 		ta.slogger.Log(context.TODO(), slog.LevelDebug,
 			"received external interrupt during initial delay, stopping",
 		)
+		ta.initialDelayLock.Unlock()
 		return nil
 	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
+	ta.initialDelayLock.Unlock()
 
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
@@ -265,6 +281,13 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
 // requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
+	if !ta.initialDelayLock.TryLock() {
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received update request during initial delay",
+		)
+		return errors.New("cannot perform update during initial delay")
+	}
+
 	var updateRequest controlServerAutoupdateRequest
 	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -321,24 +344,49 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 // FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
 // to respond to changes to autoupdate-related settings.
 func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
-	// No change -- this is the only setting we currently care about.
-	if ta.updateChannel == ta.knapsack.UpdateChannel() {
+	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
+
+	// Check to see if update channel has changed
+	if ta.updateChannel != ta.knapsack.UpdateChannel() {
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"control server sent down new update channel value",
+			"new_channel", ta.knapsack.UpdateChannel(),
+			"old_channel", ta.updateChannel,
+		)
+		ta.updateChannel = ta.knapsack.UpdateChannel()
+		binariesToCheckForUpdate = append(binariesToCheckForUpdate, binaryLauncher, binaryOsqueryd)
+	}
+
+	// Check to see if pinned versions have changed
+	for binary, currentPinnedVersion := range ta.pinnedVersions {
+		newPinnedVersion := ta.pinnedVersionGetters[binary]()
+		if currentPinnedVersion != newPinnedVersion {
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"control server sent down new pinned version for binary",
+				"binary", binary,
+				"new_pinned_version", newPinnedVersion,
+				"old_pinned_version", currentPinnedVersion,
+			)
+			ta.pinnedVersions[binary] = newPinnedVersion
+			if !slices.Contains(binariesToCheckForUpdate, binary) {
+				binariesToCheckForUpdate = append(binariesToCheckForUpdate, binary)
+			}
+		}
+	}
+
+	// No updates, or we're in the initial delay
+	if len(binariesToCheckForUpdate) == 0 || !ta.initialDelayLock.TryLock() {
 		return
 	}
 
-	// Update channel has changed -- update it, then check to see if we
-	// need to switch versions
-	ta.slogger.Log(context.TODO(), slog.LevelInfo,
-		"control server sent down new update channel value",
-		"new_channel", ta.knapsack.UpdateChannel(),
-		"old_channel", ta.updateChannel,
-	)
-	ta.updateChannel = ta.knapsack.UpdateChannel()
-	if err := ta.checkForUpdate(binaries); err != nil {
+	// At least one binary requires a recheck -- perform that now
+	if err := ta.checkForUpdate(binariesToCheckForUpdate); err != nil {
 		ta.storeError(err)
 		ta.slogger.Log(context.TODO(), slog.LevelError,
-			"error checking for update after switching update channels",
-			"new_channel", ta.updateChannel,
+			"error checking for update after autoupdate setting changed",
+			"update_channel", ta.updateChannel,
+			"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
+			"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
 			"err", err,
 		)
 	}
@@ -494,19 +542,19 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 // downloadUpdate will download a new release for the given binary, if available from TUF
 // and not already downloaded.
 func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
-	release, releaseMetadata, err := findRelease(context.Background(), binary, targets, ta.updateChannel)
+	target, targetMetadata, err := findTarget(context.Background(), binary, targets, ta.pinnedVersions[binary], ta.updateChannel, ta.slogger)
 	if err != nil {
-		return "", fmt.Errorf("could not find release: %w", err)
+		return "", fmt.Errorf("could not find appropriate target: %w", err)
 	}
 
 	// Ensure we don't download duplicate versions
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
-	if currentVersion == versionFromTarget(binary, release) {
+	if currentVersion == versionFromTarget(binary, target) {
 		return "", nil
 	}
 
-	if ta.libraryManager.Available(binary, release) {
+	if ta.libraryManager.Available(binary, target) {
 		// The release is already available in the library but we don't know if we're running it --
 		// err on the side of not restarting.
 		if currentVersion == "" {
@@ -520,15 +568,57 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 
 		// The release is already available in the library and it's not our current running version --
 		// return the version to signal for a restart.
-		return release, nil
+		return target, nil
 	}
 
 	// We haven't yet downloaded this release -- download it
-	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, release, releaseMetadata); err != nil {
-		return "", fmt.Errorf("could not add release %s for binary %s to library: %w", release, binary, err)
+	if err := ta.libraryManager.AddToLibrary(binary, currentVersion, target, targetMetadata); err != nil {
+		return "", fmt.Errorf("could not add target %s for binary %s to library: %w", target, binary, err)
 	}
 
-	return release, nil
+	return target, nil
+}
+
+// findTarget selects the appropriate target from `targets` for the given binary, using the pinned version (if set)
+// and otherwise selecting the correct release for the given channel.
+func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, pinnedVersion string, channel string, slogger *slog.Logger) (string, data.TargetFileMeta, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	if pinnedVersion != "" {
+		target, targetMetadata, err := findTargetByVersion(ctx, binary, targets, pinnedVersion)
+		if err == nil {
+			// Binary version found
+			return target, targetMetadata, nil
+		}
+		slogger.Log(ctx, slog.LevelWarn,
+			"could not find target for version, falling back to release version",
+			"pinned_version", pinnedVersion,
+			"binary", binary,
+			"err", err,
+		)
+	}
+
+	// Either there isn't a pinned version, or the pinned version couldn't be found --
+	// find the release target for the given channel instead.
+	return findRelease(ctx, binary, targets, channel)
+}
+
+// findTargetByVersion selects the appropriate target from `targets` for the given binary and version.
+func findTargetByVersion(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, binaryVersion string) (string, data.TargetFileMeta, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	targetNameForVersion := path.Join(string(binary), runtime.GOOS, PlatformArch(), fmt.Sprintf("%s-%s.tar.gz", binary, binaryVersion))
+
+	for targetName, target := range targets {
+		if targetName != targetNameForVersion {
+			continue
+		}
+
+		return filepath.Base(targetName), target, nil
+	}
+	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for binary %s and version %s", binary, binaryVersion)
 }
 
 // findRelease checks the latest data from TUF (in `targets`) to see whether a new release

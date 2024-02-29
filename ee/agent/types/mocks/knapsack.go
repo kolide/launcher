@@ -756,6 +756,34 @@ func (_m *Knapsack) PersistentHostDataStore() types.GetterSetterDeleterIteratorU
 	return r0
 }
 
+// PinnedLauncherVersion provides a mock function with given fields:
+func (_m *Knapsack) PinnedLauncherVersion() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// PinnedOsquerydVersion provides a mock function with given fields:
+func (_m *Knapsack) PinnedOsquerydVersion() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // ReadEnrollSecret provides a mock function with given fields:
 func (_m *Knapsack) ReadEnrollSecret() (string, error) {
 	ret := _m.Called()
@@ -1226,6 +1254,34 @@ func (_m *Knapsack) SetOsqueryVerbose(verbose bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(verbose)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPinnedLauncherVersion provides a mock function with given fields: version
+func (_m *Knapsack) SetPinnedLauncherVersion(version string) error {
+	ret := _m.Called(version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPinnedOsquerydVersion provides a mock function with given fields: version
+func (_m *Knapsack) SetPinnedOsquerydVersion(version string) error {
+	ret := _m.Called(version)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(version)
 	} else {
 		r0 = ret.Error(0)
 	}
