@@ -48,12 +48,19 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
+	// If this is a development build directory, we want to skip the TUF lookups and just run
+	// the requested build. Don't care about errors here. This is developer experience shim
+	inBuildDir := false
+	if execPath, err := os.Executable(); err == nil {
+		inBuildDir = strings.Contains(execPath, filepath.Join("launcher", "build")) && !env.Bool("LAUNCHER_FORCE_UPDATE_IN_BUILD", false)
+	}
+
 	// If there's a newer version of launcher on disk, use it.
 	// Allow a caller to set `LAUNCHER_SKIP_UPDATES` as a way to
 	// skip exec'ing an update. This helps prevent launcher from
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
-	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) {
+	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
 		runNewerLauncherIfAvailable(ctx, systemSlogger.Logger)
 	}
 
