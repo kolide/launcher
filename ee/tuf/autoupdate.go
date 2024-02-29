@@ -91,6 +91,7 @@ type TufAutoupdater struct {
 	updateChannel          string
 	pinnedVersions         map[autoupdatableBinary]string        // maps the binaries to their pinned versions
 	pinnedVersionGetters   map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
+	initialDelayLock       *sync.Mutex
 	updateLock             *sync.Mutex
 	interrupt              chan struct{}
 	interrupted            bool
@@ -129,6 +130,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
+		initialDelayLock:       &sync.Mutex{},
 		updateLock:             &sync.Mutex{},
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
@@ -216,15 +218,18 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
 	// Delay startup, if initial delay is set
+	ta.initialDelayLock.Lock() // prevent updates during delay
 	select {
 	case <-ta.interrupt:
 		ta.slogger.Log(context.TODO(), slog.LevelDebug,
 			"received external interrupt during initial delay, stopping",
 		)
+		ta.initialDelayLock.Unlock()
 		return nil
 	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
+	ta.initialDelayLock.Unlock()
 
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
@@ -276,6 +281,13 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
 // requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
+	if !ta.initialDelayLock.TryLock() {
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received update request during initial delay",
+		)
+		return errors.New("cannot perform update during initial delay")
+	}
+
 	var updateRequest controlServerAutoupdateRequest
 	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -362,8 +374,8 @@ func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
 		}
 	}
 
-	// No updates
-	if len(binariesToCheckForUpdate) == 0 {
+	// No updates, or we're in the initial delay
+	if len(binariesToCheckForUpdate) == 0 || !ta.initialDelayLock.TryLock() {
 		return
 	}
 

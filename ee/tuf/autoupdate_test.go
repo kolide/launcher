@@ -603,8 +603,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	interval := 500 * time.Millisecond
 	mockKnapsack.On("AutoupdateInterval").Return(interval)
-	initialDelay := 100 * time.Millisecond
-	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Millisecond)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
@@ -655,11 +654,86 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 
 	// Start the autoupdater, then make the control server request
 	go autoupdater.Execute()
-	time.Sleep(initialDelay)
+	time.Sleep(100 * time.Millisecond)
 	require.NoError(t, autoupdater.Do(data), "expected no error making update request")
 
 	// Give autoupdater a chance to run
 	time.Sleep(interval)
+
+	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
+	mockLibraryManager.AssertExpectations(t)
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+}
+
+func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.5.0"
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("PinnedLauncherVersion").Return("")
+	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	interval := 100 * time.Millisecond
+	mockKnapsack.On("AutoupdateInterval").Return(interval)
+	initialDelay := 1 * time.Second
+	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Update the metadata client with our test root JSON
+	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+
+	// Get metadata for each release
+	_, err = autoupdater.metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+
+	// Set up expectations for Execute function: tidying library, checking for updates
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	currentOsqueryVersion := "1.1.1"
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+	autoupdater.libraryManager = mockLibraryManager
+	for _, b := range binaries {
+		mockLibraryManager.On("Available", b, fmt.Sprintf("%s-%s.tar.gz", string(b), testReleaseVersion)).Return(true)
+	}
+
+	// Prepare control server request
+	rawRequest, err := json.Marshal(controlServerAutoupdateRequest{
+		BinariesToUpdate: []binaryToUpdate{
+			{
+				Name: "launcher",
+			},
+			{
+				Name: "osqueryd",
+			},
+		},
+	})
+	require.NoError(t, err, "marshalling update request")
+	data := bytes.NewReader(rawRequest)
+
+	// Start the autoupdater, then make the control server request right away, during the initial delay
+	go autoupdater.Execute()
+	time.Sleep(100 * time.Millisecond)
+	require.Error(t, autoupdater.Do(data), "expected error making request during initial delay")
+
+	// Give autoupdater a chance to run
+	time.Sleep(initialDelay + interval)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -782,6 +856,73 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 
 	// Confirm we have the current osqueryd version set
 	require.Equal(t, pinnedOsquerydVersion, autoupdater.pinnedVersions[binaryOsqueryd])
+}
+
+func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.5.0"
+	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	interval := 100 * time.Millisecond
+	mockKnapsack.On("AutoupdateInterval").Return(interval)
+	initialDelay := 1 * time.Second
+	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockQuerier := newMockQuerier(t)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
+
+	// Start out with a pinned version, then unset the pinned version
+	pinnedLauncherVersion := "1.7.3"
+	mockKnapsack.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
+	mockKnapsack.On("PinnedLauncherVersion").Return("")
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+	require.Equal(t, pinnedLauncherVersion, autoupdater.pinnedVersions[binaryLauncher])
+
+	// Update the metadata client with our test root JSON
+	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+
+	// Get metadata for each release
+	_, err = autoupdater.metadataClient.Update()
+	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+
+	// Set up expectations for Execute function: tidying library, checking for updates
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	currentOsqueryVersion := "1.1.1"
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+	autoupdater.libraryManager = mockLibraryManager
+	for _, b := range binaries {
+		mockLibraryManager.On("Available", b, fmt.Sprintf("%s-%s.tar.gz", string(b), testReleaseVersion)).Return(true)
+	}
+
+	// Start the autoupdater, then notify flag change right away, during the initial delay
+	go autoupdater.Execute()
+	time.Sleep(100 * time.Millisecond)
+	autoupdater.FlagsChanged(keys.PinnedLauncherVersion)
+
+	// Confirm we unset the pinned launcher version
+	require.Equal(t, "", autoupdater.pinnedVersions[binaryLauncher])
+
+	// Give autoupdater a chance to run
+	time.Sleep(initialDelay + interval)
+
+	// Confirm we didn't add anything to the library, and pulled all config items as expected
+	mockLibraryManager.AssertExpectations(t)
+	mockKnapsack.AssertExpectations(t)
 }
 
 func Test_currentRunningVersion_launcher_errorWhenVersionIsNotSet(t *testing.T) {
