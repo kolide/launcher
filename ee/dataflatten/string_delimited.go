@@ -36,23 +36,23 @@ func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 			}
 		}
 
-		header_count := len(headers)
+		headerCount := len(headers)
 
 		for scanner.Scan() {
 			line := scanner.Text()
 
 			// headers weren't provided, so retrieve them from the first available line.
-			if header_count == 0 {
-				headers = lineSplit(sep, line, header_count)
-				header_count = len(headers)
+			if headerCount == 0 {
+				headers = lineSplit(sep, line, headerCount)
+				headerCount = len(headers)
 				continue
 			}
 
 			row := map[string]interface{}{}
-			fields := lineSplit(sep, line, header_count)
+			fields := lineSplit(sep, line, headerCount)
 			// It's possible we don't have the same number of fields to headers, so use
 			// min here to avoid a possible array out-of-bounds exception.
-			min := min(header_count, len(fields))
+			min := min(headerCount, len(fields))
 
 			// For each header, add the corresponding line field to the result row.
 			for c := 0; c < min; c++ {
