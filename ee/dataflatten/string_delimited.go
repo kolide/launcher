@@ -27,7 +27,8 @@ func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 		results := []interface{}{}
 		scanner := bufio.NewScanner(bytes.NewReader(data))
 
-		// Skip first N lines due to provided headers or otherwise. This would likely be 1 or 0.
+		// Skip first N lines due to provided headers or otherwise.
+		// This would likely only ever be 1 or 0, but we may want more.
 		for skipN > 0 {
 			skipN--
 			// Early exit if the scanner skipped past all data.
