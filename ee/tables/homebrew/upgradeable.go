@@ -53,7 +53,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			output, err := t.getBrewOutdated(ctx, uid)
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user brew installed packages", "err", err, "target_uid", uid,)
+				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user brew installed packages", "err", err, "target_uid", uid)
 				continue
 			}
 
@@ -64,7 +64,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 			flattened, err := dataflatten.Json(output, flattenOpts...)
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err,)
+				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
 				continue
 			}
 
