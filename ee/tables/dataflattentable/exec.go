@@ -25,10 +25,10 @@ func WithKVSeparator(separator string) ExecTableOpt {
 }
 
 // WithLineSeparator sets the delimiter between fields on a line of data.
-// default "" in dataflattentable.Table (assumes whitespace separator in lines of data)
+// default "" in dataflattentable.Table (assumes whitespace separator between fields of data)
 func WithLineSeparator(separator string) ExecTableOpt {
 	return func(t *Table) {
-		t.lineValueSeparator = separator
+		t.lineFieldSeparator = separator
 	}
 }
 
@@ -57,7 +57,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		cmdGen:             cmdGen,
 		execArgs:           execArgs,
 		keyValueSeparator:  ":",
-		lineValueSeparator: "",
+		lineFieldSeparator: "",
 		lineHeaders:        []string{},
 		skipFirstNLines:    0,
 	}
@@ -78,7 +78,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		// splitting strategy
 		t.flattenBytesFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
 	case LineSepType:
-		t.flattenBytesFunc = dataflatten.StringDelimitedLineFunc(t.lineValueSeparator, t.lineHeaders, t.skipFirstNLines)
+		t.flattenBytesFunc = dataflatten.StringDelimitedLineFunc(t.lineFieldSeparator, t.lineHeaders, t.skipFirstNLines)
 	default:
 		panic("Unknown data source type")
 	}

@@ -29,8 +29,12 @@ func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 
 		// Skip first N lines due to provided headers or otherwise. This would likely be 1 or 0.
 		for skipN > 0 {
-			scanner.Scan()
-			skipN--
+			if scanner.Scan() {
+				skipN--
+			} else {
+				// Early exit if the scanner skipped past all data.
+				return Flatten(results, opts...)
+			}
 		}
 
 		header_count := len(headers)
@@ -68,7 +72,7 @@ func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 func lineSplit(sep string, line string, count int) []string {
 	switch sep {
 	case "":
-		// Separator wasn't provided, assume whitespace delimited lines.
+		// Separator wasn't provided, assume whitespace delimited fields.
 		return strings.Fields(line)
 	default:
 		// If we have a count of the headers, split the current line to N fields.

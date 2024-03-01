@@ -39,7 +39,7 @@ type Table struct {
 	execArgs []string
 
 	keyValueSeparator  string
-	lineValueSeparator string
+	lineFieldSeparator string
 	lineHeaders        []string
 	skipFirstNLines    int
 }
