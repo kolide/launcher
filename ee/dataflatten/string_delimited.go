@@ -21,7 +21,7 @@ const (
 //
 // Headers are expected to either be provided, or set from the first line of data using the separator.
 // If no separator is provided, it's assumed that fields are separated by whitespace.
-// The first N lines of data can be skipped in case garbage is sent with the data.
+// The first N lines of data can be skipped in case garbage is sent before the data.
 func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 	return func(data []byte, opts ...FlattenOpts) ([]Row, error) {
 		results := []interface{}{}
