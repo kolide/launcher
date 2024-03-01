@@ -30,12 +30,12 @@ func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 	restartHistory, err := history.GetHistory()
 	if err != nil && errors.Is(err, history.NoInstancesError{}) {
 		orc.status = Passing
-		orc.summary = "No restart history exists"
+		orc.summary = "No osquery restart history instances available"
 		return nil
 	}
 
 	if err != nil {
-		orc.status = Failing
+		orc.status = Erroring
 		orc.summary = "Unable to collect osquery restart history"
 		orc.data["error"] = err.Error()
 		return nil
