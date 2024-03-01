@@ -140,6 +140,10 @@ func Rpm(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return nil, errors.New("rpm not found")
 }
 
+func Snap(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/snap", arg...)
+}
+
 func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/systemctl", arg...)
 }
