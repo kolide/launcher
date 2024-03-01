@@ -14,6 +14,13 @@ import (
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
+type contextKey string
+
+const (
+	// PublicationCtxKey is used to set the relevant thresholds in context for reporting when logs are published
+	PublicationCtxKey contextKey = "log_publication_state"
+)
+
 type logCollection struct {
 	NodeKey string `json:"node_key"`
 	LogType logger.LogType
@@ -179,6 +186,11 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			}
 		}
 
+		pubStateVals, ok := ctx.Value(PublicationCtxKey).(map[string]int)
+		if !ok {
+			pubStateVals = make(map[string]int)
+		}
+
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishLogs",
 			"uuid", uuid,
@@ -188,6 +200,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			"reauth", reauth,
 			"err", err,
 			"took", time.Since(begin),
+			"publication_state", pubStateVals,
 		)
 	}(time.Now())
 
