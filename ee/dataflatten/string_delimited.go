@@ -29,10 +29,9 @@ func StringDelimitedLineFunc(sep string, headers []string, skipN int) dataFunc {
 
 		// Skip first N lines due to provided headers or otherwise. This would likely be 1 or 0.
 		for skipN > 0 {
-			if scanner.Scan() {
-				skipN--
-			} else {
-				// Early exit if the scanner skipped past all data.
+			skipN--
+			// Early exit if the scanner skipped past all data.
+			if !scanner.Scan() {
 				return Flatten(results, opts...)
 			}
 		}
