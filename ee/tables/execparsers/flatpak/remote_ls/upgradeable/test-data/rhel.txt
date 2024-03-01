@@ -1,0 +1,3 @@
+io.appflowy.AppFlowy                      flathub
+org.gnome.Platform                        flathub
+org.gnome.Platform.Locale                 flathub

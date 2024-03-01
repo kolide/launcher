@@ -1,0 +1,5 @@
+Discord	com.discordapp.Discord		stable	x86_64
+default	org.freedesktop.Platform.GL.default		23.08	x86_64
+default	org.freedesktop.Platform.GL.default		23.08-extra	x86_64
+freedesktop platform translations	org.freedesktop.Platform.Locale		23.08	x86_64
+freedesktop platform	org.freedesktop.Platform		23.08	x86_64
