@@ -29,7 +29,7 @@ func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 
 	restartHistory, err := history.GetHistory()
 	if err != nil && errors.Is(err, history.NoInstancesError{}) {
-		orc.status = Passing
+		orc.status = Informational
 		orc.summary = "No osquery restart history instances available"
 		return nil
 	}
