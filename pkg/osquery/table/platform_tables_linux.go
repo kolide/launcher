@@ -17,6 +17,7 @@ import (
 	pacman_group "github.com/kolide/launcher/ee/tables/execparsers/pacman/group"
 	pacman_info "github.com/kolide/launcher/ee/tables/execparsers/pacman/info"
 	pacman_upgradeable "github.com/kolide/launcher/ee/tables/execparsers/pacman/upgradeable"
+	"github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/execparsers/repcli"
 	"github.com/kolide/launcher/ee/tables/execparsers/rpm"
 	"github.com/kolide/launcher/ee/tables/execparsers/simple_array"
@@ -32,6 +33,7 @@ import (
 
 func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
+		brew_upgradeable.TablePlugin(slogger),
 		cryptsetup.TablePlugin(slogger),
 		gsettings.Settings(slogger),
 		gsettings.Metadata(slogger),

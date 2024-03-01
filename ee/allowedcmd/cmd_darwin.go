@@ -20,6 +20,10 @@ func Bputil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/bputil", arg...)
 }
 
+func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/opt/homebrew/bin/brew", arg...)
+}
+
 func Diskutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/diskutil", arg...)
 }

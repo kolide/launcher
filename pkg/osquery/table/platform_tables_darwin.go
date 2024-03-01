@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/softwareupdate"
 	"github.com/kolide/launcher/ee/tables/filevault"
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
+	"github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/ioreg"
 	"github.com/kolide/launcher/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/ee/tables/mdmclient"
@@ -81,6 +82,7 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		keychainAclsTable,
 		keychainItemsTable,
 		appicons.AppIcons(),
+		brew_upgradeable.TablePlugin(slogger),
 		ChromeLoginKeychainInfo(slogger),
 		firmwarepasswd.TablePlugin(slogger),
 		GDriveSyncConfig(slogger),
