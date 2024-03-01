@@ -13,4 +13,6 @@ type Knapsack interface {
 	LatestOsquerydPath(ctx context.Context) string
 	// ReadEnrollSecret returns the enroll secret value, checking in various locations.
 	ReadEnrollSecret() (string, error)
+	// CurrentEnrollmentStatus returns the current enrollment status of the launcher installation
+	CurrentEnrollmentStatus() (EnrollmentStatus, error)
 }

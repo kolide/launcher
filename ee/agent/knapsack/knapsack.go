@@ -170,3 +170,25 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 
 	return "", errors.New("enroll secret not set")
 }
+
+func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
+	enrollSecret, err := k.ReadEnrollSecret()
+	if err != nil || enrollSecret == "" {
+		return types.NoEnrollmentKey, nil
+	}
+
+	if k.ConfigStore() == nil {
+		return types.Unknown, errors.New("no config store in knapsack")
+	}
+
+	key, err := k.ConfigStore().Get([]byte("nodeKey"))
+	if err != nil {
+		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
+	}
+
+	if len(key) == 0 {
+		return types.Unenrolled, nil
+	}
+
+	return types.Enrolled, nil
+}

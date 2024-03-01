@@ -39,6 +39,7 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hc.data["bbolt_db_size"] = hc.bboltDbSize()
 	desktopProcesses := runner.InstanceDesktopProcessRecords()
 	hc.data["user_desktop_processes"] = desktopProcesses
+	hc.data["enrollment_status"] = naIfError(hc.k.CurrentEnrollmentStatus())
 
 	uptimeRaw, err := host.Uptime()
 	if err != nil {

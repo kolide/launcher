@@ -6,6 +6,7 @@ import (
 	"time"
 
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Autoupdate").Return(true).Maybe()
 	mockKnapsack.On("LatestOsquerydPath").Return("").Maybe()
 	mockKnapsack.On("ServerProvidedDataStore").Return(nil).Maybe()
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil).Maybe()
 	checkupLogger := NewCheckupLogger(multislogger.New().Logger, mockKnapsack)
 	mockKnapsack.AssertExpectations(t)
 
