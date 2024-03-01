@@ -36,14 +36,15 @@ import (
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey       string
-	Opts          ExtensionOpts
-	knapsack      types.Knapsack
-	serviceClient service.KolideService
-	enrollMutex   sync.Mutex
-	done          chan struct{}
-	interrupted   bool
-	slogger       *slog.Logger
+	NodeKey             string
+	Opts                ExtensionOpts
+	knapsack            types.Knapsack
+	serviceClient       service.KolideService
+	enrollMutex         sync.Mutex
+	done                chan struct{}
+	interrupted         bool
+	slogger             *slog.Logger
+	logPublicationState *logPublicationState
 }
 
 const (
@@ -146,12 +147,13 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	}
 
 	return &Extension{
-		slogger:       slogger,
-		serviceClient: client,
-		knapsack:      k,
-		NodeKey:       nodekey,
-		Opts:          opts,
-		done:          make(chan struct{}),
+		slogger:             slogger,
+		serviceClient:       client,
+		knapsack:            k,
+		NodeKey:             nodekey,
+		Opts:                opts,
+		done:                make(chan struct{}),
+		logPublicationState: NewLogPublicationState(opts.MaxBytesPerBatch),
 	}, nil
 }
 
@@ -647,12 +649,14 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 // buffers.
 func (e *Extension) writeAndPurgeLogs() {
 	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
+		originalBatchState := e.logPublicationState.CurrentValues()
 		// Write logs
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
 			e.slogger.Log(context.TODO(), slog.LevelInfo,
 				"sending logs",
 				"type", typ.String(),
+				"attempted_publication_state", originalBatchState,
 				"err", err,
 			)
 		}
@@ -701,6 +705,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
+	bufferFilled := false
 	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
 
@@ -714,7 +719,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 			// 3. Else append it
 			//
 			// Note that (1) must come first, otherwise (2) will always trigger.
-			if len(v) > e.Opts.MaxBytesPerBatch {
+			if e.logPublicationState.ExceedsCurrentBatchThreshold(len(v)) {
 				// Discard logs that are too big
 				logheadSize := minInt(len(v), 100)
 				e.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -724,8 +729,9 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 					"limit", e.Opts.MaxBytesPerBatch,
 					"loghead", string(v)[0:logheadSize],
 				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
+			} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes + len(v)) {
 				// Buffer is filled. Break the loop and come back later.
+				bufferFilled = true
 				break
 			} else {
 				logs = append(logs, string(v))
@@ -756,7 +762,14 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
-	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+	// inform the publication state tracking whether this batch should be used to
+	// determine the appropriate limit
+	e.logPublicationState.BeginBatch(time.Now(), bufferFilled)
+	publicationCtx := context.WithValue(context.Background(),
+		service.PublicationCtxKey,
+		e.logPublicationState.CurrentValues(),
+	)
+	err = e.writeLogsWithReenroll(publicationCtx, typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
 	}
@@ -779,31 +792,35 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
+	invalid = invalid || isNodeInvalidErr(err)
+	if !invalid && err == nil {
+		// publication was successful- update logPublicationState and move on
+		e.logPublicationState.EndBatch(logs, true)
+		return nil
+	}
+
+	if err != nil {
+		// logPublicationState will determine whether this failure should impact
+		// the batch size limit based on the elapsed time
+		e.logPublicationState.EndBatch(logs, false)
 		return fmt.Errorf("transport error sending logs: %w", err)
 	}
 
-	if invalid {
-		if !reenroll {
-			return errors.New("enrollment invalid, reenroll disabled")
-		}
-
-		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx)
-		if err != nil {
-			return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
-		}
-		if invalid {
-			return errors.New("enrollment invalid, reenrollment invalid")
-		}
-
-		// Don't attempt reenroll after first attempt
-		return e.writeLogsWithReenroll(ctx, typ, logs, false)
+	if !reenroll {
+		return errors.New("enrollment invalid, reenroll disabled")
 	}
 
-	return nil
+	e.RequireReenroll(ctx)
+	_, invalid, err = e.Enroll(ctx)
+	if err != nil {
+		return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
+	}
+	if invalid {
+		return errors.New("enrollment invalid, reenrollment invalid")
+	}
+
+	// Don't attempt reenroll after first attempt
+	return e.writeLogsWithReenroll(ctx, typ, logs, false)
 }
 
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
@@ -976,6 +993,14 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 
 func minInt(a, b int) int {
 	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
 		return a
 	}
 
