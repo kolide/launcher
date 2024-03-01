@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/simple_array"
 	"github.com/kolide/launcher/ee/tables/fscrypt_info"
 	"github.com/kolide/launcher/ee/tables/gsettings"
+	"github.com/kolide/launcher/ee/tables/homebrew"
 	nix_env_upgradeable "github.com/kolide/launcher/ee/tables/nix_env/upgradeable"
 	"github.com/kolide/launcher/ee/tables/secureboot"
 	"github.com/kolide/launcher/ee/tables/xfconf"
@@ -32,6 +33,7 @@ import (
 
 func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
+		brew_upgradeable.TablePlugin(slogger),
 		cryptsetup.TablePlugin(slogger),
 		gsettings.Settings(slogger),
 		gsettings.Metadata(slogger),
