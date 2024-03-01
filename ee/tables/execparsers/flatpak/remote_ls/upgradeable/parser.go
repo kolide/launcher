@@ -6,6 +6,9 @@ import (
 	"regexp"
 )
 
+// The app id conforms to: [dbus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names)
+var flatpakAppIdRegexp = regexp.MustCompile(`(([a-zA-Z0-9_]+\.){1,}([a-zA-Z0-9_]+))`)
+
 // Wow this has been a head-pounding bugger of a thing.
 //
 // flatpak remote-ls --updates
@@ -21,16 +24,14 @@ import (
 // After traveling various paths of acquiring and preserving as much data as I could, I give up. You win flatpak.
 // Thus is why I've resorted to good ole regexp, and only to get the app id.
 // The app id is the only* consistent data output between linux distributions, and is used in the flatpak update command.
-// The app id conforms to: [dbus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names)
 func remotelsParse(reader io.Reader) (any, error) {
 	results := make([]map[string]string, 0)
-	re := regexp.MustCompile("(([a-zA-Z0-9_]+\\.){1,}([a-zA-Z0-9_]+))")
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		id := re.FindString(line)
+		id := flatpakAppIdRegexp.FindString(line)
 		if id == "" {
 			continue
 		}
