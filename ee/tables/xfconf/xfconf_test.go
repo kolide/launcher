@@ -23,7 +23,7 @@ func Test_getUserConfig(t *testing.T) {
 	tmpDefaultDir, tmpUserDir := setUpConfigFiles(t)
 
 	xfconf := xfconfTable{
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	testUsername := "testUser"

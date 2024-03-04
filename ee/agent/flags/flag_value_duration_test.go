@@ -73,7 +73,7 @@ func TestFlagValueDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := NewDurationFlagValue(multislogger.New().Logger, keys.ControlRequestInterval, tt.options...)
+			d := NewDurationFlagValue(multislogger.NewNopLogger(), keys.ControlRequestInterval, tt.options...)
 			require.NotNil(t, d)
 
 			val := d.get(tt.controlServerValue)

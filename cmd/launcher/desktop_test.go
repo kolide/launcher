@@ -15,7 +15,7 @@ import (
 )
 
 func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
-	runnerServer, err := runnerserver.New(multislogger.New().Logger, nil, nil)
+	runnerServer, err := runnerserver.New(multislogger.NewNopLogger(), nil, nil)
 	require.NoError(t, err)
 
 	// register client and get token

@@ -358,7 +358,7 @@ func newInstance() *OsqueryInstance {
 	i.cancel = cancel
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
 
-	i.slogger = multislogger.New().Logger
+	i.slogger = multislogger.NewNopLogger()
 
 	i.startFunc = func(cmd *exec.Cmd) error {
 		return cmd.Start()

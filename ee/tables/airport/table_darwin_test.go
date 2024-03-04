@@ -100,7 +100,7 @@ func Test_generateAirportData_HappyPath(t *testing.T) {
 				constraints["query"] = []string{tt.query}
 			}
 
-			got, err := generateAirportData(tablehelpers.MockQueryContext(constraints), executor, multislogger.New().Logger)
+			got, err := generateAirportData(tablehelpers.MockQueryContext(constraints), executor, multislogger.NewNopLogger())
 			require.NoError(t, err)
 
 			executor.AssertExpectations(t)
@@ -218,7 +218,7 @@ func Test_generateAirportData_EdgeCases(t *testing.T) {
 
 			executor.On("Exec", mock.Anything).Return(tt.execReturn()).Once()
 
-			got, err := generateAirportData(tt.args.queryContext, executor, multislogger.New().Logger)
+			got, err := generateAirportData(tt.args.queryContext, executor, multislogger.NewNopLogger())
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
 		})

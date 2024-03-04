@@ -42,7 +42,7 @@ func TestTransformOutput(t *testing.T) {
 		},
 	}
 
-	table := Table{slogger: multislogger.New().Logger}
+	table := Table{slogger: multislogger.NewNopLogger()}
 
 	for _, tt := range tests {
 		tt := tt

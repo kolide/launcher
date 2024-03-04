@@ -32,7 +32,7 @@ func TestExec(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	slogger := multislogger.New().Logger
+	slogger := multislogger.NewNopLogger()
 
 	for _, tt := range tests {
 		tt := tt

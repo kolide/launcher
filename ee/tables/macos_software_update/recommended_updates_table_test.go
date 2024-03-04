@@ -14,7 +14,7 @@ import (
 
 func Test_generateRecommendedUpdatesHappyPath(t *testing.T) {
 	t.Parallel()
-	table := Table{slogger: multislogger.New().Logger}
+	table := Table{slogger: multislogger.NewNopLogger()}
 
 	_, err := table.generate(context.Background(), tablehelpers.MockQueryContext(nil))
 

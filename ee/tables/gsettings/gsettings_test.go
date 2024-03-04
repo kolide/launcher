@@ -48,7 +48,7 @@ func TestGsettingsValues(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		table := GsettingsValues{
-			slogger: multislogger.New().Logger,
+			slogger: multislogger.NewNopLogger(),
 			getBytes: func(ctx context.Context, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
@@ -127,7 +127,7 @@ func TestPerUser(t *testing.T) {
 
 	for _, tt := range tests {
 		table := GsettingsValues{
-			slogger:  multislogger.New().Logger,
+			slogger:  multislogger.NewNopLogger(),
 			getBytes: execGsettings,
 		}
 		mockQC := tablehelpers.MockQueryContext(map[string][]string{
@@ -171,7 +171,7 @@ func TestListKeys(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		table := GsettingsMetadata{
-			slogger: multislogger.New().Logger,
+			slogger: multislogger.NewNopLogger(),
 			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
@@ -225,7 +225,7 @@ func TestGetType(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		table := GsettingsMetadata{
-			slogger: multislogger.New().Logger,
+			slogger: multislogger.NewNopLogger(),
 			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
 				_, err := buf.WriteString(tt.input)
 				require.NoError(t, err)

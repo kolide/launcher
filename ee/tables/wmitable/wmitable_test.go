@@ -16,7 +16,7 @@ import (
 func TestQueries(t *testing.T) {
 	t.Parallel()
 
-	wmiTable := Table{slogger: multislogger.New().Logger}
+	wmiTable := Table{slogger: multislogger.NewNopLogger()}
 
 	var tests = []struct {
 		name        string

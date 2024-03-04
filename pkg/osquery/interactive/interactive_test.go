@@ -84,7 +84,7 @@ func TestProc(t *testing.T) {
 			require.NoError(t, downloadOsquery(rootDir))
 			osquerydPath := filepath.Join(rootDir, "osqueryd")
 
-			proc, _, err := StartProcess(multislogger.New().Logger, rootDir, osquerydPath, tt.osqueryFlags)
+			proc, _, err := StartProcess(multislogger.NewNopLogger(), rootDir, osquerydPath, tt.osqueryFlags)
 
 			if tt.errContainsStr != "" {
 				require.Error(t, err)

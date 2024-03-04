@@ -50,7 +50,7 @@ func TestParser(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		parser := New(multislogger.New().Logger).parser
+		parser := New(multislogger.NewNopLogger()).parser
 
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()

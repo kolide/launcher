@@ -196,7 +196,7 @@ func (tc *tufCheckup) selectedVersions() map[string]map[string]string {
 		"osqueryd": make(map[string]string),
 	}
 
-	nopLogger := multislogger.New().Logger
+	nopLogger := multislogger.NewNopLogger()
 
 	if launcherVersion, err := tuf.CheckOutLatestWithoutConfig("launcher", nopLogger); err != nil {
 		selectedVersions["launcher"]["path"] = fmt.Sprintf("error checking out latest version: %v", err)

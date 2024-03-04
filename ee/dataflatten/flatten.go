@@ -138,7 +138,7 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 	fl := &Flattener{
 		rows:            []Row{},
 		logLevel:        levelFlattenDebug, // by default, log at a level below debug
-		slogger:         multislogger.New().Logger,
+		slogger:         multislogger.NewNopLogger(),
 		queryWildcard:   `*`,
 		queryKeyDenoter: `#`,
 	}
