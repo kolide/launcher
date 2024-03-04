@@ -17,7 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type dbResetRecord struct {
+type DBResetRecord struct {
 	NodeKey        string   `json:"node_key"`
 	PubKeys        [][]byte `json:"pub_keys"`
 	Serial         string   `json:"serial"`
@@ -35,7 +35,7 @@ var (
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
 	hostDataKeyMunemo       = []byte("munemo")
 
-	hostDataKeyResetRecords = []byte("reset_records")
+	HostDataKeyResetRecords = []byte("reset_records")
 )
 
 const (
@@ -274,7 +274,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get tombstone id from store", "err", err)
 	}
 
-	dataToStore := dbResetRecord{
+	dataToStore := DBResetRecord{
 		NodeKey:        string(nodeKey),
 		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
@@ -287,15 +287,15 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		ResetReason:    resetReason,
 	}
 
-	previousHostData, err := k.PersistentHostDataStore().Get(hostDataKeyResetRecords)
+	previousHostData, err := k.PersistentHostDataStore().Get(HostDataKeyResetRecords)
 	if err != nil {
 		return nil, fmt.Errorf("getting previous host data from store: %w", err)
 	}
 
-	var hostDataCollection []dbResetRecord
+	var hostDataCollection []DBResetRecord
 	if len(previousHostData) == 0 {
 		// No previous database resets
-		hostDataCollection = []dbResetRecord{dataToStore}
+		hostDataCollection = []DBResetRecord{dataToStore}
 	} else {
 		if err := json.Unmarshal(previousHostData, &hostDataCollection); err != nil {
 			return nil, fmt.Errorf("unmarshalling previous host data: %w", err)
@@ -345,7 +345,7 @@ func ResetDatabase(ctx context.Context, k types.Knapsack, resetReason string) er
 	}
 
 	// Store the backup data
-	if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
+	if err := k.PersistentHostDataStore().Set(HostDataKeyResetRecords, backup); err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
 		return err
 	}
