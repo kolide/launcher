@@ -12,18 +12,25 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type identifiers struct {
-	UUID           string
-	InstanceId     string
-	HardwareSerial string
-}
+type (
+	identifiers struct {
+		UUID           string
+		InstanceId     string
+		HardwareSerial string
+	}
 
-type requestIdsResponse struct {
-	RequestId string
-	identifiers
-	Nonce     string
-	Timestamp time.Time
-}
+	requestIdsResponse struct {
+		RequestId string
+		identifiers
+		Nonce     string
+		Timestamp time.Time
+		Status    status
+	}
+
+	status struct {
+		EnrollmentStatus string
+	}
+)
 
 const (
 	idSQL = "select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info"
@@ -66,9 +73,14 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
+	enrollmentStatus, _ := ls.knapsack.CurrentEnrollmentStatus()
+
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
+		Status: status{
+			EnrollmentStatus: string(enrollmentStatus),
+		},
 	}
 	response.identifiers = ls.identifiers
 

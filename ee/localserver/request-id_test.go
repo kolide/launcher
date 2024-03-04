@@ -26,6 +26,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack := typesMocks.NewKnapsack(t)
 	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	mockKnapsack.On("KolideServerURL").Return("localhost")
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{
@@ -53,6 +54,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	// convert the response to a struct
 	var response requestIdsResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+
+	mockKnapsack.AssertExpectations(t)
 }
 
 func testServer(t *testing.T, k types.Knapsack) *localServer {
