@@ -12,14 +12,14 @@ import (
 func TestRun_NoActors(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.New().Logger)
+	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
 	require.NoError(t, testRunGroup.Run())
 }
 
 func TestRun_MultipleActors(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.New().Logger)
+	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -90,7 +90,7 @@ func TestRun_MultipleActors(t *testing.T) {
 func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.New().Logger)
+	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -163,7 +163,7 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.New().Logger)
+	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 	// Keep track of when `execute`s return so we give testRunGroup.Run enough time to do its thing

@@ -41,7 +41,7 @@ func main() {
 	}
 
 	opts := []dataflatten.FlattenOpts{
-		dataflatten.WithSlogger(multislogger.New().Logger),
+		dataflatten.WithSlogger(multislogger.NewNopLogger()),
 		dataflatten.WithNestedPlist(),
 		dataflatten.WithQuery(strings.Split(*flQuery, `/`)),
 	}

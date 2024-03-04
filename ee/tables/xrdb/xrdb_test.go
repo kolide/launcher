@@ -86,7 +86,7 @@ func TestXrdbParse(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		table := XRDBSettings{
-			slogger: multislogger.New().Logger,
+			slogger: multislogger.NewNopLogger(),
 			getBytes: func(ctx context.Context, display, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)

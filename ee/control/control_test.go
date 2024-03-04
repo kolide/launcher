@@ -86,7 +86,7 @@ func TestControlServiceRegisterConsumer(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -119,7 +119,7 @@ func TestControlServiceRegisterConsumerMultiple(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -167,7 +167,7 @@ func TestControlServiceUpdate(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			data := nopDataProvider{}
 			controlOpts := []Option{}
@@ -228,7 +228,7 @@ func TestControlServiceFetch(t *testing.T) {
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
 			mockKnapsack.On("ForceControlSubsystems").Return(false)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			data := &TestClient{tt.subsystems, tt.hashData}
 			controlOpts := []Option{}
@@ -293,7 +293,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				mockKnapsack := typesMocks.NewKnapsack(t)
 				mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
 				mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
-				mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+				mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 				if j >= tt.expectedUpdates {
 					// ForceControlSubsystems is only called when no update would normally be triggered
@@ -323,7 +323,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("ControlRequestInterval").Return(24 * time.Hour)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
-	k.On("Slogger").Return(multislogger.New().Logger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 	data := &TestClient{}
 	control := New(k, data)
 

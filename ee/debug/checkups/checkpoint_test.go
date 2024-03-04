@@ -31,7 +31,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath").Return("").Maybe()
 	mockKnapsack.On("ServerProvidedDataStore").Return(nil).Maybe()
 	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil).Maybe()
-	checkupLogger := NewCheckupLogger(multislogger.New().Logger, mockKnapsack)
+	checkupLogger := NewCheckupLogger(multislogger.NewNopLogger(), mockKnapsack)
 	mockKnapsack.AssertExpectations(t)
 
 	// Start and then interrupt

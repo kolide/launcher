@@ -30,7 +30,7 @@ func TestTable(t *testing.T) {
 			t.Parallel()
 
 			table := Table{
-				slogger:   multislogger.New().Logger,
+				slogger:   multislogger.NewNopLogger(),
 				queryFunc: tt.queryFunc,
 			}
 

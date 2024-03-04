@@ -297,7 +297,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
-			mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
@@ -331,7 +331,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
-	mockKnapsack.On("Slogger").Return(multislogger.New().Logger)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))

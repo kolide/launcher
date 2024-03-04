@@ -20,7 +20,7 @@ import (
 func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	t.Parallel()
 
-	slogger := multislogger.New().Logger
+	slogger := multislogger.NewNopLogger()
 
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
@@ -85,7 +85,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 func TestDataFlattenTables(t *testing.T) {
 	t.Parallel()
 
-	slogger := multislogger.New().Logger
+	slogger := multislogger.NewNopLogger()
 
 	var tests = []struct {
 		testTables   map[string]Table

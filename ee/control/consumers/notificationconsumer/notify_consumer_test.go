@@ -30,7 +30,7 @@ func TestUpdate_HappyPath(t *testing.T) {
 
 	testNc := &NotificationConsumer{
 		runner:  mockNotifier,
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	// Send one notification
@@ -65,7 +65,7 @@ func TestUpdate_HappyPath_NoAction(t *testing.T) {
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
 		runner:  mockNotifier,
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	// Send one notification that we haven't seen before
@@ -97,7 +97,7 @@ func TestUpdate_ValidatesNotifications(t *testing.T) {
 	mockNotifier := newNotifierMock()
 	testNc := &NotificationConsumer{
 		runner:  mockNotifier,
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	tests := []struct {

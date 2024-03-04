@@ -25,7 +25,7 @@ func TestRootServer(t *testing.T) {
 
 	messenger := servermocks.NewMessenger(t)
 
-	monitorServer, err := New(multislogger.New().Logger, mockSack, messenger)
+	monitorServer, err := New(multislogger.NewNopLogger(), mockSack, messenger)
 	require.NoError(t, err)
 
 	go func() {
