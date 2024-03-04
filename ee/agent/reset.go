@@ -79,24 +79,12 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		)
 
 		// In the future, we can proceed with backing up and resetting the database.
-		// For now, we are only logging that we detected the change.
+		// For now, we are only logging that we detected the change until we have a dependable
+		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
 		/*
-			backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
-			if err != nil {
-				k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
+			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
+				k.Slogger().Log(ctx, slog.LevelError, "failed to reset database", "err", err)
 			}
-
-			if err := wipeDatabase(ctx, k); err != nil {
-				k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
-				return
-			}
-
-
-			// Store the backup data
-			if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
-				k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
-			}
-
 		*/
 
 		// Cache hardware and rollout data for future checks
@@ -344,9 +332,30 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 	return pubKeyBytes, nil
 }
 
-// WipeDatabase iterates over all stores in the database, deleting all keys from
+func ResetDatabase(ctx context.Context, k types.Knapsack, resetReason string) error {
+	backup, err := prepareDatabaseResetRecords(ctx, k, resetReason)
+	if err != nil {
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
+		return err
+	}
+
+	if err := wipeDatabase(ctx, k); err != nil {
+		k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
+		return err
+	}
+
+	// Store the backup data
+	if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+// wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func WipeDatabase(ctx context.Context, k types.Knapsack) error {
+func wipeDatabase(ctx context.Context, k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
 			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)

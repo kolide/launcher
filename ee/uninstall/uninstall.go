@@ -10,6 +10,10 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
+const (
+	resetReasonUninstallRequested = "remote uninstall requested"
+)
+
 // Uninstall just removes the enroll secret file and wipes the database.
 // Logs errors, but does not return them, because we want to try each step independently.
 // If exitOnCompletion is true, it will also disable launcher autostart and exit.
@@ -23,9 +27,9 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		)
 	}
 
-	if err := agent.WipeDatabase(ctx, k); err != nil {
+	if err := agent.ResetDatabase(ctx, k, resetReasonUninstallRequested); err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"wiping database",
+			"resetting database",
 			"err", err,
 		)
 	}
