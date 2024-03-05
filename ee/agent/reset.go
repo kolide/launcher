@@ -17,7 +17,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type DBResetRecord struct {
+type dbResetRecord struct {
 	NodeKey        string   `json:"node_key"`
 	PubKeys        [][]byte `json:"pub_keys"`
 	Serial         string   `json:"serial"`
@@ -105,8 +105,8 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	}
 }
 
-func GetResetRecords(ctx context.Context, k types.Knapsack) ([]DBResetRecord, error) {
-	resetRecords := make([]DBResetRecord, 0)
+func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, error) {
+	resetRecords := make([]dbResetRecord, 0)
 	if k.PersistentHostDataStore() == nil {
 		return resetRecords, UninitializedStorageError{}
 	}
@@ -322,7 +322,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get tombstone id from store", "err", err)
 	}
 
-	dataToStore := DBResetRecord{
+	dataToStore := dbResetRecord{
 		NodeKey:        string(nodeKey),
 		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
