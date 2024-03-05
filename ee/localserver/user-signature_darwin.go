@@ -65,6 +65,7 @@ func (e *kryptoEcMiddleware) addUserSignature(ctx context.Context, response resp
 		return response, fmt.Errorf("unmarshalling sign response: %w", err)
 	}
 
+	response.Timestamp = signResponseInner.Timestamp
 	response.Nonce = signResponseInner.Nonce
 	response.UserSig = signResponseOuter.Sig
 
