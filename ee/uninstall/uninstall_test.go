@@ -2,7 +2,6 @@ package uninstall
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -95,12 +94,8 @@ func TestUninstall(t *testing.T) {
 			// the expectation of 1 here is coming from the single remaining reset_records key
 			// see agent.ResetDatabase for additional context
 			require.Equal(t, 1, itemsFound)
-			resetRecordsRaw, err := testHostDataStore.Get(agent.HostDataKeyResetRecords)
+			resetRecords, err := agent.GetResetRecords(context.TODO(), k)
 			require.NoError(t, err, "could not get reset records from test store")
-			var resetRecords []agent.DBResetRecord
-			require.Greater(t, len(resetRecordsRaw), 0, "did not expect reset records to be empty")
-			err = json.Unmarshal(resetRecordsRaw, &resetRecords)
-			require.NoError(t, err, "expected to be able to unmarshal reset records")
 			require.Equal(t, 1, len(resetRecords), "expected reset records to contain exactly 1 uninstallation record")
 			// now check the individual bits we want to ensure are migrated to the reset record
 			resetRecord := resetRecords[0]

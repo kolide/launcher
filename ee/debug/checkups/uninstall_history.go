@@ -2,7 +2,7 @@ package checkups
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"io"
 	"time"
 
@@ -27,13 +27,13 @@ func (hc *uninstallHistoryCheckup) Summary() string       { return hc.summary }
 
 func (hc *uninstallHistoryCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hc.data = make(map[string]any)
-	if hc.k.PersistentHostDataStore() == nil {
+	resetRecords, err := agent.GetResetRecords(ctx, hc.k)
+	if err != nil && errors.Is(err, agent.UninitializedStorageError{}) {
 		hc.status = Informational
 		hc.summary = "Unable to access uninstall history"
 		return nil
 	}
 
-	resetRecordsRaw, err := hc.k.PersistentHostDataStore().Get(agent.HostDataKeyResetRecords)
 	if err != nil {
 		hc.status = Erroring
 		hc.summary = "Unable to gather previous host data from store"
@@ -41,17 +41,9 @@ func (hc *uninstallHistoryCheckup) Run(ctx context.Context, extraFH io.Writer) e
 		return nil
 	}
 
-	var resetRecords []agent.DBResetRecord
-	if len(resetRecordsRaw) == 0 {
+	if len(resetRecords) == 0 {
 		hc.status = Informational
 		hc.summary = "No installation history exists for this device"
-		return nil
-	}
-
-	if err := json.Unmarshal(resetRecordsRaw, &resetRecords); err != nil {
-		hc.status = Erroring
-		hc.summary = "Unable to unmarshal previous host data from store"
-		hc.data["error"] = err.Error()
 		return nil
 	}
 

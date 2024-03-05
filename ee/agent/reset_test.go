@@ -359,7 +359,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {
 				// Confirm the old_host_data key exists in the data store
-				dataRaw, err := testHostDataStore.Get(HostDataKeyResetRecords)
+				dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 				require.NoError(t, err, "could not get old host data from test store")
 				require.NotNil(t, dataRaw, "old host data not set in store")
 
@@ -496,7 +496,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
-	dataRaw, err := testHostDataStore.Get(HostDataKeyResetRecords)
+	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 	require.NoError(t, err, "could not get old host data from test store")
 	require.NotNil(t, dataRaw, "old host data not set in store")
 
@@ -530,7 +530,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
 
 	// Confirm the old_host_data key exists in the data store
-	newDataRaw, err := testHostDataStore.Get(HostDataKeyResetRecords)
+	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
 	require.NoError(t, err, "could not get old host data from test store")
 	require.NotNil(t, dataRaw, "old host data not set in store")
 
