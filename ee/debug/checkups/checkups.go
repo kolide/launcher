@@ -119,7 +119,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&serverDataCheckup{k: k}, doctorSupported | flareSupported | logSupported},
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
-		{&uninstallHistoryCheckup{k: k}, doctorSupported | flareSupported},
+		{&uninstallHistoryCheckup{k: k}, flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
