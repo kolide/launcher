@@ -51,7 +51,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 
 	// convert the response to a struct
-	var response identifiers
+	var response requestIdsResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
 }
 
