@@ -61,7 +61,7 @@ func (hc *uninstallHistoryCheckup) Run(ctx context.Context, extraFH io.Writer) e
 		}
 	}
 
-	hc.status = Passing
+	hc.status = Informational
 	hc.summary = "Successfully collected uninstallation history"
 
 	return nil
