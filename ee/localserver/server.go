@@ -40,15 +40,16 @@ type Querier interface {
 }
 
 type localServer struct {
-	slogger      *slog.Logger
-	knapsack     types.Knapsack
-	srv          *http.Server
-	identifiers  identifiers
-	limiter      *rate.Limiter
-	tlsCerts     []tls.Certificate
-	querier      Querier
-	kolideServer string
-	cancel       context.CancelFunc
+	slogger             *slog.Logger
+	knapsack            types.Knapsack
+	srv                 *http.Server
+	identifiers         identifiers
+	limiter             *rate.Limiter
+	tlsCerts            []tls.Certificate
+	querier             Querier
+	kolideServer        string
+	cancel              context.CancelFunc
+	allowedOriginDomain string
 
 	myKey                 *rsa.PrivateKey
 	myLocalDbSigner       crypto.Signer
@@ -67,6 +68,13 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	hostport := strings.SplitN(k.KolideServerURL(), ":", 2)
+	parts := strings.Split(hostport[0], ".")
+	if len(parts) < 2 {
+		// TODO
+	}
+	allowedOriginDomain := fmt.Sprintf("%s.%s", parts[len(parts)-2], parts[len(parts)-1])
+
 	ls := &localServer{
 		slogger:               k.Slogger().With("component", "localserver"),
 		knapsack:              k,
@@ -74,6 +82,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		kolideServer:          k.KolideServerURL(),
 		myLocalDbSigner:       agent.LocalDbKeys(),
 		myLocalHardwareSigner: agent.HardwareKeys(),
+		allowedOriginDomain:   allowedOriginDomain,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -356,7 +365,9 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 		// Think harder, maybe?
 		// https://stackoverflow.com/questions/12830095/setting-http-headers
 		if origin := r.Header.Get("Origin"); origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+			if strings.HasSuffix(origin, ls.allowedOriginDomain) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers",
