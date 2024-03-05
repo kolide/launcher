@@ -5,10 +5,7 @@ package secureenclavesigner
 
 import (
 	"context"
-	"crypto"
 	"crypto/ecdsa"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,7 +25,7 @@ const (
 	macOsAppResourceDir  = "./test_app_resources"
 )
 
-func WithBinaryPath(p string) opt {
+func WithBinaryPath(p string) Opt {
 	return func(ses *secureEnclaveSigner) {
 		ses.pathToLauncherBinary = p
 	}
@@ -96,40 +93,31 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	pubKey := ses.Public()
 	require.NotNil(t, pubKey)
 
-	dataToSign := []byte(ulid.New())
+	dataToSign := ulid.New()
 
-	sigB64, err := ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
+	outerResponse, err := ses.Sign(ulid.New(), []byte(dataToSign))
 	require.NoError(t, err)
 
-	sig, err := base64.StdEncoding.DecodeString(string(sigB64))
-	require.NoError(t, err)
-
-	require.NoError(t, echelper.VerifySignature(pubKey.(*ecdsa.PublicKey), dataToSign, sig))
+	require.NoError(t, echelper.VerifySignature(pubKey.(*ecdsa.PublicKey), outerResponse.Msg, outerResponse.Sig))
 
 	// create brand new signer without existing key
 	// ask to sign first to trigger key generation
 	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath))
 	require.NoError(t, err)
 
-	sigB64, err = ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
+	outerResponse, err = ses.Sign(ulid.New(), []byte(dataToSign))
 	require.NoError(t, err)
 
-	sig, err = base64.StdEncoding.DecodeString(string(sigB64))
-	require.NoError(t, err)
-
-	require.NoError(t, echelper.VerifySignature(ses.Public().(*ecdsa.PublicKey), dataToSign, sig))
+	require.NoError(t, echelper.VerifySignature(ses.Public().(*ecdsa.PublicKey), outerResponse.Msg, outerResponse.Sig))
 
 	// create signer with existing key
 	ses, err = New(usr.Uid, serverPubKeyDer, challenge, WithBinaryPath(executablePath), WithExistingKey(pubKey.(*ecdsa.PublicKey)))
 	require.NoError(t, err)
 
-	sigB64, err = ses.Sign(rand.Reader, dataToSign, crypto.SHA256)
+	outerResponse, err = ses.Sign(ulid.New(), []byte(dataToSign))
 	require.NoError(t, err)
 
-	sig, err = base64.StdEncoding.DecodeString(string(sigB64))
-	require.NoError(t, err)
-
-	require.NoError(t, echelper.VerifySignature(pubKey.(*ecdsa.PublicKey), dataToSign, sig))
+	require.NoError(t, echelper.VerifySignature(pubKey.(*ecdsa.PublicKey), outerResponse.Msg, outerResponse.Sig))
 
 	pubKey = ses.Public()
 	require.NotNil(t, pubKey)

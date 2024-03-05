@@ -2,11 +2,13 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
@@ -21,10 +23,44 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/keys"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v5"
 )
+
+type mockSecureEnclaveSigner struct {
+	t         *testing.T
+	key       *ecdsa.PrivateKey
+	baseNonce string
+}
+
+func (m *mockSecureEnclaveSigner) Public() crypto.PublicKey {
+	return m.key.Public()
+}
+
+func (m *mockSecureEnclaveSigner) Sign(baseNonce string, data []byte) (*secureenclavesigner.SignResponseOuter, error) {
+	inner := &secureenclavesigner.SignResponseInner{
+		Nonce:     fmt.Sprintf("%s%s", m.baseNonce, ulid.New()),
+		Timestamp: time.Now().Unix(),
+		Data:      []byte(fmt.Sprintf("kolide:%s:kolide", data)),
+	}
+
+	innerBytes, err := msgpack.Marshal(inner)
+	require.NoError(m.t, err)
+
+	hash, err := echelper.HashForSignature(innerBytes)
+	require.NoError(m.t, err)
+
+	sig, err := m.key.Sign(rand.Reader, hash, crypto.SHA256)
+	require.NoError(m.t, err)
+
+	return &secureenclavesigner.SignResponseOuter{
+		Msg: innerBytes,
+		Sig: sig,
+	}, nil
+}
 
 func TestKryptoEcMiddleware(t *testing.T) {
 	t.Parallel()
@@ -53,7 +89,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		challenge               func() ([]byte, *[32]byte)
 		loggedErr               string
 		handler                 http.HandlerFunc
-		responseData            []byte
+		mockResponseData        []byte
 	}{
 		{
 			name:       "no command",
@@ -91,8 +127,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				require.NoError(t, err)
 				return challenge, priv
 			},
-			handler:      http.NotFound,
-			responseData: []byte("404 page not found\n"),
+			handler:          http.NotFound,
+			mockResponseData: []byte("404 page not found\n"),
 		},
 		{
 			name:        "works with hardware key",
@@ -130,7 +166,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			responseData := tt.responseData
+			responseData := tt.mockResponseData
 			// generate the response we want the handler to return
 			if responseData == nil {
 				responseData = []byte(ulid.New())
@@ -169,6 +205,13 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
 					require.NoError(t, err)
 
+					kryptoEcMiddleware.createUserSignerFunc = func(ctx context.Context, c challenge.OuterChallenge) (secureEnclaveSigner, error) {
+						return &mockSecureEnclaveSigner{
+							t:   t,
+							key: ecdsaKey(t),
+						}, nil
+					}
+
 					// give our middleware with the test handler to the determiner
 					h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -201,7 +244,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
-					require.Equal(t, responseData, opened.ResponseData)
+
+					var requestData response
+					require.NoError(t, json.Unmarshal(opened.ResponseData, &requestData))
+
+					require.Equal(t, responseData, requestData.Data)
 					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 				})
 			}

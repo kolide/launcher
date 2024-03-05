@@ -12,11 +12,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -29,6 +32,13 @@ const (
 	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
 	kolideSessionIdHeaderKey           = "X-Kolide-Session"
 )
+
+type response struct {
+	Nonce     string
+	Timestamp int64
+	Data      []byte
+	UserSig   []byte
+}
 
 type v2CmdRequestType struct {
 	Path            string
@@ -63,15 +73,30 @@ type kryptoEcMiddleware struct {
 	localDbSigner, hardwareSigner crypto.Signer
 	counterParty                  ecdsa.PublicKey
 	slogger                       *slog.Logger
+
+	// createUserSignerFunc is a function that creates a signer for user signature
+	// currently this is only applicable to macOS using secure enclave
+	// it's here to allow for mocking in tests
+	// the string parameter is the base nonce that will be combined with a nonce
+	// produced by the user launcher
+	createUserSignerFunc func(context.Context, challenge.OuterChallenge) (secureEnclaveSigner, error)
+}
+
+type secureEnclaveSigner interface {
+	Public() crypto.PublicKey
+	Sign(baseNonce string, data []byte) (*secureenclavesigner.SignResponseOuter, error)
 }
 
 func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
-	return &kryptoEcMiddleware{
+	k := &kryptoEcMiddleware{
 		localDbSigner:  localDbSigner,
 		hardwareSigner: hardwareSigner,
 		counterParty:   counterParty,
 		slogger:        slogger.With("keytype", "ec"),
 	}
+
+	k.createUserSignerFunc = k.createSecureEnclaveSigner
+	return k
 }
 
 // Because callback errors are effectively a shared API with K2, let's define them as a constant and not just
@@ -259,14 +284,45 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		var response []byte
+		response := response{
+			Nonce:     ulid.New(),
+			Timestamp: time.Now().UTC().Unix(),
+			Data:      bhr.Bytes(),
+		}
+
+		if runtime.GOOS == "darwin" {
+			requestDataWithUserSig, err := e.addUserSignature(r.Context(), response, *challengeBox)
+			// if we hit an error, just log and move on for now
+			if err != nil {
+				traces.SetError(span, err)
+				e.slogger.Log(r.Context(), slog.LevelError,
+					"failed to add user signature",
+					"err", err,
+				)
+			} else {
+				response = requestDataWithUserSig
+			}
+		}
+
+		requestDataBytes, err := json.Marshal(response)
+		if err != nil {
+			traces.SetError(span, err)
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"failed to marshal request data",
+				"err", err,
+			)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		var challengeResponse []byte
 		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 		// pass nil to krypto
-		if e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
+		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
+			challengeResponse, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, requestDataBytes)
 		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
+			challengeResponse, err = challengeBox.Respond(e.localDbSigner, nil, requestDataBytes)
 		}
 
 		if err != nil {
@@ -282,7 +338,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// because the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
 		// it to a string, which has an implicit copy
-		callbackData.Response = base64.StdEncoding.EncodeToString(response)
+		callbackData.Response = base64.StdEncoding.EncodeToString(challengeResponse)
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
@@ -290,9 +346,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// buffering the http response, so it feels a bit silly. When we ditch the v1/v2 switcher, we can
 		// be a bit more clever and move this.
 		if strings.HasSuffix(cmdReq.Path, ".png") {
-			krypto.ToPng(w, response)
+			krypto.ToPng(w, challengeResponse)
 		} else {
-			w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
+			w.Write([]byte(base64.StdEncoding.EncodeToString(challengeResponse)))
 		}
 	})
 }

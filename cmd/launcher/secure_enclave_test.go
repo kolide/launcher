@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,11 +143,15 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 	require.NotNil(t, secureEnclavePubKey, "should be able to get public key")
 
+	dataToSign := ulid.New()
+	baseNonce := ulid.New()
 	signRequest := secureenclavesigner.SignRequest{
 		SecureEnclaveRequest: secureenclavesigner.SecureEnclaveRequest{
 			Challenge:    challengeBytes,
 			ServerPubKey: testServerPubKeyB64Der,
 		},
+		Data:                []byte(dataToSign),
+		BaseNonce:           baseNonce,
 		SecureEnclavePubKey: createKeyResponse,
 	}
 
@@ -163,13 +168,19 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 	_, err = buf.ReadFrom(pipeReader)
 	require.NoError(t, err)
 
-	sig, err := base64.StdEncoding.DecodeString(string(buf.Bytes()))
+	outerResponseBytes, err := base64.StdEncoding.DecodeString(string(buf.Bytes()))
 	require.NoError(t, err)
 
-	c, err := challenge.UnmarshalChallenge(challengeBytes)
-	require.NoError(t, err)
+	var outerResponse secureenclavesigner.SignResponseOuter
+	require.NoError(t, msgpack.Unmarshal(outerResponseBytes, &outerResponse))
 
-	require.NoError(t, echelper.VerifySignature(secureEnclavePubKey, c.Msg, sig))
+	require.NoError(t, echelper.VerifySignature(secureEnclavePubKey, outerResponse.Msg, outerResponse.Sig))
+
+	var innerResponse secureenclavesigner.SignResponseInner
+	require.NoError(t, msgpack.Unmarshal(outerResponse.Msg, &innerResponse))
+
+	require.True(t, strings.HasPrefix(innerResponse.Nonce, baseNonce), "returned nonce should be concat of base nonce and generated nonce")
+	require.NotEmpty(t, innerResponse.Timestamp, "inner response should include timestamp")
 }
 
 func TestSecureEnclaveCmdValidation(t *testing.T) { //nolint:paralleltest

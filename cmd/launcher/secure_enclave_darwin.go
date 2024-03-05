@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/krypto/pkg/secureenclave"
@@ -26,7 +27,7 @@ const secureEnclaveTimestampValiditySeconds = 150
 var serverPubKeys = make(map[string]*ecdsa.PublicKey)
 
 // runSecureEnclave performs either a create-key or sign operation using the secure enclave.
-// It's available as a separate command because launcher runs aa root by default and since it's
+// It's available as a separate command because launcher runs as root by default and since it's
 // not in a user security context, it can't use the secure enclave directly. However, this command
 // can be run in the user context using launchctl. To perform an operation, root launcher needs to
 // include a challenge signed by a known server. See ee/secureenclavesigner for command data
@@ -98,7 +99,7 @@ func createSecureEnclaveKey(requestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack request: %w", err)
 	}
 
-	if _, err := extractVerifiedSecureEnclaveChallenge(createKeyRequest.SecureEnclaveRequest); err != nil {
+	if err := verifySecureEnclaveChallenge(createKeyRequest.SecureEnclaveRequest); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
@@ -127,8 +128,7 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("unmarshaling msgpack sign request: %w", err)
 	}
 
-	challenge, err := extractVerifiedSecureEnclaveChallenge(signRequest.SecureEnclaveRequest)
-	if err != nil {
+	if err := verifySecureEnclaveChallenge(signRequest.SecureEnclaveRequest); err != nil {
 		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
@@ -142,7 +142,23 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("creating secure enclave signer: %w", err)
 	}
 
-	digest, err := echelper.HashForSignature(challenge.Msg)
+	// tag the ends of the data to sign, this is intended to ensure that launcher wont
+	// sign arbitrary things, any party verifying the signature will need to
+	// handle these tags
+	dataToSign := []byte(fmt.Sprintf("kolide:%s:kolide", signRequest.Data))
+
+	innerSignResponse := secureenclavesigner.SignResponseInner{
+		Nonce:     fmt.Sprintf("%s%s", signRequest.BaseNonce, ulid.New()),
+		Timestamp: time.Now().UTC().Unix(),
+		Data:      dataToSign,
+	}
+
+	innerResponseBytes, err := msgpack.Marshal(innerSignResponse)
+	if err != nil {
+		return fmt.Errorf("marshalling inner response: %w", err)
+	}
+
+	digest, err := echelper.HashForSignature(innerResponseBytes)
 	if err != nil {
 		return fmt.Errorf("hashing data for signature: %w", err)
 	}
@@ -152,31 +168,40 @@ func signWithSecureEnclave(signRequestB64 string) error {
 		return fmt.Errorf("signing request: %w", err)
 	}
 
-	os.Stdout.Write([]byte(base64.StdEncoding.EncodeToString(sig)))
+	outerResponseBytes, err := msgpack.Marshal(secureenclavesigner.SignResponseOuter{
+		Msg: innerResponseBytes,
+		Sig: sig,
+	})
+
+	if err != nil {
+		return fmt.Errorf("marshalling outer response: %w", err)
+	}
+
+	os.Stdout.Write([]byte(base64.StdEncoding.EncodeToString(outerResponseBytes)))
 	return nil
 }
 
-func extractVerifiedSecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveRequest) (*challenge.OuterChallenge, error) {
+func verifySecureEnclaveChallenge(request secureenclavesigner.SecureEnclaveRequest) error {
 	challengeUnmarshalled, err := challenge.UnmarshalChallenge(request.Challenge)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshaling challenge: %w", err)
+		return fmt.Errorf("unmarshaling challenge: %w", err)
 	}
 
 	serverPubKey, ok := serverPubKeys[string(request.ServerPubKey)]
 	if !ok {
-		return nil, errors.New("server public key not found")
+		return errors.New("server public key not found")
 	}
 
 	if err := challengeUnmarshalled.Verify(*serverPubKey); err != nil {
-		return nil, fmt.Errorf("verifying challenge: %w", err)
+		return fmt.Errorf("verifying challenge: %w", err)
 	}
 
 	// Check the timestamp, this prevents people from saving a challenge and then
 	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 	timestampDelta := time.Now().Unix() - challengeUnmarshalled.Timestamp()
 	if timestampDelta > secureEnclaveTimestampValiditySeconds || timestampDelta < -secureEnclaveTimestampValiditySeconds {
-		return nil, fmt.Errorf("timestamp delta %d is outside of validity range %d", timestampDelta, secureEnclaveTimestampValiditySeconds)
+		return fmt.Errorf("timestamp delta %d is outside of validity range %d", timestampDelta, secureEnclaveTimestampValiditySeconds)
 	}
 
-	return challengeUnmarshalled, nil
+	return nil
 }
