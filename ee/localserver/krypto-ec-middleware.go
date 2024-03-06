@@ -222,7 +222,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		if len(cmdReq.AllowedOrigins) > 0 {
 			allowed := false
 			for _, ao := range cmdReq.AllowedOrigins {
-				if r.Header.Get("Origin") == ao {
+				if strings.EqualFold(ao, r.Header.Get("Origin")) {
 					allowed = true
 					break
 				}

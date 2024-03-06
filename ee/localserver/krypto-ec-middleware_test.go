@@ -209,6 +209,139 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	}
 }
 
+func Test_AllowedOrigin(t *testing.T) {
+	t.Parallel()
+
+	counterpartyKey, err := echelper.GenerateEcdsaKey()
+	require.NoError(t, err)
+
+	challengeId := []byte(ulid.New())
+	challengeData := []byte(ulid.New())
+
+	var tests = []struct {
+		name           string
+		requestOrigin  string
+		allowedOrigins []string
+		logStr         string
+		expectedStatus int
+	}{
+		{
+			name:           "no allowed specified",
+			requestOrigin:  "auth.example.com",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "no allowed specified missing origin",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "allowed specified missing origin",
+			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name:           "allowed specified origin mismatch",
+			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			requestOrigin:  "not-it.example.com",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name:           "allowed specified origin matches",
+			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			requestOrigin:  "auth.example.com",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "allowed specified origin matches 2",
+			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			requestOrigin:  "login.example.com",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "allowed specified origin matches casing",
+			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			requestOrigin:  "AuTh.ExAmPlE.cOm",
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
+
+			cmdReq := v2CmdRequestType{
+				Path:           "whatevs",
+				Body:           cmdReqBody,
+				AllowedOrigins: tt.allowedOrigins,
+			}
+
+			challengeBytes, privateEncryptionKey, err := challenge.Generate(counterpartyKey, challengeId, challengeData, mustMarshal(t, cmdReq))
+			require.NoError(t, err)
+			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
+
+			responseData := []byte(ulid.New())
+
+			testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				reqBodyRaw, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				defer r.Body.Close()
+
+				require.Equal(t, cmdReqBody, reqBodyRaw)
+				w.Write(responseData)
+			})
+
+			var logBytes bytes.Buffer
+			slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			})).Logger
+
+			// set up middlewares
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, ecdsaKey(t), nil, counterpartyKey.PublicKey)
+			require.NoError(t, err)
+
+			h := kryptoEcMiddleware.Wrap(testHandler)
+
+			req := makeGetRequest(t, encodedChallenge)
+			req.Header.Set("origin", tt.requestOrigin)
+
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+
+			// FIXME: add some log string tests
+			//spew.Dump(logBytes.String(), tt.logStr)
+
+			require.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.logStr != "" {
+				assert.Contains(t, logBytes.String(), tt.logStr)
+			}
+
+			if tt.expectedStatus != http.StatusOK {
+				return
+			}
+
+			// try to open the response
+			returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
+			require.NoError(t, err)
+
+			responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
+			require.NoError(t, err)
+			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
+
+			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
+			require.NoError(t, err)
+			require.Equal(t, challengeData, opened.ChallengeData)
+			require.Equal(t, responseData, opened.ResponseData)
+			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+
+		})
+	}
+
+}
+
 func ecdsaKey(t *testing.T) *ecdsa.PrivateKey {
 	key, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
