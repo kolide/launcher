@@ -218,7 +218,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			}()
 		}
 
-		// Check if the origin is in the allowed list. This prevents some classes of proxy attacks.
+		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
 		if len(cmdReq.AllowedOrigins) > 0 {
 			allowed := false
 			for _, ao := range cmdReq.AllowedOrigins {
