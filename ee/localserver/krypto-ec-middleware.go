@@ -35,6 +35,7 @@ type v2CmdRequestType struct {
 	Body            []byte
 	CallbackUrl     string
 	CallbackHeaders map[string][]string
+	AllowedOrigins  []string
 }
 
 func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
@@ -79,8 +80,9 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner c
 type callbackErrors string
 
 const (
-	timeOutOfRangeErr  callbackErrors = "time-out-of-range"
-	responseFailureErr callbackErrors = "response-failure"
+	timeOutOfRangeErr   callbackErrors = "time-out-of-range"
+	responseFailureErr  callbackErrors = "response-failure"
+	originDisallowedErr callbackErrors = "origin-disallowed"
 )
 
 type callbackDataStruct struct {
@@ -96,7 +98,7 @@ type callbackDataStruct struct {
 // Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
 //
-// Note that this should be a goroutine.
+// Note that because this is a network call, it should be called in a goroutine.
 func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataStruct) {
 	if req == nil {
 		return
@@ -214,6 +216,41 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				}
 				go e.sendCallback(callbackReq, callbackData)
 			}()
+		}
+
+		// Check if the origin is in the allowed list. This prevents some classes of proxy attacks.
+		if len(cmdReq.AllowedOrigins) > 0 {
+			allowed := false
+			for _, ao := range cmdReq.AllowedOrigins {
+				if r.Header.Get("Origin") == ao {
+					allowed = true
+					break
+				}
+			}
+
+			if !allowed {
+				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
+				span.SetStatus(codes.Error, "origin is not allowed")
+				e.slogger.Log(r.Context(), slog.LevelError,
+					"origin is not allowed",
+					"allowlist", cmdReq.AllowedOrigins,
+					"origin", r.Header.Get("Origin"),
+				)
+
+				w.WriteHeader(http.StatusUnauthorized)
+				callbackData.Error = originDisallowedErr
+				return
+			}
+
+			e.slogger.Log(r.Context(), slog.LevelDebug,
+				"origin matches allowlist",
+				"origin", r.Header.Get("Origin"),
+			)
+		} else {
+			e.slogger.Log(r.Context(), slog.LevelDebug,
+				"origin is allowed by default, no allowlist",
+				"origin", r.Header.Get("Origin"),
+			)
 		}
 
 		// Check the timestamp, this prevents people from saving a challenge and then
