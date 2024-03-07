@@ -34,13 +34,18 @@ var (
 	hostDataKeySerial       = []byte("serial")
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
 	hostDataKeyMunemo       = []byte("munemo")
-
 	hostDataKeyResetRecords = []byte("reset_records")
 )
 
 const (
 	resetReasonNewHardwareOrEnrollmentDetected = "launcher detected new hardware or enrollment"
 )
+
+type UninitializedStorageError struct{}
+
+func (use UninitializedStorageError) Error() string {
+	return "storage is uninitialized in knapsack"
+}
 
 // DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
 // has changed, by checking current hardware- and enrollment- identifying information against
@@ -79,24 +84,12 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		)
 
 		// In the future, we can proceed with backing up and resetting the database.
-		// For now, we are only logging that we detected the change.
+		// For now, we are only logging that we detected the change until we have a dependable
+		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
 		/*
-			backup, err := prepareDatabaseResetRecords(ctx, k, resetReasonNewHardwareOrEnrollmentDetected)
-			if err != nil {
-				k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
+			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
+				k.Slogger().Log(ctx, slog.LevelError, "failed to reset database", "err", err)
 			}
-
-			if err := wipeDatabase(ctx, k); err != nil {
-				k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
-				return
-			}
-
-
-			// Store the backup data
-			if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
-				k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
-			}
-
 		*/
 
 		// Cache hardware and rollout data for future checks
@@ -110,6 +103,49 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 			k.Slogger().Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
 	}
+}
+
+func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, error) {
+	resetRecords := make([]dbResetRecord, 0)
+	if k.PersistentHostDataStore() == nil {
+		return resetRecords, UninitializedStorageError{}
+	}
+
+	resetRecordsRaw, err := k.PersistentHostDataStore().Get(hostDataKeyResetRecords)
+	if err != nil {
+		return resetRecords, err
+	}
+
+	if len(resetRecordsRaw) == 0 {
+		return resetRecords, nil
+	}
+
+	if err := json.Unmarshal(resetRecordsRaw, &resetRecords); err != nil {
+		return resetRecords, err
+	}
+
+	return resetRecords, nil
+}
+
+func ResetDatabase(ctx context.Context, k types.Knapsack, resetReason string) error {
+	backup, err := prepareDatabaseResetRecords(ctx, k, resetReason)
+	if err != nil {
+		k.Slogger().Log(ctx, slog.LevelError, "could not prepare db reset records", "err", err)
+		return err
+	}
+
+	if err := wipeDatabase(ctx, k); err != nil {
+		k.Slogger().Log(ctx, slog.LevelError, "could not wipe database", "err", err)
+		return err
+	}
+
+	// Store the backup data
+	if err := k.PersistentHostDataStore().Set(hostDataKeyResetRecords, backup); err != nil {
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not store db reset records", "err", err)
+		return err
+	}
+
+	return nil
 }
 
 // currentSerialAndHardwareUUID queries osquery for the required information.
@@ -299,23 +335,13 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 		ResetReason:    resetReason,
 	}
 
-	previousHostData, err := k.PersistentHostDataStore().Get(hostDataKeyResetRecords)
+	previousHostData, err := GetResetRecords(ctx, k)
 	if err != nil {
 		return nil, fmt.Errorf("getting previous host data from store: %w", err)
 	}
 
-	var hostDataCollection []dbResetRecord
-	if len(previousHostData) == 0 {
-		// No previous database resets
-		hostDataCollection = []dbResetRecord{dataToStore}
-	} else {
-		if err := json.Unmarshal(previousHostData, &hostDataCollection); err != nil {
-			return nil, fmt.Errorf("unmarshalling previous host data: %w", err)
-		}
-		hostDataCollection = append(hostDataCollection, dataToStore)
-	}
-
-	hostDataCollectionRaw, err := json.Marshal(hostDataCollection)
+	previousHostData = append(previousHostData, dataToStore)
+	hostDataCollectionRaw, err := json.Marshal(previousHostData)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling host data for storage: %w", err)
 	}
@@ -344,9 +370,9 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 	return pubKeyBytes, nil
 }
 
-// WipeDatabase iterates over all stores in the database, deleting all keys from
+// wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func WipeDatabase(ctx context.Context, k types.Knapsack) error {
+func wipeDatabase(ctx context.Context, k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
 			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)

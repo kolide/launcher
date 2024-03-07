@@ -730,12 +730,12 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	// Start the autoupdater, then make the control server request right away, during the initial delay
 	go autoupdater.Execute()
 	time.Sleep(100 * time.Millisecond)
-	require.Error(t, autoupdater.Do(data), "expected error making request during initial delay")
+	require.NoError(t, autoupdater.Do(data), "should not have received error when performing request during initial delay")
 
 	// Give autoupdater a chance to run
 	time.Sleep(initialDelay + interval)
 
-	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
+	// Assert expectation that we did not add the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
 
 	// Confirm we pulled all config items as expected

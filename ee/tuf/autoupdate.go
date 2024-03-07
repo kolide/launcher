@@ -283,9 +283,11 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 func (ta *TufAutoupdater) Do(data io.Reader) error {
 	if !ta.initialDelayLock.TryLock() {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"received update request during initial delay",
+			"received update request during initial delay, discarding",
 		)
-		return errors.New("cannot perform update during initial delay")
+		// We don't return an error because there's no need for the actionqueue to retry this request --
+		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
+		return nil
 	}
 
 	var updateRequest controlServerAutoupdateRequest
