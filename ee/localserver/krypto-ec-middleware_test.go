@@ -227,7 +227,7 @@ func Test_AllowedOrigin(t *testing.T) {
 	}{
 		{
 			name:           "no allowed specified",
-			requestOrigin:  "auth.example.com",
+			requestOrigin:  "https://auth.example.com",
 			expectedStatus: http.StatusOK,
 		},
 		{
@@ -236,31 +236,37 @@ func Test_AllowedOrigin(t *testing.T) {
 		},
 		{
 			name:           "allowed specified missing origin",
-			allowedOrigins: []string{"auth.example.com", "login.example.com"},
+			allowedOrigins: []string{"https://auth.example.com", "https://login.example.com"},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "allowed specified origin mismatch",
-			allowedOrigins: []string{"auth.example.com", "login.example.com"},
-			requestOrigin:  "not-it.example.com",
+			allowedOrigins: []string{"https://auth.example.com", "https://login.example.com"},
+			requestOrigin:  "https://not-it.example.com",
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name:           "scheme mismatc",
+			allowedOrigins: []string{"https://auth.example.com"},
+			requestOrigin:  "http://auth.example.com",
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "allowed specified origin matches",
-			allowedOrigins: []string{"auth.example.com", "login.example.com"},
-			requestOrigin:  "auth.example.com",
+			allowedOrigins: []string{"https://auth.example.com", "https://login.example.com"},
+			requestOrigin:  "https://auth.example.com",
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "allowed specified origin matches 2",
-			allowedOrigins: []string{"auth.example.com", "login.example.com"},
-			requestOrigin:  "login.example.com",
+			allowedOrigins: []string{"https://auth.example.com", "https://login.example.com"},
+			requestOrigin:  "https://login.example.com",
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "allowed specified origin matches casing",
-			allowedOrigins: []string{"auth.example.com", "login.example.com"},
-			requestOrigin:  "AuTh.ExAmPlE.cOm",
+			allowedOrigins: []string{"https://auth.example.com", "https://login.example.com"},
+			requestOrigin:  "https://AuTh.ExAmPlE.cOm",
 			expectedStatus: http.StatusOK,
 		},
 	}

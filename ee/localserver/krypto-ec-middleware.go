@@ -271,12 +271,15 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		newReq := &http.Request{
 			Method: http.MethodPost,
+			Header: make(http.Header),
 			URL: &url.URL{
 				Scheme: r.URL.Scheme,
 				Host:   r.Host,
 				Path:   cmdReq.Path,
 			},
 		}
+
+		newReq.Header.Set("Origin", r.Header.Get("Origin"))
 
 		// setting the newReq context to the current request context
 		// allows the trace to continue to the inner request,
