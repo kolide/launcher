@@ -130,7 +130,7 @@ func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, er
 func ResetDatabase(ctx context.Context, k types.Knapsack, resetReason string) error {
 	backup, err := prepareDatabaseResetRecords(ctx, k, resetReason)
 	if err != nil {
-		k.Slogger().Log(ctx, slog.LevelWarn, "could not prepare db reset records", "err", err)
+		k.Slogger().Log(ctx, slog.LevelError, "could not prepare db reset records", "err", err)
 		return err
 	}
 
