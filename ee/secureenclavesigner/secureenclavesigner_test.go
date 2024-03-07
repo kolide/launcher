@@ -40,8 +40,10 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		t.Skipf("\nskipping because %s env var was not empty, this is being run in a CI environment without access to secure enclave", testWrappedEnvVarKey)
 	}
 
-	// set up app bundle
-	rootDir := "/tmp/secure_enclave_test"
+	// put the root dir somewhere else if you want to persist the signed macos app bundle
+	// rootDir := "/tmp/secure_enclave_test"
+
+	rootDir := t.TempDir()
 	appRoot := filepath.Join(rootDir, "launcher_test.app")
 
 	// make required dirs krypto_test.app/Contents/MacOS and add files
