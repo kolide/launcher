@@ -6,7 +6,6 @@ package secureenclavesigner
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,9 +14,8 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/secureenclavesigner/mocks"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +25,7 @@ const (
 )
 
 func WithBinaryPath(p string) opt {
-	return func(ses *SecureEnclaveSigner) {
+	return func(ses *secureEnclaveSigner) {
 		ses.pathToLauncherBinary = p
 	}
 }
@@ -81,15 +79,14 @@ func TestSecureEnclaveSigner(t *testing.T) {
 	// sign app bundle
 	signApp(t, appRoot)
 
-	persister := mocks.NewPersister(t)
+	store := inmemory.NewStore()
 
 	// create brand new signer without existing key
 	// ask for public first to trigger key generation
-	ses, err := New(multislogger.NewNopLogger(), persister, WithBinaryPath(executablePath))
-	require.NoError(t, err)
-
-	// should only call persist once on first public key generation
-	persister.On("Persist", mock.Anything).Return(nil).Once()
+	ses, err := New(multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
+	require.NoError(t, err,
+		"should be able to create secure enclave signer",
+	)
 
 	pubKey := ses.Public()
 	require.NotNil(t, pubKey,
@@ -115,22 +112,12 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		"asking for the same public key should return the same key",
 	)
 
-	jsonBytes, err := json.Marshal(ses)
+	existingDataSes, err := New(multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
 	require.NoError(t, err,
-		"should be able to marshal secure enclave signer to json",
+		"should be able to create secure enclave signer with existing key",
 	)
 
-	unmarshalledSes, err := New(multislogger.NewNopLogger(), persister, WithBinaryPath(executablePath))
-	require.NoError(t, err)
-
-	require.NoError(t, json.Unmarshal(jsonBytes, &unmarshalledSes),
-		"should be able to unmarshal secure enclave signer from json",
-	)
-
-	// use same test binary
-	unmarshalledSes.pathToLauncherBinary = ses.pathToLauncherBinary
-
-	pubKeyUnmarshalled := unmarshalledSes.Public()
+	pubKeyUnmarshalled := existingDataSes.Public()
 	require.NotNil(t, pubKeyUnmarshalled,
 		"should be able to get public key from unmarshalled secure enclave signer",
 	)

@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/ee/secureenclavesigner"
 )
 
-// runSecureEnclave performs either a create-key or sign operation using the secure enclave.
+// runSecureEnclave performs either a create-key operation using the secure enclave.
 // It's available as a separate command because launcher runs as root by default and since it's
 // not in a user security context, it can't use the secure enclave directly. However, this command
 // can be run in the user context using launchctl.

@@ -14,15 +14,6 @@ import (
 	"github.com/kolide/launcher/ee/secureenclavesigner"
 )
 
-// persister satisfies the persister interface for secureenclavesigner
-type persister struct {
-	store types.GetterSetterDeleter
-}
-
-func (p *persister) Persist(data []byte) error {
-	return storeKeyData(p.store, nil, data)
-}
-
 func setupHardwareKeys(slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
 
 	// fetch any existing key data
@@ -31,7 +22,7 @@ func setupHardwareKeys(slogger *slog.Logger, store types.GetterSetterDeleter) (k
 		return nil, err
 	}
 
-	ses, err := secureenclavesigner.New(slogger, &persister{store: store})
+	ses, err := secureenclavesigner.New(slogger, store)
 	if err != nil {
 		return nil, fmt.Errorf("creating secureenclave signer: %w", err)
 	}
@@ -45,7 +36,7 @@ func setupHardwareKeys(slogger *slog.Logger, store types.GetterSetterDeleter) (k
 			)
 			clearKeyData(slogger, store)
 
-			ses, err = secureenclavesigner.New(slogger, &persister{store: store})
+			ses, err = secureenclavesigner.New(slogger, store)
 			if err != nil {
 				return nil, fmt.Errorf("creating secureenclave signer: %w", err)
 			}

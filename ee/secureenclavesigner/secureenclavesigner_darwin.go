@@ -17,37 +17,50 @@ import (
 	"sync"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/consoleuser"
 )
 
 const (
-	CreateKeyCmd = "create-key"
+	CreateKeyCmd     = "create-key"
+	PublicEccDataKey = "publicEccData"
 )
 
-type opt func(*SecureEnclaveSigner)
+type opt func(*secureEnclaveSigner)
 
-type SecureEnclaveSigner struct {
+type secureEnclaveSigner struct {
 	uidPubKeyMap         map[string]*ecdsa.PublicKey
 	pathToLauncherBinary string
-	persister            persister
+	store                types.GetterSetterDeleter
 	slogger              *slog.Logger
 	mux                  *sync.Mutex
 }
 
-// persister is an interface that allows the secure enclave signer to persist
-// keys it creates, this is needed since we may need to create a new key anytime
-// a new user logs in on macos
-type persister interface {
-	Persist([]byte) error
-}
-
-func New(slogger *slog.Logger, persister persister, opts ...opt) (*SecureEnclaveSigner, error) {
-	ses := &SecureEnclaveSigner{
+func New(slogger *slog.Logger, store types.GetterSetterDeleter, opts ...opt) (*secureEnclaveSigner, error) {
+	ses := &secureEnclaveSigner{
 		uidPubKeyMap: make(map[string]*ecdsa.PublicKey),
-		persister:    persister,
+		store:        store,
 		slogger:      slogger.With("component", "secureenclavesigner"),
 		mux:          &sync.Mutex{},
+	}
+
+	data, err := store.Get([]byte(PublicEccDataKey))
+	if err != nil {
+		return nil, fmt.Errorf("getting public ecc data: %w", err)
+	}
+
+	if data != nil {
+		if err := json.Unmarshal(data, ses); err != nil {
+			ses.slogger.Log(context.TODO(), slog.LevelError,
+				"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
+				"err", err,
+			)
+
+			if err := store.Delete([]byte(PublicEccDataKey)); err != nil {
+				return nil, fmt.Errorf("deleting public ecc data: %w", err)
+			}
+		}
 	}
 
 	for _, opt := range opts {
@@ -68,7 +81,7 @@ func New(slogger *slog.Logger, persister persister, opts ...opt) (*SecureEnclave
 
 // Public returns the public key of the current console user
 // creating and peristing a new one if needed
-func (ses *SecureEnclaveSigner) Public() crypto.PublicKey {
+func (ses *secureEnclaveSigner) Public() crypto.PublicKey {
 	ses.mux.Lock()
 	defer ses.mux.Unlock()
 
@@ -110,7 +123,7 @@ func (ses *SecureEnclaveSigner) Public() crypto.PublicKey {
 		return nil
 	}
 
-	if err := ses.persister.Persist(json); err != nil {
+	if err := ses.store.Set([]byte(PublicEccDataKey), json); err != nil {
 		ses.slogger.Log(context.TODO(), slog.LevelError,
 			"persisting secure enclave signer",
 			"err", err,
@@ -122,11 +135,11 @@ func (ses *SecureEnclaveSigner) Public() crypto.PublicKey {
 	return key
 }
 
-func (ses *SecureEnclaveSigner) Type() string {
+func (ses *secureEnclaveSigner) Type() string {
 	return "secure_enclave"
 }
 
-func (ses *SecureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -135,7 +148,7 @@ type keyData struct {
 	PubKey string `json:"pub_key"`
 }
 
-func (ses *SecureEnclaveSigner) MarshalJSON() ([]byte, error) {
+func (ses *secureEnclaveSigner) MarshalJSON() ([]byte, error) {
 	var keyDatas []keyData
 
 	for uid, pubKey := range ses.uidPubKeyMap {
@@ -154,7 +167,7 @@ func (ses *SecureEnclaveSigner) MarshalJSON() ([]byte, error) {
 	return json.Marshal(keyDatas)
 }
 
-func (ses *SecureEnclaveSigner) UnmarshalJSON(data []byte) error {
+func (ses *secureEnclaveSigner) UnmarshalJSON(data []byte) error {
 	if ses.uidPubKeyMap == nil {
 		ses.uidPubKeyMap = make(map[string]*ecdsa.PublicKey)
 	}
@@ -176,7 +189,7 @@ func (ses *SecureEnclaveSigner) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (ses *SecureEnclaveSigner) createKey(ctx context.Context, u *user.User) (*ecdsa.PublicKey, error) {
+func (ses *secureEnclaveSigner) createKey(ctx context.Context, u *user.User) (*ecdsa.PublicKey, error) {
 	cmd, err := allowedcmd.Launchctl(
 		ctx,
 		"asuser",
