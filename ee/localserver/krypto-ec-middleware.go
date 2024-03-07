@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,7 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -230,7 +230,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 			if !allowed {
 				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
-				span.SetStatus(codes.Error, "origin is not allowed")
+				traces.SetError(span, fmt.Errorf("origin %s is not allowed", r.Header.Get("Origin")))
 				e.slogger.Log(r.Context(), slog.LevelError,
 					"origin is not allowed",
 					"allowlist", cmdReq.AllowedOrigins,
@@ -258,7 +258,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
 		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
-			span.SetStatus(codes.Error, "timestamp is out of range")
+			traces.SetError(span, errors.New("timestamp is out of range"))
 			e.slogger.Log(r.Context(), slog.LevelError,
 				"timestamp is out of range",
 				"delta", timestampDelta,
