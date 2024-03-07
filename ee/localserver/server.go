@@ -353,8 +353,10 @@ func (ls *localServer) startListener() (net.Listener, error) {
 
 func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Think harder, maybe?
-		// https://stackoverflow.com/questions/12830095/setting-http-headers
+		// We don't believe we can meaningfully enforce a CORS style check here -- those are enforced by the browser.
+		// And we recognize there are some patterns that bypass the browsers CORS enforcement. However, we do implement
+		// origin enforcement as an allowlist inside kryptoEcMiddleware
+		// See https://github.com/kolide/k2/issues/9634
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
