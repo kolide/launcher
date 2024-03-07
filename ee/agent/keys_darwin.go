@@ -4,46 +4,59 @@
 package agent
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 )
 
-// nolint:unused
+// persister satisfies the persister interface for secureenclavesigner
+type persister struct {
+	store types.GetterSetterDeleter
+}
+
+func (p *persister) Persist(data []byte) error {
+	return storeKeyData(p.store, nil, data)
+}
+
 func setupHardwareKeys(slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
-	// We're seeing issues where launcher hangs (and does not complete startup) on the
-	// Sonoma Beta 2 release when trying to interact with the secure enclave below, on
-	// CreateKey. Since we don't expect this to work at the moment anyway, we are
-	// short-circuiting and returning early for now.
-	return nil, errors.New("secure enclave is not currently supported")
 
-	/*
-		_, pubData, err := fetchKeyData(store)
-		if err != nil {
-			return nil, err
-		}
+	// fetch any existing key data
+	_, pubData, err := fetchKeyData(store)
+	if err != nil {
+		return nil, err
+	}
 
-		if pubData == nil {
-			level.Info(logger).Log("msg", "Generating new keys")
+	ses, err := secureenclavesigner.New(slogger, &persister{store: store})
+	if err != nil {
+		return nil, fmt.Errorf("creating secureenclave signer: %w", err)
+	}
 
-			var err error
-			pubData, err = secureenclave.CreateKey()
+	if pubData != nil {
+		if err := json.Unmarshal(pubData, &ses); err != nil {
+			// data is corrupt or not in the expected format, clear it
+			slogger.Log(context.TODO(), slog.LevelError,
+				"could not unmarshal stored key data, clearing key data and generating new keys",
+				"err", err,
+			)
+			clearKeyData(slogger, store)
+
+			ses, err = secureenclavesigner.New(slogger, &persister{store: store})
 			if err != nil {
-				return nil, fmt.Errorf("creating key: %w", err)
-			}
-
-			if err := storeKeyData(store, nil, pubData); err != nil {
-				clearKeyData(logger, store)
-				return nil, fmt.Errorf("storing key: %w", err)
+				return nil, fmt.Errorf("creating secureenclave signer: %w", err)
 			}
 		}
+	}
 
-		k, err := secureenclave.New(pubData)
-		if err != nil {
-			return nil, fmt.Errorf("creating secureenclave signer: %w", err)
-		}
+	// this is kind of weird, but we need to call public to ensure the key is generated
+	// it's done this way to do satisfying signer interface which doesn't return an error
+	if ses.Public() == nil {
+		return nil, errors.New("public key was not be created")
+	}
 
-		return k, nil
-	*/
+	return ses, nil
 }
