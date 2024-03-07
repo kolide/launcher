@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,7 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -35,6 +35,7 @@ type v2CmdRequestType struct {
 	Body            []byte
 	CallbackUrl     string
 	CallbackHeaders map[string][]string
+	AllowedOrigins  []string
 }
 
 func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
@@ -79,8 +80,9 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner c
 type callbackErrors string
 
 const (
-	timeOutOfRangeErr  callbackErrors = "time-out-of-range"
-	responseFailureErr callbackErrors = "response-failure"
+	timeOutOfRangeErr   callbackErrors = "time-out-of-range"
+	responseFailureErr  callbackErrors = "response-failure"
+	originDisallowedErr callbackErrors = "origin-disallowed"
 )
 
 type callbackDataStruct struct {
@@ -96,7 +98,7 @@ type callbackDataStruct struct {
 // Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
 //
-// Note that this should be a goroutine.
+// Note that because this is a network call, it should be called in a goroutine.
 func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataStruct) {
 	if req == nil {
 		return
@@ -216,12 +218,47 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			}()
 		}
 
+		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
+		if len(cmdReq.AllowedOrigins) > 0 {
+			allowed := false
+			for _, ao := range cmdReq.AllowedOrigins {
+				if strings.EqualFold(ao, r.Header.Get("Origin")) {
+					allowed = true
+					break
+				}
+			}
+
+			if !allowed {
+				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
+				traces.SetError(span, fmt.Errorf("origin %s is not allowed", r.Header.Get("Origin")))
+				e.slogger.Log(r.Context(), slog.LevelError,
+					"origin is not allowed",
+					"allowlist", cmdReq.AllowedOrigins,
+					"origin", r.Header.Get("Origin"),
+				)
+
+				w.WriteHeader(http.StatusUnauthorized)
+				callbackData.Error = originDisallowedErr
+				return
+			}
+
+			e.slogger.Log(r.Context(), slog.LevelDebug,
+				"origin matches allowlist",
+				"origin", r.Header.Get("Origin"),
+			)
+		} else {
+			e.slogger.Log(r.Context(), slog.LevelDebug,
+				"origin is allowed by default, no allowlist",
+				"origin", r.Header.Get("Origin"),
+			)
+		}
+
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
 		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
-			span.SetStatus(codes.Error, "timestamp is out of range")
+			traces.SetError(span, errors.New("timestamp is out of range"))
 			e.slogger.Log(r.Context(), slog.LevelError,
 				"timestamp is out of range",
 				"delta", timestampDelta,
@@ -234,12 +271,15 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		newReq := &http.Request{
 			Method: http.MethodPost,
+			Header: make(http.Header),
 			URL: &url.URL{
 				Scheme: r.URL.Scheme,
 				Host:   r.Host,
 				Path:   cmdReq.Path,
 			},
 		}
+
+		newReq.Header.Set("Origin", r.Header.Get("Origin"))
 
 		// setting the newReq context to the current request context
 		// allows the trace to continue to the inner request,

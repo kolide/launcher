@@ -25,6 +25,7 @@ type (
 		Nonce     string
 		Timestamp time.Time
 		Status    status
+		Origin    string
 	}
 
 	status struct {
@@ -78,6 +79,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
+		Origin:    r.Header.Get("Origin"),
 		Status: status{
 			EnrollmentStatus: string(enrollmentStatus),
 		},
