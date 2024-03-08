@@ -29,7 +29,7 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, initHardwareKeys bool) error {
+func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, skipHardwareKeys bool) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -43,7 +43,7 @@ func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSett
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	if !initHardwareKeys {
+	if skipHardwareKeys {
 		return nil
 	}
 

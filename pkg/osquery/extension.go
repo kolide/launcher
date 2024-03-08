@@ -92,6 +92,9 @@ type ExtensionOpts struct {
 	// RunDifferentialQueriesImmediately allows the client to execute a new query the first time it sees it,
 	// bypassing the scheduler.
 	RunDifferentialQueriesImmediately bool
+	// skipHardwareKeysSetup is a flag to indicate if we should skip setting up hardware keys.
+	// This is useful for testing environments where we don't have required hardware.
+	skipHardwareKeysSetup bool
 }
 
 // NewExtension creates a new Extension from the provided service.KolideService
@@ -125,7 +128,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(ctx, slogger, configStore, true); err != nil {
+	if err := agent.SetupKeys(ctx, slogger, configStore, opts.skipHardwareKeysSetup); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
