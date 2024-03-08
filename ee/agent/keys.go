@@ -5,12 +5,12 @@ import (
 	"crypto"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type keyInt interface {
@@ -29,7 +29,10 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(slogger *slog.Logger, store types.GetterSetterDeleter) error {
+func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, skipHardwareKeys bool) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	slogger = slogger.With("component", "agentkeys")
 
 	var err error
@@ -40,13 +43,12 @@ func SetupKeys(slogger *slog.Logger, store types.GetterSetterDeleter) error {
 		return fmt.Errorf("setting up local db keys: %w", err)
 	}
 
-	// Secure Enclave is not currently supported, so don't spend startup time waiting for it to work -- see keys_darwin.go for more details.
-	if runtime.GOOS == "darwin" {
+	if skipHardwareKeys {
 		return nil
 	}
 
 	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(slogger, store)
+		hwKeys, err := setupHardwareKeys(ctx, slogger, store)
 		if err != nil {
 			return err
 		}

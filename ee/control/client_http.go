@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -97,7 +98,9 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 
 	// Calculate second signature if available
 	hardwareKeys := agent.HardwareKeys()
-	if hardwareKeys.Public() != nil {
+
+	// hardware signing is not implemented for darwin
+	if runtime.GOOS != "darwin" && hardwareKeys.Public() != nil {
 		key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
 		if err != nil {
 			return nil, fmt.Errorf("could not get key header from hardware keys: %w", err)
