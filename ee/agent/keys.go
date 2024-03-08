@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type keyInt interface {
@@ -28,7 +29,10 @@ func LocalDbKeys() keyInt {
 	return localDbKeys
 }
 
-func SetupKeys(slogger *slog.Logger, store types.GetterSetterDeleter) error {
+func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	slogger = slogger.With("component", "agentkeys")
 
 	var err error
@@ -40,7 +44,7 @@ func SetupKeys(slogger *slog.Logger, store types.GetterSetterDeleter) error {
 	}
 
 	err = backoff.WaitFor(func() error {
-		hwKeys, err := setupHardwareKeys(slogger, store)
+		hwKeys, err := setupHardwareKeys(ctx, slogger, store)
 		if err != nil {
 			return err
 		}

@@ -40,9 +40,9 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	// put the root dir somewhere else if you want to persist the signed macos app bundle
 	// should build this into make at some point
-	// rootDir := "/tmp/secure_enclave_test"
+	rootDir := "/tmp/secure_enclave_test"
 
-	rootDir := t.TempDir()
+	// rootDir := t.TempDir()
 	appRoot := filepath.Join(rootDir, "launcher_test.app")
 
 	// make required dirs krypto_test.app/Contents/MacOS and add files
@@ -84,7 +84,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	// create brand new signer without existing key
 	// ask for public first to trigger key generation
-	ses, err := New(multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
+	ses, err := New(context.TODO(), multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
 	require.NoError(t, err,
 		"should be able to create secure enclave signer",
 	)
@@ -113,7 +113,7 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		"asking for the same public key should return the same key",
 	)
 
-	existingDataSes, err := New(multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
+	existingDataSes, err := New(context.TODO(), multislogger.NewNopLogger(), store, WithBinaryPath(executablePath))
 	require.NoError(t, err,
 		"should be able to create secure enclave signer with existing key",
 	)
