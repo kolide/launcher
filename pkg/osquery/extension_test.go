@@ -727,7 +727,8 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 100,
+		MaxBytesPerBatch:      100,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -800,7 +801,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 15,
+		MaxBytesPerBatch:      15,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -884,9 +886,10 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 200,
-		Clock:            mockClock,
-		LoggingInterval:  expectedLoggingInterval,
+		MaxBytesPerBatch:      200,
+		Clock:                 mockClock,
+		LoggingInterval:       expectedLoggingInterval,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -1012,7 +1015,10 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	max := 10
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBufferedLogs: max})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		MaxBufferedLogs:       max,
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	var expectedStatusLogs, expectedResultLogs []string
