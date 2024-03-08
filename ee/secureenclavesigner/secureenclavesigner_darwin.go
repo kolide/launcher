@@ -59,7 +59,7 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 	if data != nil {
 		if err := json.Unmarshal(data, ses); err != nil {
 			traces.SetError(span, fmt.Errorf("unmarshaling secure enclave signer: %w", err))
-			ses.slogger.Log(context.TODO(), slog.LevelError,
+			ses.slogger.Log(ctx, slog.LevelError,
 				"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
 				"err", err,
 			)
@@ -88,7 +88,7 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 	// get current console user key to make sure it's available
 	if _, err := ses.currentConsoleUserKey(ctx); err != nil {
 		traces.SetError(span, fmt.Errorf("getting current console user key: %w", err))
-		ses.slogger.Log(context.TODO(), slog.LevelError,
+		ses.slogger.Log(ctx, slog.LevelError,
 			"getting current console user key",
 			"err", err,
 		)
