@@ -14,7 +14,7 @@ import (
 )
 
 func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
-	ctx, span := traces.StartSpan(ctx)
+	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	priData, pubData, err := fetchKeyData(store)
