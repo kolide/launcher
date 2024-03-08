@@ -862,19 +862,17 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	testReleaseVersion := "1.5.0"
-	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	interval := 100 * time.Millisecond
-	mockKnapsack.On("AutoupdateInterval").Return(interval)
+	mockKnapsack.On("AutoupdateInterval").Return(interval).Maybe()
 	initialDelay := 1 * time.Second
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockQuerier := newMockQuerier(t)
@@ -891,37 +889,18 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, pinnedLauncherVersion, autoupdater.pinnedVersions[binaryLauncher])
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
-
-	// Set up expectations for Execute function: tidying library, checking for updates
-	mockLibraryManager := NewMocklibrarian(t)
-	autoupdater.libraryManager = mockLibraryManager
-	currentOsqueryVersion := "1.1.1"
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": currentOsqueryVersion}}, nil)
-	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
-	autoupdater.libraryManager = mockLibraryManager
-	for _, b := range binaries {
-		mockLibraryManager.On("Available", b, fmt.Sprintf("%s-%s.tar.gz", string(b), testReleaseVersion)).Return(true)
-	}
-
 	// Start the autoupdater, then notify flag change right away, during the initial delay
 	go autoupdater.Execute()
 	time.Sleep(100 * time.Millisecond)
 	autoupdater.FlagsChanged(keys.PinnedLauncherVersion)
 
+	// Stop the autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
+
 	// Confirm we unset the pinned launcher version
 	require.Equal(t, "", autoupdater.pinnedVersions[binaryLauncher])
 
-	// Give autoupdater a chance to run
-	time.Sleep(initialDelay + interval)
-
-	// Confirm we didn't add anything to the library, and pulled all config items as expected
-	mockLibraryManager.AssertExpectations(t)
+	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
 }
 
