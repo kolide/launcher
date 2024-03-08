@@ -125,7 +125,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
 
-	if err := agent.SetupKeys(ctx, slogger, configStore); err != nil {
+	if err := agent.SetupKeys(ctx, slogger, configStore, true); err != nil {
 		return nil, fmt.Errorf("setting up agent keys: %w", err)
 	}
 
