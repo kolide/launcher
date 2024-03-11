@@ -29,7 +29,7 @@ func (p parser) Parse(reader io.Reader) (any, error) {
 // The line fields are paired with a header, which is defined by an input array, or the first line of data.
 // If no delimiter is provided, it's assumed that fields are separated by whitespace.
 // The first N lines of data can be skipped in case garbage is sent before the data.
-func (p parser) parseLines(reader io.Reader) []map[string]string {
+func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 	results := make([]map[string]string, 0)
 	scanner := bufio.NewScanner(reader)
 
@@ -39,7 +39,7 @@ func (p parser) parseLines(reader io.Reader) []map[string]string {
 		p.skipLines--
 		// Early exit if the scanner skipped past all data.
 		if !scanner.Scan() {
-			return results // <-- Do we want to error here?
+			return results, nil // <-- Do we want to error here?
 		}
 	}
 
@@ -70,7 +70,7 @@ func (p parser) parseLines(reader io.Reader) []map[string]string {
 		results = append(results, row)
 	}
 
-	return results
+	return results, nil
 }
 
 // Switch to the appropriate function to return the current line's fields.
