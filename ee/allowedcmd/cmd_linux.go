@@ -50,6 +50,10 @@ func FalconKernelCheck(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/opt/CrowdStrike/falcon-kernel-check", arg...)
 }
 
+func Flatpak(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/flatpak", arg...)
+}
+
 func GnomeExtensions(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/gnome-extensions", arg...)
 }
