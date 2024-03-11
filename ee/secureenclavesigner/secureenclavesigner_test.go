@@ -40,9 +40,9 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	// put the root dir somewhere else if you want to persist the signed macos app bundle
 	// should build this into make at some point
-	rootDir := "/tmp/secure_enclave_test"
+	// rootDir := "/tmp/secure_enclave_test"
 
-	// rootDir := t.TempDir()
+	rootDir := t.TempDir()
 	appRoot := filepath.Join(rootDir, "launcher_test.app")
 
 	// make required dirs krypto_test.app/Contents/MacOS and add files
