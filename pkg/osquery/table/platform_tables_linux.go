@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/cryptsetup"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/execparsers/apt"
+	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
 	"github.com/kolide/launcher/ee/tables/execparsers/dnf"
 	"github.com/kolide/launcher/ee/tables/execparsers/dpkg"
 	"github.com/kolide/launcher/ee/tables/execparsers/flatpak/remote_ls/upgradeable"
