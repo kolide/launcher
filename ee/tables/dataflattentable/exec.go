@@ -28,11 +28,11 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 	columns := Columns()
 
 	t := &Table{
-		slogger:            slogger.With("table", tableName),
-		tableName:          tableName,
-		cmdGen:             cmdGen,
-		execArgs:           execArgs,
-		keyValueSeparator:  ":",
+		slogger:           slogger.With("table", tableName),
+		tableName:         tableName,
+		cmdGen:            cmdGen,
+		execArgs:          execArgs,
+		keyValueSeparator: ":",
 	}
 
 	for _, opt := range opts {

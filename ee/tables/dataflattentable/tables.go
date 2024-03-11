@@ -37,7 +37,7 @@ type Table struct {
 	cmdGen   allowedcmd.AllowedCommand
 	execArgs []string
 
-	keyValueSeparator  string
+	keyValueSeparator string
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.

@@ -11,7 +11,11 @@ import (
 // skipLines - The number of initial lines of data to skip. By default no lines are skipped. This can be useful if consistent undesired output/garbage is printed before the data to parse.
 // headers - The set of headers. If left blank, the parser assumes the headers are in the first line of data and splits the line to set them.
 // delimiter - The splitting string. If left blank, the parser assumes the delimiter is whitespace and uses `strings.Fields()` split method.
-type parser struct {skipLines uint, headers []string, delimiter string}
+type parser struct {
+	skipLines uint
+	headers   []string
+	delimiter string
+}
 
 func Parser(skipLines uint, headers []string, delimiter string) parser {
 	return parser{skipLines: skipLines, headers: headers, delimiter: delimiter}
