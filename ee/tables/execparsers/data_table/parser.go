@@ -84,7 +84,7 @@ func (p parser) lineSplit(line string, headerCount int) []string {
 		// If we have a count of the headers, split the current line to N fields.
 		// Otherwise assume headers weren't provided and split the initial line to set them.
 		if headerCount > 0 {
-			return strings.SplitN(p.delimiter, line, headerCount)
+			return strings.SplitN(line, p.delimiter, headerCount)
 		} else {
 			return strings.Split(line, p.delimiter)
 		}
