@@ -24,30 +24,6 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-// WithLineSeparator sets the delimiter between fields on a line of data.
-// default "" in dataflattentable.Table (assumes whitespace separator between fields of data)
-func WithLineSeparator(separator string) ExecTableOpt {
-	return func(t *Table) {
-		t.lineFieldSeparator = separator
-	}
-}
-
-// WithLineHeaders sets the slice of headers that will be used for fields in each line of data.
-// default []string{} in dataflattentable.Table (sets headers from first available line of data)
-func WithLineHeaders(headers []string) ExecTableOpt {
-	return func(t *Table) {
-		t.lineHeaders = headers
-	}
-}
-
-// SkipFirstNLines sets the number of initial lines to skip over before reading from lines of data.
-// default 0 in dataflattentable.Table
-func SkipFirstNLines(skip int) ExecTableOpt {
-	return func(t *Table) {
-		t.skipFirstNLines = skip
-	}
-}
-
 func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
@@ -57,9 +33,6 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		cmdGen:             cmdGen,
 		execArgs:           execArgs,
 		keyValueSeparator:  ":",
-		lineFieldSeparator: "",
-		lineHeaders:        []string{},
-		skipFirstNLines:    0,
 	}
 
 	for _, opt := range opts {
@@ -77,8 +50,6 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		// TODO: allow callers of TablePluginExec to specify the record
 		// splitting strategy
 		t.flattenBytesFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
-	case LineSepType:
-		t.flattenBytesFunc = dataflatten.StringDelimitedLineFunc(t.lineFieldSeparator, t.lineHeaders, t.skipFirstNLines)
 	default:
 		panic("Unknown data source type")
 	}

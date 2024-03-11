@@ -25,7 +25,6 @@ const (
 	XmlType
 	IniType
 	KeyValueType
-	LineSepType
 )
 
 type Table struct {
@@ -39,9 +38,6 @@ type Table struct {
 	execArgs []string
 
 	keyValueSeparator  string
-	lineFieldSeparator string
-	lineHeaders        []string
-	skipFirstNLines    int
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.

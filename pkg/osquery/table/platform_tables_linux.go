@@ -66,7 +66,7 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_version_info", pacman_info.Parser, allowedcmd.Pacman, []string{"-Qi"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, allowedcmd.Pacman, []string{"-Qu"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_rpm_version_info", rpm.Parser, allowedcmd.Rpm, []string{"-qai"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.TablePluginExec(slogger, "kolide_snap_upgradeable", dataflattentable.LineSepType, allowedcmd.Snap, []string{"refresh", "--list"}),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_snap_upgradeable", data_table.Parser, allowedcmd.Snap, []string{"refresh", "--list"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.TablePluginExec(slogger, "kolide_nftables", dataflattentable.JsonType, allowedcmd.Nftables, []string{"-jat", "list", "ruleset"}), // -j (json) -a (show object handles) -t (terse, omit set contents)
 		zfs.ZfsPropertiesPlugin(slogger),
