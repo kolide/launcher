@@ -105,16 +105,37 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 			if err != nil {
 				return nil, fmt.Errorf("marshalling hardware keys: %w", err)
 			}
-			results[0]["hardware_key"] = string(jsonBytes)
-			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()
+
+			// for darwin we'll have an array of uid / key pairs looking this
+			// [{"uid":"501","pub_key":"PUB_KEY_B64_DER"}, {"uid":"502","pub_key":"PUB_KEY_B64_DER"}]
+			results[0]["hardware_keys"] = string(jsonBytes)
+			results[0]["hardware_keys_source"] = agent.HardwareKeys().Type()
 
 			return results, nil
 		}
 
 		if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
-			// der is a binary format, so convert to b64
-			results[0]["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
-			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()
+			// for windows and linux we just have a single key, but we want data to be in a consistent format, so update it to look like
+			// the darwin format
+			keys := []struct {
+				Uid    string `json:"uid"`
+				PubKey string `json:"pub_key"`
+			}{
+				{
+					// the uid is irrelevant for windows and linux, so just use -1
+					// since hardware keys are not tied to user
+					Uid:    "-1",
+					PubKey: base64.StdEncoding.EncodeToString(hardwareKeyDer),
+				},
+			}
+
+			jsonBytes, err := json.Marshal(keys)
+			if err != nil {
+				return nil, fmt.Errorf("marshalling hardware keys: %w", err)
+			}
+
+			results[0]["hardware_keys"] = string(jsonBytes)
+			results[0]["hardware_keys_source"] = agent.HardwareKeys().Type()
 		}
 
 		return results, nil
