@@ -22,7 +22,7 @@ func Parser(skipLines uint, headers []string, delimiter string) parser {
 }
 
 func (p parser) Parse(reader io.Reader) (any, error) {
-	return parseLines(reader)
+	return p.parseLines(reader)
 }
 
 // parseLines scans a reader line by line and splits it into fields based on a delimiter.
@@ -50,13 +50,13 @@ func (p parser) parseLines(reader io.Reader) []map[string]string {
 
 		// headers weren't provided, so retrieve them from the first available line.
 		if headerCount == 0 {
-			p.headers = lineSplit(line, headerCount)
+			p.headers = p.lineSplit(line, headerCount)
 			headerCount = len(p.headers)
 			continue
 		}
 
-		row := map[string]string
-		fields := lineSplit(line, headerCount)
+		row := make(map[string]string)
+		fields := p.lineSplit(line, headerCount)
 		// It's possible we don't have the same number of fields to headers, so use
 		// min here to avoid a possible array out-of-bounds exception.
 		min := min(headerCount, len(fields))
