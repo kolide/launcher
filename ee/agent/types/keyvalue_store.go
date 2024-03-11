@@ -37,8 +37,22 @@ type Iterator interface {
 type Updater interface {
 	// Update takes a map of key-value pairs, and inserts
 	// these key-values into the store. Any preexisting keys in the store which
-	// do not exist in data will be deleted.
+	// do not exist in data will be deleted, and the deleted keys will be returned
 	Update(kvPairs map[string]string) ([]string, error)
+}
+
+// Counter is an interface for reporting the count of key-value
+// pairs held by the underlying storage methodology
+type Counter interface {
+	// Count should return the total number of current key-value pairs
+	Count() int
+}
+
+// Appender is an interface for supporting the ordered addition of values to a store
+// implementations should generate keys to ensure an ordered iteration is possible
+type Appender interface {
+	// AppendValues takes 1 or more values
+	AppendValues(values ...[]byte) error
 }
 
 // GetterSetter is an interface that groups the Get and Set methods.
@@ -75,13 +89,15 @@ type GetterSetterDeleterIterator interface {
 }
 
 // GetterSetterDeleterIteratorUpdater is an interface that groups the Get, Set, Delete, ForEach, and Update methods.
-type GetterSetterDeleterIteratorUpdater interface {
+type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Getter
 	Setter
 	Deleter
 	Iterator
 	Updater
+	Counter
+	Appender
 }
 
 // Convenient alias for a key value store that supports all methods
-type KVStore = GetterSetterDeleterIteratorUpdater
+type KVStore = GetterSetterDeleterIteratorUpdaterCounterAppender

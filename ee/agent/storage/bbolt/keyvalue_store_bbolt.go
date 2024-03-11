@@ -2,6 +2,7 @@ package agentbbolt
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 
@@ -137,12 +138,14 @@ func (s *bboltKeyValueStore) DeleteAll() error {
 	})
 }
 
+// ForEach provides a read-only iterator for all key-value pairs stored within s.bucketName
+// this allows bboltKeyValueStore to adhere to the types.Iterator interace
 func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil || s.db == nil {
 		return NoDbError{}
 	}
 
-	return s.db.Update(func(tx *bbolt.Tx) error {
+	return s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
 			return NewNoBucketError(s.bucketName)
@@ -224,4 +227,67 @@ func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error)
 	}
 
 	return deletedKeys, nil
+}
+
+func (s *bboltKeyValueStore) Count() int {
+	if s == nil || s.db == nil {
+		s.slogger.Log(context.TODO(), slog.LevelError, "unable to count uninitialized bbolt storage db")
+		return 0
+	}
+
+	var len int
+	if err := s.db.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return NewNoBucketError(s.bucketName)
+		}
+
+		len = b.Stats().KeyN
+		return nil
+	}); err != nil {
+		s.slogger.Log(context.TODO(), slog.LevelError,
+			"err counting from bucket",
+			"err", err,
+		)
+		return 0
+	}
+
+	return len
+}
+
+// AppendValues utlizes bbolts NextSequence functionality to add ordered values
+// after generating the next autoincrementing key for each
+func (s *bboltKeyValueStore) AppendValues(values ...[]byte) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("unable to append values into uninitialized bbolt db store")
+	}
+
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(s.bucketName))
+		if b == nil {
+			return NewNoBucketError(s.bucketName)
+		}
+
+		for _, value := range values {
+			key, err := b.NextSequence()
+			if err != nil {
+				return fmt.Errorf("generating key: %w", err)
+			}
+
+			b.Put(byteKeyFromUint64(key), value)
+			if err != nil {
+				return fmt.Errorf("adding ordered value: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func byteKeyFromUint64(k uint64) []byte {
+	// Adapted from Bolt docs
+	// 8 bytes in a uint64
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, k)
+	return b
 }
