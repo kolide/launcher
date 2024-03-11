@@ -39,7 +39,7 @@ func (p parser) parseLines(reader io.Reader) []map[string]string {
 		p.skipLines--
 		// Early exit if the scanner skipped past all data.
 		if !scanner.Scan() {
-			return results // <-- do we want to error here?
+			return results // <-- Do we want to error here?
 		}
 	}
 
@@ -62,6 +62,7 @@ func (p parser) parseLines(reader io.Reader) []map[string]string {
 		min := min(headerCount, len(fields))
 
 		// For each header, add the corresponding line field to the result row.
+		// Duplicate headers overwrite the set value. <-- Perhaps this should be different?
 		for c := 0; c < min; c++ {
 			row[strings.TrimSpace(p.headers[c])] = strings.TrimSpace(fields[c])
 		}

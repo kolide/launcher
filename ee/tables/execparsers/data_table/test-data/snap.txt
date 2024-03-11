@@ -1,0 +1,2 @@
+Name    Version   Rev   Size  Publisher    Notes
+core22  20240111  1122  77MB  canonical**  base
