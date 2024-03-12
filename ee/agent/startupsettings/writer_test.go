@@ -37,6 +37,10 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, updateChannelVal, string(v1), "incorrect flag value")
 
+	v2, err := s.kvStore.Get([]byte("use_tuf_autoupdater"))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "enabled", string(v2), "incorrect flag value")
+
 	require.NoError(t, s.Close(), "closing startup db")
 }
 
