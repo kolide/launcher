@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"runtime"
 	"strings"
 	"time"
 
@@ -304,8 +303,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 		// pass nil to krypto
-		// hardware signing is not implemented for darwin
-		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
+		if e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
 			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
 		} else {
 			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())

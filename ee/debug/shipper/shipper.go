@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"os/user"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -207,11 +206,7 @@ func signHttpRequest(req *http.Request, body []byte) {
 	}
 
 	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)
-
-	// hardware signing is not implemented for darwin
-	if runtime.GOOS != "darwin" {
-		sign(agent.HardwareKeys(), control.HeaderKey2, control.HeaderSignature2, req)
-	}
+	sign(agent.HardwareKeys(), control.HeaderKey2, control.HeaderSignature2, req)
 }
 
 func launcherData(k types.Knapsack, note string) ([]byte, error) {

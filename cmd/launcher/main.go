@@ -159,8 +159,6 @@ func runSubcommands() error {
 		run = runDownloadOsquery
 	case "uninstall":
 		run = runUninstall
-	case "secure-enclave":
-		run = runSecureEnclave
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
