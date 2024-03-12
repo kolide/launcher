@@ -61,6 +61,7 @@ func (s *startupSettingsWriter) setFlags() error {
 	for flag, getter := range s.storedFlags {
 		updatedFlags[flag.String()] = getter()
 	}
+	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility
 
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
 		return fmt.Errorf("updating flags: %w", err)
