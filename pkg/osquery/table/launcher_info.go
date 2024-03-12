@@ -5,8 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
-	"fmt"
 	"runtime"
 
 	"github.com/kolide/kit/version"
@@ -97,17 +95,6 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 
 		// we might not always have hardware keys so check first
 		if agent.HardwareKeys().Public() == nil {
-			return results, nil
-		}
-
-		if runtime.GOOS == "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
-			jsonBytes, err := json.Marshal(agent.HardwareKeys())
-			if err != nil {
-				return nil, fmt.Errorf("marshalling hardware keys: %w", err)
-			}
-			results[0]["hardware_key"] = string(jsonBytes)
-			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()
-
 			return results, nil
 		}
 

@@ -23,10 +23,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
-	})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBytesPerBatch: startingBatchLimitBytes})
 	require.Nil(t, err)
 
 	// issue a few successful calls, expect that the batch limit is unchanged from the original opts
@@ -60,10 +57,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
-	})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBytesPerBatch: startingBatchLimitBytes})
 	require.Nil(t, err)
 
 	// expect each subsequent failed call to reduce the batch size until the min threshold is reached
@@ -112,10 +106,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
-	})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBytesPerBatch: startingBatchLimitBytes})
 	require.Nil(t, err)
 
 	// issue a few calls that error immediately, expect that the batch limit is unchanged from the original opts
