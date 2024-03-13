@@ -635,20 +635,6 @@ func uint64FromByteKey(k []byte) uint64 {
 	return binary.BigEndian.Uint64(k)
 }
 
-// bucketNameFromLogType returns the Bolt bucket name that stores logs of the
-// provided type.
-// func bucketNameFromLogType(typ logger.LogType) (string, error) {
-// 	switch typ {
-// 	case logger.LogTypeString, logger.LogTypeSnapshot:
-// 		return storage.ResultLogsStore.String(), nil
-// 	case logger.LogTypeStatus:
-// 		return storage.StatusLogsStore.String(), nil
-// 	default:
-// 		return "", fmt.Errorf("unknown log type: %v", typ)
-
-// 	}
-// }
-
 // storeForLogType returns the store with the logs of the provided type.
 func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) {
 	switch typ {
@@ -751,56 +737,6 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	} else if err != nil {
 		return fmt.Errorf("reading buffered logs: %w", err)
 	}
-	// err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-	// 	b := tx.Bucket([]byte(bucketName))
-
-	// 	c := b.Cursor()
-	// 	k, v := c.First()
-	// 	for totalBytes := 0; k != nil; {
-	// 		// A somewhat cumbersome if block...
-	// 		//
-	// 		// 1. If the log is too big, skip it and mark for deletion.
-	// 		// 2. If the buffer would be too big with the log, break for
-	// 		// 3. Else append it
-	// 		//
-	// 		// Note that (1) must come first, otherwise (2) will always trigger.
-	// 		if e.logPublicationState.ExceedsCurrentBatchThreshold(len(v)) {
-	// 			// Discard logs that are too big
-	// 			logheadSize := minInt(len(v), 100)
-	// 			e.slogger.Log(context.TODO(), slog.LevelInfo,
-	// 				"dropped log",
-	// 				"log_id", k,
-	// 				"size", len(v),
-	// 				"limit", e.Opts.MaxBytesPerBatch,
-	// 				"loghead", string(v)[0:logheadSize],
-	// 			)
-	// 		} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes + len(v)) {
-	// 			// Buffer is filled. Break the loop and come back later.
-	// 			bufferFilled = true
-	// 			break
-	// 		} else {
-	// 			logs = append(logs, string(v))
-	// 			totalBytes += len(v)
-	// 		}
-
-	// 		// Note the logID for deletion. We do this by
-	// 		// making a copy of k. It is retained in
-	// 		// logIDs after the transaction is closed,
-	// 		// when the goroutine ticks it zeroes out some
-	// 		// of the IDs to delete below, causing logs to
-	// 		// remain in the buffer and be sent again to
-	// 		// the server.
-	// 		logID := make([]byte, len(k))
-	// 		copy(logID, k)
-	// 		logIDs = append(logIDs, logID)
-
-	// 		k, v = c.Next()
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return fmt.Errorf("reading buffered logs: %w", err)
-	// }
 
 	if len(logs) == 0 {
 		// Nothing to send
@@ -879,7 +815,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	logIdsCollectedCount := 0
 	logIDsForDeletion := make([][]byte, deleteCount)
 	if err = store.ForEach(func(k, v []byte) error {
-		if logIdsCollectedCount > deleteCount {
+		if logIdsCollectedCount >= deleteCount {
 			return iterationTerminatedError{}
 		}
 

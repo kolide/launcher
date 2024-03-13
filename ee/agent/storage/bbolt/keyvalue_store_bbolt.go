@@ -139,7 +139,7 @@ func (s *bboltKeyValueStore) DeleteAll() error {
 }
 
 // ForEach provides a read-only iterator for all key-value pairs stored within s.bucketName
-// this allows bboltKeyValueStore to adhere to the types.Iterator interace
+// this allows bboltKeyValueStore to adhere to the types.Iterator interface
 func (s *bboltKeyValueStore) ForEach(fn func(k, v []byte) error) error {
 	if s == nil || s.db == nil {
 		return NoDbError{}

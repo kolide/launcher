@@ -980,66 +980,66 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
 
-// func TestExtensionPurgeBufferedLogs(t *testing.T) {
+func TestExtensionPurgeBufferedLogs(t *testing.T) {
 
-// 	var gotStatusLogs, gotResultLogs []string
-// 	m := &mock.KolideService{
-// 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
-// 			switch logType {
-// 			case logger.LogTypeStatus:
-// 				gotStatusLogs = logs
-// 			case logger.LogTypeString:
-// 				gotResultLogs = logs
-// 			default:
-// 				t.Error("Unknown log type")
-// 			}
-// 			// Mock as if sending logs errored
-// 			return "", "", false, errors.New("server rejected logs")
-// 		},
-// 	}
+	var gotStatusLogs, gotResultLogs []string
+	m := &mock.KolideService{
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			switch logType {
+			case logger.LogTypeStatus:
+				gotStatusLogs = logs
+			case logger.LogTypeString:
+				gotResultLogs = logs
+			default:
+				t.Error("Unknown log type")
+			}
+			// Mock as if sending logs errored
+			return "", "", false, errors.New("server rejected logs")
+		},
+	}
 
-// 	// Create these buckets ahead of time
-// 	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
-// 	require.NoError(t, err)
-// 	resultLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ResultLogsStore.String())
-// 	require.NoError(t, err)
+	// Create these buckets ahead of time
+	statusLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.StatusLogsStore.String())
+	require.NoError(t, err)
+	resultLogsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ResultLogsStore.String())
+	require.NoError(t, err)
 
-// 	k := mocks.NewKnapsack(t)
-// 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-// 	k.On("StatusLogsStore").Return(statusLogsStore)
-// 	k.On("ResultLogsStore").Return(resultLogsStore)
-// 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k := mocks.NewKnapsack(t)
+	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("StatusLogsStore").Return(statusLogsStore)
+	k.On("ResultLogsStore").Return(resultLogsStore)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-//	max := 10
-//	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-//		MaxBufferedLogs:       max,
-//		skipHardwareKeysSetup: true,
-//	})
-// 	require.Nil(t, err)
+	max := 10
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		MaxBufferedLogs:       max,
+		skipHardwareKeysSetup: true,
+	})
+	require.Nil(t, err)
 
-// 	var expectedStatusLogs, expectedResultLogs []string
-// 	for i := 0; i < 100; i++ {
-// 		gotStatusLogs = nil
-// 		gotResultLogs = nil
-// 		statusLog := fmt.Sprintf("status %d", i)
-// 		expectedStatusLogs = append(expectedStatusLogs, statusLog)
-// 		e.LogString(context.Background(), logger.LogTypeStatus, statusLog)
+	var expectedStatusLogs, expectedResultLogs []string
+	for i := 0; i < 100; i++ {
+		gotStatusLogs = nil
+		gotResultLogs = nil
+		statusLog := fmt.Sprintf("status %d", i)
+		expectedStatusLogs = append(expectedStatusLogs, statusLog)
+		e.LogString(context.Background(), logger.LogTypeStatus, statusLog)
 
-// 		resultLog := fmt.Sprintf("result %d", i)
-// 		expectedResultLogs = append(expectedResultLogs, resultLog)
-// 		e.LogString(context.Background(), logger.LogTypeString, resultLog)
+		resultLog := fmt.Sprintf("result %d", i)
+		expectedResultLogs = append(expectedResultLogs, resultLog)
+		e.LogString(context.Background(), logger.LogTypeString, resultLog)
 
-// 		e.writeAndPurgeLogs()
+		e.writeAndPurgeLogs()
 
-// 		if i < max {
-// 			assert.Equal(t, expectedStatusLogs, gotStatusLogs)
-// 			assert.Equal(t, expectedResultLogs, gotResultLogs)
-// 		} else {
-// 			assert.Equal(t, expectedStatusLogs[i-max:], gotStatusLogs)
-// 			assert.Equal(t, expectedResultLogs[i-max:], gotResultLogs)
-// 		}
-// 	}
-// }
+		if i < max {
+			assert.Equal(t, expectedStatusLogs, gotStatusLogs)
+			assert.Equal(t, expectedResultLogs, gotResultLogs)
+		} else {
+			assert.Equal(t, expectedStatusLogs[i-max:], gotStatusLogs)
+			assert.Equal(t, expectedResultLogs[i-max:], gotResultLogs)
+		}
+	}
+}
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
 

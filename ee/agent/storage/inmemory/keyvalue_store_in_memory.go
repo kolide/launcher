@@ -151,7 +151,7 @@ func (s *inMemoryKeyValueStore) AppendValues(values ...[]byte) error {
 	}
 
 	for _, value := range values {
-		s.Set(s.nextSequenceKey(), []byte(value))
+		s.Set(s.nextSequenceKey(), value)
 	}
 
 	return nil
