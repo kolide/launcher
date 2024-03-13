@@ -9,7 +9,7 @@ import (
 // data_table is a general parser for an input of data which conforms to columns and rows styled output.
 // Parser options
 // skipLines - The number of initial lines of data to skip. By default no lines are skipped. This can be useful if consistent undesired output/garbage is printed before the data to parse.
-// headers - The set of headers. If left blank, the parser assumes the headers are in the first line of data and splits the line to set them.
+// headers - The set of headers. If left blank, the parser assumes the headers are in the first line of data and splits that line to set them.
 // delimiter - The splitting string. If left blank, the parser assumes the delimiter is whitespace and uses `strings.Fields()` split method.
 type parser struct {
 	skipLines uint
@@ -17,7 +17,7 @@ type parser struct {
 	delimiter string
 }
 
-func Parser(skipLines uint, headers []string, delimiter string) parser {
+func NewParser(skipLines uint, headers []string, delimiter string) parser {
 	return parser{skipLines: skipLines, headers: headers, delimiter: delimiter}
 }
 
@@ -27,8 +27,6 @@ func (p parser) Parse(reader io.Reader) (any, error) {
 
 // parseLines scans a reader line by line and splits it into fields based on a delimiter.
 // The line fields are paired with a header, which is defined by an input array, or the first line of data.
-// If no delimiter is provided, it's assumed that fields are separated by whitespace.
-// The first N lines of data can be skipped in case garbage is sent before the data.
 func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 	results := make([]map[string]string, 0)
 	scanner := bufio.NewScanner(reader)
@@ -73,7 +71,7 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 	return results, nil
 }
 
-// Switch to the appropriate function to return the current line's fields.
+// lineSplit switches to the appropriate splitting method to return the current line's fields.
 // Delimiter often might be a comma or similar single character.
 func (p parser) lineSplit(line string, headerCount int) []string {
 	switch p.delimiter {
