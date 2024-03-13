@@ -70,7 +70,9 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 
 	// We should be able to make an extension despite an empty enroll secret
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	assert.Nil(t, err)
 	assert.NotNil(t, e)
 }
@@ -100,7 +102,9 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	m.On("ConfigStore").Return(agentbbolt.NewStore(multislogger.NewNopLogger(), db, storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
@@ -110,7 +114,9 @@ func TestGetHostIdentifier(t *testing.T) {
 	defer cleanup()
 
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	ident, err := e.getHostIdentifier()
@@ -125,7 +131,9 @@ func TestGetHostIdentifier(t *testing.T) {
 	db, cleanup = makeTempDB(t)
 	defer cleanup()
 	k = makeKnapsack(t, db)
-	e, err = NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
+	e, err = NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	ident, err = e.getHostIdentifier()
@@ -140,7 +148,9 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	// Put garbage UUID in DB
@@ -169,7 +179,9 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -189,7 +201,9 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	k := makeKnapsack(t, db)
 	defer cleanup()
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -218,7 +232,9 @@ func TestExtensionEnroll(t *testing.T) {
 	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -237,7 +253,9 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err = NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
 	key, invalid, err = e.Enroll(context.Background())
@@ -271,7 +289,9 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 	k.ConfigStore().Set([]byte(nodeKeyKey), []byte("some_node_key"))
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -292,7 +312,9 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -329,7 +351,9 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -356,7 +380,9 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 
-	e, err := NewExtension(context.TODO(), s, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), s, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -385,7 +411,9 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
@@ -404,7 +432,9 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
@@ -428,7 +458,9 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -457,7 +489,9 @@ func TestExtensionWriteLogs(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	e.NodeKey = expectedNodeKey
 
@@ -533,7 +567,9 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	// No buffered logs should result in success and no remote action being
@@ -572,7 +608,9 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
@@ -642,7 +680,9 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
@@ -687,7 +727,8 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 100,
+		MaxBytesPerBatch:      100,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -760,7 +801,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 15,
+		MaxBytesPerBatch:      15,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -844,9 +886,10 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch: 200,
-		Clock:            mockClock,
-		LoggingInterval:  expectedLoggingInterval,
+		MaxBytesPerBatch:      200,
+		Clock:                 mockClock,
+		LoggingInterval:       expectedLoggingInterval,
+		skipHardwareKeysSetup: true,
 	})
 	require.Nil(t, err)
 
@@ -972,7 +1015,10 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	max := 10
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{MaxBufferedLogs: max})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		MaxBufferedLogs:       max,
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	var expectedStatusLogs, expectedResultLogs []string
@@ -1009,7 +1055,9 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
@@ -1039,7 +1087,9 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -1067,7 +1117,9 @@ func TestExtensionGetQueries(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	queries, err := e.GetQueries(context.Background())
@@ -1086,7 +1138,9 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	err = e.WriteResults(context.Background(), []distributed.Result{})
@@ -1110,7 +1164,9 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
@@ -1133,7 +1189,9 @@ func TestExtensionWriteResults(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.Nil(t, err)
 
 	expectedResults := []distributed.Result{
@@ -1161,7 +1219,9 @@ func TestLauncherRsaKeys(t *testing.T) {
 	k.On("ConfigStore").Return(configStore)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	_, err = NewExtension(context.TODO(), m, k, ExtensionOpts{})
+	_, err = NewExtension(context.TODO(), m, k, ExtensionOpts{
+		skipHardwareKeysSetup: true,
+	})
 	require.NoError(t, err)
 
 	key, err := PrivateRSAKeyFromDB(configStore)
