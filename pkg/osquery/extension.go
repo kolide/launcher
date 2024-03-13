@@ -693,7 +693,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	var logIDs [][]byte
 	bufferFilled := false
 	totalBytes := 0
-	store.ForEach(func(k, v []byte) error {
+	err = store.ForEach(func(k, v []byte) error {
 		// A somewhat cumbersome if block...
 		//
 		// 1. If the log is too big, skip it and mark for deletion.
