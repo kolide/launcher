@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-func runCmdAsUser(cmd *exec.Cmd, uid string) ([]byte, error) {
+func RunCmdAsUser(cmd *exec.Cmd, uid string) ([]byte, error) {
 	currentUser, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("getting current user: %w", err)

@@ -49,7 +49,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			output, err := tablehelpers.runCmdAsUser(cmd, uid)
+			output, err := tablehelpers.RunCmdAsUser(cmd, uid)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user installed packages", "err", err, "target_uid", uid)
 				continue
