@@ -171,3 +171,7 @@ func Zfs(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 func Zpool(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
 }
+
+func Zypper(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/zypper", arg...)
+}
