@@ -193,7 +193,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := NewParser(tt.skipLines, tt.headers, tt.delimiter)
+			p := NewParser(WithSkipLines(tt.skipLines), WithHeaders(tt.headers), WithDelimiter(tt.delimiter))
 			result, err := p.Parse(bytes.NewReader(tt.input))
 
 			require.NoError(t, err, "unexpected error parsing input")

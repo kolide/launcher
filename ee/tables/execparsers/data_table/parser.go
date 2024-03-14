@@ -17,8 +17,38 @@ type parser struct {
 	delimiter string
 }
 
-func NewParser(skipLines uint, headers []string, delimiter string) parser {
-	return parser{skipLines: skipLines, headers: headers, delimiter: delimiter}
+type parserOpt func(*parser)
+
+func WithSkipLines(skipLines uint) parserOpt {
+	return func(p *parser) {
+		p.skipLines = skipLines
+	}
+}
+
+func WithHeaders(headers []string) parserOpt {
+	return func(p *parser) {
+		p.headers = headers
+	}
+}
+
+func WithDelimiter(delimiter string) parserOpt {
+	return func(p *parser) {
+		p.delimiter = delimiter
+	}
+}
+
+func NewParser(opts ...parserOpt) *parser {
+	p := &parser{
+		skipLines: 0,
+		headers:   nil,
+		delimiter: "",
+	}
+
+	for _, opt := range opts {
+		opt(p)
+	}
+
+	return p
 }
 
 func (p parser) Parse(reader io.Reader) (any, error) {
