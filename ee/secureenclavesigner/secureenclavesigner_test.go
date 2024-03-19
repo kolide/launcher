@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	testWrappedEnvVarKey = "SECURE_ENCLAVE_TEST_WRAPPED"
-	macOsAppResourceDir  = "./test_app_resources"
+	testWrappedEnvVarKey                  = "SECURE_ENCLAVE_TEST_WRAPPED"
+	testSkipSecureEnclaveTestingEnvVarKey = "SKIP_SECURE_ENCLAVE_TESTS"
+	macOsAppResourceDir                   = "./test_app_resources"
 )
 
 func WithBinaryPath(p string) opt {
@@ -36,6 +37,10 @@ func TestSecureEnclaveSigner(t *testing.T) {
 
 	if os.Getenv("CI") != "" {
 		t.Skipf("\nskipping because %s env var was not empty, this is being run in a CI environment without access to secure enclave", testWrappedEnvVarKey)
+	}
+
+	if os.Getenv(testSkipSecureEnclaveTestingEnvVarKey) != "" {
+		t.Skipf("\nskipping because %s env var was set", testSkipSecureEnclaveTestingEnvVarKey)
 	}
 
 	// put the root dir somewhere else if you want to persist the signed macos app bundle
