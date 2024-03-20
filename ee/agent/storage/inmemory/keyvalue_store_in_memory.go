@@ -158,6 +158,9 @@ func (s *inMemoryKeyValueStore) AppendValues(values ...[]byte) error {
 }
 
 func (s *inMemoryKeyValueStore) nextSequenceKey() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.sequence++
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, s.sequence)

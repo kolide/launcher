@@ -808,7 +808,7 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 	}
 
 	deleteCount := store.Count() - e.Opts.MaxBufferedLogs
-	if deleteCount <= 0 {
+	if deleteCount <= 0 { // Limit not exceeded
 		return nil
 	}
 
@@ -851,6 +851,8 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
+	// note that AppendValues guarantees these logs are inserted with
+	// sequential keys for ordered retrieval later
 	return store.AppendValues([]byte(logText))
 }
 

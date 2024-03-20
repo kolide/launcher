@@ -274,8 +274,7 @@ func (s *bboltKeyValueStore) AppendValues(values ...[]byte) error {
 				return fmt.Errorf("generating key: %w", err)
 			}
 
-			b.Put(byteKeyFromUint64(key), value)
-			if err != nil {
+			if err = b.Put(byteKeyFromUint64(key), value); err != nil {
 				return fmt.Errorf("adding ordered value: %w", err)
 			}
 		}
