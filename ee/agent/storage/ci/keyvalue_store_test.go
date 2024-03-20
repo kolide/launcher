@@ -142,14 +142,9 @@ func Test_Delete(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				// There should be no records, count and verify
-				var recordCount int
-				rowFn := func(k, v []byte) error {
-					recordCount = recordCount + 1
-					return nil
-				}
-				s.ForEach(rowFn)
-				assert.Equal(t, tt.expectedRecordCount, recordCount)
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedRecordCount, totalCount)
 			}
 		})
 	}
@@ -189,13 +184,9 @@ func Test_DeleteAll(t *testing.T) {
 				require.NoError(t, s.DeleteAll())
 
 				// There should be no records, count and verify
-				var recordCount int
-				rowFn := func(k, v []byte) error {
-					recordCount = recordCount + 1
-					return nil
-				}
-				s.ForEach(rowFn)
-				assert.Equal(t, 0, recordCount)
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 0, totalCount)
 			}
 		})
 	}
@@ -372,6 +363,94 @@ func Test_ForEach(t *testing.T) {
 					}
 				}()
 				wg.Wait()
+			}
+		})
+	}
+}
+
+func Test_Count(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		sets          map[string]string
+		expectedCount int
+	}{
+		{
+			name:          "empty",
+			sets:          map[string]string{},
+			expectedCount: 0,
+		},
+		{
+			name:          "one value",
+			sets:          map[string]string{"key1": "value1"},
+			expectedCount: 1,
+		},
+		{
+			name:          "multiple values",
+			sets:          map[string]string{"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"},
+			expectedCount: 4,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, s := range getStores(t) {
+				_, err := s.Update(tt.sets)
+				require.NoError(t, err)
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedCount, totalCount)
+			}
+		})
+	}
+}
+
+func Test_AppendValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		sets          [][]byte
+		expectedCount int
+	}{
+		{
+			name:          "empty",
+			sets:          [][]byte{},
+			expectedCount: 0,
+		},
+		{
+			name:          "one value",
+			sets:          [][]byte{[]byte("one")},
+			expectedCount: 1,
+		},
+		{
+			name:          "multiple values",
+			sets:          [][]byte{[]byte("one"), []byte("two"), []byte("three"), []byte("four"), []byte("five")},
+			expectedCount: 5,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, s := range getStores(t) {
+				err := s.AppendValues(tt.sets...)
+				require.NoError(t, err)
+				// check the count to ensure the tests below will endure the expected number of iterations
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedCount, totalCount)
+				idx := 0
+				// now we expect to be able to iterate over these in the same order that we appended them
+				s.ForEach(func(k, v []byte) error {
+					require.Equal(t, tt.sets[idx], v)
+					idx++
+					return nil
+				})
 			}
 		})
 	}
