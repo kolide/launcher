@@ -108,7 +108,7 @@ func (mw *metadataWriter) recordMetadata(metadata *metadata) error {
 	return nil
 }
 
-func (mw *metadataWriter) getServerDataValue(store types.GetterSetterDeleterIteratorUpdater, key string) string {
+func (mw *metadataWriter) getServerDataValue(store types.KVStore, key string) string {
 	val, err := store.Get([]byte(key))
 	if err != nil {
 		mw.slogger.Log(context.TODO(), slog.LevelDebug,
