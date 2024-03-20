@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	testWrappedEnvVarKey = "SECURE_ENCLAVE_TEST_WRAPPED"
-	macOsAppResourceDir  = "../../ee/secureenclavesigner/test_app_resources"
+	testWrappedEnvVarKey                  = "SECURE_ENCLAVE_TEST_WRAPPED"
+	testSkipSecureEnclaveTestingEnvVarKey = "SKIP_SECURE_ENCLAVE_TESTS"
+	macOsAppResourceDir                   = "../../ee/secureenclavesigner/test_app_resources"
 )
 
 // TestSecureEnclaveTestRunner creates a MacOS app with the binary of this packages tests, then signs the app with entitlements and runs the tests.
@@ -35,6 +36,10 @@ func TestSecureEnclaveTestRunner(t *testing.T) {
 
 	if os.Getenv(testWrappedEnvVarKey) != "" {
 		t.Skipf("\nskipping because %s env var was not empty, this is the execution of the codesigned app with entitlements", testWrappedEnvVarKey)
+	}
+
+	if os.Getenv(testSkipSecureEnclaveTestingEnvVarKey) != "" {
+		t.Skipf("\nskipping because %s env var was set", testSkipSecureEnclaveTestingEnvVarKey)
 	}
 
 	t.Log("\nexecuting wrapped tests with codesigned app and entitlements")
