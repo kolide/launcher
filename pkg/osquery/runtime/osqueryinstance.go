@@ -393,7 +393,8 @@ func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	extensionAutoloadPath := filepath.Join(opts.rootDirectory, "osquery.autoload")
 
-	// We want to use a unique pidfile per launcher run to avoid file locking issues
+	// We want to use a unique pidfile per launcher run to avoid file locking issues.
+	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
 		pidfilePath:           filepath.Join(opts.rootDirectory, fmt.Sprintf("osquery-%s.pid", ulid.New())),
 		databasePath:          filepath.Join(opts.rootDirectory, "osquery.db"),
