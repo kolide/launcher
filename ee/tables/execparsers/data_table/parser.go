@@ -38,11 +38,7 @@ func WithDelimiter(delimiter string) parserOpt {
 }
 
 func NewParser(opts ...parserOpt) *parser {
-	p := &parser{
-		skipLines: 0,
-		headers:   nil,
-		delimiter: "",
-	}
+	p := &parser{}
 
 	for _, opt := range opts {
 		opt(p)
@@ -91,8 +87,8 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 
 		// For each header, add the corresponding line field to the result row.
 		// Duplicate headers overwrite the set value. <-- Perhaps this should be different?
-		for c := 0; c < min; c++ {
-			row[strings.TrimSpace(p.headers[c])] = strings.TrimSpace(fields[c])
+		for i := 0; i < min; i++ {
+			row[strings.TrimSpace(p.headers[i])] = strings.TrimSpace(fields[i])
 		}
 
 		results = append(results, row)
