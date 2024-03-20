@@ -6,17 +6,22 @@ package secureenclavesigner
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
+	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 const (
@@ -89,27 +94,27 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		"should be able to create secure enclave signer",
 	)
 
-	pubKey := ses.Public()
-	require.NotNil(t, pubKey,
+	userPubKey := ses.Public()
+	require.NotNil(t, userPubKey,
 		"should be able to create brand new public key",
 	)
 
-	pubEcdsaKey := pubKey.(*ecdsa.PublicKey)
-	require.NotNil(t, pubEcdsaKey,
+	userPubEcdsaKey := userPubKey.(*ecdsa.PublicKey)
+	require.NotNil(t, userPubEcdsaKey,
 		"public key should convert to ecdsa key",
 	)
 
-	pubKeySame := ses.Public()
-	require.NotNil(t, pubKeySame,
+	userPubKeySame := ses.Public()
+	require.NotNil(t, userPubKeySame,
 		"should be able to get public key again",
 	)
 
-	pubEcdsaKeySame := pubKeySame.(*ecdsa.PublicKey)
-	require.NotNil(t, pubEcdsaKeySame,
+	userPubEcdsaKeySame := userPubKeySame.(*ecdsa.PublicKey)
+	require.NotNil(t, userPubEcdsaKeySame,
 		"public key should convert to ecdsa key",
 	)
 
-	require.Equal(t, pubEcdsaKey, pubEcdsaKeySame,
+	require.True(t, userPubEcdsaKey.Equal(userPubEcdsaKeySame),
 		"asking for the same public key should return the same key",
 	)
 
@@ -128,8 +133,101 @@ func TestSecureEnclaveSigner(t *testing.T) {
 		"public key should convert to ecdsa key",
 	)
 
-	require.Equal(t, pubEcdsaKey, pubEcdsaKeyUnmarshalled,
+	require.Equal(t, userPubEcdsaKey, pubEcdsaKeyUnmarshalled,
 		"unmarshalled public key should be the same as original public key",
+	)
+
+	challengeBytes, _, err := challenge.Generate(serverPrivKey, []byte(ulid.New()), []byte(ulid.New()), []byte(ulid.New()))
+	require.NoError(t, err,
+		"should be able to generate challenge",
+	)
+
+	baseNonce := ulid.New()
+	signResponseOuterBytes, err := ses.SignConsoleUser(ctx, challengeBytes, []byte(ulid.New()), serverPubKeyDer, baseNonce)
+	require.NoError(t, err,
+		"should be able to sign with secure enclave",
+	)
+
+	var signResponseOuter SignResponseOuter
+	require.NoError(t, json.Unmarshal(signResponseOuterBytes, &signResponseOuter),
+		"should be able to unmarshal sign response outer",
+	)
+
+	require.NoError(t, echelper.VerifySignature(userPubEcdsaKey, signResponseOuter.Msg, signResponseOuter.Sig),
+		"should be able to verify signature",
+	)
+
+	var signResponseInner SignResponseInner
+	require.NoError(t, json.Unmarshal(signResponseOuter.Msg, &signResponseInner),
+		"should be able to unmarshal sign response inner",
+	)
+
+	require.True(t, strings.HasPrefix(string(signResponseInner.Data), "kolide:"),
+		"signed data should have prefix",
+	)
+
+	require.True(t, strings.HasSuffix(string(signResponseInner.Data), ":kolide"),
+		"signed data should have suffix",
+	)
+
+	require.True(t, strings.HasPrefix(signResponseInner.Nonce, baseNonce),
+		"nonce should have base nonce prefix",
+	)
+
+	require.InDelta(t, time.Now().UTC().Unix(), signResponseInner.Timestamp, 5,
+		"timestamp should be within 5 seconds of now",
+	)
+
+	// test some error cases
+	_, err = ses.SignConsoleUser(ctx, nil, []byte(ulid.New()), serverPubKeyDer, ulid.New())
+	require.Error(t, err,
+		"should not be able to sign with nil challenge",
+	)
+
+	_, err = ses.SignConsoleUser(ctx, challengeBytes, []byte(ulid.New()), nil, ulid.New())
+	require.Error(t, err,
+		"should not be able to sign with nil serverkey",
+	)
+
+	randomKey, err := echelper.GenerateEcdsaKey()
+	require.NoError(t, err,
+		"should be able to generate ecdsa key",
+	)
+
+	randomKeyMarshalled, err := echelper.PublicEcdsaToB64Der(randomKey.Public().(*ecdsa.PublicKey))
+	require.NoError(t, err,
+		"should be able to marshal ecdsa key",
+	)
+
+	_, err = ses.SignConsoleUser(ctx, challengeBytes, []byte(ulid.New()), randomKeyMarshalled, ulid.New())
+	require.Error(t, err,
+		"should not be able to sign with unrecognized serverkey",
+	)
+
+	challengeBoxOuter, err := challenge.UnmarshalChallenge(challengeBytes)
+	require.NoError(t, err,
+		"should be able to unmarshal challenge",
+	)
+
+	var challengeBoxInner *challenge.InnerChallenge
+	require.NoError(t, msgpack.Unmarshal(challengeBoxOuter.Msg, &challengeBoxInner),
+		"should be able to unmarshal inner challenge",
+	)
+
+	challengeBoxInner.Timestamp = time.Now().Unix() - 1000000
+	challengeBoxOuter.Msg, err = msgpack.Marshal(challengeBoxInner)
+	require.NoError(t, err,
+		"should be able to marshal inner challenge",
+	)
+
+	challengeBytes, err = challengeBoxOuter.Marshal()
+	require.NoError(t, err,
+		"should be able to marshal challenge",
+	)
+
+	_, err = ses.SignConsoleUser(ctx, challengeBytes, []byte(ulid.New()), serverPubKeyDer, ulid.New())
+	require.ErrorContains(t, err, "invalid signature",
+		"any tampering should invalidate signature",
 	)
 }
 

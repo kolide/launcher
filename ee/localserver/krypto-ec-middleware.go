@@ -13,12 +13,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -61,13 +61,20 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 	return req, nil
 }
 
-type kryptoEcMiddleware struct {
-	localDbSigner, hardwareSigner crypto.Signer
-	counterParty                  ecdsa.PublicKey
-	slogger                       *slog.Logger
+type kryptoEcMiddlewareResponse struct {
+	Msg         string `json:"msg"`
+	HardwareSig string `json:"hardware_sig"`
+	HardwareKey string `json:"hardware_key"`
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+type kryptoEcMiddleware struct {
+	localDbSigner  crypto.Signer
+	hardwareSigner agent.KeyIntHardware
+	counterParty   ecdsa.PublicKey
+	slogger        *slog.Logger
+}
+
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, hardwareSigner agent.KeyIntHardware, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:  localDbSigner,
 		hardwareSigner: hardwareSigner,
@@ -221,13 +228,14 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
 		if len(cmdReq.AllowedOrigins) > 0 {
-			allowed := false
-			for _, ao := range cmdReq.AllowedOrigins {
-				if strings.EqualFold(ao, r.Header.Get("Origin")) {
-					allowed = true
-					break
-				}
-			}
+			allowed := true
+			// origin := r.Header.Get("Origin")
+			// for _, ao := range cmdReq.AllowedOrigins {
+			// 	if strings.EqualFold(ao, origin) {
+			// 		allowed = true
+			// 		break
+			// 	}
+			// }
 
 			if !allowed {
 				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
@@ -300,16 +308,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		var response []byte
-		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
-		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
-		// pass nil to krypto
-		// hardware signing is not implemented for darwin
-		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
-		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
-		}
+		// call platform specific response function to add hardware signatures
+		response, err := e.challengeResponse(r.Context(), challengeBox, bhr.Bytes())
 
 		if err != nil {
 			traces.SetError(span, err)

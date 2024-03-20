@@ -13,7 +13,15 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
+type tpmKeyInt struct {
+	*tpm.TpmSigner
+}
+
+func (t *tpmKeyInt) SignConsoleUser(_ context.Context, _, _, _ []byte, _ string) ([]byte, error) {
+	return nil, fmt.Errorf("can't sign with console user, unsupported for non darwin platforms")
+}
+
+func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) (KeyIntHardware, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -52,5 +60,5 @@ func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.Ge
 		return nil, fmt.Errorf("creating tpm signer: from new key: %w", err)
 	}
 
-	return k, nil
+	return &tpmKeyInt{k}, nil
 }

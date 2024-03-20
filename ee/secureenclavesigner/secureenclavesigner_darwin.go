@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 
 const (
 	CreateKeyCmd     = "create-key"
+	SignCmd          = "sign"
 	PublicEccDataKey = "publicEccData"
 )
 
@@ -37,6 +39,14 @@ type secureEnclaveSigner struct {
 	store                types.GetterSetterDeleter
 	slogger              *slog.Logger
 	mux                  *sync.Mutex
+}
+
+type SignRequest struct {
+	Challenge    []byte `json:"challenge"`
+	Data         []byte `json:"data"`
+	BaseNonce    string `json:"base_nonce"`
+	UserPubkey   []byte `json:"user_pubkey"`
+	ServerPubKey []byte `json:"server_pubkey"`
 }
 
 func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, opts ...opt) (*secureEnclaveSigner, error) {
@@ -119,8 +129,50 @@ func (ses *secureEnclaveSigner) Type() string {
 	return "secure_enclave"
 }
 
+// Sign is not implemented, it's just here to satisfy the crypto.Signer interface,
+// use SignConsoleUser instead
 func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (ses *secureEnclaveSigner) SignConsoleUser(ctx context.Context, challenge, data, serverPubkey []byte, baseNonce string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	signRequest := &SignRequest{
+		Challenge:    challenge,
+		Data:         data,
+		BaseNonce:    baseNonce,
+		ServerPubKey: serverPubkey,
+	}
+
+	userPubkey, err := ses.currentConsoleUserKey(ctx)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("getting current console: %w", err))
+		return nil, fmt.Errorf("getting current console user key: %w", err)
+	}
+
+	userPubkeyBytes, err := echelper.PublicEcdsaToB64Der(userPubkey)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("converting public key to b64 der: %w", err))
+		return nil, fmt.Errorf("converting public key to b64 der: %w", err)
+	}
+
+	signRequest.UserPubkey = userPubkeyBytes
+
+	signRequestBytes, err := json.Marshal(signRequest)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("marshalling sign request: %w", err))
+		return nil, fmt.Errorf("marshalling sign request: %w", err)
+	}
+
+	signResponseOuterBytes, err := ses.execSign(ctx, base64.StdEncoding.EncodeToString(signRequestBytes))
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("signing with secure enclave: %w", err))
+		return nil, fmt.Errorf("signing with secure enclave: %w", err)
+	}
+
+	return signResponseOuterBytes, nil
 }
 
 type keyData struct {
@@ -244,6 +296,46 @@ func (ses *secureEnclaveSigner) createKey(ctx context.Context, u *user.User) (*e
 	}
 
 	return pubKey, nil
+}
+
+func (ses *secureEnclaveSigner) execSign(ctx context.Context, signRequestB64 string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	u, err := firstConsoleUser(ctx)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("getting first console: %w", err))
+		return nil, fmt.Errorf("getting first console: %w", err)
+	}
+
+	cmd, err := allowedcmd.Launchctl(
+		ctx,
+		"asuser",
+		u.Uid,
+		"sudo",
+		"--preserve-env",
+		"-u",
+		u.Username,
+		ses.pathToLauncherBinary,
+		"secure-enclave",
+		SignCmd,
+		signRequestB64,
+	)
+
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("creating sign cmd: %w", err))
+		return nil, fmt.Errorf("creating sign cmd:: %w", err)
+	}
+
+	// skip updates since we have full path of binary
+	cmd.Env = append(cmd.Environ(), fmt.Sprintf("%s=%s", "LAUNCHER_SKIP_UPDATES", "true"))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("executing launcher binary to sign with secure enclave: %w: %s", err, string(out)))
+		return nil, fmt.Errorf("executing launcher binary to sign with secure enclave: %w: %s", err, string(out))
+	}
+
+	return base64.StdEncoding.DecodeString(lastLine(out))
 }
 
 // lastLine returns the last line of the out.

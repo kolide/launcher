@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) (keyInt, error) {
+func setupHardwareKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) (KeyIntHardware, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 

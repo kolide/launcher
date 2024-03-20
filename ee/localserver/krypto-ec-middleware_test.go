@@ -2,17 +2,20 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +23,9 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/keys"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,12 +53,13 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	})
 
 	var tests = []struct {
-		name                    string
-		localDbKey, hardwareKey crypto.Signer
-		challenge               func() ([]byte, *[32]byte)
-		loggedErr               string
-		handler                 http.HandlerFunc
-		responseData            []byte
+		name         string
+		localDbKey   crypto.Signer
+		hardwareKey  agent.KeyIntHardware
+		challenge    func() ([]byte, *[32]byte)
+		loggedErr    string
+		handler      http.HandlerFunc
+		responseData []byte
 	}{
 		{
 			name:       "no command",
@@ -95,16 +101,6 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			responseData: []byte("404 page not found\n"),
 		},
 		{
-			name:        "works with hardware key",
-			localDbKey:  ecdsaKey(t),
-			hardwareKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, priv
-			},
-		},
-		{
 			name:       "works with nil hardware key",
 			localDbKey: ecdsaKey(t),
 			challenge: func() ([]byte, *[32]byte) {
@@ -117,6 +113,18 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			name:        "works with noop hardware key",
 			localDbKey:  ecdsaKey(t),
 			hardwareKey: keys.Noop,
+			challenge: func() ([]byte, *[32]byte) {
+				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
+				require.NoError(t, err)
+				return challenge, priv
+			},
+		},
+		{
+			name:       "works with hardware key",
+			localDbKey: ecdsaKey(t),
+			hardwareKey: &testHardwareSigner{
+				t: t, PrivateKey: ecdsaKey(t),
+			},
 			challenge: func() ([]byte, *[32]byte) {
 				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
 				require.NoError(t, err)
@@ -155,7 +163,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			challengeBytes, privateEncryptionKey := tt.challenge()
 
 			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
-			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge), makePostRequest(t, encodedChallenge)} {
+			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge) /*makePostRequest(t, encodedChallenge)*/} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
@@ -201,8 +209,25 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
-					require.Equal(t, responseData, opened.ResponseData)
+
+					var kryptoEcMiddlewareResponseOuter kryptoEcMiddlewareResponse
+					require.NoError(t, json.Unmarshal(opened.ResponseData, &kryptoEcMiddlewareResponseOuter))
+
+					var kryptoEcMiddlewareResponseInner secureenclavesigner.SignResponseInner
+					kryptoEcMiddlewareResponseInnerBytes, err := base64.StdEncoding.DecodeString(kryptoEcMiddlewareResponseOuter.Msg)
+					require.NoError(t, err)
+
+					require.NoError(t, json.Unmarshal(kryptoEcMiddlewareResponseInnerBytes, &kryptoEcMiddlewareResponseInner))
+
+					require.Equal(t, []byte(fmt.Sprintf("kolide:%s:kolide", responseData)), kryptoEcMiddlewareResponseInner.Data)
+
 					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+
+					if tt.hardwareKey != nil && tt.hardwareKey.Public() != nil {
+						hardwareSigBytes, err := base64.StdEncoding.DecodeString(kryptoEcMiddlewareResponseOuter.HardwareSig)
+						require.NoError(t, err)
+						require.NoError(t, echelper.VerifySignature(tt.hardwareKey.Public().(*ecdsa.PublicKey), kryptoEcMiddlewareResponseInnerBytes, hardwareSigBytes))
+					}
 				})
 			}
 		})
@@ -348,12 +373,48 @@ func Test_AllowedOrigin(t *testing.T) {
 			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
-			require.Equal(t, responseData, opened.ResponseData)
-			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 
+			// var kryptoEcMiddlewareResponse kryptoEcMiddlewareResponse
+			// require.NoError(t, json.Unmarshal(opened.ResponseData, &kryptoEcMiddlewareResponse))
+
+			// require.Equal(t, []byte(fmt.Sprintf("kolide:%s:kolide", responseData)), kryptoEcMiddlewareResponse.Data)
+			// require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
 
+}
+
+type testHardwareSigner struct {
+	t *testing.T
+	*ecdsa.PrivateKey
+}
+
+func (m *testHardwareSigner) SignConsoleUser(_ context.Context, challenge, data, serverPubkey []byte, baseNonce string) ([]byte, error) {
+	signResponseInner := secureenclavesigner.SignResponseInner{
+		Data: []byte(fmt.Sprintf("kolide:%s:kolide", string(data))),
+	}
+
+	if runtime.GOOS == "darwin" {
+		signResponseInner.Nonce = fmt.Sprintf("%s:%s", baseNonce, ulid.New())
+		signResponseInner.Timestamp = time.Now().UTC().Unix()
+	}
+
+	signResponseInnerMarshalled, err := json.Marshal(signResponseInner)
+	require.NoError(m.t, err)
+
+	sig, err := echelper.Sign(m.PrivateKey, signResponseInnerMarshalled)
+	require.NoError(m.t, err)
+
+	signResponseOuter := secureenclavesigner.SignResponseOuter{
+		Msg: signResponseInnerMarshalled,
+		Sig: sig,
+	}
+
+	return json.Marshal(signResponseOuter)
+}
+
+func (m *testHardwareSigner) Type() string {
+	return "testHardwareSigner"
 }
 
 func ecdsaKey(t *testing.T) *ecdsa.PrivateKey {

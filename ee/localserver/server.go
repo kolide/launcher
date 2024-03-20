@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/certs"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
@@ -52,7 +53,7 @@ type localServer struct {
 
 	myKey                 *rsa.PrivateKey
 	myLocalDbSigner       crypto.Signer
-	myLocalHardwareSigner crypto.Signer
+	myLocalHardwareSigner agent.KeyIntHardware
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
@@ -145,8 +146,8 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverRsaCertPem := k2RsaServerCert
-	serverEccCertPem := k2EccServerCert
+	serverRsaCertPem := certs.K2RsaServerCert
+	serverEccCertPem := certs.K2EccServerCert
 
 	ctx := context.TODO()
 	slogLevel := slog.LevelDebug
@@ -157,15 +158,15 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 			"using developer certificates",
 		)
 
-		serverRsaCertPem = localhostRsaServerCert
-		serverEccCertPem = localhostEccServerCert
+		serverRsaCertPem = certs.LocalhostRsaServerCert
+		serverEccCertPem = certs.LocalhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using review app certificates",
 		)
 
-		serverRsaCertPem = reviewRsaServerCert
-		serverEccCertPem = reviewEccServerCert
+		serverRsaCertPem = certs.ReviewRsaServerCert
+		serverEccCertPem = certs.ReviewEccServerCert
 	default:
 		ls.slogger.Log(ctx, slogLevel,
 			"using default/production certificates",
