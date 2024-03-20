@@ -42,14 +42,10 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, fmt.Errorf("kolide_nix_upgradeable requires at least one user id to be specified")
 	}
 
-	cmd, err := allowedcmd.NixEnv(ctx, "--query", "--installed", "-c", "--xml")
-	if err != nil {
-		return results, fmt.Errorf("creating nix-env package query command: %w", err)
-	}
-
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			output, err := tablehelpers.RunCmdAsUser(cmd, uid)
+			// Nix takes a while to load, so leaving a minute timeout here to give enough time. More might be needed.
+			output, err := tablehelpers.Exec(ctx, t.slogger, 60, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}, true, tablehelpers.WithUid(uid))
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user installed packages", "err", err, "target_uid", uid)
 				continue

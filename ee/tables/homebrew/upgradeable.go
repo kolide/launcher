@@ -42,14 +42,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return results, fmt.Errorf("kolide_brew_upgradeable requires at least one user id to be specified")
 	}
 
-	cmd, err := allowedcmd.Brew(ctx, "outdated", "--json")
-	if err != nil {
-		return results, fmt.Errorf("creating brew outdated command: %w", err)
-	}
-
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			output, err := tablehelpers.RunCmdAsUser(cmd, uid)
+			output, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Brew, []string{"outdated", "--json"}, true, tablehelpers.WithUid(uid))
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user brew installed packages", "err", err, "target_uid", uid)
 				continue
