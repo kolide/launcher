@@ -18,9 +18,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-type execOps func(*exec.Cmd) error
+type ExecOps func(*exec.Cmd) error
 
-func WithUid(uid string) execOps {
+func WithUid(uid string) ExecOps {
 	return func(cmd *exec.Cmd) error {
 		currentUser, err := user.Current()
 		if err != nil {
@@ -69,7 +69,7 @@ func WithUid(uid string) execOps {
 // `possibleBins` can be either a list of command names, or a list of paths to commands.
 // Where reasonable, `possibleBins` should be command names only, so that we can perform
 // lookup against PATH.
-func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool, opts ...execOps) ([]byte, error) {
+func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool, opts ...ExecOps) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 

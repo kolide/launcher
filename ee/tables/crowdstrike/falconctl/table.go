@@ -38,7 +38,7 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, bool, ...tablehelpers.execOps) ([]byte, error)
+type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, bool, ...tablehelpers.ExecOps) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	slogger   *slog.Logger
