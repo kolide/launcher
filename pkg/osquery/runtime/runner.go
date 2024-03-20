@@ -642,7 +642,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			r.slogger.Log(ctx, slog.LevelInfo,
 				"could not remove PID file",
 				"pid_file", paths.pidfilePath,
-				"err", "err",
+				"err", err,
 			)
 		}
 		return o.doneCtx.Err()
