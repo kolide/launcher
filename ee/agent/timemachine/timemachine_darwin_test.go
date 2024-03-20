@@ -5,6 +5,7 @@ package timemachine
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/stretchr/testify/require"
@@ -52,10 +54,11 @@ func TestAddExclusions(t *testing.T) {
 		"osquery.autoload":                      true,
 		"osquery.db/":                           true,
 		"osquery.pid":                           true,
-		"osquery.sock":                          true,
-		"osquery.sock.51807":                    true,
-		"osquery.sock.63071":                    true,
-		"osqueryd-tuf/":                         true,
+		fmt.Sprintf("osquery-%s.pid", ulid.New()): true,
+		"osquery.sock":       true,
+		"osquery.sock.51807": true,
+		"osquery.sock.63071": true,
+		"osqueryd-tuf/":      true,
 
 		// these should NOT be excluded
 		"launcher-tuf/":                     false,
