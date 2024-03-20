@@ -45,13 +45,13 @@ type Updater interface {
 // pairs held by the underlying storage methodology
 type Counter interface {
 	// Count should return the total number of current key-value pairs
-	Count() int
+	Count() (int, error)
 }
 
 // Appender is an interface for supporting the ordered addition of values to a store
 // implementations should generate keys to ensure an ordered iteration is possible
 type Appender interface {
-	// AppendValues takes 1 or more values
+	// AppendValues takes 1 or more ordered values
 	AppendValues(values ...[]byte) error
 }
 

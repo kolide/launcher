@@ -142,7 +142,9 @@ func Test_Delete(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				assert.Equal(t, tt.expectedRecordCount, s.Count())
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedRecordCount, totalCount)
 			}
 		})
 	}
@@ -182,7 +184,9 @@ func Test_DeleteAll(t *testing.T) {
 				require.NoError(t, s.DeleteAll())
 
 				// There should be no records, count and verify
-				assert.Equal(t, 0, s.Count())
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, 0, totalCount)
 			}
 		})
 	}
@@ -396,7 +400,9 @@ func Test_Count(t *testing.T) {
 			for _, s := range getStores(t) {
 				_, err := s.Update(tt.sets)
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedCount, s.Count())
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedCount, totalCount)
 			}
 		})
 	}
@@ -435,7 +441,9 @@ func Test_AppendValues(t *testing.T) {
 				err := s.AppendValues(tt.sets...)
 				require.NoError(t, err)
 				// check the count to ensure the tests below will endure the expected number of iterations
-				require.Equal(t, tt.expectedCount, s.Count())
+				totalCount, err := s.Count()
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedCount, totalCount)
 				idx := 0
 				// now we expect to be able to iterate over these in the same order that we appended them
 				s.ForEach(func(k, v []byte) error {

@@ -229,10 +229,10 @@ func (s *bboltKeyValueStore) Update(kvPairs map[string]string) ([]string, error)
 	return deletedKeys, nil
 }
 
-func (s *bboltKeyValueStore) Count() int {
+func (s *bboltKeyValueStore) Count() (int, error) {
 	if s == nil || s.db == nil {
 		s.slogger.Log(context.TODO(), slog.LevelError, "unable to count uninitialized bbolt storage db")
-		return 0
+		return 0, NoDbError{}
 	}
 
 	var len int
@@ -249,10 +249,10 @@ func (s *bboltKeyValueStore) Count() int {
 			"err counting from bucket",
 			"err", err,
 		)
-		return 0
+		return 0, err
 	}
 
-	return len
+	return len, nil
 }
 
 // AppendValues utlizes bbolts NextSequence functionality to add ordered values

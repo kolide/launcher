@@ -807,7 +807,12 @@ func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
 		return err
 	}
 
-	deleteCount := store.Count() - e.Opts.MaxBufferedLogs
+	totalCount, err := store.Count()
+	if err != nil {
+		return err
+	}
+
+	deleteCount := totalCount - e.Opts.MaxBufferedLogs
 	if deleteCount <= 0 { // Limit not exceeded
 		return nil
 	}

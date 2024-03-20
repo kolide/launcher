@@ -138,11 +138,11 @@ func (s *inMemoryKeyValueStore) Update(kvPairs map[string]string) ([]string, err
 	return deletedKeys, nil
 }
 
-func (s *inMemoryKeyValueStore) Count() int {
+func (s *inMemoryKeyValueStore) Count() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return len(s.items)
+	return len(s.items), nil
 }
 
 func (s *inMemoryKeyValueStore) AppendValues(values ...[]byte) error {

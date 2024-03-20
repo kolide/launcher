@@ -803,7 +803,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	startLogCount := e.knapsack.ResultLogsStore().Count()
+	startLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
 	require.Equal(t, 0, startLogCount, "start with no buffered logs")
 
 	expectedResultLogs := []string{"res1", "res2", "res3", "res4"}
@@ -816,7 +817,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeString, "res4")
 	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
 
-	queuedLogCount := e.knapsack.ResultLogsStore().Count()
+	queuedLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
 	require.Equal(t, 8, queuedLogCount, "correct number of enqueued logs")
 
 	// Should write first 3 logs
@@ -840,7 +842,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	assert.Nil(t, gotResultLogs)
 	assert.Nil(t, gotStatusLogs)
 
-	finalLogCount := e.knapsack.ResultLogsStore().Count()
+	finalLogCount, err := e.knapsack.ResultLogsStore().Count()
+	require.NoError(t, err)
 	require.Equal(t, 0, finalLogCount, "no more queued logs")
 }
 
