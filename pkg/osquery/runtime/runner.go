@@ -630,6 +630,24 @@ func (r *Runner) launchOsqueryInstance() error {
 		return o.doneCtx.Err()
 	})
 
+	// Clean up PID file on shutdown
+	o.errgroup.Go(func() error {
+		defer r.slogger.Log(ctx, slog.LevelInfo,
+			"exiting errgroup",
+			"errgroup", "cleanup PID file",
+		)
+
+		<-o.doneCtx.Done()
+		if err := os.Remove(paths.pidfilePath); err != nil {
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"could not remove PID file",
+				"pid_file", paths.pidfilePath,
+				"err", "err",
+			)
+		}
+		return o.doneCtx.Err()
+	})
+
 	return nil
 }
 
