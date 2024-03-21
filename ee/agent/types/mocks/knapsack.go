@@ -5,10 +5,7 @@ package mocks
 import (
 	context "context"
 
-	bbolt "go.etcd.io/bbolt"
-
 	keys "github.com/kolide/launcher/ee/agent/flags/keys"
-
 	mock "github.com/stretchr/testify/mock"
 
 	slog "log/slog"
@@ -105,22 +102,6 @@ func (_m *Knapsack) AutoupdateInterval() time.Duration {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
-// BboltDB provides a mock function with given fields:
-func (_m *Knapsack) BboltDB() *bbolt.DB {
-	ret := _m.Called()
-
-	var r0 *bbolt.DB
-	if rf, ok := ret.Get(0).(func() *bbolt.DB); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*bbolt.DB)
-		}
 	}
 
 	return r0
@@ -1484,6 +1465,22 @@ func (_m *Knapsack) StatusLogsStore() types.GetterSetterDeleterIteratorUpdaterCo
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
+	}
+
+	return r0
+}
+
+// StorageStatTracker provides a mock function with given fields:
+func (_m *Knapsack) StorageStatTracker() types.StorageStatTracker {
+	ret := _m.Called()
+
+	var r0 types.StorageStatTracker
+	if rf, ok := ret.Get(0).(func() types.StorageStatTracker); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.StorageStatTracker)
 		}
 	}
 
