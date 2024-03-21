@@ -60,17 +60,17 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 }
 
 func (hc *hostInfoCheckup) bboltDbSize() string {
-	db := hc.k.BboltDB()
+	db := hc.k.StorageStatTracker()
 	if db == nil {
-		return "error: bbolt db connection was not available via knapsack"
+		return "error: storage stat tracking db connection was not available via knapsack"
 	}
 
-	boltStats, err := agent.GetStats(db)
+	sizeBytes, err := db.SizeBytes()
 	if err != nil {
-		return fmt.Sprintf("encountered error accessing bbolt stats: %s", err.Error())
+		return fmt.Sprintf("encountered error accessing storage stats: %s", err.Error())
 	}
 
-	return strconv.FormatInt(boltStats.DB.Size, 10)
+	return strconv.FormatInt(sizeBytes, 10)
 }
 
 func hostName() string {

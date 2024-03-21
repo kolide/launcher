@@ -6,7 +6,6 @@ import "context"
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 type Knapsack interface {
 	Stores
-	BboltDB
 	Flags
 	Slogger
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
@@ -15,4 +14,5 @@ type Knapsack interface {
 	ReadEnrollSecret() (string, error)
 	// CurrentEnrollmentStatus returns the current enrollment status of the launcher installation
 	CurrentEnrollmentStatus() (EnrollmentStatus, error)
+	StorageStatTracker() StorageStatTracker
 }

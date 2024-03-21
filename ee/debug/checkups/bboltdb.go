@@ -2,11 +2,11 @@ package checkups
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 
-	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
@@ -20,20 +20,23 @@ func (c *bboltdbCheckup) Name() string {
 }
 
 func (c *bboltdbCheckup) Run(_ context.Context, _ io.Writer) error {
-	db := c.k.BboltDB()
+	db := c.k.StorageStatTracker()
 	if db == nil {
-		return errors.New("no DB available")
+		return errors.New("no db connection available for storage stat tracking")
 	}
 
-	stats, err := agent.GetStats(db)
+	stats, err := db.GetStats()
 	if err != nil {
 		return fmt.Errorf("getting db stats: %w", err)
 	}
 
-	c.data = make(map[string]any)
-	for k, v := range stats.Buckets {
-		c.data[k] = v
+	data := make(map[string]any)
+
+	if err := json.Unmarshal(stats, &data); err != nil {
+		return fmt.Errorf("unmarshalling storage stats json: %w", err)
 	}
+
+	c.data = data
 
 	return nil
 }

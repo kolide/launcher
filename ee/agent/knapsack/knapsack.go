@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"go.etcd.io/bbolt"
 )
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
@@ -26,14 +25,7 @@ type knapsack struct {
 	stores map[storage.Store]types.KVStore
 	// Embed flags so we get all the flag interfaces
 	flags
-
-	// BboltDB is the underlying bbolt database.
-	// Ideally, we can eventually remove this. This is only here because some parts of the codebase
-	// like the osquery extension have a direct dependency on bbolt and need this reference.
-	// If we are able to abstract bbolt out completely in these areas, we should be able to
-	// remove this field and prevent "leaking" bbolt into places it doesn't need to.
-	db *bbolt.DB
-
+	storageStatTracker     types.StorageStatTracker
 	slogger, systemSlogger *multislogger.MultiSlogger
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
@@ -41,7 +33,7 @@ type knapsack struct {
 	// Querier
 }
 
-func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
+func New(stores map[storage.Store]types.KVStore, flags types.Flags, sStatTracker types.StorageStatTracker, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
 	if slogger == nil {
 		slogger = multislogger.New()
 	}
@@ -50,11 +42,11 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	}
 
 	k := &knapsack{
-		db:            db,
-		flags:         flags,
-		stores:        stores,
-		slogger:       slogger,
-		systemSlogger: systemSlogger,
+		storageStatTracker: sStatTracker,
+		flags:              flags,
+		stores:             stores,
+		slogger:            slogger,
+		systemSlogger:      systemSlogger,
 	}
 
 	return k
@@ -74,9 +66,9 @@ func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.systemSlogger.AddHandler(handler...)
 }
 
-// BboltDB interface methods
-func (k *knapsack) BboltDB() *bbolt.DB {
-	return k.db
+// storage stat tracking interface methods
+func (k *knapsack) StorageStatTracker() types.StorageStatTracker {
+	return k.storageStatTracker
 }
 
 // Stores interface methods
