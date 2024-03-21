@@ -163,7 +163,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			challengeBytes, privateEncryptionKey := tt.challenge()
 
 			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
-			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge) /*makePostRequest(t, encodedChallenge)*/} {
+			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge), makePostRequest(t, encodedChallenge)} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
