@@ -16,9 +16,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -241,14 +243,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
 		if len(cmdReq.AllowedOrigins) > 0 {
-			allowed := true
-			// origin := r.Header.Get("Origin")
-			// for _, ao := range cmdReq.AllowedOrigins {
-			// 	if strings.EqualFold(ao, origin) {
-			// 		allowed = true
-			// 		break
-			// 	}
-			// }
+			allowed := false
+			for _, ao := range cmdReq.AllowedOrigins {
+				if strings.EqualFold(ao, r.Header.Get("Origin")) {
+					allowed = true
+					break
+				}
+			}
 
 			if !allowed {
 				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
@@ -322,7 +323,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		next.ServeHTTP(bhr, newReq)
 
 		// call platform specific response function to add hardware signatures
-		response, err := e.challengeResponse(r.Context(), challengeBox, bhr.Bytes())
+		response, err := e.generateChallengeResponse(r.Context(), challengeBox, bhr.Bytes())
 
 		if err != nil {
 			traces.SetError(span, err)
@@ -391,6 +392,31 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 	}
 
 	return challenge.UnmarshalChallenge(decoded)
+}
+
+func (e *kryptoEcMiddleware) responseWithoutHardwareSig(o *challenge.OuterChallenge, data []byte) ([]byte, error) {
+	msg := secureenclavesigner.SignResponseInner{
+		Nonce:     ulid.New(),
+		Timestamp: time.Now().UTC().Unix(),
+		// add the kolide:%s:kolide tags since the secure enclave cmd
+		// wont be execed and add them
+		Data: []byte(fmt.Sprintf("kolide:%s:kolide", string(data))),
+	}
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling krypto response: %w", err)
+	}
+
+	outerResponseBytes, err := json.Marshal(kryptoEcMiddlewareResponse{
+		Msg: base64.StdEncoding.EncodeToString(msgBytes),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("marshalling krypto response: %w", err)
+	}
+
+	return o.Respond(e.localDbSigner, nil, outerResponseBytes)
 }
 
 type bufferedHttpResponse struct {

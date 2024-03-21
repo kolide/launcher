@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,15 +22,9 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-func (e *kryptoEcMiddleware) challengeResponse(ctx context.Context, o *challenge.OuterChallenge, data []byte) ([]byte, error) {
+func (e *kryptoEcMiddleware) generateChallengeResponse(ctx context.Context, o *challenge.OuterChallenge, data []byte) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
-
-	response := &secureenclavesigner.SignResponseInner{
-		Nonce:     ulid.New(),
-		Timestamp: time.Now().UTC().Unix(),
-		Data:      []byte(fmt.Sprintf("kolide:%s:kolide", string(data))),
-	}
 
 	if e.hardwareSigner == nil || e.hardwareSigner.Public() == nil {
 		e.slogger.Log(ctx, slog.LevelError,
@@ -37,38 +32,41 @@ func (e *kryptoEcMiddleware) challengeResponse(ctx context.Context, o *challenge
 		)
 		traces.SetError(span, errors.New("no hardware signer available"))
 
-		responseBytes, err := json.Marshal(response)
-		if err != nil {
-			return nil, fmt.Errorf("marshalling krypto response: %w", err)
-		}
-
-		return o.Respond(e.localDbSigner, nil, responseBytes)
+		return e.responseWithoutHardwareSig(o, data)
 	}
 
-	hwSig, err := e.hardwareSigner.Sign(rand.Reader, data, crypto.SHA256)
+	inner := secureenclavesigner.SignResponseInner{
+		Nonce:     ulid.New(),
+		Timestamp: time.Now().UTC().Unix(),
+		Data:      []byte(fmt.Sprintf("kolide:%s:kolide", data)),
+	}
+
+	innerBytes, err := json.Marshal(inner)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling inner response: %w", err)
+	}
+
+	hwSig, err := e.hardwareSigner.Sign(rand.Reader, innerBytes, crypto.SHA256)
 	if err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"signing with hardware signer",
 			"err", err,
 		)
 		traces.SetError(span, fmt.Errorf("signing with hardware signer, %w", err))
-
-		responseBytes, err := json.Marshal(response)
-		if err != nil {
-			return nil, fmt.Errorf("marshalling krypto response: %w", err)
-		}
-
-		return o.Respond(e.localDbSigner, nil, responseBytes)
+		return e.responseWithoutHardwareSig(o, data)
 	}
 
-	response.HardwareSig = hwSig
-
-	response.HardwareKey, err = echelper.PublicEcdsaToB64Der(e.hardwareSigner.Public().(*ecdsa.PublicKey))
+	hwKey, err := echelper.PublicEcdsaToB64Der(e.hardwareSigner.Public().(*ecdsa.PublicKey))
 	if err != nil {
 		return nil, fmt.Errorf("marshalling public signing key to der: %w", err)
 	}
 
-	responseBytes, err := json.Marshal(response)
+	responseBytes, err := json.Marshal(kryptoEcMiddlewareResponse{
+		Msg:         base64.StdEncoding.EncodeToString(innerBytes),
+		HardwareSig: base64.StdEncoding.EncodeToString(hwSig),
+		HardwareKey: string(hwKey),
+	})
+
 	if err != nil {
 		return nil, fmt.Errorf("marshalling krypto response: %w", err)
 	}

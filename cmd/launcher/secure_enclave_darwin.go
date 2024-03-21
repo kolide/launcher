@@ -168,11 +168,9 @@ func loadSecureEnclaveServerPubKey(b64Key string) (*ecdsa.PublicKey, error) {
 			return nil, fmt.Errorf("parsing test server public key: %w", err)
 		}
 
-		if !providedKey.Equal(k) {
-			return nil, errors.New("provided server public key does not match test server public key")
+		if providedKey.Equal(k) {
+			return k, nil
 		}
-
-		return k, nil
 	}
 
 	for _, serverKey := range []string{certs.K2EccServerCert, certs.ReviewEccServerCert, certs.LocalhostEccServerCert} {
