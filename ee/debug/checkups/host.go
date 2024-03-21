@@ -36,7 +36,7 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hc.data = make(map[string]any)
 	hc.data["hostname"] = hostName()
 	hc.data["keyinfo"] = agentKeyInfo()
-	hc.data["bbolt_db_size"] = hc.bboltDbSize()
+	hc.data["bbolt_db_size"] = hc.kvStorageSizeBytes()
 	desktopProcesses := runner.InstanceDesktopProcessRecords()
 	hc.data["user_desktop_processes"] = desktopProcesses
 	hc.data["enrollment_status"] = naIfError(hc.k.CurrentEnrollmentStatus())
@@ -59,7 +59,7 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (hc *hostInfoCheckup) bboltDbSize() string {
+func (hc *hostInfoCheckup) kvStorageSizeBytes() string {
 	db := hc.k.StorageStatTracker()
 	if db == nil {
 		return "error: storage stat tracking db connection was not available via knapsack"

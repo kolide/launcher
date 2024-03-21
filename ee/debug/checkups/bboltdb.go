@@ -10,16 +10,16 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-type bboltdbCheckup struct {
+type kvStorageStatsCheckup struct {
 	k    types.Knapsack
 	data map[string]any
 }
 
-func (c *bboltdbCheckup) Name() string {
-	return "bboltdb"
+func (c *kvStorageStatsCheckup) Name() string {
+	return "KV Storage Stats"
 }
 
-func (c *bboltdbCheckup) Run(_ context.Context, _ io.Writer) error {
+func (c *kvStorageStatsCheckup) Run(_ context.Context, _ io.Writer) error {
 	db := c.k.StorageStatTracker()
 	if db == nil {
 		return errors.New("no db connection available for storage stat tracking")
@@ -41,18 +41,18 @@ func (c *bboltdbCheckup) Run(_ context.Context, _ io.Writer) error {
 	return nil
 }
 
-func (c *bboltdbCheckup) ExtraFileName() string {
+func (c *kvStorageStatsCheckup) ExtraFileName() string {
 	return ""
 }
 
-func (c *bboltdbCheckup) Status() Status {
+func (c *kvStorageStatsCheckup) Status() Status {
 	return Informational
 }
 
-func (c *bboltdbCheckup) Summary() string {
+func (c *kvStorageStatsCheckup) Summary() string {
 	return "N/A"
 }
 
-func (c *bboltdbCheckup) Data() any {
+func (c *kvStorageStatsCheckup) Data() any {
 	return c.data
 }
