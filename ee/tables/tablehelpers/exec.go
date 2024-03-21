@@ -7,10 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
-	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -18,44 +15,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// ExecOps is a type for functional arguments to Exec, which changes the behavior of the exec command.
+// An example of this is to run the exec as a specific user instead of root.
 type ExecOps func(*exec.Cmd) error
-
-func WithUid(uid string) ExecOps {
-	return func(cmd *exec.Cmd) error {
-		currentUser, err := user.Current()
-		if err != nil {
-			return fmt.Errorf("getting current user: %w", err)
-		}
-
-		runningUser, err := user.LookupId(uid)
-		if err != nil {
-			return fmt.Errorf("looking up user with uid %s: %w", uid, err)
-		}
-
-		if currentUser.Uid != "0" && currentUser.Uid != runningUser.Uid {
-			return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
-		}
-
-		runningUserUid, err := strconv.ParseUint(runningUser.Uid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting uid %s to int: %w", runningUser.Uid, err)
-		}
-
-		runningUserGid, err := strconv.ParseUint(runningUser.Gid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting gid %s to int: %w", runningUser.Gid, err)
-		}
-
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: uint32(runningUserUid),
-				Gid: uint32(runningUserGid),
-			},
-		}
-
-		return nil
-	}
-}
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
 // additional things to help with table usage:
