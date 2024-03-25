@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/cryptsetup"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/execparsers/apt"
+	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
 	"github.com/kolide/launcher/ee/tables/execparsers/dnf"
 	"github.com/kolide/launcher/ee/tables/execparsers/dpkg"
 	"github.com/kolide/launcher/ee/tables/execparsers/flatpak/remote_ls/upgradeable"
@@ -66,6 +67,7 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_version_info", pacman_info.Parser, allowedcmd.Pacman, []string{"-Qi"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, allowedcmd.Pacman, []string{"-Qu"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_rpm_version_info", rpm.Parser, allowedcmd.Rpm, []string{"-qai"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_snap_upgradeable", data_table.NewParser(), allowedcmd.Snap, []string{"refresh", "--list"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.TablePluginExec(slogger, "kolide_zypper_upgradeable_packages", dataflattentable.XmlType, allowedcmd.Zypper, []string{"-x", "lu"}),
 		dataflattentable.TablePluginExec(slogger, "kolide_zypper_upgradeable_patches", dataflattentable.XmlType, allowedcmd.Zypper, []string{"-x", "lp"}),
