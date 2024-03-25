@@ -25,9 +25,10 @@ func (d *desktopMenu) Name() string {
 func (d *desktopMenu) Run(_ context.Context, fullFH io.Writer) error {
 	menuJsonPath := filepath.Join(d.k.RootDirectory(), "menu.json")
 
+	d.status = Failing
+
 	if _, err := os.Stat(menuJsonPath); err != nil {
-		d.status = Failing
-		d.summary = fmt.Sprintf("failed to stat menu json: %s", err)
+		d.summary = fmt.Sprintf("failed to stat menu.json: %s", err)
 		return nil
 	}
 
@@ -43,22 +44,15 @@ func (d *desktopMenu) Run(_ context.Context, fullFH io.Writer) error {
 		return nil
 	}
 
-	// just unmarshall the file to make sure it's valid json
+	if _, err := io.Copy(fullFH, bytes.NewBuffer(menuJson)); err != nil {
+		d.summary = fmt.Sprintf("failed to copy menu.json to file handler: %s", err)
+		return nil
+	}
+
+	// just unmarshall the contents to make sure it's valid json
 	var unmarshalledMenuJson any
 	if err := json.Unmarshal(menuJson, &unmarshalledMenuJson); err != nil {
 		d.summary = fmt.Sprintf("failed to unmarshal menu.json: %s", err)
-		return nil
-	}
-
-	// marshal it back as pretty json
-	marshalledPretty, err := json.MarshalIndent(unmarshalledMenuJson, "", "  ")
-	if err != nil {
-		d.summary = fmt.Sprintf("failed to marshal menu.json: %s", err)
-		return nil
-	}
-
-	if _, err := io.Copy(fullFH, bytes.NewBuffer(marshalledPretty)); err != nil {
-		d.summary = fmt.Sprintf("failed to copy menu.json to file handler: %s", err)
 		return nil
 	}
 
