@@ -85,6 +85,8 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 		opt(ses)
 	}
 
+	// this is here to facilitate testing, since go builds a special test binary,
+	// if we look for os.Executable in a test and try to exec it, it will error
 	if ses.pathToLauncherBinary == "" {
 		p, err := os.Executable()
 		if err != nil {
