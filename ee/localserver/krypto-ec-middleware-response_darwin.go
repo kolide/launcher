@@ -61,24 +61,8 @@ func (e *kryptoEcMiddleware) generateChallengeResponse(ctx context.Context, o *c
 		return nil, fmt.Errorf("unmarshaling sign response outer: %w", err)
 	}
 
-	var signResponseInner secureenclavesigner.SignResponseInner
-	if err := json.Unmarshal(signResponseOuter.Msg, &signResponseInner); err != nil {
-		return nil, fmt.Errorf("unmarshaling sign response inner: %w", err)
-	}
-
-	inner := secureenclavesigner.SignResponseInner{
-		Nonce:     signResponseInner.Nonce,
-		Timestamp: signResponseInner.Timestamp,
-		Data:      signResponseInner.Data,
-	}
-
-	innerBytes, err := json.Marshal(inner)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling krypto middleware inner response: %w", err)
-	}
-
 	outer := kryptoEcMiddlewareResponse{
-		Msg:         base64.StdEncoding.EncodeToString(innerBytes),
+		Msg:         base64.StdEncoding.EncodeToString(signResponseOuter.Msg),
 		HardwareSig: base64.StdEncoding.EncodeToString(signResponseOuter.Sig),
 		HardwareKey: string(hardwareKeyBytes),
 	}

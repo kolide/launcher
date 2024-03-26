@@ -66,12 +66,15 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 // kryptoEcMiddlewareResponse is a box that contains the response, hardware signature of the response,
 // and the public key of the hardware signer.
 type kryptoEcMiddlewareResponse struct {
-	// To validate the response.
+	// This ends up in the "ResponseData" field of the challenge response.
+
+	// To validate:
 	// 1. Convert th b64der hardware key field to public key
 	// 2. Determine if hardware key is trusted
 	// 3. B64 decode message and hardware sig to bytes
 	// 4. Use decoded msg, hardware sig, and public key to verify the signature
 	// 4. After verifying the signature, unmarshall the b64 decoded msg to json
+	// 5. Do stuff with the data.
 
 	// Msg is the base64 encoded message that contains timestamp, nonce, and
 	// the response from the endpoint called.
