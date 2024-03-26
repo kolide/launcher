@@ -73,6 +73,9 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 			`virus`,
 			`quarantine`,
 			`snitch`,
+			`action1`,
+			`nessus`,
+			`dnsfilter`,
 			// carbon black possible processes
 			`cbagent`,
 			`carbonblack`,

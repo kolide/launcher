@@ -86,7 +86,7 @@ func TestOptionRestrictions(t *testing.T) {
 	}
 }
 
-func noopExec(ctx context.Context, slogger *slog.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool) ([]byte, error) {
+func noopExec(ctx context.Context, slogger *slog.Logger, _ int, _ allowedcmd.AllowedCommand, args []string, _ bool, _ ...tablehelpers.ExecOps) ([]byte, error) {
 	slogger.Log(ctx, slog.LevelInfo, "exec-in-test", "args", strings.Join(args, " "))
 	return []byte{}, nil
 }

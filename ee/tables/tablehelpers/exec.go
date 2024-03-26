@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+// ExecOps is a type for functional arguments to Exec, which changes the behavior of the exec command.
+// An example of this is to run the exec as a specific user instead of root.
+type ExecOps func(*exec.Cmd) error
 
 // Exec is a wrapper over exec.CommandContext. It does a couple of
 // additional things to help with table usage:
@@ -26,7 +31,7 @@ import (
 // `possibleBins` can be either a list of command names, or a list of paths to commands.
 // Where reasonable, `possibleBins` should be command names only, so that we can perform
 // lookup against PATH.
-func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool) ([]byte, error) {
+func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, includeStderr bool, opts ...ExecOps) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -39,6 +44,12 @@ func Exec(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd
 	cmd, err := execCmd(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("creating command: %w", err)
+	}
+
+	for _, opt := range opts {
+		if err := opt(cmd); err != nil {
+			return nil, err
+		}
 	}
 
 	span.SetAttributes(attribute.String("exec.path", cmd.Path))
