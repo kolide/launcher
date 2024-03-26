@@ -18,10 +18,15 @@ type keyInt interface {
 	Type() string
 }
 
-var hardwareKeys keyInt = keys.Noop
+type KeyIntHardware interface {
+	keyInt
+	SignConsoleUser(ctx context.Context, challenge, data, serverPubkey []byte, baseNonce string) ([]byte, error)
+}
+
+var hardwareKeys KeyIntHardware = keys.Noop
 var localDbKeys keyInt = keys.Noop
 
-func HardwareKeys() keyInt {
+func HardwareKeys() KeyIntHardware {
 	return hardwareKeys
 }
 
