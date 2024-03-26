@@ -46,7 +46,12 @@ func (e *kryptoEcMiddleware) generateChallengeResponse(ctx context.Context, o *c
 		return nil, fmt.Errorf("marshalling inner response: %w", err)
 	}
 
-	hwSig, err := e.hardwareSigner.Sign(rand.Reader, innerBytes, crypto.SHA256)
+	hash, err := echelper.HashForSignature(innerBytes)
+	if err != nil {
+		return nil, fmt.Errorf("hashing inner response: %w", err)
+	}
+
+	hwSig, err := e.hardwareSigner.Sign(rand.Reader, hash, crypto.SHA256)
 	if err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
 			"signing with hardware signer",
