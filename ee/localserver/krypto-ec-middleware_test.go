@@ -374,11 +374,18 @@ func Test_AllowedOrigin(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
 
-			// var kryptoEcMiddlewareResponse kryptoEcMiddlewareResponse
-			// require.NoError(t, json.Unmarshal(opened.ResponseData, &kryptoEcMiddlewareResponse))
+			var kryptoEcMiddlewareResponseOuter kryptoEcMiddlewareResponse
+			require.NoError(t, json.Unmarshal(opened.ResponseData, &kryptoEcMiddlewareResponseOuter))
 
-			// require.Equal(t, []byte(fmt.Sprintf("kolide:%s:kolide", responseData)), kryptoEcMiddlewareResponse.Data)
-			// require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+			var kryptoEcMiddlewareResponseInner secureenclavesigner.SignResponseInner
+			kryptoEcMiddlewareResponseInnerBytes, err := base64.StdEncoding.DecodeString(kryptoEcMiddlewareResponseOuter.Msg)
+			require.NoError(t, err)
+
+			require.NoError(t, json.Unmarshal(kryptoEcMiddlewareResponseInnerBytes, &kryptoEcMiddlewareResponseInner))
+
+			require.Equal(t, []byte(fmt.Sprintf("kolide:%s:kolide", responseData)), kryptoEcMiddlewareResponseInner.Data)
+
+			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 		})
 	}
 
