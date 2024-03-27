@@ -66,6 +66,13 @@ func New(k types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
 }
 
 func (r *Runner) Run() error {
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"modern standby detected, skipping osquery instance start",
+		)
+		return nil
+	}
+
 	if err := r.launchOsqueryInstance(); err != nil {
 		return fmt.Errorf("starting instance: %w", err)
 	}
@@ -106,6 +113,13 @@ func (r *Runner) Run() error {
 				"error recording osquery instance exit to history",
 				"err", err,
 			)
+		}
+
+		if r.knapsack.InModernStandby() {
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"modern standby detected, skipping osquery instance restart",
+			)
+			return nil
 		}
 
 		r.instanceLock.Lock()
