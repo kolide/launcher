@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
+	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
@@ -42,7 +43,9 @@ type Querier interface {
 type localServer struct {
 	slogger      *slog.Logger
 	knapsack     types.Knapsack
-	srv          *http.Server
+	httpSrv      *http.Server
+	httpsSrv     *http.Server
+	srvMux       cmux.CMux
 	identifiers  identifiers
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
@@ -61,6 +64,11 @@ type localServer struct {
 const (
 	defaultRateLimit = 5
 	defaultRateBurst = 10
+
+	serverReadTimeout       = 500 * time.Millisecond
+	serverReadHeaderTimeout = 50 * time.Millisecond
+	serverWriteTimeout      = 30 * time.Second //  WriteTimeout very high due to retry logic in the scheduledquery endpoint
+	serverMaxHeaderBytes    = 1024
 )
 
 func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
@@ -120,18 +128,38 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
-	srv := &http.Server{
+	ls.httpSrv = &http.Server{
 		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 			return r.URL.Path
 		})),
-		ReadTimeout:       500 * time.Millisecond,
-		ReadHeaderTimeout: 50 * time.Millisecond,
-		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
-		WriteTimeout:   30 * time.Second,
-		MaxHeaderBytes: 1024,
+		ReadTimeout:       serverReadTimeout,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		WriteTimeout:      serverWriteTimeout,
+		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
 
-	ls.srv = srv
+	cert, err := tls.X509KeyPair([]byte(serverCert), []byte(serverKey))
+	if err != nil {
+		// TODO RM - make this actually happen
+		ls.slogger.Log(ctx, slog.LevelError,
+			"could not load certs, will serve HTTP only",
+			"err", err,
+		)
+	}
+	ls.tlsCerts = []tls.Certificate{cert}
+
+	ls.httpsSrv = &http.Server{
+		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return r.URL.Path
+		})),
+		TLSConfig: &tls.Config{
+			Certificates: ls.tlsCerts,
+		},
+		ReadTimeout:       serverReadTimeout,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		WriteTimeout:      serverWriteTimeout,
+		MaxHeaderBytes:    serverMaxHeaderBytes,
+	}
 
 	return ls, nil
 }
@@ -266,21 +294,15 @@ func (ls *localServer) Start() error {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
-		ls.slogger.Log(ctx, slog.LevelDebug,
-			"using TLS",
-		)
+	ls.srvMux = cmux.New(l)
+	httpsListener := ls.srvMux.Match(cmux.TLS())
+	httpListener := ls.srvMux.Match(cmux.Any())
 
-		tlsConfig := &tls.Config{Certificates: ls.tlsCerts}
+	// Omit cert/key here because we already specified them in the httpsSrv TLS config
+	go ls.httpsSrv.ServeTLS(httpsListener, "", "")
+	go ls.httpSrv.Serve(httpListener)
 
-		l = tls.NewListener(l, tlsConfig)
-	} else {
-		ls.slogger.Log(ctx, slog.LevelDebug,
-			"not using TLS",
-		)
-	}
-
-	return ls.srv.Serve(l)
+	return ls.srvMux.Serve()
 }
 
 func (ls *localServer) Stop() error {
@@ -292,12 +314,22 @@ func (ls *localServer) Stop() error {
 	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	if err := ls.srv.Shutdown(ctx); err != nil {
+	if err := ls.httpSrv.Shutdown(ctx); err != nil {
 		ls.slogger.Log(ctx, slog.LevelError,
-			"shutting down",
+			"shutting down HTTP server",
 			"err", err,
 		)
 	}
+
+	// TODO RM - this will log a complaint that doesn't matter, fix
+	if err := ls.httpsSrv.Shutdown(ctx); err != nil {
+		ls.slogger.Log(ctx, slog.LevelError,
+			"shutting down HTTPS server",
+			"err", err,
+		)
+	}
+
+	ls.srvMux.Close()
 
 	// Consider calling srv.Stop as a more forceful shutdown?
 
