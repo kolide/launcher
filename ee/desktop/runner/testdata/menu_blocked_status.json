@@ -1,0 +1,91 @@
+{
+    "icon": "circle-x",
+    "tooltip": "Kolide - Device Status: Blocked",
+    "items": [
+        {
+            "label": "tester@example.test",
+            "tooltip": null,
+            "disabled": true,
+            "items": []
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://example.com/docs/about/overview"
+                }
+            },
+            "label": "About Kolide...",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        },
+        {
+            "separator": true
+        },
+        {
+            "label": "Device Blocked",
+            "tooltip": null,
+            "disabled": true,
+            "items": []
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://app.example.com/sdkfgjfdjgidfgd"
+                }
+            },
+            "label": "❌ Fix 2 Failing Checks...",
+            "tooltip": null,
+            "disabled": false,
+            "items": [
+                {
+                    "action": {
+                        "type": "open-url",
+                        "action": {
+                            "url": "https://app.example.com/sdkfgjfdjgidfgd"
+                        }
+                    },
+                    "label": "❌ something pretty bad",
+                    "tooltip": null,
+                    "disabled": false,
+                    "items": []
+                },
+                {
+                    "action": {
+                        "type": "open-url",
+                        "action": {
+                            "url": "https://app.example.com/sdkfgjfdjgidfgd"
+                        }
+                    },
+                    "label": "❌ even worse",
+                    "tooltip": null,
+                    "disabled": false,
+                    "items": []
+                }
+            ]
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://app.example.com/1dsfsdfsdfsd"
+                }
+            },
+            "label": "View Details...",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        },
+        {
+            "separator": true
+        },
+        {
+            "label": "Debug",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        }
+    ]
+}
