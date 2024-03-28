@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -138,15 +139,15 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		MaxHeaderBytes:    serverMaxHeaderBytes,
 	}
 
-	cert, err := tls.X509KeyPair([]byte(serverCert), []byte(serverKey))
-	if err != nil {
+	if cert, err := tlsCertificate(); err != nil {
 		// TODO RM - make this actually happen
 		ls.slogger.Log(ctx, slog.LevelError,
 			"could not load certs, will serve HTTP only",
 			"err", err,
 		)
+	} else {
+		ls.tlsCerts = []tls.Certificate{cert}
 	}
-	ls.tlsCerts = []tls.Certificate{cert}
 
 	ls.httpsSrv = &http.Server{
 		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
@@ -162,6 +163,27 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	}
 
 	return ls, nil
+}
+
+// tlsCertificate loads the certificate necessary for localserver. The cert and key
+// are embedded, as base64-encoded strings, at build time.
+func tlsCertificate() (tls.Certificate, error) {
+	localserverCert, err := base64.StdEncoding.DecodeString(localserverCertB64)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("decoding cert: %w", err)
+	}
+
+	localserverKey, err := base64.StdEncoding.DecodeString(localserverKeyB64)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("decoding key: %w", err)
+	}
+
+	cert, err := tls.X509KeyPair(localserverCert, localserverKey)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
+	}
+
+	return cert, nil
 }
 
 func (ls *localServer) SetQuerier(querier Querier) {

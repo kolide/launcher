@@ -64,6 +64,9 @@ jobs:
 
     - name: Build
       run: make -j2 github-build
+      env:
+        LOCALSERVER_CERT_B64: ""
+        LOCALSERVER_KEY_B64: ""
 
     - name: Check macOS build target
       if: contains(matrix.os, 'macos')

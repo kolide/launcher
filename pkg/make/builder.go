@@ -11,9 +11,16 @@ package make
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"os/user"
@@ -345,6 +352,19 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 		// Set the build time for autoupdate.FindNewest
 		ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/launcher/pkg/autoupdate.defaultBuildTimestamp=%s"`, strconv.FormatInt(time.Now().Unix(), 10)))
 
+		// Embed server cert and key
+		localserverCert := os.Getenv("LOCALSERVER_CERT_B64")
+		localserverKey := os.Getenv("LOCALSERVER_KEY_B64")
+		if localserverCert == "" || localserverKey == "" {
+			var err error
+			localserverCert, localserverKey, err = generateSelfSignedCertB64()
+			if err != nil {
+				return fmt.Errorf("generating self-signed cert for localserver: %w", err)
+			}
+		}
+		ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/launcher/ee/localserver.localserverCertB64=%s"`, localserverCert))
+		ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/launcher/ee/localserver.localserverKeyB64=%s"`, localserverKey))
+
 		if len(ldFlags) != 0 {
 			baseArgs = append(baseArgs, fmt.Sprintf("--ldflags=%s", strings.Join(ldFlags, " ")))
 		}
@@ -430,6 +450,56 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		return nil
 	}
+}
+
+func generateSelfSignedCertB64() (string, string, error) {
+	// Generate a random serial number
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return "", "", fmt.Errorf("generating serial number: %w", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Kolide, Inc"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		// TODO RM: set DNSNames
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return "", "", fmt.Errorf("generating private key: %w", err)
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("creating certificate: %w", err)
+	}
+
+	var certBuf bytes.Buffer
+	if err := pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return "", "", fmt.Errorf("encoding cert to pem: %w", err)
+	}
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("marshalling private key: %w", err)
+	}
+
+	var keyBuf bytes.Buffer
+	if err := pem.Encode(&keyBuf, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
+		return "", "", fmt.Errorf("encoding key to pem: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(certBuf.Bytes()), base64.StdEncoding.EncodeToString(keyBuf.Bytes()), nil
 }
 
 // getVersion uses `git describe` to determine the version of the
