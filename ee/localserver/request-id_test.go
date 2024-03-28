@@ -45,8 +45,8 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 
 	// We want to test that there were no errors or warnings logged. We do this indiredtly, by making sure the log
 	// only contains what we expect. There's probably a cleaner way....
-	// Right now, we expect a single log line about certificates
-	assert.Equal(t, 1, strings.Count(logBytes.String(), "\n"))
+	// Right now, we expect a single log line about certificates and another about failing to load TLS certs (which are not set in test)
+	assert.Equal(t, 2, strings.Count(logBytes.String(), "\n"))
 	assert.Contains(t, logBytes.String(), "certificate")
 
 	assert.Equal(t, http.StatusOK, rr.Code)
