@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -15,10 +16,13 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
+	statStore, err := agentbbolt.NewStatStore(multislogger.NewNopLogger(), storageci.SetupDB(t))
+	require.NoError(t, err)
+
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
 	mockKnapsack.On("TufServerURL").Return("localhost").Maybe()
-	mockKnapsack.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+	mockKnapsack.On("StorageStatTracker").Return(statStore).Maybe()
 	mockKnapsack.On("KolideHosted").Return(false).Maybe()
 	mockKnapsack.On("KolideServerURL").Return("localhost").Maybe()
 	mockKnapsack.On("ControlServerURL").Return("localhost").Maybe()

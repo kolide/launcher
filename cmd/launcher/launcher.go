@@ -185,9 +185,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("failed to create stores: %w", err)
 	}
 
+	statTracker, err := agentbbolt.NewStatStore(slogger, db)
+	if err != nil {
+		return fmt.Errorf("failed to create stat tracker: %w", err)
+	}
+
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
-	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
+	k := knapsack.New(stores, flagController, statTracker, multiSlogger, systemMultiSlogger)
 
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
