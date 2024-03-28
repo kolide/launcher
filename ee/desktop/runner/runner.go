@@ -3,7 +3,6 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -360,11 +359,8 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return errors.New("data is nil")
 	}
 
-	var dataCopy bytes.Buffer
-	dataTee := io.TeeReader(data, &dataCopy)
-
 	// Replace the menu template file
-	dataBytes, err := io.ReadAll(dataTee)
+	dataBytes, err := io.ReadAll(data)
 	if err != nil {
 		return fmt.Errorf("error reading control data: %w", err)
 	}
