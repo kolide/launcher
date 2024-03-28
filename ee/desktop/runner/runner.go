@@ -3,7 +3,6 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -127,6 +126,8 @@ type DesktopUsersProcessesRunner struct {
 	runnerServer *runnerserver.RunnerServer
 	// osVersion is the version of the OS cached in new
 	osVersion string
+	// cachedMenuData is the cached label values of the currently displayed menu data, used for detecting changes
+	cachedMenuData *menuItemCache
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -163,6 +164,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: k.DesktopEnabled(),
 		knapsack:               k,
+		cachedMenuData:         newMenuItemCache(),
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
@@ -357,11 +359,8 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return errors.New("data is nil")
 	}
 
-	var dataCopy bytes.Buffer
-	dataTee := io.TeeReader(data, &dataCopy)
-
 	// Replace the menu template file
-	dataBytes, err := io.ReadAll(dataTee)
+	dataBytes, err := io.ReadAll(data)
 	if err != nil {
 		return fmt.Errorf("error reading control data: %w", err)
 	}
@@ -474,6 +473,21 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 	// any desktop user processes, either when they refresh, or when they are spawned.
 	if err := r.writeSharedFile(r.menuPath(), parsedMenuDataBytes); err != nil {
 		return err
+	}
+
+	menuChanges, err := r.cachedMenuData.recordMenuUpdates(parsedMenuDataBytes)
+	if err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error recording updates to cached menu items",
+			"err", err,
+		)
+	}
+
+	if len(menuChanges) > 0 {
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"detected changes to menu bar items",
+			"changes", menuChanges,
+		)
 	}
 
 	return nil
