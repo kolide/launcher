@@ -592,6 +592,13 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 				"err", err,
 				"extension_name", name,
 			)
+			// PR Note, remove after test working
+			// On windows, during test this always returns error
+			// "status 1 registering extension: Failed adding registry: SQLITE_CANTOPEN"
+			// the source of the error is in osquery-go code
+			// https://github.com/osquery/osquery-go/blob/master/server.go#L217
+			// coming out of
+			// https://github.com/osquery/osquery-go/blob/master/gen/osquery/osquery.go#L2225
 			return fmt.Errorf("running extension server: %w", err)
 		}
 		return errors.New("extension manager server exited")
