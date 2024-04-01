@@ -2,12 +2,15 @@ package localserver
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_generateSelfSignedCert(t *testing.T) {
 	t.Parallel()
 
-	fmt.Println(generateSelfSignedCert(context.TODO()))
+	cert, err := generateSelfSignedCert(context.TODO())
+	require.NoError(t, err, "expected no error generating cert")
+	require.NotEmpty(t, cert.Certificate, "expected cert")
 }
