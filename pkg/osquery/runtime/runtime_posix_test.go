@@ -117,3 +117,34 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	require.NoError(t, runner.Shutdown())
 }
+
+// TestRestart tests that the launcher can restart the osqueryd process.
+// This test causes time outs on windows, so it is only run on non-windows platforms.
+// Should investigate why this is the case.
+func TestRestart(t *testing.T) {
+	t.Parallel()
+	runner, teardown := setupOsqueryInstanceForTests(t)
+	defer teardown()
+
+	previousStats := runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	previousStats = runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+}
