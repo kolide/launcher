@@ -137,7 +137,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
 		WriteTimeout:   30 * time.Second,
-		MaxHeaderBytes: 1024,
+		MaxHeaderBytes: 4096,
 		TLSConfig: &tls.Config{
 			Certificates: ls.tlsCerts,
 		},
