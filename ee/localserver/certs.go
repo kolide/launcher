@@ -74,6 +74,11 @@ func generateSelfSignedCert(_ context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("generating serial number: %w", err)
 	}
 
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("generating private key: %w", err)
+	}
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -90,11 +95,7 @@ func generateSelfSignedCert(_ context.Context) (tls.Certificate, error) {
 		},
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("generating private key: %w", err)
-	}
-
+	// parent == template => self-signed cert
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("creating certificate: %w", err)
