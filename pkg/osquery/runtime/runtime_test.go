@@ -504,6 +504,34 @@ func TestMultipleShutdowns(t *testing.T) {
 	}
 }
 
+func TestRestart(t *testing.T) {
+	t.Parallel()
+	runner, teardown := setupOsqueryInstanceForTests(t)
+	defer teardown()
+
+	previousStats := runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	previousStats = runner.instance.stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner)
+
+	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+}
+
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
@@ -565,34 +593,6 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.startFunc = f
 	}
-}
-
-func TestRestart(t *testing.T) {
-	t.Parallel()
-	runner, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
-
-	previousStats := runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
-
-	previousStats = runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
 }
 
 // TestExtensionIsCleanedUp tests that the osquery extension cleans
