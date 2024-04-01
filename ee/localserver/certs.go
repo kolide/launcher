@@ -74,26 +74,9 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("generating serial number: %w", err)
 	}
 
-	caPrivateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("generating CA private key: %w", err)
-	}
-
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("generating private key: %w", err)
-	}
-
-	parentTemplate := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"Kolide, Inc"},
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
-		IsCA:                  true,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-		BasicConstraintsValid: true,
 	}
 
 	template := x509.Certificate{
@@ -104,7 +87,7 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
 		IsCA:                  false,
-		KeyUsage:              x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IPAddresses: []net.IP{
@@ -112,12 +95,8 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		},
 	}
 
-	caDerBytes, err := x509.CreateCertificate(rand.Reader, &parentTemplate, &parentTemplate, &caPrivateKey.PublicKey, caPrivateKey)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("creating CA: %w", err)
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &parentTemplate, &privateKey.PublicKey, privateKey)
+	// parent == template => self-signed cert
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("creating certificate: %w", err)
 	}
@@ -144,28 +123,16 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
 	}
 
-	x509Cert, err := x509.ParseCertificate(derBytes)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
-	}
+	/*
+		x509Cert, err := x509.ParseCertificate(derBytes)
+		if err != nil {
+			return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
+		}
 
-	if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
-		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
-	}
-
-	var caCertBuf bytes.Buffer
-	if err := pem.Encode(&caCertBuf, &pem.Block{Type: "CERTIFICATE", Bytes: caDerBytes}); err != nil {
-		return tls.Certificate{}, fmt.Errorf("encoding CA cert to pem: %w", err)
-	}
-
-	x509CACert, err := x509.ParseCertificate(caDerBytes)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
-	}
-
-	if err := addCertToKeyStore(ctx, caCertBuf.Bytes(), x509CACert); err != nil {
-		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
-	}
+		if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
+			return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
+		}
+	*/
 
 	return cert, nil
 }
