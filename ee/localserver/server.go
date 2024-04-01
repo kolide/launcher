@@ -120,6 +120,15 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
+	if cert, err := generateSelfSignedCert(ctx); err != nil {
+		ls.slogger.Log(ctx, slog.LevelError,
+			"could not generate cert",
+			"err", err,
+		)
+	} else {
+		ls.tlsCerts = []tls.Certificate{cert}
+	}
+
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 			return r.URL.Path
@@ -129,6 +138,9 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
 		WriteTimeout:   30 * time.Second,
 		MaxHeaderBytes: 1024,
+		TLSConfig: &tls.Config{
+			Certificates: ls.tlsCerts,
+		},
 	}
 
 	ls.srv = srv
@@ -266,18 +278,8 @@ func (ls *localServer) Start() error {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
-		ls.slogger.Log(ctx, slog.LevelDebug,
-			"using TLS",
-		)
-
-		tlsConfig := &tls.Config{Certificates: ls.tlsCerts}
-
-		l = tls.NewListener(l, tlsConfig)
-	} else {
-		ls.slogger.Log(ctx, slog.LevelDebug,
-			"not using TLS",
-		)
+	if len(ls.tlsCerts) > 0 {
+		return ls.srv.ServeTLS(l, "", "")
 	}
 
 	return ls.srv.Serve(l)

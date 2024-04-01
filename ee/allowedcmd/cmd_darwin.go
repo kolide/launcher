@@ -112,6 +112,10 @@ func Scutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/scutil", arg...)
 }
 
+func Security(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/security", arg...)
+}
+
 func Softwareupdate(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/softwareupdate", arg...)
 }

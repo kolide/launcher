@@ -1,5 +1,20 @@
 package localserver
 
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"net"
+	"time"
+)
+
 // These are the hardcoded certificates
 const (
 	k2RsaServerCert = `-----BEGIN PUBLIC KEY-----
@@ -50,3 +65,73 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwowFsPUaOC61LAfDz1hLnsuSDfEx
 SC4TSfHtbHHv3lx2/Bfu+H0szXYZ75GF/qZ5edobq3UkABN6OaFnnJId3w==
 -----END PUBLIC KEY-----`
 )
+
+func generateSelfSignedCert(_ context.Context) (tls.Certificate, error) {
+	// Generate a random serial number
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("generating serial number: %w", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Kolide, Inc"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses: []net.IP{
+			net.ParseIP("127.0.0.1"),
+		},
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("generating private key: %w", err)
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("creating certificate: %w", err)
+	}
+
+	var certBuf bytes.Buffer
+	if err := pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return tls.Certificate{}, fmt.Errorf("encoding cert to pem: %w", err)
+	}
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("marshalling private key: %w", err)
+	}
+
+	var keyBuf bytes.Buffer
+	if err := pem.Encode(&keyBuf, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
+		return tls.Certificate{}, fmt.Errorf("encoding key to pem: %w", err)
+	}
+
+	certBytes := certBuf.Bytes()
+
+	cert, err := tls.X509KeyPair(certBytes, keyBuf.Bytes())
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
+	}
+
+	/*
+		x509Cert, err := x509.ParseCertificate(derBytes)
+		if err != nil {
+			return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
+		}
+
+		if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
+			return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
+		}
+	*/
+
+	return cert, nil
+}
