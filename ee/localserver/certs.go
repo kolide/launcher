@@ -66,7 +66,7 @@ SC4TSfHtbHHv3lx2/Bfu+H0szXYZ75GF/qZ5edobq3UkABN6OaFnnJId3w==
 -----END PUBLIC KEY-----`
 )
 
-func generateSelfSignedCert(_ context.Context) (tls.Certificate, error) {
+func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 	// Generate a random serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -123,16 +123,14 @@ func generateSelfSignedCert(_ context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
 	}
 
-	/*
-		x509Cert, err := x509.ParseCertificate(derBytes)
-		if err != nil {
-			return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
-		}
+	x509Cert, err := x509.ParseCertificate(derBytes)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
+	}
 
-		if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
-			return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
-		}
-	*/
+	if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
+		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
+	}
 
 	return cert, nil
 }
