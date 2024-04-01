@@ -605,15 +605,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	runner, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	osqueryPID := runner.instance.cmd.Process.Pid
-
-	requirePgidMatch(t, osqueryPID)
-
-	require.NoError(t, runner.instance.cmd.Process.Kill())
+	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
 
 	// kill the current osquery process but not the extension
-	// err = syscall.Kill(osqueryPID, syscall.SIGKILL)
-	// require.NoError(t, err)
+	require.NoError(t, runner.instance.cmd.Process.Kill())
 
 	// We need to (a) let the runner restart osquery, and (b) wait for
 	// the extension to die. Both of these may take up to 30s. We'll
@@ -654,9 +649,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	go runner.Run()
 	waitHealthy(t, runner)
 
-	osqueryPID := runner.instance.cmd.Process.Pid
-
-	requirePgidMatch(t, osqueryPID)
+	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
 
 	teardown = func() {
 		defer rmRootDirectory()
