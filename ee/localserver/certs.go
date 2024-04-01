@@ -79,7 +79,7 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("generating private key: %w", err)
 	}
 
-	template := x509.Certificate{
+	parentTemplate := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"Kolide, Inc"},
@@ -87,7 +87,19 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
 		IsCA:                  true,
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
+		BasicConstraintsValid: true,
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Kolide, Inc"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(90 * 24 * time.Hour), // approximately 3 months
+		IsCA:                  false,
+		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IPAddresses: []net.IP{
@@ -95,8 +107,7 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		},
 	}
 
-	// parent == template => self-signed cert
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &parentTemplate, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("creating certificate: %w", err)
 	}
@@ -123,14 +134,16 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
 	}
 
-	x509Cert, err := x509.ParseCertificate(derBytes)
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
-	}
+	/*
+		x509Cert, err := x509.ParseCertificate(derBytes)
+		if err != nil {
+			return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
+		}
 
-	if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
-		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
-	}
+		if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
+			return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
+		}
+	*/
 
 	return cert, nil
 }
