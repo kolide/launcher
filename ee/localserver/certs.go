@@ -144,17 +144,26 @@ func generateSelfSignedCert(ctx context.Context) (tls.Certificate, error) {
 		return tls.Certificate{}, fmt.Errorf("loading key pair: %w", err)
 	}
 
+	x509Cert, err := x509.ParseCertificate(derBytes)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
+	}
+
+	if err := addCertToKeyStore(ctx, certBytes, x509Cert); err != nil {
+		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
+	}
+
 	var caCertBuf bytes.Buffer
 	if err := pem.Encode(&caCertBuf, &pem.Block{Type: "CERTIFICATE", Bytes: caDerBytes}); err != nil {
 		return tls.Certificate{}, fmt.Errorf("encoding CA cert to pem: %w", err)
 	}
 
-	x509Cert, err := x509.ParseCertificate(caDerBytes)
+	x509CACert, err := x509.ParseCertificate(caDerBytes)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("parsing cert: %w", err)
 	}
 
-	if err := addCertToKeyStore(ctx, caCertBuf.Bytes(), x509Cert); err != nil {
+	if err := addCertToKeyStore(ctx, caCertBuf.Bytes(), x509CACert); err != nil {
 		return tls.Certificate{}, fmt.Errorf("adding cert to key store: %w", err)
 	}
 
