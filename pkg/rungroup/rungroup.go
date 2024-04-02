@@ -33,8 +33,8 @@ type (
 )
 
 const (
-	interruptTimeout     = 5 * time.Second // How long for all actors to return from their `interrupt` function
-	executeReturnTimeout = 5 * time.Second // After interrupted, how long for all actors to exit their `execute` functions
+	interruptTimeout     = 10 * time.Second // How long for all actors to return from their `interrupt` function
+	executeReturnTimeout = 5 * time.Second  // After interrupted, how long for all actors to exit their `execute` functions
 )
 
 func NewRunGroup(slogger *slog.Logger) *Group {
