@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -42,8 +43,8 @@ func New(authToken, socketPath string) client {
 	return client
 }
 
-func (c *client) Shutdown() error {
-	return c.get("shutdown")
+func (c *client) Shutdown(ctx context.Context) error {
+	return c.getWithContext(ctx, "shutdown")
 }
 
 func (c *client) Ping() error {
@@ -83,6 +84,28 @@ func (c *client) get(path string) error {
 	resp, err := c.base.Get(fmt.Sprintf("http://unix/%s", path))
 	if err != nil {
 		return err
+	}
+
+	if resp.Body != nil {
+		resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *client) getWithContext(ctx context.Context, path string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://unix/%s", path), nil)
+	if err != nil {
+		return fmt.Errorf("creating request with context: %w", err)
+	}
+
+	resp, err := c.base.Do(req)
+	if err != nil {
+		return fmt.Errorf("making request: %w", err)
 	}
 
 	if resp.Body != nil {
