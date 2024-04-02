@@ -33,8 +33,8 @@ type (
 )
 
 const (
-	interruptTimeout     = 5 * time.Second // How long for all actors to return from their `interrupt` function
-	executeReturnTimeout = 5 * time.Second // After interrupted, how long for all actors to exit their `execute` functions
+	InterruptTimeout     = 10 * time.Second // How long for all actors to return from their `interrupt` function
+	executeReturnTimeout = 5 * time.Second  // After interrupted, how long for all actors to exit their `execute` functions
 )
 
 func NewRunGroup(slogger *slog.Logger) *Group {
@@ -107,7 +107,7 @@ func (g *Group) Run() error {
 		}(a)
 	}
 
-	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), interruptTimeout)
+	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), InterruptTimeout)
 	defer interruptCancel()
 
 	// Wait for interrupts to complete, but only until we hit our interruptCtx timeout
