@@ -282,7 +282,7 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	}
 
 	r.slogger.Log(ctx, slog.LevelInfo,
-		"shutdown complete",
+		"desktop runner shutdown complete",
 	)
 }
 
