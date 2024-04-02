@@ -102,6 +102,10 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 		return fmt.Errorf("gathering service manager event logs: %w", err)
 	}
 
+	if err := gatherServiceManagerEvents(ctx, extraZip); err != nil {
+		return fmt.Errorf("gathering service manager events: %w", err)
+	}
+
 	return nil
 }
 
@@ -228,10 +232,38 @@ func gatherServices(z *zip.Writer, serviceManager *mgr.Mgr) error {
 	return nil
 }
 
-func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
-	eventLogOut, err := z.Create("eventlog.txt")
+// gatherServiceManagerEvents uses Get-WinEvent to fetch the service manager logs. This might be newer than Get-EventLog
+func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
+	out, err := z.Create("eventlog-Get-WinEvent.json")
 	if err != nil {
-		return fmt.Errorf("creating eventlog.txt: %w", err)
+		return fmt.Errorf("creating eventlog-Get-WinEvent.json: %w", err)
+	}
+
+	cmdArgs := []string{
+		"Get-WinEvent",
+		`-FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}`,
+		"|",
+		"ForEach-Object { $_.Message }",
+	}
+
+	cmd, err := allowedcmd.Powershell(ctx, cmdArgs...)
+	if err != nil {
+		return fmt.Errorf("creating powershell command: %w", err)
+	}
+	hideWindow(cmd)
+	cmd.Stdout = out // write directly to zip
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("running Get-WinEvent: error %w", err)
+	}
+
+	return nil
+}
+
+// gatherServiceManagerEventLogs uses Get-EventLog to getch service manager logs. This might be a legacy path
+func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
+	eventLogOut, err := z.Create("eventlog-Get-EventLog.txt")
+	if err != nil {
+		return fmt.Errorf("creating eventlog-Get-EventLog.txt: %w", err)
 	}
 
 	cmdletArgs := []string{
