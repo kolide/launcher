@@ -34,6 +34,11 @@ var testOsqueryBinaryDirectory string
 
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
+	if !hasPermissionsToRunTest() {
+		fmt.Println("these tests must be run as an administrator on windows")
+		return
+	}
+
 	binDirectory, rmBinDirectory, err := osqueryTempDir()
 	if err != nil {
 		fmt.Println("Failed to make temp dir for test binaries")

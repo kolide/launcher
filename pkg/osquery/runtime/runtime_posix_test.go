@@ -27,9 +27,15 @@ func requirePgidMatch(t *testing.T, pid int) {
 	require.Equal(t, pgid, pid)
 }
 
-// TestOsquerySlowStart tests that the launcher can handle a slow-starting osqueryd process.
-// This this is only enabled on non-Windows platforms because suspending we have not yet
-// figured out how to suspend a process on windows via golang.
+// hasPermissionsToRunTest always return true for non-windows platforms since
+// elveated permissions are not required to run the tests
+func hasPermissionsToRunTest() bool {
+	return true
+}
+
+// TestOsquerySlowStart tests that launcher can handle a slow-starting osqueryd process.
+// This this is only enabled on non-Windows platforms because we have not yet figured
+// out how to suspend and resume a process on Windows via golang.
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
