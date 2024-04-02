@@ -86,6 +86,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockQuerier := newMockQuerier(t)
 
@@ -179,6 +180,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockQuerier := newMockQuerier(t)
 
@@ -256,6 +258,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockQuerier := newMockQuerier(t)
 
@@ -387,6 +390,53 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
+func TestExecute_inModernStandby(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	testReleaseVersion := "1.2.3"
+	tufServerUrl, _ := tufci.InitRemoteTufServer(t, testReleaseVersion)
+	s := setupStorage(t)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
+	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("PinnedLauncherVersion").Return("")
+	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	mockKnapsack.On("InModernStandby").Return(true)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
+	mockQuerier := newMockQuerier(t)
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
+		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Set up library manager: we should expect to tidy the library on startup, but NOT add anything to it
+	mockLibraryManager := NewMocklibrarian(t)
+	autoupdater.libraryManager = mockLibraryManager
+	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "5.6.7"}}, nil)
+	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
+
+	// Let the autoupdater run for less than the initial delay
+	go autoupdater.Execute()
+	time.Sleep(300 * time.Millisecond)
+
+	// Shut down the autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
+	time.Sleep(100 * time.Millisecond)
+
+	// Confirm we didn't attempt any library updates, and pulled config items as expected
+	mockLibraryManager.AssertExpectations(t)
+	mockKnapsack.AssertExpectations(t)
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
@@ -414,6 +464,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockQuerier := newMockQuerier(t)
 
@@ -543,6 +594,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 			mockQuerier := newMockQuerier(t)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 
 			// Set up autoupdater
@@ -609,6 +661,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
@@ -689,6 +742,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 
 	// Set up autoupdater
@@ -760,6 +814,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 
 	// Start out on beta channel, then swap to nightly
@@ -819,6 +874,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 
 	// Start out with no pinned version, then set a pinned version
@@ -978,6 +1034,7 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockQuerier := newMockQuerier(t)
 
