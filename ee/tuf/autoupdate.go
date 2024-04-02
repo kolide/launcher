@@ -452,6 +452,11 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 	ta.updateLock.Lock()
 	defer ta.updateLock.Unlock()
 
+	// Skip autoupdating when Windows is sleeping
+	if ta.knapsack.InModernStandby() {
+		return nil
+	}
+
 	// Attempt an update a couple times before returning an error -- sometimes we just hit caching issues.
 	errs := make([]error, 0)
 	successfulUpdate := false
