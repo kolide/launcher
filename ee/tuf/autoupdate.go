@@ -454,6 +454,9 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 
 	// Skip autoupdating when Windows is sleeping
 	if ta.knapsack.InModernStandby() {
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"skipping autoupdate while in modern standby",
+		)
 		return nil
 	}
 
