@@ -184,6 +184,11 @@ func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollectio
 func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(results)
+		resTruncated := string(resJSON[:200])
+		if len(resJSON) > 200 {
+			resTruncated += "..."
+		}
+
 		uuid, _ := uuid.FromContext(ctx)
 
 		if message == "" {
@@ -197,7 +202,9 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishResults",
 			"uuid", uuid,
-			"results", string(resJSON),
+			"results_truncated", resTruncated,
+			"result_count", len(results),
+			"result_size", len(resJSON),
 			"errcode", errcode,
 			"reauth", reauth,
 			"err", err,
