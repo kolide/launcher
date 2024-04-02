@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	launcherServiceName            = `LauncherKolideK2Svc`
 	launcherServiceRegistryKeyName = `SYSTEM\CurrentControlSet\Services\LauncherKolideK2Svc`
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
@@ -144,7 +145,7 @@ func checkRestartActions(logger *slog.Logger) {
 
 	defer sman.Disconnect()
 
-	launcherService, err := sman.OpenService(`LauncherKolideK2Svc`)
+	launcherService, err := sman.OpenService(launcherServiceName)
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"opening the launcher service from control manager",
