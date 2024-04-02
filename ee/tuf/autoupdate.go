@@ -452,7 +452,9 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 	ta.updateLock.Lock()
 	defer ta.updateLock.Unlock()
 
-	// Skip autoupdating when Windows is sleeping
+	// Skip autoupdating when Windows is sleeping. The Service Manager often has trouble with starting up
+	// launcher while sleeping, so skipping the check is our safest option to keep launcher running
+	// and functional.
 	if ta.knapsack.InModernStandby() {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
 			"skipping autoupdate while in modern standby",
