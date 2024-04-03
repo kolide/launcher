@@ -7,6 +7,6 @@ import (
 	"io"
 )
 
-func systemSlogger() (*MultiSlogger, io.Closer, error) {
+func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 	return defaultSystemSlogger(), io.NopCloser(nil), nil
 }
