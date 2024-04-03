@@ -3,6 +3,7 @@ package multislogger
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	"github.com/kolide/kit/ulid"
 	slogmulti "github.com/samber/slog-multi"
@@ -87,4 +88,10 @@ func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(cont
 	}
 
 	return next(ctx, record)
+}
+
+func defaultSystemSlogger() *MultiSlogger {
+	return New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
 }

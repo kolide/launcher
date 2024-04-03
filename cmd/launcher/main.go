@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	systemSlogger, logCloser, err := systemSlogger()
+	systemSlogger, logCloser, err := multislogger.SystemSlogger()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating system logger: %v\n", err)
 		os.Exit(1)
@@ -265,10 +265,4 @@ func runVersion(args []string) error {
 
 	os.Exit(0)
 	return nil
-}
-
-func defaultSystemSlogger() *multislogger.MultiSlogger {
-	return multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
 }

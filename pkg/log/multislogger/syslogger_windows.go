@@ -1,20 +1,20 @@
 //go:build windows
 // +build windows
 
-package main
+package multislogger
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 
 	"github.com/kolide/launcher/pkg/log/eventlog"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"golang.org/x/sys/windows"
 )
 
-func systemSlogger() (*multislogger.MultiSlogger, io.Closer, error) {
+const serviceName = "launcher"
+
+func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 	if !windows.GetCurrentProcessToken().IsElevated() {
 		syslogger := defaultSystemSlogger()
 
@@ -27,10 +27,17 @@ func systemSlogger() (*multislogger.MultiSlogger, io.Closer, error) {
 
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating eventlog writer: %w", err)
+		syslogger := defaultSystemSlogger()
+
+		syslogger.Log(context.TODO(), slog.LevelError,
+			"could not create eventlog writer, using default stderr instead of eventlog",
+			"err", err,
+		)
+
+		return syslogger, io.NopCloser(nil), nil
 	}
 
-	systemSlogger := multislogger.New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
+	systemSlogger := New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
