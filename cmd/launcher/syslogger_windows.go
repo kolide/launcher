@@ -22,7 +22,7 @@ func systemSlogger() (*multislogger.MultiSlogger, io.Closer, error) {
 			"launcher running on windows without elevated permissions, using default stderr instead of eventlog",
 		)
 
-		return defaultSystemSlogger(), io.NopCloser(nil), nil
+		return syslogger, io.NopCloser(nil), nil
 	}
 
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
