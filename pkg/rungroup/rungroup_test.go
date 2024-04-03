@@ -60,7 +60,7 @@ func TestRun_MultipleActors(t *testing.T) {
 	}()
 
 	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + interruptTimeout + executeReturnTimeout + 1*time.Second
+	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
 	interruptCheckTimer := time.NewTicker(runDuration)
 	defer interruptCheckTimer.Stop()
 
@@ -119,7 +119,7 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 		<-blockingActorInterrupt
 		return nil
 	}, func(error) {
-		time.Sleep(4 * interruptTimeout)
+		time.Sleep(4 * InterruptTimeout)
 		groupReceivedInterrupts <- struct{}{}
 		blockingActorInterrupt <- struct{}{}
 	})
@@ -132,7 +132,7 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	}()
 
 	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + interruptTimeout + executeReturnTimeout + 1*time.Second
+	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
 	interruptCheckTimer := time.NewTicker(runDuration)
 	defer interruptCheckTimer.Stop()
 
@@ -208,7 +208,7 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	}()
 
 	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + interruptTimeout + executeReturnTimeout + 1*time.Second
+	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
 	interruptCheckTimer := time.NewTicker(runDuration)
 	defer interruptCheckTimer.Stop()
 

@@ -3,7 +3,6 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -32,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/exp/maps"
@@ -127,6 +127,8 @@ type DesktopUsersProcessesRunner struct {
 	runnerServer *runnerserver.RunnerServer
 	// osVersion is the version of the OS cached in new
 	osVersion string
+	// cachedMenuData is the cached label values of the currently displayed menu data, used for detecting changes
+	cachedMenuData *menuItemCache
 }
 
 // processRecord is used to track spawned desktop processes.
@@ -158,11 +160,12 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		updateInterval:         k.DesktopUpdateInterval(),
 		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
 		procsWg:                &sync.WaitGroup{},
-		interruptTimeout:       time.Second * 10,
+		interruptTimeout:       time.Second * 5,
 		hostname:               k.KolideServerURL(),
 		usersFilesRoot:         agent.TempPath("kolide-desktop"),
 		processSpawningEnabled: k.DesktopEnabled(),
 		knapsack:               k,
+		cachedMenuData:         newMenuItemCache(),
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
@@ -257,11 +260,19 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	// Tell the execute loop to stop checking, and exit
 	r.interrupt <- struct{}{}
 
-	// Kill any desktop processes that may exist
-	r.killDesktopProcesses()
+	// The timeout for `Interrupt` is the desktop process interrupt timeout (r.interruptTimeout)
+	// plus a small buffer for killing processes that couldn't be shut down gracefully during r.interuptTimeout.
+	shutdownTimeout := r.interruptTimeout + 3*time.Second
+	// This timeout for `Interrupt` should not be larger than rungroup.interruptTimeout.
+	if shutdownTimeout > rungroup.InterruptTimeout {
+		shutdownTimeout = rungroup.InterruptTimeout
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// Kill any desktop processes that may exist
+	r.killDesktopProcesses(ctx)
 
 	if err := r.runnerServer.Shutdown(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
@@ -269,10 +280,14 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 			"err", err,
 		)
 	}
+
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"desktop runner shutdown complete",
+	)
 }
 
 // killDesktopProcesses kills any existing desktop processes
-func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
+func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
 	wgDone := make(chan struct{})
 	go func() {
 		defer close(wgDone)
@@ -285,8 +300,8 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		r.runnerServer.DeRegisterClient(uid)
 
 		client := client.New(r.userServerAuthToken, proc.socketPath)
-		if err := client.Shutdown(); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
+		if err := client.Shutdown(ctx); err != nil {
+			r.slogger.Log(ctx, slog.LevelError,
 				"sending shutdown command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
@@ -301,7 +316,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 	select {
 	case <-wgDone:
 		if shutdownRequestCount > 0 {
-			r.slogger.Log(context.TODO(), slog.LevelDebug,
+			r.slogger.Log(ctx, slog.LevelDebug,
 				"successfully completed desktop process shutdown requests",
 				"count", shutdownRequestCount,
 			)
@@ -310,7 +325,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
-		r.slogger.Log(context.TODO(), slog.LevelError,
+		r.slogger.Log(ctx, slog.LevelError,
 			"timeout waiting for desktop processes to exit, now killing",
 		)
 
@@ -319,7 +334,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 				continue
 			}
 			if err := processRecord.Process.Kill(); err != nil {
-				r.slogger.Log(context.TODO(), slog.LevelError,
+				r.slogger.Log(ctx, slog.LevelError,
 					"killing desktop process",
 					"uid", uid,
 					"pid", processRecord.Process.Pid,
@@ -329,6 +344,10 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses() {
 			}
 		}
 	}
+
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"killed user desktop processes",
+	)
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
@@ -357,11 +376,8 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return errors.New("data is nil")
 	}
 
-	var dataCopy bytes.Buffer
-	dataTee := io.TeeReader(data, &dataCopy)
-
 	// Replace the menu template file
-	dataBytes, err := io.ReadAll(dataTee)
+	dataBytes, err := io.ReadAll(data)
 	if err != nil {
 		return fmt.Errorf("error reading control data: %w", err)
 	}
@@ -476,6 +492,21 @@ func (r *DesktopUsersProcessesRunner) generateMenuFile() error {
 		return err
 	}
 
+	menuChanges, err := r.cachedMenuData.recordMenuUpdates(parsedMenuDataBytes)
+	if err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error recording updates to cached menu items",
+			"err", err,
+		)
+	}
+
+	if len(menuChanges) > 0 {
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"detected changes to menu bar items",
+			"changes", menuChanges,
+		)
+	}
+
 	return nil
 }
 
@@ -502,7 +533,7 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 	if !r.processSpawningEnabled {
 		// Desktop is disabled, kill any existing desktop user processes
-		r.killDesktopProcesses()
+		r.killDesktopProcesses(context.Background())
 		return nil
 	}
 
@@ -895,6 +926,6 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 			"new", currentOsVersion,
 		)
 		r.osVersion = currentOsVersion
-		r.killDesktopProcesses()
+		r.killDesktopProcesses(context.Background())
 	}
 }

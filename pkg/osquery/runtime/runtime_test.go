@@ -1,34 +1,29 @@
-//go:build !windows
-// +build !windows
-
 package runtime
+
+// these tests have to be run as admin on windows
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/kit/testutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
-	osquery "github.com/osquery/osquery-go"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,6 +34,11 @@ var testOsqueryBinaryDirectory string
 
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
+	if !hasPermissionsToRunTest() {
+		fmt.Println("these tests must be run as an administrator on windows")
+		return
+	}
+
 	binDirectory, rmBinDirectory, err := osqueryTempDir()
 	if err != nil {
 		fmt.Println("Failed to make temp dir for test binaries")
@@ -96,7 +96,12 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	// dictated
 	require.Equal(t, binDir, filepath.Dir(paths.pidfilePath))
 	require.Equal(t, binDir, filepath.Dir(paths.databasePath))
-	require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
+
+	// socket path on windows includes semi-random ulid
+	if runtime.GOOS != "windows" {
+		require.Equal(t, binDir, filepath.Dir(paths.extensionSocketPath))
+	}
+
 	require.Equal(t, binDir, filepath.Dir(paths.extensionAutoloadPath))
 }
 
@@ -275,7 +280,14 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	}
 
 	outputFile := filepath.Join(binDirectory, "osqueryd")
+	if runtime.GOOS == "windows" {
+		outputFile += ".exe"
+	}
+
 	cacheDir := "/tmp"
+	if runtime.GOOS == "windows" {
+		cacheDir = os.Getenv("TEMP")
+	}
 
 	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
@@ -432,11 +444,12 @@ func TestFlagsChanged(t *testing.T) {
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test
 func waitHealthy(t *testing.T, runner *Runner) {
-	testutil.FatalAfterFunc(t, 30*time.Second, func() {
-		for runner.Healthy() != nil {
-			time.Sleep(500 * time.Millisecond)
+	require.NoError(t, backoff.WaitFor(func() error {
+		if runner.Healthy() == nil {
+			return nil
 		}
-	})
+		return fmt.Errorf("instance not healthy")
+	}, 30*time.Second, 1*time.Second))
 }
 
 func TestSimplePath(t *testing.T) {
@@ -496,34 +509,6 @@ func TestMultipleShutdowns(t *testing.T) {
 	}
 }
 
-func TestRestart(t *testing.T) {
-	t.Parallel()
-	runner, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
-
-	previousStats := runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
-
-	previousStats = runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
-}
-
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	rootDirectory, rmRootDirectory, err := osqueryTempDir()
@@ -578,6 +563,15 @@ func TestNotStarted(t *testing.T) {
 	assert.NoError(t, runner.Shutdown())
 }
 
+// WithStartFunc defines the function that will be used to exeute the osqueryd
+// start command. It is useful during testing to simulate osquery start delays or
+// osquery instability.
+func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
+	return func(i *OsqueryInstance) {
+		i.startFunc = f
+	}
+}
+
 // TestExtensionIsCleanedUp tests that the osquery extension cleans
 // itself up. Unfortunately, this test has proved very flakey on
 // circle-ci, but just fine on laptops.
@@ -588,17 +582,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	runner, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	osqueryPID := runner.instance.cmd.Process.Pid
-
-	pgid, err := syscall.Getpgid(osqueryPID)
-	require.NoError(t, err)
-	require.Equal(t, pgid, osqueryPID, "pgid must be set")
-
-	require.NoError(t, err)
+	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
 
 	// kill the current osquery process but not the extension
-	err = syscall.Kill(osqueryPID, syscall.SIGKILL)
-	require.NoError(t, err)
+	require.NoError(t, runner.instance.cmd.Process.Kill())
 
 	// We need to (a) let the runner restart osquery, and (b) wait for
 	// the extension to die. Both of these may take up to 30s. We'll
@@ -613,101 +600,6 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 	// Ensure we've waited at least 32s
 	<-timer1.C
-}
-
-func TestExtensionSocketPath(t *testing.T) {
-	t.Parallel()
-
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
-
-	k := typesMocks.NewKnapsack(t)
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
-
-	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithExtensionSocketPath(extensionSocketPath),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
-	)
-	go runner.Run()
-
-	waitHealthy(t, runner)
-
-	// wait for the launcher-provided extension to register
-	time.Sleep(2 * time.Second)
-
-	client, err := osquery.NewClient(extensionSocketPath, 5*time.Second, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(1*time.Minute))
-	require.NoError(t, err)
-	defer client.Close()
-
-	resp, err := client.Query("select * from launcher_gc_info")
-	require.NoError(t, err)
-	assert.Equal(t, int32(0), resp.Status.Code)
-	assert.Equal(t, "OK", resp.Status.Message)
-
-	require.NoError(t, runner.Shutdown())
-}
-
-func TestOsquerySlowStart(t *testing.T) {
-	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
-
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-
-	k := typesMocks.NewKnapsack(t)
-	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	k.On("Slogger").Return(slogger.Logger)
-	k.On("PinnedOsquerydVersion").Return("")
-
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithSlogger(slogger.Logger),
-		WithStartFunc(func(cmd *exec.Cmd) error {
-			err := cmd.Start()
-			if err != nil {
-				return fmt.Errorf("unexpected error starting command: %w", err)
-			}
-			// suspend the process right away
-			cmd.Process.Signal(syscall.SIGTSTP)
-			go func() {
-				// wait a while before resuming the process
-				time.Sleep(3 * time.Second)
-				cmd.Process.Signal(syscall.SIGCONT)
-			}()
-			return nil
-		}),
-	)
-	go runner.Run()
-	waitHealthy(t, runner)
-
-	// ensure that we actually had to wait on the socket
-	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	require.NoError(t, runner.Shutdown())
-}
-
-// WithStartFunc defines the function that will be used to exeute the osqueryd
-// start command. It is useful during testing to simulate osquery start delays or
-// osquery instability.
-func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.startFunc = f
-	}
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
@@ -734,11 +626,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	go runner.Run()
 	waitHealthy(t, runner)
 
-	osqueryPID := runner.instance.cmd.Process.Pid
-
-	pgid, err := syscall.Getpgid(osqueryPID)
-	require.NoError(t, err)
-	require.Equal(t, pgid, osqueryPID)
+	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
 
 	teardown = func() {
 		defer rmRootDirectory()
