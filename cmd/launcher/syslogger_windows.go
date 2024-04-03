@@ -34,7 +34,5 @@ func systemSlogger() (*multislogger.MultiSlogger, io.Closer, error) {
 		Level: slog.LevelInfo,
 	}))
 
-	systemSlogger.Info("@@@@@ THIS IS A TEST @@@@@")
-
 	return systemSlogger, eventLogWriter, nil
 }
