@@ -61,10 +61,12 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 `
 
 	var respBytes bytes.Buffer
+	var stderrBytes bytes.Buffer
 
 	osq, err := runsimple.NewOsqueryProcess(
 		osquerydPath,
 		runsimple.WithStdout(&respBytes),
+		runsimple.WithStderr(&stderrBytes),
 	)
 	if err != nil {
 		return details, fmt.Errorf("create osquery for enrollment details: %w", err)
@@ -74,18 +76,18 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 	defer osqCancel()
 
 	if sqlErr := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
-		return details, fmt.Errorf("query enrollment details context error: %w", osqCtx.Err())
+		return details, fmt.Errorf("query enrollment details context error: %w: stderr: %s", osqCtx.Err(), stderrBytes.String())
 	} else if sqlErr != nil {
-		return details, fmt.Errorf("query enrollment details: %w", sqlErr)
+		return details, fmt.Errorf("query enrollment details: %w; stderr: %s", sqlErr, stderrBytes.String())
 	}
 
 	var resp []map[string]string
 	if err := json.Unmarshal(respBytes.Bytes(), &resp); err != nil {
-		return details, fmt.Errorf("json decode enrollment details: %w", err)
+		return details, fmt.Errorf("json decode enrollment details: %w; stderr: %s", err, stderrBytes.String())
 	}
 
 	if len(resp) < 1 {
-		return details, errors.New("expected at least one row from the enrollment details query")
+		return details, fmt.Errorf("expected at least one row from the enrollment details query: stderr: %s", stderrBytes.String())
 	}
 
 	if val, ok := resp[0]["os_version"]; ok {
