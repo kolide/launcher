@@ -13,12 +13,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/secureenclavesigner"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -61,13 +63,36 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 	return req, nil
 }
 
-type kryptoEcMiddleware struct {
-	localDbSigner, hardwareSigner crypto.Signer
-	counterParty                  ecdsa.PublicKey
-	slogger                       *slog.Logger
+// kryptoEcMiddlewareResponse is a box that contains the response, hardware signature of the response,
+// and the public key of the hardware signer.
+type kryptoEcMiddlewareResponse struct {
+	// This ends up in the "ResponseData" field of the challenge response.
+
+	// To validate:
+	// 1. Convert th b64der hardware key field to public key
+	// 2. Determine if hardware key is trusted
+	// 3. B64 decode message and hardware sig to bytes
+	// 4. Use decoded msg, hardware sig, and public key to verify the signature
+	// 4. After verifying the signature, unmarshall the b64 decoded msg to json
+	// 5. Do stuff with the data.
+
+	// Msg is the base64 encoded message that contains timestamp, nonce, and
+	// the response from the endpoint called.
+	Msg string `json:"msg"`
+	// HardwareSig is the base64 encoded signature of the msg
+	HardwareSig string `json:"hardware_sig"`
+	// HardwareKey is the base64 encoded public key DER of the hardware signer
+	HardwareKey string `json:"hardware_key"`
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+type kryptoEcMiddleware struct {
+	localDbSigner  crypto.Signer
+	hardwareSigner agent.KeyIntHardware
+	counterParty   ecdsa.PublicKey
+	slogger        *slog.Logger
+}
+
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, hardwareSigner agent.KeyIntHardware, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:  localDbSigner,
 		hardwareSigner: hardwareSigner,
@@ -300,16 +325,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		var response []byte
-		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
-		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
-		// pass nil to krypto
-		// hardware signing is not implemented for darwin
-		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
-		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
-		}
+		// call platform specific response function to add hardware signatures
+		response, err := e.generateChallengeResponse(r.Context(), challengeBox, bhr.Bytes())
 
 		if err != nil {
 			traces.SetError(span, err)
@@ -378,6 +395,31 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 	}
 
 	return challenge.UnmarshalChallenge(decoded)
+}
+
+func (e *kryptoEcMiddleware) responseWithoutHardwareSig(o *challenge.OuterChallenge, data []byte) ([]byte, error) {
+	msg := secureenclavesigner.SignResponseInner{
+		Nonce:     ulid.New(),
+		Timestamp: time.Now().UTC().Unix(),
+		// add the kolide:%s:kolide tags since the secure enclave cmd
+		// wont be execed and add them
+		Data: []byte(fmt.Sprintf("kolide:%s:kolide", string(data))),
+	}
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling krypto response: %w", err)
+	}
+
+	outerResponseBytes, err := json.Marshal(kryptoEcMiddlewareResponse{
+		Msg: base64.StdEncoding.EncodeToString(msgBytes),
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("marshalling krypto response: %w", err)
+	}
+
+	return o.Respond(e.localDbSigner, nil, outerResponseBytes)
 }
 
 type bufferedHttpResponse struct {
