@@ -239,11 +239,14 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
 		return fmt.Errorf("creating eventlog-Get-WinEvent.json: %w", err)
 	}
 
+	filterExpression := fmt.Sprintf(`@{LogName='System'; ProviderName='Service Control Manager'; Data=%s}`, kolideSvcName)
+
 	cmdArgs := []string{
 		"Get-WinEvent",
-		`-FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}`,
+		"-MaxEvents 100",
+		"-FilterHashtable", filterExpression,
 		"|",
-		"ForEach-Object { $_.Message }",
+		"ConvertTo-Json",
 	}
 
 	cmd, err := allowedcmd.Powershell(ctx, cmdArgs...)
@@ -268,7 +271,7 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 
 	cmdletArgs := []string{
 		"Get-EventLog",
-		"-Newest", "50",
+		"-Newest", "100",
 		"-LogName", "System",
 		"-Source", "\"Service Control Manager\"",
 		"-Message", fmt.Sprintf("*%s*", kolideSvcName),
