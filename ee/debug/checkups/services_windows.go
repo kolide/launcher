@@ -254,7 +254,8 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
 	hideWindow(cmd)
-	cmd.Stdout = out // write directly to zip
+	cmd.Stdout = out
+	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("running Get-WinEvent: error %w", err)
 	}
@@ -284,7 +285,8 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
 	hideWindow(getEventLogCmd)
-	getEventLogCmd.Stdout = eventLogOut // write directly to zip
+	getEventLogCmd.Stdout = eventLogOut
+	getEventLogCmd.Stderr = eventLogOut
 	if err := getEventLogCmd.Run(); err != nil {
 		return fmt.Errorf("running Get-EventLog: error %w", err)
 	}
