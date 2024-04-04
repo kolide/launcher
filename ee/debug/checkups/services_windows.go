@@ -239,7 +239,7 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
 		return fmt.Errorf("creating eventlog-Get-WinEvent.json: %w", err)
 	}
 
-	filterExpression := fmt.Sprintf(`'@{LogName='System'; ProviderName='Service Control Manager'; Data=%s}'`, kolideSvcName)
+	filterExpression := fmt.Sprintf(`@{LogName='System'; ProviderName='Service Control Manager'; Data='%s'}`, kolideSvcName)
 
 	cmdArgs := []string{
 		"Get-WinEvent",
