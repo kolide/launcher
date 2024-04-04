@@ -18,10 +18,8 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 
 	"golang.org/x/sys/windows/svc"
@@ -33,46 +31,28 @@ const serviceName = "launcher"
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
-func runWindowsSvc(args []string) error {
-	eventLogWriter, err := eventlog.NewWriter(serviceName)
-	if err != nil {
-		return fmt.Errorf("create eventlog writer: %w", err)
-	}
-	defer eventLogWriter.Close()
-
-	logger := eventlog.New(eventLogWriter)
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-	level.Debug(logger).Log(
-		"msg", "service start requested",
+func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
+	systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+		"service start requested",
 		"version", version.Version().Version,
 	)
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
-		level.Info(logger).Log("msg", "Error parsing options", "err", err)
+		systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+			"error parsing options",
+			"err", err,
+		)
 		os.Exit(1)
 	}
 
-	// Now that we've parsed the options, let's set a filter on our eventLog logger.
-	// We don't want to set this on the teelogger below because we want debug logs to always
-	// go to debug.json.
-	if opts.Debug {
-		logger = level.NewFilter(logger, level.AllowDebug())
-	} else {
-		logger = level.NewFilter(logger, level.AllowInfo())
-	}
-
-	systemSlogger := multislogger.New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
 	localSlogger := multislogger.New()
+	logger := log.NewNopLogger()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
-		logger = teelogger.New(logger, ll)
+		logger = ll
 
 		localSloggerHandler := slog.NewJSONHandler(ll.Writer(), &slog.HandlerOptions{
 			AddSource: true,
@@ -83,8 +63,6 @@ func runWindowsSvc(args []string) error {
 
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
-
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	// Use the FindNewest mechanism to delete old
@@ -95,7 +73,7 @@ func runWindowsSvc(args []string) error {
 	go func() {
 		time.Sleep(15 * time.Second)
 		_ = autoupdate.FindNewest(
-			ctxlog.NewContext(context.TODO(), logger),
+			context.TODO(),
 			os.Args[0],
 			autoupdate.DeleteOldUpdates(),
 		)
@@ -104,21 +82,21 @@ func runWindowsSvc(args []string) error {
 	// Confirm that service configuration is up-to-date
 	checkServiceConfiguration(systemSlogger.Logger, opts)
 
-	level.Info(logger).Log(
-		"msg", "launching service",
+	systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+		"launching service",
 		"version", version.Version().Version,
 	)
 
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			level.Info(logger).Log(
-				"msg", "panic occurred in windows service",
+			systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+				"panic occurred in windows service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				level.Info(logger).Log(
-					"msg", "panic stack trace",
+				systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+					"panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
 			}
@@ -150,7 +128,7 @@ func runWindowsSvc(args []string) error {
 	return nil
 }
 
-func runWindowsSvcForeground(args []string) error {
+func runWindowsSvcForeground(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	attachConsole()
 	defer detachConsole()
 
@@ -160,7 +138,6 @@ func runWindowsSvcForeground(args []string) error {
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
 	// Use new logger to write logs to stdout
-	systemSlogger := new(multislogger.MultiSlogger)
 	localSlogger := new(multislogger.MultiSlogger)
 
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{

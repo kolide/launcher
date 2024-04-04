@@ -3,8 +3,12 @@
 
 package main
 
-import "errors"
+import (
+	"errors"
 
-func runSecureEnclave(args []string) error {
+	"github.com/kolide/launcher/pkg/log/multislogger"
+)
+
+func runSecureEnclave(_ *multislogger.MultiSlogger, args []string) error {
 	return errors.New("not implemented on non darwin platforms")
 }

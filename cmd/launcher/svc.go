@@ -6,15 +6,17 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-func runWindowsSvc(args []string) error {
+func runWindowsSvc(_ *multislogger.MultiSlogger, _ []string) error {
 	fmt.Println("This isn't windows")
 	os.Exit(1)
 	return nil
 }
 
-func runWindowsSvcForeground(args []string) error {
+func runWindowsSvcForeground(_ *multislogger.MultiSlogger, _ []string) error {
 	fmt.Println("This isn't windows")
 	os.Exit(1)
 	return nil

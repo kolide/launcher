@@ -11,13 +11,14 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/krypto/pkg/secureenclave"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 // runSecureEnclave performs either a create-key operation using the secure enclave.
 // It's available as a separate command because launcher runs as root by default and since it's
 // not in a user security context, it can't use the secure enclave directly. However, this command
 // can be run in the user context using launchctl.
-func runSecureEnclave(args []string) error {
+func runSecureEnclave(_ *multislogger.MultiSlogger, args []string) error {
 	// currently we are just creating key, but plan to add sign command in future
 	if len(args) < 1 {
 		return errors.New("not enough arguments, expect create_key")

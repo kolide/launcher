@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/env"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	osquerygo "github.com/osquery/osquery-go"
 )
 
@@ -17,7 +18,7 @@ type queryFile struct {
 	Queries map[string]string `json:"queries"`
 }
 
-func runQuery(args []string) error {
+func runQuery(_ *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("launcher query", flag.ExitOnError)
 	var (
 		flQueries = flagset.String(

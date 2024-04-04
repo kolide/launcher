@@ -18,7 +18,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
-func runInteractive(args []string) error {
+func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("interactive", flag.ExitOnError)
 	var (
 		flDebug        = flagset.Bool("debug", false, "enable debug logging")
@@ -38,14 +38,15 @@ func runInteractive(args []string) error {
 		slogLevel = slog.LevelDebug
 	}
 
-	slogger := multislogger.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
-	})).Logger
+	}))
 
 	osquerydPath := *flOsquerydPath
 	if osquerydPath == "" {
-		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", slogger)
+		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", systemMultiSlogger.Logger)
 		if err != nil {
 			osquerydPath = launcher.FindOsquery()
 			if osquerydPath == "" {
@@ -89,7 +90,7 @@ func runInteractive(args []string) error {
 		flOsqueryFlags = append(flOsqueryFlags, fmt.Sprintf("tls_server_certs=%s", certs))
 	}
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(slogger, rootDir, osquerydPath, flOsqueryFlags)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(systemMultiSlogger.Logger, rootDir, osquerydPath, flOsqueryFlags)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}

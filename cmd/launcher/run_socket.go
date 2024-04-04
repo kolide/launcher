@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 )
 
-func runSocket(args []string) error {
+func runSocket(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	flagset := flag.NewFlagSet("launcher socket", flag.ExitOnError)
 	var (
 		flPath = flagset.String(
@@ -59,12 +59,13 @@ func runSocket(args []string) error {
 	if err != nil {
 		return err
 	}
-	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: true,
-	})).Logger
+	}))
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(cmdlineopts)}
-	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)
+	flagController := flags.NewFlagController(systemMultiSlogger.Logger, inmemory.NewStore(), fcOpts...)
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 	runner := runtime.New(k, opts...)
 	go runner.Run()

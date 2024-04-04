@@ -22,7 +22,7 @@ import (
 )
 
 // runFlare is a command that runs the flare checkup and saves the results locally or uploads them to a server.
-func runFlare(args []string) error {
+func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	attachConsole()
 	defer detachConsole()
 
@@ -54,13 +54,14 @@ func runFlare(args []string) error {
 		slogLevel = slog.LevelDebug
 	}
 
-	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
-	})).Logger
+	}))
 
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
-	flagController := flags.NewFlagController(slogger, inmemory.NewStore(), fcOpts...)
+	flagController := flags.NewFlagController(systemMultiSlogger.Logger, inmemory.NewStore(), fcOpts...)
 
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 	ctx := context.Background()
@@ -99,7 +100,7 @@ func runFlare(args []string) error {
 		return err
 	}
 
-	slogger.Log(ctx, slog.LevelInfo,
+	systemMultiSlogger.Logger.Log(ctx, slog.LevelInfo,
 		"flare creation complete",
 		"status", successMessage,
 		"file", flareDest.Name(),
