@@ -41,7 +41,7 @@ func runCompactDb(systemMultiSlogger *multislogger.MultiSlogger, args []string) 
 		return err
 	}
 
-	systemMultiSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+	systemMultiSlogger.Log(context.TODO(), slog.LevelInfo,
 		"done compacting, safe to remove old db",
 		"path", oldDbPath,
 	)

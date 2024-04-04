@@ -100,7 +100,7 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return err
 	}
 
-	systemMultiSlogger.Logger.Log(ctx, slog.LevelInfo,
+	systemMultiSlogger.Log(ctx, slog.LevelInfo,
 		"flare creation complete",
 		"status", successMessage,
 		"file", flareDest.Name(),
