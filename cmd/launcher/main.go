@@ -27,26 +27,27 @@ import (
 )
 
 func main() {
-	// create initial logger. As this is prior to options parsing,
-	// use the environment to determine verbosity.  It will be
-	// re-leveled during options parsing.
-	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
-
-	level.Info(logger).Log(
-		"msg", "Launcher starting up",
-		"version", version.Version().Version,
-		"revision", version.Version().Revision,
-	)
+	systemSlogger, logCloser, err := multislogger.SystemSlogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating system logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logCloser.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ctx = ctxlog.NewContext(ctx, logger)
+	systemSlogger.Log(ctx, slog.LevelInfo,
+		"launcher starting up",
+		"version", version.Version().Version,
+		"revision", version.Version().Revision,
+	)
 
-	// set up system slogger to write to os logs
-	systemSlogger := multislogger.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	// create initial logger. As this is prior to options parsing,
+	// use the environment to determine verbosity.  It will be
+	// re-leveled during options parsing.
+	logger := logutil.NewServerLogger(env.Bool("LAUNCHER_DEBUG", false))
+	ctx = ctxlog.NewContext(ctx, logger)
 
 	// If this is a development build directory, we want to skip the TUF lookups and just run
 	// the requested build. Don't care about errors here. This is developer experience shim
