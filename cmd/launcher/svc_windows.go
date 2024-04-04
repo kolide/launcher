@@ -32,14 +32,14 @@ const serviceName = "launcher"
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
-	systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"service start requested",
 		"version", version.Version().Version,
 	)
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
-		systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+		systemSlogger.Log(context.TODO(), slog.LevelInfo,
 			"error parsing options",
 			"err", err,
 		)
@@ -82,7 +82,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	// Confirm that service configuration is up-to-date
 	checkServiceConfiguration(systemSlogger.Logger, opts)
 
-	systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"launching service",
 		"version", version.Version().Version,
 	)
@@ -90,12 +90,12 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+			systemSlogger.Log(context.TODO(), slog.LevelInfo,
 				"panic occurred in windows service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				systemSlogger.Logger.Log(context.TODO(), slog.LevelInfo,
+				systemSlogger.Log(context.TODO(), slog.LevelInfo,
 					"panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
@@ -113,16 +113,18 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
-		level.Info(logger).Log(
-			"msg", "error in service run",
+		systemSlogger.Log(context.TODO(), slog.LevelInfo,
+			"error in service run",
 			"err", err,
-			"version", version.Version().Version,
 		)
 		time.Sleep(time.Second)
 		return err
 	}
 
-	level.Debug(logger).Log("msg", "service exited", "version", version.Version().Version)
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		"service exited",
+	)
+
 	time.Sleep(time.Second)
 
 	return nil
@@ -169,21 +171,26 @@ type winSvc struct {
 }
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	changes <- svc.Status{State: svc.StartPending}
-	level.Debug(w.logger).Log("msg", "windows service starting")
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
+	changes <- svc.Status{State: svc.StartPending}
+	w.systemSlogger.Log(ctx, slog.LevelInfo,
+		"windows service starting",
+	)
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
-			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
-			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"runLauncher exited",
+				"err", err,
+				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+			)
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			// Launcher is already shut down -- fully exit so that the service manager can restart the service
 			os.Exit(1)
@@ -193,7 +200,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// nothing, the service is left running, but with no
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
-		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
+		w.systemSlogger.Log(ctx, slog.LevelInfo,
+			"runLauncher exited cleanly",
+		)
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		os.Exit(0)
 	}()
@@ -208,14 +217,19 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				level.Info(w.logger).Log("msg", "shutdown request received")
+				w.systemSlogger.Log(ctx, slog.LevelInfo,
+					"shutdown request received",
+				)
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
-				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
+				w.systemSlogger.Log(ctx, slog.LevelInfo,
+					"unexpected change request",
+					"change_request", fmt.Sprintf("%+v", c),
+				)
 			}
 		}
 	}
