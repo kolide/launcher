@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/peterbourgon/ff/v3"
 )
 
 // Specific to Unix platforms, matching only standard-looking identifiers
 var identifierRegexp = regexp.MustCompile(`^\/var\/([-a-zA-Z0-9]*)\/.*\.kolide\.com`)
 
-func runUninstall(args []string) error {
+func runUninstall(_ *multislogger.MultiSlogger, args []string) error {
 	var (
 		flagset         = flag.NewFlagSet("kolide uninstaller", flag.ExitOnError)
 		flRootDirectory = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")

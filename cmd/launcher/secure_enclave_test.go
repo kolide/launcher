@@ -15,6 +15,7 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/secureenclavesigner"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,7 +107,7 @@ func TestSecureEnclaveCmd(t *testing.T) { //nolint:paralleltest
 
 	os.Stdout = pipeWriter
 
-	require.NoError(t, runSecureEnclave([]string{secureenclavesigner.CreateKeyCmd}))
+	require.NoError(t, runSecureEnclave(multislogger.New(), []string{secureenclavesigner.CreateKeyCmd}))
 	require.NoError(t, pipeWriter.Close())
 
 	var buf bytes.Buffer

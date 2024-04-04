@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-func runCompactDb(args []string) error {
+func runCompactDb(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	opts, err := launcher.ParseOptions("compactdb", args)
 	if err != nil {
 		return err
@@ -28,10 +28,11 @@ func runCompactDb(args []string) error {
 		slogLevel = slog.LevelDebug
 	}
 
-	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
-	})).Logger
+	}))
 
 	boltPath := filepath.Join(opts.RootDirectory, "launcher.db")
 
@@ -40,7 +41,7 @@ func runCompactDb(args []string) error {
 		return err
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	systemMultiSlogger.Log(context.TODO(), slog.LevelInfo,
 		"done compacting, safe to remove old db",
 		"path", oldDbPath,
 	)

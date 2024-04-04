@@ -18,10 +18,8 @@ import (
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/eventlog"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/pkg/errors"
 
 	"golang.org/x/sys/windows/svc"
@@ -33,46 +31,28 @@ const serviceName = "launcher"
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
-func runWindowsSvc(args []string) error {
-	eventLogWriter, err := eventlog.NewWriter(serviceName)
-	if err != nil {
-		return fmt.Errorf("create eventlog writer: %w", err)
-	}
-	defer eventLogWriter.Close()
-
-	logger := eventlog.New(eventLogWriter)
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
-
-	level.Debug(logger).Log(
-		"msg", "service start requested",
+func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		"service start requested",
 		"version", version.Version().Version,
 	)
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
-		level.Info(logger).Log("msg", "Error parsing options", "err", err)
+		systemSlogger.Log(context.TODO(), slog.LevelInfo,
+			"error parsing options",
+			"err", err,
+		)
 		os.Exit(1)
 	}
 
-	// Now that we've parsed the options, let's set a filter on our eventLog logger.
-	// We don't want to set this on the teelogger below because we want debug logs to always
-	// go to debug.json.
-	if opts.Debug {
-		logger = level.NewFilter(logger, level.AllowDebug())
-	} else {
-		logger = level.NewFilter(logger, level.AllowInfo())
-	}
-
-	systemSlogger := multislogger.New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-
 	localSlogger := multislogger.New()
+	logger := log.NewNopLogger()
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
-		logger = teelogger.New(logger, ll)
+		logger = ll
 
 		localSloggerHandler := slog.NewJSONHandler(ll.Writer(), &slog.HandlerOptions{
 			AddSource: true,
@@ -83,8 +63,6 @@ func runWindowsSvc(args []string) error {
 
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
-
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	// Use the FindNewest mechanism to delete old
@@ -95,7 +73,7 @@ func runWindowsSvc(args []string) error {
 	go func() {
 		time.Sleep(15 * time.Second)
 		_ = autoupdate.FindNewest(
-			ctxlog.NewContext(context.TODO(), logger),
+			context.TODO(),
 			os.Args[0],
 			autoupdate.DeleteOldUpdates(),
 		)
@@ -104,21 +82,21 @@ func runWindowsSvc(args []string) error {
 	// Confirm that service configuration is up-to-date
 	checkServiceConfiguration(systemSlogger.Logger, opts)
 
-	level.Info(logger).Log(
-		"msg", "launching service",
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		"launching service",
 		"version", version.Version().Version,
 	)
 
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			level.Info(logger).Log(
-				"msg", "panic occurred in windows service",
+			systemSlogger.Log(context.TODO(), slog.LevelInfo,
+				"panic occurred in windows service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				level.Info(logger).Log(
-					"msg", "panic stack trace",
+				systemSlogger.Log(context.TODO(), slog.LevelInfo,
+					"panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
 			}
@@ -135,22 +113,24 @@ func runWindowsSvc(args []string) error {
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
-		level.Info(logger).Log(
-			"msg", "error in service run",
+		systemSlogger.Log(context.TODO(), slog.LevelInfo,
+			"error in service run",
 			"err", err,
-			"version", version.Version().Version,
 		)
 		time.Sleep(time.Second)
 		return err
 	}
 
-	level.Debug(logger).Log("msg", "service exited", "version", version.Version().Version)
+	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		"service exited",
+	)
+
 	time.Sleep(time.Second)
 
 	return nil
 }
 
-func runWindowsSvcForeground(args []string) error {
+func runWindowsSvcForeground(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	attachConsole()
 	defer detachConsole()
 
@@ -160,7 +140,6 @@ func runWindowsSvcForeground(args []string) error {
 	level.Debug(logger).Log("msg", "foreground service start requested (debug mode)")
 
 	// Use new logger to write logs to stdout
-	systemSlogger := new(multislogger.MultiSlogger)
 	localSlogger := new(multislogger.MultiSlogger)
 
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -192,21 +171,26 @@ type winSvc struct {
 }
 
 func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
-	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	changes <- svc.Status{State: svc.StartPending}
-	level.Debug(w.logger).Log("msg", "windows service starting")
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
+	changes <- svc.Status{State: svc.StartPending}
+	w.systemSlogger.Log(ctx, slog.LevelInfo,
+		"windows service starting",
+	)
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
-			level.Info(w.logger).Log("msg", "runLauncher exited", "err", err)
-			level.Debug(w.logger).Log("msg", "runLauncher exited", "err", err, "stack", fmt.Sprintf("%+v", err))
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"runLauncher exited",
+				"err", err,
+				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+			)
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 			// Launcher is already shut down -- fully exit so that the service manager can restart the service
 			os.Exit(1)
@@ -216,7 +200,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		// nothing, the service is left running, but with no
 		// functionality. Instead, signal that as a stop to the service
 		// manager, and exit. We rely on the service manager to restart.
-		level.Info(w.logger).Log("msg", "runLauncher exited cleanly")
+		w.systemSlogger.Log(ctx, slog.LevelInfo,
+			"runLauncher exited cleanly",
+		)
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		os.Exit(0)
 	}()
@@ -231,14 +217,19 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(100 * time.Millisecond)
 				changes <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				level.Info(w.logger).Log("msg", "shutdown request received")
+				w.systemSlogger.Log(ctx, slog.LevelInfo,
+					"shutdown request received",
+				)
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
 				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
-				level.Info(w.logger).Log("msg", "unexpected change request", "change_request", fmt.Sprintf("%+v", c))
+				w.systemSlogger.Log(ctx, slog.LevelInfo,
+					"unexpected change request",
+					"change_request", fmt.Sprintf("%+v", c),
+				)
 			}
 		}
 	}

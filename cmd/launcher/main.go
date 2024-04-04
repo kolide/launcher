@@ -68,7 +68,7 @@ func main() {
 	// if the launcher is being ran with a positional argument,
 	// handle that argument. Fall-back to running launcher
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
-		if err := runSubcommands(); err != nil {
+		if err := runSubcommands(systemSlogger); err != nil {
 			logutil.Fatal(logger, "err", fmt.Errorf("run with positional args: %w", err))
 		}
 		os.Exit(0)
@@ -100,8 +100,6 @@ func main() {
 
 		// also send system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
-
-		locallogger.CleanUpRenamedDebugLogs(opts.RootDirectory, logger)
 	}
 
 	defer func() {
@@ -133,8 +131,8 @@ func main() {
 	}
 }
 
-func runSubcommands() error {
-	var run func([]string) error
+func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
+	var run func(*multislogger.MultiSlogger, []string) error
 	switch os.Args[1] {
 	case "socket":
 		run = runSocket
@@ -166,7 +164,7 @@ func runSubcommands() error {
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
 
-	if err := run(os.Args[2:]); err != nil {
+	if err := run(systemMultiSlogger, os.Args[2:]); err != nil {
 		return fmt.Errorf("running subcommand %s: %w", os.Args[1], err)
 	}
 
@@ -258,7 +256,7 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 	}
 }
 
-func runVersion(args []string) error {
+func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	attachConsole()
 	version.PrintFull()
 	detachConsole()

@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 )
 
 // runDownloadOsquery downloads the stable osquery to the provided path. It's meant for use in out CI pipeline.
-func runDownloadOsquery(args []string) error {
+func runDownloadOsquery(_ *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download-osquery", flag.ExitOnError)
 
 	var (

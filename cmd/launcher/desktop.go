@@ -19,12 +19,13 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/systray"
 	"github.com/peterbourgon/ff/v3"
 )
 
-func runDesktop(args []string) error {
+func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	var (
 		flagset    = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
 		flhostname = flagset.String(
