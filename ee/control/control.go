@@ -147,15 +147,6 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 		return
 	}
 
-	// perform a fetch now
-	if err := cs.Fetch(); err != nil {
-		// if we got an error, log it and move on
-		cs.slogger.Log(context.TODO(), slog.LevelWarn,
-			"failed to fetch data from control server. Not fatal, moving on",
-			"err", err,
-		)
-	}
-
 	if interval < cs.requestInterval {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"accelerating control service request interval",
