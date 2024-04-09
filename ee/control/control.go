@@ -78,6 +78,7 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 // wrapper over the Start function, which takes a context.Context.
 func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
 	return func() error {
+		ctx, cs.cancel = context.WithCancel(ctx)
 		cs.Start(ctx)
 		return nil
 	}
@@ -88,7 +89,6 @@ func (cs *ControlService) Start(ctx context.Context) {
 	cs.slogger.Log(ctx, slog.LevelInfo,
 		"control service started",
 	)
-	ctx, cs.cancel = context.WithCancel(ctx)
 
 	startUpMessageSuccess := false
 
