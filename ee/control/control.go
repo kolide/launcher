@@ -147,6 +147,14 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 		return
 	}
 
+	if err := cs.Fetch(); err != nil {
+		// if we got an error, log it and move on
+		cs.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to fetch data from control server. Not fatal, moving on",
+			"err", err,
+		)
+	}
+
 	if interval < cs.requestInterval {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"accelerating control service request interval",
@@ -166,7 +174,16 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	cs.fetchMutex.Lock()
+	// Do not block in the case where:
+	// 1. `Start` called `Fetch` on an interval
+	// 2. The control service received an updated `ControlRequestInterval` from the server
+	// 3. `requestIntervalChanged` is now attempting to call `Fetch` again before updating the interval
+	// We do want to allow `requestIntervalChanged` to call `Fetch` to handle the case where
+	// `ControlRequestInterval` updated via a different mechanism, like a request to localserver
+	// or the user clicking on the menu bar app.
+	if !cs.fetchMutex.TryLock() {
+		return errors.New("fetch is currently executing elsewhere")
+	}
 	defer cs.fetchMutex.Unlock()
 
 	// Empty hash means get the map of subsystems & hashes
