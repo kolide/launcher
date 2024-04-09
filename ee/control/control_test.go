@@ -302,7 +302,7 @@ func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
 	service.Interrupt(errors.New("test error"))
 
 	// Confirm request interval was updated as expected
-	require.Equal(t, expectedInterval, service.requestInterval)
+	require.Equal(t, expectedInterval, service.readRequestInterval())
 }
 
 func TestControlServicePersistLastFetched(t *testing.T) {

@@ -18,17 +18,18 @@ import (
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	slogger         *slog.Logger
-	knapsack        types.Knapsack
-	cancel          context.CancelFunc
-	requestInterval time.Duration
-	requestTicker   *time.Ticker
-	fetcher         dataProvider
-	fetchMutex      sync.Mutex
-	store           types.GetterSetter
-	lastFetched     map[string]string
-	consumers       map[string]consumer
-	subscribers     map[string][]subscriber
+	slogger              *slog.Logger
+	knapsack             types.Knapsack
+	cancel               context.CancelFunc
+	requestIntervalMutex *sync.RWMutex
+	requestInterval      time.Duration
+	requestTicker        *time.Ticker
+	fetcher              dataProvider
+	fetchMutex           sync.Mutex
+	store                types.GetterSetter
+	lastFetched          map[string]string
+	consumers            map[string]consumer
+	subscribers          map[string][]subscriber
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -53,13 +54,14 @@ type dataProvider interface {
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		slogger:         k.Slogger().With("component", "control"),
-		knapsack:        k,
-		requestInterval: k.ControlRequestInterval(),
-		fetcher:         fetcher,
-		lastFetched:     make(map[string]string),
-		consumers:       make(map[string]consumer),
-		subscribers:     make(map[string][]subscriber),
+		slogger:              k.Slogger().With("component", "control"),
+		knapsack:             k,
+		requestInterval:      k.ControlRequestInterval(),
+		requestIntervalMutex: &sync.RWMutex{},
+		fetcher:              fetcher,
+		lastFetched:          make(map[string]string),
+		consumers:            make(map[string]consumer),
+		subscribers:          make(map[string][]subscriber),
 	}
 
 	for _, opt := range opts {
@@ -142,8 +144,9 @@ func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 }
 
-func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
-	if interval == cs.requestInterval {
+func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
+	currentRequestInterval := cs.readRequestInterval()
+	if newInterval == currentRequestInterval {
 		return
 	}
 
@@ -158,21 +161,35 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 		)
 	}
 
-	if interval < cs.requestInterval {
+	if newInterval < currentRequestInterval {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"accelerating control service request interval",
-			"interval", interval,
+			"new_interval", newInterval.String(),
+			"old_interval", currentRequestInterval.String(),
 		)
 	} else {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"resetting control service request interval after acceleration",
-			"interval", cs.requestInterval,
+			"new_interval", newInterval.String(),
+			"old_interval", currentRequestInterval.String(),
 		)
 	}
 
 	// restart the ticker on new interval
+	cs.setRequestInterval(newInterval)
+	cs.requestTicker.Reset(newInterval)
+}
+
+func (cs *ControlService) setRequestInterval(interval time.Duration) {
+	cs.requestIntervalMutex.Lock()
+	defer cs.requestIntervalMutex.Unlock()
 	cs.requestInterval = interval
-	cs.requestTicker.Reset(interval)
+}
+
+func (cs *ControlService) readRequestInterval() time.Duration {
+	cs.requestIntervalMutex.RLock()
+	defer cs.requestIntervalMutex.RUnlock()
+	return cs.requestInterval
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
