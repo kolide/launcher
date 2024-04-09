@@ -4,11 +4,17 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -254,6 +260,48 @@ func TestControlServiceFetch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
+	t.Parallel()
+
+	// We want an actual, minimal test knapsack rather than a mock
+	// to ensure that we get a call to `FlagsChanged` when the
+	// `ControlRequestInterval` flag changes during a `Fetch`.
+	nopMultislogger := multislogger.New()
+	db := storageci.SetupDB(t)
+	stores, err := storageci.MakeStores(t, nopMultislogger.Logger, db)
+	require.NoError(t, err)
+	flagController := flags.NewFlagController(nopMultislogger.Logger, stores[storage.AgentFlagsStore])
+	flagController.SetControlRequestInterval(5 * time.Second) // this is the minimum value
+	testKnapsack := knapsack.New(stores, flagController, db, nopMultislogger, nopMultislogger)
+
+	// Init the test client
+	expectedInterval := 6 * time.Second
+	expectedIntervalInNanoseconds := expectedInterval.Nanoseconds()
+	subsystemMap := map[string]string{"agent_flags": "302a42f3"}
+	hashData := map[string]any{"302a42f3": map[string]string{
+		"control_request_interval": strconv.FormatInt(expectedIntervalInNanoseconds, 10),
+	}}
+	client, err := NewControlTestClient(subsystemMap, hashData)
+	require.NoError(t, err)
+
+	// Init the service and register consumer
+	controlOpts := []Option{
+		WithStore(testKnapsack.ControlStore()),
+	}
+	service := New(testKnapsack, client, controlOpts...)
+	require.NoError(t, service.RegisterConsumer("agent_flags", keyvalueconsumer.New(flagController)))
+
+	// Start running and wait at least a couple request intervals for the change to be applied
+	go service.Start(context.TODO())
+	time.Sleep(2 * service.requestInterval)
+
+	// Confirm request interval was updated as expected
+	require.Equal(t, expectedInterval, service.requestInterval)
+
+	// Stop the service
+	service.Interrupt(errors.New("test error"))
 }
 
 func TestControlServicePersistLastFetched(t *testing.T) {
