@@ -273,7 +273,8 @@ func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
 	stores, err := storageci.MakeStores(t, nopMultislogger.Logger, db)
 	require.NoError(t, err)
 	flagController := flags.NewFlagController(nopMultislogger.Logger, stores[storage.AgentFlagsStore])
-	flagController.SetControlRequestInterval(5 * time.Second) // this is the minimum value
+	startingRequestInterval := 5 * time.Second // this is the minimum value
+	flagController.SetControlRequestInterval(startingRequestInterval)
 	testKnapsack := knapsack.New(stores, flagController, db, nopMultislogger, nopMultislogger)
 
 	// Init the test client
@@ -295,13 +296,13 @@ func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
 
 	// Start running and wait at least a couple request intervals for the change to be applied
 	go service.Start(context.TODO())
-	time.Sleep(2 * service.requestInterval)
-
-	// Confirm request interval was updated as expected
-	require.Equal(t, expectedInterval, service.requestInterval)
+	time.Sleep(2 * startingRequestInterval)
 
 	// Stop the service
 	service.Interrupt(errors.New("test error"))
+
+	// Confirm request interval was updated as expected
+	require.Equal(t, expectedInterval, service.requestInterval)
 }
 
 func TestControlServicePersistLastFetched(t *testing.T) {
