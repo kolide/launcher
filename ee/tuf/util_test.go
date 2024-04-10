@@ -2,7 +2,6 @@ package tuf
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,8 +67,11 @@ func TestCheckExecutable(t *testing.T) {
 
 	// We need to run this from a temp dir, else the early return
 	// from matching os.Executable bypasses the point of this.
-	tmpDir, binaryName := setupTestDir(t, executableUpdates)
+	tmpDir := t.TempDir()
+	binaryName := windowsAddExe("testbinary")
 	targetExe := filepath.Join(tmpDir, binaryName)
+	tufci.CopyBinary(t, targetExe)
+	require.NoError(t, os.Chmod(targetExe, 0755))
 
 	var tests = []struct {
 		testName    string
@@ -122,7 +125,7 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	defer os.Remove(truncatedBinary.Name())
 	truncatedBinary.Close()
 
-	require.NoError(t, copyFile(truncatedBinary.Name(), os.Args[0], true), "copy executable")
+	copyFileTruncated(t, truncatedBinary.Name(), os.Args[0])
 	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
 
 	require.Error(t,
@@ -130,120 +133,21 @@ func TestCheckExecutableTruncated(t *testing.T) {
 		"truncated binary")
 }
 
-// copyFile copies a file from srcPath to dstPath. If truncate is set,
-// only half the file is copied. (This is a trivial wrapper to
-// simplify setting up test cases)
-func copyFile(dstPath, srcPath string, truncate bool) error {
+// copyFile copies half of the file from srcPath to dstPath.
+func copyFileTruncated(t *testing.T, dstPath, srcPath string) {
 	src, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err, "opening src")
 	defer src.Close()
 
 	dst, err := os.Create(dstPath)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err, "opening dest")
 	defer dst.Close()
 
-	if !truncate {
-		if _, err := io.Copy(dst, src); err != nil {
-			return err
-		}
-	} else {
-		stat, err := src.Stat()
-		if err != nil {
-			return fmt.Errorf("statting srcFile: %w", err)
-		}
+	stat, err := src.Stat()
+	require.NoError(t, err, "statting src")
 
-		if _, err = io.CopyN(dst, src, stat.Size()/2); err != nil {
-			return fmt.Errorf("copying srcFile: %w", err)
-		}
-	}
-
-	return nil
-}
-
-type setupState int
-
-const (
-	emptySetup setupState = iota
-	emptyUpdateDirs
-	nonExecutableUpdates
-	executableUpdates
-	truncatedUpdates
-)
-
-// This suffix is added to the binary path to find the updates
-const updateDirSuffix = "-updates"
-
-// setupTestDir function to setup the test dirs. This work is broken
-// up in stages, allowing test functions to tap into various
-// points. This is setup this way to allow simpler isolation on test
-// failures.
-func setupTestDir(t *testing.T, stage setupState) (string, string) {
-	tmpDir := t.TempDir()
-
-	// Create a test binary
-	binaryName := windowsAddExe("binary")
-	binaryPath := filepath.Join(tmpDir, binaryName)
-	updatesDir := fmt.Sprintf("%s%s", binaryPath, updateDirSuffix)
-
-	require.NoError(t, copyFile(binaryPath, os.Args[0], false), "copy executable")
-	require.NoError(t, os.Chmod(binaryPath, 0755), "chmod")
-
-	if stage <= emptySetup {
-		return tmpDir, binaryName
-	}
-
-	// make some update directories
-	// (these are out of order, to jumble up the create times)
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n), 0755))
-		if runtime.GOOS == "darwin" {
-			require.NoError(t, os.MkdirAll(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS"), 0755))
-		}
-	}
-
-	if stage <= emptyUpdateDirs {
-		return tmpDir, binaryName
-	}
-
-	// Copy executable to update directories
-	for _, n := range []string{"2", "5", "3", "1"} {
-		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
-		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, false), "copy executable")
-		if runtime.GOOS == "darwin" {
-			updatedAppBundleBinaryPath := filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", filepath.Base(binaryPath))
-			require.NoError(t, copyFile(updatedAppBundleBinaryPath, binaryPath, false), "copy executable")
-		}
-	}
-
-	if stage <= nonExecutableUpdates {
-		return tmpDir, binaryName
-	}
-
-	// Make our top-level binaries executable
-	for _, n := range []string{"2", "5", "3", "1"} {
-		require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, binaryName), 0755))
-		if runtime.GOOS == "darwin" {
-			require.NoError(t, os.Chmod(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", binaryName), 0755))
-		}
-	}
-
-	if stage <= executableUpdates {
-		return tmpDir, binaryName
-	}
-
-	for _, n := range []string{"5", "1"} {
-		updatedBinaryPath := filepath.Join(updatesDir, n, binaryName)
-		require.NoError(t, copyFile(updatedBinaryPath, binaryPath, true), "copy & truncate executable")
-		if runtime.GOOS == "darwin" {
-			require.NoError(t, copyFile(filepath.Join(updatesDir, n, "Test.app", "Contents", "MacOS", binaryName), binaryPath, true), "copy & truncate executable")
-		}
-	}
-
-	return tmpDir, binaryName
+	_, err = io.CopyN(dst, src, stat.Size()/2)
+	require.NoError(t, err, "copying src to dest")
 }
 
 // TestHelperProcess isn't a real test. It's used as a helper process
