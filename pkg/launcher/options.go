@@ -82,7 +82,7 @@ type Options struct {
 	// updates.
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
-	UpdateChannel autoupdate.UpdateChannel
+	UpdateChannel UpdateChannel
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
@@ -319,16 +319,16 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
-	var updateChannel autoupdate.UpdateChannel
+	var updateChannel UpdateChannel
 	switch *flUpdateChannel {
 	case "", "stable":
-		updateChannel = autoupdate.Stable
+		updateChannel = Stable
 	case "beta":
-		updateChannel = autoupdate.Beta
+		updateChannel = Beta
 	case "alpha":
-		updateChannel = autoupdate.Alpha
+		updateChannel = Alpha
 	case "nightly":
-		updateChannel = autoupdate.Nightly
+		updateChannel = Nightly
 	default:
 		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
 	}
@@ -580,6 +580,30 @@ func FindOsquery() string {
 	}
 
 	return ""
+}
+
+// UpdateChannel determines the TUF target for a Updater.
+// The Default UpdateChannel is Stable.
+type UpdateChannel string
+
+const (
+	Stable  UpdateChannel = "stable"
+	Alpha   UpdateChannel = "alpha"
+	Beta    UpdateChannel = "beta"
+	Nightly UpdateChannel = "nightly"
+)
+
+func (c UpdateChannel) String() string {
+	return string(c)
+}
+
+func SanitizeUpdateChannel(value string) string {
+	switch UpdateChannel(value) {
+	case Stable, Alpha, Beta, Nightly:
+		return value
+	}
+	// Fallback to stable if invalid channel
+	return Stable.String()
 }
 
 func commandUsage(fs *flag.FlagSet, short string) func() {
