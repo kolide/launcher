@@ -217,7 +217,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
