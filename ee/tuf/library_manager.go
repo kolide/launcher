@@ -162,7 +162,9 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
 	if _, err := io.Copy(out, &fileBuffer); err != nil {
-		out.Close()
+		if err := out.Close(); err != nil {
+			return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and could not close file: %w", targetFilename, stagedUpdatePath, err)
+		}
 		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 	if err := out.Close(); err != nil {
