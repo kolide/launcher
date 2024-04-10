@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
@@ -208,7 +207,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
-			require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+			require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
@@ -538,7 +537,7 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
@@ -578,7 +577,7 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions

@@ -17,7 +17,6 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/theupdateframework/go-tuf/data"
@@ -68,7 +67,7 @@ func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) st
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	executablePath, _ := pathToTargetVersionExecutable(binary, targetFilename, ulm.baseDir)
-	return autoupdate.CheckExecutable(context.TODO(), executablePath, "--version") == nil
+	return CheckExecutable(context.TODO(), executablePath, "--version") == nil
 }
 
 // pathToTargetVersionExecutable returns the path to the executable for the desired target,
@@ -223,7 +222,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	// Validate the executable -- the executable check will occasionally time out, especially on Windows,
 	// and we aren't in a rush here, so we retry a couple times.
 	if err := backoff.WaitFor(func() error {
-		return autoupdate.CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version")
+		return CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version")
 	}, 45*time.Second, 15*time.Second); err != nil {
 		return fmt.Errorf("could not verify executable after retries: %w", err)
 	}
@@ -345,7 +344,7 @@ func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, ba
 		}
 
 		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
-		if err := autoupdate.CheckExecutable(ctx, executableLocation(versionDir, binary), "--version"); err != nil {
+		if err := CheckExecutable(ctx, executableLocation(versionDir, binary), "--version"); err != nil {
 			traces.SetError(span, err)
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
