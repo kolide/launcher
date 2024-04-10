@@ -281,6 +281,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 	if time.Now().Before(ta.initialDelayEnd) {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
 			"received update request during initial delay, discarding",
+			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
 		)
 		// We don't return an error because there's no need for the actionqueue to retry this request --
 		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
