@@ -18,17 +18,18 @@ import (
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	slogger         *slog.Logger
-	knapsack        types.Knapsack
-	cancel          context.CancelFunc
-	requestInterval time.Duration
-	requestTicker   *time.Ticker
-	fetcher         dataProvider
-	fetchMutex      sync.Mutex
-	store           types.GetterSetter
-	lastFetched     map[string]string
-	consumers       map[string]consumer
-	subscribers     map[string][]subscriber
+	slogger              *slog.Logger
+	knapsack             types.Knapsack
+	cancel               context.CancelFunc
+	requestIntervalMutex *sync.RWMutex
+	requestInterval      time.Duration
+	requestTicker        *time.Ticker
+	fetcher              dataProvider
+	fetchMutex           sync.Mutex
+	store                types.GetterSetter
+	lastFetched          map[string]string
+	consumers            map[string]consumer
+	subscribers          map[string][]subscriber
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -53,13 +54,14 @@ type dataProvider interface {
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		slogger:         k.Slogger().With("component", "control"),
-		knapsack:        k,
-		requestInterval: k.ControlRequestInterval(),
-		fetcher:         fetcher,
-		lastFetched:     make(map[string]string),
-		consumers:       make(map[string]consumer),
-		subscribers:     make(map[string][]subscriber),
+		slogger:              k.Slogger().With("component", "control"),
+		knapsack:             k,
+		requestInterval:      k.ControlRequestInterval(),
+		requestIntervalMutex: &sync.RWMutex{},
+		fetcher:              fetcher,
+		lastFetched:          make(map[string]string),
+		consumers:            make(map[string]consumer),
+		subscribers:          make(map[string][]subscriber),
 	}
 
 	for _, opt := range opts {
@@ -78,6 +80,7 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 // wrapper over the Start function, which takes a context.Context.
 func (cs *ControlService) ExecuteWithContext(ctx context.Context) func() error {
 	return func() error {
+		ctx, cs.cancel = context.WithCancel(ctx)
 		cs.Start(ctx)
 		return nil
 	}
@@ -88,7 +91,6 @@ func (cs *ControlService) Start(ctx context.Context) {
 	cs.slogger.Log(ctx, slog.LevelInfo,
 		"control service started",
 	)
-	ctx, cs.cancel = context.WithCancel(ctx)
 
 	startUpMessageSuccess := false
 
@@ -142,12 +144,15 @@ func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 }
 
-func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
-	if interval == cs.requestInterval {
+func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
+	currentRequestInterval := cs.readRequestInterval()
+	if newInterval == currentRequestInterval {
 		return
 	}
 
-	// perform a fetch now
+	// Perform a fetch now, to retrieve data faster in case this change
+	// was triggered by localserver or the user clicking on the menu bar app
+	// instead of by a control server change.
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
 		cs.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -156,26 +161,49 @@ func (cs *ControlService) requestIntervalChanged(interval time.Duration) {
 		)
 	}
 
-	if interval < cs.requestInterval {
+	if newInterval < currentRequestInterval {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"accelerating control service request interval",
-			"interval", interval,
+			"new_interval", newInterval.String(),
+			"old_interval", currentRequestInterval.String(),
 		)
 	} else {
 		cs.slogger.Log(context.TODO(), slog.LevelDebug,
 			"resetting control service request interval after acceleration",
-			"interval", cs.requestInterval,
+			"new_interval", newInterval.String(),
+			"old_interval", currentRequestInterval.String(),
 		)
 	}
 
 	// restart the ticker on new interval
+	cs.setRequestInterval(newInterval)
+	cs.requestTicker.Reset(newInterval)
+}
+
+func (cs *ControlService) setRequestInterval(interval time.Duration) {
+	cs.requestIntervalMutex.Lock()
+	defer cs.requestIntervalMutex.Unlock()
 	cs.requestInterval = interval
-	cs.requestTicker.Reset(interval)
+}
+
+func (cs *ControlService) readRequestInterval() time.Duration {
+	cs.requestIntervalMutex.RLock()
+	defer cs.requestIntervalMutex.RUnlock()
+	return cs.requestInterval
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch() error {
-	cs.fetchMutex.Lock()
+	// Do not block in the case where:
+	// 1. `Start` called `Fetch` on an interval
+	// 2. The control service received an updated `ControlRequestInterval` from the server
+	// 3. `requestIntervalChanged` is now attempting to call `Fetch` again before updating the interval
+	// We do want to allow `requestIntervalChanged` to call `Fetch` to handle the case where
+	// `ControlRequestInterval` updated via a different mechanism, like a request to localserver
+	// or the user clicking on the menu bar app.
+	if !cs.fetchMutex.TryLock() {
+		return errors.New("fetch is currently executing elsewhere")
+	}
 	defer cs.fetchMutex.Unlock()
 
 	// Empty hash means get the map of subsystems & hashes
