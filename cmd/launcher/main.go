@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -178,15 +177,10 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
 	newerBinary, err := latestLauncherPath(ctx, slogger)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"could not check out latest launcher, will fall back to old autoupdate library",
+			"could not check out latest launcher",
 			"err", err,
 		)
-
-		// Fall back to legacy autoupdate library
-		newerBinary, err = autoupdate.FindNewestSelf(ctx)
-		if err != nil {
-			return
-		}
+		return
 	}
 
 	if newerBinary == "" {

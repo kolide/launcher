@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -12,7 +11,6 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
@@ -48,12 +46,7 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 	if osquerydPath == "" {
 		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", systemMultiSlogger.Logger)
 		if err != nil {
-			osquerydPath = launcher.FindOsquery()
-			if osquerydPath == "" {
-				return errors.New("could not find osqueryd binary")
-			}
-			// Fall back to old autoupdate library
-			osquerydPath = autoupdate.FindNewest(context.Background(), osquerydPath)
+			return fmt.Errorf("finding osqueryd binary: %w", err)
 		} else {
 			osquerydPath = latestOsquerydBinary.Path
 		}

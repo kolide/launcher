@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -311,21 +310,14 @@ func (r *Runner) launchOsqueryInstance() error {
 	// see if we have the newest version. Do this every time. If
 	// this proves undesirable, we can expose a function to set
 	// o.opts.binaryPath in the finalizer to call.
-	//
-	// FindNewest uses context as a way to get a logger, so we need to
-	// create and pass a ctxlog in.
 	var currentOsquerydBinaryPath string
 	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.knapsack.PinnedOsquerydVersion(), o.opts.updateChannel, r.slogger)
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelDebug,
-			"could not get latest version of osqueryd from new autoupdate library, falling back",
+			"could not get latest version of osqueryd from autoupdate library",
 			"err", err,
 		)
-		currentOsquerydBinaryPath = autoupdate.FindNewest(
-			ctx,
-			o.opts.binaryPath,
-			autoupdate.DeleteOldUpdates(),
-		)
+		return fmt.Errorf("getting osqueryd path: %w", err)
 	} else {
 		currentOsquerydBinaryPath = currentOsquerydBinary.Path
 	}
