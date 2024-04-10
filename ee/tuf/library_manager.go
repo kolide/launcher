@@ -154,8 +154,10 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
 	}
 
-	// Everything looks good: create the file and write it to disk
-	out, err := os.Create(stagedUpdatePath)
+	// Everything looks good: create the file and write it to disk.
+	// We create the file with 0655 permissions to prevent any other user from writing to this file
+	// before we can copy to it.
+	out, err := os.OpenFile(stagedUpdatePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0655)
 	if err != nil {
 		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
 	}
