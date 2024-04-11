@@ -193,6 +193,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runUninstall
 	case "secure-enclave":
 		run = runSecureEnclave
+	case "restart-service": // note only implemented for windows
+		run = runRestartService
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
