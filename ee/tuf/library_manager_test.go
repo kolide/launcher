@@ -425,7 +425,12 @@ func Test_sanitizePermissions(t *testing.T) {
 			require.Equal(t, tt.givenFilePermissions.Type(), sanitizedPermissions.Type())
 
 			// Confirm owner permissions are unmodified
-			require.Equal(t, tt.givenFilePermissions&0700, sanitizedPermissions&0700)
+			var ownerBits fs.FileMode = 0700
+			if runtime.GOOS == "windows" {
+				// Windows doesn't have executable bit
+				ownerBits = 0600
+			}
+			require.Equal(t, tt.givenFilePermissions&ownerBits, sanitizedPermissions&ownerBits)
 		})
 	}
 }
