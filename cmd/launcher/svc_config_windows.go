@@ -6,6 +6,8 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
+	"time"
 
 	"github.com/kolide/launcher/pkg/launcher"
 
@@ -16,6 +18,7 @@ import (
 const (
 	launcherServiceName            = `LauncherKolideK2Svc`
 	launcherServiceRegistryKeyName = `SYSTEM\CurrentControlSet\Services\LauncherKolideK2Svc`
+	launcherAccountName            = `Kolide` //?
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
 	delayedAutostartName            = `DelayedAutostart`
@@ -28,7 +31,7 @@ const (
 	notFoundInRegistryError = "The system cannot find the file specified."
 )
 
-func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
+func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	// If this isn't a Kolide installation, do not update the configuration
 	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
 		return
@@ -37,7 +40,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	// Get launcher service key
 	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceRegistryKeyName, registry.ALL_ACCESS)
 	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"could not open registry key",
 			"key_name", launcherServiceRegistryKeyName,
 			"err", err,
@@ -49,7 +52,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	// Close it once we're done
 	defer func() {
 		if err := launcherServiceKey.Close(); err != nil {
-			logger.Log(context.TODO(), slog.LevelError,
+			slogger.Log(context.TODO(), slog.LevelError,
 				"could not close registry key",
 				"key_name", launcherServiceRegistryKeyName,
 				"err", err,
@@ -58,17 +61,30 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	}()
 
 	// Check to see if we need to turn off delayed autostart
-	checkDelayedAutostart(launcherServiceKey, logger)
+	checkDelayedAutostart(launcherServiceKey, slogger)
 
 	// Check to see if we need to update the service to depend on Dnscache
-	checkDependOnService(launcherServiceKey, logger)
+	checkDependOnService(launcherServiceKey, slogger)
 
-	checkRestartActions(logger)
+	sman, err := mgr.Connect()
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"connecting to service control manager",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer sman.Disconnect()
+
+	checkRestartActions(sman, slogger)
+	checkRestartService(sman, slogger)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
 // before starting the launcher service) and updates it if necessary.
-func checkDelayedAutostart(launcherServiceKey registry.Key, logger *slog.Logger) {
+func checkDelayedAutostart(launcherServiceKey registry.Key, slogger *slog.Logger) {
 	currentDelayedAutostart, _, getDelayedAutostartErr := launcherServiceKey.GetIntegerValue(delayedAutostartName)
 
 	// Can't determine current value, don't update
@@ -83,7 +99,7 @@ func checkDelayedAutostart(launcherServiceKey registry.Key, logger *slog.Logger)
 
 	// Turn off delayed autostart
 	if err := launcherServiceKey.SetDWordValue(delayedAutostartName, delayedAutostartDisabled); err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"could not turn off DelayedAutostart",
 			"err", err,
 		)
@@ -92,14 +108,14 @@ func checkDelayedAutostart(launcherServiceKey registry.Key, logger *slog.Logger)
 
 // checkDependOnService checks the current value of `DependOnService` (the list of services that must
 // start before launcher can) and updates it if necessary.
-func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) {
+func checkDependOnService(launcherServiceKey registry.Key, slogger *slog.Logger) {
 	serviceList, _, getServiceListErr := launcherServiceKey.GetStringsValue(dependOnServiceName)
 
 	if getServiceListErr != nil {
 		if getServiceListErr.Error() == notFoundInRegistryError {
 			// `DependOnService` does not exist for this service yet -- we can safely set it to include the Dnscache service.
 			if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dnscacheService}); err != nil {
-				logger.Log(context.TODO(), slog.LevelError,
+				slogger.Log(context.TODO(), slog.LevelError,
 					"could not set strings value for DependOnService",
 					"err", err,
 				)
@@ -123,7 +139,7 @@ func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) 
 	// Set service to depend on Dnscache
 	serviceList = append(serviceList, dnscacheService)
 	if err := launcherServiceKey.SetStringsValue(dependOnServiceName, serviceList); err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"could not set strings value for DependOnService",
 			"err", err,
 		)
@@ -132,23 +148,11 @@ func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) 
 
 // checkRestartActions checks the current value of our `SERVICE_FAILURE_ACTIONS_FLAG` and
 // sets it to true if required. See https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_failure_actions_flag
-func checkRestartActions(logger *slog.Logger) {
-	sman, err := mgr.Connect()
+func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
+	launcherService, err := serviceManager.OpenService(launcherServiceName)
 	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"connecting to service control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer sman.Disconnect()
-
-	launcherService, err := sman.OpenService(launcherServiceName)
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"opening the launcher service from control manager",
+		slogger.Log(context.TODO(), slog.LevelError,
+			"opening the launcher restart service from control manager",
 			"err", err,
 		)
 
@@ -159,7 +163,7 @@ func checkRestartActions(logger *slog.Logger) {
 
 	curFlag, err := launcherService.RecoveryActionsOnNonCrashFailures()
 	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"querying for current RecoveryActionsOnNonCrashFailures flag",
 			"err", err,
 		)
@@ -172,7 +176,7 @@ func checkRestartActions(logger *slog.Logger) {
 	}
 
 	if err = launcherService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"setting RecoveryActionsOnNonCrashFailures flag",
 			"err", err,
 		)
@@ -180,5 +184,102 @@ func checkRestartActions(logger *slog.Logger) {
 		return
 	}
 
-	logger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
+	slogger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
+}
+
+func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
+	slogger = slogger.With("service", launcherRestartServiceName)
+	// first check if we've already installed the service
+	_, err := serviceManager.OpenService(launcherRestartServiceName)
+	if err == nil {
+		// commented out code here enables re-installation on restart, may need to be wired into updates
+		// if err = restartService.Delete(); err != nil {
+		// 	slogger.Log(context.TODO(), slog.LevelError,
+		// 		"failed to delete existing service",
+		// 		"err", err,
+		// 	)
+
+		// 	return
+		// }
+
+		// if err = restartService.Close(); err != nil {
+		// 	slogger.Log(context.TODO(), slog.LevelError,
+		// 		"failed to close existing service",
+		// 		"err", err,
+		// 	)
+		// }
+
+		// TODO swap this out for code above so we aren't constantly re-installing
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"service already exists, skipping installation",
+			"service", launcherRestartServiceName,
+		)
+
+		return
+	}
+
+	currentExe, err := os.Executable()
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"installing launcher restart service, unable to collect current executable path",
+			"service", launcherRestartServiceName,
+			"err", err,
+		)
+	}
+
+	svcMgrConf := mgr.Config{
+		DisplayName:      launcherRestartServiceName,
+		StartType:        mgr.StartAutomatic,
+		ErrorControl:     mgr.ErrorNormal,
+		DelayedAutoStart: true, // seems safest to wait until after launcher proper has attempted to start
+	}
+
+	restartService, err := serviceManager.CreateService(
+		launcherRestartServiceName,
+		currentExe,
+		svcMgrConf,
+		"restart-service",
+	)
+
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to create launcher restart service",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer restartService.Close()
+
+	recoveryActions := []mgr.RecoveryAction{
+		{
+			Type:  mgr.ServiceRestart,
+			Delay: 5 * time.Second,
+		},
+	}
+
+	if err = restartService.SetRecoveryActions(recoveryActions, 10800); err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to set recovery actions for service installation, proceeding",
+			"service", launcherRestartServiceName,
+			"err", err,
+		)
+	}
+
+	if err = restartService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to set RecoveryActionsOnNonCrashFailures flag, proceeding",
+			"service", launcherRestartServiceName,
+			"err", err,
+		)
+	}
+
+	if err = restartService.Start(); err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to start launcher restart service",
+			"service", launcherRestartServiceName,
+			"err", err,
+		)
+	}
 }
