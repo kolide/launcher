@@ -1,10 +1,13 @@
 package tuf
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,7 +19,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/theupdateframework/go-tuf/data"
@@ -207,9 +209,8 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		}
 	}()
 
-	// Untar the archive. Note that `UntarBundle` calls `filepath.Dir(destination)`, so the inclusion of `binary`
-	// here doesn't matter as it's immediately stripped off.
-	if err := fsutil.UntarBundle(filepath.Join(stagedVersionedDirectory, string(binary)), stagedUpdate); err != nil {
+	// Untar the archive.
+	if err := untar(stagedVersionedDirectory, stagedUpdate); err != nil {
 		return fmt.Errorf("could not untar update to %s: %w", stagedVersionedDirectory, err)
 	}
 
@@ -246,6 +247,82 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		return fmt.Errorf("could not chmod %s: %w", newUpdateDirectory, err)
 	}
 
+	return nil
+}
+
+// untar extracts the archive `source` to the given `destinationDir`. It sanitizes
+// extract paths and file permissions.
+func untar(destinationDir string, source string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("opening source: %w", err)
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("creating gzip reader from %s: %w", source, err)
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("reading tar file: %w", err)
+		}
+
+		if err := sanitizeExtractPath(destinationDir, header.Name); err != nil {
+			return fmt.Errorf("checking filename: %w", err)
+		}
+
+		destPath := filepath.Join(destinationDir, header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(destPath, sanitizePermissions(info)); err != nil {
+				return fmt.Errorf("creating directory %s for tar file: %w", destPath, err)
+			}
+			continue
+		}
+
+		if err := writeBundleFile(destPath, sanitizePermissions(info), tr); err != nil {
+			return fmt.Errorf("writing file: %w", err)
+		}
+	}
+	return nil
+}
+
+// sanitizeExtractPath checks that the supplied extraction path is nor
+// vulnerable to zip slip attacks. See https://snyk.io/research/zip-slip-vulnerability
+func sanitizeExtractPath(filePath string, destination string) error {
+	destpath := filepath.Join(destination, filePath)
+	if !strings.HasPrefix(destpath, filepath.Clean(destination)+string(os.PathSeparator)) {
+		return fmt.Errorf("illegal file path %s", filePath)
+	}
+	return nil
+}
+
+// Allow owner read/write/execute, and only read/execute for all others.
+const allowedPermissionBits fs.FileMode = fs.ModeType | 0755
+
+// sanitizePermissions ensures that only the file owner has write permissions.
+func sanitizePermissions(fileInfo fs.FileInfo) fs.FileMode {
+	return fileInfo.Mode() & allowedPermissionBits
+}
+
+// writeBundleFile reads from the given reader to create a file at the given path, with the desired permissions.
+func writeBundleFile(destPath string, perm fs.FileMode, srcReader io.Reader) error {
+	file, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perm)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", destPath, err)
+	}
+	defer file.Close()
+	if _, err := io.Copy(file, srcReader); err != nil {
+		return fmt.Errorf("copying to %s: %w", destPath, err)
+	}
 	return nil
 }
 
