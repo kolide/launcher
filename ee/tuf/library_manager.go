@@ -295,7 +295,7 @@ func untar(destinationDir string, source string) error {
 	return nil
 }
 
-// sanitizeExtractPath checks that the supplied extraction path is nor
+// sanitizeExtractPath checks that the supplied extraction path is not
 // vulnerable to zip slip attacks. See https://snyk.io/research/zip-slip-vulnerability
 func sanitizeExtractPath(filePath string, destination string) error {
 	destpath := filepath.Join(destination, filePath)
