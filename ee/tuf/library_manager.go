@@ -319,9 +319,14 @@ func writeBundleFile(destPath string, perm fs.FileMode, srcReader io.Reader) err
 	if err != nil {
 		return fmt.Errorf("opening %s: %w", destPath, err)
 	}
-	defer file.Close()
 	if _, err := io.Copy(file, srcReader); err != nil {
+		if closeErr := file.Close(); closeErr != nil {
+			return fmt.Errorf("copying to %s: %v; close error: %w", destPath, err, closeErr)
+		}
 		return fmt.Errorf("copying to %s: %w", destPath, err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("closing %s: %w", destPath, err)
 	}
 	return nil
 }
