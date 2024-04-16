@@ -9,10 +9,10 @@ sequenceDiagram
     Note left of LauncherKolideRestartSvc: ./launcher.exe restart-service
 
     alt yes the service already exists
-        Note left of WindowsServiceManager: no-op (may change for update behavior)
+        LauncherKolideK2Svc->>LauncherKolideRestartSvc: Restart to ensure latest
     else no the service does not exist
-        LauncherKolideK2Svc->>WindowsServiceManager: create, configure, etc
-        WindowsServiceManager->>LauncherKolideRestartSvc: Start()
+        LauncherKolideK2Svc->>WindowsServiceManager: 1 - create, configure, etc
+        LauncherKolideK2Svc->>LauncherKolideRestartSvc: 2 - Start
         activate LauncherKolideRestartSvc
     end
 
