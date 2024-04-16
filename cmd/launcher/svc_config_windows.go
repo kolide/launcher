@@ -20,7 +20,6 @@ import (
 const (
 	launcherServiceName            = `LauncherKolideK2Svc`
 	launcherServiceRegistryKeyName = `SYSTEM\CurrentControlSet\Services\LauncherKolideK2Svc`
-	launcherAccountName            = `Kolide` //?
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
 	delayedAutostartName            = `DelayedAutostart`
@@ -275,10 +274,10 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	}
 
 	svcMgrConf := mgr.Config{
-		DisplayName:      launcherRestartServiceName,
-		Description:      "The Kolide Launcher Restart Service",
-		StartType:        mgr.StartAutomatic,
-		ErrorControl:     mgr.ErrorNormal,
+		DisplayName:  launcherRestartServiceName,
+		Description:  "The Kolide Launcher Restart Service",
+		StartType:    mgr.StartAutomatic,
+		ErrorControl: mgr.ErrorNormal,
 		// no reason to rush start for this service, we should wait until after
 		// launcher proper has attempted to start anyway
 		DelayedAutoStart: true,
