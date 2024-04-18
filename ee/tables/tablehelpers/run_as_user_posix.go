@@ -24,7 +24,10 @@ func WithUid(uid string) ExecOps {
 			return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 		}
 
-		if currentUser.Uid != "0" && currentUser.Uid != runningUser.Uid {
+		// If the current user is the user to run as, then early return to avoid needing NoSetGroups.
+		if currentUser.Uid == runningUser.Uid {
+			return nil
+		} else if currentUser.Uid != "0" {
 			return fmt.Errorf("current user %s is not root and can't start process for other user %s", currentUser.Uid, uid)
 		}
 
