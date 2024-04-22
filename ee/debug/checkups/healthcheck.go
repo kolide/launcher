@@ -35,7 +35,7 @@ func NewHealthChecker(slogger *slog.Logger, k types.Knapsack, writer *restartser
 // maintain a historical record of launcher health for general debugging
 // and for our watchdog service to observe unhealthy states and respond accordingly
 func (c *healthChecker) Run() error {
-	ticker := time.NewTicker(time.Minute * 1)
+	ticker := time.NewTicker(time.Minute * 30)
 	defer ticker.Stop()
 
 	for {
@@ -66,15 +66,21 @@ func (c *healthChecker) Interrupt(_ error) {
 
 func (c *healthChecker) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, healthCheckSupported)
-	results := make(map[string]map[string]any)
+	results := make(map[string]Status)
 	checkupTime := time.Now().Unix()
 
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
 		checkupName := normalizeCheckupName(checkup.Name())
-		results[checkupName] = make(map[string]any)
-		results[checkupName]["status"] = checkup.Status()
-		results[checkupName]["data"] = checkup.Data()
+		results[checkupName] = checkup.Status()
+		// log all data for debugging if Failing
+		if checkup.Status() == Failing {
+			c.slogger.Log(ctx, slog.LevelWarn,
+				"detected health check failure",
+				"checkup", checkupName,
+				"data", checkup.Data(),
+			)
+		}
 	}
 
 	resultsJson, err := json.Marshal(results)

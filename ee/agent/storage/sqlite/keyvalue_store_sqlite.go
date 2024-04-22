@@ -33,7 +33,7 @@ func (s storeName) String() string {
 	case StartupSettingsStore:
 		return "startup_settings"
 	case HealthCheckStore:
-		return "health_check"
+		return "health_check_results"
 	case RestartServiceLogStore:
 		return "restart_service_logs"
 	}

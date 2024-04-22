@@ -17,7 +17,7 @@ type ResultFetcher interface {
 
 type ResultSetter interface {
 	// AddResult marshals
-	AddResult(ctx context.Context, columnName string, timestamp int64, result []byte) error
+	AddResult(ctx context.Context, timestamp int64, result []byte) error
 	Closer
 }
 

@@ -15,8 +15,6 @@ type HealthCheckWriter struct {
 	store types.ResultSetter
 }
 
-const healthCheckResultsColumn string = "values"
-
 // OpenWriter returns a new health check results writer, creating and initializing
 // the database if necessary.
 func OpenWriter(ctx context.Context, rootDirectory string) (*HealthCheckWriter, error) {
@@ -40,7 +38,7 @@ func (hw *HealthCheckWriter) AddHealthCheckResult(ctx context.Context, timestamp
 		return errors.New("store is nil")
 	}
 
-	if err := hw.store.AddResult(ctx, healthCheckResultsColumn, timestamp, value); err != nil {
+	if err := hw.store.AddResult(ctx, timestamp, value); err != nil {
 		return fmt.Errorf("adding healthcheck result: %w", err)
 	}
 
