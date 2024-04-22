@@ -11,7 +11,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/peterbourgon/ff/v3"
@@ -238,7 +237,7 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if err := autoupdate.CheckExecutable(ctx, targetPath, "--version"); err != nil {
+	if err := CheckExecutable(ctx, targetPath, "--version"); err != nil {
 		traces.SetError(span, err)
 		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, targetPath, err)
 	}

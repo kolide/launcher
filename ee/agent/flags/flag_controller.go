@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/exp/maps"
 )
@@ -462,7 +461,7 @@ func (fc *FlagController) SetUpdateChannel(channel string) error {
 }
 func (fc *FlagController) UpdateChannel() string {
 	return NewStringFlagValue(
-		WithSanitizer(autoupdate.SanitizeUpdateChannel),
+		WithSanitizer(launcher.SanitizeUpdateChannel),
 		WithDefaultString(string(fc.cmdLineOpts.UpdateChannel)),
 	).get(fc.getControlServerValue(keys.UpdateChannel))
 }

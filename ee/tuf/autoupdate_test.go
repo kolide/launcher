@@ -43,6 +43,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
@@ -216,7 +217,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -587,6 +588,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("UpdateChannel").Return("nightly")
 			mockKnapsack.On("PinnedLauncherVersion").Return("")
 			mockKnapsack.On("PinnedOsquerydVersion").Return("")
+			mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 			mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 			mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 			mockKnapsack.On("UpdateDirectory").Return("")
@@ -809,6 +811,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
@@ -870,6 +873,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
+	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("UpdateChannel").Return("nightly")

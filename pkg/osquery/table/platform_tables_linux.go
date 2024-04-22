@@ -62,7 +62,7 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_apt_upgradeable", apt.Parser, allowedcmd.Apt, []string{"list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_dnf_upgradeable", dnf.Parser, allowedcmd.Dnf, []string{"check-update"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_dpkg_version_info", dpkg.Parser, allowedcmd.Dpkg, []string{"-p"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(slogger, "kolide_flatpak_upgradeable", flatpak_upgradeable.Parser, allowedcmd.Flatpak, []string{"remote-ls", "--all", "--updates"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_flatpak_upgradeable", flatpak_upgradeable.Parser, allowedcmd.Flatpak, []string{"remote-ls", "--updates"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_group", pacman_group.Parser, allowedcmd.Pacman, []string{"-Qg"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_version_info", pacman_info.Parser, allowedcmd.Pacman, []string{"-Qi"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_pacman_upgradeable", pacman_upgradeable.Parser, allowedcmd.Pacman, []string{"-Qu"}, dataflattentable.WithIncludeStderr()),

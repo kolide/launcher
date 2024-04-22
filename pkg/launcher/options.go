@@ -13,8 +13,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/kolide/launcher/pkg/autoupdate"
-
 	"github.com/kolide/kit/version"
 	"github.com/peterbourgon/ff/v3"
 )
@@ -82,7 +80,7 @@ type Options struct {
 	// updates.
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
-	UpdateChannel autoupdate.UpdateChannel
+	UpdateChannel UpdateChannel
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
@@ -170,6 +168,7 @@ const (
 	defaultRootDirectory = "launcher-root"
 	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 	DefaultTufServer     = "https://tuf.kolide.com"
+	DefaultMirror        = "https://dl.kolide.co"
 )
 
 // Adapted from
@@ -240,7 +239,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
-		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flMirrorURL              = flagset.String("mirror_url", DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
 		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
 		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
@@ -319,16 +318,16 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
-	var updateChannel autoupdate.UpdateChannel
+	var updateChannel UpdateChannel
 	switch *flUpdateChannel {
 	case "", "stable":
-		updateChannel = autoupdate.Stable
+		updateChannel = Stable
 	case "beta":
-		updateChannel = autoupdate.Beta
+		updateChannel = Beta
 	case "alpha":
-		updateChannel = autoupdate.Alpha
+		updateChannel = Alpha
 	case "nightly":
-		updateChannel = autoupdate.Nightly
+		updateChannel = Nightly
 	default:
 		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
 	}
@@ -580,6 +579,30 @@ func FindOsquery() string {
 	}
 
 	return ""
+}
+
+// UpdateChannel determines the TUF target for a Updater.
+// The Default UpdateChannel is Stable.
+type UpdateChannel string
+
+const (
+	Stable  UpdateChannel = "stable"
+	Alpha   UpdateChannel = "alpha"
+	Beta    UpdateChannel = "beta"
+	Nightly UpdateChannel = "nightly"
+)
+
+func (c UpdateChannel) String() string {
+	return string(c)
+}
+
+func SanitizeUpdateChannel(value string) string {
+	switch UpdateChannel(value) {
+	case Stable, Alpha, Beta, Nightly:
+		return value
+	}
+	// Fallback to stable if invalid channel
+	return Stable.String()
 }
 
 func commandUsage(fs *flag.FlagSet, short string) func() {
