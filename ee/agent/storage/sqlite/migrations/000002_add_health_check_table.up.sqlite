@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS health_check_results (
+    timestamp INT NOT NULL,
+    values TEXT
+);

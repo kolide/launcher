@@ -21,7 +21,9 @@ import (
 type storeName int
 
 const (
-	StartupSettingsStore storeName = iota
+	StartupSettingsStore   storeName = iota
+	HealthCheckStore       storeName = 1
+	RestartServiceLogStore storeName = 2
 )
 
 // String translates the exported int constant to the actual name of the
@@ -30,6 +32,10 @@ func (s storeName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
+	case HealthCheckStore:
+		return "health_check"
+	case RestartServiceLogStore:
+		return "restart_service_logs"
 	}
 
 	return ""

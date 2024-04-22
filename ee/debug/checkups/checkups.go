@@ -80,6 +80,7 @@ const (
 	doctorSupported targetBits = 1 << iota
 	flareSupported
 	logSupported
+	healthCheckSupported
 )
 
 //const checkupFor iota
