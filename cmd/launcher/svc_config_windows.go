@@ -203,23 +203,6 @@ func serviceExists(serviceManager *mgr.Mgr, serviceName string) bool { // nolint
 	return false
 }
 
-// removeService utilizes the passed serviceManager to remove the existing service
-// after looking up the handle from serviceName
-func removeService(serviceManager *mgr.Mgr, serviceName string) error { // nolint:unused
-	existingService, err := serviceManager.OpenService(serviceName)
-	if err != nil {
-		return fmt.Errorf("opening %s service: %w", serviceName, err)
-	}
-
-	defer existingService.Close()
-
-	if err = existingService.Delete(); err != nil {
-		return fmt.Errorf("deleting %s service: %w", serviceName, err)
-	}
-
-	return nil
-}
-
 func restartService(service *mgr.Service) error {
 	status, err := service.Control(svc.Stop)
 	if err != nil {

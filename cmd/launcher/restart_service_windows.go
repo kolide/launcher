@@ -51,7 +51,7 @@ func runRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	// notes/questions for review:
-	// - do we want to re-use debug.json across services?
+	// - do we want to re-use debug.json across services? - no
 	// - is it worth trying to consolidate the code re-use between here and svc_windows.go
 	if opts.RootDirectory != "" {
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
@@ -201,6 +201,7 @@ func (w *winRestartSvc) checkLauncherStatus(ctx context.Context) error {
 
 func runLauncherRestartService(ctx context.Context, w *winRestartSvc) error {
 	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -212,7 +213,6 @@ func runLauncherRestartService(ctx context.Context, w *winRestartSvc) error {
 				)
 			}
 		case <-ctx.Done():
-			ticker.Stop()
 			return ctx.Err()
 		}
 	}
