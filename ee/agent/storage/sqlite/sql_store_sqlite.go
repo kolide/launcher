@@ -58,7 +58,7 @@ func (s *sqliteStore) FetchLatestResult(ctx context.Context, columnName string) 
 	}
 }
 
-func (s *sqliteStore) AddResult(ctx context.Context, columnName string, timestamp int64, result []byte) error {
+func (s *sqliteStore) AddResult(ctx context.Context, timestamp int64, result []byte) error {
 	if s == nil || s.conn == nil {
 		return errors.New("store is nil")
 	}
@@ -68,9 +68,9 @@ func (s *sqliteStore) AddResult(ctx context.Context, columnName string, timestam
 	}
 
 	// It's fine to interpolate the table name into the query because we allowlist via `storeName` type
-	insertSql := fmt.Sprintf(`INSERT INTO %s (timestamp, ?) VALUES (?, ?);`, s.tableName)
+	insertSql := fmt.Sprintf(`INSERT INTO %s (timestamp, results) VALUES (?, ?);`, s.tableName)
 
-	if _, err := s.conn.Exec(insertSql, columnName, timestamp, string(result)); err != nil {
+	if _, err := s.conn.Exec(insertSql, timestamp, string(result)); err != nil {
 		return fmt.Errorf("inserting into %s: %w", s.tableName, err)
 	}
 

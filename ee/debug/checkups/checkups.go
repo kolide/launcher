@@ -80,6 +80,9 @@ const (
 	doctorSupported targetBits = 1 << iota
 	flareSupported
 	logSupported
+	// note that in the future a failing checkup that is healthCheckSupported should
+	// result in a launcher restart from our watchdog service. ensure that this makes
+	// sense for a checkup before adding the healthCheckSupported bits
 	healthCheckSupported
 )
 
@@ -95,7 +98,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&Platform{}, doctorSupported | flareSupported | logSupported},
 		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
-		{&Processes{}, doctorSupported | flareSupported},
+		{&Processes{}, doctorSupported | flareSupported | healthCheckSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
