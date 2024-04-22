@@ -2,12 +2,17 @@ package startupsettings
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -27,6 +32,8 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("UpdateChannel").Return(updateChannelVal)
 	k.On("PinnedLauncherVersion").Return("")
 	k.On("PinnedOsquerydVersion").Return("5.11.0")
+	k.On("ConfigStore").Return(inmemory.NewStore())
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
@@ -85,6 +92,9 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion)
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion)
 
+	k.On("ConfigStore").Return(inmemory.NewStore())
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
@@ -121,6 +131,17 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
+
+	configStore := inmemory.NewStore()
+	configMap := map[string]any{
+		"auto_table_construction":      ulid.New(),
+		"something_else_not_important": ulid.New(),
+	}
+	configJson, err := json.Marshal(configMap)
+	require.NoError(t, err, "marshalling config map")
+
+	configStore.Set([]byte(osquery.ConfigKey), configJson)
+	k.On("ConfigStore").Return(configStore)
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
