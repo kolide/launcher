@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
@@ -66,6 +67,13 @@ func TestProc(t *testing.T) {
 			osqueryFlags: []string{
 				"verbose",
 				"force=false",
+			},
+			wantProc: true,
+		},
+		{
+			name: "config path",
+			osqueryFlags: []string{
+				fmt.Sprintf("config_path=%s", ulid.New()),
 			},
 			wantProc: true,
 		},

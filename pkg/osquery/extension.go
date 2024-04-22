@@ -51,7 +51,7 @@ const (
 	// DB key for node key
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
-	configKey = "config"
+	ConfigKey = "config"
 	// DB keys for the rsa keys
 	privateKeyKey = "privateKey"
 
@@ -332,7 +332,7 @@ func NodeKey(getter types.Getter) (string, error) {
 
 // Config returns the device config from the storage layer
 func Config(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(configKey))
+	key, err := getter.Get([]byte(ConfigKey))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -504,7 +504,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(ConfigKey))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -516,7 +516,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
+		e.knapsack.ConfigStore().Set([]byte(ConfigKey), []byte(config))
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.
