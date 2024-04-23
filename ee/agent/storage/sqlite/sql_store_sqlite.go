@@ -9,7 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func (s *sqliteStore) FetchResults(ctx context.Context, columnName string) ([][]byte, error) {
+func (s *sqliteStore) FetchResults(ctx context.Context) ([][]byte, error) {
 	results := make([][]byte, 0)
 
 	if s == nil || s.conn == nil {
@@ -17,8 +17,8 @@ func (s *sqliteStore) FetchResults(ctx context.Context, columnName string) ([][]
 	}
 
 	// It's fine to interpolate the table name into the query because we allowlist via `storeName` type
-	query := fmt.Sprintf(`SELECT timestamp, ? FROM %s;`, s.tableName)
-	rows, err := s.conn.QueryContext(ctx, query, columnName)
+	query := fmt.Sprintf(`SELECT timestamp, results FROM %s;`, s.tableName)
+	rows, err := s.conn.QueryContext(ctx, query)
 	if err != nil {
 		return results, err
 	}
@@ -37,17 +37,17 @@ func (s *sqliteStore) FetchResults(ctx context.Context, columnName string) ([][]
 	return results, nil
 }
 
-func (s *sqliteStore) FetchLatestResult(ctx context.Context, columnName string) ([]byte, error) {
+func (s *sqliteStore) FetchLatestResult(ctx context.Context) ([]byte, error) {
 	if s == nil || s.conn == nil {
 		return []byte{}, errors.New("store is nil")
 	}
 
 	// It's fine to interpolate the table name into the query because we allowlist via `storeName` type
-	query := fmt.Sprintf(`SELECT timestamp, ? FROM %s ORDER BY timestamp DESC LIMIT 1;`, s.tableName)
+	query := fmt.Sprintf(`SELECT timestamp, results FROM %s ORDER BY timestamp DESC LIMIT 1;`, s.tableName)
 	var timestamp int64
 	var result string
 
-	err := s.conn.QueryRowContext(ctx, query, columnName).Scan(&timestamp, &result)
+	err := s.conn.QueryRowContext(ctx, query).Scan(&timestamp, &result)
 	switch {
 	case err == sql.ErrNoRows:
 		return []byte{}, nil

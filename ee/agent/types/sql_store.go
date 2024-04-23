@@ -6,17 +6,17 @@ import (
 
 // ResultFetcher is an interface for querying a single text field from a structured data store.
 // This is intentionally vague for potential future re-use, allowing the caller to unmarshal string results as needed.
-// This interface is compatible with any tables that include a timestamp, and any text field of interest
+// This was initially intended to support the sqlite health_check_results table
 type ResultFetcher interface {
-	// Fetch retrieves all rows provided by the results of executing query
-	FetchResults(ctx context.Context, columnName string) ([][]byte, error)
-	// FetchLatest retrieves the most recent value for columnName
-	FetchLatestResult(ctx context.Context, columnName string) ([]byte, error)
+	// Fetch retrieves all results rows
+	FetchResults(ctx context.Context) ([][]byte, error)
+	// FetchLatest retrieves the most recent result based on timestamp column
+	FetchLatestResult(ctx context.Context) ([]byte, error)
 	Closer
 }
 
 type ResultSetter interface {
-	// AddResult marshals
+	// AddResult persists a marshalled result entry alongside the provided unix timestamp
 	AddResult(ctx context.Context, timestamp int64, result []byte) error
 	Closer
 }
