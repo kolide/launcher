@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -253,6 +254,13 @@ INSERT INTO %s (name, value)
 VALUES %s
 ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	valueStr := strings.TrimRight(strings.Repeat("(?, ?),", len(kvPairs)), ",")
+
+	// make sure we don't go over max int size
+	// this is driven codeql code scanning
+	// https://codeql.github.com/codeql-query-help/go/go-allocation-size-overflow/
+	if len(kvPairs) > math.MaxInt/2 {
+		return nil, errors.New("too many key-value pairs")
+	}
 
 	// Build value args; save key names at the same time to determine which keys to prune later
 	valueArgs := make([]any, 2*len(kvPairs))
