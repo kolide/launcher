@@ -58,6 +58,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
+	m.On("RootDirectory").Maybe().Return("whatever")
 	return m
 }
 
