@@ -3,7 +3,6 @@ package service
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +43,6 @@ func Test_TrivialTruncate(t *testing.T) {
 		})
 
 		actual := trivialTruncate(tt.in, maxLen)
-		spew.Dump(actual)
 		require.Equal(t, tt.expected, actual)
 	}
 
