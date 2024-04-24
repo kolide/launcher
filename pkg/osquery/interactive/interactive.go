@@ -12,8 +12,8 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
-	"github.com/kolide/launcher/pkg/launcher"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
@@ -25,13 +25,13 @@ const (
 	defaultConfigPluginName = "interactive_config"
 )
 
-func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
-	if err := os.MkdirAll(rootDir, fsutil.DirMode); err != nil {
+func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Process, *osquery.ExtensionManagerServer, error) {
+	if err := os.MkdirAll(interactiveRootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath := osqueryRuntime.SocketPath(rootDir)
-	augeasLensesPath := filepath.Join(rootDir, "augeas-lenses")
+	socketPath := osqueryRuntime.SocketPath(interactiveRootDir)
+	augeasLensesPath := filepath.Join(interactiveRootDir, "augeas-lenses")
 
 	// only install augeas lenses on non-windows platforms
 	if runtime.GOOS != "windows" {
@@ -48,7 +48,7 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 	// we need to check this before loading the default config plugin,
 	// passing 2 configs to osquery will result in an error
 	haveConfigPathOsqFlag := false
-	for _, flag := range osqueryFlags {
+	for _, flag := range knapsack.OsqueryFlags() {
 		if strings.HasPrefix(flag, "config_path") {
 			haveConfigPathOsqFlag = true
 			break
@@ -56,14 +56,15 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 	}
 
 	// start building list of osq plugins with the kolide tables
-	osqPlugins := table.PlatformTables(slogger, osquerydPath)
+	osqPlugins := table.PlatformTables(knapsack.Slogger(), knapsack.OsquerydPath())
 
+	osqueryFlags := knapsack.OsqueryFlags()
 	// if we were not provided a config path flag, try to add default config
 	if !haveConfigPathOsqFlag {
 		// check to see if we can actually get a config plugin
-		configPlugin, err := generateConfigPlugin()
+		configPlugin, err := generateConfigPlugin(knapsack.RootDirectory())
 		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelDebug,
+			knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"error creating config plugin",
 				"err", err,
 			)
@@ -73,7 +74,7 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 		}
 	}
 
-	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
+	proc, err := os.StartProcess(knapsack.OsquerydPath(), buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
 		// Transfer stdin, stdout, and stderr to the new process
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 	})
@@ -85,7 +86,6 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 	// while developing for windows it was found that it will sometimes take osquery a while
 	// to create the socket, so we wait for it to exist before continuing
 	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
-
 		procKillErr := proc.Kill()
 		if procKillErr != nil {
 			err = fmt.Errorf("error killing osqueryd interactive: %s: %w", procKillErr, err)
@@ -189,8 +189,8 @@ func waitForFile(path string, interval, timeout time.Duration) error {
 	}
 }
 
-func generateConfigPlugin() (*config.Plugin, error) {
-	r, err := startupsettings.OpenReader(context.TODO(), launcher.DefaultPath(launcher.RootDirectory))
+func generateConfigPlugin(launcherDaemonRootDir string) (*config.Plugin, error) {
+	r, err := startupsettings.OpenReader(context.TODO(), launcherDaemonRootDir)
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
