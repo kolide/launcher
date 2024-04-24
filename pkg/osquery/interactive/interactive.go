@@ -61,7 +61,7 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 	// if we were not provided a config path flag, try to add default config
 	if !haveConfigPathOsqFlag {
 		// check to see if we can actually get a config plugin
-		configPlugin, err := configPlugin()
+		configPlugin, err := generateConfigPlugin()
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelDebug,
 				"error creating config plugin",
@@ -189,7 +189,7 @@ func waitForFile(path string, interval, timeout time.Duration) error {
 	}
 }
 
-func configPlugin() (*config.Plugin, error) {
+func generateConfigPlugin() (*config.Plugin, error) {
 	r, err := startupsettings.OpenReader(context.TODO(), launcher.DefaultPath(launcher.RootDirectory))
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)

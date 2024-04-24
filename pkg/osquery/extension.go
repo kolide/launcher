@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -51,7 +52,7 @@ const (
 	// DB key for node key
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
-	ConfigKey = "config"
+	configKey = "config"
 	// DB keys for the rsa keys
 	privateKeyKey = "privateKey"
 
@@ -332,7 +333,7 @@ func NodeKey(getter types.Getter) (string, error) {
 
 // Config returns the device config from the storage layer
 func Config(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(ConfigKey))
+	key, err := getter.Get([]byte(configKey))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -504,7 +505,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(ConfigKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -516,7 +517,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.knapsack.ConfigStore().Set([]byte(ConfigKey), []byte(config))
+		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
+
+		// open the start up settings writer just to trigger a write of the config,
+		// then we can immediately close it
+		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
+		if err != nil {
+			e.slogger.Log(ctx, slog.LevelWarn,
+				"could not get startup settings writer",
+				"err", err,
+			)
+		} else {
+			startupSettingsWriter.Close()
+		}
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.

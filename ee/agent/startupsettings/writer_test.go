@@ -12,7 +12,6 @@ import (
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -140,7 +139,7 @@ func TestFlagsChanged(t *testing.T) {
 	configJson, err := json.Marshal(configMap)
 	require.NoError(t, err, "marshalling config map")
 
-	configStore.Set([]byte(osquery.ConfigKey), configJson)
+	configStore.Set([]byte("config"), configJson)
 	k.On("ConfigStore").Return(configStore)
 
 	// Set up storage db, which should create the database and set all flags

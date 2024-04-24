@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -101,7 +100,7 @@ func (s *startupSettingsWriter) Close() error {
 }
 
 func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get([]byte(osquery.ConfigKey))
+	osqConfig, err := s.knapsack.ConfigStore().Get([]byte("config"))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}
