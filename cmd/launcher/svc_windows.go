@@ -184,6 +184,22 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
 	go func() {
+		// Log panics from runLauncher
+		defer func() {
+			if r := recover(); r != nil {
+				w.systemSlogger.Log(context.TODO(), slog.LevelInfo,
+					"panic occurred in runLauncher",
+					"err", r,
+				)
+				if err, ok := r.(error); ok {
+					w.systemSlogger.Log(context.TODO(), slog.LevelInfo,
+						"panic stack trace",
+						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+					)
+				}
+			}
+		}()
+
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
