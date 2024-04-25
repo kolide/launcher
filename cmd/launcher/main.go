@@ -69,7 +69,9 @@ func runMain() error {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
-		runNewerLauncherIfAvailable(ctx, systemSlogger.Logger)
+		if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
+			return fmt.Errorf("running newer version of launcher: %w", err)
+		}
 	}
 
 	// if the launcher is being ran with a positional argument,
