@@ -43,7 +43,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 			"error parsing options",
 			"err", err,
 		)
-		os.Exit(1)
+		return fmt.Errorf("parsing options: %w", err)
 	}
 
 	localSlogger := multislogger.New()
@@ -152,7 +152,7 @@ func runWindowsSvcForeground(systemSlogger *multislogger.MultiSlogger, args []st
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
 		level.Info(logger).Log("err", err)
-		os.Exit(1)
+		return fmt.Errorf("parsing options: %w", err)
 	}
 
 	// set extra debug options
@@ -183,6 +183,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
+	runLauncherResults := make(chan struct{}, 0)
+
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
@@ -192,8 +194,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 			)
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-			// Launcher is already shut down -- fully exit so that the service manager can restart the service
-			os.Exit(1)
+			// Launcher is already shut down -- send signal to fully exit so that the service manager can restart the service
+			runLauncherResults <- struct{}{}
 		}
 
 		// If we get here, it means runLauncher returned nil. If we do
@@ -204,7 +206,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			"runLauncher exited cleanly",
 		)
 		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-		os.Exit(0)
+		runLauncherResults <- struct{}{}
 	}()
 
 	for {
@@ -231,6 +233,15 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 					"change_request", fmt.Sprintf("%+v", c),
 				)
 			}
+		case <-runLauncherResults:
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"shutting down service after launcher shutdown",
+			)
+			changes <- svc.Status{State: svc.StopPending}
+			cancel()
+			time.Sleep(2 * time.Second) // give rungroups enough time to shut down
+			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+			return ssec, errno
 		}
 	}
 }

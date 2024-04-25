@@ -35,6 +35,8 @@ linters-settings:
     forbid:
       - p: ^exec\.Command.*$
         msg: use ee/allowedcmd functions instead
+      - p: ^os\.Exit.*$
+        msg: do not use os.Exit so that launcher can shut down gracefully
   sloglint:
     kv-only: true
     context-only: true

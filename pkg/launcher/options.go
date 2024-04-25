@@ -289,13 +289,13 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	// handle --version
 	if *flVersion {
 		version.PrintFull()
-		os.Exit(0)
+		return nil, nil
 	}
 
 	// handle --usage
 	if *flDeveloperUsage {
 		developerUsage(flagset)
-		os.Exit(0)
+		return nil, nil
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
