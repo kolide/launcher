@@ -26,6 +26,8 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 		return err
 	}
 
+	// here we are looking for the launcher "proper" root directory so that we know where
+	// to find the kv.sqlite where we can pull the auto table construction config from
 	if opts.RootDirectory == "" {
 		opts.RootDirectory = launcher.DefaultPath(launcher.RootDirectory)
 	}
@@ -55,7 +57,8 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 		}
 	}
 
-	// have to keep tempdir name short so we don't exceed socket length
+	// this is a tmp root directory that launcher can use to store files it needs to run
+	// such as the osquery socket and augeas lense files
 	interactiveRootDir, err := agent.MkdirTemp("launcher-interactive")
 	if err != nil {
 		return fmt.Errorf("creating temp dir for interactive mode: %w", err)
