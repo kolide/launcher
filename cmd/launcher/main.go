@@ -83,6 +83,9 @@ func runMain() error {
 
 	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
+		if launcher.IsInfoCmd(err) {
+			return nil
+		}
 		level.Info(logger).Log("err", err)
 		return fmt.Errorf("parsing options: %w", err)
 	}
