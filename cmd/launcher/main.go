@@ -76,7 +76,11 @@ func runMain() error {
 	// handle that argument. Fall-back to running launcher
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
-			logutil.Fatal(logger, "err", fmt.Errorf("run with positional args: %w", err))
+			systemSlogger.Log(ctx, slog.LevelInfo,
+				"running with positional args",
+				"err", err,
+			)
+			return fmt.Errorf("running with positional args: %w", err)
 		}
 		return nil
 	}
