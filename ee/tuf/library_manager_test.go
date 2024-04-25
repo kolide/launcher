@@ -3,6 +3,7 @@ package tuf
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/kolide/kit/ulid"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
@@ -287,6 +289,148 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			updateMatches, err := filepath.Glob(filepath.Join(updatesDirectory(tt.binary, testBaseDir), "*"))
 			require.NoError(t, err, "checking that updates directory does not contain any updates")
 			require.Equal(t, 0, len(updateMatches), "unexpected files found in updates directory: %+v", updateMatches)
+		})
+	}
+}
+
+func Test_sanitizeExtractPath(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		filepath    string
+		destination string
+		expectError bool
+	}{
+		{
+			filepath:    "file",
+			destination: "/tmp",
+			expectError: false,
+		},
+		{
+			filepath:    "subdir/../subdir/file",
+			destination: "/tmp",
+			expectError: false,
+		},
+
+		{
+			filepath:    "../../../file",
+			destination: "/tmp",
+			expectError: true,
+		},
+		{
+			filepath:    "./././file",
+			destination: "/tmp",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.filepath, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.expectError {
+				require.Error(t, sanitizeExtractPath(tt.filepath, tt.destination), tt.filepath)
+			} else {
+				require.NoError(t, sanitizeExtractPath(tt.filepath, tt.destination), tt.filepath)
+			}
+		})
+	}
+}
+
+func Test_sanitizePermissions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		testCaseName         string
+		givenFilePermissions fs.FileMode
+	}{
+		{
+			testCaseName:         "directory, valid permissions",
+			givenFilePermissions: fs.ModeDir | 0755,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (group has write)",
+			givenFilePermissions: fs.ModeDir | 0775,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (public has write)",
+			givenFilePermissions: fs.ModeDir | 0757,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (everyone has write)",
+			givenFilePermissions: fs.ModeDir | 0777,
+		},
+		{
+			testCaseName:         "executable file, valid permissions",
+			givenFilePermissions: 0755,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (group has write)",
+			givenFilePermissions: 0775,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (public has write)",
+			givenFilePermissions: 0757,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (everyone has write)",
+			givenFilePermissions: 0777,
+		},
+		{
+			testCaseName:         "non-executable file, valid permissions",
+			givenFilePermissions: 0644,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (group has write)",
+			givenFilePermissions: 0664,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (public has write)",
+			givenFilePermissions: 0646,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (everyone has write)",
+			givenFilePermissions: 0666,
+		},
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a temp file to extract a FileInfo from it with tt.givenFilePermissions
+			tmpDir := t.TempDir()
+			pathUnderTest := filepath.Join(tmpDir, ulid.New())
+			if tt.givenFilePermissions.IsDir() {
+				require.NoError(t, os.MkdirAll(pathUnderTest, tt.givenFilePermissions))
+			} else {
+				f, err := os.OpenFile(pathUnderTest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, tt.givenFilePermissions)
+				require.NoError(t, err)
+				require.NoError(t, f.Close())
+			}
+			fileInfo, err := os.Stat(pathUnderTest)
+			require.NoError(t, err)
+
+			sanitizedPermissions := sanitizePermissions(fileInfo)
+
+			// Confirm no group write
+			require.True(t, sanitizedPermissions&0020 == 0)
+
+			// Confirm no public write
+			require.True(t, sanitizedPermissions&0002 == 0)
+
+			// Confirm type is set correctly
+			require.Equal(t, tt.givenFilePermissions.Type(), sanitizedPermissions.Type())
+
+			// Confirm owner permissions are unmodified
+			var ownerBits fs.FileMode = 0700
+			if runtime.GOOS == "windows" {
+				// Windows doesn't have executable bit
+				ownerBits = 0600
+			}
+			require.Equal(t, tt.givenFilePermissions&ownerBits, sanitizedPermissions&ownerBits)
 		})
 	}
 }

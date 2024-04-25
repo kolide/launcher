@@ -184,10 +184,6 @@ func (s *grpcServer) PublishResults(ctx context.Context, req *pb.ResultCollectio
 func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(results)
-		resTruncated := string(resJSON[:200])
-		if len(resJSON) > 200 {
-			resTruncated += "..."
-		}
 
 		uuid, _ := uuid.FromContext(ctx)
 
@@ -202,7 +198,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishResults",
 			"uuid", uuid,
-			"results_truncated", resTruncated,
+			"results_truncated", trivialTruncate(string(resJSON), 200),
 			"result_count", len(results),
 			"result_size", len(resJSON),
 			"errcode", errcode,
@@ -219,4 +215,16 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 func (mw uuidmw) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (message, errcode string, reauth bool, err error) {
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.PublishResults(ctx, nodeKey, results)
+}
+
+// trivialTruncate performs a trivial truncate operation on strings. Because it's string based, it may not handle
+// multibyte characters correctly. Note that this actually returns a string length of maxLen +3, but that's okay
+// because it's only used to keep logs from being too huge.
+func trivialTruncate(str string, maxLen int) string {
+	if len(str) <= maxLen {
+		return str
+	}
+
+	return str[:maxLen] + "..."
+
 }

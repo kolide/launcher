@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
-	github.com/kolide/kit v0.0.0-20221107170827-fb85e3d59eab
+	github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50
 	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
