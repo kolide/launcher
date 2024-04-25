@@ -10,9 +10,9 @@ import (
 )
 
 func runWindowsSvc(_ *multislogger.MultiSlogger, _ []string) error {
-	return errors.New("this isn't windows")
+	return errors.New("this is not windows")
 }
 
 func runWindowsSvcForeground(_ *multislogger.MultiSlogger, _ []string) error {
-	return errors.New("this isn't windows")
+	return errors.New("this is not windows")
 }
