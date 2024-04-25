@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -62,29 +62,8 @@ func (g *Group) Run() error {
 
 	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
-		go func(a rungroupActor) {
-			defer func() {
-				if r := recover(); r != nil {
-					g.slogger.Log(context.TODO(), slog.LevelError,
-						"panic on rungroup execute",
-						"actor_name", a.name,
-						"err", r,
-					)
-					if err, ok := r.(error); ok {
-						g.slogger.Log(context.TODO(), slog.LevelError,
-							"panic stack trace",
-							"actor_name", a.name,
-							"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
-						)
-					}
-					// Since execute panicked, the actor error won't get sent to our channel below --
-					// add it now.
-					actorErrors <- actorError{
-						errorSourceName: a.name,
-						err:             fmt.Errorf("execute panicked: %+v", r),
-					}
-				}
-			}()
+		a := a
+		gowrapper.Go(g.slogger, func() {
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
@@ -94,7 +73,19 @@ func (g *Group) Run() error {
 				errorSourceName: a.name,
 				err:             err,
 			}
-		}(a)
+		}, func(r any) {
+			g.slogger.Log(context.TODO(), slog.LevelInfo,
+				"shutting down after actor panic",
+				"actor", a.name,
+			)
+
+			// Since execute panicked, the actor error won't get sent to our channel below --
+			// add it now.
+			actorErrors <- actorError{
+				errorSourceName: a.name,
+				err:             fmt.Errorf("execute panicked: %+v", r),
+			}
+		})
 	}
 
 	// Wait for the first actor to stop.
