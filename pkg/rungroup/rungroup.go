@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -59,15 +60,37 @@ func (g *Group) Run() error {
 		"actor_count", len(g.actors),
 	)
 
-	errors := make(chan actorError, len(g.actors))
+	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
 		go func(a rungroupActor) {
+			defer func() {
+				if r := recover(); r != nil {
+					g.slogger.Log(context.TODO(), slog.LevelError,
+						"panic on rungroup execute",
+						"actor_name", a.name,
+						"err", r,
+					)
+					if err, ok := r.(error); ok {
+						g.slogger.Log(context.TODO(), slog.LevelError,
+							"panic stack trace",
+							"actor_name", a.name,
+							"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+						)
+					}
+					// Since execute panicked, the actor error won't get sent to our channel below --
+					// add it now.
+					actorErrors <- actorError{
+						errorSourceName: a.name,
+						err:             fmt.Errorf("execute panicked: %+v", r),
+					}
+				}
+			}()
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
 			)
 			err := a.execute()
-			errors <- actorError{
+			actorErrors <- actorError{
 				errorSourceName: a.name,
 				err:             err,
 			}
@@ -75,7 +98,7 @@ func (g *Group) Run() error {
 	}
 
 	// Wait for the first actor to stop.
-	initialActorErr := <-errors
+	initialActorErr := <-actorErrors
 
 	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
@@ -121,7 +144,7 @@ func (g *Group) Run() error {
 	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
 	timeoutTimer := time.NewTimer(executeReturnTimeout)
 	defer timeoutTimer.Stop()
-	for i := 1; i < cap(errors); i++ {
+	for i := 1; i < cap(actorErrors); i++ {
 		select {
 		case <-timeoutTimer.C:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -130,7 +153,7 @@ func (g *Group) Run() error {
 
 			// Return the original error so we can proceed with shutdown
 			return initialActorErr.err
-		case e := <-errors:
+		case e := <-actorErrors:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received error from actor",
 				"actor", e.errorSourceName,
