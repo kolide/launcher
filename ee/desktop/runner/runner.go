@@ -588,6 +588,11 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		traces.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
 		return fmt.Errorf("running desktop command as user: %w", err)
 	}
+	// Extra nil check to ensure we can access cmd.Process.Pid safely later
+	if cmd.Process == nil {
+		traces.SetError(span, fmt.Errorf("starting desktop command: %w", err))
+		return fmt.Errorf("starting desktop command: %w", err)
+	}
 
 	span.AddEvent("command_started")
 
