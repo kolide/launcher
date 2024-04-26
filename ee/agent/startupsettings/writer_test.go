@@ -3,6 +3,7 @@ package startupsettings
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -135,9 +136,11 @@ func TestFlagsChanged(t *testing.T) {
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
 
+	autoTableConstructionValue := ulid.New()
+
 	configStore := inmemory.NewStore()
 	configMap := map[string]any{
-		"auto_table_construction":      ulid.New(),
+		"auto_table_construction":      autoTableConstructionValue,
 		"something_else_not_important": ulid.New(),
 	}
 	configJson, err := json.Marshal(configMap)
@@ -164,6 +167,10 @@ func TestFlagsChanged(t *testing.T) {
 	v3, err := s.kvStore.Get([]byte(keys.PinnedOsquerydVersion.String()))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, pinnedOsquerydVersion, string(v3), "incorrect flag value")
+
+	v4, err := s.kvStore.Get([]byte("auto_table_construction"))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, fmt.Sprintf("{\"auto_table_construction\":\"%s\"}", autoTableConstructionValue), string(v4), "incorrect config value")
 
 	// Now, prepare for flag changes
 	newFlagValue := "alpha"
