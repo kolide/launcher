@@ -78,7 +78,7 @@ func runMain() error {
 	// handle that argument. Fall-back to running launcher
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
-			systemSlogger.Log(ctx, slog.LevelInfo,
+			systemSlogger.Log(ctx, slog.LevelError,
 				"running with positional args",
 				"err", err,
 			)
@@ -92,7 +92,10 @@ func runMain() error {
 		if launcher.IsInfoCmd(err) {
 			return nil
 		}
-		level.Info(logger).Log("err", err)
+		systemSlogger.Log(ctx, slog.LevelError,
+			"could not parse options",
+			"err", err,
+		)
 		return fmt.Errorf("parsing options: %w", err)
 	}
 
@@ -203,6 +206,10 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 		// Fall back to legacy autoupdate library
 		newerBinary, err = autoupdate.FindNewestSelf(ctx)
 		if err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"could not check out latest launcher from legacy autoupdate library",
+				"err", err,
+			)
 			return nil
 		}
 	}
