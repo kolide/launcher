@@ -44,11 +44,6 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		},
 	}
 
-	// Attempt to ensure flags are up-to-date
-	if err := s.setFlags(); err != nil {
-		s.knapsack.Slogger().Log(ctx, slog.LevelWarn, "could not set flags", "err", err)
-	}
-
 	for k := range s.storedFlags {
 		s.knapsack.RegisterChangeObserver(s, k)
 	}
@@ -56,8 +51,8 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 	return s, nil
 }
 
-// setFlags updates the flags with their values from the agent flag data store.
-func (s *startupSettingsWriter) setFlags() error {
+// WriteSettings updates the flags with their values from the agent flag data store.
+func (s *startupSettingsWriter) WriteSettings() error {
 	updatedFlags := make(map[string]string)
 	for flag, getter := range s.storedFlags {
 		updatedFlags[flag.String()] = getter()
@@ -69,7 +64,7 @@ func (s *startupSettingsWriter) setFlags() error {
 	atcConfig, err := s.extractAutoTableConstructionConfig()
 	if err != nil {
 		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-			"could not extract auto_table_construction config",
+			"extracting auto_table_construction config",
 			"err", err,
 		)
 	} else {
@@ -77,7 +72,7 @@ func (s *startupSettingsWriter) setFlags() error {
 	}
 
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
-		return fmt.Errorf("updating flags: %w", err)
+		return fmt.Errorf("writing settings: %w", err)
 	}
 
 	return nil
@@ -87,9 +82,9 @@ func (s *startupSettingsWriter) setFlags() error {
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
 func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if err := s.setFlags(); err != nil {
+	if err := s.WriteSettings(); err != nil {
 		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
-			"could not set flags after change",
+			"writing startup settings after flag change",
 			"err", err,
 		)
 	}

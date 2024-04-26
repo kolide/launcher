@@ -523,12 +523,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		// then we can immediately close it
 		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
 		if err != nil {
-			e.slogger.Log(ctx, slog.LevelWarn,
+			e.slogger.Log(ctx, slog.LevelError,
 				"could not get startup settings writer",
 				"err", err,
 			)
 		} else {
-			startupSettingsWriter.Close()
+			defer startupSettingsWriter.Close()
+
+			if err := startupSettingsWriter.WriteSettings(); err != nil {
+				e.slogger.Log(ctx, slog.LevelError,
+					"writing startup settings",
+					"err", err,
+				)
+			}
 		}
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in

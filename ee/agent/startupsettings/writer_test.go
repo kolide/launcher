@@ -38,6 +38,8 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
+
 	// Check that all values were set
 	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
@@ -98,6 +100,8 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
+
 	// Now check that all values were updated
 	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
@@ -145,6 +149,8 @@ func TestFlagsChanged(t *testing.T) {
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
+
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
 
 	// Check that all values were set
 	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
