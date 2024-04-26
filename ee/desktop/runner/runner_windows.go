@@ -19,7 +19,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	defer span.End()
 
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
-	if err != nil {
+	if err != nil || explorerProc == nil {
 		return fmt.Errorf("getting user explorer process: %w", err)
 	}
 
