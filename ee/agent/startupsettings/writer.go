@@ -59,8 +59,6 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
-	// Set flags will only be called when a flag value changes. The osquery config that contains the atc config
-	// comes in via osquery extension. So a new config will not trigger a re-write.
 	atcConfig, err := s.extractAutoTableConstructionConfig()
 	if err != nil {
 		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
