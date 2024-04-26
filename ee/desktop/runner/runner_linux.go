@@ -42,7 +42,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	}
 
 	runningUser, err := user.LookupId(uid)
-	if err != nil {
+	if err != nil || runningUser == nil {
 		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
 
