@@ -18,7 +18,7 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 	if !windows.GetCurrentProcessToken().IsElevated() {
 		syslogger := defaultSystemSlogger()
 
-		syslogger.Log(context.TODO(), slog.LevelDebug,
+		syslogger.Log(context.TODO(), slog.LevelInfo,
 			"launcher running on windows without elevated permissions, using default stderr instead of eventlog",
 		)
 
@@ -26,7 +26,7 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 	}
 
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
-	if err != nil {
+	if err != nil || eventLogWriter == nil {
 		syslogger := defaultSystemSlogger()
 
 		syslogger.Log(context.TODO(), slog.LevelError,

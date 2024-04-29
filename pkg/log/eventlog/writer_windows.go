@@ -49,10 +49,6 @@ type Writer struct {
 }
 
 func (w *Writer) Close() error {
-	// TODO RM why does only CI hit this issue
-	if w == nil {
-		return nil
-	}
 	return windows.DeregisterEventSource(w.handle)
 }
 
