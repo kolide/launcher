@@ -52,7 +52,7 @@ func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 	case pb.LogCollection_RESULT:
 		typ = logger.LogTypeSnapshot
 	default:
-		panic(fmt.Sprintf("logType %d not implemented", req.LogType))
+		return logCollection{}, fmt.Errorf("unsupported log type %d", req.LogType)
 	}
 
 	return logCollection{

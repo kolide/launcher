@@ -24,12 +24,9 @@ import (
 func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
 	r.TransferEncoding = []string{"identity"}
 
-	// read the body, set the content legth, and leave a new ReadCloser in Body
+	// read the body, set the content length, and leave a new ReadCloser in Body
 	bodyBuf := &bytes.Buffer{}
-	bodyReadBytes, err := io.Copy(bodyBuf, r.Body)
-	if err != nil {
-		panic(err)
-	}
+	bodyReadBytes, _ := io.Copy(bodyBuf, r.Body)
 	r.Body.Close()
 	r.ContentLength = bodyReadBytes
 	r.Body = io.NopCloser(bodyBuf)
