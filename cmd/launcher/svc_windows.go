@@ -183,7 +183,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 
-	runLauncherResults := make(chan struct{}, 0)
+	runLauncherResults := make(chan struct{})
 
 	go func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
@@ -231,7 +231,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
 				"shutting down service after runLauncher exited",
 			)
-			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+			// We don't want to tell the service manager that we've stopped on purpose,
+			// so that the service manager will restart launcher correctly.
 			return false, uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
 		}
 	}
