@@ -2,6 +2,7 @@ package dataflattentable
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -76,8 +77,6 @@ func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.Os
 	case JWTType:
 		t.flattenFileFunc = dataflatten.JWTFile
 		t.tableName = "kolide_jwt"
-	default:
-		panic("Unknown data source type")
 	}
 
 	t.slogger = slogger.With("table", t.tableName)
@@ -122,6 +121,13 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string) ([]map[string]string, error) {
+	if t.flattenFileFunc == nil {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"flatten file func not provided, cannot perform dataflatten",
+		)
+		return nil, errors.New("flatten file func not provided")
+	}
+
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithNestedPlist(),

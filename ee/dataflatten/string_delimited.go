@@ -22,7 +22,7 @@ func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingSt
 	case DuplicateKeys:
 		return duplicateKeyFunc(kVDelimiter)
 	default:
-		panic("Unknown record splitting strategy")
+		return nil
 	}
 }
 
