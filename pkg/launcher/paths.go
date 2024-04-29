@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 )
@@ -56,7 +57,14 @@ func DefaultPath(path defaultPath) string {
 	// not windows
 	switch path {
 	case RootDirectory:
-		return "/var/kolide-k2/k2device.kolide.com/"
+		const defaultRootDir = "/var/kolide-k2/k2device.kolide.com"
+
+		// see if default root dir exists, if not assume it's a preprod install
+		if _, err := os.Stat(defaultRootDir); err != nil {
+			return "/var/kolide-k2/k2device-preprod.kolide.com"
+		}
+
+		return defaultRootDir
 	case EtcDirectory:
 		return "/etc/kolide-k2/"
 	case BinDirectory:

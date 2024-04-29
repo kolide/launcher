@@ -1,30 +1,37 @@
 package interactive
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	osquery "github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/config"
 )
 
-const extensionName = "com.kolide.launcher_interactive"
+const (
+	extensionName           = "com.kolide.launcher_interactive"
+	defaultConfigPluginName = "interactive_config"
+)
 
-func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFlags []string) (*os.Process, *osquery.ExtensionManagerServer, error) {
-
-	if err := os.MkdirAll(rootDir, fsutil.DirMode); err != nil {
+func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Process, *osquery.ExtensionManagerServer, error) {
+	if err := os.MkdirAll(interactiveRootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath := osqueryRuntime.SocketPath(rootDir)
-	augeasLensesPath := filepath.Join(rootDir, "augeas-lenses")
+	socketPath := osqueryRuntime.SocketPath(interactiveRootDir)
+	augeasLensesPath := filepath.Join(interactiveRootDir, "augeas-lenses")
 
 	// only install augeas lenses on non-windows platforms
 	if runtime.GOOS != "windows" {
@@ -37,7 +44,37 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 		}
 	}
 
-	proc, err := os.StartProcess(osquerydPath, buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
+	// check to see if a config flag path was given,
+	// we need to check this before loading the default config plugin,
+	// passing 2 configs to osquery will result in an error
+	haveConfigPathOsqFlag := false
+	for _, flag := range knapsack.OsqueryFlags() {
+		if strings.HasPrefix(flag, "config_path") {
+			haveConfigPathOsqFlag = true
+			break
+		}
+	}
+
+	// start building list of osq plugins with the kolide tables
+	osqPlugins := table.PlatformTables(knapsack.Slogger(), knapsack.OsquerydPath())
+
+	osqueryFlags := knapsack.OsqueryFlags()
+	// if we were not provided a config path flag, try to add default config
+	if !haveConfigPathOsqFlag {
+		// check to see if we can actually get a config plugin
+		configPlugin, err := generateConfigPlugin(knapsack.RootDirectory())
+		if err != nil {
+			knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+				"error creating config plugin",
+				"err", err,
+			)
+		} else {
+			osqPlugins = append(osqPlugins, configPlugin)
+			osqueryFlags = append(osqueryFlags, fmt.Sprintf("config_plugin=%s", defaultConfigPluginName))
+		}
+	}
+
+	proc, err := os.StartProcess(knapsack.OsquerydPath(), buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
 		// Transfer stdin, stdout, and stderr to the new process
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 	})
@@ -46,10 +83,9 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
 
-	// while developing for windows it was found that it will sometimes take osquey a while
+	// while developing for windows it was found that it will sometimes take osquery a while
 	// to create the socket, so we wait for it to exist before continuing
 	if err := waitForFile(socketPath, time.Second/4, time.Second*10); err != nil {
-
 		procKillErr := proc.Kill()
 		if procKillErr != nil {
 			err = fmt.Errorf("error killing osqueryd interactive: %s: %w", procKillErr, err)
@@ -58,7 +94,7 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
-	extensionServer, err := loadExtensions(slogger, socketPath, osquerydPath)
+	extensionServer, err := loadExtensions(socketPath, osqPlugins...)
 	if err != nil {
 		err = fmt.Errorf("error loading extensions: %w", err)
 
@@ -74,7 +110,6 @@ func StartProcess(slogger *slog.Logger, rootDir, osquerydPath string, osqueryFla
 }
 
 func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []string) []string {
-
 	// putting "-S" (the interactive flag) first because the behavior is inconsistent
 	// when it's in the middle, found this during development on M1 macOS monterey 12.4
 	// ~James Pickett 07/05/2022
@@ -100,7 +135,7 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 	return flags
 }
 
-func loadExtensions(slogger *slog.Logger, socketPath string, osquerydPath string) (*osquery.ExtensionManagerServer, error) {
+func loadExtensions(socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
 	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
@@ -117,7 +152,7 @@ func loadExtensions(slogger *slog.Logger, socketPath string, osquerydPath string
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
-	extensionManagerServer.RegisterPlugin(table.PlatformTables(slogger, osquerydPath)...)
+	extensionManagerServer.RegisterPlugin(plugins...)
 
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
@@ -152,4 +187,21 @@ func waitForFile(path string, interval, timeout time.Duration) error {
 			}
 		}
 	}
+}
+
+func generateConfigPlugin(launcherDaemonRootDir string) (*config.Plugin, error) {
+	r, err := startupsettings.OpenReader(context.TODO(), launcherDaemonRootDir)
+	if err != nil {
+		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
+	}
+	defer r.Close()
+
+	atcConfig, err := r.Get("auto_table_construction")
+	if err != nil {
+		return nil, fmt.Errorf("error getting auto_table_construction from startup settings: %w", err)
+	}
+
+	return config.NewPlugin(defaultConfigPluginName, func(ctx context.Context) (map[string]string, error) {
+		return map[string]string{defaultConfigPluginName: atcConfig}, nil
+	}), nil
 }

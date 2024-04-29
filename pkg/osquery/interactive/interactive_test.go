@@ -15,6 +15,8 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
@@ -70,6 +72,13 @@ func TestProc(t *testing.T) {
 			wantProc: true,
 		},
 		{
+			name: "config path",
+			osqueryFlags: []string{
+				fmt.Sprintf("config_path=%s", ulid.New()),
+			},
+			wantProc: true,
+		},
+		{
 			name:           "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			wantProc:       false,
 			errContainsStr: "error waiting for osquery to create socket",
@@ -82,9 +91,14 @@ func TestProc(t *testing.T) {
 
 			rootDir := t.TempDir()
 			require.NoError(t, downloadOsquery(rootDir))
-			osquerydPath := filepath.Join(rootDir, "osqueryd")
 
-			proc, _, err := StartProcess(multislogger.NewNopLogger(), rootDir, osquerydPath, tt.osqueryFlags)
+			mockSack := mocks.NewKnapsack(t)
+			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
+			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
+			mockSack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
+
+			proc, _, err := StartProcess(mockSack, rootDir)
 
 			if tt.errContainsStr != "" {
 				require.Error(t, err)
