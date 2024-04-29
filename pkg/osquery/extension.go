@@ -175,6 +175,9 @@ func (e *Extension) Execute() error {
 		// select to either exit or write another batch of logs
 		select {
 		case <-e.done:
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"osquery extension received shutdown request",
+			)
 			return nil
 		case <-ticker.Chan():
 			// Resume loop
