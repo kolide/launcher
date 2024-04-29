@@ -3,9 +3,11 @@
 
 package eventlog
 
+import "errors"
+
 type Writer struct {
 }
 
 func NewWriter(name string) (*Writer, error) {
-	panic("windows only")
+	return nil, errors.New("windows only")
 }

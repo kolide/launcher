@@ -8,5 +8,5 @@ import (
 )
 
 func New(w *Writer) log.Logger {
-	panic("Windows Only")
+	return log.NewNopLogger()
 }
