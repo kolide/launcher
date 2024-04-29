@@ -193,7 +193,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				"err", err,
 				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 			)
-			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
+
 			// Launcher is already shut down -- send signal to fully exit so that the service manager can restart the service
 			runLauncherResults <- struct{}{}
 		}
@@ -205,7 +205,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 		w.systemSlogger.Log(ctx, slog.LevelInfo,
 			"runLauncher exited cleanly",
 		)
-		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 		runLauncherResults <- struct{}{}
 	}()
 
