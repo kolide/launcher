@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/pkg/errors"
-
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -193,18 +193,13 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				"err", err,
 				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 			)
-
-			// Launcher is already shut down -- send signal to fully exit so that the service manager can restart the service
-			runLauncherResults <- struct{}{}
+		} else {
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"runLauncher exited cleanly",
+			)
 		}
 
-		// If we get here, it means runLauncher returned nil. If we do
-		// nothing, the service is left running, but with no
-		// functionality. Instead, signal that as a stop to the service
-		// manager, and exit. We rely on the service manager to restart.
-		w.systemSlogger.Log(ctx, slog.LevelInfo,
-			"runLauncher exited cleanly",
-		)
+		// Since launcher shut down, we must signal to fully exit so that the service manager can restart the service.
 		runLauncherResults <- struct{}{}
 	}()
 
@@ -234,13 +229,10 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			}
 		case <-runLauncherResults:
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
-				"shutting down service after launcher shutdown",
+				"shutting down service after runLauncher exited",
 			)
-			changes <- svc.Status{State: svc.StopPending}
-			cancel()
-			time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-			return ssec, errno
+			return false, uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
 		}
 	}
 }

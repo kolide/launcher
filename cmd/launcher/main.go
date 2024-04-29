@@ -79,7 +79,7 @@ func runMain() int {
 	}
 
 	// if the launcher is being ran with a positional argument,
-	// handle that argument. Fall-back to running launcher
+	// handle that argument.
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
@@ -91,6 +91,7 @@ func runMain() int {
 		return 0
 	}
 
+	// Fall back to running launcher
 	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
 		if launcher.IsInfoCmd(err) {
