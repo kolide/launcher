@@ -138,7 +138,7 @@ func New(opts ...Option) *Builder {
 	// that windows and cgo aren't friends. This might be wrong,
 	// but I don't want to change it yet.
 	case b.cgo && b.os == "windows":
-		panic("Windows and CGO are not friends")
+		panic("Windows and CGO are not friends") //nolint:forbidigo // Fine to use panic outside of launcher proper
 
 	// cgo is intentionally enabled
 	case b.cgo:
@@ -158,7 +158,7 @@ func New(opts ...Option) *Builder {
 			// caller here is a bunch simpler if we can
 			// return *Builder, and this error is
 			// exceedingly unlikely.
-			panic(fmt.Sprintf("Unable to get cwd: %s", err))
+			panic(fmt.Sprintf("Unable to get cwd: %s", err)) //nolint:forbidigo // Fine to use panic outside of launcher proper
 		}
 
 		cmdEnv = append(
