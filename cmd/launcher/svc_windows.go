@@ -233,6 +233,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			)
 			// We don't want to tell the service manager that we've stopped on purpose,
 			// so that the service manager will restart launcher correctly.
+			// We use this error code largely because the windows/svc code also uses it
+			// and it seems semantically correct enough; it doesn't appear to matter to us
+			// what the code is.
 			return false, uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
 		}
 	}
