@@ -531,6 +531,13 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping desktop process spawning and health checks",
+		)
+		return nil
+	}
+
 	if !r.processSpawningEnabled {
 		// Desktop is disabled, kill any existing desktop user processes
 		r.killDesktopProcesses(context.Background())
