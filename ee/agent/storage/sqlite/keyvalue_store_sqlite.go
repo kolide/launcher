@@ -19,20 +19,23 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type storeName int
+type StoreName int
 
 const (
-	StartupSettingsStore storeName = iota
+	StartupSettingsStore   StoreName = iota
+	RestartServiceLogStore StoreName = 1
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
 
 // String translates the exported int constant to the actual name of the
 // supported table in the sqlite database.
-func (s storeName) String() string {
+func (s StoreName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
+	case RestartServiceLogStore:
+		return "restart_service_logs"
 	}
 
 	return ""
@@ -48,9 +51,14 @@ type sqliteStore struct {
 	tableName     string
 }
 
+type sqliteColumns struct {
+	pk          string
+	valueColumn string
+}
+
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+func OpenRO(ctx context.Context, rootDirectory string, name StoreName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
@@ -70,7 +78,7 @@ func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 
 // OpenRW creates a validated database connection to a validated database, performing
 // migrations if necessary.
-func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+func OpenRW(ctx context.Context, rootDirectory string, name StoreName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
@@ -325,4 +333,92 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 
 func isMissingMigrationError(err error) bool {
 	return missingMigrationErrFormat.MatchString(err.Error())
+}
+
+func (s *sqliteStore) getColumns() *sqliteColumns {
+	switch s.tableName {
+	case StartupSettingsStore.String():
+		return &sqliteColumns{pk: "name", valueColumn: "value"}
+	case RestartServiceLogStore.String():
+		return &sqliteColumns{pk: "timestamp", valueColumn: "log"}
+	}
+
+	return nil
+}
+
+func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
+	colInfo := s.getColumns()
+	if s == nil || s.conn == nil || colInfo == nil {
+		return errors.New("store is nil")
+	}
+
+	if s.readOnly {
+		return errors.New("cannot perform update with RO connection")
+	}
+
+	insertSql := fmt.Sprintf(
+		`INSERT INTO %s (%s, %s) VALUES (?, ?)`,
+		s.tableName,
+		colInfo.pk,
+		colInfo.valueColumn,
+	)
+
+	if _, err := s.conn.Exec(insertSql, timestamp, value); err != nil {
+		return fmt.Errorf("appending row into %s: %w", s.tableName, err)
+	}
+
+	return nil
+}
+
+func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) error {
+	colInfo := s.getColumns()
+	if s == nil || s.conn == nil || colInfo == nil {
+		return errors.New("store is nil")
+	}
+
+	query := fmt.Sprintf(
+		`SELECT %s, %s  FROM %s;`,
+		colInfo.pk,
+		colInfo.valueColumn,
+		s.tableName,
+	)
+
+	rows, err := s.conn.Query(query)
+	if err != nil {
+		return fmt.Errorf("issuing foreach query: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var rowid int64
+		var timestamp int64
+		var result string
+		if err := rows.Scan(&rowid, &timestamp, &result); err != nil {
+			return fmt.Errorf("scanning foreach query: %w", err)
+		}
+
+		if err := fn(rowid, timestamp, []byte(result)); err != nil {
+			return fmt.Errorf("caller error during foreach iteration: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *sqliteStore) Count() (int, error) {
+	if s == nil || s.conn == nil {
+		return 0, errors.New("store is nil")
+	}
+
+	// It's fine to interpolate the table name into the query because
+	// we require the table name to be in our allowlist `supportedTables`
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s;`, s.tableName)
+
+	var countValue int
+	if err := s.conn.QueryRow(query).Scan(&countValue); err != nil {
+		return 0, fmt.Errorf("querying for %s table count: %w", s.tableName, err)
+	}
+
+	return countValue, nil
 }

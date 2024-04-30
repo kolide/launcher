@@ -33,6 +33,21 @@ type Iterator interface {
 	ForEach(fn func(k, v []byte) error) error
 }
 
+// TimestampedIterator is a read-only interface for iterating timestamped data.
+type TimestampedIterator interface {
+	// ForEach executes a function for each timestamp/value pair in a store.
+	// If the provided function returns an error then the iteration is stopped and
+	// the error is returned to the caller. The provided function must not modify
+	// the store; this will result in undefined behavior.
+	ForEach(fn func(rowid, timestamp int64, v []byte) error) error
+}
+
+// TimestampedAppender is an interface for supporting the addition of timestamped values to a store
+type TimestampedAppender interface {
+	// AppendValue takes the timestamp, and marshalled value for insertion as a new row
+	AppendValue(timestamp int64, value []byte) error
+}
+
 // Updater is an interface for bulk replacing data in a key/value store.
 type Updater interface {
 	// Update takes a map of key-value pairs, and inserts
@@ -61,10 +76,14 @@ type GetterSetter interface {
 	Setter
 }
 
+type Closer interface {
+	Close() error
+}
+
 // GetterCloser extends the Getter interface with a Close method.
 type GetterCloser interface {
 	Getter
-	Close() error
+	Closer
 }
 
 // GetterUpdaterCloser groups the Get, Update, and Close methods.
@@ -97,6 +116,16 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Updater
 	Counter
 	Appender
+}
+
+// TimestampedIteratorAppenderCounterCloser is an interface to support the storage and retrieval of
+// sets of timestamped values. This can be used where a strict key/value interface may not suffice,
+// e.g. for writing logs or historical records to sqlite
+type TimestampedIteratorAppenderCounterCloser interface {
+	TimestampedIterator
+	TimestampedAppender
+	Counter
+	Closer
 }
 
 // Convenient alias for a key value store that supports all methods

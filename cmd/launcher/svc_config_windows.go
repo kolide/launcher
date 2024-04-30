@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kolide/launcher/cmd/launcher/restartservice"
 	"github.com/kolide/launcher/pkg/launcher"
 
 	"golang.org/x/sys/windows/registry"
@@ -244,9 +245,9 @@ func restartService(service *mgr.Service) error {
 
 func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	logCtx := context.TODO()
-	slogger = slogger.With("target_service", launcherRestartServiceName)
+	slogger = slogger.With("target_service", restartservice.LauncherRestartServiceName)
 	// first check if we've already installed the service
-	existingService, err := serviceManager.OpenService(launcherRestartServiceName)
+	existingService, err := serviceManager.OpenService(restartservice.LauncherRestartServiceName)
 	if err == nil {
 		// if the service already exists, just restart it to ensure it's running from the latest launcher update.
 		// If this fails, log the error but move on, this service is not worth tying up the main launcher startup.
@@ -274,7 +275,7 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	}
 
 	svcMgrConf := mgr.Config{
-		DisplayName:  launcherRestartServiceName,
+		DisplayName:  restartservice.LauncherRestartServiceName,
 		Description:  "The Kolide Launcher Restart Service",
 		StartType:    mgr.StartAutomatic,
 		ErrorControl: mgr.ErrorNormal,
@@ -288,7 +289,7 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	serviceArgs = append(serviceArgs, os.Args[2:]...)
 
 	restartService, err := serviceManager.CreateService(
-		launcherRestartServiceName,
+		restartservice.LauncherRestartServiceName,
 		currentExe,
 		svcMgrConf,
 		serviceArgs...,
@@ -315,7 +316,7 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	if err = restartService.SetRecoveryActions(recoveryActions, 10800); err != nil {
 		slogger.Log(context.TODO(), slog.LevelWarn,
 			"unable to set recovery actions for service installation, proceeding",
-			"service", launcherRestartServiceName,
+			"service", restartservice.LauncherRestartServiceName,
 			"err", err,
 		)
 	}
@@ -323,7 +324,7 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	if err = restartService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
 		slogger.Log(context.TODO(), slog.LevelWarn,
 			"unable to set RecoveryActionsOnNonCrashFailures flag, proceeding",
-			"service", launcherRestartServiceName,
+			"service", restartservice.LauncherRestartServiceName,
 			"err", err,
 		)
 	}
@@ -331,7 +332,7 @@ func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	if err = restartService.Start(); err != nil {
 		slogger.Log(context.TODO(), slog.LevelWarn,
 			"unable to start launcher restart service",
-			"service", launcherRestartServiceName,
+			"service", restartservice.LauncherRestartServiceName,
 			"err", err,
 		)
 	}

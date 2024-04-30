@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package main
+package restartservice
 
 import (
 	"context"
@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	launcherRestartServiceName string = `LauncherKolideRestartSvc`
+	LauncherRestartServiceName string = `LauncherKolideRestartSvc`
+	launcherServiceName        string = `LauncherKolideK2Svc`
 )
 
 type winRestartSvc struct {
@@ -29,10 +30,10 @@ type winRestartSvc struct {
 	opts                   *launcher.Options
 }
 
-func runRestartService(systemSlogger *multislogger.MultiSlogger, args []string) error {
+func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	logCtx := context.TODO()
 	systemSlogger.Logger = systemSlogger.Logger.With(
-		"service", launcherRestartServiceName,
+		"service", LauncherRestartServiceName,
 		"version", version.Version().Version,
 	)
 
@@ -68,7 +69,7 @@ func runRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	}
 
 	localSlogger.Logger = localSlogger.Logger.With(
-		"service", launcherRestartServiceName,
+		"service", LauncherRestartServiceName,
 		"version", version.Version().Version,
 	)
 
@@ -89,7 +90,7 @@ func runRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 		}
 	}()
 
-	if err := svc.Run(launcherRestartServiceName, &winRestartSvc{
+	if err := svc.Run(LauncherRestartServiceName, &winRestartSvc{
 		systemSlogger: systemSlogger,
 		slogger:       localSlogger,
 		opts:          opts,
@@ -154,7 +155,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 			default:
 				w.slogger.Log(ctx, slog.LevelInfo,
 					"unexpected change request",
-					"service", launcherRestartServiceName,
+					"service", LauncherRestartServiceName,
 					"change_request", fmt.Sprintf("%+v", c),
 				)
 			}
@@ -217,3 +218,5 @@ func runLauncherRestartService(ctx context.Context, w *winRestartSvc) error {
 		}
 	}
 }
+
+// NtQuerySystemInformation - SystemProcessorPowerInformation
