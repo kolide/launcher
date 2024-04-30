@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -32,9 +31,6 @@ type touchIDSystemConfigTable struct {
 
 // TouchIDSystemConfigGenerate will be called whenever the table is queried.
 func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	var results []map[string]string
 	var touchIDCompatible, secureEnclaveCPU, touchIDEnabled, touchIDUnlock string
 
