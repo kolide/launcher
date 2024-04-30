@@ -8,22 +8,25 @@ import (
 
 type dataFunc func(data []byte, opts ...FlattenOpts) ([]Row, error)
 
-type recordSplittingStrategy int
+type RecordSplittingStrategy interface {
+	stringDelimitedFunc()
+}
 
-const (
-	None recordSplittingStrategy = iota
-	DuplicateKeys
+type recordSplittingStrategy struct {
+	splitFunc func(kvDelimiter string) dataFunc
+}
+
+var (
+	None = recordSplittingStrategy{
+		splitFunc: singleRecordFunc,
+	}
+	DuplicateKeys = recordSplittingStrategy{
+		splitFunc: duplicateKeyFunc,
+	}
 )
 
 func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingStrategy) dataFunc {
-	switch splittingStrategy {
-	case None:
-		return singleRecordFunc(kVDelimiter)
-	case DuplicateKeys:
-		return duplicateKeyFunc(kVDelimiter)
-	default:
-		return nil
-	}
+	return splittingStrategy.splitFunc(kVDelimiter)
 }
 
 // duplicateKeyFunc returns a function that conforms to the interface expected
