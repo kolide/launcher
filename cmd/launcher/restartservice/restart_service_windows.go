@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/version"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/sqlitelogger"
@@ -119,7 +120,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 
 	runRestartServiceResults := make(chan struct{})
 
-	go func() {
+	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
 		err := runLauncherRestartService(ctx, w)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
@@ -133,9 +134,17 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 			)
 		}
 
-		// Since restart service shut down, we must signal to fully exit so that the service manager can restart the service.
+		// signal to fully exit so that the service manager can restart the service
 		runRestartServiceResults <- struct{}{}
-	}()
+	}, func(r any) {
+		w.systemSlogger.Log(ctx, slog.LevelError,
+			"exiting after runLauncherRestartService panic",
+			"err", r,
+		)
+
+		// signal to fully exit so that the service manager can restart the service.
+		runRestartServiceResults <- struct{}{}
+	})
 
 	for {
 		select {
