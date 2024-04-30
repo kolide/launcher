@@ -5,6 +5,7 @@ package startupsettings
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -43,11 +44,6 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		},
 	}
 
-	// Attempt to ensure flags are up-to-date
-	if err := s.setFlags(); err != nil {
-		s.knapsack.Slogger().Log(ctx, slog.LevelWarn, "could not set flags", "err", err)
-	}
-
 	for k := range s.storedFlags {
 		s.knapsack.RegisterChangeObserver(s, k)
 	}
@@ -55,16 +51,26 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 	return s, nil
 }
 
-// setFlags updates the flags with their values from the agent flag data store.
-func (s *startupSettingsWriter) setFlags() error {
+// WriteSettings updates the flags with their values from the agent flag data store.
+func (s *startupSettingsWriter) WriteSettings() error {
 	updatedFlags := make(map[string]string)
 	for flag, getter := range s.storedFlags {
 		updatedFlags[flag.String()] = getter()
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
+	atcConfig, err := s.extractAutoTableConstructionConfig()
+	if err != nil {
+		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+			"extracting auto_table_construction config",
+			"err", err,
+		)
+	} else {
+		updatedFlags["auto_table_construction"] = atcConfig
+	}
+
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
-		return fmt.Errorf("updating flags: %w", err)
+		return fmt.Errorf("writing settings: %w", err)
 	}
 
 	return nil
@@ -74,9 +80,9 @@ func (s *startupSettingsWriter) setFlags() error {
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
 func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if err := s.setFlags(); err != nil {
+	if err := s.WriteSettings(); err != nil {
 		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
-			"could not set flags after change",
+			"writing startup settings after flag change",
 			"err", err,
 		)
 	}
@@ -84,4 +90,32 @@ func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
 
 func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
+}
+
+func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, error) {
+	osqConfig, err := s.knapsack.ConfigStore().Get([]byte("config"))
+	if err != nil {
+		return "", fmt.Errorf("could not get osquery config from store: %w", err)
+	}
+
+	// convert osquery config to map
+	var configUnmarshalled map[string]json.RawMessage
+	if err := json.Unmarshal(osqConfig, &configUnmarshalled); err != nil {
+		return "", fmt.Errorf("could not unmarshal osquery config: %w", err)
+	}
+
+	// delete what we don't want
+	for k := range configUnmarshalled {
+		if k == "auto_table_construction" {
+			continue
+		}
+		delete(configUnmarshalled, k)
+	}
+
+	atcJson, err := json.Marshal(configUnmarshalled)
+	if err != nil {
+		return "", fmt.Errorf("could not marshal auto_table_construction: %w", err)
+	}
+
+	return string(atcJson), nil
 }

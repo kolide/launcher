@@ -22,13 +22,13 @@ func main() {
 
 	if *flPlatform == "" {
 		fmt.Println("The --platform option must be defined")
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 	target := packaging.Target{}
 	if err := target.PlatformFromString(*flPlatform); err != nil {
 		fmt.Printf("Error parsing platform: %v\n", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 	// If we have a cacheDir, use it. Otherwise. set something random.
@@ -38,7 +38,7 @@ func main() {
 		cacheDir, err = os.MkdirTemp("", "download_cache")
 		if err != nil {
 			fmt.Printf("Could not create temp dir for caching files %v", err)
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 		}
 		defer os.RemoveAll(cacheDir)
 	}
@@ -48,14 +48,14 @@ func main() {
 	path, err := packaging.FetchBinary(ctx, cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), *flVersion, target)
 	if err != nil {
 		fmt.Println("An error occurred fetching the osqueryd binary: ", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 	if *flOutput != "" {
 		platformOutput := target.PlatformBinaryName(*flOutput)
 		if err := fsutil.CopyFile(path, platformOutput); err != nil {
 			fmt.Printf("Couldn't copy file to %s: %s", platformOutput, err)
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 		}
 		fmt.Println(*flOutput)
 	} else {
