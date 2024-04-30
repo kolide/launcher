@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -182,10 +183,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
-
 	runLauncherResults := make(chan struct{})
 
-	go func() {
+	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
@@ -201,7 +201,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 		// Since launcher shut down, we must signal to fully exit so that the service manager can restart the service.
 		runLauncherResults <- struct{}{}
-	}()
+	}, func(r any) {
+		w.systemSlogger.Log(ctx, slog.LevelError,
+			"exiting after runLauncher panic",
+			"err", r,
+		)
+		// Since launcher shut down, we must signal to fully exit so that the service manager can restart the service.
+		runLauncherResults <- struct{}{}
+	})
 
 	for {
 		select {

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/launcher/ee/gowrapper"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -59,23 +60,36 @@ func (g *Group) Run() error {
 		"actor_count", len(g.actors),
 	)
 
-	errors := make(chan actorError, len(g.actors))
+	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
-		go func(a rungroupActor) {
+		a := a
+		gowrapper.Go(context.TODO(), g.slogger, func() {
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
 			)
 			err := a.execute()
-			errors <- actorError{
+			actorErrors <- actorError{
 				errorSourceName: a.name,
 				err:             err,
 			}
-		}(a)
+		}, func(r any) {
+			g.slogger.Log(context.TODO(), slog.LevelInfo,
+				"shutting down after actor panic",
+				"actor", a.name,
+			)
+
+			// Since execute panicked, the actor error won't get sent to our channel below --
+			// add it now.
+			actorErrors <- actorError{
+				errorSourceName: a.name,
+				err:             fmt.Errorf("execute panicked: %+v", r),
+			}
+		})
 	}
 
 	// Wait for the first actor to stop.
-	initialActorErr := <-errors
+	initialActorErr := <-actorErrors
 
 	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
@@ -121,7 +135,7 @@ func (g *Group) Run() error {
 	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
 	timeoutTimer := time.NewTimer(executeReturnTimeout)
 	defer timeoutTimer.Stop()
-	for i := 1; i < cap(errors); i++ {
+	for i := 1; i < cap(actorErrors); i++ {
 		select {
 		case <-timeoutTimer.C:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -130,7 +144,7 @@ func (g *Group) Run() error {
 
 			// Return the original error so we can proceed with shutdown
 			return initialActorErr.err
-		case e := <-errors:
+		case e := <-actorErrors:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received error from actor",
 				"actor", e.errorSourceName,
