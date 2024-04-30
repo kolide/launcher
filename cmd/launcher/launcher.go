@@ -285,12 +285,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
-	sqliteLogPublisher, err := agentsqlite.OpenRW(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
+	sqliteLogWriter, err := agentsqlite.OpenRW(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
 	if err != nil {
-		return fmt.Errorf("opening log db in %s: %w", rootDirectory, err)
+		return fmt.Errorf("opening log db in %s: %w", opts.RootDirectory, err)
 	}
-	sqlitelogPublisher := sqlitelogger.NewSqliteLogPublisher(slogger, sqliteLogPublisher)
-	runGroup.Add("sqlite_log_publisher", sqlitelogPublisher.Run, sqlitelogPublisher.Interrupt)
+	sqliteLogPublisher := sqlitelogger.NewSqliteLogPublisher(slogger, sqliteLogWriter)
+	runGroup.Add("sqlite_log_publisher", sqliteLogPublisher.Run, sqliteLogPublisher.Interrupt)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)

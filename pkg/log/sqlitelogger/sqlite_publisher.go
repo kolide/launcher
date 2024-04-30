@@ -91,6 +91,7 @@ func (slp *SqliteLogPublisher) Interrupt(_ error) {
 		return
 	}
 
+	slp.publisher.Close()
 	slp.interrupted = true
 	slp.interrupt <- struct{}{}
 }
