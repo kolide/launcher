@@ -5,7 +5,6 @@ package execwrapper
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -49,7 +48,5 @@ func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error
 			"err", err,
 		)
 	}
-	os.Exit(cmd.ProcessState.ExitCode())
-	return errors.New("Exec shouldn't have gotten here.")
-
+	return fmt.Errorf("exec completed with exit code %d", cmd.ProcessState.ExitCode())
 }

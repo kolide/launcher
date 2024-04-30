@@ -27,10 +27,17 @@ import (
 )
 
 func main() {
+	os.Exit(runMain()) //nolint:forbidigo // Our only allowed usage of os.Exit is in this function
+}
+
+// runMain runs launcher main -- selecting the appropriate subcommand and running that (if provided),
+// or running `runLauncher`. We wrap it so that all our deferred calls will execute before we call
+// `os.Exit` in `main()`.
+func runMain() int {
 	systemSlogger, logCloser, err := multislogger.SystemSlogger()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating system logger: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer logCloser.Close()
 
@@ -62,22 +69,39 @@ func main() {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
-		runNewerLauncherIfAvailable(ctx, systemSlogger.Logger)
+		if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
+			systemSlogger.Log(ctx, slog.LevelInfo,
+				"could not run newer version of launcher",
+				"err", err,
+			)
+			return 1
+		}
 	}
 
 	// if the launcher is being ran with a positional argument,
-	// handle that argument. Fall-back to running launcher
+	// handle that argument.
 	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], `-`) {
 		if err := runSubcommands(systemSlogger); err != nil {
-			logutil.Fatal(logger, "err", fmt.Errorf("run with positional args: %w", err))
+			systemSlogger.Log(ctx, slog.LevelError,
+				"running with positional args",
+				"err", err,
+			)
+			return 1
 		}
-		os.Exit(0)
+		return 0
 	}
 
+	// Fall back to running launcher
 	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
-		level.Info(logger).Log("err", err)
-		os.Exit(1)
+		if launcher.IsInfoCmd(err) {
+			return 0
+		}
+		systemSlogger.Log(ctx, slog.LevelError,
+			"could not parse options",
+			"err", err,
+		)
+		return 0
 	}
 
 	// recreate the logger with  the appropriate level.
@@ -121,14 +145,16 @@ func main() {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if tuf.IsLauncherReloadNeededErr(err) {
-			level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
-			runNewerLauncherIfAvailable(ctx, slogger.Logger)
-		} else {
+		if !tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
-			logutil.Fatal(logger, err, "run launcher")
+			return 1
+		}
+		level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
+		if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+			return 1
 		}
 	}
+	return 0
 }
 
 func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
@@ -169,12 +195,11 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 	}
 
 	return nil
-
 }
 
 // runNewerLauncherIfAvailable checks the autoupdate library for a newer version
 // of launcher than the currently-running one. If found, it will exec that version.
-func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
+func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) error {
 	newerBinary, err := latestLauncherPath(ctx, slogger)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelError,
@@ -185,7 +210,11 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
 		// Fall back to legacy autoupdate library
 		newerBinary, err = autoupdate.FindNewestSelf(ctx)
 		if err != nil {
-			return
+			slogger.Log(ctx, slog.LevelError,
+				"could not check out latest launcher from legacy autoupdate library",
+				"err", err,
+			)
+			return nil
 		}
 	}
 
@@ -193,7 +222,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
 		slogger.Log(ctx, slog.LevelInfo,
 			"nothing newer",
 		)
-		return
+		return nil
 	}
 
 	slogger.Log(ctx, slog.LevelInfo,
@@ -208,14 +237,14 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) {
 			"new_binary", newerBinary,
 			"err", err,
 		)
-		os.Exit(1)
+		return fmt.Errorf("execing newer version of launcher: %w", err)
 	}
 
 	slogger.Log(ctx, slog.LevelError,
 		"execing newer version of launcher exited unexpectedly without error",
 		"new_binary", newerBinary,
 	)
-	os.Exit(1)
+	return errors.New("execing newer version of launcher exited unexpectedly without error")
 }
 
 // latestLauncherPath looks for the latest version of launcher in the new autoupdate library,
@@ -261,6 +290,5 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	version.PrintFull()
 	detachConsole()
 
-	os.Exit(0)
 	return nil
 }
