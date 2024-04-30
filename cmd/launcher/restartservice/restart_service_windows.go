@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -45,7 +46,8 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 			"error parsing options",
 			"err", err,
 		)
-		os.Exit(1)
+
+		return fmt.Errorf("parsing options: %w", err)
 	}
 
 	localSlogger := multislogger.New()
@@ -118,22 +120,24 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 	w.slogger.Log(ctx, slog.LevelInfo, "executing windows service")
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
+	runRestartServiceResults := make(chan struct{})
+
 	go func() {
 		err := runLauncherRestartService(ctx, w)
 		if err != nil {
-			w.slogger.Log(ctx, slog.LevelInfo,
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
 				"runLauncherRestartService exited",
 				"err", err,
 				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 			)
-			changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-			// service is already shut down -- fully exit so that the service manager can restart the service
-			os.Exit(1)
+		} else {
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"runLauncher exited cleanly",
+			)
 		}
 
-		w.slogger.Log(ctx, slog.LevelInfo, "runLauncherRestartService exited cleanly")
-		changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
-		os.Exit(0)
+		// Since restart service shut down, we must signal to fully exit so that the service manager can restart the service.
+		runRestartServiceResults <- struct{}{}
 	}()
 
 	for {
@@ -159,6 +163,16 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 					"change_request", fmt.Sprintf("%+v", c),
 				)
 			}
+		case <-runRestartServiceResults:
+			w.systemSlogger.Log(ctx, slog.LevelInfo,
+				"shutting down restart service after exit",
+			)
+			// We don't want to tell the service manager that we've stopped on purpose,
+			// so that the service manager will restart launcher correctly.
+			// We use this error code largely because the windows/svc code also uses it
+			// and it seems semantically correct enough; it doesn't appear to matter to us
+			// what the code is.
+			return false, uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
 		}
 	}
 }
@@ -218,5 +232,3 @@ func runLauncherRestartService(ctx context.Context, w *winRestartSvc) error {
 		}
 	}
 }
-
-// NtQuerySystemInformation - SystemProcessorPowerInformation
