@@ -351,6 +351,13 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping notification send",
+		)
+		return errors.New("modern standby detected, skipping notification send")
+	}
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -434,6 +441,13 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 				"err", err,
 			)
 		}
+	}
+
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping menu refresh",
+		)
+		return
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
