@@ -24,6 +24,11 @@ type Deleter interface {
 	DeleteAll() error
 }
 
+// RowDeleter is an interface for deleting rows by rowid in a sql store
+type RowDeleter interface {
+	DeleteRows(rowids ...any) error
+}
+
 // Iterator is an interface for iterating data in a key/value store.
 type Iterator interface {
 	// ForEach executes a function for each key/value pair in a store.
@@ -118,15 +123,19 @@ type GetterSetterDeleterIteratorUpdaterCounterAppender interface {
 	Appender
 }
 
-// TimestampedIteratorAppenderCounterCloser is an interface to support the storage and retrieval of
+// TimestampedIteratorDeleterAppenderCounterCloser is an interface to support the storage and retrieval of
 // sets of timestamped values. This can be used where a strict key/value interface may not suffice,
 // e.g. for writing logs or historical records to sqlite
-type TimestampedIteratorAppenderCounterCloser interface {
+type TimestampedIteratorDeleterAppenderCounterCloser interface {
 	TimestampedIterator
 	TimestampedAppender
 	Counter
+	RowDeleter
 	Closer
 }
+
+// LogStore is a convenient alias for a store that supports all methods required to manipulate sqlite logs
+type LogStore = TimestampedIteratorDeleterAppenderCounterCloser
 
 // Convenient alias for a key value store that supports all methods
 type KVStore = GetterSetterDeleterIteratorUpdaterCounterAppender

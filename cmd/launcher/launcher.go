@@ -28,6 +28,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/timemachine"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
@@ -48,6 +49,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/log/sqlitelogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -282,6 +284,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
+
+	sqliteLogPublisher, err := agentsqlite.OpenRW(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
+	if err != nil {
+		return fmt.Errorf("opening log db in %s: %w", rootDirectory, err)
+	}
+	sqlitelogPublisher := sqlitelogger.NewSqliteLogPublisher(slogger, sqliteLogPublisher)
+	runGroup.Add("sqlite_log_publisher", sqlitelogPublisher.Run, sqlitelogPublisher.Interrupt)
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)

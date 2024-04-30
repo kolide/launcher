@@ -370,6 +370,27 @@ func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
 	return nil
 }
 
+func (s *sqliteStore) DeleteRows(rowids ...any) error {
+	if s == nil || s.conn == nil {
+		return errors.New("store is nil")
+	}
+
+	if s.readOnly {
+		return errors.New("cannot perform deletes with RO connection")
+	}
+
+	// interpolate the proper number of question marks
+	paramQs := strings.Repeat("?,", len(rowids))
+	paramQs = paramQs[:len(paramQs)-1]
+	deleteSql := fmt.Sprintf(`DELETE FROM %s WHERE rowid IN (%s)`, s.tableName, paramQs)
+
+	if _, err := s.conn.Exec(deleteSql, rowids...); err != nil {
+		return fmt.Errorf("deleting row from %s: %w", s.tableName, err)
+	}
+
+	return nil
+}
+
 func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) error {
 	colInfo := s.getColumns()
 	if s == nil || s.conn == nil || colInfo == nil {
@@ -377,7 +398,7 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 	}
 
 	query := fmt.Sprintf(
-		`SELECT %s, %s  FROM %s;`,
+		`SELECT rowid, %s, %s  FROM %s;`,
 		colInfo.pk,
 		colInfo.valueColumn,
 		s.tableName,

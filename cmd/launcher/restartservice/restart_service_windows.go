@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/kolide/kit/version"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/log/sqlitelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -32,17 +32,17 @@ type winRestartSvc struct {
 }
 
 func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) error {
-	logCtx := context.TODO()
+	ctx := context.TODO()
 	systemSlogger.Logger = systemSlogger.Logger.With(
 		"service", LauncherRestartServiceName,
 		"version", version.Version().Version,
 	)
 
-	systemSlogger.Log(logCtx, slog.LevelInfo, "windows restart service start requested")
+	systemSlogger.Log(ctx, slog.LevelInfo, "windows restart service start requested")
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
-		systemSlogger.Log(logCtx, slog.LevelError,
+		systemSlogger.Log(ctx, slog.LevelError,
 			"error parsing options",
 			"err", err,
 		)
@@ -52,21 +52,18 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 
 	localSlogger := multislogger.New()
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
-	// notes/questions for review:
-	// - do we want to re-use debug.json across services?
-	// - is it worth trying to consolidate the code re-use between here and svc_windows.go
+	// Create a local logger to drop logs into the sqlite DB. These will be collected and published
+	// to debug.json from the primary launcher invocation
 	if opts.RootDirectory != "" {
-		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
+		ll, err := sqlitelogger.NewSqliteLogWriter(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
+		if err != nil {
+			return fmt.Errorf("initializing sqlite log writer: %w", err)
+		}
 
-		localSloggerHandler := slog.NewJSONHandler(ll.Writer(), &slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		})
+		localSloggerHandler := slog.NewJSONHandler(ll, &slog.HandlerOptions{Level: slog.LevelDebug})
 
+		// add the sqlite handler to both local and systemSloggers
 		localSlogger.AddHandler(localSloggerHandler)
-
-		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
 	}
 
@@ -78,12 +75,12 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			systemSlogger.Log(logCtx, slog.LevelError,
+			systemSlogger.Log(ctx, slog.LevelError,
 				"panic occurred in windows restart service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				systemSlogger.Log(logCtx, slog.LevelError,
+				systemSlogger.Log(ctx, slog.LevelError,
 					"windows restart service panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
@@ -97,7 +94,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 		slogger:       localSlogger,
 		opts:          opts,
 	}); err != nil {
-		systemSlogger.Log(logCtx, slog.LevelError,
+		systemSlogger.Log(ctx, slog.LevelError,
 			"error in service run",
 			"err", err,
 		)
@@ -105,7 +102,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 		return err
 	}
 
-	systemSlogger.Log(logCtx, slog.LevelInfo, "service exited")
+	systemSlogger.Log(ctx, slog.LevelInfo, "service exited")
 	time.Sleep(time.Second)
 
 	return nil
@@ -157,7 +154,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			default:
-				w.slogger.Log(ctx, slog.LevelInfo,
+				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"unexpected change request",
 					"service", LauncherRestartServiceName,
 					"change_request", fmt.Sprintf("%+v", c),
@@ -202,10 +199,6 @@ func (w *winRestartSvc) checkLauncherStatus(ctx context.Context) error {
 		return fmt.Errorf("checking current launcher status: %w", err)
 	}
 
-	// TODO there is a lot more we can do here in terms of health checking
-	// - a more robust health check (i.e. over localserver) could be beneficial
-	// - are there more states we should act on? it seems to wait until stopped and ignore the pending states (we will check again)
-	// - is there any benefit in hooking into power events if we will health check on an interval anyway?
 	if currentStatus.State == svc.Stopped {
 		w.slogger.Log(ctx, slog.LevelInfo, "restart service checker detected stopped state, restarting")
 		return launcherService.Start()

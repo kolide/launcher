@@ -3,6 +3,7 @@ package sqlitelogger
 import (
 	"context"
 	"fmt"
+	"time"
 
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -10,9 +11,11 @@ import (
 )
 
 type (
-	// RestartServiceLogWriter adheres to the io.Writer interface
+	// RestartServiceLogWriter wraps a sqlite write connection and
+	// implements the io.Writer interface, allowing sqlite to be used as a logging backend
+	// when used as a multislogger handler
 	SqliteLogWriter struct {
-		writer types.TimestampedIteratorAppenderCounterCloser
+		writer types.LogStore
 	}
 )
 
@@ -28,6 +31,16 @@ func NewSqliteLogWriter(ctx context.Context, rootDirectory string, tableName age
 	slw := &SqliteLogWriter{writer: writer}
 
 	return slw, nil
+}
+
+// Write implements the io.Writer interface
+func (s *SqliteLogWriter) Write(p []byte) (n int, err error) {
+	timestamp := time.Now().Unix()
+	if err := s.writer.AppendValue(timestamp, p); err != nil {
+		return 0, err
+	}
+
+	return len(p), nil
 }
 
 func (s *SqliteLogWriter) Close() error {
