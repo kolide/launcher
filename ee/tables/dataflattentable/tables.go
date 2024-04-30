@@ -58,6 +58,8 @@ var (
 			return dataflatten.StringDelimitedFunc(kvDelimiter, dataflatten.DuplicateKeys)
 		},
 		flattenFileFunc: func(kvDelimiter string) dataflatten.DataFileFunc {
+			// This func is unused -- only flattenBytesFunc is used, in `TablePluginExec` --
+			// but we include it here for completeness.
 			return func(file string, opts ...dataflatten.FlattenOpts) ([]dataflatten.Row, error) {
 				f, err := os.Open(file)
 				if err != nil {
