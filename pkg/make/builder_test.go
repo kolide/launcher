@@ -221,10 +221,10 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	}
 
 	if os.Getenv("GO_WANT_HELPER_PROCESS_FORCE_ERROR") == "1" {
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
-	defer os.Exit(0)
+	defer os.Exit(0) //nolint:forbidigo // Fine to use os.Exit in tests
 
 	args := os.Args
 	for len(args) > 0 {
@@ -236,7 +236,7 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	}
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "No command\n")
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	cmd, args := args[0], args[1:]
@@ -249,7 +249,7 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 		fmt.Println(iargs...)
 	case cmd == "exit":
 		n, _ := strconv.Atoi(args[0])
-		os.Exit(n)
+		os.Exit(n) //nolint:forbidigo // Fine to use os.Exit in tests
 	case cmd == "go" && args[0] == "mod" && args[1] == "download":
 		return
 	case cmd == "git" && args[0] == "describe":
@@ -257,6 +257,6 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 		return
 	default:
 		fmt.Fprintf(os.Stderr, "Can't mock, unknown command(%q) args(%q) -- Fix TestHelperProcess", cmd, args)
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 }

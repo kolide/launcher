@@ -175,11 +175,11 @@ func TestHelperProcess(t *testing.T) {
 	case "sleep":
 		time.Sleep(10 * time.Second)
 	case "exit0":
-		os.Exit(0)
+		os.Exit(0) //nolint:forbidigo // Fine to use os.Exit inside tests
 	case "exit1":
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
 	case "exit2":
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
 	// default behavior nothing

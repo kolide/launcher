@@ -29,23 +29,23 @@ func TestMain(m *testing.M) {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		fmt.Printf("error parsing platform: %s, %s", err, runtime.GOOS)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	if err := os.MkdirAll(osquerydCacheDir, fsutil.DirMode); err != nil {
 		fmt.Printf("error creating cache dir: %s", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	_, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
 		fmt.Printf("error fetching binary osqueryd binary: %s", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	// Run the tests!
 	retCode := m.Run()
-	os.Exit(retCode)
+	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
 }
 
 // TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough

@@ -42,18 +42,18 @@ func TestMain(m *testing.M) {
 	binDirectory, rmBinDirectory, err := osqueryTempDir()
 	if err != nil {
 		fmt.Println("Failed to make temp dir for test binaries")
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 	defer rmBinDirectory()
 
 	s, err := storageci.NewStore(nil, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
 	if err != nil {
 		fmt.Println("Failed to make new store")
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 	if err := history.InitHistory(s); err != nil {
 		fmt.Println("Failed to init history")
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	testOsqueryBinaryDirectory = filepath.Join(binDirectory, "osqueryd")
@@ -62,12 +62,12 @@ func TestMain(m *testing.M) {
 
 	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
 		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	// Run the tests!
 	retCode := m.Run()
-	os.Exit(retCode)
+	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
 }
 
 // getBinDir finds the directory of the currently running binary (where we will

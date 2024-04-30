@@ -45,7 +45,7 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		)
 	}
 
-	os.Exit(0)
+	os.Exit(0) //nolint:forbidigo // Since we're disabling launcher, it is probably fine to call os.Exit here and skip a graceful shutdown
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {

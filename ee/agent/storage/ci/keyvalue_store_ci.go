@@ -37,7 +37,7 @@ func SetupDB(t *testing.T) *bbolt.DB {
 		dbDir, err = os.MkdirTemp(os.TempDir(), "storage-bbolt")
 		if err != nil {
 			fmt.Println("Failed to create temp dir for bbolt test")
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
 		}
 	}
 
@@ -52,7 +52,7 @@ func SetupDB(t *testing.T) *bbolt.DB {
 	} else {
 		if err != nil {
 			fmt.Println("Falied to create bolt db")
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
 		}
 	}
 

@@ -96,10 +96,10 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	if os.Getenv("GO_WANT_HELPER_PROCESS_FORCE_ERROR") == "1" {
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
-	defer os.Exit(0)
+	defer os.Exit(0) //nolint:forbidigo // Fine to use os.Exit in tests
 
 	args := os.Args
 	for len(args) > 0 {
@@ -111,7 +111,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "No command\n")
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	cmd, args := args[0], args[1:]
@@ -124,7 +124,7 @@ func TestHelperProcess(t *testing.T) {
 		fmt.Println(iargs...)
 	case cmd == "exit":
 		n, _ := strconv.Atoi(args[0])
-		os.Exit(n)
+		os.Exit(n) //nolint:forbidigo // Fine to use os.Exit in tests
 	case strings.HasSuffix(cmd, "launcher") && args[0] == "-version":
 		fmt.Println(`launcher - version 0.5.6-19-g17c8589
   branch: 	master
@@ -134,7 +134,7 @@ func TestHelperProcess(t *testing.T) {
   go version: 	go1.11`)
 	default:
 		fmt.Fprintf(os.Stderr, "Can't mock, unknown command(%q) args(%q) -- Fix TestHelperProcess", cmd, args)
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 }
