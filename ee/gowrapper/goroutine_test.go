@@ -21,7 +21,7 @@ func TestGo_WithPanic(t *testing.T) {
 	g := func() {
 		time.Sleep(funcDelay)
 		goroutineResults <- struct{}{}
-		panic("test panic")
+		panic("test panic") //nolint:forbidigo // Fine to use panic in tests
 	}
 
 	// Capture onPanic results so we know that onPanic executed
