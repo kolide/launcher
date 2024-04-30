@@ -185,7 +185,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	ctx = ctxlog.NewContext(ctx, w.logger)
 	runLauncherResults := make(chan struct{})
 
-	gowrapper.Go(w.systemSlogger.Logger, func() {
+	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,

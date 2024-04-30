@@ -63,7 +63,7 @@ func (g *Group) Run() error {
 	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
 		a := a
-		gowrapper.Go(g.slogger, func() {
+		gowrapper.Go(context.TODO(), g.slogger, func() {
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
