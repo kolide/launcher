@@ -2,7 +2,6 @@ package dataflattentable
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -168,13 +167,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string) ([]map[string]string, error) {
-	if t.flattenFileFunc == nil {
-		t.slogger.Log(ctx, slog.LevelWarn,
-			"flatten file func not provided, cannot perform dataflatten",
-		)
-		return nil, errors.New("flatten file func not provided")
-	}
-
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithNestedPlist(),
