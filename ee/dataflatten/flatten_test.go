@@ -1,7 +1,6 @@
 package dataflatten
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -231,7 +230,7 @@ func TestFlatten_Jsonl_Complex(t *testing.T) {
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
-			actual, err := Jsonl(bytes.NewReader(dataRaw), tt.options...)
+			actual, err := Jsonl(dataRaw, tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
 	}
@@ -507,7 +506,7 @@ func TestFlattenJsonlErrors(t *testing.T) {
 		t.Run(tt.comment, func(t *testing.T) {
 			t.Parallel()
 
-			actual, err := Jsonl(bytes.NewBuffer([]byte(tt.in)), tt.options...)
+			actual, err := Jsonl([]byte(tt.in), tt.options...)
 			testFlattenCase(t, tt, actual, err)
 		})
 	}

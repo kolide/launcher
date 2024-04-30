@@ -6,27 +6,28 @@ import (
 	"strings"
 )
 
-type dataFunc func(data []byte, opts ...FlattenOpts) ([]Row, error)
+type DataFunc func(data []byte, opts ...FlattenOpts) ([]Row, error)
+type DataFileFunc func(string, ...FlattenOpts) ([]Row, error)
 
-type RecordSplittingStrategy interface {
-	stringDelimitedFunc()
-}
-
-type recordSplittingStrategy struct {
-	splitFunc func(kvDelimiter string) dataFunc
+type RecordSplittingStrategy struct {
+	splitFunc func(kvDelimiter string) DataFunc
 }
 
 var (
-	None = recordSplittingStrategy{
+	None = RecordSplittingStrategy{
 		splitFunc: singleRecordFunc,
 	}
-	DuplicateKeys = recordSplittingStrategy{
+	DuplicateKeys = RecordSplittingStrategy{
 		splitFunc: duplicateKeyFunc,
 	}
 )
 
-func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingStrategy) dataFunc {
-	return splittingStrategy.splitFunc(kVDelimiter)
+func (r RecordSplittingStrategy) SplitFunc(kVDelimiter string) DataFunc {
+	return r.splitFunc(kVDelimiter)
+}
+
+func StringDelimitedFunc(kVDelimiter string, splittingStrategy RecordSplittingStrategy) DataFunc {
+	return splittingStrategy.SplitFunc(kVDelimiter)
 }
 
 // duplicateKeyFunc returns a function that conforms to the interface expected
@@ -37,7 +38,7 @@ func StringDelimitedFunc(kVDelimiter string, splittingStrategy recordSplittingSt
 // collection, and a new record is started. This strategy is only suitable if
 // properties for a single record are grouped together, and there is at least
 // one field that appears for every record before any sparse data.
-func duplicateKeyFunc(kVDelimiter string) dataFunc {
+func duplicateKeyFunc(kVDelimiter string) DataFunc {
 	return func(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		results := []interface{}{}
 		scanner := bufio.NewScanner(bytes.NewReader(rawdata))
@@ -66,7 +67,7 @@ func duplicateKeyFunc(kVDelimiter string) dataFunc {
 // only holds key-value pairs for a single record. Additionally, each k/v pair
 // must be on its own line. Useful for output that can be easily separated into
 // separate records before 'flattening'
-func singleRecordFunc(kVDelimiter string) dataFunc {
+func singleRecordFunc(kVDelimiter string) DataFunc {
 	return func(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
 		results := []interface{}{}
 		scanner := bufio.NewScanner(bytes.NewReader(rawdata))

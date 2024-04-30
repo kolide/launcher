@@ -39,36 +39,12 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		opt(t)
 	}
 
-	switch dataSourceType {
-	case PlistType:
-		t.flattenBytesFunc = dataflatten.Plist
-	case JsonType:
-		t.flattenBytesFunc = dataflatten.Json
-	case XmlType:
-		t.flattenBytesFunc = dataflatten.Xml
-	case KeyValueType:
-		// TODO: allow callers of TablePluginExec to specify the record
-		// splitting strategy
-		t.flattenBytesFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
-	default:
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"unknown data source type, will not be able to flatten data",
-			"type", dataSourceType,
-		)
-	}
+	t.flattenBytesFunc = dataSourceType.FlattenBytesFunc(t.keyValueSeparator)
 
 	return table.NewPlugin(t.tableName, columns, t.generateExec)
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	if t.flattenBytesFunc == nil {
-		// Log the error, but don't return it, to avoid breaking joins
-		t.slogger.Log(ctx, slog.LevelWarn,
-			"cannot flatten without flatten bytes func",
-		)
-		return nil, nil
-	}
-
 	var results []map[string]string
 
 	execBytes, err := tablehelpers.Exec(ctx, t.slogger, 50, t.cmdGen, t.execArgs, false)
