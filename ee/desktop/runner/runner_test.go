@@ -125,6 +125,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(slogger)
+			mockKnapsack.On("InModernStandby").Return(false)
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
@@ -298,6 +299,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("InModernStandby").Return(false)
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
@@ -332,6 +334,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("InModernStandby").Return(false)
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
