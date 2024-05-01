@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package dsim_default_associations
+package dism_default_associations
 
 import (
 	"context"
