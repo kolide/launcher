@@ -26,6 +26,8 @@ func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Contex
 
 	// read the body, set the content length, and leave a new ReadCloser in Body
 	bodyBuf := &bytes.Buffer{}
+
+	// We discard the error because we can't do anything about it here -- no logger access
 	bodyReadBytes, _ := io.Copy(bodyBuf, r.Body)
 	r.Body.Close()
 	r.ContentLength = bodyReadBytes
