@@ -9,7 +9,6 @@ import (
 	"C"
 )
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -82,6 +81,6 @@ func goValueFromCFPlistRef(ref C.CFPropertyListRef) interface{} {
 	case C.CFStringGetTypeID():
 		return goString(C.CFStringRef(ref))
 	default:
-		panic(fmt.Sprintf("unknown CF type id %v", typeID))
+		return "Unknown"
 	}
 }

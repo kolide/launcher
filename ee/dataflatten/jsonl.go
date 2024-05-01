@@ -1,6 +1,7 @@
 package dataflatten
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,16 +9,20 @@ import (
 )
 
 func JsonlFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	f, err := os.Open(file)
+	rawdata, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to read JSON file: %w", err)
 	}
-	defer f.Close()
-	return Jsonl(f, opts...)
+
+	return flattenJsonl(rawdata, opts...)
 }
 
-func Jsonl(r io.Reader, opts ...FlattenOpts) ([]Row, error) {
-	decoder := json.NewDecoder(r)
+func Jsonl(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
+	return flattenJsonl(rawdata, opts...)
+}
+
+func flattenJsonl(rawdata []byte, opts ...FlattenOpts) ([]Row, error) {
+	decoder := json.NewDecoder(bytes.NewReader(rawdata))
 	var objects []interface{}
 
 	for {
