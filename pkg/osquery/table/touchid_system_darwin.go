@@ -34,7 +34,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	var results []map[string]string
 	var touchIDCompatible, secureEnclaveCPU, touchIDEnabled, touchIDUnlock string
 
-	stdout, err := tablehelpers.Exec(ctx, t.slogger, 15, allowedcmd.SystemProfiler, []string{"SPiBridgeDataType"}, false)
+	stdout, err := tablehelpers.Exec(ctx, t.slogger, 10, allowedcmd.SystemProfiler, []string{"SPiBridgeDataType"}, false)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"execing system_profiler SPiBridgeDataType",
@@ -53,7 +53,7 @@ func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext ta
 	}
 
 	// Read the system's bioutil configuration
-	stdout, err = tablehelpers.Exec(ctx, t.slogger, 15, allowedcmd.Bioutil, []string{"-r", "-s"}, false)
+	stdout, err = tablehelpers.Exec(ctx, t.slogger, 10, allowedcmd.Bioutil, []string{"-r", "-s"}, false)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"execing bioutil",

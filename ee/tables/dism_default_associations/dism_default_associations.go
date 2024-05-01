@@ -4,14 +4,12 @@
 package dsim_default_associations
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -77,36 +75,24 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
-
-	dstFile := "associations.xml"
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
+	const dstFile = "associations.xml"
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
 
-	cmd, err := allowedcmd.Dism(ctx, args...)
+	out, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Dism, args, true, tablehelpers.WithDir(dir))
 	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
-	cmd.Dir = dir
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+		t.slogger.Log(ctx, slog.LevelDebug,
+			"execing dism",
+			"out", string(out),
+			"err", err,
+			"args", args,
+		)
 
-	t.slogger.Log(ctx, slog.LevelDebug,
-		"calling dsim",
-		"args", cmd.Args,
-	)
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
+		return nil, fmt.Errorf("execing dism: %w", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, dstFile))
 	if err != nil {
-		return nil, fmt.Errorf("error reading dism output file: %s: %w", err, err)
+		return nil, fmt.Errorf("reading dism output file: %w", err)
 	}
 
 	return data, nil

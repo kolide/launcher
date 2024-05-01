@@ -19,6 +19,13 @@ import (
 // An example of this is to run the exec as a specific user instead of root.
 type ExecOps func(*exec.Cmd) error
 
+func WithDir(dir string) ExecOps {
+	return func(cmd *exec.Cmd) error {
+		cmd.Dir = dir
+		return nil
+	}
+}
+
 // Exec is a wrapper over exec.CommandContext. It does a couple of
 // additional things to help with table usage:
 //  1. It enforces a timeout.
