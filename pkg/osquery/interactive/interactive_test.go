@@ -15,6 +15,8 @@ import (
 	"testing"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/stretchr/testify/require"
@@ -27,23 +29,23 @@ func TestMain(m *testing.M) {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		fmt.Printf("error parsing platform: %s, %s", err, runtime.GOOS)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	if err := os.MkdirAll(osquerydCacheDir, fsutil.DirMode); err != nil {
 		fmt.Printf("error creating cache dir: %s", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	_, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
 		fmt.Printf("error fetching binary osqueryd binary: %s", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	// Run the tests!
 	retCode := m.Run()
-	os.Exit(retCode)
+	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
 }
 
 // TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough
@@ -70,6 +72,13 @@ func TestProc(t *testing.T) {
 			wantProc: true,
 		},
 		{
+			name: "config path",
+			osqueryFlags: []string{
+				fmt.Sprintf("config_path=%s", ulid.New()),
+			},
+			wantProc: true,
+		},
+		{
 			name:           "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			wantProc:       false,
 			errContainsStr: "error waiting for osquery to create socket",
@@ -82,9 +91,14 @@ func TestProc(t *testing.T) {
 
 			rootDir := t.TempDir()
 			require.NoError(t, downloadOsquery(rootDir))
-			osquerydPath := filepath.Join(rootDir, "osqueryd")
 
-			proc, _, err := StartProcess(multislogger.NewNopLogger(), rootDir, osquerydPath, tt.osqueryFlags)
+			mockSack := mocks.NewKnapsack(t)
+			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
+			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
+			mockSack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
+
+			proc, _, err := StartProcess(mockSack, rootDir)
 
 			if tt.errContainsStr != "" {
 				require.Error(t, err)

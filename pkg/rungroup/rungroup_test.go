@@ -2,10 +2,13 @@ package rungroup
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -237,4 +240,54 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
 	require.Equal(t, 3, receivedInterrupts)
 	require.Equal(t, 2, receivedExecuteReturns)
+}
+
+func TestRun_RecoversAndLogsPanic(t *testing.T) {
+	t.Parallel()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	testRunGroup := NewRunGroup(slogger)
+
+	// Actor that will panic in its execute function
+	testRunGroup.Add("panickingActor", func() error {
+		time.Sleep(1 * time.Second)
+		panic("test panic in rungroup actor")
+	}, func(error) {})
+
+	runCompleted := make(chan struct{})
+	go func() {
+		err := testRunGroup.Run()
+		runCompleted <- struct{}{}
+		require.Error(t, err)
+	}()
+
+	// Give it a bit of time to return
+	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
+	interruptCheckTimer := time.NewTicker(runDuration)
+	defer interruptCheckTimer.Stop()
+
+	// Confirm that the rungroup exited without panicking (i.e. we recovered appropriately)
+	gotRunCompleted := false
+	for {
+		if gotRunCompleted {
+			break
+		}
+
+		select {
+		case <-runCompleted:
+			gotRunCompleted = true
+		case <-interruptCheckTimer.C:
+			fmt.Println(logBytes.String())
+			t.Error("did not interrupt within reasonable time")
+			t.FailNow()
+		}
+	}
+	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
+
+	// Confirm we have some sort of log about the panic
+	require.Contains(t, logBytes.String(), "panic")
 }

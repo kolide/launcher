@@ -247,6 +247,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 	defer s.Close()
 
+	if err := s.WriteSettings(); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"writing startup settings",
+			"err", err,
+		)
+	}
+
 	// If we have successfully opened the DB, and written a pid,
 	// we expect we're live. Record the version for osquery to
 	// pickup

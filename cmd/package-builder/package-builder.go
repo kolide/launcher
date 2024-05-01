@@ -318,7 +318,7 @@ func usage() {
 func main() {
 	if len(os.Args) < 2 {
 		usage()
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher
 	}
 
 	var run func([]string) error
@@ -331,12 +331,12 @@ func main() {
 		run = runListTargets
 	default:
 		usage()
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher
 	}
 
 	if err := run(os.Args[2:]); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher
 	}
 }
 

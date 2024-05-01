@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -174,6 +175,9 @@ func (e *Extension) Execute() error {
 		// select to either exit or write another batch of logs
 		select {
 		case <-e.done:
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"osquery extension received shutdown request",
+			)
 			return nil
 		case <-ticker.Chan():
 			// Resume loop
@@ -517,6 +521,25 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 	} else {
 		// Store good config
 		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
+
+		// open the start up settings writer just to trigger a write of the config,
+		// then we can immediately close it
+		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
+		if err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not get startup settings writer",
+				"err", err,
+			)
+		} else {
+			defer startupSettingsWriter.Close()
+
+			if err := startupSettingsWriter.WriteSettings(); err != nil {
+				e.slogger.Log(ctx, slog.LevelError,
+					"writing startup settings",
+					"err", err,
+				)
+			}
+		}
 		// TODO log or record metrics when caching config fails? We
 		// would probably like to return the config and not an error in
 		// this case.

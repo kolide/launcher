@@ -15,7 +15,7 @@ import (
 func checkError(err error) {
 	if err != nil {
 		fmt.Printf("Got Error: %v\nStack:\n%+v\n", err, err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 }
 

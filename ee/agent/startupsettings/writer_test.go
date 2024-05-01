@@ -2,12 +2,17 @@ package startupsettings
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
@@ -27,10 +32,14 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("UpdateChannel").Return(updateChannelVal)
 	k.On("PinnedLauncherVersion").Return("")
 	k.On("PinnedOsquerydVersion").Return("5.11.0")
+	k.On("ConfigStore").Return(inmemory.NewStore())
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
+
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
 
 	// Check that all values were set
 	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
@@ -85,9 +94,14 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion)
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion)
 
+	k.On("ConfigStore").Return(inmemory.NewStore())
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
+
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
 
 	// Now check that all values were updated
 	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
@@ -122,9 +136,24 @@ func TestFlagsChanged(t *testing.T) {
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
 
+	autoTableConstructionValue := ulid.New()
+
+	configStore := inmemory.NewStore()
+	configMap := map[string]any{
+		"auto_table_construction":      autoTableConstructionValue,
+		"something_else_not_important": ulid.New(),
+	}
+	configJson, err := json.Marshal(configMap)
+	require.NoError(t, err, "marshalling config map")
+
+	configStore.Set([]byte("config"), configJson)
+	k.On("ConfigStore").Return(configStore)
+
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
+
+	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
 
 	// Check that all values were set
 	v1, err := s.kvStore.Get([]byte(keys.UpdateChannel.String()))
@@ -138,6 +167,10 @@ func TestFlagsChanged(t *testing.T) {
 	v3, err := s.kvStore.Get([]byte(keys.PinnedOsquerydVersion.String()))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, pinnedOsquerydVersion, string(v3), "incorrect flag value")
+
+	v4, err := s.kvStore.Get([]byte("auto_table_construction"))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, fmt.Sprintf("{\"auto_table_construction\":\"%s\"}", autoTableConstructionValue), string(v4), "incorrect config value")
 
 	// Now, prepare for flag changes
 	newFlagValue := "alpha"

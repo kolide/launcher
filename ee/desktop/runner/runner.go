@@ -351,6 +351,13 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping notification send",
+		)
+		return errors.New("modern standby detected, skipping notification send")
+	}
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -434,6 +441,13 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 				"err", err,
 			)
 		}
+	}
+
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping menu refresh",
+		)
+		return
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
@@ -531,6 +545,13 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 }
 
 func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"modern standby detected, skipping desktop process spawning and health checks",
+		)
+		return nil
+	}
+
 	if !r.processSpawningEnabled {
 		// Desktop is disabled, kill any existing desktop user processes
 		r.killDesktopProcesses(context.Background())
@@ -587,6 +608,11 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	if err := r.runAsUser(ctx, uid, cmd); err != nil {
 		traces.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
 		return fmt.Errorf("running desktop command as user: %w", err)
+	}
+	// Extra nil check to ensure we can access cmd.Process.Pid safely later
+	if cmd.Process == nil {
+		traces.SetError(span, fmt.Errorf("starting desktop command: %w", err))
+		return fmt.Errorf("starting desktop command: %w", err)
 	}
 
 	span.AddEvent("command_started")
