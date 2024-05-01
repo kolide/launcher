@@ -9,15 +9,9 @@ import (
 )
 
 func JsonlFile(file string, opts ...FlattenOpts) ([]Row, error) {
-	f, err := os.Open(file)
+	rawdata, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	rawdata, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read JSON: %w", err)
+		return nil, fmt.Errorf("unable to read JSON file: %w", err)
 	}
 
 	return flattenJsonl(rawdata, opts...)
