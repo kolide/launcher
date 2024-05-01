@@ -379,6 +379,10 @@ func (s *sqliteStore) DeleteRows(rowids ...any) error {
 		return errors.New("cannot perform deletes with RO connection")
 	}
 
+	if len(rowids) == 0 {
+		return nil
+	}
+
 	// interpolate the proper number of question marks
 	paramQs := strings.Repeat("?,", len(rowids))
 	paramQs = paramQs[:len(paramQs)-1]
