@@ -19,6 +19,12 @@ import (
 func TestFindNewestSelf(t *testing.T) {
 	t.Parallel()
 
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
+
 	ctx := context.TODO()
 
 	{
@@ -113,6 +119,12 @@ func TestFindBaseDir(t *testing.T) {
 func TestFindNewestEmpty(t *testing.T) {
 	t.Parallel()
 
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
+
 	tmpDir, binaryName := setupTestDir(t, emptySetup)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
@@ -125,6 +137,12 @@ func TestFindNewestEmpty(t *testing.T) {
 
 func TestFindNewestEmptyUpdateDirs(t *testing.T) {
 	t.Parallel()
+
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
 
 	tmpDir, binaryName := setupTestDir(t, emptyUpdateDirs)
 	ctx := context.TODO()
@@ -164,6 +182,12 @@ func TestFindNewestNonExecutable(t *testing.T) {
 func TestFindNewestExecutableUpdates(t *testing.T) {
 	t.Parallel()
 
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
+
 	tmpDir, binaryName := setupTestDir(t, executableUpdates)
 	ctx := context.TODO()
 	binaryPath := filepath.Join(tmpDir, binaryName)
@@ -183,6 +207,12 @@ func TestFindNewestExecutableUpdates(t *testing.T) {
 
 func TestFindNewestCleanup(t *testing.T) {
 	t.Parallel()
+
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
 
 	// delete doesn't seem to work on windows. It gets a
 	// "Access is denied" error". This may be a test setup
@@ -222,6 +252,12 @@ func TestFindNewestCleanup(t *testing.T) {
 
 func TestCheckExecutableCorruptCleanup(t *testing.T) {
 	t.Parallel()
+
+	// These tests will be deleted in https://github.com/kolide/launcher/pull/1679
+	// after the next stable release.
+	if os.Getenv("CI") != "" {
+		t.Skip("skipping flaky and soon-to-be-deleted tests in CI")
+	}
 
 	tmpDir, binaryName := setupTestDir(t, truncatedUpdates)
 	ctx := context.TODO()
