@@ -222,4 +222,8 @@ type Flags interface {
 
 	// LocalDevelopmentPath points to a local build of launcher to use instead of the one selected from the autoupdate library
 	LocalDevelopmentPath() string
+
+	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
+	SetLauncherWatchdogEnabled(enabled bool) error
+	LauncherWatchdogEnabled() bool
 }
