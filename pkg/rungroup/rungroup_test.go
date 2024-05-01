@@ -255,7 +255,7 @@ func TestRun_RecoversAndLogsPanic(t *testing.T) {
 	// Actor that will panic in its execute function
 	testRunGroup.Add("panickingActor", func() error {
 		time.Sleep(1 * time.Second)
-		panic("test panic in rungroup actor")
+		panic("test panic in rungroup actor") //nolint:forbidigo // Fine to use panic in tests
 	}, func(error) {})
 
 	runCompleted := make(chan struct{})

@@ -39,20 +39,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 		opt(t)
 	}
 
-	switch dataSourceType {
-	case PlistType:
-		t.flattenBytesFunc = dataflatten.Plist
-	case JsonType:
-		t.flattenBytesFunc = dataflatten.Json
-	case XmlType:
-		t.flattenBytesFunc = dataflatten.Xml
-	case KeyValueType:
-		// TODO: allow callers of TablePluginExec to specify the record
-		// splitting strategy
-		t.flattenBytesFunc = dataflatten.StringDelimitedFunc(t.keyValueSeparator, dataflatten.DuplicateKeys)
-	default:
-		panic("Unknown data source type")
-	}
+	t.flattenBytesFunc = dataSourceType.FlattenBytesFunc(t.keyValueSeparator)
 
 	return table.NewPlugin(t.tableName, columns, t.generateExec)
 }

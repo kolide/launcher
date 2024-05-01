@@ -39,6 +39,8 @@ linters-settings:
         msg: do not use os.Exit so that launcher can shut down gracefully
       - p: ^logutil\.Fatal.*$
         msg: do not use logutil.Fatal so that launcher can shut down gracefully
+      - p: ^panic.*$
+        msg: do not use panic so that launcher can shut down gracefully
   sloglint:
     kv-only: true
     context-only: true
