@@ -55,7 +55,7 @@ const (
 	DisableTraceIngestTLS           FlagKey = "disable_trace_ingest_tls"
 	InModernStandby                 FlagKey = "in_modern_standby"
 	LocalDevelopmentPath            FlagKey = "localdev_path"
-	LauncherWatchdogEnabled         FlagKey = "with_launcher_watchdog" // note that this will only impact windows deployments
+	LauncherWatchdogEnabled         FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
 )
 
 func (key FlagKey) String() string {

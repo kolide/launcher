@@ -81,7 +81,7 @@ func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	defer sman.Disconnect()
 
 	checkRestartActions(sman, slogger)
-	checkRestartService(sman, slogger)
+	checkRestartService(sman, slogger, opts)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -209,13 +209,13 @@ func serviceExists(serviceManager *mgr.Mgr, serviceName string) bool { // nolint
 func removeService(serviceManager *mgr.Mgr, serviceName string) error { // nolint:unused
 	existingService, err := serviceManager.OpenService(serviceName)
 	if err != nil {
-		return fmt.Errorf("opening %s service: %w", serviceName, err)
+		return err
 	}
 
 	defer existingService.Close()
 
 	if err = existingService.Delete(); err != nil {
-		return fmt.Errorf("deleting %s service: %w", serviceName, err)
+		return err
 	}
 
 	return nil
@@ -243,9 +243,21 @@ func restartService(service *mgr.Service) error {
 	return service.Start()
 }
 
-func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger) {
+func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger, opts *launcher.Options) {
 	logCtx := context.TODO()
 	slogger = slogger.With("target_service", restartservice.LauncherRestartServiceName)
+	// if we don't currently have the service enabled, remove it
+	if !opts.LauncherWatchdogEnabled {
+		if err := removeService(serviceManager, restartservice.LauncherRestartServiceName); err != nil {
+			// TODO can we check for service does not exist error and prevent spamming logs here
+			slogger.Log(logCtx, slog.LevelWarn,
+				"encountered error disabling restart service",
+				"err", err,
+			)
+		}
+
+		return
+	}
 	// first check if we've already installed the service
 	existingService, err := serviceManager.OpenService(restartservice.LauncherRestartServiceName)
 	if err == nil {
