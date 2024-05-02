@@ -36,6 +36,7 @@ func WithAppendEnv(key, value string) ExecOps {
 
 // RunSimple is a wrapper over allowedcmd.AllowedCommand.
 // It enforces a timeout, logs, traces, and returns the stdout as a byte slice.
+// It discards stderr.
 //
 // This is not suitable for high performance work -- it allocates new buffers each time
 // Use Run() for more control over the stdout and stderr streams.
