@@ -4,6 +4,7 @@
 package dism_default_associations
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -78,16 +79,16 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	const dstFile = "associations.xml"
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
 
-	out, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Dism, args, true, tablehelpers.WithDir(dir))
-	if err != nil {
+	var out bytes.Buffer
+	if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Dism, args, &out, &out, tablehelpers.WithDir(dir)); err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"execing dism",
 			"args", args,
-			"out", string(out),
+			"out", out.String(),
 			"err", err,
 		)
 
-		return nil, fmt.Errorf("execing dism: out: %s, %w", string(out), err)
+		return nil, fmt.Errorf("execing dism: out: %s, %w", out.String(), err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, dstFile))
