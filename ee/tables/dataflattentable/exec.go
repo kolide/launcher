@@ -47,7 +47,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	execBytes, err := tablehelpers.Exec(ctx, t.slogger, 50, t.cmdGen, t.execArgs, false)
+	execBytes, err := tablehelpers.RunSimple(ctx, t.slogger, 50, t.cmdGen, t.execArgs)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

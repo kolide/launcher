@@ -102,7 +102,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 							for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 								// Finally, an inner loop
 
-								ioregOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Ioreg, ioregArgs, false)
+								ioregOutput, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Ioreg, ioregArgs)
 								if err != nil {
 									t.slogger.Log(ctx, slog.LevelInfo,
 										"ioreg failed",

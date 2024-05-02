@@ -4,6 +4,7 @@
 package brew_upgradeable
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -45,9 +46,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
-			output, err := tablehelpers.Exec(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, true, tablehelpers.WithUid(uid))
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user brew installed packages", "err", err, "target_uid", uid)
+
+			var output bytes.Buffer
+			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"update"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failure querying user brew installed packages",
+					"err", err,
+					"target_uid", uid,
+					"output", output.String(),
+				)
 				continue
 			}
 
@@ -56,7 +63,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
-			flattened, err := dataflatten.Json(output, flattenOpts...)
+			flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
 				continue

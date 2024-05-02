@@ -82,12 +82,12 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"execing dism",
+			"args", args,
 			"out", string(out),
 			"err", err,
-			"args", args,
 		)
 
-		return nil, fmt.Errorf("execing dism: %w", err)
+		return nil, fmt.Errorf("execing dism: out: %s, %w", string(out), err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, dstFile))

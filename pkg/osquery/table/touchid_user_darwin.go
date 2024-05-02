@@ -57,7 +57,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		}
 
 		// Get the user's TouchID config
-		configOutput, err := tablehelpers.Exec(ctx, t.slogger, 10, allowedcmd.Bioutil, []string{"-r"}, false, tablehelpers.WithUid(u.Uid))
+		configOutput, err := tablehelpers.RunSimple(ctx, t.slogger, 10, allowedcmd.Bioutil, []string{"-r"}, tablehelpers.WithUid(u.Uid))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"could not run bioutil -r",
@@ -87,7 +87,7 @@ func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext tabl
 		}
 
 		// Grab the fingerprint count
-		countOut, err := tablehelpers.Exec(ctx, t.slogger, 10, allowedcmd.Bioutil, []string{"-c"}, false, tablehelpers.WithUid(u.Uid))
+		countOut, err := tablehelpers.RunSimple(ctx, t.slogger, 10, allowedcmd.Bioutil, []string{"-c"}, tablehelpers.WithUid(u.Uid))
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"could not run bioutil -c",
