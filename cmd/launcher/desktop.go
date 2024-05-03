@@ -14,6 +14,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/customprotocol"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
@@ -151,6 +152,9 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 			)
 		}
 	})
+
+	customProtocolHandler := customprotocol.NewCustomProtocolHandler(slogger)
+	runGroup.Add("customProtocolHandler", customProtocolHandler.Execute, customProtocolHandler.Interrupt)
 
 	// listen on shutdown channel
 	runGroup.Add("desktopServerShutdownListener", func() error {
