@@ -1,4 +1,7 @@
 
+//go:build darwin
+// +build darwin
+
 #include "handler.h"
 
 @implementation CustomProtocolConnector
