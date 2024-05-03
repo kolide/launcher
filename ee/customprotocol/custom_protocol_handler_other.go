@@ -24,5 +24,11 @@ func (n *noopCustomProtocolHandler) Execute() error {
 }
 
 func (n *noopCustomProtocolHandler) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if n.interrupted {
+		return
+	}
+	n.interrupted = true
+
 	n.interrupt <- struct{}{}
 }
