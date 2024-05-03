@@ -9,7 +9,7 @@
 @end
 
 void StartURLHandler(void) {
-	  NSAppleEventManager *appleEventManager = [NSAppleEventManager sharedAppleEventManager];
+    NSAppleEventManager *appleEventManager = [NSAppleEventManager sharedAppleEventManager];
     [appleEventManager setEventHandler:[CustomProtocolConnector class]
         andSelector:@selector(handleGetURLEvent:)
         forEventClass:kInternetEventClass andEventID:kAEGetURL];
