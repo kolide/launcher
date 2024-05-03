@@ -42,12 +42,12 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -194,12 +194,10 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
-	timeout := 45 * time.Second
+	timeoutSeconds := 45
 	if detailLevel == "full" {
-		timeout = 5 * time.Minute
+		timeoutSeconds = 60 * 5
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -212,20 +210,8 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 
 	args = append(args, subcommands...)
 
-	cmd, err := allowedcmd.SystemProfiler(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating system_profiler command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	t.slogger.Log(ctx, slog.LevelDebug,
-		"calling system_profiler",
-		"args", cmd.Args,
-	)
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", stderr.String(), err)
+	if err := tablehelpers.Run(ctx, t.slogger, timeoutSeconds, allowedcmd.SystemProfiler, args, &stdout, &stderr); err != nil {
+		return nil, fmt.Errorf("execing system_profiler. Got: %s: %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil

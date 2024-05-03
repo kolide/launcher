@@ -15,6 +15,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
@@ -27,7 +28,7 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
-	cmd, err := allowedcmd.Launchctl(ctx,
+	args := []string{
 		"asuser",
 		targetUser.Uid,
 		osqueryPath,
@@ -39,9 +40,6 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 		"-S",
 		"--json",
 		query,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating launchctl command: %w", err)
 	}
 
 	dir, err := agent.MkdirTemp("osq-launchctl")
@@ -54,12 +52,8 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 		return nil, fmt.Errorf("chmod: %w", err)
 	}
 
-	cmd.Dir = dir
-
-	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-
-	if err := cmd.Run(); err != nil {
+	var stdout, stderr bytes.Buffer
+	if err := Run(ctx, multislogger.NewNopLogger(), timeoutSeconds, allowedcmd.Launchctl, args, &stdout, &stderr, WithDir(dir)); err != nil {
 		return nil, fmt.Errorf("running osquery. Got: '%s': %w", stderr.String(), err)
 	}
 

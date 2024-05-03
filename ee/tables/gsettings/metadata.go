@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -223,17 +225,8 @@ func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, out
 	defer cancel()
 
 	command := args[0]
-	cmd, err := allowedcmd.Gsettings(ctx, args...)
-	if err != nil {
-		return fmt.Errorf("creating gsettings command: %w", err)
-	}
-
-	cmd.Dir = tmpdir
-	cmd.Stderr = new(bytes.Buffer)
-	cmd.Stdout = output
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("running gsettings %s: %w", command, err)
+	if err := tablehelpers.Run(ctx, multislogger.NewNopLogger(), 3, allowedcmd.Gsettings, args, output, io.Discard, tablehelpers.WithDir(tmpdir)); err != nil {
+		return fmt.Errorf("execing gsettings: %s: %w", command, err)
 	}
 
 	return nil

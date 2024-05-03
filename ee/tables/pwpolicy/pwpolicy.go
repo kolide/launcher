@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -96,22 +95,7 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd, err := t.execCC(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	t.slogger.Log(ctx, slog.LevelDebug,
-		"calling pwpolicy",
-		"args", cmd.Args,
-	)
-
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, 30, t.execCC, args, &stdout, &stderr); err != nil {
 		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", stderr.String(), err)
 	}
 
