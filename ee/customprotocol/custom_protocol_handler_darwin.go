@@ -30,7 +30,7 @@ func NewCustomProtocolHandler(slogger *slog.Logger) *customProtocolHandler {
 }
 
 func (c *customProtocolHandler) Execute() error {
-	urlInput = make(chan string, 1) // the event handler blocks!, so buffer the channel at least once to get the first message
+	urlInput = make(chan string, 1)
 	go C.StartURLHandler()
 
 	for {
