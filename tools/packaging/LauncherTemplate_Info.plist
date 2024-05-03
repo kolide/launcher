@@ -6,6 +6,19 @@
 	<string>launcher</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.kolide.agent</string>
+	<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>CFBundleURLName</key>
+				<string>com.kolide.agent</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>kolideagent</string>
+				</array>
+			</dict>
+		</array>
 	<key>CFBundleName</key>
 	<string>Kolide</string>
 	<key>LSUIElement</key>
