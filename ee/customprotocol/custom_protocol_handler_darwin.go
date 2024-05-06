@@ -23,6 +23,8 @@ type customProtocolHandler struct {
 }
 
 func NewCustomProtocolHandler(slogger *slog.Logger) *customProtocolHandler {
+	urlInput = make(chan string, 1)
+
 	return &customProtocolHandler{
 		slogger:   slogger.With("component", "custom_protocol_handler"),
 		interrupt: make(chan struct{}),
@@ -30,7 +32,6 @@ func NewCustomProtocolHandler(slogger *slog.Logger) *customProtocolHandler {
 }
 
 func (c *customProtocolHandler) Execute() error {
-	urlInput = make(chan string, 1)
 	C.StartURLHandler()
 
 	for {
