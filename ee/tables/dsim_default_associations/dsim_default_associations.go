@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package dism_default_associations
+package dsim_default_associations
 
 import (
 	"bytes"
@@ -76,24 +76,25 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("creating kolide_dism tmp dir: %w", err)
 	}
 	defer os.RemoveAll(dir)
-	const dstFile = "associations.xml"
+
+	dstFile := "associations.xml"
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
 
-	var out bytes.Buffer
-	if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Dism, args, &out, &out, tablehelpers.WithDir(dir)); err != nil {
-		t.slogger.Log(ctx, slog.LevelDebug,
-			"execing dism",
-			"args", args,
-			"out", out.String(),
-			"err", err,
-		)
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling dsim",
+		"args", args,
+	)
 
-		return nil, fmt.Errorf("execing dism: out: %s, %w", out.String(), err)
+	if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Dism, args, &stdout, &stderr, tablehelpers.WithDir(dir)); err != nil {
+		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, dstFile))
 	if err != nil {
-		return nil, fmt.Errorf("reading dism output file: %w", err)
+		return nil, fmt.Errorf("error reading dism output file: %s: %w", err, err)
 	}
 
 	return data, nil
