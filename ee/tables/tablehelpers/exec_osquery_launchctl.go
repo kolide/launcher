@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -20,9 +19,6 @@ import (
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
 func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
-	defer cancel()
-
 	targetUser, err := user.Lookup(username)
 	if err != nil {
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
@@ -58,7 +54,6 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 	}
 
 	return stdout.Bytes(), nil
-
 }
 
 func ExecOsqueryLaunchctlParsed(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
