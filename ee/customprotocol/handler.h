@@ -2,7 +2,7 @@
 #import <AppKit/AppKit.h>
 
 // Go callback
-extern void HandleURL(char*);
+extern void handleURL(char*);
 
 @interface CustomProtocolConnector : NSObject
 + (void)handleGetURLEvent:(NSAppleEventDescriptor *)event;

@@ -7,7 +7,7 @@
 @implementation CustomProtocolConnector
 + (void)handleGetURLEvent:(NSAppleEventDescriptor *)event
 {
-    HandleURL((char*)[[[event paramDescriptorForKeyword:keyDirectObject] stringValue] UTF8String]);
+    handleURL((char*)[[[event paramDescriptorForKeyword:keyDirectObject] stringValue] UTF8String]);
 }
 @end
 

@@ -63,7 +63,7 @@ func (c *customProtocolHandler) Interrupt(_ error) {
 	c.interrupt <- struct{}{}
 }
 
-//export HandleURL
-func HandleURL(u *C.char) {
+//export handleURL
+func handleURL(u *C.char) {
 	urlInput <- C.GoString(u)
 }
