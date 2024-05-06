@@ -95,6 +95,11 @@ func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling pwpolicy",
+		"args", args,
+	)
+
 	if err := tablehelpers.Run(ctx, t.slogger, 30, t.execCC, args, &stdout, &stderr); err != nil {
 		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", stderr.String(), err)
 	}
