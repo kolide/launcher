@@ -31,7 +31,7 @@ func NewCustomProtocolHandler(slogger *slog.Logger) *customProtocolHandler {
 
 func (c *customProtocolHandler) Execute() error {
 	urlInput = make(chan string, 1)
-	go C.StartURLHandler()
+	C.StartURLHandler()
 
 	for {
 		select {
