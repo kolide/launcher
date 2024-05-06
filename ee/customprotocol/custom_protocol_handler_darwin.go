@@ -18,7 +18,8 @@ var urlInput chan string
 
 // customProtocolHandler receives requests from the browser that cannot be sent
 // directly to localserver; it processes and forwards them. Currently, this exists
-// only to ensure Safari support for device trust.
+// only to ensure Safari support for device trust. Custom protocol handling requires
+// a running process for the given user, so this actor must run in launcher desktop.
 type customProtocolHandler struct {
 	slogger     *slog.Logger
 	interrupted bool
