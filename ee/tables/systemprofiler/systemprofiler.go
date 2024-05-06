@@ -196,7 +196,7 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
 	timeoutSeconds := 45
 	if detailLevel == "full" {
-		timeoutSeconds = 60 * 5
+		timeoutSeconds = 5 * 60
 	}
 
 	var stdout bytes.Buffer
@@ -210,8 +210,13 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 
 	args = append(args, subcommands...)
 
+	t.slogger.Log(ctx, slog.LevelDebug,
+		"calling system_profiler",
+		"args", args,
+	)
+
 	if err := tablehelpers.Run(ctx, t.slogger, timeoutSeconds, allowedcmd.SystemProfiler, args, &stdout, &stderr); err != nil {
-		return nil, fmt.Errorf("execing system_profiler. Got: %s: %w", stderr.String(), err)
+		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil
