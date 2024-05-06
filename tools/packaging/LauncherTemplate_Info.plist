@@ -15,7 +15,7 @@
 				<string>com.kolide.agent</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>kolideagent</string>
+					<string>kolide</string>
 				</array>
 			</dict>
 		</array>
