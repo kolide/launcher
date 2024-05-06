@@ -16,6 +16,9 @@ import (
 
 var urlInput chan string
 
+// customProtocolHandler receives requests from the browser that cannot be sent
+// directly to localserver; it processes and forwards them. Currently, this exists
+// only to ensure Safari support for device trust.
 type customProtocolHandler struct {
 	slogger     *slog.Logger
 	interrupted bool
@@ -37,10 +40,12 @@ func (c *customProtocolHandler) Execute() error {
 	for {
 		select {
 		case i := <-urlInput:
-			c.slogger.Log(context.TODO(), slog.LevelInfo,
-				"received custom protocol request",
-				"request", i,
-			)
+			if err := c.handleCustomProtocolRequest(i); err != nil {
+				c.slogger.Log(context.TODO(), slog.LevelWarn,
+					"could not handle custom protocol request",
+					"err", err,
+				)
+			}
 		case <-c.interrupt:
 			c.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received external interrupt, stopping",
@@ -62,6 +67,19 @@ func (c *customProtocolHandler) Interrupt(_ error) {
 	c.interrupted = true
 
 	c.interrupt <- struct{}{}
+}
+
+// handleCustomProtocolRequest receives requests and logs them. In the future,
+// it will validate them and forward them to launcher root.
+func (c *customProtocolHandler) handleCustomProtocolRequest(requestUrl string) error {
+	c.slogger.Log(context.TODO(), slog.LevelInfo,
+		"received custom protocol request",
+		"request_url", requestUrl,
+	)
+
+	// TODO: validate the request and forward it to launcher root
+
+	return nil
 }
 
 //export handleURL

@@ -7,6 +7,9 @@ import (
 	"log/slog"
 )
 
+// Currently, we only require custom protocol handling on macOS (in order to
+// appropriately support Safari) -- so on other OSes, custom protocol handling
+// is a no-op.
 type noopCustomProtocolHandler struct {
 	interrupted bool
 	interrupt   chan struct{}
