@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/user"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -85,9 +84,6 @@ func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryCon
 // execXRDB writes the output of running 'xrdb' command into the
 // supplied bytes buffer
 func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
 	u, err := user.Lookup(username)
 	if err != nil {
 		return fmt.Errorf("finding user by username '%s': %w", username, err)

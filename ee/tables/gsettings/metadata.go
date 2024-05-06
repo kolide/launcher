@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -221,9 +220,6 @@ func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir str
 
 // execGsettingsCommand should be called with a tmpdir that will be cleaned up.
 func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
 	command := args[0]
 	if err := tablehelpers.Run(ctx, multislogger.NewNopLogger(), 3, allowedcmd.Gsettings, args, output, io.Discard, tablehelpers.WithDir(tmpdir)); err != nil {
 		return fmt.Errorf("execing gsettings: %s: %w", command, err)

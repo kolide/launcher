@@ -70,8 +70,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	result := make(map[string]string)
 
 	for _, mode := range []string{"-check", "-mode"} {
-		out, err := t.runFirmwarepasswd(ctx, mode)
-		if err != nil {
+		output := new(bytes.Buffer)
+		if err := t.runFirmwarepasswd(ctx, mode, output); err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"error running firmware password",
 				"command", mode,
@@ -81,7 +81,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		}
 
 		// Merge resulting matches
-		for _, row := range t.parser.Parse(bytes.NewBuffer(out)) {
+		for _, row := range t.parser.Parse(output) {
 			for k, v := range row {
 				result[k] = v
 			}
@@ -90,29 +90,29 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return []map[string]string{result}, nil
 }
 
-func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string) ([]byte, error) {
+func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output *bytes.Buffer) error {
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {
-		return nil, fmt.Errorf("mktemp: %w", err)
+		return fmt.Errorf("mktemp: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	if err := os.Chmod(dir, 0755); err != nil {
-		return nil, fmt.Errorf("chmod: %w", err)
+		return fmt.Errorf("chmod: %w", err)
 	}
 
-	var out bytes.Buffer
-	if err := tablehelpers.Run(ctx, t.slogger, 1, allowedcmd.Firmwarepasswd, []string{subcommand}, &out, &out, tablehelpers.WithDir(dir)); err != nil {
+	stderr := new(bytes.Buffer)
+
+	if err := tablehelpers.Run(ctx, t.slogger, 1, allowedcmd.Firmwarepasswd, []string{subcommand}, output, stderr, tablehelpers.WithDir(dir)); err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
-			"execing firmwarepasswd",
-			"subcommand", subcommand,
-			"out", out.String(),
+			"error running firmwarepasswd",
+			"stderr", strings.TrimSpace(stderr.String()),
+			"stdout", strings.TrimSpace(output.String()),
 			"err", err,
 		)
-		return out.Bytes(), fmt.Errorf("execing firmwarepasswd: %w", err)
+		return fmt.Errorf("running firmwarepasswd: %w", err)
 	}
-
-	return out.Bytes(), nil
+	return nil
 }
 
 func modeValue(in string) (string, error) {
