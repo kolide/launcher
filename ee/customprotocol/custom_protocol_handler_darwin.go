@@ -37,8 +37,8 @@ func (c *customProtocolHandler) Execute() error {
 		select {
 		case i := <-urlInput:
 			c.slogger.Log(context.TODO(), slog.LevelInfo,
-				"got input from URL handler!",
-				"input", i,
+				"received custom protocol request",
+				"request", i,
 			)
 		case <-c.interrupt:
 			c.slogger.Log(context.TODO(), slog.LevelDebug,
