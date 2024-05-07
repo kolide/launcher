@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/desktop/user/universallink"
 	"github.com/kolide/launcher/pkg/authedclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -159,6 +160,9 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}, func(err error) {
 		m.Shutdown()
 	})
+
+	universalLinkHandler := universallink.NewUniversalLinkHandler(slogger)
+	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
 
 	// notify runner server when menu opened
 	runGroup.Add("desktopMenuOpenedListener", func() error {
