@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
@@ -799,6 +800,10 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	}
 
 	if err != nil {
+		if errors.Is(err, service.ErrDeviceDisabled{}) {
+			uninstall.Uninstall(ctx, e.knapsack, true)
+		}
+
 		// logPublicationState will determine whether this failure should impact
 		// the batch size limit based on the elapsed time
 		e.logPublicationState.EndBatch(logs, false)

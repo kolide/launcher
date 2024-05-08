@@ -20,6 +20,7 @@ type queriesRequest struct {
 }
 
 type queryCollectionResponse struct {
+	jsonRpcResponse
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`

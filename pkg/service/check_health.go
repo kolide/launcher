@@ -16,6 +16,7 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
+	jsonRpcResponse
 	Status    int32  `json:"status"`
 	ErrorCode string `json:"error_code,omitempty"`
 	Err       error  `json:"err,omitempty"`

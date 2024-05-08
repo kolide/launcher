@@ -41,6 +41,7 @@ type EnrollmentDetails struct {
 }
 
 type enrollmentResponse struct {
+	jsonRpcResponse
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -177,6 +178,7 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier, EnrollmentDetails: details}
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
+
 	if err != nil {
 		return "", false, err
 	}
