@@ -19,7 +19,6 @@ type configRequest struct {
 }
 
 type configResponse struct {
-	jsonRpcResponse
 	ConfigJSONBlob string `json:"config"`
 	NodeInvalid    bool   `json:"node_invalid"`
 	ErrorCode      string `json:"error_code,omitempty"`

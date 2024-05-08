@@ -41,7 +41,6 @@ type EnrollmentDetails struct {
 }
 
 type enrollmentResponse struct {
-	jsonRpcResponse
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`

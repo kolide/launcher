@@ -20,7 +20,6 @@ type resultCollection struct {
 }
 
 type publishResultsResponse struct {
-	jsonRpcResponse
 	Message     string `json:"message"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
