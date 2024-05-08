@@ -21,7 +21,7 @@ func Bputil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, "/opt/homebrew/bin/brew", arg...)
+	return validatedCommand(ctx, "HOMEBREW_NO_AUTO_UPDATE=1 /opt/homebrew/bin/brew", arg...)
 }
 
 func Diskutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {

@@ -14,7 +14,7 @@ func Apt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, "/home/linuxbrew/.linuxbrew/bin/brew", arg...)
+	return validatedCommand(ctx, "HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew", arg...)
 }
 
 func Cryptsetup(ctx context.Context, arg ...string) (*exec.Cmd, error) {
