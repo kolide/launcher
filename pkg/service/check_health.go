@@ -16,6 +16,7 @@ import (
 
 type healthcheckRequest struct{}
 type healthcheckResponse struct {
+	jsonRpcResponse
 	Status    int32  `json:"status"`
 	ErrorCode string `json:"error_code,omitempty"`
 	Err       error  `json:"err,omitempty"`
@@ -93,6 +94,11 @@ func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 		return 0, err
 	}
 	resp := response.(healthcheckResponse)
+
+	if resp.DisableDevice {
+		return 0, ErrDeviceDisabled{}
+	}
+
 	return resp.Status, resp.Err
 }
 

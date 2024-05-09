@@ -41,6 +41,7 @@ type EnrollmentDetails struct {
 }
 
 type enrollmentResponse struct {
+	jsonRpcResponse
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -182,6 +183,11 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 		return "", false, err
 	}
 	resp := response.(enrollmentResponse)
+
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.NodeKey, resp.NodeInvalid, resp.Err
 }
 

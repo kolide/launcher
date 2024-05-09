@@ -19,6 +19,7 @@ type configRequest struct {
 }
 
 type configResponse struct {
+	jsonRpcResponse
 	ConfigJSONBlob string `json:"config"`
 	NodeInvalid    bool   `json:"node_invalid"`
 	ErrorCode      string `json:"error_code,omitempty"`
@@ -120,6 +121,11 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, b
 		return "", false, err
 	}
 	resp := response.(configResponse)
+
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.ConfigJSONBlob, resp.NodeInvalid, resp.Err
 }
 

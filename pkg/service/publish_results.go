@@ -20,6 +20,7 @@ type resultCollection struct {
 }
 
 type publishResultsResponse struct {
+	jsonRpcResponse
 	Message     string `json:"message"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -170,6 +171,11 @@ func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results [
 		return "", "", false, err
 	}
 	resp := response.(publishResultsResponse)
+
+	if resp.DisableDevice {
+		return "", "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 

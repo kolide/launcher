@@ -20,6 +20,7 @@ type queriesRequest struct {
 }
 
 type queryCollectionResponse struct {
+	jsonRpcResponse
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -143,6 +144,11 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 		return nil, false, err
 	}
 	resp := response.(queryCollectionResponse)
+
+	if resp.DisableDevice {
+		return nil, false, ErrDeviceDisabled{}
+	}
+
 	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 

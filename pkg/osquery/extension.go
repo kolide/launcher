@@ -450,13 +450,19 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
-		err := fmt.Errorf("transport error in enrollment: %w", err)
-		traces.SetError(span, err)
-		return "", true, err
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrDeviceDisabled{}):
+			uninstall.Uninstall(ctx, e.knapsack, true)
+
+		case isNodeInvalidErr(err):
+			invalid = true
+
+		default:
+			return "", true, fmt.Errorf("transport error getting queries: %w", err)
+		}
 	}
+
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
@@ -555,10 +561,17 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
-		return "", fmt.Errorf("transport error retrieving config: %w", err)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrDeviceDisabled{}):
+			uninstall.Uninstall(ctx, e.knapsack, true)
+
+		case isNodeInvalidErr(err):
+			invalid = true
+
+		default:
+			return "", fmt.Errorf("transport error getting queries: %w", err)
+		}
 	}
 
 	if invalid {
@@ -904,10 +917,18 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
-		return nil, fmt.Errorf("transport error getting queries: %w", err)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrDeviceDisabled{}):
+			uninstall.Uninstall(ctx, e.knapsack, true)
+
+		case isNodeInvalidErr(err):
+			invalid = true
+
+		default:
+			return nil, fmt.Errorf("transport error getting queries: %w", err)
+		}
 	}
 
 	if invalid {
@@ -950,10 +971,17 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	defer span.End()
 
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
-		return fmt.Errorf("transport error writing results: %w", err)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrDeviceDisabled{}):
+			uninstall.Uninstall(ctx, e.knapsack, true)
+
+		case isNodeInvalidErr(err):
+			invalid = true
+
+		default:
+			return fmt.Errorf("transport error getting queries: %w", err)
+		}
 	}
 
 	if invalid {
