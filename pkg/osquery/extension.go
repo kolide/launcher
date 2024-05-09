@@ -450,17 +450,18 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrDeviceDisabled{}):
-			uninstall.Uninstall(ctx, e.knapsack, true)
 
-		case isNodeInvalidErr(err):
-			invalid = true
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
 
-		default:
-			return "", true, fmt.Errorf("transport error getting queries: %w", err)
-		}
+	case isNodeInvalidErr(err):
+		invalid = true
+
+	case err != nil:
+		return "", true, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -561,17 +562,17 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrDeviceDisabled{}):
-			uninstall.Uninstall(ctx, e.knapsack, true)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
 
-		case isNodeInvalidErr(err):
-			invalid = true
+	case isNodeInvalidErr(err):
+		invalid = true
 
-		default:
-			return "", fmt.Errorf("transport error getting queries: %w", err)
-		}
+	case err != nil:
+		return "", fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -805,6 +806,11 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
+
+	if errors.Is(err, service.ErrDeviceDisabled{}) {
+		uninstall.Uninstall(ctx, e.knapsack, true)
+	}
+
 	invalid = invalid || isNodeInvalidErr(err)
 	if !invalid && err == nil {
 		// publication was successful- update logPublicationState and move on
@@ -813,10 +819,6 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	}
 
 	if err != nil {
-		if errors.Is(err, service.ErrDeviceDisabled{}) {
-			uninstall.Uninstall(ctx, e.knapsack, true)
-		}
-
 		// logPublicationState will determine whether this failure should impact
 		// the batch size limit based on the elapsed time
 		e.logPublicationState.EndBatch(logs, false)
@@ -918,17 +920,17 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
 
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrDeviceDisabled{}):
-			uninstall.Uninstall(ctx, e.knapsack, true)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
 
-		case isNodeInvalidErr(err):
-			invalid = true
+	case isNodeInvalidErr(err):
+		invalid = true
 
-		default:
-			return nil, fmt.Errorf("transport error getting queries: %w", err)
-		}
+	case err != nil:
+		return nil, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -971,17 +973,17 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	defer span.End()
 
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrDeviceDisabled{}):
-			uninstall.Uninstall(ctx, e.knapsack, true)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
 
-		case isNodeInvalidErr(err):
-			invalid = true
+	case isNodeInvalidErr(err):
+		invalid = true
 
-		default:
-			return fmt.Errorf("transport error getting queries: %w", err)
-		}
+	case err != nil:
+		return fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
