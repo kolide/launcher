@@ -48,6 +48,9 @@ func WithUid(uid string) ExecOps {
 			},
 		}
 
+		// Set PWD and HOME to the running user's home directory for supporting executes that use them as the prefix to create temp files.
+		cmd.Env = append(cmd.Environ(), "PWD=" + runningUser.HomeDir, "HOME=" + runningUser.HomeDir)
+
 		return nil
 	}
 }
