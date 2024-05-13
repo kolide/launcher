@@ -8,7 +8,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-func queryIndexeddb(dbLocation string) ([]map[string]any, error) {
+func QueryIndexeddb(dbLocation string) ([]map[string]any, error) {
 	opts := &opt.Options{
 		Comparer: &chromeComparer{},
 	}
