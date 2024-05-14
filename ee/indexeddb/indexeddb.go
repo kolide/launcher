@@ -11,7 +11,7 @@ import (
 
 func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
 	opts := &opt.Options{
-		Comparer: &chromeComparer{},
+		Comparer: newChromeComparer(),
 	}
 
 	db, err := leveldb.OpenFile(dbLocation, opts)
