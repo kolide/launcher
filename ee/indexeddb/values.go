@@ -36,6 +36,8 @@ const (
 	tokenNull              byte = 0x30
 )
 
+// deserializeIndexeddbValue takes the value in `src` and deserializes it
+// into a map.
 func deserializeIndexeddbValue(src []byte) (map[string]any, error) {
 	srcReader := bytes.NewReader(src)
 	obj := make(map[string]any)
@@ -57,6 +59,9 @@ func deserializeIndexeddbValue(src []byte) (map[string]any, error) {
 	return obj, nil
 }
 
+// readHeader reads through the header bytes at the start of `srcReader`.
+// It parses the version, if found. It stops as soon as it reaches the first
+// object reference.
 func readHeader(srcReader io.ByteReader) (uint64, error) {
 	var version uint64
 	for {
@@ -75,31 +80,33 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 				return 0, fmt.Errorf("decoding uint32: %w", err)
 			}
 		case tokenObjectBegin:
-			// done reading header
+			// Done reading header
 			return version, nil
 		default:
-			// padding -- ignore
+			// Padding -- ignore
 			continue
 		}
 	}
 }
 
+// deserializeObject deserializes the next object from the srcReader.
 func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
 	obj := make(map[string]any)
 
 	for {
 		// Parse the next property in this object.
+
 		// First, we'll want the object property name. Typically, we'll get " (denoting a string),
 		// then the length of the string, then the string itself.
 		objPropertyStart, err := srcReader.ReadByte()
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
 		}
+		// No more properties. We've reached the end of the object -- return.
 		if objPropertyStart == tokenObjectEnd {
 			// The next byte is `properties_written`, which we don't care about -- read it
 			// so it doesn't affect future parsing.
 			_, _ = srcReader.ReadByte()
-			// All done parsing this object! Return it
 			return obj, nil
 		}
 
@@ -167,21 +174,22 @@ func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
 			}
 			obj[currentPropertyName] = propertyInt
 		case tokenBeginSparseArray:
-			// This is the only type of array we seem to encounter
+			// This is the only type of array I've encountered so far, so it's the only one implemented.
 			arr, err := deserializeSparseArray(srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding array: %w", err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenPadding, tokenVerifyObjectCount:
-			continue
+			fallthrough
 		default:
-			fmt.Printf("unsure how to handle token 0x%02x / `%s`\n", nextByte, string(nextByte))
+			continue
 		}
 	}
 }
 
-// deserializeSparseArray currently only handles arrays of objects.
+// deserializeSparseArray deserializes the next array from the srcReader.
+// Currently, it only handles an array of objects.
 func deserializeSparseArray(srcReader io.ByteReader) ([]any, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
@@ -239,11 +247,12 @@ func deserializeSparseArray(srcReader io.ByteReader) ([]any, error) {
 			}
 			arrItems[i] = obj
 		default:
-			return arrItems, fmt.Errorf("unhandled array type 0x%02x / `%s`", nextByte, string(nextByte))
+			return arrItems, fmt.Errorf("unimplemented array type 0x%02x / `%s`", nextByte, string(nextByte))
 		}
 	}
 }
 
+// deserializeAsciiStr handles the upcoming ascii string in srcReader.
 func deserializeAsciiStr(srcReader io.ByteReader) (string, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -263,6 +272,7 @@ func deserializeAsciiStr(srcReader io.ByteReader) (string, error) {
 	return string(strBytes), nil
 }
 
+// deserializeUtf16Str handles the upcoming utf-16 string in srcReader.
 func deserializeUtf16Str(srcReader io.ByteReader) (string, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -282,7 +292,7 @@ func deserializeUtf16Str(srcReader io.ByteReader) (string, error) {
 	utf16Reader := transform.NewReader(bytes.NewReader(strBytes), unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
 	decoded, err := io.ReadAll(utf16Reader)
 	if err != nil {
-		return "", fmt.Errorf("reading as utf-16: %w", err)
+		return "", fmt.Errorf("reading string as utf-16: %w", err)
 	}
 
 	return string(decoded), nil
