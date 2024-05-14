@@ -9,7 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-func QueryIndexeddb(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
+func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
 	opts := &opt.Options{
 		Comparer: &chromeComparer{},
 	}
@@ -30,8 +30,28 @@ func QueryIndexeddb(dbLocation string, dbName string, objectStoreName string) ([
 	}
 
 	databaseId, _ := binary.Uvarint(databaseIdRaw)
-	fmt.Println(databaseId)
 
+	// We can't query for the object store ID by its name -- we have to query each ID to get its name,
+	// and check against that. Object store indices start at 1.
+	objectStoreId := 0
+	for i := 1; i < 100; i++ {
+		objectStoreNameRaw, err := db.Get(objectStoreNameKey(databaseId, uint64(i)), nil)
+		if err != nil {
+			continue
+		}
+		foundObjectStoreName, err := utf16BigEndianBytesToString(objectStoreNameRaw)
+		if err != nil {
+			continue
+		}
+		if string(foundObjectStoreName) == objectStoreName {
+			objectStoreId = i
+			break
+		}
+	}
+
+	fmt.Println(objectStoreId)
+
+	// Now, we can read all records in this object store.
 	objs := make([]map[string]any, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {

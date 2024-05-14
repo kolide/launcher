@@ -9,6 +9,10 @@ import (
 	"golang.org/x/text/encoding/unicode"
 )
 
+const (
+	objectStoreMetaDataTypeByte = 0x32 // 50
+)
+
 // databaseIdKey returns a key for querying the global metadata for the given `dbName`,
 // which will return its id.
 func databaseIdKey(databaseLocation string, dbName string) ([]byte, error) {
@@ -38,6 +42,29 @@ func databaseIdKey(databaseLocation string, dbName string) ([]byte, error) {
 	return databaseNameKey, nil
 }
 
+// objectStoreNameKey constructs a query for the object store name for the object store with the given ID.
+func objectStoreNameKey(dbId uint64, objectStoreId uint64) []byte {
+	// Key takes the format <0, database id, 0, 0, 50, object store id, 0>.
+	storeNameKey := []byte{0x00}
+	storeNameKey = append(storeNameKey, uvarintToBytes(dbId)...)
+	storeNameKey = append(storeNameKey,
+		0x00,
+		0x00,
+		objectStoreMetaDataTypeByte,
+	)
+
+	// Add the object store ID
+	storeNameKey = append(storeNameKey, uvarintToBytes(objectStoreId)...)
+
+	// Add 00, indicating we're querying for the object store name
+	return append(storeNameKey, 0x00)
+}
+
+func utf16BigEndianBytesToString(b []byte) ([]byte, error) {
+	utf16BigEndianDecoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
+	return utf16BigEndianDecoder.Bytes(b)
+}
+
 // stringWithLength constructs an appropriate representation of `s`.
 // See: https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#types
 func stringWithLength(s string) ([]byte, error) {
@@ -52,9 +79,14 @@ func stringWithLength(s string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encoding string as utf-16: %w", err)
 	}
-	// TODO RM: this is sufficient for small strings, but will be an issue soon
-	strLenBytes := make([]byte, 1)
-	binary.PutUvarint(strLenBytes, uint64(len(strBytesUtf16)/2))
+	strLenBytes := uvarintToBytes(uint64(len(strBytesUtf16) / 2))
 
 	return append(strLenBytes, strBytesUtf16...), nil
+}
+
+func uvarintToBytes(x uint64) []byte {
+	buf := make([]byte, 100)
+	bytesWritten := binary.PutUvarint(buf, x)
+
+	return buf[:bytesWritten]
 }
