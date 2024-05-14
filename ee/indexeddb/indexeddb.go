@@ -59,7 +59,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		value := iter.Value()
 
 		if bytes.HasPrefix(key, keyPrefix) {
-			obj, err := valueDecode(value)
+			obj, err := deserializeIndexeddbValue(value)
 			if err != nil {
 				return objs, fmt.Errorf("decoding object: %w", err)
 			}

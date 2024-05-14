@@ -36,7 +36,7 @@ const (
 	tokenNull              byte = 0x30
 )
 
-func valueDecode(src []byte) (map[string]any, error) {
+func deserializeIndexeddbValue(src []byte) (map[string]any, error) {
 	srcReader := bytes.NewReader(src)
 	obj := make(map[string]any)
 
@@ -48,7 +48,7 @@ func valueDecode(src []byte) (map[string]any, error) {
 	obj["version"] = version
 
 	// Now, parse the actual data in this row
-	objData, err := objectDecode(srcReader)
+	objData, err := deserializeObject(srcReader)
 	obj["data"] = objData
 	if err != nil {
 		return obj, fmt.Errorf("decoding obj: %w", err)
@@ -84,7 +84,7 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 	}
 }
 
-func objectDecode(srcReader io.ByteReader) (map[string]any, error) {
+func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
 	obj := make(map[string]any)
 
 	for {
@@ -135,21 +135,21 @@ func objectDecode(srcReader io.ByteReader) (map[string]any, error) {
 		switch nextByte {
 		case tokenObjectBegin:
 			// Object nested inside this object
-			nestedObj, err := objectDecode(srcReader)
+			nestedObj, err := deserializeObject(srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding nested object: %w", err)
 			}
 			obj[currentPropertyName] = nestedObj
 		case tokenAsciiStr:
 			// ASCII string
-			strVal, err := asciiStrDecode(srcReader)
+			strVal, err := deserializeAsciiStr(srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding ascii string: %w", err)
 			}
 			obj[currentPropertyName] = strVal
 		case tokenUtf16Str:
 			// UTF-16 string
-			strVal, err := utf16StrDecode(srcReader)
+			strVal, err := deserializeUtf16Str(srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding ascii string: %w", err)
 			}
@@ -168,7 +168,7 @@ func objectDecode(srcReader io.ByteReader) (map[string]any, error) {
 			obj[currentPropertyName] = propertyInt
 		case tokenBeginSparseArray:
 			// This is the only type of array we seem to encounter
-			arr, err := parseSparseArray(srcReader)
+			arr, err := deserializeSparseArray(srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding array: %w", err)
 			}
@@ -181,8 +181,8 @@ func objectDecode(srcReader io.ByteReader) (map[string]any, error) {
 	}
 }
 
-// parseSparseArray currently only handles arrays of objects.
-func parseSparseArray(srcReader io.ByteReader) ([]any, error) {
+// deserializeSparseArray currently only handles arrays of objects.
+func deserializeSparseArray(srcReader io.ByteReader) ([]any, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -233,7 +233,7 @@ func parseSparseArray(srcReader io.ByteReader) ([]any, error) {
 		}
 		switch nextByte {
 		case tokenObjectBegin:
-			obj, err := objectDecode(srcReader)
+			obj, err := deserializeObject(srcReader)
 			if err != nil {
 				return arrItems, fmt.Errorf("decoding object in array: %w", err)
 			}
@@ -244,7 +244,7 @@ func parseSparseArray(srcReader io.ByteReader) ([]any, error) {
 	}
 }
 
-func asciiStrDecode(srcReader io.ByteReader) (string, error) {
+func deserializeAsciiStr(srcReader io.ByteReader) (string, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
 		return "", fmt.Errorf("reading uvarint: %w", err)
@@ -263,7 +263,7 @@ func asciiStrDecode(srcReader io.ByteReader) (string, error) {
 	return string(strBytes), nil
 }
 
-func utf16StrDecode(srcReader io.ByteReader) (string, error) {
+func deserializeUtf16Str(srcReader io.ByteReader) (string, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
 		return "", fmt.Errorf("reading uvarint: %w", err)
