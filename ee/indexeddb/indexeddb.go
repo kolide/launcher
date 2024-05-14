@@ -42,7 +42,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		if err != nil {
 			continue
 		}
-		foundObjectStoreName, err := utf16BigEndianBytesToString(objectStoreNameRaw)
+		foundObjectStoreName, err := decodeUtf16BigEndianBytes(objectStoreNameRaw)
 		if err != nil {
 			continue
 		}

@@ -19,6 +19,10 @@ const (
 
 	// Index IDs
 	objectStoreDataIndexId = 0x01 // 1
+
+	// When parsing the origin from the database location, I have to add @1 at the end for the origin to be complete.
+	// I don't know why.
+	originSuffix = "@1"
 )
 
 // databaseIdKey returns a key for querying the global metadata for the given `dbName`,
@@ -33,8 +37,8 @@ func databaseIdKey(databaseLocation string, dbName string) ([]byte, error) {
 		databaseNameTypeByte, // 201
 	}
 
-	// Next, append origin. I don't know why I have to append @1 to the origin name.
-	originBytes, err := stringWithLength(strings.TrimSuffix(filepath.Base(databaseLocation), ".indexeddb.leveldb") + "@1")
+	// Next, append origin.
+	originBytes, err := stringWithLength(strings.TrimSuffix(filepath.Base(databaseLocation), ".indexeddb.leveldb") + originSuffix)
 	if err != nil {
 		return nil, fmt.Errorf("constructing StringWithLength: %w", err)
 	}
@@ -78,7 +82,7 @@ func objectDataKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
 	return append(keyPrefix, objectStoreDataIndexId)
 }
 
-func utf16BigEndianBytesToString(b []byte) ([]byte, error) {
+func decodeUtf16BigEndianBytes(b []byte) ([]byte, error) {
 	utf16BigEndianDecoder := unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder()
 	return utf16BigEndianDecoder.Bytes(b)
 }
