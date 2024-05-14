@@ -1,6 +1,7 @@
 package indexeddb
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-func QueryIndexeddb(dbLocation string) ([]map[string]any, error) {
+func QueryIndexeddb(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
 	opts := &opt.Options{
 		Comparer: &chromeComparer{},
 	}
@@ -19,6 +20,18 @@ func QueryIndexeddb(dbLocation string) ([]map[string]any, error) {
 	}
 	defer db.Close()
 
+	databaseNameKey, err := databaseIdKey(dbLocation, dbName)
+	if err != nil {
+		return nil, fmt.Errorf("getting database id key: %w", err)
+	}
+	databaseIdRaw, err := db.Get(databaseNameKey, nil)
+	if err != nil {
+		return nil, fmt.Errorf("querying for database id: %w", err)
+	}
+
+	databaseId, _ := binary.Uvarint(databaseIdRaw)
+	fmt.Println(databaseId)
+
 	objs := make([]map[string]any, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
@@ -26,9 +39,6 @@ func QueryIndexeddb(dbLocation string) ([]map[string]any, error) {
 		value := iter.Value()
 
 		if strings.Contains(string(key), "signinAddress") || strings.Contains(string(value), "signinAddress") {
-			// TODO: parse key
-			// https://github.com/chromium/chromium/blob/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md
-
 			obj, err := valueDecode(value)
 			if err != nil {
 				return objs, fmt.Errorf("decoding object: %w", err)
