@@ -171,6 +171,8 @@ github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvW
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQD5Q2jXmPdTJS8L8JfA1GquHnFeK3PDcl26E/k=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
+github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6 h1:6/RKW8FQlrtaBeL7We3SdpdoiGZk3Pm5STXsSxbm9ho=
+github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6/go.mod h1:zgOxCKTwS/xpJtz6LH60b3lZoQ30kqtc252N+SM4enc=
 github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50 h1:N7RaYBPTK5o4y2z1z8kl/G3iAeP73QCfAUH4y39GRCc=
 github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50/go.mod h1:pFbEKXFww1uqu4RRO7qCnUmQ2EIwKYRzUqpJbODNlfc=
 github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121 h1:f7APX9VNsCkD/tdlAjbU4A22FyfTOCF6QadlvnzZElg=
@@ -308,8 +310,6 @@ github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d h1:vfofYNRScrDdvS342BElfbETmL1Aiz3i2t0zfRj16Hs=
-github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
 github.com/tevino/abool v1.2.0 h1:heAkClL8H6w+mK5md9dzsuohKeXHUpY7Vw0ZCKW+huA=
 github.com/tevino/abool v1.2.0/go.mod h1:qc66Pna1RiIsPa7O4Egxxs9OqkuxDX55zznh9K07Tzg=
 github.com/theupdateframework/go-tuf v0.5.2 h1:habfDzTmpbzBLIFGWa2ZpVhYvFBoK0C1onC3a4zuPRA=

@@ -1,7 +1,7 @@
 package indexeddb
 
 import (
-	"github.com/syndtr/goleveldb/leveldb/comparer"
+	"github.com/kolide/goleveldb/leveldb/comparer"
 )
 
 // chromeComparer is a thin wrapper around the default comparer to allow us

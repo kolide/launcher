@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/kolide/goleveldb/leveldb"
+	"github.com/kolide/goleveldb/leveldb/opt"
 )
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
