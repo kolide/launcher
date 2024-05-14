@@ -22,8 +22,8 @@ import (
 type StoreName int
 
 const (
-	StartupSettingsStore   StoreName = iota
-	RestartServiceLogStore StoreName = 1
+	StartupSettingsStore StoreName = iota
+	WatchdogLogStore     StoreName = 1
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
@@ -34,8 +34,8 @@ func (s StoreName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
-	case RestartServiceLogStore:
-		return "restart_service_logs"
+	case WatchdogLogStore:
+		return "watchdog_logs"
 	}
 
 	return ""
@@ -339,7 +339,7 @@ func (s *sqliteStore) getColumns() *sqliteColumns {
 	switch s.tableName {
 	case StartupSettingsStore.String():
 		return &sqliteColumns{pk: "name", valueColumn: "value"}
-	case RestartServiceLogStore.String():
+	case WatchdogLogStore.String():
 		return &sqliteColumns{pk: "timestamp", valueColumn: "log"}
 	}
 

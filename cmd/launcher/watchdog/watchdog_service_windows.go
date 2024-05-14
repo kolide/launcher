@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package restartservice
+package watchdog
 
 import (
 	"context"
@@ -22,24 +22,19 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-const (
-	LauncherRestartServiceName string = `LauncherKolideRestartSvc`
-	launcherServiceName        string = `LauncherKolideK2Svc`
-)
-
-type winRestartSvc struct {
+type winWatchdogSvc struct {
 	systemSlogger, slogger *multislogger.MultiSlogger
 	opts                   *launcher.Options
 }
 
-func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) error {
+func RunWatchdogService(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	ctx := context.TODO()
 	systemSlogger.Logger = systemSlogger.Logger.With(
-		"service", LauncherRestartServiceName,
+		"service", launcherWatchdogServiceName,
 		"version", version.Version().Version,
 	)
 
-	systemSlogger.Log(ctx, slog.LevelInfo, "windows restart service start requested")
+	systemSlogger.Log(ctx, slog.LevelInfo, "watchdog service start requested")
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
@@ -56,7 +51,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	// Create a local logger to drop logs into the sqlite DB. These will be collected and published
 	// to debug.json from the primary launcher invocation
 	if opts.RootDirectory != "" {
-		ll, err := sqlitelogger.NewSqliteLogWriter(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
+		ll, err := sqlitelogger.NewSqliteLogWriter(ctx, opts.RootDirectory, agentsqlite.WatchdogLogStore)
 		if err != nil {
 			return fmt.Errorf("initializing sqlite log writer: %w", err)
 		}
@@ -69,7 +64,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	}
 
 	localSlogger.Logger = localSlogger.Logger.With(
-		"service", LauncherRestartServiceName,
+		"service", launcherWatchdogServiceName,
 		"version", version.Version().Version,
 	)
 
@@ -77,12 +72,12 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	defer func() {
 		if r := recover(); r != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
-				"panic occurred in windows restart service",
+				"panic occurred in watchdog service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
 				systemSlogger.Log(ctx, slog.LevelError,
-					"windows restart service panic stack trace",
+					"watchdog service panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
 			}
@@ -90,7 +85,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 		}
 	}()
 
-	if err := svc.Run(LauncherRestartServiceName, &winRestartSvc{
+	if err := svc.Run(launcherWatchdogServiceName, &winWatchdogSvc{
 		systemSlogger: systemSlogger,
 		slogger:       localSlogger,
 		opts:          opts,
@@ -109,7 +104,7 @@ func RunRestartService(systemSlogger *multislogger.MultiSlogger, args []string) 
 	return nil
 }
 
-func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
+func (w *winWatchdogSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -121,10 +116,10 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 	runRestartServiceResults := make(chan struct{})
 
 	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
-		err := runLauncherRestartService(ctx, w)
+		err := runLauncherWatchdogService(ctx, w)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
-				"runLauncherRestartService exited",
+				"runLauncherWatchdogService exited",
 				"err", err,
 				"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 			)
@@ -138,7 +133,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 		runRestartServiceResults <- struct{}{}
 	}, func(r any) {
 		w.systemSlogger.Log(ctx, slog.LevelError,
-			"exiting after runLauncherRestartService panic",
+			"exiting after runLauncherWatchdogService panic",
 			"err", r,
 		)
 
@@ -165,7 +160,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 			default:
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"unexpected change request",
-					"service", LauncherRestartServiceName,
+					"service", launcherWatchdogServiceName,
 					"change_request", fmt.Sprintf("%+v", c),
 				)
 			}
@@ -183,7 +178,7 @@ func (w *winRestartSvc) Execute(args []string, r <-chan svc.ChangeRequest, chang
 	}
 }
 
-func (w *winRestartSvc) checkLauncherStatus(ctx context.Context) error {
+func (w *winWatchdogSvc) checkLauncherStatus(ctx context.Context) error {
 	serviceManager, err := mgr.Connect()
 	if err != nil {
 		w.slogger.Log(ctx, slog.LevelError,
@@ -209,14 +204,14 @@ func (w *winRestartSvc) checkLauncherStatus(ctx context.Context) error {
 	}
 
 	if currentStatus.State == svc.Stopped {
-		w.slogger.Log(ctx, slog.LevelInfo, "restart service checker detected stopped state, restarting")
+		w.slogger.Log(ctx, slog.LevelInfo, "watchdog service checker detected stopped state, restarting")
 		return launcherService.Start()
 	}
 
 	return nil
 }
 
-func runLauncherRestartService(ctx context.Context, w *winRestartSvc) error {
+func runLauncherWatchdogService(ctx context.Context, w *winWatchdogSvc) error {
 	ticker := time.NewTicker(1 * time.Minute)
 
 	for {

@@ -28,6 +28,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.LauncherWatchdogEnabled)
 	updateChannelVal := "stable"
 	k.On("UpdateChannel").Return(updateChannelVal)
 	k.On("PinnedLauncherVersion").Return("")
@@ -35,6 +36,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("KatcConfigStore").Return(inmemory.NewStore())
+	k.On("LauncherWatchdogEnabled").Return(true)
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
@@ -50,6 +52,10 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	v2, err := s.kvStore.Get([]byte("use_tuf_autoupdater"))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, "enabled", string(v2), "incorrect flag value")
+
+	watchdogEnabled, err := s.kvStore.Get([]byte(keys.LauncherWatchdogEnabled.String()))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "enabled", string(watchdogEnabled), "incorrect flag value")
 
 	require.NoError(t, s.Close(), "closing startup db")
 }

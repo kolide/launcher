@@ -5,16 +5,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"os"
-	"time"
 
-	"github.com/kolide/launcher/cmd/launcher/restartservice"
 	"github.com/kolide/launcher/pkg/launcher"
 
 	"golang.org/x/sys/windows/registry"
-	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
@@ -81,7 +76,6 @@ func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	defer sman.Disconnect()
 
 	checkRestartActions(sman, slogger)
-	checkRestartService(sman, slogger, opts)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -192,160 +186,3 @@ func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	slogger.Log(logCtx, slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
 }
 
-// serviceExists utilizes the service manager to determine if there is already a registered
-// service for serviceName. It handles closing the service handle (if present)
-func serviceExists(serviceManager *mgr.Mgr, serviceName string) bool { // nolint:unused
-	existingService, err := serviceManager.OpenService(serviceName)
-	if err == nil {
-		existingService.Close()
-		return true
-	}
-
-	return false
-}
-
-// removeService utilizes the passed serviceManager to remove the existing service
-// after looking up the handle from serviceName
-func removeService(serviceManager *mgr.Mgr, serviceName string) error { // nolint:unused
-	existingService, err := serviceManager.OpenService(serviceName)
-	if err != nil {
-		return err
-	}
-
-	defer existingService.Close()
-
-	if err = existingService.Delete(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func restartService(service *mgr.Service) error {
-	status, err := service.Control(svc.Stop)
-	if err != nil {
-		return fmt.Errorf("stopping %s service: %w", service.Name, err)
-	}
-
-	timeout := time.Now().Add(10 * time.Second)
-	for status.State != svc.Stopped {
-		if timeout.Before(time.Now()) {
-			return fmt.Errorf("timeout waiting for %s service to stop", service.Name)
-		}
-
-		time.Sleep(500 * time.Millisecond)
-		status, err = service.Query()
-		if err != nil {
-			return fmt.Errorf("could not retrieve service status: %w", err)
-		}
-	}
-
-	return service.Start()
-}
-
-func checkRestartService(serviceManager *mgr.Mgr, slogger *slog.Logger, opts *launcher.Options) {
-	logCtx := context.TODO()
-	slogger = slogger.With("target_service", restartservice.LauncherRestartServiceName)
-	// if we don't currently have the service enabled, remove it
-	if !opts.LauncherWatchdogEnabled {
-		if err := removeService(serviceManager, restartservice.LauncherRestartServiceName); err != nil {
-			// TODO can we check for service does not exist error and prevent spamming logs here
-			slogger.Log(logCtx, slog.LevelWarn,
-				"encountered error disabling restart service",
-				"err", err,
-			)
-		}
-
-		return
-	}
-	// first check if we've already installed the service
-	existingService, err := serviceManager.OpenService(restartservice.LauncherRestartServiceName)
-	if err == nil {
-		// if the service already exists, just restart it to ensure it's running from the latest launcher update.
-		// If this fails, log the error but move on, this service is not worth tying up the main launcher startup.
-		if err = restartService(existingService); err != nil {
-			slogger.Log(logCtx, slog.LevelError,
-				"failure attempting to restart service",
-				"err", err,
-			)
-		}
-
-		existingService.Close()
-		return
-	}
-
-	// if we need to make any changes to the initial configuration of this service,
-	// (e.g. all logic below here), we will likely need to rework this method to re-install,
-	// rather than restart the service. This may make more sense to do as part of the upgrade process
-	// instead of standard start up flow
-	currentExe, err := os.Executable()
-	if err != nil {
-		slogger.Log(logCtx, slog.LevelError,
-			"installing launcher restart service, unable to collect current executable path",
-			"err", err,
-		)
-	}
-
-	svcMgrConf := mgr.Config{
-		DisplayName:  restartservice.LauncherRestartServiceName,
-		Description:  "The Kolide Launcher Restart Service",
-		StartType:    mgr.StartAutomatic,
-		ErrorControl: mgr.ErrorNormal,
-		// no reason to rush start for this service, we should wait until after
-		// launcher proper has attempted to start anyway
-		DelayedAutoStart: true,
-	}
-
-	serviceArgs := []string{"restart-service"}
-	// add any original service arguments from the launcher proper invocation (currently running)
-	serviceArgs = append(serviceArgs, os.Args[2:]...)
-
-	restartService, err := serviceManager.CreateService(
-		restartservice.LauncherRestartServiceName,
-		currentExe,
-		svcMgrConf,
-		serviceArgs...,
-	)
-
-	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to create launcher restart service",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer restartService.Close()
-
-	recoveryActions := []mgr.RecoveryAction{
-		{
-			Type:  mgr.ServiceRestart,
-			Delay: 5 * time.Second,
-		},
-	}
-
-	if err = restartService.SetRecoveryActions(recoveryActions, 10800); err != nil {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to set recovery actions for service installation, proceeding",
-			"service", restartservice.LauncherRestartServiceName,
-			"err", err,
-		)
-	}
-
-	if err = restartService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to set RecoveryActionsOnNonCrashFailures flag, proceeding",
-			"service", restartservice.LauncherRestartServiceName,
-			"err", err,
-		)
-	}
-
-	if err = restartService.Start(); err != nil {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to start launcher restart service",
-			"service", restartservice.LauncherRestartServiceName,
-			"err", err,
-		)
-	}
-}

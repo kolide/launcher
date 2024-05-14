@@ -38,9 +38,10 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
-			keys.UpdateChannel:         func() string { return knapsack.UpdateChannel() },
-			keys.PinnedLauncherVersion: func() string { return knapsack.PinnedLauncherVersion() },
-			keys.PinnedOsquerydVersion: func() string { return knapsack.PinnedOsquerydVersion() },
+			keys.UpdateChannel:           func() string { return knapsack.UpdateChannel() },
+			keys.PinnedLauncherVersion:   func() string { return knapsack.PinnedLauncherVersion() },
+			keys.PinnedOsquerydVersion:   func() string { return knapsack.PinnedOsquerydVersion() },
+			keys.LauncherWatchdogEnabled: func() string { return boolToString(knapsack.LauncherWatchdogEnabled()) },
 		},
 	}
 
@@ -138,6 +139,16 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, er
 	}
 
 	return string(atcJson), nil
+}
+
+// boolToString is a reproduction of the flags.BoolToString functionality
+// brought in here to avoid import cycle
+func boolToString(enabled bool) string {
+	if enabled {
+		return "enabled"
+	}
+
+	return ""
 }
 
 func (s *startupSettingsWriter) extractKATCConstructionConfig() (string, error) {

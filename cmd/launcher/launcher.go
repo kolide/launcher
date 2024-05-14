@@ -22,13 +22,14 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/cmd/launcher/internal"
+	"github.com/kolide/launcher/cmd/launcher/watchdog"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
-	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/timemachine"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
@@ -49,7 +50,6 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/logshipper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/log/sqlitelogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
@@ -285,14 +285,26 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
-	if k.LauncherWatchdogEnabled() { // no need to publish watchdog logs if the service isn't enabled
-		sqliteLogWriter, err := agentsqlite.OpenRW(ctx, opts.RootDirectory, agentsqlite.RestartServiceLogStore)
-		if err != nil {
-			return fmt.Errorf("opening log db in %s: %w", opts.RootDirectory, err)
-		}
+	slogger.Log(ctx, slog.LevelDebug, // TODO REMOVEME
+		"checking LauncherKolideRestartSvc enabled",
+		"knapsack_enabled", k.LauncherWatchdogEnabled(),
+		"opts_enabled", opts.LauncherWatchdogEnabled,
+	)
 
-		sqliteLogPublisher := sqlitelogger.NewSqliteLogPublisher(slogger, sqliteLogWriter)
-		runGroup.Add("sqlite_log_publisher", sqliteLogPublisher.Run, sqliteLogPublisher.Interrupt)
+	if opts.LauncherWatchdogEnabled { // TODO REMOVEME
+		k.SetLauncherWatchdogEnabled(true)
+	}
+
+	watchdogController, err := watchdog.NewController(ctx, k)
+	if err != nil { // log any issues here but move on, watchdog is not critical path
+		slogger.Log(ctx, slog.LevelError,
+			"could not init watchdog controller",
+			"err", err,
+		)
+	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
+		go watchdogController.ServiceEnabledChanged(k.LauncherWatchdogEnabled())
+		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
+		runGroup.Add("watchdog_controller", watchdogController.Run, watchdogController.Interrupt)
 	}
 
 	// Create a channel for signals

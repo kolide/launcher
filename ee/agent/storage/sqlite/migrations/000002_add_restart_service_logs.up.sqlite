@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS restart_service_logs (
-    timestamp INT NOT NULL,
-    log TEXT
-);

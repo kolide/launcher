@@ -15,7 +15,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/cmd/launcher/restartservice"
+	"github.com/kolide/launcher/cmd/launcher/watchdog"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
@@ -194,8 +194,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runUninstall
 	case "secure-enclave":
 		run = runSecureEnclave
-	case "restart-service": // note only implemented for windows
-		run = restartservice.RunRestartService
+	case "watchdog": // note: this is currently only implemented for windows
+		run = watchdog.RunWatchdogService
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}

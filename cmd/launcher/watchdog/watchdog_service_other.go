@@ -1,7 +1,7 @@
 //go:build !windows
 // +build !windows
 
-package restartservice
+package watchdog
 
 import (
 	"errors"
@@ -9,6 +9,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-func RunRestartService(_ *multislogger.MultiSlogger, args []string) error {
+func RunWatchdogService(_ *multislogger.MultiSlogger, args []string) error {
 	return errors.New("not implemented on non windows platforms")
 }
