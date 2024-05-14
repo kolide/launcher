@@ -1,9 +1,9 @@
 package indexeddb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
-	"strings"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -33,7 +33,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 
 	// We can't query for the object store ID by its name -- we have to query each ID to get its name,
 	// and check against that. Object store indices start at 1.
-	objectStoreId := 0
+	var objectStoreId uint64
 	for i := 1; i < 100; i++ {
 		objectStoreNameRaw, err := db.Get(objectStoreNameKey(databaseId, uint64(i)), nil)
 		if err != nil {
@@ -44,21 +44,21 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 			continue
 		}
 		if string(foundObjectStoreName) == objectStoreName {
-			objectStoreId = i
+			objectStoreId = uint64(i)
 			break
 		}
 	}
 
-	fmt.Println(objectStoreId)
+	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
-	// Now, we can read all records in this object store.
+	// Now, we can read all records, parsing only the ones with our matching key prefix.
 	objs := make([]map[string]any, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
 
-		if strings.Contains(string(key), "signinAddress") || strings.Contains(string(value), "signinAddress") {
+		if bytes.HasPrefix(key, keyPrefix) {
 			obj, err := valueDecode(value)
 			if err != nil {
 				return objs, fmt.Errorf("decoding object: %w", err)

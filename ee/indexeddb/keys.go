@@ -10,7 +10,11 @@ import (
 )
 
 const (
+	// Metadata types
 	objectStoreMetaDataTypeByte = 0x32 // 50
+
+	// Index IDs
+	objectStoreDataIndexId = 0x01 // 1
 )
 
 // databaseIdKey returns a key for querying the global metadata for the given `dbName`,
@@ -56,8 +60,18 @@ func objectStoreNameKey(dbId uint64, objectStoreId uint64) []byte {
 	// Add the object store ID
 	storeNameKey = append(storeNameKey, uvarintToBytes(objectStoreId)...)
 
-	// Add 00, indicating we're querying for the object store name
+	// Add 0x00, indicating we're querying for the object store name
 	return append(storeNameKey, 0x00)
+}
+
+// objectDataKeyPrefix returns the key prefix shared by all objects stored in the given database
+// and in the given store.
+func objectDataKeyPrefix(dbId uint64, objectStoreId uint64) []byte {
+	keyPrefix := []byte{0x00}
+	keyPrefix = append(keyPrefix, uvarintToBytes(dbId)...)
+	keyPrefix = append(keyPrefix, uvarintToBytes(objectStoreId)...)
+
+	return append(keyPrefix, objectStoreDataIndexId)
 }
 
 func utf16BigEndianBytesToString(b []byte) ([]byte, error) {
