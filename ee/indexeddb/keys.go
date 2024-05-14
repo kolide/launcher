@@ -10,6 +10,10 @@ import (
 )
 
 const (
+	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/indexed_db_leveldb_coding.cc
+	// Types
+	databaseNameTypeByte = 0xc9 // 201
+
 	// Metadata types
 	objectStoreMetaDataTypeByte = 0x32 // 50
 
@@ -25,8 +29,8 @@ func databaseIdKey(databaseLocation string, dbName string) ([]byte, error) {
 		0x00,
 		0x00,
 		0x00,
-		0x00, // documentation says there should be only 3 of these, but I keep seeing 4.
-		0xc9, // 201
+		0x00,                 // documentation says there should be only 3 of these, but I keep seeing 4.
+		databaseNameTypeByte, // 201
 	}
 
 	// Next, append origin. I don't know why I have to append @1 to the origin name.
