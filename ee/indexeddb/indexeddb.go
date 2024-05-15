@@ -4,6 +4,7 @@ package indexeddb
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/kolide/goleveldb/leveldb"
@@ -52,6 +53,20 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		}
 	}
 
+	if objectStoreId == 0 {
+		return nil, errors.New("unable to get object store ID")
+	}
+
+	// Get the key path for all objects in this store
+	keyPathRaw, err := db.Get(objectStoreKeyPathKey(databaseId, objectStoreId), nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting key path: %w", err)
+	}
+	keyPath, err := decodeIDBKeyPath(keyPathRaw)
+	if err != nil {
+		return nil, fmt.Errorf("decoding key path: %w", err)
+	}
+
 	// Get the key prefix for all objects in this store.
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
@@ -59,14 +74,23 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	objs := make([]map[string]any, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
-		if !bytes.HasPrefix(iter.Key(), keyPrefix) {
+		key := iter.Key()
+		if !bytes.HasPrefix(key, keyPrefix) {
 			continue
+		}
+
+		keyVal, err := decodeIDBKey(key, keyPrefix)
+		if err != nil {
+			return objs, fmt.Errorf("decoding key: %w", err)
 		}
 
 		obj, err := deserializeIndexeddbValue(iter.Value())
 		if err != nil {
 			return objs, fmt.Errorf("decoding object: %w", err)
 		}
+
+		// Set the key path in the object -- add idb_ prefix to avoid collisions
+		obj[fmt.Sprintf("idb_%s", string(keyPath))] = keyVal
 
 		objs = append(objs, obj)
 	}
