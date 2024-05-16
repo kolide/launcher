@@ -46,9 +46,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
-
 			var output bytes.Buffer
-			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"update"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
+			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"failure querying user brew installed packages",
 					"err", err,
