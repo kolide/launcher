@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kolide.agent;
 
-option go_package = "launcher";
+option go_package = "../launcher";
 
 service Api {
 
@@ -50,6 +50,7 @@ message AgentApiResponse {
      string message = 1;
      string error_code = 2;
      bool node_invalid = 3;
+     bool disable_device = 4;
 }
 
 
@@ -82,6 +83,7 @@ message EnrollmentResponse {
     string node_key = 1;
     bool node_invalid = 2;
     string error_code = 3;
+    bool disable_device = 4;
 }
 
 
@@ -96,6 +98,7 @@ message ConfigResponse {
     string config_json_blob = 1;
     bool node_invalid = 2;
     string error_code = 3;
+    bool disable_device = 4;
 }
 
 
@@ -132,6 +135,7 @@ message QueryCollection {
     repeated Query queries = 1;
     bool node_invalid = 2;
     string error_code = 3;
+    bool disable_device = 4;
 
     message Query {
         string id = 1;

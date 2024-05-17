@@ -76,6 +76,9 @@ func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interfac
 		queries.Queries[query.Id] = query.Query
 	}
 	return queryCollectionResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Queries:     queries,
 		NodeInvalid: req.NodeInvalid,
 	}, nil

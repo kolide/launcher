@@ -55,6 +55,9 @@ func encodeGRPCConfigRequest(_ context.Context, request interface{}) (interface{
 func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.ConfigResponse)
 	return configResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		ConfigJSONBlob: req.ConfigJsonBlob,
 		NodeInvalid:    req.NodeInvalid,
 	}, nil

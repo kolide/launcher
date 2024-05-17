@@ -139,6 +139,9 @@ func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interf
 func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.EnrollmentResponse)
 	return enrollmentResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		NodeKey:     req.NodeKey,
 		NodeInvalid: req.NodeInvalid,
 	}, nil
