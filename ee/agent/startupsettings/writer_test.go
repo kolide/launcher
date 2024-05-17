@@ -70,6 +70,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.PinnedLauncherVersion.String()), []byte("")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.PinnedOsquerydVersion.String()), []byte("")), "setting key")
+	require.NoError(t, store.Set([]byte(keys.LauncherWatchdogEnabled.String()), []byte("")), "setting key")
 
 	// Confirm flags were set
 	v1, err := store.Get([]byte(keys.UpdateChannel.String()))
@@ -84,6 +85,10 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, "", string(v3), "incorrect flag value")
 
+	watchdogEnabled, err := store.Get([]byte(keys.LauncherWatchdogEnabled.String()))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "", string(watchdogEnabled), "incorrect flag value")
+
 	require.NoError(t, store.Close(), "closing setup connection")
 
 	// Set up dependencies
@@ -93,6 +98,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.LauncherWatchdogEnabled)
 
 	// Set up flag
 	updateChannelVal := "alpha"
@@ -101,6 +107,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("UpdateChannel").Return(updateChannelVal)
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion)
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion)
+	k.On("LauncherWatchdogEnabled").Return(true)
 
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
@@ -124,6 +131,10 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, pinnedOsquerydVersion, string(v3), "incorrect flag value")
 
+	watchdogEnabled, err = s.kvStore.Get([]byte(keys.LauncherWatchdogEnabled.String()))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "enabled", string(watchdogEnabled), "incorrect flag value")
+
 	require.NoError(t, s.Close(), "closing startup db")
 }
 
@@ -138,12 +149,14 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.LauncherWatchdogEnabled)
 	updateChannelVal := "beta"
 	k.On("UpdateChannel").Return(updateChannelVal).Once()
 	pinnedLauncherVersion := "1.2.3"
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
+	k.On("LauncherWatchdogEnabled").Return(true).Once()
 
 	autoTableConstructionValue := ulid.New()
 
@@ -181,6 +194,10 @@ func TestFlagsChanged(t *testing.T) {
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, fmt.Sprintf("{\"auto_table_construction\":\"%s\"}", autoTableConstructionValue), string(v4), "incorrect config value")
 
+	watchdogEnabled, err := s.kvStore.Get([]byte(keys.LauncherWatchdogEnabled.String()))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "enabled", string(watchdogEnabled), "incorrect flag value")
+
 	// Now, prepare for flag changes
 	newFlagValue := "alpha"
 	k.On("UpdateChannel").Return(newFlagValue).Once()
@@ -188,6 +205,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return(newPinnedLauncherVersion).Once()
 	newPinnedOsquerydVersion := "5.4.3"
 	k.On("PinnedOsquerydVersion").Return(newPinnedOsquerydVersion).Once()
+	k.On("LauncherWatchdogEnabled").Return(false).Once()
 
 	// Call FlagsChanged and expect that all flag values are updated
 	s.FlagsChanged(keys.UpdateChannel)
@@ -202,6 +220,10 @@ func TestFlagsChanged(t *testing.T) {
 	v3, err = s.kvStore.Get([]byte(keys.PinnedOsquerydVersion.String()))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, newPinnedOsquerydVersion, string(v3), "incorrect flag value")
+
+	watchdogEnabled, err = s.kvStore.Get([]byte(keys.LauncherWatchdogEnabled.String()))
+	require.NoError(t, err, "getting startup value")
+	require.Equal(t, "", string(watchdogEnabled), "incorrect flag value")
 
 	require.NoError(t, s.Close(), "closing startup db")
 }
