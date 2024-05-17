@@ -185,4 +185,3 @@ func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 
 	slogger.Log(logCtx, slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
 }
-
