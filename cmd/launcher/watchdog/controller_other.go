@@ -10,22 +10,18 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
+type WatchdogController struct{}
+
 func NewController(_ context.Context, _ types.Knapsack) (*WatchdogController, error) {
 	return nil, nil
 }
 
-func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {
-	return
-}
+func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {}
 
-func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
-	return
-}
+func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {}
 
 func (wc *WatchdogController) Run() error {
 	return nil
 }
 
-func (wc *WatchdogController) Interrupt(_ error) {
-	return
-}
+func (wc *WatchdogController) Interrupt(_ error) {}
