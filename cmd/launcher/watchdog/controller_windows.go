@@ -291,7 +291,14 @@ func removeService(serviceManager *mgr.Mgr, serviceName string) error {
 func (wc *WatchdogController) restartService(service *mgr.Service) error {
 	status, err := service.Control(svc.Stop)
 	if err != nil {
-		return fmt.Errorf("stopping %s service: %w", service.Name, err)
+		wc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"error stopping service",
+			"err", err,
+		)
+
+		// always attempt to start the service regardless, if the service was already
+		// stopped it will still err on the control (stop) call above
+		return service.Start()
 	}
 
 	timeout := time.Now().Add(10 * time.Second)
