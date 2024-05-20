@@ -169,7 +169,7 @@ func stringWithLength(s string) ([]byte, error) {
 }
 
 func uvarintToBytes(x uint64) []byte {
-	buf := make([]byte, 100)
+	buf := make([]byte, binary.MaxVarintLen64)
 	bytesWritten := binary.PutUvarint(buf, x)
 
 	return buf[:bytesWritten]

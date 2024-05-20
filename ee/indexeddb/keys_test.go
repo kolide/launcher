@@ -151,9 +151,10 @@ func Test_uvarintToBytes(t *testing.T) {
 	t.Parallel()
 
 	for _, i := range []uint64{
-		0,
+		0, // min uint64 value
 		35,
 		128,
+		18446744073709551615, // max uint64 value
 	} {
 		// convert int to bytes
 		intBytes := uvarintToBytes(i)
