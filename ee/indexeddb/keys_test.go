@@ -162,5 +162,4 @@ func Test_uvarintToBytes(t *testing.T) {
 		convertedInt, _ := binary.Uvarint(intBytes)
 		require.Equal(t, i, convertedInt)
 	}
-
 }
