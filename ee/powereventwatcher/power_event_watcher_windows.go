@@ -97,6 +97,11 @@ func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEve
 	// Save the handle so that we can close it later
 	p.subscriptionHandle = subscriptionHandle
 
+	// Clear InModernStandby flag, in case it's cached. We may have missed wake/sleep events
+	// while launcher was not running, and we want to err on the side of assuming the device
+	// is awake.
+	k.SetInModernStandby(false)
+
 	return p, nil
 }
 
