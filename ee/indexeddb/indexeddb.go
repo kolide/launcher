@@ -11,6 +11,13 @@ import (
 	"github.com/kolide/goleveldb/leveldb/opt"
 )
 
+// maxObjectStoresToCheck is the number of indices for object stores we will check
+// before declaring failure to find the given object store. We cannot look up
+// object stores by their names, only by their IDs -- so we have to iterate through
+// up to maxObjectStoresToCheck IDs to find the desired store. We assume there are
+// fewer than 100 object stores in a given database.
+const maxObjectStoresToCheck = 100
+
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
 func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
@@ -35,10 +42,9 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	databaseId, _ := binary.Uvarint(databaseIdRaw)
 
 	// We can't query for the object store ID by its name -- we have to query each ID to get its name,
-	// and check against that. Object store indices start at 1. We assume there are fewer than 100
-	// object stores in the given database.
+	// and check against that. Object store indices start at 1.
 	var objectStoreId uint64
-	for i := 1; i < 100; i++ {
+	for i := 1; i < maxObjectStoresToCheck; i++ {
 		objectStoreNameRaw, err := db.Get(objectStoreNameKey(databaseId, uint64(i)), nil)
 		if err != nil {
 			continue
