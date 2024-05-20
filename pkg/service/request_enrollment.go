@@ -150,8 +150,9 @@ func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (inter
 func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentResponse)
 	resp := &pb.EnrollmentResponse{
-		NodeKey:     req.NodeKey,
-		NodeInvalid: req.NodeInvalid,
+		NodeKey:       req.NodeKey,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }

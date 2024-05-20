@@ -96,8 +96,9 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 		)
 	}
 	resp := &pb.QueryCollection{
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
+		Queries:       queries,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }

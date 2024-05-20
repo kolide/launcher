@@ -68,6 +68,7 @@ func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 	resp := &pb.ConfigResponse{
 		ConfigJsonBlob: req.ConfigJSONBlob,
 		NodeInvalid:    req.NodeInvalid,
+		DisableDevice:  req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
