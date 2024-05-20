@@ -138,6 +138,10 @@ func copyIndexeddb(sourceDb string) (string, error) {
 		if entry.IsDir() || !entry.Type().IsRegular() {
 			continue
 		}
+		// We don't want to copy over the lock -- we won't be able to open it for reading.
+		if entry.Name() == "LOCK" {
+			continue
+		}
 		src := filepath.Join(sourceDb, entry.Name())
 		dest := filepath.Join(dbCopyLocation, entry.Name())
 		if err := copyFile(src, dest); err != nil {
