@@ -6,9 +6,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/kolide/goleveldb/leveldb"
 	"github.com/kolide/goleveldb/leveldb/opt"
+	"github.com/kolide/launcher/ee/agent"
 )
 
 // maxObjectStoresToCheck is the number of indices for object stores we will check
@@ -21,10 +25,20 @@ const maxObjectStoresToCheck = 100
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
 func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
+	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.
+	tempDbCopyLocation, err := copyIndexeddb(dbLocation)
+	if err != nil {
+		if tempDbCopyLocation != "" {
+			_ = os.RemoveAll(tempDbCopyLocation)
+		}
+		return nil, fmt.Errorf("unable to copy db: %w", err)
+	}
+	defer os.RemoveAll(tempDbCopyLocation)
+
 	opts := &opt.Options{
 		Comparer: newChromeComparer(),
 	}
-	db, err := leveldb.OpenFile(dbLocation, opts)
+	db, err := leveldb.OpenFile(tempDbCopyLocation, opts)
 	if err != nil {
 		return nil, fmt.Errorf("opening db: %w", err)
 	}
@@ -106,4 +120,54 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	}
 
 	return objs, nil
+}
+
+func copyIndexeddb(sourceDb string) (string, error) {
+	dbCopyLocation, err := agent.MkdirTemp(filepath.Base(sourceDb))
+	if err != nil {
+		return "", fmt.Errorf("making temporary directory: %w", err)
+	}
+
+	entries, err := os.ReadDir(sourceDb)
+	if err != nil {
+		return dbCopyLocation, fmt.Errorf("reading directory contents: %w", err)
+	}
+	for _, entry := range entries {
+		// We expect only files in the database -- no directories, symlinks, etc.
+		// Ignore any unexpected files.
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			continue
+		}
+		src := filepath.Join(sourceDb, entry.Name())
+		dest := filepath.Join(dbCopyLocation, entry.Name())
+		if err := copyFile(src, dest); err != nil {
+			return dbCopyLocation, fmt.Errorf("copying file: %w", err)
+		}
+	}
+
+	return dbCopyLocation, nil
+}
+
+func copyFile(src string, dest string) error {
+	srcFh, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", src, err)
+	}
+	defer srcFh.Close()
+
+	destFh, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", dest, err)
+	}
+
+	if _, err := io.Copy(destFh, srcFh); err != nil {
+		_ = destFh.Close()
+		return fmt.Errorf("copying %s to %s: %w", src, dest, err)
+	}
+
+	if err := destFh.Close(); err != nil {
+		return fmt.Errorf("completing write from %s to %s: %w", src, dest, err)
+	}
+
+	return nil
 }
