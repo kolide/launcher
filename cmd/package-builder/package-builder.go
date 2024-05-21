@@ -54,6 +54,11 @@ func runMake(args []string) error {
 			false,
 			"enable debug logging",
 		)
+		flContainerTool = flagset.String(
+			"container_tool",
+			"docker",
+			"container orchestration tool to build with ('docker', 'podman')",
+		)
 		flHostname = flagset.String(
 			"hostname",
 			env.String("HOSTNAME", ""),
@@ -233,6 +238,7 @@ func runMake(args []string) error {
 		Hostname:          *flHostname,
 		Secret:            *flEnrollSecret,
 		AppleSigningKey:   *flSigningKey,
+		ContainerTool:     *flContainerTool,
 		Transport:         *flTransport,
 		Insecure:          *flInsecure,
 		InsecureTransport: *flInsecureTransport,

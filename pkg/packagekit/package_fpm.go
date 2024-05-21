@@ -134,16 +134,16 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		fpmCommand = append(fpmCommand, "--before-remove", filepath.Join("/pkgscripts", "prerm"))
 	}
 
-	dockerArgs := []string{
+	args := []string{
 		"run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),
-		"-v", fmt.Sprintf("%s:/pkgscripts", po.Scripts),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
+		"-v", fmt.Sprintf("%s:/pkgsrc:Z", po.Root),
+		"-v", fmt.Sprintf("%s:/pkgscripts:Z", po.Scripts),
+		"-v", fmt.Sprintf("%s:/out:Z", outputPathDir),
 		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
-		"kolide/fpm:latest",
+		"docker.io/kolide/fpm:latest",
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
+	cmd := exec.CommandContext(ctx, po.ContainerTool, append(args, fpmCommand...)...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	stderr := new(bytes.Buffer)
 	stdout := new(bytes.Buffer)
