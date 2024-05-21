@@ -5,6 +5,7 @@
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:auth.kolide.com</string>
+        <string>applinks:sso.kolide.com</string>
     </array>
 </dict>
 </plist>
