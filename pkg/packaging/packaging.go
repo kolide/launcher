@@ -49,6 +49,7 @@ type PackageOptions struct {
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
+	BinRootDir        string
 	CacheDir          string
 	TufServerURL      string
 	MirrorURL         string
@@ -721,7 +722,7 @@ fi`
 func (p *PackageOptions) setupDirectories() error {
 	switch p.target.Platform {
 	case Linux, Darwin:
-		p.binDir = filepath.Join("/usr/local", p.Identifier, "bin")
+		p.binDir = filepath.Join(p.BinRootDir, p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
 		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
 	case Windows:
