@@ -169,7 +169,7 @@ func (ses *secureEnclaveSigner) MarshalJSON() ([]byte, error) {
 	for uid, pubKey := range ses.uidPubKeyMap {
 		pubKeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("converting public key to b64 der: %w", err)
+			return nil, fmt.Errorf("marshalling to PXIX public key: %w", err)
 		}
 
 		keyMap[uid] = base64.StdEncoding.EncodeToString(pubKeyBytes)
@@ -196,7 +196,7 @@ func (ses *secureEnclaveSigner) UnmarshalJSON(data []byte) error {
 
 		pubKey, err := x509.ParsePKIXPublicKey(decoded)
 		if err != nil {
-			return fmt.Errorf("parsing PXIXPublicKey: %w", err)
+			return fmt.Errorf("parsing PXIX public key: %w", err)
 		}
 
 		ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
