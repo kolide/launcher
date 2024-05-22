@@ -137,8 +137,13 @@ func (ses *secureEnclaveSigner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	cu, err := firstConsoleUser(ctx)
 	if err != nil {
+		ses.slogger.Log(ctx, slog.LevelDebug,
+			"getting first console user, expected when root launcher running without a logged in console user",
+			"err", err,
+		)
+
 		traces.SetError(span, fmt.Errorf("getting first console user: %w", err))
-		return nil, fmt.Errorf("getting first console user: %w", err)
+		return nil, nil
 	}
 
 	key, ok := ses.uidPubKeyMap[cu.Uid]
