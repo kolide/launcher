@@ -112,8 +112,18 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 		}
 
 		if hardwareKeyDer, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+			// on non-darwin we'll only have 1 key for the entire machine, but we want to keep format consistent with darwin
+			// so just return a map with 0 as the uid
+			jsonBytes, err := json.Marshal(map[string]string{
+				"0": base64.StdEncoding.EncodeToString(hardwareKeyDer),
+			})
+
+			if err != nil {
+				return nil, fmt.Errorf("marshalling hardware keys: %w", err)
+			}
+
 			// der is a binary format, so convert to b64
-			results[0]["hardware_key"] = base64.StdEncoding.EncodeToString(hardwareKeyDer)
+			results[0]["hardware_key"] = string(jsonBytes)
 			results[0]["hardware_key_source"] = agent.HardwareKeys().Type()
 		}
 
