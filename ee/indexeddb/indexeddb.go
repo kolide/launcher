@@ -36,9 +36,16 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	defer os.RemoveAll(tempDbCopyLocation)
 
 	opts := &opt.Options{
-		Comparer: newChromeComparer(),
+		Comparer:               newChromeComparer(),
+		DisableSeeksCompaction: true, // no need to perform compaction
+		Strict:                 opt.StrictAll,
 	}
 	db, err := leveldb.OpenFile(tempDbCopyLocation, opts)
+	if err != nil {
+		// Perform recover in case we missed something while copying
+		db, err = leveldb.RecoverFile(tempDbCopyLocation, opts)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("opening db: %w", err)
 	}
