@@ -7,6 +7,8 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -123,11 +125,6 @@ func (ses *secureEnclaveSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 	return nil, fmt.Errorf("not implemented")
 }
 
-type keyData struct {
-	Uid    string `json:"uid"`
-	PubKey string `json:"pub_key"`
-}
-
 func (ses *secureEnclaveSigner) currentConsoleUserKey(ctx context.Context) (*ecdsa.PublicKey, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
@@ -137,8 +134,13 @@ func (ses *secureEnclaveSigner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	cu, err := firstConsoleUser(ctx)
 	if err != nil {
+		ses.slogger.Log(ctx, slog.LevelDebug,
+			"getting first console user, expected when root launcher running without a logged in console user",
+			"err", err,
+		)
+
 		traces.SetError(span, fmt.Errorf("getting first console user: %w", err))
-		return nil, fmt.Errorf("getting first console user: %w", err)
+		return nil, nil
 	}
 
 	key, ok := ses.uidPubKeyMap[cu.Uid]
@@ -167,22 +169,18 @@ func (ses *secureEnclaveSigner) currentConsoleUserKey(ctx context.Context) (*ecd
 }
 
 func (ses *secureEnclaveSigner) MarshalJSON() ([]byte, error) {
-	var keyDatas []keyData
+	keyMap := make(map[string]string)
 
 	for uid, pubKey := range ses.uidPubKeyMap {
-		pubKeyBytes, err := echelper.PublicEcdsaToB64Der(pubKey)
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
 		if err != nil {
-			return nil, fmt.Errorf("converting public key to b64 der: %w", err)
+			return nil, fmt.Errorf("marshalling to PXIX public key: %w", err)
 		}
 
-		keyDatas = append(keyDatas, keyData{
-			Uid:    uid,
-			PubKey: string(pubKeyBytes),
-		})
-
+		keyMap[uid] = base64.StdEncoding.EncodeToString(pubKeyBytes)
 	}
 
-	return json.Marshal(keyDatas)
+	return json.Marshal(keyMap)
 }
 
 func (ses *secureEnclaveSigner) UnmarshalJSON(data []byte) error {
@@ -190,18 +188,28 @@ func (ses *secureEnclaveSigner) UnmarshalJSON(data []byte) error {
 		ses.uidPubKeyMap = make(map[string]*ecdsa.PublicKey)
 	}
 
-	var keyDatas []keyData
-	if err := json.Unmarshal(data, &keyDatas); err != nil {
+	var keyMap map[string]string
+	if err := json.Unmarshal(data, &keyMap); err != nil {
 		return fmt.Errorf("unmarshalling key data: %w", err)
 	}
 
-	for _, kd := range keyDatas {
-		pubKey, err := echelper.PublicB64DerToEcdsaKey([]byte(kd.PubKey))
+	for k, v := range keyMap {
+		decoded, err := base64.StdEncoding.DecodeString(v)
 		if err != nil {
-			return fmt.Errorf("converting public key to ecdsa: %w", err)
+			return fmt.Errorf("decoding base64: %w", err)
 		}
 
-		ses.uidPubKeyMap[kd.Uid] = pubKey
+		pubKey, err := x509.ParsePKIXPublicKey(decoded)
+		if err != nil {
+			return fmt.Errorf("parsing PXIX public key: %w", err)
+		}
+
+		ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("public key is not ecdsa")
+		}
+
+		ses.uidPubKeyMap[k] = ecdsaPubKey
 	}
 
 	return nil
