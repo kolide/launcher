@@ -2,7 +2,7 @@
 <dict>
     <key>keychain-access-groups</key>
 	<array>
-		<string>X98UFR7HA3.com.kolide.agent</string>
+		<string>X98UFR7HA3.com.kolide.agent.dev</string>
 	</array>
 </dict>
 </plist>
