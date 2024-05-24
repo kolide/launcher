@@ -64,6 +64,11 @@ func runMake(args []string) error {
 			env.String("PACKAGE_VERSION", ""),
 			"the resultant package version. If left blank, auto detection will be attempted",
 		)
+		flBinRootDir = flagset.String(
+			"bin_root_dir",
+			"/usr/local",
+			"the root directory path for the launcher on macOS and Linux",
+		)
 		flOsqueryVersion = flagset.String(
 			"osquery_version",
 			env.String("OSQUERY_VERSION", "stable"),
@@ -242,6 +247,7 @@ func runMake(args []string) error {
 		OmitSecret:        *flOmitSecret,
 		CertPins:          *flCertPins,
 		RootPEM:           *flRootPEM,
+		BinRootDir:        *flBinRootDir,
 		CacheDir:          cacheDir,
 		TufServerURL:      *flTufURL,
 		MirrorURL:         *flMirrorURL,
