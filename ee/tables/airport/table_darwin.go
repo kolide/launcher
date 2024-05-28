@@ -49,7 +49,7 @@ type airportExecutor struct {
 }
 
 func (a *airportExecutor) Exec(option string) ([]byte, error) {
-	return tablehelpers.Exec(a.ctx, a.slogger, 30, allowedcmd.Airport, []string{"--" + option}, false)
+	return tablehelpers.RunSimple(a.ctx, a.slogger, 30, allowedcmd.Airport, []string{"--" + option})
 }
 
 type executor interface {

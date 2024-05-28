@@ -35,7 +35,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.slogger, 5, allowedcmd.FalconKernelCheck, []string{}, false)
+	output, err := tablehelpers.RunSimple(ctx, t.slogger, 5, allowedcmd.FalconKernelCheck, []string{})
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"exec failed",

@@ -57,7 +57,7 @@ func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryC
 		query = []string{where}
 	}
 
-	out, err := tablehelpers.Exec(ctx, t.slogger, 120, allowedcmd.Mdfind, query, false)
+	out, err := tablehelpers.RunSimple(ctx, t.slogger, 120, allowedcmd.Mdfind, query)
 	if err != nil {
 		return nil, fmt.Errorf("call mdfind: %w", err)
 	}

@@ -4,6 +4,7 @@
 package nix_env_upgradeable
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -45,8 +46,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	for _, uid := range uids {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			// Nix takes a while to load, so leaving a minute timeout here to give enough time. More might be needed.
-			output, err := tablehelpers.Exec(ctx, t.slogger, 60, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}, true, tablehelpers.WithUid(uid))
-			if err != nil {
+
+			var output bytes.Buffer
+			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.NixEnv, []string{"--query", "--upgradeable", "-c", "--xml"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure querying user installed packages", "err", err, "target_uid", uid)
 				continue
 			}
@@ -56,7 +58,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
-			flattened, err := dataflatten.Xml(output, flattenOpts...)
+			flattened, err := dataflatten.Xml(output.Bytes(), flattenOpts...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
 				continue

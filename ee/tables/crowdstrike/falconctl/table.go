@@ -38,7 +38,7 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, bool, ...tablehelpers.ExecOps) ([]byte, error)
+type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, ...tablehelpers.ExecOps) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	slogger   *slog.Logger
@@ -54,7 +54,7 @@ func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
 	t := &falconctlOptionsTable{
 		slogger:   slogger.With("table", "kolide_falconctl_options"),
 		tableName: "kolide_falconctl_options",
-		execFunc:  tablehelpers.Exec,
+		execFunc:  tablehelpers.RunSimple,
 	}
 
 	return table.NewPlugin(t.tableName, columns, t.generate)
@@ -92,7 +92,7 @@ OUTER:
 		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
-		output, err := t.execFunc(ctx, t.slogger, 30, allowedcmd.Falconctl, args, false)
+		output, err := t.execFunc(ctx, t.slogger, 30, allowedcmd.Falconctl, args)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"exec failed",

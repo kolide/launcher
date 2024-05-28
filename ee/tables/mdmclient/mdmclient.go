@@ -91,7 +91,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-			mdmclientOutput, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand}, false)
+			mdmclientOutput, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Mdmclient, []string{mdmclientCommand})
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
 					"mdmclient failed",

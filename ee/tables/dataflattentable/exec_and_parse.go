@@ -1,7 +1,9 @@
 package dataflattentable
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -72,9 +74,14 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	defer span.End()
 
 	var results []map[string]string
+	var stdout bytes.Buffer
+	stdErr := io.Discard
 
-	execOutput, err := tablehelpers.Exec(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, t.includeStderr)
-	if err != nil {
+	if t.includeStderr {
+		stdErr = &stdout
+	}
+
+	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, stdErr); err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
@@ -96,7 +103,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 			flattenOpts = append(flattenOpts, dataflatten.WithDebugLogging())
 		}
 
-		flattened, err := t.flattener.FlattenBytes(execOutput, flattenOpts...)
+		flattened, err := t.flattener.FlattenBytes(stdout.Bytes(), flattenOpts...)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"failure flattening output",

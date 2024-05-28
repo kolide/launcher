@@ -14,10 +14,10 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -91,14 +91,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-
-	cmd, err := allowedcmd.Firmwarepasswd(ctx, subcommand)
-	if err != nil {
-		return fmt.Errorf("creating command: %w", err)
-	}
-
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)
@@ -109,14 +101,9 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 		return fmt.Errorf("chmod: %w", err)
 	}
 
-	cmd.Dir = dir
-
 	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
 
-	cmd.Stdout = output
-
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, 1, allowedcmd.Firmwarepasswd, []string{subcommand}, output, stderr, tablehelpers.WithDir(dir)); err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"error running firmwarepasswd",
 			"stderr", strings.TrimSpace(stderr.String()),

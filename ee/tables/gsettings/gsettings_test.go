@@ -6,6 +6,7 @@ package gsettings
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +50,7 @@ func TestGsettingsValues(t *testing.T) {
 		tt := tt
 		table := GsettingsValues{
 			slogger: multislogger.NewNopLogger(),
-			getBytes: func(ctx context.Context, username string, buf *bytes.Buffer) error {
+			getBytes: func(ctx context.Context, slogger *slog.Logger, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
 				_, err = buf.ReadFrom(f)
