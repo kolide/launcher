@@ -43,17 +43,6 @@ func WithOsqueryExtensionPlugins(plugins ...osquery.OsqueryPlugin) OsqueryInstan
 	}
 }
 
-// WithOsquerydBinary is a functional option which allows the user to define the
-// path of the osqueryd binary which will be launched. This should only be called
-// once as only one binary will be executed. Defining the path to the osqueryd
-// binary is optional. If it is not explicitly defined by the caller, an osqueryd
-// binary will be looked for in the current $PATH.
-func WithOsquerydBinary(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.binaryPath = path
-	}
-}
-
 // WithRootDirectory is a functional option which allows the user to define the
 // path where filesystem artifacts will be stored. This may include pidfiles,
 // RocksDB database files, etc. If this is not defined, a temporary directory
@@ -305,7 +294,6 @@ type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc        func(dir string) error
-	binaryPath            string
 	configPluginFlag      string
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin

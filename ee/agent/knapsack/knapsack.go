@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
@@ -149,7 +148,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.PinnedOsquerydVersion(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
-		return autoupdate.FindNewest(ctx, k.OsquerydPath())
+		return k.OsquerydPath()
 	}
 
 	return latestBin.Path
