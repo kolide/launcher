@@ -332,7 +332,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		osqueryruntime.WithKnapsack(k),
-		osqueryruntime.WithOsquerydBinary(k.OsquerydPath()),
 		osqueryruntime.WithRootDirectory(k.RootDirectory()),
 		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
 		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
