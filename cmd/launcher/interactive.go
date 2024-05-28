@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
@@ -50,8 +49,8 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 			if opts.OsquerydPath == "" {
 				return errors.New("could not find osqueryd binary")
 			}
-			// Fall back to old autoupdate library
-			opts.OsquerydPath = autoupdate.FindNewest(context.Background(), opts.OsquerydPath)
+
+			return fmt.Errorf("finding osqueryd binary: %w", err)
 		} else {
 			opts.OsquerydPath = latestOsquerydBinary.Path
 		}

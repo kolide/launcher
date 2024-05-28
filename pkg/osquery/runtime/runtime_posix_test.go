@@ -50,13 +50,12 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	k.On("Slogger").Return(slogger.Logger)
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithSlogger(slogger.Logger),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
@@ -95,7 +94,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(
@@ -103,7 +102,6 @@ func TestExtensionSocketPath(t *testing.T) {
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
 	go runner.Run()
 

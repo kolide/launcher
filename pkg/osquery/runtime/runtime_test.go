@@ -312,13 +312,12 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return("")
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary("/foobar"),
 	)
 	assert.Error(t, runner.Run())
 
@@ -336,13 +335,12 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
 	)
 	go runner.Run()
@@ -369,14 +367,13 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	// Start the runner
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 		WithOsqueryFlags([]string{"verbose=false"}),
 	)
 	go runner.Run()
@@ -463,13 +460,12 @@ func TestSimplePath(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
 	go runner.Run()
 
@@ -492,13 +488,12 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
 	go runner.Run()
 
@@ -520,13 +515,12 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner := New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
 	go runner.Run()
 	require.NoError(t, err)
@@ -615,13 +609,12 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 
 	runner = New(
 		k,
 		WithKnapsack(k),
 		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
 	)
 	go runner.Run()
 	waitHealthy(t, runner)

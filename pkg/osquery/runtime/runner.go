@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -15,8 +13,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 
-	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -217,23 +213,6 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	o := r.instance
 
-	// What binary name to look for
-	lookFor := "osqueryd"
-	if runtime.GOOS == "windows" {
-		lookFor = lookFor + ".exe"
-	}
-
-	// If the path of the osqueryd binary wasn't explicitly defined by the caller,
-	// try to find it in the path.
-	if o.opts.binaryPath == "" {
-		path, err := exec.LookPath(lookFor)
-		if err != nil {
-			traces.SetError(span, fmt.Errorf("osqueryd not supplied and not found: %w", err))
-			return fmt.Errorf("osqueryd not supplied and not found: %w", err)
-		}
-		o.opts.binaryPath = path
-	}
-
 	// If the caller did not define the directory which all of the osquery file
 	// artifacts should be stored in, use a temporary directory.
 	if o.opts.rootDirectory == "" {
@@ -302,33 +281,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		o.opts.distributedPluginFlag = "internal_noop"
 	}
 
-	// If we're on windows, ensure that we're looking for the .exe
-	if runtime.GOOS == "windows" && !strings.HasSuffix(o.opts.binaryPath, ".exe") {
-		o.opts.binaryPath = o.opts.binaryPath + ".exe"
-	}
-
-	// before we start osqueryd, check with the update system to
-	// see if we have the newest version. Do this every time. If
-	// this proves undesirable, we can expose a function to set
-	// o.opts.binaryPath in the finalizer to call.
-	//
-	// FindNewest uses context as a way to get a logger, so we need to
-	// create and pass a ctxlog in.
-	var currentOsquerydBinaryPath string
-	currentOsquerydBinary, err := tuf.CheckOutLatest(ctx, "osqueryd", o.opts.rootDirectory, o.opts.updateDirectory, o.knapsack.PinnedOsquerydVersion(), o.opts.updateChannel, r.slogger)
-	if err != nil {
-		r.slogger.Log(ctx, slog.LevelDebug,
-			"could not get latest version of osqueryd from new autoupdate library, falling back",
-			"err", err,
-		)
-		currentOsquerydBinaryPath = autoupdate.FindNewest(
-			ctx,
-			o.opts.binaryPath,
-			autoupdate.DeleteOldUpdates(),
-		)
-	} else {
-		currentOsquerydBinaryPath = currentOsquerydBinary.Path
-	}
+	// The knapsack will retrieve the correct version of osqueryd from the download library if available.
+	// If not available, it will fall back to the configured installed version of osqueryd.
+	currentOsquerydBinaryPath := o.knapsack.LatestOsquerydPath(ctx)
 	span.AddEvent("got_osqueryd_binary_path", trace.WithAttributes(attribute.String("path", currentOsquerydBinaryPath)))
 
 	// Now that we have accepted options from the caller and/or determined what
