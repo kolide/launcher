@@ -454,6 +454,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", true, fmt.Errorf("device disabled, should have uninstalled: %w", err)
 
 	case isNodeInvalidErr(err):
 		invalid = true
@@ -565,6 +569,10 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", fmt.Errorf("device disabled, should have uninstalled: %w", err)
 
 	case isNodeInvalidErr(err):
 		invalid = true
@@ -809,6 +817,10 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
 		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
 	}
 
 	invalid = invalid || isNodeInvalidErr(err)
@@ -923,6 +935,10 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return nil, fmt.Errorf("device disabled, should have uninstalled: %w", err)
 
 	case isNodeInvalidErr(err):
 		invalid = true
@@ -976,6 +992,10 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
 
 	case isNodeInvalidErr(err):
 		invalid = true
