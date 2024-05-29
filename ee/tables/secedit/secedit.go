@@ -4,6 +4,7 @@
 package secedit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -108,8 +109,9 @@ func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, err
 		args = append(args, "/mergedpolicy")
 	}
 
-	if out, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Secedit, args, true); err != nil {
-		return nil, fmt.Errorf("calling secedit. Got: %s: %w", string(out), err)
+	var out bytes.Buffer
+	if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Secedit, args, &out, &out); err != nil {
+		return nil, fmt.Errorf("calling secedit. Got: %s: %w", out.String(), err)
 	}
 
 	file, err := os.Open(dst)

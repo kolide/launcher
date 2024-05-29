@@ -9,14 +9,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -219,21 +220,9 @@ func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir str
 
 // execGsettingsCommand should be called with a tmpdir that will be cleaned up.
 func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
 	command := args[0]
-	cmd, err := allowedcmd.Gsettings(ctx, args...)
-	if err != nil {
-		return fmt.Errorf("creating gsettings command: %w", err)
-	}
-
-	cmd.Dir = tmpdir
-	cmd.Stderr = new(bytes.Buffer)
-	cmd.Stdout = output
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("running gsettings %s: %w", command, err)
+	if err := tablehelpers.Run(ctx, multislogger.NewNopLogger(), 3, allowedcmd.Gsettings, args, output, io.Discard, tablehelpers.WithDir(tmpdir)); err != nil {
+		return fmt.Errorf("execing gsettings: %s: %w", command, err)
 	}
 
 	return nil

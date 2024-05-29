@@ -13,10 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"strconv"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -26,7 +23,7 @@ import (
 
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
 
-type gsettingsExecer func(ctx context.Context, username string, buf *bytes.Buffer) error
+type gsettingsExecer func(ctx context.Context, slogger *slog.Logger, username string, buf *bytes.Buffer) error
 
 type GsettingsValues struct {
 	slogger  *slog.Logger
@@ -61,7 +58,7 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 	for _, username := range users {
 		var output bytes.Buffer
 
-		err := t.getBytes(ctx, username, &output)
+		err := t.getBytes(ctx, t.slogger, username, &output)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"error getting bytes for user",
@@ -80,44 +77,10 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 
 // execGsettings writes the output of running 'gsettings' command into the
 // supplied bytes buffer
-func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
+func execGsettings(ctx context.Context, slogger *slog.Logger, username string, buf *bytes.Buffer) error {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
-	}
-
-	cmd, err := allowedcmd.Gsettings(ctx, "list-recursively")
-	if err != nil {
-		return fmt.Errorf("creating gsettings command: %w", err)
-	}
-
-	// set the HOME for the the cmd so that gsettings is exec'd properly as the
-	// new user.
-	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
-
-	// Check if the supplied UID is that of the current user
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("checking current user uid: %w", err)
-	}
-
-	if u.Uid != currentUser.Uid {
-		uid, err := strconv.ParseInt(u.Uid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting uid from string to int: %w", err)
-		}
-		gid, err := strconv.ParseInt(u.Gid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting gid from string to int: %w", err)
-		}
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{
-			Uid: uint32(uid),
-			Gid: uint32(gid),
-		}
 	}
 
 	dir, err := agent.MkdirTemp("osq-gsettings")
@@ -132,14 +95,15 @@ func execGsettings(ctx context.Context, username string, buf *bytes.Buffer) erro
 		return fmt.Errorf("chmod: %w", err)
 	}
 
-	cmd.Dir = dir
+	var stderr bytes.Buffer
 
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	cmd.Stdout = buf
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("running gsettings, err is: %s: %w", stderr.String(), err)
+	if err := tablehelpers.Run(ctx, slogger, 2,
+		allowedcmd.Gsettings, []string{"list-recursively"}, buf, &stderr,
+		tablehelpers.WithUid(u.Uid),
+		tablehelpers.WithAppendEnv("HOME", u.HomeDir),
+		tablehelpers.WithDir(dir),
+	); err != nil {
+		return fmt.Errorf("creating gsettings command: %w", err)
 	}
 
 	return nil

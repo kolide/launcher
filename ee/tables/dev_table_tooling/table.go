@@ -67,7 +67,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			"error":  "",
 		}
 
-		if output, err := tablehelpers.Exec(ctx, t.slogger, 30, cmd.bin, cmd.args, false); err != nil {
+		if output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, cmd.bin, cmd.args); err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"execution failed",
 				"name", name,

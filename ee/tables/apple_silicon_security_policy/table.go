@@ -37,7 +37,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	output, err := tablehelpers.Exec(ctx, t.slogger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs}, false)
+	output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs})
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"bputil failed",

@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -82,25 +81,14 @@ func (t *Table) execDism(ctx context.Context) ([]byte, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	args := []string{"/online", "/Export-DefaultAppAssociations:" + dstFile}
-
-	cmd, err := allowedcmd.Dism(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
-	cmd.Dir = dir
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 
 	t.slogger.Log(ctx, slog.LevelDebug,
 		"calling dsim",
-		"args", cmd.Args,
+		"args", args,
 	)
 
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Dism, args, &stdout, &stderr, tablehelpers.WithDir(dir)); err != nil {
 		return nil, fmt.Errorf("calling dism. Got: %s: %w", stderr.String(), err)
 	}
 

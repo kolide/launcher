@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -70,11 +71,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
-		// MS requires interfaces to complete network scans in <4 seconds, but
-		// that appears not to be consistent
-		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
-		defer cancel()
-
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe
@@ -90,16 +86,9 @@ func execPwsh(slogger *slog.Logger) execer {
 		}
 
 		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
-		cmd, err := allowedcmd.Powershell(ctx, args...)
-		if err != nil {
-			return fmt.Errorf("creating powershell command: %w", err)
-		}
-		cmd.Dir = dir
 		var stderr bytes.Buffer
-		cmd.Stdout = buf
-		cmd.Stderr = &stderr
 
-		err = cmd.Run()
+		err = tablehelpers.Run(ctx, slogger, 45, allowedcmd.Powershell, args, buf, &stderr, tablehelpers.WithDir(dir))
 		errOutput := stderr.String()
 		// sometimes the powershell script logs errors to stderr, but returns a
 		// successful execution code.
