@@ -5,7 +5,8 @@ import (
 )
 
 // chromeComparer is a thin wrapper around the default comparer to allow us
-// to use it as `idb_cmp1`.
+// to use it as `idb_cmp1`, which is the comparer used in Chromium's IndexedDB
+// implementation.
 type chromeComparer struct {
 	defaultComparer comparer.Comparer
 }

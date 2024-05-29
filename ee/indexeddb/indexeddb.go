@@ -15,12 +15,14 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 )
 
-// maxObjectStoresToCheck is the number of indices for object stores we will check
+// maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
 // before declaring failure to find the given object store. We cannot look up
 // object stores by their names, only by their IDs -- so we have to iterate through
-// up to maxObjectStoresToCheck IDs to find the desired store. We assume there are
-// fewer than 100 object stores in a given database.
-const maxObjectStoresToCheck = 100
+// up to maxNumberOfObjectStoresToCheck IDs to find the desired store. We assume there are
+// fewer than 100 object stores in a given database. (We may need to adjust this
+// number upward after further research, but for now this seems like a safe upper
+// bounds.)
+const maxNumberOfObjectStoresToCheck = 100
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
@@ -33,6 +35,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		}
 		return nil, fmt.Errorf("unable to copy db: %w", err)
 	}
+	// The copy was successful -- make sure we clean it up after we're done
 	defer os.RemoveAll(tempDbCopyLocation)
 
 	opts := &opt.Options{
@@ -65,8 +68,9 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	// We can't query for the object store ID by its name -- we have to query each ID to get its name,
 	// and check against that. Object store indices start at 1.
 	var objectStoreId uint64
-	for i := 1; i < maxObjectStoresToCheck; i++ {
-		objectStoreNameRaw, err := db.Get(objectStoreNameKey(databaseId, uint64(i)), nil)
+	var i uint64
+	for i = 1; i <= maxNumberOfObjectStoresToCheck; i++ {
+		objectStoreNameRaw, err := db.Get(objectStoreNameKey(databaseId, i), nil)
 		if err != nil {
 			continue
 		}
