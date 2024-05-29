@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/desktop/user/universallink"
 	"github.com/kolide/launcher/pkg/authedclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -134,7 +135,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		return err
 	}
 
-	m := menu.New(slogger, *flhostname, *flmenupath)
+	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
+	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
+
+	// Pass through channel so that systray can alert the link handler when it receives a universal link request
+	m := menu.New(slogger, *flhostname, *flmenupath, urlInput)
 	refreshMenu := func() {
 		m.Build()
 	}
