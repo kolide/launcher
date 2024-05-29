@@ -285,16 +285,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
-	slogger.Log(ctx, slog.LevelDebug, // TODO REMOVEME
-		"checking LauncherKolideRestartSvc enabled",
-		"knapsack_enabled", k.LauncherWatchdogEnabled(),
-		"opts_enabled", opts.LauncherWatchdogEnabled,
-	)
-
-	if opts.LauncherWatchdogEnabled { // TODO REMOVEME
-		k.SetLauncherWatchdogEnabled(true)
-	}
-
 	watchdogController, err := watchdog.NewController(ctx, k)
 	if err != nil { // log any issues here but move on, watchdog is not critical path
 		slogger.Log(ctx, slog.LevelError,
