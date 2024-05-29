@@ -82,7 +82,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 			continue
 		}
 		if string(foundObjectStoreName) == objectStoreName {
-			objectStoreId = uint64(i)
+			objectStoreId = i
 			break
 		}
 	}
