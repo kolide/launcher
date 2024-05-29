@@ -26,7 +26,7 @@ import (
 )
 
 // Special Kolide Ports
-var portList = []int{
+var PortList = []int{
 	12519,
 	40978,
 	52115,
@@ -324,7 +324,7 @@ func (ls *localServer) Interrupt(_ error) {
 func (ls *localServer) startListener() (net.Listener, error) {
 	ctx := context.TODO()
 
-	for _, p := range portList {
+	for _, p := range PortList {
 		ls.slogger.Log(ctx, slog.LevelDebug,
 			"trying port",
 			"port", p,
