@@ -7,11 +7,20 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/localserver"
 )
 
-const universalLinkPrefix = "/launcher/applinks"
+const (
+	universalLinkPrefix = "/launcher/applinks/"
+	requestTimeout      = 40 * time.Second
+)
 
 type universalLinkHandler struct {
 	urlInput    chan string
@@ -63,8 +72,8 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 	close(u.urlInput)
 }
 
-// handleUniversalLinkRequest receives requests and logs them. In the future,
-// it will validate them and forward them to launcher root.
+// handleUniversalLinkRequest receives requests, validates them, and forwards them
+// to launcher root's localserver.
 func (u *universalLinkHandler) handleUniversalLinkRequest(requestUrl string) error {
 	// Parsing the URL also validates that we got a reasonable URL
 	parsedUrl, err := url.Parse(requestUrl)
@@ -72,18 +81,66 @@ func (u *universalLinkHandler) handleUniversalLinkRequest(requestUrl string) err
 		return fmt.Errorf("parsing universal link request URL: %w", err)
 	}
 
-	origin := parsedUrl.Host
+	origin := fmt.Sprintf("%s://%s", parsedUrl.Scheme, parsedUrl.Host)
 	requestPath := strings.TrimPrefix(parsedUrl.Path, universalLinkPrefix)
 	requestQuery := parsedUrl.RawQuery
 
-	u.slogger.Log(context.TODO(), slog.LevelInfo,
-		"received universal link request",
-		"origin", origin,
-		"request_path", requestPath,
-		"request_query", requestQuery,
-	)
+	// Forward the request to each potential launcher root port, in parallel
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	for _, p := range localserver.PortList {
+		p := p
+		wg.Add(1)
 
-	// TODO: forward the request to launcher root
+		gowrapper.Go(ctx, u.slogger, func() {
+			defer wg.Done()
+			if err := forwardRequest(ctx, p, requestPath, requestQuery, origin); err != nil {
+				if strings.Contains(err.Error(), "connection refused") {
+					// Launcher not running on that port -- no need to log the error
+					return
+				}
+				u.slogger.Log(ctx, slog.LevelWarn,
+					"could not make universal link request",
+					"port", p,
+					"err", err,
+				)
+				return
+			}
+
+			// Success!
+			u.slogger.Log(ctx, slog.LevelDebug,
+				"successfully forwarded universal link request",
+				"port", p,
+			)
+		},
+			func(r any) {}, // no special behavior needed after recovering from panic
+		)
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func forwardRequest(ctx context.Context, port int, requestPath string, requestQuery string, requestOrigin string) error {
+	// Construct forwarded request, using URL as origin
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/%s?%s", port, requestPath, requestQuery), nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Origin", requestOrigin)
+
+	// Forward request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("forwarding request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 
 	return nil
 }
