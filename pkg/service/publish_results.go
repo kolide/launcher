@@ -20,6 +20,7 @@ type resultCollection struct {
 }
 
 type publishResultsResponse struct {
+	jsonRpcResponse
 	Message     string `json:"message"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -117,6 +118,9 @@ func encodeGRPCResultCollection(_ context.Context, request interface{}) (interfa
 func decodeGRPCPublishResultsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.AgentApiResponse)
 	return publishResultsResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Message:     req.Message,
 		ErrorCode:   req.ErrorCode,
 		NodeInvalid: req.NodeInvalid,
@@ -126,9 +130,10 @@ func decodeGRPCPublishResultsResponse(_ context.Context, grpcReq interface{}) (i
 func encodeGRPCPublishResultsResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(publishResultsResponse)
 	resp := &pb.AgentApiResponse{
-		Message:     req.Message,
-		ErrorCode:   req.ErrorCode,
-		NodeInvalid: req.NodeInvalid,
+		Message:       req.Message,
+		ErrorCode:     req.ErrorCode,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -170,6 +175,11 @@ func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results [
 		return "", "", false, err
 	}
 	resp := response.(publishResultsResponse)
+
+	if resp.DisableDevice {
+		return "", "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 

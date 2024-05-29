@@ -20,6 +20,7 @@ type queriesRequest struct {
 }
 
 type queryCollectionResponse struct {
+	jsonRpcResponse
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -75,6 +76,9 @@ func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interfac
 		queries.Queries[query.Id] = query.Query
 	}
 	return queryCollectionResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Queries:     queries,
 		NodeInvalid: req.NodeInvalid,
 	}, nil
@@ -92,8 +96,9 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 		)
 	}
 	resp := &pb.QueryCollection{
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
+		Queries:       queries,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -143,6 +148,11 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 		return nil, false, err
 	}
 	resp := response.(queryCollectionResponse)
+
+	if resp.DisableDevice {
+		return nil, false, ErrDeviceDisabled{}
+	}
+
 	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 
