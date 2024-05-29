@@ -24,6 +24,9 @@ import (
 // bounds.)
 const maxNumberOfObjectStoresToCheck = 100
 
+// indexeddbComparer can be used when opening any IndexedDB instance.
+var indexeddbComparer = newChromeComparer()
+
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
 func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
@@ -39,7 +42,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	defer os.RemoveAll(tempDbCopyLocation)
 
 	opts := &opt.Options{
-		Comparer:               newChromeComparer(),
+		Comparer:               indexeddbComparer,
 		DisableSeeksCompaction: true, // no need to perform compaction
 		Strict:                 opt.StrictAll,
 	}
