@@ -41,6 +41,7 @@ type EnrollmentDetails struct {
 }
 
 type enrollmentResponse struct {
+	jsonRpcResponse
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -138,6 +139,9 @@ func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interf
 func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.EnrollmentResponse)
 	return enrollmentResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		NodeKey:     req.NodeKey,
 		NodeInvalid: req.NodeInvalid,
 	}, nil
@@ -146,8 +150,9 @@ func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (inter
 func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(enrollmentResponse)
 	resp := &pb.EnrollmentResponse{
-		NodeKey:     req.NodeKey,
-		NodeInvalid: req.NodeInvalid,
+		NodeKey:       req.NodeKey,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -177,10 +182,16 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier, EnrollmentDetails: details}
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
+
 	if err != nil {
 		return "", false, err
 	}
 	resp := response.(enrollmentResponse)
+
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.NodeKey, resp.NodeInvalid, resp.Err
 }
 

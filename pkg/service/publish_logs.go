@@ -28,6 +28,7 @@ type logCollection struct {
 }
 
 type publishLogsResponse struct {
+	jsonRpcResponse
 	Message     string `json:"message"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -101,6 +102,9 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.AgentApiResponse)
 	return publishLogsResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Message:     req.Message,
 		ErrorCode:   req.ErrorCode,
 		NodeInvalid: req.NodeInvalid,
@@ -110,9 +114,10 @@ func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (inte
 func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(publishLogsResponse)
 	resp := &pb.AgentApiResponse{
-		Message:     req.Message,
-		ErrorCode:   req.ErrorCode,
-		NodeInvalid: req.NodeInvalid,
+		Message:       req.Message,
+		ErrorCode:     req.ErrorCode,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -163,6 +168,11 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 		return "", "", false, err
 	}
 	resp := response.(publishLogsResponse)
+
+	if resp.DisableDevice {
+		return "", "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 

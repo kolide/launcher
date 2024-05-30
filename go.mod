@@ -50,7 +50,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
-	github.com/kolide/systray v1.10.4
+	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
 	github.com/spf13/pflag v1.0.5
@@ -117,7 +117,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

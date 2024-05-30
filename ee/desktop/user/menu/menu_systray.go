@@ -21,7 +21,7 @@ var (
 func (m *menu) Init() {
 	// Build will be invoked after the menu has been initialized
 	// Before the menu exits, cleanup the goroutines
-	systray.Run(m.Build, m.cleanup, m.onAppearanceChanged)
+	systray.Run(m.Build, m.cleanup, m.onAppearanceChanged, m.urlInput)
 }
 
 // onAppearanceChanged is called by systray when the menu bar's effective appearance changes between dark and light
