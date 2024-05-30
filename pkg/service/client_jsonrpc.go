@@ -36,6 +36,16 @@ func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Contex
 	return ctx
 }
 
+type ErrDeviceDisabled struct{}
+
+func (e ErrDeviceDisabled) Error() string {
+	return "device disabled"
+}
+
+type jsonRpcResponse struct {
+	DisableDevice bool `json:"disable_device"`
+}
+
 // New creates a new Kolide Client (implementation of the KolideService
 // interface) using a JSONRPC client connection.
 func NewJSONRPCClient(
