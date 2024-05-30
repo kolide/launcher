@@ -19,9 +19,11 @@ import (
 
 const (
 	universalLinkPrefix = "/launcher/applinks/"
-	requestTimeout      = 40 * time.Second
+	requestTimeout      = 40 * time.Second // localserver timeout plus a little extra buffer
 )
 
+// universalLinkHandler receives URLs from our AppDelegate in systray and forwards those requests
+// to root launcher's localserver.
 type universalLinkHandler struct {
 	urlInput    chan string
 	slogger     *slog.Logger
