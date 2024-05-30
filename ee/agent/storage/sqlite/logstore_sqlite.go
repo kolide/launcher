@@ -101,20 +101,3 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 
 	return nil
 }
-
-func (s *sqliteStore) Count() (int, error) {
-	if s == nil || s.conn == nil {
-		return 0, errors.New("store is nil")
-	}
-
-	// It's fine to interpolate the table name into the query because
-	// we require the table name to be in our allowlist `supportedTables`
-	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s;`, s.tableName)
-
-	var countValue int
-	if err := s.conn.QueryRow(query).Scan(&countValue); err != nil {
-		return 0, fmt.Errorf("querying for %s table count: %w", s.tableName, err)
-	}
-
-	return countValue, nil
-}

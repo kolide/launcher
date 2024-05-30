@@ -20,16 +20,15 @@ type TimestampedAppender interface {
 	AppendValue(timestamp int64, value []byte) error
 }
 
-// TimestampedIteratorDeleterAppenderCounterCloser is an interface to support the storage and retrieval of
+// TimestampedIteratorDeleterAppenderCloser is an interface to support the storage and retrieval of
 // sets of timestamped values. This can be used where a strict key/value interface may not suffice,
 // e.g. for writing logs or historical records to sqlite
-type TimestampedIteratorDeleterAppenderCounterCloser interface {
+type TimestampedIteratorDeleterAppenderCloser interface {
 	TimestampedIterator
 	TimestampedAppender
-	Counter
 	RowDeleter
 	Closer
 }
 
 // LogStore is a convenient alias for a store that supports all methods required to manipulate sqlite logs
-type LogStore = TimestampedIteratorDeleterAppenderCounterCloser
+type LogStore = TimestampedIteratorDeleterAppenderCloser

@@ -134,9 +134,6 @@ type Options struct {
 
 	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
 	LocalDevelopmentPath string
-
-	// LauncherWatchdogEnabled determines whether the launcher watchdog service should be installed and run
-	LauncherWatchdogEnabled bool
 }
 
 // ConfigFilePath returns the path to launcher's launcher.flags file. If the path
@@ -249,15 +246,14 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flUpdateDirectory        = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
 
 		// Development & Debugging options
-		flDebug                   = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
-		flOsqueryVerbose          = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
-		flDeveloperUsage          = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options (default: false)")
-		flInsecureTransport       = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
-		flInsecureTLS             = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
-		flIAmBreakingEELicense    = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
-		flDelayStart              = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
-		flLocalDevelopmentPath    = flagset.String("localdev_path", "", "Path to local launcher build")
-		flLauncherWatchdogEnabled = flagset.Bool("launcher_watchdog_enabled", false, "Whether or not the launcher watchdog service is enabled (default: false)")
+		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
+		flOsqueryVerbose       = flagset.Bool("osquery_verbose", false, "Enable verbose osqueryd (default: false)")
+		flDeveloperUsage       = flagset.Bool("dev_help", false, "Print full Launcher help, including developer options (default: false)")
+		flInsecureTransport    = flagset.Bool("insecure_transport", false, "Do not use TLS for transport layer (default: false)")
+		flInsecureTLS          = flagset.Bool("insecure", false, "Do not verify TLS certs for outgoing connections (default: false)")
+		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
+		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
+		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -429,7 +425,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		WatchdogDelaySec:                   *flWatchdogDelaySec,
 		WatchdogMemoryLimitMB:              *flWatchdogMemoryLimitMB,
 		WatchdogUtilizationLimitPercent:    *flWatchdogUtilizationLimitPercent,
-		LauncherWatchdogEnabled:            *flLauncherWatchdogEnabled,
 	}
 
 	return opts, nil

@@ -28,7 +28,7 @@ const (
 	notFoundInRegistryError = "The system cannot find the file specified."
 )
 
-func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
+func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	// If this isn't a Kolide installation, do not update the configuration
 	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
 		return
@@ -37,7 +37,7 @@ func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	// Get launcher service key
 	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceRegistryKeyName, registry.ALL_ACCESS)
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelError,
 			"could not open registry key",
 			"key_name", launcherServiceRegistryKeyName,
 			"err", err,
@@ -49,7 +49,7 @@ func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	// Close it once we're done
 	defer func() {
 		if err := launcherServiceKey.Close(); err != nil {
-			slogger.Log(context.TODO(), slog.LevelError,
+			logger.Log(context.TODO(), slog.LevelError,
 				"could not close registry key",
 				"key_name", launcherServiceRegistryKeyName,
 				"err", err,
@@ -58,29 +58,17 @@ func checkServiceConfiguration(slogger *slog.Logger, opts *launcher.Options) {
 	}()
 
 	// Check to see if we need to turn off delayed autostart
-	checkDelayedAutostart(launcherServiceKey, slogger)
+	checkDelayedAutostart(launcherServiceKey, logger)
 
 	// Check to see if we need to update the service to depend on Dnscache
-	checkDependOnService(launcherServiceKey, slogger)
+	checkDependOnService(launcherServiceKey, logger)
 
-	sman, err := mgr.Connect()
-	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"connecting to service control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer sman.Disconnect()
-
-	checkRestartActions(sman, slogger)
+	checkRestartActions(logger)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
 // before starting the launcher service) and updates it if necessary.
-func checkDelayedAutostart(launcherServiceKey registry.Key, slogger *slog.Logger) {
+func checkDelayedAutostart(launcherServiceKey registry.Key, logger *slog.Logger) {
 	currentDelayedAutostart, _, getDelayedAutostartErr := launcherServiceKey.GetIntegerValue(delayedAutostartName)
 
 	// Can't determine current value, don't update
@@ -95,7 +83,7 @@ func checkDelayedAutostart(launcherServiceKey registry.Key, slogger *slog.Logger
 
 	// Turn off delayed autostart
 	if err := launcherServiceKey.SetDWordValue(delayedAutostartName, delayedAutostartDisabled); err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelError,
 			"could not turn off DelayedAutostart",
 			"err", err,
 		)
@@ -104,14 +92,14 @@ func checkDelayedAutostart(launcherServiceKey registry.Key, slogger *slog.Logger
 
 // checkDependOnService checks the current value of `DependOnService` (the list of services that must
 // start before launcher can) and updates it if necessary.
-func checkDependOnService(launcherServiceKey registry.Key, slogger *slog.Logger) {
+func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) {
 	serviceList, _, getServiceListErr := launcherServiceKey.GetStringsValue(dependOnServiceName)
 
 	if getServiceListErr != nil {
 		if getServiceListErr.Error() == notFoundInRegistryError {
 			// `DependOnService` does not exist for this service yet -- we can safely set it to include the Dnscache service.
 			if err := launcherServiceKey.SetStringsValue(dependOnServiceName, []string{dnscacheService}); err != nil {
-				slogger.Log(context.TODO(), slog.LevelError,
+				logger.Log(context.TODO(), slog.LevelError,
 					"could not set strings value for DependOnService",
 					"err", err,
 				)
@@ -135,7 +123,7 @@ func checkDependOnService(launcherServiceKey registry.Key, slogger *slog.Logger)
 	// Set service to depend on Dnscache
 	serviceList = append(serviceList, dnscacheService)
 	if err := launcherServiceKey.SetStringsValue(dependOnServiceName, serviceList); err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelError,
 			"could not set strings value for DependOnService",
 			"err", err,
 		)
@@ -146,12 +134,23 @@ func checkDependOnService(launcherServiceKey registry.Key, slogger *slog.Logger)
 // sets it to true if required. See https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_failure_actions_flag
 // if we choose to implement restart backoff, that logic must be added here (it is not exposed via wix). See the "Windows Service Manager"
 // doc in Notion for additional details on configurability
-func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
-	logCtx := context.TODO()
-	launcherService, err := serviceManager.OpenService(launcherServiceName)
+func checkRestartActions(logger *slog.Logger) {
+	sman, err := mgr.Connect()
 	if err != nil {
-		slogger.Log(logCtx, slog.LevelError,
-			"opening the launcher restart service from control manager",
+		logger.Log(context.TODO(), slog.LevelError,
+			"connecting to service control manager",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer sman.Disconnect()
+
+	launcherService, err := sman.OpenService(launcherServiceName)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"opening the launcher service from control manager",
 			"err", err,
 		)
 
@@ -162,7 +161,7 @@ func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 
 	curFlag, err := launcherService.RecoveryActionsOnNonCrashFailures()
 	if err != nil {
-		slogger.Log(logCtx, slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelError,
 			"querying for current RecoveryActionsOnNonCrashFailures flag",
 			"err", err,
 		)
@@ -175,7 +174,7 @@ func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 	}
 
 	if err = launcherService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
-		slogger.Log(logCtx, slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelError,
 			"setting RecoveryActionsOnNonCrashFailures flag",
 			"err", err,
 		)
@@ -183,5 +182,5 @@ func checkRestartActions(serviceManager *mgr.Mgr, slogger *slog.Logger) {
 		return
 	}
 
-	slogger.Log(logCtx, slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
+	logger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
 }
