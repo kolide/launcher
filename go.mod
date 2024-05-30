@@ -49,7 +49,7 @@ require (
 	github.com/apache/thrift v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/kolide/systray v1.10.4
+	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
 	github.com/spf13/pflag v1.0.5
