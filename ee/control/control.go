@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"golang.org/x/exp/slices"
@@ -103,7 +104,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"err", fetchErr,
 			)
 		case !startUpMessageSuccess:
-			if err := cs.SendMessage("startup", nil); err != nil {
+			if err := cs.SendMessage("startup", cs.startupData(ctx)); err != nil {
 				cs.slogger.Log(ctx, slog.LevelWarn,
 					"failed to send startup message on control server start",
 					"err", err,
@@ -122,6 +123,60 @@ func (cs *ControlService) Start(ctx context.Context) {
 			continue
 		}
 	}
+}
+
+// startupData retrieves data to be reported to the control server on launcher startup.
+func (cs *ControlService) startupData(ctx context.Context) map[string]string {
+	data := map[string]string{
+		"launcher_version": version.Version().Version,
+	}
+
+	if enrollStatus, err := cs.knapsack.CurrentEnrollmentStatus(); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get enrollment status for startup message",
+			"err", err,
+		)
+	} else {
+		data["current_enrollment_status"] = string(enrollStatus)
+	}
+
+	if deviceId, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get device ID for startup message",
+			"err", err,
+		)
+	} else {
+		data["device_id"] = string(deviceId)
+	}
+
+	if munemo, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get munemo for startup message",
+			"err", err,
+		)
+	} else {
+		data["munemo"] = string(munemo)
+	}
+
+	if orgId, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get organization ID for startup message",
+			"err", err,
+		)
+	} else {
+		data["organization_id"] = string(orgId)
+	}
+
+	if serialNumber, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get serial number for startup message",
+			"err", err,
+		)
+	} else {
+		data["serial_number"] = string(serialNumber)
+	}
+
+	return data
 }
 
 func (cs *ControlService) Interrupt(_ error) {
