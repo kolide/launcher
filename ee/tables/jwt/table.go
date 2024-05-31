@@ -76,7 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			// UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
 			token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "err", err.Error())
+				t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err.Error())
 
 				if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
 					row["verified"] = "INVALID"
