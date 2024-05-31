@@ -64,7 +64,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			rawData, err := JWTRaw(path)
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelError, "error reading JWT data file", "err", err)
+				t.slogger.Log(ctx, slog.LevelInfo, "error reading JWT data file", "err", err)
 				continue
 			}
 
@@ -76,7 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			// UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
 			token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err.Error())
+				t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
 
 				if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
 					row["verified"] = "INVALID"
@@ -88,6 +88,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
 				t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
+				continue
 			}
 
 			parsedClaims := map[string]interface{}{}
