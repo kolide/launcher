@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
 )
@@ -41,6 +43,13 @@ func NewUniversalLinkHandler(slogger *slog.Logger) (*universalLinkHandler, chan 
 }
 
 func (u *universalLinkHandler) Execute() error {
+	// Register self
+	if err := register(); err != nil {
+		u.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not register desktop app with Launch Services on startup",
+			"err", err,
+		)
+	}
 	for {
 		select {
 		case i := <-u.urlInput:
@@ -72,6 +81,36 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 
 	u.interrupt <- struct{}{}
 	close(u.urlInput)
+}
+
+func register() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	currentExecutable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("getting current executable: %w", err)
+	}
+
+	// If we're running the originally-installed version of launcher, no need to register
+	if strings.HasPrefix(currentExecutable, "/usr/local") {
+		return nil
+	}
+
+	// Point to `Kolide.app`
+	currentExecutable = strings.TrimSuffix(currentExecutable, "/Contents/MacOS/launcher")
+
+	// Run lsregister against this path
+	lsregisterCmd, err := allowedcmd.Lsregister(ctx, currentExecutable)
+	if err != nil {
+		return fmt.Errorf("creating lsregister %s command: %w", currentExecutable, err)
+	}
+
+	if out, err := lsregisterCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("running lsregister %s: output `%s`, err: %w", currentExecutable, string(out), err)
+	}
+
+	return nil
 }
 
 // handleUniversalLinkRequest receives requests, validates them, and forwards them

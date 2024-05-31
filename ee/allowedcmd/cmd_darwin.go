@@ -67,6 +67,10 @@ func Lsof(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/lsof", arg...)
 }
 
+func Lsregister(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister", arg...)
+}
+
 func Mdfind(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/mdfind", arg...)
 }
