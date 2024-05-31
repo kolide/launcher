@@ -95,6 +95,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 			// delete the query keys, so we don't need to enumerate them in the test case
 			for _, row := range rows {
 				delete(row, "query")
+				delete(row, "raw_data")
 			}
 
 			// Despite being an array. data is returned unordered. Sort it.
