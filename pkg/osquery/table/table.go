@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/desktopprocs"
 	"github.com/kolide/launcher/ee/tables/dev_table_tooling"
 	"github.com/kolide/launcher/ee/tables/firefox_preferences"
+	"github.com/kolide/launcher/ee/tables/jwt"
 	"github.com/kolide/launcher/ee/tables/launcher_db"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
 	"github.com/kolide/launcher/ee/tables/tdebug"
@@ -48,6 +49,7 @@ func PlatformTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []os
 		cryptoinfotable.TablePlugin(slogger),
 		dev_table_tooling.TablePlugin(slogger),
 		firefox_preferences.TablePlugin(slogger),
+		kolide_jwt.TablePlugin(slogger),
 		dataflattentable.TablePluginExec(slogger,
 			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
 		dataflattentable.TablePluginExec(slogger,

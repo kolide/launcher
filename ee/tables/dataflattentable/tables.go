@@ -38,11 +38,6 @@ var (
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonlFile },
 		tableName:        "kolide_jsonl",
 	}
-	JWTType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.JWT },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JWTFile },
-		tableName:        "kolide_jwt",
-	}
 	XmlType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Xml },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.XmlFile },
@@ -115,7 +110,6 @@ func AllTablePlugins(slogger *slog.Logger) []osquery.OsqueryPlugin {
 		TablePlugin(slogger, IniType),
 		TablePlugin(slogger, PlistType),
 		TablePlugin(slogger, JsonlType),
-		TablePlugin(slogger, JWTType),
 	}
 }
 
