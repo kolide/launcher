@@ -30,10 +30,12 @@ const (
 	Unknown = "UNKNOWN"
 )
 
+// Values for include_raw_jwt column.
 var (
 	allowedIncludeValues = []string{"true", "false"}
 )
 
+// Created errors here to handle switching the verified value depending on the returned error.
 var (
 	ErrMissingKeyId     = errors.New("no key id found in the JWT header")
 	ErrMatchingKeyId    = errors.New("no key id matched the JWT header key id")
