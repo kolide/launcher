@@ -20,6 +20,20 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
+// I've set 3 different states for if the signature is verified:
+// VALID - The token parsed without errors and the signature was successfully validated.
+// INVALID - The signature attempted to validate with the matched public key, but it was a bad key.
+// UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
+const (
+	Valid   = "VALID"
+	Invalid = "INVALID"
+	Unknown = "UNKNOWN"
+)
+
+var (
+	allowedIncludeValues = []string{"true", "false"}
+)
+
 var (
 	ErrMissingKeyId     = errors.New("no key id found in the JWT header")
 	ErrMatchingKeyId    = errors.New("no key id matched the JWT header key id")
@@ -34,7 +48,8 @@ type Table struct {
 func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("path"),
-		table.TextColumn("signature_key"),
+		table.TextColumn("signing_keys"),
+		table.TextColumn("include_raw_jwt"),
 	)
 
 	t := &Table{
@@ -45,77 +60,79 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	var results []map[string]string
+
 	paths := tablehelpers.GetConstraints(queryContext, "path")
 	if len(paths) < 1 {
 		return nil, fmt.Errorf("kolide_jwt requires at least one path to be specified")
 	}
 
-	var results []map[string]string
-	var keyMap map[string]string
-	keys := tablehelpers.GetConstraints(queryContext, "signature_key")
-
-	// This is perhaps a naive viewpoint, but if we want to return data even if we don't have a valid signature,
-	// then we don't entirely need to handle errors for unmarshaling passed-through keys.
-	for _, jsonString := range keys {
-		json.Unmarshal([]byte(jsonString), &keyMap)
-	}
-
 	for _, path := range paths {
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			rawData, err := JWTRaw(path)
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "error reading JWT data file", "err", err)
-				continue
-			}
+		for _, keyJSON := range tablehelpers.GetConstraints(queryContext, "signing_keys", tablehelpers.WithDefaults("")) {
+			for _, include_raw_jwt := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
+				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+					rawData, err := JWTRaw(path)
+					if err != nil {
+						t.slogger.Log(ctx, slog.LevelInfo, "error reading JWT data file", "err", err)
+						continue
+					}
 
-			row := map[string]interface{}{"verified": "UNKNOWN"}
+					// Parse provided JWT signing keys into an map for verification in the JWT parser
+					var keyMap map[string]string
+					if err := json.Unmarshal([]byte(keyJSON), &keyMap); err != nil {
+						t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
+					}
 
-			// I've set 3 different states for if the signature is verified:
-			// VALID - The token parsed without errors and the signature was successfully validated.
-			// INVALID - The signature attempted to validate with the matched public key, but it was a bad key.
-			// UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
-			token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
+					row := map[string]interface{}{"verified": Unknown}
+					token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
+					if err != nil {
+						t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
 
-				if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
-					row["verified"] = "INVALID"
+						if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
+							row["verified"] = Invalid
+						}
+					} else {
+						row["verified"] = Valid
+					}
+
+					claims, ok := token.Claims.(jwt.MapClaims)
+					if !ok {
+						t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
+						continue
+					}
+
+					parsedClaims := map[string]interface{}{}
+					for k, v := range claims {
+						parsedClaims[k] = v
+					}
+
+					row["header"] = token.Header
+					row["claims"] = parsedClaims
+
+					if include_raw_jwt == "true" {
+						row["raw_jwt"] = string(rawData)
+					}
+
+					flattenOpts := []dataflatten.FlattenOpts{
+						dataflatten.WithSlogger(t.slogger),
+						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+					}
+
+					flattened, err := dataflatten.Flatten(row, flattenOpts...)
+					if err != nil {
+						t.slogger.Log(ctx, slog.LevelInfo, "failure flattening JWT data", "err", err)
+						continue
+					}
+
+					rowData := map[string]string{
+						"path":            path,
+						"signing_keys":    keyJSON,
+						"include_raw_jwt": include_raw_jwt,
+					}
+
+					results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
 				}
-			} else {
-				row["verified"] = "VALID"
 			}
-
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				t.slogger.Log(ctx, slog.LevelInfo, "error parsing JWT claims")
-				continue
-			}
-
-			parsedClaims := map[string]interface{}{}
-			for k, v := range claims {
-				parsedClaims[k] = v
-			}
-
-			row["header"] = token.Header
-			row["claims"] = parsedClaims
-
-			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithSlogger(t.slogger),
-				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-			}
-
-			flattened, err := dataflatten.Flatten(row, flattenOpts...)
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening JWT data", "err", err)
-				continue
-			}
-
-			rowData := map[string]string{
-				"path":          path,
-				"signature_key": strings.Join(keys, ""),
-			}
-
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
 		}
 	}
 
