@@ -99,12 +99,6 @@ func register() error {
 		return fmt.Errorf("getting current executable: %w", err)
 	}
 
-	// If we're running the originally-installed version of launcher, no need to register;
-	// Launch Services should already know about this application from the install process.
-	if strings.HasPrefix(currentExecutable, "/usr/local") {
-		return nil
-	}
-
 	// Point to `Kolide.app`
 	currentExecutable = strings.TrimSuffix(currentExecutable, "/Contents/MacOS/launcher")
 
