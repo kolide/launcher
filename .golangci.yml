@@ -41,7 +41,7 @@ linters-settings:
         msg: do not use panic so that launcher can shut down gracefully
   sloglint:
     kv-only: true
-    context: true
+    context-only: true
     key-naming-case: snake
     static-msg: true
   revive:
