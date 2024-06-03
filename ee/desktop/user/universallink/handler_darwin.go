@@ -3,15 +3,27 @@
 
 package universallink
 
+/*
+#cgo darwin CFLAGS: -DDARWIN -x objective-c
+#cgo darwin LDFLAGS: -framework Foundation
+
+#include <stdbool.h>
+#include <stdlib.h>
+
+bool registerAppBundle(char *cAppBundlePath);
+*/
+import "C"
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
@@ -41,6 +53,13 @@ func NewUniversalLinkHandler(slogger *slog.Logger) (*universalLinkHandler, chan 
 }
 
 func (u *universalLinkHandler) Execute() error {
+	// Register self
+	if err := register(); err != nil {
+		u.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not register desktop app with Launch Services on startup",
+			"err", err,
+		)
+	}
 	for {
 		select {
 		case i := <-u.urlInput:
@@ -74,6 +93,26 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 	close(u.urlInput)
 }
 
+func register() error {
+	currentExecutable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("getting current executable: %w", err)
+	}
+
+	// Point to `Kolide.app`
+	currentExecutable = strings.TrimSuffix(currentExecutable, "/Contents/MacOS/launcher")
+
+	currentExecutableCStr := C.CString(currentExecutable)
+	defer C.free(unsafe.Pointer(currentExecutableCStr))
+
+	success := C.registerAppBundle(currentExecutableCStr)
+	if !success {
+		return fmt.Errorf("could not register %s", currentExecutable)
+	}
+
+	return nil
+}
+
 // handleUniversalLinkRequest receives requests, validates them, and forwards them
 // to launcher root's localserver.
 func (u *universalLinkHandler) handleUniversalLinkRequest(requestUrl string) error {
@@ -103,7 +142,7 @@ func (u *universalLinkHandler) handleUniversalLinkRequest(requestUrl string) err
 					return
 				}
 				u.slogger.Log(ctx, slog.LevelWarn,
-					"could not make universal link request",
+					"could not forward universal link request",
 					"port", p,
 					"err", err,
 				)
