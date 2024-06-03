@@ -3,6 +3,16 @@
 
 package universallink
 
+/*
+#cgo darwin CFLAGS: -DDARWIN -x objective-c
+#cgo darwin LDFLAGS: -framework Foundation
+
+#include <stdbool.h>
+#include <stdlib.h>
+
+bool registerAppBundle(char *cAppBundlePath);
+*/
+import "C"
 import (
 	"context"
 	"fmt"
@@ -13,8 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
-	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
 )
@@ -84,15 +94,13 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 }
 
 func register() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	currentExecutable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("getting current executable: %w", err)
 	}
 
-	// If we're running the originally-installed version of launcher, no need to register
+	// If we're running the originally-installed version of launcher, no need to register;
+	// Launch Services should already know about this application from the install process.
 	if strings.HasPrefix(currentExecutable, "/usr/local") {
 		return nil
 	}
@@ -100,14 +108,12 @@ func register() error {
 	// Point to `Kolide.app`
 	currentExecutable = strings.TrimSuffix(currentExecutable, "/Contents/MacOS/launcher")
 
-	// Run lsregister against this path
-	lsregisterCmd, err := allowedcmd.Lsregister(ctx, currentExecutable)
-	if err != nil {
-		return fmt.Errorf("creating lsregister %s command: %w", currentExecutable, err)
-	}
+	currentExecutableCStr := C.CString(currentExecutable)
+	defer C.free(unsafe.Pointer(currentExecutableCStr))
 
-	if out, err := lsregisterCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("running lsregister %s: output `%s`, err: %w", currentExecutable, string(out), err)
+	success := C.registerAppBundle(currentExecutableCStr)
+	if !success {
+		return fmt.Errorf("could not register %s", currentExecutable)
 	}
 
 	return nil
