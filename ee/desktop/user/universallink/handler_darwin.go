@@ -142,7 +142,7 @@ func (u *universalLinkHandler) handleUniversalLinkRequest(requestUrl string) err
 					return
 				}
 				u.slogger.Log(ctx, slog.LevelWarn,
-					"could not make universal link request",
+					"could not forward universal link request",
 					"port", p,
 					"err", err,
 				)
