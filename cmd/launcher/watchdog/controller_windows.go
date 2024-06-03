@@ -69,7 +69,7 @@ func (wc *WatchdogController) Run() error {
 	defer ticker.Stop()
 
 	for {
-		wc.Once(ctx)
+		wc.publishLogs(ctx)
 
 		select {
 		case <-ticker.C:
@@ -83,7 +83,7 @@ func (wc *WatchdogController) Run() error {
 	}
 }
 
-func (wc *WatchdogController) Once(ctx context.Context) {
+func (wc *WatchdogController) publishLogs(ctx context.Context) {
 	// do nothing if watchdog is not enabled
 	if !wc.knapsack.LauncherWatchdogEnabled() {
 		return
@@ -114,6 +114,10 @@ func (wc *WatchdogController) Once(ctx context.Context) {
 		return nil
 	}); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError, "iterating sqlite logs", "err", err)
+		return
+	}
+
+	if len(logsToDelete) == 0 { // nothing else to do if there are no new logs
 		return
 	}
 
@@ -238,6 +242,7 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 
 	defer restartService.Close()
 
+	// set recovery actions - always restart after a 5 second delay
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			Type:  mgr.ServiceRestart,
@@ -252,6 +257,9 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 		)
 	}
 
+	// set recovery actions on non crash failures - indicates that we want service manager
+	// to restart this service after terminating without a state of SERVICE_STOPPED, or whenever
+	// the exit code is not 0 (ERROR_SUCCESS)
 	if err = restartService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
 		wc.slogger.Log(ctx, slog.LevelWarn,
 			"unable to set RecoveryActionsOnNonCrashFailures flag, proceeding",
