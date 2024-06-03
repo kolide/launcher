@@ -140,8 +140,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
 	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
 
-	if len(requestedPaths)+len(requestedRawDatas) == 0 {
-		return results, fmt.Errorf("The %s table requires that you specify a single constraint for path or raw_data", t.tableName)
+	if len(requestedPaths) == 0 && len(requestedRawDatas) == 0 {
+		return results, fmt.Errorf("The %s table requires that you specify at least one of 'path' or 'raw_data'", t.tableName)
 	}
 
 	flattenOpts := []dataflatten.FlattenOpts{
