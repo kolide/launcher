@@ -179,7 +179,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			subresults, err := t.generateRawData(ctx, rawdata, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
-					"failed to get data for raw_data",
+					"failed to generate for raw_data",
 					"err", err,
 				)
 				continue
