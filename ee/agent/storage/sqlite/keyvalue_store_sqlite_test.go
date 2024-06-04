@@ -234,3 +234,36 @@ func Test_Migrations(t *testing.T) {
 	require.NoError(t, srcErr, "source error closing migration")
 	require.NoError(t, dbErr, "database error closing migration")
 }
+
+func Test_MissingMigrations(t *testing.T) {
+	t.Parallel()
+
+	tempRootDir := t.TempDir()
+
+	conn, err := validatedDbConn(context.TODO(), tempRootDir)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, conn.Close(), "closing test db")
+
+	d, err := iofs.New(migrations, "migrations")
+	require.NoError(t, err, "loading migration files")
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
+	require.NoError(t, err, "creating migrate instance")
+	require.NoError(t, m.Up(), "expected no error running all migrations")
+	currentVersion, dirty, err := m.Version()
+	require.NoError(t, err, "error looking for current version")
+	require.False(t, dirty, "did not expect dirty migration state")
+	missingMigrationVersion := int(currentVersion) + 1
+	forceVersionErr := m.Force(missingMigrationVersion)
+	require.NoError(t, forceVersionErr, "error forcing version")
+
+	srcErr, dbErr := m.Close()
+	require.NoError(t, srcErr, "source error closing migration")
+	require.NoError(t, dbErr, "database error closing migration")
+
+	// now re-open and re-attempt migrations, this will only work if we correctly ignore the missing
+	// migration file error
+	s, migrationError := OpenRW(context.TODO(), tempRootDir, StartupSettingsStore)
+	require.NoError(t, migrationError, "database error running missing migration")
+	require.NoError(t, s.Close(), "error closing sqliteStore conn")
+}

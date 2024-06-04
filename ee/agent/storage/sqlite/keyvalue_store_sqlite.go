@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -23,6 +24,8 @@ type storeName int
 const (
 	StartupSettingsStore storeName = iota
 )
+
+var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
 
 // String translates the exported int constant to the actual name of the
 // supported table in the sqlite database.
@@ -170,7 +173,9 @@ func (s *sqliteStore) migrate(ctx context.Context) error {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	// don't prevent DB access for a missing migration, this is the result of a downgrade after previously
+	// running a migration
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) && !isMissingMigrationError(err) {
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
@@ -316,4 +321,8 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	}
 
 	return deletedKeys, nil
+}
+
+func isMissingMigrationError(err error) bool {
+	return missingMigrationErrFormat.MatchString(err.Error())
 }
