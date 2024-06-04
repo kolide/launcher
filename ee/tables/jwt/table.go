@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -25,14 +24,14 @@ import (
 // INVALID - The signature attempted to validate with the matched public key, but it was a bad key.
 // UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
 const (
-	Valid   = "VALID"
-	Invalid = "INVALID"
-	Unknown = "UNKNOWN"
+	Valid   = "client_valid"
+	Invalid = "client_invalid"
+	Unknown = "client_unverified"
 )
 
 // Values for include_raw_jwt column.
 var (
-	allowedIncludeValues = []string{"true", "false"}
+	allowedIncludeValues = []string{"true", "false", "1", "0"}
 )
 
 // Created errors here to handle switching the verified value depending on the returned error.
@@ -52,7 +51,6 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("path"),
 		table.TextColumn("signing_keys"),
 		table.TextColumn("include_raw_jwt"),
-		table.TextColumn("raw_jwt"),
 	)
 
 	t := &Table{
@@ -72,7 +70,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	for _, path := range paths {
 		for _, keyJSON := range tablehelpers.GetConstraints(queryContext, "signing_keys", tablehelpers.WithDefaults("")) {
-			for _, include_raw_jwt := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
+			for _, includeRawJWT := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 					rawData, err := os.ReadFile(path)
 					if err != nil {
@@ -112,7 +110,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					row["header"] = token.Header
 					row["claims"] = parsedClaims
 
-					if include_raw_jwt == "true" {
+					if includeRawJWT == "true" || includeRawJWT == "1" {
 						row["raw_jwt"] = string(rawData)
 					}
 
@@ -130,7 +128,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					rowData := map[string]string{
 						"path":            path,
 						"signing_keys":    keyJSON,
-						"include_raw_jwt": include_raw_jwt,
+						"include_raw_jwt": includeRawJWT,
 					}
 
 					results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
@@ -140,23 +138,6 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return results, nil
-}
-
-// JWTRaw takes a file path and returns the raw byte array. Nothing special here.
-func JWTRaw(file string) ([]byte, error) {
-	jwtFH, err := os.Open(file)
-	if err != nil {
-		return nil, fmt.Errorf("unable to access file: %w", err)
-	}
-
-	defer jwtFH.Close()
-
-	tokenRaw, err := io.ReadAll(jwtFH)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read JWT: %w", err)
-	}
-
-	return tokenRaw, nil
 }
 
 // JWTKeyFunc handles taking in an array of public keys to validate against the JWT signature.
