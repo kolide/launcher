@@ -52,6 +52,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("path"),
 		table.TextColumn("signing_keys"),
 		table.TextColumn("include_raw_jwt"),
+		table.TextColumn("raw_jwt"),
 	)
 
 	t := &Table{
