@@ -22,6 +22,8 @@ jobs:
           - ubuntu-20.04
           - macos-12
           - windows-latest
+          - test.ubuntu20.04.arm64
+          - test.windows11.arm64
     steps:
     - name: Check out code
       id: checkout
@@ -133,6 +135,10 @@ jobs:
           - macos-13
           - windows-2019
           - windows-2022
+          - test.ubuntu20.04.arm64
+          - test.ubuntu22.04.arm64
+          - test.windows11.arm64
+
     needs: version_baseline
     steps:
     - name: cache restore build output
