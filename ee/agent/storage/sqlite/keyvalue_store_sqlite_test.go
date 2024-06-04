@@ -263,6 +263,7 @@ func Test_MissingMigrations(t *testing.T) {
 
 	// now re-open and re-attempt migrations, this will only work if we correctly ignore the missing
 	// migration file error
-	_, migrationError := OpenRW(context.TODO(), tempRootDir, StartupSettingsStore)
+	s, migrationError := OpenRW(context.TODO(), tempRootDir, StartupSettingsStore)
 	require.NoError(t, migrationError, "database error running missing migration")
+	require.NoError(t, s.Close(), "error closing sqliteStore conn")
 }
