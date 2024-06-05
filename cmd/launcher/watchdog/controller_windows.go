@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -320,17 +321,19 @@ func (wc *WatchdogController) restartService(service *mgr.Service) error {
 		return service.Start()
 	}
 
-	timeout := time.Now().Add(10 * time.Second)
-	for status.State != svc.Stopped {
-		if timeout.Before(time.Now()) {
-			return fmt.Errorf("timeout waiting for %s service to stop", service.Name)
-		}
-
-		time.Sleep(500 * time.Millisecond)
+	if err := backoff.WaitFor(func() error {
 		status, err = service.Query()
 		if err != nil {
 			return fmt.Errorf("could not retrieve service status: %w", err)
 		}
+
+		if status.State != svc.Stopped {
+			return fmt.Errorf("service has not stopped")
+		}
+
+		return nil
+	}, 10*time.Second, 500*time.Millisecond); err != nil {
+		return fmt.Errorf("timed out waiting for %s service to stop: %w", service.Name, err)
 	}
 
 	return service.Start()
