@@ -47,6 +47,7 @@ type localServer struct {
 	limiter      *rate.Limiter
 	tlsCerts     []tls.Certificate
 	querier      Querier
+	webrtcConn   *webrtcConnectionHandler
 	kolideServer string
 	cancel       context.CancelFunc
 
@@ -100,6 +101,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	ecAuthedMux.Handle("/query.png", ls.requestQueryHandler())
 	ecAuthedMux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	ecAuthedMux.Handle("/scheduledquery.png", ls.requestScheduledQueryHandler())
+	ecAuthedMux.Handle("/webrtc", ls.webrtcHandler())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
@@ -138,6 +140,10 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 
 func (ls *localServer) SetQuerier(querier Querier) {
 	ls.querier = querier
+}
+
+func (ls *localServer) setWebrtcConn(w *webrtcConnectionHandler) {
+	ls.webrtcConn = w
 }
 
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {
@@ -297,6 +303,10 @@ func (ls *localServer) Stop() error {
 			"shutting down",
 			"err", err,
 		)
+	}
+
+	if ls.webrtcConn != nil {
+		ls.webrtcConn.close()
 	}
 
 	// Consider calling srv.Stop as a more forceful shutdown?
