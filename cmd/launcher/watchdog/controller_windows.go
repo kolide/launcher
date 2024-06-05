@@ -161,6 +161,13 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 				"encountered error removing watchdog service",
 				"err", err,
 			)
+
+			return
+		}
+
+		if err.Error() == serviceDoesNotExistError {
+			wc.slogger.Log(ctx, slog.LevelInfo, "watchdog service was not previously installed")
+			return
 		}
 
 		wc.slogger.Log(ctx, slog.LevelInfo, "removed watchdog service")
@@ -213,6 +220,8 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 			"installing launcher watchdog, unable to collect current executable path",
 			"err", err,
 		)
+
+		return fmt.Errorf("collecting current executable path: %w", err)
 	}
 
 	svcMgrConf := mgr.Config{
