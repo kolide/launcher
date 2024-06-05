@@ -163,6 +163,8 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 			)
 		}
 
+		wc.slogger.Log(ctx, slog.LevelInfo, "removed watchdog service")
+
 		return
 	}
 
@@ -177,6 +179,8 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 				"err", err,
 			)
 		}
+
+		wc.slogger.Log(ctx, slog.LevelInfo, "installed watchdog service")
 
 		return
 	}
