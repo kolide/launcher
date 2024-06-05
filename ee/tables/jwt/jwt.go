@@ -1,4 +1,4 @@
-package kolide_jwt
+package jwt
 
 import (
 	"context"
@@ -25,13 +25,13 @@ import (
 // UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
 const (
 	Valid   = "client_valid"
-	Invalid = "client_invalid"
-	Unknown = "client_unverified"
+	Invalid = "invalid"
+	Unknown = ""
 )
 
 // Values for include_raw_jwt column.
 var (
-	allowedIncludeValues = []string{"true", "false", "1", "0"}
+	allowedIncludeValues = []string{"true", "1"}
 )
 
 // Created errors here to handle switching the verified value depending on the returned error.
@@ -84,16 +84,16 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
 					}
 
-					row := map[string]interface{}{"verified": Unknown}
+					data := map[string]interface{}{"verified": Unknown}
 					token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
 
 						if errors.Is(err, ErrParsingPemBlock) || errors.Is(err, ErrParsingPublicKey) {
-							row["verified"] = Invalid
+							data["verified"] = Invalid
 						}
 					} else {
-						row["verified"] = Valid
+						data["verified"] = Valid
 					}
 
 					claims, ok := token.Claims.(jwt.MapClaims)
@@ -107,11 +107,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						parsedClaims[k] = v
 					}
 
-					row["header"] = token.Header
-					row["claims"] = parsedClaims
+					data["header"] = token.Header
+					data["claims"] = parsedClaims
 
 					if includeRawJWT == "true" || includeRawJWT == "1" {
-						row["raw_jwt"] = string(rawData)
+						data["raw_jwt"] = string(rawData)
 					}
 
 					flattenOpts := []dataflatten.FlattenOpts{
@@ -119,7 +119,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 					}
 
-					flattened, err := dataflatten.Flatten(row, flattenOpts...)
+					flattened, err := dataflatten.Flatten(data, flattenOpts...)
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "failure flattening JWT data", "err", err)
 						continue
