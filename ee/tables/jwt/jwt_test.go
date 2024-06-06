@@ -102,7 +102,7 @@ func TestTransformOutput(t *testing.T) {
 			},
 		},
 		{
-			name: "rsa256 JWT unknown",
+			name: "rsa256 JWT unverified",
 			path: "testdata/rsa256.raw",
 			res: map[string]string{
 				"parent":          "header",
