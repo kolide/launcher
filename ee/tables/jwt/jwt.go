@@ -19,14 +19,13 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-// I've set 3 different states for if the signature is verified:
+// I've set 2 different states for if the signature is verified:
 // VALID - The token parsed without errors and the signature was successfully validated.
 // INVALID - The signature attempted to validate with the matched public key, but it was a bad key.
-// UNKNOWN - The default state. This can mean that no key id matched, or simply no keys were provided to validate against.
+// By default the `verified` value is unset.
 const (
 	Valid   = "client_valid"
 	Invalid = "invalid"
-	Unknown = ""
 )
 
 // Values for include_raw_jwt column.
@@ -84,7 +83,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 						t.slogger.Log(ctx, slog.LevelInfo, "error unmarshaling JWT signing keys", "err", err)
 					}
 
-					data := map[string]interface{}{"verified": Unknown}
+					data := map[string]interface{}{}
 					token, err := jwt.ParseWithClaims(string(rawData), jwt.MapClaims{}, JWTKeyFunc(keyMap))
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "error parsing token", "err", err)
