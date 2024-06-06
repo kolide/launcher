@@ -70,7 +70,7 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 	}
 
 	query := fmt.Sprintf(
-		`SELECT rowid, %s, %s  FROM %s;`,
+		`SELECT rowid, %s, %s FROM %s;`,
 		colInfo.pk,
 		colInfo.valueColumn,
 		s.tableName,
