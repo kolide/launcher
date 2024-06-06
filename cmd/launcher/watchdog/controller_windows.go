@@ -118,11 +118,11 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		return
 	}
 
-	if len(logsToDelete) == 0 { // nothing else to do if there are no new logs
+	if len(logsToDelete) == 0 { // nothing else to do
 		return
 	}
 
-	wc.slogger.Log(ctx, slog.LevelInfo, "collected logs for deletion", "rowids", logsToDelete)
+	wc.slogger.Log(ctx, slog.LevelDebug, "collected logs for deletion", "rowids", logsToDelete)
 
 	if err := wc.logPublisher.DeleteRows(logsToDelete...); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError, "cleaning up published sqlite logs", "err", err)
@@ -167,7 +167,7 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 		}
 
 		if err.Error() == serviceDoesNotExistError {
-			wc.slogger.Log(ctx, slog.LevelInfo, "watchdog service was not previously installed")
+			wc.slogger.Log(ctx, slog.LevelDebug, "watchdog service was not previously installed")
 			return
 		}
 

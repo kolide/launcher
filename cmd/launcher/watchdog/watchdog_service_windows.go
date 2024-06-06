@@ -116,8 +116,7 @@ func (w *winWatchdogSvc) Execute(args []string, r <-chan svc.ChangeRequest, chan
 	runRestartServiceResults := make(chan struct{})
 
 	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
-		err := runLauncherWatchdogService(ctx, w)
-		if err != nil {
+		if err := runLauncherWatchdogService(ctx, w); err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
 				"runLauncherWatchdogService exited",
 				"err", err,
