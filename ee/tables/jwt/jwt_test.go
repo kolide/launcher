@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -46,7 +47,7 @@ func TestTransformOutput(t *testing.T) {
 				"query":           "*",
 				"path":            "testdata/rsa256.raw",
 				"include_raw_jwt": "false",
-				"signing_keys":    "{\"test\":\"-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo\\n4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u\\n+qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh\\nkd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ\\n0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg\\ncKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc\\nmwIDAQAB\\n-----END PUBLIC KEY-----\"}",
+				"signing_keys":    "{\"test\":" + strconv.Quote(rsa256_key) + "}",
 			},
 		},
 		{
@@ -63,7 +64,7 @@ func TestTransformOutput(t *testing.T) {
 				"query":           "*",
 				"path":            "testdata/es256.raw",
 				"include_raw_jwt": "false",
-				"signing_keys":    "{\"US2\":\"-----BEGIN PUBLIC KEY-----\\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9\\nq9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\\n-----END PUBLIC KEY-----\"}",
+				"signing_keys":    "{\"US2\":" + strconv.Quote(es256_key) + "}",
 			},
 		},
 		{
@@ -80,7 +81,7 @@ func TestTransformOutput(t *testing.T) {
 				"query":           "*",
 				"path":            "testdata/ps256.raw",
 				"include_raw_jwt": "false",
-				"signing_keys":    "{\"blahblah\":\"-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo\\n4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u\\n+qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh\\nkd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ\\n0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg\\ncKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc\\nmwIDAQAB\\n-----END PUBLIC KEY-----\"}",
+				"signing_keys":    "{\"blahblah\":" + strconv.Quote(ps256_key) + "}",
 			},
 		},
 		{
