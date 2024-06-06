@@ -220,22 +220,27 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
+		origin := r.Header.Get("Origin")
+		// When loading images, the origin may not be set, but the referer will. We can accept that instead.
+		if origin == "" {
+			origin = strings.TrimSuffix(r.Header.Get("Referer"), "/")
+		}
 		if len(cmdReq.AllowedOrigins) > 0 {
 			allowed := false
 			for _, ao := range cmdReq.AllowedOrigins {
-				if strings.EqualFold(ao, r.Header.Get("Origin")) {
+				if strings.EqualFold(ao, origin) {
 					allowed = true
 					break
 				}
 			}
 
 			if !allowed {
-				span.SetAttributes(attribute.String("origin", r.Header.Get("Origin")))
-				traces.SetError(span, fmt.Errorf("origin %s is not allowed", r.Header.Get("Origin")))
+				span.SetAttributes(attribute.String("origin", origin))
+				traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
 				e.slogger.Log(r.Context(), slog.LevelError,
 					"origin is not allowed",
 					"allowlist", cmdReq.AllowedOrigins,
-					"origin", r.Header.Get("Origin"),
+					"origin", origin,
 				)
 
 				w.WriteHeader(http.StatusUnauthorized)
@@ -245,12 +250,12 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"origin matches allowlist",
-				"origin", r.Header.Get("Origin"),
+				"origin", origin,
 			)
 		} else {
 			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"origin is allowed by default, no allowlist",
-				"origin", r.Header.Get("Origin"),
+				"origin", origin,
 			)
 		}
 
@@ -281,6 +286,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		newReq.Header.Set("Origin", r.Header.Get("Origin"))
+		newReq.Header.Set("Referer", r.Header.Get("Referer"))
 
 		// setting the newReq context to the current request context
 		// allows the trace to continue to the inner request,
