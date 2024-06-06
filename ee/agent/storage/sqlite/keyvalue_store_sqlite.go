@@ -54,6 +54,10 @@ type sqliteStore struct {
 type sqliteColumns struct {
 	pk          string
 	valueColumn string
+	// isLogstore is used to determine whether the underlying table can support our LogStore interface methods.
+	// because any logstore iteration must scan the values into known types, we use this to avoid pulling in
+	// the reflect package here and making this more complicated than it needs to be
+	isLogstore bool
 }
 
 // OpenRO opens a connection to the database in the given root directory; it does
@@ -329,6 +333,17 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	}
 
 	return deletedKeys, nil
+}
+
+func (s *sqliteStore) getColumns() *sqliteColumns {
+	switch s.tableName {
+	case StartupSettingsStore.String():
+		return &sqliteColumns{pk: "name", valueColumn: "value", isLogstore: false}
+	case WatchdogLogStore.String():
+		return &sqliteColumns{pk: "timestamp", valueColumn: "log", isLogstore: true}
+	}
+
+	return nil
 }
 
 func isMissingMigrationError(err error) bool {

@@ -6,17 +6,6 @@ import (
 	"strings"
 )
 
-func (s *sqliteStore) getColumns() *sqliteColumns {
-	switch s.tableName {
-	case StartupSettingsStore.String():
-		return &sqliteColumns{pk: "name", valueColumn: "value"}
-	case WatchdogLogStore.String():
-		return &sqliteColumns{pk: "timestamp", valueColumn: "log"}
-	}
-
-	return nil
-}
-
 func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
 	colInfo := s.getColumns()
 	if s == nil || s.conn == nil || colInfo == nil {
@@ -25,6 +14,10 @@ func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
 
 	if s.readOnly {
 		return errors.New("cannot perform update with RO connection")
+	}
+
+	if !colInfo.isLogstore {
+		return errors.New("this table type does not support adding values by timestamp")
 	}
 
 	insertSql := fmt.Sprintf(
@@ -70,6 +63,10 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 	colInfo := s.getColumns()
 	if s == nil || s.conn == nil || colInfo == nil {
 		return errors.New("store is nil")
+	}
+
+	if !colInfo.isLogstore {
+		return errors.New("this table type is not supported for timestamped iteration")
 	}
 
 	query := fmt.Sprintf(

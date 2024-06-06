@@ -25,6 +25,8 @@ const (
 	launcherServiceName         string = `LauncherKolideK2Svc`
 
 	serviceDoesNotExistError string = "The specified service does not exist as an installed service."
+
+	serviceResetPeriod uint32 = 10800 // 3 hours in seconds
 )
 
 // WatchdogController is responsible for:
@@ -94,9 +96,15 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 
 	if err := wc.logPublisher.ForEach(func(rowid, timestamp int64, v []byte) error {
 		logRecord := make(map[string]any)
+		logsToDelete = append(logsToDelete, rowid)
+
 		if err := json.Unmarshal(v, &logRecord); err != nil {
-			wc.slogger.Log(ctx, slog.LevelError, "failed to unmarshal sqlite log", "log", string(v))
-			logsToDelete = append(logsToDelete, rowid)
+			wc.slogger.Log(ctx, slog.LevelError,
+				"failed to unmarshal sqlite log",
+				"log", string(v),
+				"err", err,
+			)
+
 			// log the issue but don't return an error, we want to keep processing whatever we can
 			return nil
 		}
@@ -110,7 +118,6 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		// pulling out the existing log and re-adding all attributes like this will overwrite
 		// the automatic timestamp creation, as well as the msg and level set below
 		wc.slogger.LogAttrs(ctx, slog.LevelInfo, "", logArgs...)
-		logsToDelete = append(logsToDelete, rowid)
 
 		return nil
 	}); err != nil {
@@ -157,17 +164,17 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 
 	if !enabled {
 		err := removeService(serviceManager, launcherWatchdogServiceName)
-		if err != nil && err.Error() != serviceDoesNotExistError {
+		if err != nil {
+			if err.Error() == serviceDoesNotExistError {
+				wc.slogger.Log(ctx, slog.LevelDebug, "watchdog service was not previously installed")
+				return
+			}
+
 			wc.slogger.Log(ctx, slog.LevelWarn,
 				"encountered error removing watchdog service",
 				"err", err,
 			)
 
-			return
-		}
-
-		if err.Error() == serviceDoesNotExistError {
-			wc.slogger.Log(ctx, slog.LevelDebug, "watchdog service was not previously installed")
 			return
 		}
 
@@ -217,11 +224,6 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 	ctx := context.TODO()
 	currentExe, err := os.Executable()
 	if err != nil {
-		wc.slogger.Log(ctx, slog.LevelError,
-			"installing launcher watchdog, unable to collect current executable path",
-			"err", err,
-		)
-
 		return fmt.Errorf("collecting current executable path: %w", err)
 	}
 
@@ -262,7 +264,7 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 		},
 	}
 
-	if err = restartService.SetRecoveryActions(recoveryActions, 10800); err != nil {
+	if err = restartService.SetRecoveryActions(recoveryActions, serviceResetPeriod); err != nil {
 		wc.slogger.Log(ctx, slog.LevelWarn,
 			"unable to set recovery actions for service installation, proceeding",
 			"err", err,
