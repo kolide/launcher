@@ -49,7 +49,7 @@ func PlatformTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []os
 		cryptoinfotable.TablePlugin(slogger),
 		dev_table_tooling.TablePlugin(slogger),
 		firefox_preferences.TablePlugin(slogger),
-		kolide_jwt.TablePlugin(slogger),
+		jwt.TablePlugin(slogger),
 		dataflattentable.TablePluginExec(slogger,
 			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
 		dataflattentable.TablePluginExec(slogger,
