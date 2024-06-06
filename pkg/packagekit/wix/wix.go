@@ -263,19 +263,6 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 		return fmt.Errorf("create base data dir error for wix harvest: %w", err)
 	}
 
-	// touch these known file names before harvest to ensure they're cleaned up on uninstall
-	dataFilenames := []string{"launcher.db", "metadata.json", "kv.sqlite"}
-
-	for _, fname := range dataFilenames {
-		newPath := filepath.Join(dataFilesPath, fname)
-		newFile, err := os.Create(newPath)
-		if err != nil {
-			return err
-		}
-
-		newFile.Close()
-	}
-
 	_, err = wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "heat.exe"),
 		"dir", wo.packageDataRoot,
