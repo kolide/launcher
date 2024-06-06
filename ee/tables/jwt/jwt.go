@@ -110,7 +110,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 					data["header"] = token.Header
 					data["claims"] = parsedClaims
 
-					if includeRawJWT == "true" || includeRawJWT == "1" {
+					if includeRawJWT != "false" {
 						data["raw_jwt"] = string(rawData)
 					}
 
