@@ -56,10 +56,16 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...")
-
 	serialChanged := false
 	hardwareUUIDChanged := false
+	munemoChanged := false
+
+	defer k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...",
+		"serial", serialChanged,
+		"hardware_uuid", hardwareUUIDChanged,
+		"munemo", munemoChanged,
+	)
+
 	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current serial and hardware UUID", "err", err)
@@ -68,7 +74,6 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		hardwareUUIDChanged = valueChanged(ctx, k, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
-	munemoChanged := false
 	currentTenantMunemo, err := currentMunemo(k)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current munemo", "err", err)
