@@ -29,6 +29,11 @@ import (
 // TODO This should be inherited from some setting
 const serviceName = "launcher"
 
+var likelyRootDirPaths = []string{
+	"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data",
+	"C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data",
+}
+
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
@@ -49,8 +54,18 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	localSlogger := multislogger.New()
 	logger := log.NewNopLogger()
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
+		rootDirectoryChanged := false
+		optsRootDirectory := opts.RootDirectory
+		// check for old root directories before creating DB in case we've stomped over with windows MSI install
+		updatedRootDirectory := determineRootDirectory(systemSlogger.Logger, opts)
+		if updatedRootDirectory != opts.RootDirectory {
+			opts.RootDirectory = updatedRootDirectory
+			// cache that we did this so we can log to debug.json when set up below
+			rootDirectoryChanged = true
+		}
+
+		// Create a local logger. This logs to a known path, and aims to help diagnostics
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = ll
 
@@ -63,6 +78,14 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
+
+		if rootDirectoryChanged {
+			localSlogger.Log(context.TODO(), slog.LevelInfo,
+				"old root directory contents detected, overriding opts.RootDirectory",
+				"opts_root_directory", optsRootDirectory,
+				"updated_root_directory", updatedRootDirectory,
+			)
+		}
 	}
 
 	// Confirm that service configuration is up-to-date
@@ -231,4 +254,76 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 			return false, uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
 		}
 	}
+}
+
+// determineRootDirectory is used specifically for windows deployments to override the
+// configured root directory if another one containing a launcher DB already exists
+func determineRootDirectory(slogger *slog.Logger, opts *launcher.Options) string {
+	optsRootDirectory := opts.RootDirectory
+	// don't mess with the path if this installation isn't pointing to a kolide server URL
+	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
+		return optsRootDirectory
+	}
+
+	optsDBLocation := filepath.Join(optsRootDirectory, "launcher.db")
+	dbExists, err := nonEmptyFileExists(optsDBLocation)
+	// If we get an unknown error, back out from making any options changes. This is an
+	// unlikely path but doesn't feel right updating the rootDirectory without knowing what's going
+	// on here
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"encountered error checking for pre-existing launcher.db",
+			"location", optsDBLocation,
+			"err", err,
+		)
+
+		return optsRootDirectory
+	}
+
+	// database already exists in configured root directory, keep that
+	if dbExists {
+		return optsRootDirectory
+	}
+
+	// we know this is a fresh install with no launcher.db in the configured root directory,
+	// check likely locations and return updated rootDirectory if found
+	for _, path := range likelyRootDirPaths {
+		if path == optsRootDirectory { // we already know this does not contain an enrolled DB
+			continue
+		}
+
+		testingLocation := filepath.Join(path, "launcher.db")
+		dbExists, err := nonEmptyFileExists(testingLocation)
+		if err == nil && dbExists {
+			return path
+		}
+
+		if err != nil {
+			slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered error checking non-configured locations for launcher.db",
+				"opts_location", optsDBLocation,
+				"tested_location", testingLocation,
+				"err", err,
+			)
+
+			continue
+		}
+	}
+
+	// if all else fails, return the originally configured rootDirectory -
+	// this is expected for devices that are truly installing from MSI for the first time
+	return optsRootDirectory
+}
+
+func nonEmptyFileExists(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return fileInfo.Size() > 0, nil
 }
