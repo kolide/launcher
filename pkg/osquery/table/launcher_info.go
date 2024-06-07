@@ -28,7 +28,7 @@ func LauncherInfoTable(store types.GetterSetter) *table.Plugin {
 		table.TextColumn("goos"),
 		table.TextColumn("revision"),
 		table.TextColumn("version"),
-		table.TextColumn("initial_version"),
+		table.TextColumn("version_chain"),
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
 
@@ -77,7 +77,7 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 				"goos":                runtime.GOOS,
 				"revision":            version.Version().Revision,
 				"version":             version.Version().Version,
-				"initial_version":     os.Getenv("KOLIDE_LAUNCHER_INITIAL_VERSION"),
+				"version_chain":       os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"),
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
 				"fingerprint":         fingerprint,

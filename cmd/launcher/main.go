@@ -51,8 +51,10 @@ func runMain() int {
 
 	// Set an os environmental variable that we can use to track launcher versions across
 	// various bits of updated binaries
-	if os.Getenv("KOLIDE_LAUNCHER_INITIAL_VERSION") == "" {
-		os.Setenv("KOLIDE_LAUNCHER_INITIAL_VERSION", version.Version().Version)
+	if chain := os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"); chain == "" {
+		os.Setenv("KOLIDE_LAUNCHER_VERSION_CHAIN", version.Version().Version)
+	} else {
+		os.Setenv("KOLIDE_LAUNCHER_VERSION_CHAIN", fmt.Sprintf("%s:%s", chain, version.Version().Version))
 	}
 
 	// create initial logger. As this is prior to options parsing,
