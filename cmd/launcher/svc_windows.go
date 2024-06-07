@@ -255,7 +255,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 func determineRootDirectory(opts *launcher.Options, slogger *slog.Logger) string {
 	optsRootDirectory := opts.RootDirectory
 	// don't mess with the path if this installation isn't pointing to a kolide server URL
-	if opts.ControlServerURL != "k2device.kolide.com" && opts.ControlServerURL != "k2device-preprod.kolide.com" {
+	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
 		return optsRootDirectory
 	}
 
