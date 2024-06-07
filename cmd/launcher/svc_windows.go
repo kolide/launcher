@@ -57,7 +57,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
 		// check for old root directories before creating DB in case we've stomped over with windows MSI install
-		updatedRootDirectory := determineRootDirectory(opts.RootDirectory, systemSlogger.Logger)
+		updatedRootDirectory := determineRootDirectory(opts, systemSlogger.Logger)
 		if updatedRootDirectory != opts.RootDirectory {
 			systemSlogger.Log(context.TODO(), slog.LevelInfo,
 				"old root directory contents detected, overriding opts.RootDirectory",
@@ -252,7 +252,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 // determineRootDirectory is used specifically for windows deployments to override the
 // configured root directory if another one containing a launcher DB already exists
-func determineRootDirectory(optsRootDirectory string, slogger *slog.Logger, opts *launcher.Options) string {
+func determineRootDirectory(opts *launcher.Options, slogger *slog.Logger) string {
+	optsRootDirectory := opts.RootDirectory
 	// don't mess with the path if this installation isn't pointing to a kolide server URL
 	if opts.ControlServerURL != "k2device.kolide.com" && opts.ControlServerURL != "k2device-preprod.kolide.com" {
 		return optsRootDirectory
