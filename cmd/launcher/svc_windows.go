@@ -29,6 +29,11 @@ import (
 // TODO This should be inherited from some setting
 const serviceName = "launcher"
 
+var likelyRootDirPaths = []string{
+	"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data",
+	"C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data",
+}
+
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
@@ -247,14 +252,14 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 // determineRootDirectory is used specifically for windows deployments to override the
 // configured root directory if another one containing a launcher DB already exists
-func determineRootDirectory(optsRootDirectory string, slogger *slog.Logger) string {
-	optsDBLocation := filepath.Join(optsRootDirectory, "launcher.db")
-	// database already exists in configured root directory, keep that
-	dbExists, err := nonEmptyFileExists(optsDBLocation)
-	if err == nil && dbExists {
+func determineRootDirectory(optsRootDirectory string, slogger *slog.Logger, opts *launcher.Options) string {
+	// don't mess with the path if this installation isn't pointing to a kolide server URL
+	if opts.ControlServerURL != "k2device.kolide.com" && opts.ControlServerURL != "k2device-preprod.kolide.com" {
 		return optsRootDirectory
 	}
 
+	optsDBLocation := filepath.Join(optsRootDirectory, "launcher.db")
+	dbExists, err := nonEmptyFileExists(optsDBLocation)
 	// If we get an unknown error, back out from making any options changes. This is an
 	// unlikely path but doesn't feel right updating the rootDirectory without knowing what's going
 	// on here
@@ -268,13 +273,13 @@ func determineRootDirectory(optsRootDirectory string, slogger *slog.Logger) stri
 		return optsRootDirectory
 	}
 
-	// we know this is a fresh install with no launcher.db in the configured root directory,
-	// check likely locations and return updated rootDirectory if found
-	likelyRootDirPaths := []string{
-		"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data",
-		"C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data",
+	// database already exists in configured root directory, keep that
+	if dbExists {
+		return optsRootDirectory
 	}
 
+	// we know this is a fresh install with no launcher.db in the configured root directory,
+	// check likely locations and return updated rootDirectory if found
 	for _, path := range likelyRootDirPaths {
 		if path == optsRootDirectory { // we already know this does not contain an enrolled DB
 			continue
