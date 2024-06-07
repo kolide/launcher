@@ -60,7 +60,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	hardwareUUIDChanged := false
 	munemoChanged := false
 
-	defer k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...",
+	defer k.Slogger().Log(ctx, slog.LevelDebug, "finished check to see if database should be reset...",
 		"serial", serialChanged,
 		"hardware_uuid", hardwareUUIDChanged,
 		"munemo", munemoChanged,
@@ -82,16 +82,16 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	}
 
 	if serialChanged || hardwareUUIDChanged || munemoChanged {
-		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or enrollment",
-			"serial_changed", serialChanged,
-			"hardware_uuid_changed", hardwareUUIDChanged,
-			"tenant_munemo_changed", munemoChanged,
-		)
-
 		// In the future, we can proceed with backing up and resetting the database.
 		// For now, we are only logging that we detected the change until we have a dependable
 		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
 		/*
+			k.Slogger().Log(ctx, slog.LevelWarn, "resetting the database",
+				"serial_changed", serialChanged,
+				"hardware_uuid_changed", hardwareUUIDChanged,
+				"tenant_munemo_changed", munemoChanged,
+			)
+
 			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
 				k.Slogger().Log(ctx, slog.LevelError, "failed to reset database", "err", err)
 			}
