@@ -103,7 +103,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 	// unlikely path but doesn't feel right updating the rootDirectory without knowing what's going
 	// on here
 	if err != nil {
-		// we should add logs here when available
+		// we should add logs here when available - revisit with https://github.com/kolide/launcher/issues/1698
 		return optsRootDirectory
 	}
 
@@ -126,7 +126,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 		}
 
 		if err != nil {
-			// we should add logs here when available
+			// we should add logs here when available - revisit with https://github.com/kolide/launcher/issues/1698
 			continue
 		}
 	}
