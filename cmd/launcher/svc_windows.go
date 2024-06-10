@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
@@ -54,7 +53,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		rootDirectoryChanged := false
 		optsRootDirectory := opts.RootDirectory
 		// check for old root directories before creating DB in case we've stomped over with windows MSI install
-		updatedRootDirectory := tuf.DetermineRootDirectoryOverride(systemSlogger.Logger, opts.RootDirectory, opts.KolideServerURL)
+		updatedRootDirectory := launcher.DetermineRootDirectoryOverride(systemSlogger.Logger, opts.RootDirectory, opts.KolideServerURL)
 		if updatedRootDirectory != opts.RootDirectory {
 			opts.RootDirectory = updatedRootDirectory
 			// cache that we did this so we can log to debug.json when set up below
