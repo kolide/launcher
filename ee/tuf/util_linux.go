@@ -6,6 +6,7 @@ package tuf
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -35,4 +36,9 @@ func checkExecutablePermissions(potentialBinary string) error {
 	}
 
 	return nil
+}
+
+// DetermineRootDirectoryOverride is a no-op on non-windows platforms
+func DetermineRootDirectoryOverride(_ *slog.Logger, optsRootDirectory, kolideServerURL string) string {
+	return optsRootDirectory
 }
