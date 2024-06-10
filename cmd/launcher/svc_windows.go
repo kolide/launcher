@@ -50,16 +50,6 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	logger := log.NewNopLogger()
 
 	if opts.RootDirectory != "" {
-		rootDirectoryChanged := false
-		optsRootDirectory := opts.RootDirectory
-		// check for old root directories before creating DB in case we've stomped over with windows MSI install
-		updatedRootDirectory := launcher.DetermineRootDirectoryOverride(systemSlogger.Logger, opts.RootDirectory, opts.KolideServerURL)
-		if updatedRootDirectory != opts.RootDirectory {
-			opts.RootDirectory = updatedRootDirectory
-			// cache that we did this so we can log to debug.json when set up below
-			rootDirectoryChanged = true
-		}
-
 		// Create a local logger. This logs to a known path, and aims to help diagnostics
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = ll
@@ -73,14 +63,6 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
-
-		if rootDirectoryChanged {
-			localSlogger.Log(context.TODO(), slog.LevelInfo,
-				"old root directory contents detected, overriding opts.RootDirectory",
-				"opts_root_directory", optsRootDirectory,
-				"updated_root_directory", updatedRootDirectory,
-			)
-		}
 	}
 
 	// Confirm that service configuration is up-to-date

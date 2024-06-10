@@ -367,6 +367,14 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		*flKolideHosted = true
 	}
 
+	if runtime.GOOS == "windows" {
+		// check for old root directories before returning the configured option in case we've stomped over with windows MSI install
+		updatedRootDirectory := DetermineRootDirectoryOverride(*flRootDirectory, *flKolideServerURL)
+		if updatedRootDirectory != *flRootDirectory {
+			*flRootDirectory = updatedRootDirectory
+		}
+	}
+
 	opts := &Options{
 		Autoupdate:                         *flAutoupdate,
 		AutoupdateInterval:                 *flAutoupdateInterval,

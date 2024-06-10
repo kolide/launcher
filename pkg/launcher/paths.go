@@ -1,8 +1,6 @@
 package launcher
 
 import (
-	"context"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -87,7 +85,9 @@ func DefaultPath(path defaultPath) string {
 
 // DetermineRootDirectoryOverride is used specifically for windows deployments to override the
 // configured root directory if another well known location containing a launcher DB already exists
-func DetermineRootDirectoryOverride(slogger *slog.Logger, optsRootDirectory, kolideServerURL string) string {
+// This is used by ParseOptions which doesn't have access to a logger, we should add more logging here
+// when we have that available
+func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) string {
 	if runtime.GOOS != "windows" {
 		return optsRootDirectory
 	}
@@ -103,12 +103,7 @@ func DetermineRootDirectoryOverride(slogger *slog.Logger, optsRootDirectory, kol
 	// unlikely path but doesn't feel right updating the rootDirectory without knowing what's going
 	// on here
 	if err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"encountered error checking for pre-existing launcher.db",
-			"location", optsDBLocation,
-			"err", err,
-		)
-
+		// we should add logs here when available
 		return optsRootDirectory
 	}
 
@@ -131,13 +126,7 @@ func DetermineRootDirectoryOverride(slogger *slog.Logger, optsRootDirectory, kol
 		}
 
 		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
-				"encountered error checking non-configured locations for launcher.db",
-				"opts_location", optsDBLocation,
-				"tested_location", testingLocation,
-				"err", err,
-			)
-
+			// we should add logs here when available
 			continue
 		}
 	}
