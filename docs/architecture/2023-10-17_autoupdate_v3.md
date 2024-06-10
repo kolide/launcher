@@ -14,6 +14,8 @@ Changes rolled out to beta channel in November 2023.
 
 Slow rollout to stable channel began January 2024.
 
+Rollout to stable completed by February 2024.
+
 Supersedes: [Launcher Auto Update Process Version 2](2019-09-05_autoupdate_v2.md)
 
 ## Context
