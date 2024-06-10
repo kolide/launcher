@@ -219,11 +219,12 @@ func Test_AllowedOrigin(t *testing.T) {
 	challengeData := []byte(ulid.New())
 
 	var tests = []struct {
-		name           string
-		requestOrigin  string
-		allowedOrigins []string
-		logStr         string
-		expectedStatus int
+		name            string
+		requestOrigin   string
+		requestReferrer string
+		allowedOrigins  []string
+		logStr          string
+		expectedStatus  int
 	}{
 		{
 			name:           "no allowed specified",
@@ -277,6 +278,13 @@ func Test_AllowedOrigin(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			logStr:         "origin matches allowlist",
 		},
+		{
+			name:            "no allowed specified origin, but acceptable referer is present",
+			allowedOrigins:  []string{"https://auth.example.com", "https://login.example.com"},
+			requestReferrer: "https://auth.example.com",
+			expectedStatus:  http.StatusOK,
+			logStr:          "origin matches allowlist",
+		},
 	}
 
 	for _, tt := range tests {
@@ -320,6 +328,7 @@ func Test_AllowedOrigin(t *testing.T) {
 
 			req := makeGetRequest(t, encodedChallenge)
 			req.Header.Set("origin", tt.requestOrigin)
+			req.Header.Set("referer", tt.requestReferrer)
 
 			rr := httptest.NewRecorder()
 			h.ServeHTTP(rr, req)

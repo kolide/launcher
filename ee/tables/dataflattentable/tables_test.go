@@ -3,6 +3,7 @@ package dataflattentable
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -24,9 +25,9 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 
 	// Test plist parsing both the json and xml forms
 	testTables := map[string]Table{
-		"plist": {slogger: slogger, flattenFileFunc: dataflatten.PlistFile},
-		"xml":   {slogger: slogger, flattenFileFunc: dataflatten.PlistFile},
-		"json":  {slogger: slogger, flattenFileFunc: dataflatten.JsonFile},
+		"plist": {slogger: slogger, flattenFileFunc: dataflatten.PlistFile, flattenBytesFunc: dataflatten.Plist},
+		"xml":   {slogger: slogger, flattenFileFunc: dataflatten.PlistFile, flattenBytesFunc: dataflatten.Plist},
+		"json":  {slogger: slogger, flattenFileFunc: dataflatten.JsonFile, flattenBytesFunc: dataflatten.Json},
 	}
 
 	var tests = []struct {
@@ -57,19 +58,44 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 	for _, tt := range tests {
 		for dataType, tableFunc := range testTables {
 			testFile := filepath.Join("testdata", "animals."+dataType)
-			mockQC := tablehelpers.MockQueryContext(map[string][]string{
+
+			// test file path
+			mockPathQC := tablehelpers.MockQueryContext(map[string][]string{
 				"path":  {testFile},
 				"query": tt.queries,
 			})
 
-			rows, err := tableFunc.generate(context.TODO(), mockQC)
-
+			rows, err := tableFunc.generate(context.TODO(), mockPathQC)
 			require.NoError(t, err)
 
 			// delete the path and query keys, so we don't need to enumerate them in the test case
 			for _, row := range rows {
 				delete(row, "path")
 				delete(row, "query")
+			}
+
+			// Despite being an array. data is returned unordered. Sort it.
+			sort.SliceStable(tt.expected, func(i, j int) bool { return tt.expected[i]["fullkey"] < tt.expected[j]["fullkey"] })
+			sort.SliceStable(rows, func(i, j int) bool { return rows[i]["fullkey"] < rows[j]["fullkey"] })
+
+			require.EqualValues(t, tt.expected, rows, "table type %s test", dataType)
+
+			// test bytes path
+			raw_data, err := os.ReadFile(testFile)
+			require.NoError(t, err)
+
+			mockBytesQC := tablehelpers.MockQueryContext(map[string][]string{
+				"raw_data": {string(raw_data)},
+				"query":    tt.queries,
+			})
+
+			rows, err = tableFunc.generate(context.TODO(), mockBytesQC)
+			require.NoError(t, err)
+
+			// delete the query keys, so we don't need to enumerate them in the test case
+			for _, row := range rows {
+				delete(row, "query")
+				delete(row, "raw_data")
 			}
 
 			// Despite being an array. data is returned unordered. Sort it.

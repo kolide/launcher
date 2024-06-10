@@ -27,6 +27,7 @@ type autoupdateConfig struct {
 	updateDirectory      string
 	channel              string
 	localDevelopmentPath string
+	hostname             string
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
@@ -44,6 +45,18 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 	// Short-circuit lookup for local launcher test builds
 	if binary == binaryLauncher && cfg.localDevelopmentPath != "" {
 		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
+	}
+
+	// check for old root directories before returning final config in case we've stomped over with windows MSI install
+	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(cfg.rootDirectory, cfg.hostname)
+	if updatedRootDirectory != cfg.rootDirectory {
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"old root directory contents detected, overriding for autoupdate config",
+			"opts_root_directory", cfg.rootDirectory,
+			"updated_root_directory", updatedRootDirectory,
+		)
+
+		cfg.rootDirectory = updatedRootDirectory
 	}
 
 	// Get update channel from startup settings
@@ -112,12 +125,13 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	pflagSet.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
 
 	// Extract the config flag plus the autoupdate flags
-	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath string
+	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath, flHostname string
 	pflagSet.StringVar(&flConfigFilePath, "config", "", "")
 	pflagSet.StringVar(&flRootDirectory, "root_directory", "", "")
 	pflagSet.StringVar(&flUpdateDirectory, "update_directory", "", "")
 	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
 	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
+	pflagSet.StringVar(&flHostname, "hostname", "", "")
 
 	if err := pflagSet.Parse(argsToParse); err != nil {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
@@ -171,6 +185,8 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 			cfg.channel = value
 		case "localdev_path":
 			cfg.localDevelopmentPath = value
+		case "hostname":
+			cfg.hostname = value
 		}
 		return nil
 	}); err != nil {

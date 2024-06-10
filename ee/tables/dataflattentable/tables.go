@@ -38,11 +38,6 @@ var (
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JsonlFile },
 		tableName:        "kolide_jsonl",
 	}
-	JWTType = DataSourceType{
-		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.JWT },
-		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.JWTFile },
-		tableName:        "kolide_jwt",
-	}
 	XmlType = DataSourceType{
 		flattenBytesFunc: func(_ string) dataflatten.DataFunc { return dataflatten.Xml },
 		flattenFileFunc:  func(_ string) dataflatten.DataFileFunc { return dataflatten.XmlFile },
@@ -115,16 +110,16 @@ func AllTablePlugins(slogger *slog.Logger) []osquery.OsqueryPlugin {
 		TablePlugin(slogger, IniType),
 		TablePlugin(slogger, PlistType),
 		TablePlugin(slogger, JsonlType),
-		TablePlugin(slogger, JWTType),
 	}
 }
 
 func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
-	columns := Columns(table.TextColumn("path"))
+	columns := Columns(table.TextColumn("path"), table.TextColumn("raw_data"))
 
 	t := &Table{
-		tableName:       dataSourceType.TableName(),
-		flattenFileFunc: dataSourceType.FlattenFileFunc(""),
+		tableName:        dataSourceType.TableName(),
+		flattenFileFunc:  dataSourceType.FlattenFileFunc(""),
+		flattenBytesFunc: dataSourceType.FlattenBytesFunc(""),
 	}
 
 	t.slogger = slogger.With("table", t.tableName)
@@ -137,8 +132,15 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var results []map[string]string
 
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
-	if len(requestedPaths) == 0 {
-		return results, fmt.Errorf("The %s table requires that you specify a single constraint for path", t.tableName)
+	requestedRawDatas := tablehelpers.GetConstraints(queryContext, "raw_data")
+
+	if len(requestedPaths) == 0 && len(requestedRawDatas) == 0 {
+		return results, fmt.Errorf("The %s table requires that you specify at least one of 'path' or 'raw_data'", t.tableName)
+	}
+
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithSlogger(t.slogger),
+		dataflatten.WithNestedPlist(),
 	}
 
 	for _, requestedPath := range requestedPaths {
@@ -151,7 +153,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		for _, filePath := range filePaths {
 			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-				subresults, err := t.generatePath(ctx, filePath, dataQuery)
+				subresults, err := t.generatePath(ctx, filePath, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
 				if err != nil {
 					t.slogger.Log(ctx, slog.LevelInfo,
 						"failed to get data for path",
@@ -165,16 +167,43 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			}
 		}
 	}
+
+	for _, rawdata := range requestedRawDatas {
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+			subresults, err := t.generateRawData(ctx, rawdata, dataQuery, append(flattenOpts, dataflatten.WithQuery(strings.Split(dataQuery, "/")))...)
+			if err != nil {
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"failed to generate for raw_data",
+					"err", err,
+				)
+				continue
+			}
+
+			results = append(results, subresults...)
+		}
+	}
+
 	return results, nil
 }
 
-func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string) ([]map[string]string, error) {
-	flattenOpts := []dataflatten.FlattenOpts{
-		dataflatten.WithSlogger(t.slogger),
-		dataflatten.WithNestedPlist(),
-		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+func (t *Table) generateRawData(ctx context.Context, rawdata string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+	data, err := t.flattenBytesFunc([]byte(rawdata), flattenOpts...)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"failure parsing raw data",
+			"err", err,
+		)
+		return nil, fmt.Errorf("parsing data: %w", err)
 	}
 
+	rowData := map[string]string{
+		"raw_data": rawdata,
+	}
+
+	return ToMap(data, dataQuery, rowData), nil
+}
+
+func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
 	data, err := t.flattenFileFunc(filePath, flattenOpts...)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
