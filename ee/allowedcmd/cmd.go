@@ -4,7 +4,7 @@ package allowedcmd
 // We mostly use hardcoded (known, safe) paths to executables, but make an exception
 // to allow for looking up executable locations when it's not possible to know these
 // locations in advance -- e.g. on NixOS, we cannot know the specific store path ahead
-// of time.
+// of time. All usage of exec.Cmd in launcher should use this package.
 
 import (
 	"context"
