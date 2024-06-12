@@ -49,8 +49,8 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	localSlogger := multislogger.New()
 	logger := log.NewNopLogger()
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
+		// Create a local logger. This logs to a known path, and aims to help diagnostics
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = ll
 

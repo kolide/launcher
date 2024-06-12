@@ -7,7 +7,7 @@
   "users": [
     {
       "favorites": [
-	"ants"
+        "ants"
       ],
       "uuid": "abc123",
       "name": "Alex Aardvark",
@@ -15,8 +15,8 @@
     },
     {
       "favorites": [
-	"mice",
-	"birds"
+        "mice",
+        "birds"
       ],
       "uuid": "def456",
       "name": "Bailey Bobcat",
@@ -24,7 +24,7 @@
     },
     {
       "favorites": [
-	"seeds"
+        "seeds"
       ],
       "uuid": "ghi789",
       "name": "Cam Chipmunk",
