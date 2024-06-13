@@ -49,6 +49,7 @@ require (
 	github.com/apache/thrift v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
+	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
 	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
@@ -62,12 +63,12 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/samber/lo v1.38.1 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
@@ -116,9 +117,8 @@ require (
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
