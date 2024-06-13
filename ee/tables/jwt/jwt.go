@@ -72,7 +72,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			for _, includeRawJWT := range tablehelpers.GetConstraints(queryContext, "include_raw_jwt", tablehelpers.WithAllowedValues(allowedIncludeValues), tablehelpers.WithDefaults("false")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 					rawData, err := os.ReadFile(path)
-					if err != nil {
+					if len(rawData) == 0 || err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo, "error reading JWT data file", "err", err)
 						continue
 					}
