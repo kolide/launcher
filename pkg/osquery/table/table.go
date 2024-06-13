@@ -24,7 +24,7 @@ import (
 func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		LauncherConfigTable(k.ConfigStore()),
-		LauncherDbInfo(k.BboltDB()),
+		LauncherDbInfo(k.StorageStatTracker()),
 		LauncherInfoTable(k.ConfigStore()),
 		launcher_db.TablePlugin("kolide_server_data", k.ServerProvidedDataStore()),
 		launcher_db.TablePlugin("kolide_control_flags", k.AgentFlagsStore()),

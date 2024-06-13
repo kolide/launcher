@@ -2,31 +2,28 @@ package table
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/osquery/osquery-go/plugin/table"
-	"go.etcd.io/bbolt"
 )
 
-func LauncherDbInfo(db *bbolt.DB) *table.Plugin {
+func LauncherDbInfo(sStatTracker types.StorageStatTracker) *table.Plugin {
 	columns := dataflattentable.Columns()
-	return table.NewPlugin("kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
+	return table.NewPlugin("kolide_launcher_db_info", columns, generateLauncherDbInfo(sStatTracker))
 }
 
-func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
+func generateLauncherDbInfo(sStatTracker types.StorageStatTracker) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		stats, err := agent.GetStats(db)
-		if err != nil {
-			return nil, err
+		if sStatTracker == nil {
+			return nil, fmt.Errorf("unable to gather db info without stat tracking connection")
 		}
 
-		statsJson, err := json.Marshal(stats)
+		statsJson, err := sStatTracker.GetStats()
 		if err != nil {
 			return nil, err
 		}

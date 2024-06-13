@@ -55,6 +55,16 @@ type Appender interface {
 	AppendValues(values ...[]byte) error
 }
 
+// StorageStatTracker is an interface towards exposing the
+// statistics of an underlying storage methodology
+type StorageStatTracker interface {
+	// GetStats will return any relevant global and bucket-level statistics
+	// for the underlying storage methodology, expected as a json blob
+	GetStats() ([]byte, error)
+	// Size will return the total size in bytes for the stored key-value pairs
+	SizeBytes() (int64, error)
+}
+
 // GetterSetter is an interface that groups the Get and Set methods.
 type GetterSetter interface {
 	Getter
