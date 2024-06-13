@@ -22,7 +22,9 @@ import (
 type storeName int
 
 const (
-	StartupSettingsStore storeName = iota
+	StartupSettingsStore   storeName = iota
+	HealthCheckStore       storeName = 1
+	RestartServiceLogStore storeName = 2
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
@@ -33,6 +35,10 @@ func (s storeName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
+	case HealthCheckStore:
+		return "health_check_results"
+	case RestartServiceLogStore:
+		return "restart_service_logs"
 	}
 
 	return ""
