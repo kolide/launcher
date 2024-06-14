@@ -259,6 +259,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// pickup
 	internal.RecordLauncherVersion(ctx, rootDirectory)
 
+	p := agentbbolt.NewDatabasePhotographer(k)
+	runGroup.Add("databasePhotographer", p.Execute, p.Interrupt)
+
 	// create the certificate pool
 	var rootPool *x509.CertPool
 	if k.RootPEM() != "" {
