@@ -14,45 +14,44 @@ import (
 )
 
 const (
-	snapshotInitialDelay = 10 * time.Minute
-	snapshotInterval     = 1 * time.Hour
+	backupInitialDelay = 10 * time.Minute
+	backupInterval     = 1 * time.Hour
 )
 
-// A photographer takes snapshots.
-// TODO RM - A better name.
-type photographer struct {
+// databaseBackupMaintainer periodically takes backups of launcher.db.
+type databaseBackupMaintainer struct {
 	knapsack    types.Knapsack
 	slogger     *slog.Logger
 	interrupt   chan struct{}
 	interrupted bool
 }
 
-func NewDatabasePhotographer(k types.Knapsack) *photographer {
-	return &photographer{
+func NewDatabaseBackupMaintainer(k types.Knapsack) *databaseBackupMaintainer {
+	return &databaseBackupMaintainer{
 		knapsack:  k,
-		slogger:   k.Slogger().With("component", "database_photographer"),
+		slogger:   k.Slogger().With("component", "database_backup_maintainer"),
 		interrupt: make(chan struct{}, 1),
 	}
 }
 
-func (p *photographer) Execute() error {
-	// Wait a little bit after startup before taking first snapshot, to allow for enrollment
+func (d *databaseBackupMaintainer) Execute() error {
+	// Wait a little bit after startup before taking first backup, to allow for enrollment
 	select {
-	case <-p.interrupt:
-		p.slogger.Log(context.TODO(), slog.LevelDebug,
+	case <-d.interrupt:
+		d.slogger.Log(context.TODO(), slog.LevelDebug,
 			"received external interrupt during initial delay, stopping",
 		)
 		return nil
-	case <-time.After(snapshotInitialDelay):
+	case <-time.After(backupInitialDelay):
 		break
 	}
 
-	// Take periodic snapshots
-	ticker := time.NewTicker(snapshotInterval)
+	// Take periodic backups
+	ticker := time.NewTicker(backupInterval)
 	defer ticker.Stop()
 	for {
-		if err := p.backupDb(); err != nil {
-			p.slogger.Log(context.TODO(), slog.LevelWarn,
+		if err := d.backupDb(); err != nil {
+			d.slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not perform periodic database backup",
 				"err", err,
 			)
@@ -61,8 +60,8 @@ func (p *photographer) Execute() error {
 		select {
 		case <-ticker.C:
 			continue
-		case <-p.interrupt:
-			p.slogger.Log(context.TODO(), slog.LevelDebug,
+		case <-d.interrupt:
+			d.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupt received, exiting execute loop",
 			)
 			return nil
@@ -70,20 +69,20 @@ func (p *photographer) Execute() error {
 	}
 }
 
-func (p *photographer) Interrupt(_ error) {
+func (d *databaseBackupMaintainer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if p.interrupted {
+	if d.interrupted {
 		return
 	}
-	p.interrupted = true
+	d.interrupted = true
 
-	p.interrupt <- struct{}{}
+	d.interrupt <- struct{}{}
 }
 
-func (p *photographer) backupDb() error {
+func (d *databaseBackupMaintainer) backupDb() error {
 	// Take backup -- it's fine to just overwrite previous backups
-	backupLocation := BackupLauncherDbLocation(p.knapsack.RootDirectory())
-	if err := p.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
+	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
+	if err := d.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		return tx.CopyFile(backupLocation, 0600)
 	}); err != nil {
 		return fmt.Errorf("backing up database: %w", err)
@@ -97,7 +96,7 @@ func (p *photographer) backupDb() error {
 	}
 
 	// Log success
-	p.slogger.Log(context.TODO(), slog.LevelDebug,
+	d.slogger.Log(context.TODO(), slog.LevelDebug,
 		"took backup",
 		"backup_location", backupLocation,
 	)
