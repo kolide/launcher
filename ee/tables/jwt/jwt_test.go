@@ -34,6 +34,10 @@ func TestTransformOutput(t *testing.T) {
 		res  map[string]string
 	}{
 		{
+			name: "empty token",
+			path: "testdata/empty",
+		},
+		{
 			name: "rsa256 JWT valid",
 			path: "testdata/rsa256.raw",
 			keys: map[string]string{
@@ -149,7 +153,12 @@ func TestTransformOutput(t *testing.T) {
 			rows, err := jwtTable.generate(context.TODO(), mockQC)
 
 			require.NoError(t, err)
-			require.Contains(t, rows, tt.res, "generated rows should contain the expected result")
+
+			if tt.name == "empty token" {
+				require.Nil(t, rows, "the result should be nil for an empty token")
+			} else {
+				require.Contains(t, rows, tt.res, "generated rows should contain the expected result")
+			}
 		})
 	}
 }
