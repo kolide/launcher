@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/launcher"
 	"go.etcd.io/bbolt"
 )
 
@@ -89,7 +88,7 @@ func (d *databaseBackupSaver) backupDb() error {
 	}
 
 	// Confirm file exists and is nonempty
-	if exists, err := launcher.NonEmptyFileExists(backupLocation); !exists {
+	if exists, err := nonEmptyFileExists(backupLocation); !exists {
 		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", backupLocation)
 	} else if err != nil {
 		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
@@ -110,7 +109,7 @@ func (d *databaseBackupSaver) backupDb() error {
 func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
 	// Check first to see if the regular database exists
 	originalDbLocation := LauncherDbLocation(rootDir)
-	if originalDbExists, err := launcher.NonEmptyFileExists(originalDbLocation); originalDbExists {
+	if originalDbExists, err := nonEmptyFileExists(originalDbLocation); originalDbExists {
 		// DB exists -- we should use that
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"launcher.db exists, no need to use backup",
@@ -128,7 +127,7 @@ func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
 
 	// Launcher DB doesn't exist -- check to see if the backup does
 	backupLocation := BackupLauncherDbLocation(rootDir)
-	backupDbExists, err := launcher.NonEmptyFileExists(backupLocation)
+	backupDbExists, err := nonEmptyFileExists(backupLocation)
 	if !backupDbExists {
 		// Backup DB doesn't exist either -- this is likely a fresh install.
 		// Nothing to do here; launcher should create a new DB.
@@ -170,4 +169,17 @@ func LauncherDbLocation(rootDir string) string {
 
 func BackupLauncherDbLocation(rootDir string) string {
 	return filepath.Join(rootDir, "launcher.db.bak")
+}
+
+func nonEmptyFileExists(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return fileInfo.Size() > 0, nil
 }

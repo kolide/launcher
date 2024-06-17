@@ -98,7 +98,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 	}
 
 	optsDBLocation := filepath.Join(optsRootDirectory, "launcher.db")
-	dbExists, err := NonEmptyFileExists(optsDBLocation)
+	dbExists, err := nonEmptyFileExists(optsDBLocation)
 	// If we get an unknown error, back out from making any options changes. This is an
 	// unlikely path but doesn't feel right updating the rootDirectory without knowing what's going
 	// on here
@@ -120,7 +120,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 		}
 
 		testingLocation := filepath.Join(path, "launcher.db")
-		dbExists, err := NonEmptyFileExists(testingLocation)
+		dbExists, err := nonEmptyFileExists(testingLocation)
 		if err == nil && dbExists {
 			return path
 		}
@@ -136,7 +136,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 	return optsRootDirectory
 }
 
-func NonEmptyFileExists(path string) (bool, error) {
+func nonEmptyFileExists(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
