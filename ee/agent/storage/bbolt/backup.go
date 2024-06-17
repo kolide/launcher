@@ -18,23 +18,23 @@ const (
 	backupInterval     = 1 * time.Hour
 )
 
-// databaseBackupMaintainer periodically takes backups of launcher.db.
-type databaseBackupMaintainer struct {
+// databaseBackupSaver periodically takes backups of launcher.db.
+type databaseBackupSaver struct {
 	knapsack    types.Knapsack
 	slogger     *slog.Logger
 	interrupt   chan struct{}
 	interrupted bool
 }
 
-func NewDatabaseBackupMaintainer(k types.Knapsack) *databaseBackupMaintainer {
-	return &databaseBackupMaintainer{
+func NewDatabaseBackupSaver(k types.Knapsack) *databaseBackupSaver {
+	return &databaseBackupSaver{
 		knapsack:  k,
-		slogger:   k.Slogger().With("component", "database_backup_maintainer"),
+		slogger:   k.Slogger().With("component", "database_backup_saver"),
 		interrupt: make(chan struct{}, 1),
 	}
 }
 
-func (d *databaseBackupMaintainer) Execute() error {
+func (d *databaseBackupSaver) Execute() error {
 	// Wait a little bit after startup before taking first backup, to allow for enrollment
 	select {
 	case <-d.interrupt:
@@ -69,7 +69,7 @@ func (d *databaseBackupMaintainer) Execute() error {
 	}
 }
 
-func (d *databaseBackupMaintainer) Interrupt(_ error) {
+func (d *databaseBackupSaver) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if d.interrupted {
 		return
@@ -79,7 +79,7 @@ func (d *databaseBackupMaintainer) Interrupt(_ error) {
 	d.interrupt <- struct{}{}
 }
 
-func (d *databaseBackupMaintainer) backupDb() error {
+func (d *databaseBackupSaver) backupDb() error {
 	// Take backup -- it's fine to just overwrite previous backups
 	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
 	if err := d.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {

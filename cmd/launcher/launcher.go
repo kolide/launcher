@@ -260,8 +260,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// pickup
 	internal.RecordLauncherVersion(ctx, rootDirectory)
 
-	dbBackupMaintainer := agentbbolt.NewDatabaseBackupMaintainer(k)
-	runGroup.Add("databaseBackupMaintainer", dbBackupMaintainer.Execute, dbBackupMaintainer.Interrupt)
+	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
+	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool

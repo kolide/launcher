@@ -114,7 +114,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testKnapsack := typesmocks.NewKnapsack(t)
 	testKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	p := NewDatabaseBackupMaintainer(testKnapsack)
+	p := NewDatabaseBackupSaver(testKnapsack)
 
 	// Start and then interrupt
 	go p.Execute()
