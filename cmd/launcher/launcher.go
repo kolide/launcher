@@ -168,6 +168,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
+	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
 	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
 	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {

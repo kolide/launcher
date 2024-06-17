@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -102,6 +103,66 @@ func (p *photographer) backupDb() error {
 	)
 
 	return nil
+}
+
+// UseBackupDbIfNeeded falls back to the backup database IFF the original database does not exist
+// and the backup does. In this case, it renames the backup database to the expected filename
+// launcher.db.
+func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
+	// Check first to see if the regular database exists
+	originalDbLocation := LauncherDbLocation(rootDir)
+	if originalDbExists, err := launcher.NonEmptyFileExists(originalDbLocation); originalDbExists {
+		// DB exists -- we should use that
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"launcher.db exists, no need to use backup",
+			"db_location", originalDbLocation,
+		)
+		return
+	} else if err != nil {
+		// Can't determine whether the db exists -- err on the side of not replacing it
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not determine whether original launcher db exists, not going to use backup",
+			"err", err,
+		)
+		return
+	}
+
+	// Launcher DB doesn't exist -- check to see if the backup does
+	backupLocation := BackupLauncherDbLocation(rootDir)
+	backupDbExists, err := launcher.NonEmptyFileExists(backupLocation)
+	if !backupDbExists {
+		// Backup DB doesn't exist either -- this is likely a fresh install.
+		// Nothing to do here; launcher should create a new DB.
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"both launcher db and backup db do not exist -- likely a fresh install",
+		)
+		return
+	}
+	if err != nil {
+		// Couldn't determine if the backup DB exists -- let launcher create a new DB instead.
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not determine whether backup launcher db exists, not going to use backup",
+			"err", err,
+		)
+		return
+	}
+
+	// The backup database exists, and the original one does not. Rename the backup
+	// to the original so we can use it.
+	if err := os.Rename(backupLocation, originalDbLocation); err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not rename backup db",
+			"backup_location", backupLocation,
+			"original_location", originalDbLocation,
+			"err", err,
+		)
+		return
+	}
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"original db does not exist and backup does -- using backup db",
+		"backup_location", backupLocation,
+		"original_location", originalDbLocation,
+	)
 }
 
 func LauncherDbLocation(rootDir string) string {
