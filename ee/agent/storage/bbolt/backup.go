@@ -92,13 +92,13 @@ func (d *databaseBackupSaver) backupDb() error {
 		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", backupLocation)
 	} else if err != nil {
 		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
+	} else {
+		// Log success
+		d.slogger.Log(context.TODO(), slog.LevelDebug,
+			"took backup",
+			"backup_location", backupLocation,
+		)
 	}
-
-	// Log success
-	d.slogger.Log(context.TODO(), slog.LevelDebug,
-		"took backup",
-		"backup_location", backupLocation,
-	)
 
 	return nil
 }
