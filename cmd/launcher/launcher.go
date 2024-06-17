@@ -169,7 +169,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// unimplemented on windows, though empirically it seems to
 	// work.
 	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
 	}
