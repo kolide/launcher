@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 	"go.etcd.io/bbolt"
 )
 
@@ -89,15 +89,10 @@ func (p *photographer) backupDb() error {
 	}
 
 	// Confirm file exists and is nonempty
-	fileInfo, err := os.Stat(backupLocation)
-	if os.IsNotExist(err) {
-		return fmt.Errorf("backup succeeded, but no file at backup location %s", backupLocation)
-	}
-	if err != nil {
-		return fmt.Errorf("checking %s exists after taking backup: %w", backupLocation, err)
-	}
-	if fileInfo.Size() <= 0 {
-		return fmt.Errorf("backup succeeded, but backup database at %s is empty", backupLocation)
+	if exists, err := launcher.NonEmptyFileExists(backupLocation); !exists {
+		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", backupLocation)
+	} else if err != nil {
+		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
 	}
 
 	// Log success
