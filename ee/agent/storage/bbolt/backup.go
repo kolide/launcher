@@ -112,19 +112,20 @@ func (d *databaseBackupSaver) backupDb() error {
 func (d *databaseBackupSaver) rotate() error {
 	baseBackupPath := BackupLauncherDbLocation(d.knapsack.RootDirectory())
 
-	for i := numberOfOldBackupsToRetain; i > 0; i -= 1 {
+	// Delete the oldest backup, if it exists
+	oldestBackupPath := fmt.Sprintf("%s.%d", baseBackupPath, numberOfOldBackupsToRetain)
+	if _, err := os.Stat(oldestBackupPath); err == nil {
+		if err := os.Remove(oldestBackupPath); err != nil {
+			return fmt.Errorf("removing oldest backup %s during rotation: %w", oldestBackupPath, err)
+		}
+	}
+
+	// Rename all other backups
+	for i := numberOfOldBackupsToRetain - 1; i > 0; i -= 1 {
 		currentBackupPath := fmt.Sprintf("%s.%d", baseBackupPath, i)
 
 		// This backup doesn't exist yet -- skip it
 		if _, err := os.Stat(currentBackupPath); err != nil && os.IsNotExist(err) {
-			continue
-		}
-
-		// If is the oldest backup, delete it so we can rotate a new one into its place
-		if i == numberOfOldBackupsToRetain {
-			if err := os.Remove(currentBackupPath); err != nil {
-				return fmt.Errorf("removing oldest backup %s during rotation: %w", currentBackupPath, err)
-			}
 			continue
 		}
 
