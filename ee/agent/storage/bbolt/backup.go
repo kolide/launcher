@@ -169,9 +169,8 @@ func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
 	}
 
 	// Launcher DB doesn't exist -- check to see if the backup does
-	backupLocation := BackupLauncherDbLocation(rootDir)
-	backupDbExists, err := nonEmptyFileExists(backupLocation)
-	if !backupDbExists {
+	latestBackupLocation := latestBackupDb(rootDir)
+	if latestBackupLocation == "" {
 		// Backup DB doesn't exist either -- this is likely a fresh install.
 		// Nothing to do here; launcher should create a new DB.
 		slogger.Log(context.TODO(), slog.LevelInfo,
@@ -179,21 +178,13 @@ func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
 		)
 		return
 	}
-	if err != nil {
-		// Couldn't determine if the backup DB exists -- let launcher create a new DB instead.
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not determine whether backup launcher db exists, not going to use backup",
-			"err", err,
-		)
-		return
-	}
 
 	// The backup database exists, and the original one does not. Rename the backup
 	// to the original so we can use it.
-	if err := os.Rename(backupLocation, originalDbLocation); err != nil {
+	if err := os.Rename(latestBackupLocation, originalDbLocation); err != nil {
 		slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not rename backup db",
-			"backup_location", backupLocation,
+			"backup_location", latestBackupLocation,
 			"original_location", originalDbLocation,
 			"err", err,
 		)
@@ -201,7 +192,7 @@ func UseBackupDbIfNeeded(rootDir string, slogger *slog.Logger) {
 	}
 	slogger.Log(context.TODO(), slog.LevelInfo,
 		"original db does not exist and backup does -- using backup db",
-		"backup_location", backupLocation,
+		"backup_location", latestBackupLocation,
 		"original_location", originalDbLocation,
 	)
 }
@@ -212,6 +203,22 @@ func LauncherDbLocation(rootDir string) string {
 
 func BackupLauncherDbLocation(rootDir string) string {
 	return filepath.Join(rootDir, "launcher.db.bak")
+}
+
+func latestBackupDb(rootDir string) string {
+	backupLocation := BackupLauncherDbLocation(rootDir)
+	if exists, _ := nonEmptyFileExists(backupLocation); exists {
+		return backupLocation
+	}
+
+	for i := 1; i <= numberOfOldBackupsToRetain; i += 1 {
+		currentBackupLocation := fmt.Sprintf("%s.%d", backupLocation, i)
+		if exists, _ := nonEmptyFileExists(currentBackupLocation); exists {
+			return currentBackupLocation
+		}
+	}
+
+	return ""
 }
 
 func nonEmptyFileExists(path string) (bool, error) {
