@@ -147,6 +147,10 @@ func Test_rotate(t *testing.T) {
 			}
 		}
 	}
+
+	// Test rotation when backup db does not exist
+	_ = os.Remove(backupDbFileLocation)
+	require.NoError(t, d.rotate(), "must be able to rotate even when launcher.db.bak does not exist")
 }
 
 func TestInterrupt_Multiple(t *testing.T) {

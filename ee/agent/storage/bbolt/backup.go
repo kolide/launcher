@@ -14,7 +14,7 @@ import (
 
 const (
 	backupInitialDelay         = 10 * time.Minute
-	backupInterval             = 1 * time.Hour
+	backupInterval             = 6 * time.Hour
 	numberOfOldBackupsToRetain = 3
 )
 
@@ -82,7 +82,7 @@ func (d *databaseBackupSaver) Interrupt(_ error) {
 func (d *databaseBackupSaver) backupDb() error {
 	// Perform rotation of older backups to prepare for newer backup
 	if err := d.rotate(); err != nil {
-		return fmt.Errorf("backup succeeded, but rotation did not: %w", err)
+		return fmt.Errorf("rotation did not succeed: %w", err)
 	}
 
 	// Take backup
@@ -136,8 +136,11 @@ func (d *databaseBackupSaver) rotate() error {
 		}
 	}
 
-	if err := os.Rename(baseBackupPath, fmt.Sprintf("%s.1", baseBackupPath)); err != nil {
-		return fmt.Errorf("rotating %s: %w", baseBackupPath, err)
+	// Rename launcher.db.bak, if present
+	if _, err := os.Stat(baseBackupPath); err == nil {
+		if err := os.Rename(baseBackupPath, fmt.Sprintf("%s.1", baseBackupPath)); err != nil {
+			return fmt.Errorf("rotating %s: %w", baseBackupPath, err)
+		}
 	}
 
 	return nil
