@@ -2,6 +2,7 @@ package agentbbolt
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -108,24 +109,64 @@ func createNonEmptyBboltDb(t *testing.T, dbFileLocation string) time.Time {
 	return fi.ModTime()
 }
 
+func Test_rotate(t *testing.T) {
+	t.Parallel()
+
+	// Set up test root dir
+	tempRootDir := t.TempDir()
+	backupDbFileLocation := BackupLauncherDbLocation(tempRootDir)
+
+	// Set up backup saver
+	testKnapsack := typesmocks.NewKnapsack(t)
+	testKnapsack.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
+	testKnapsack.On("RootDirectory").Return(tempRootDir)
+	d := NewDatabaseBackupSaver(testKnapsack)
+
+	for i := 1; i <= numberOfOldBackupsToRetain+1; i += 1 {
+		createNonEmptyBboltDb(t, backupDbFileLocation)
+		require.NoError(t, d.rotate(), "expected no error on rotation")
+
+		// launcher.db.bak should be renamed to launcher.db.bak.1
+		_, err := os.Stat(backupDbFileLocation)
+		require.True(t, os.IsNotExist(err), "launcher.db.bak should have been moved to launcher.db.bak.1")
+
+		for j := 1; j <= numberOfOldBackupsToRetain+1; j += 1 {
+			currentFilepath := fmt.Sprintf("%s.%d", backupDbFileLocation, j)
+			if j > numberOfOldBackupsToRetain {
+				// File should never exist
+				_, err := os.Stat(currentFilepath)
+				require.True(t, os.IsNotExist(err), "%s should not exist -- too many backups retained", currentFilepath)
+			} else if j <= i {
+				// File should exist
+				_, err = os.Stat(currentFilepath)
+				require.NoError(t, err, "checking if launcher.db.bak.%d exists", j)
+			} else {
+				// File should not exist yet
+				_, err := os.Stat(currentFilepath)
+				require.True(t, os.IsNotExist(err), "%s should not exist yet", currentFilepath)
+			}
+		}
+	}
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
 	testKnapsack := typesmocks.NewKnapsack(t)
 	testKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	p := NewDatabaseBackupSaver(testKnapsack)
+	d := NewDatabaseBackupSaver(testKnapsack)
 
 	// Start and then interrupt
-	go p.Execute()
-	p.Interrupt(errors.New("test error"))
+	go d.Execute()
+	d.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
 	interruptComplete := make(chan struct{})
 	expectedInterrupts := 3
 	for i := 0; i < expectedInterrupts; i += 1 {
 		go func() {
-			p.Interrupt(nil)
+			d.Interrupt(nil)
 			interruptComplete <- struct{}{}
 		}()
 	}

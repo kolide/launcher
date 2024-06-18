@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	backupInitialDelay = 10 * time.Minute
-	backupInterval     = 1 * time.Hour
+	backupInitialDelay         = 10 * time.Minute
+	backupInterval             = 1 * time.Hour
+	numberOfOldBackupsToRetain = 3
 )
 
 // databaseBackupSaver periodically takes backups of launcher.db.
@@ -79,25 +80,73 @@ func (d *databaseBackupSaver) Interrupt(_ error) {
 }
 
 func (d *databaseBackupSaver) backupDb() error {
-	// Take backup -- it's fine to just overwrite previous backups
+	// Take backup in temporary location
 	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
+	tempBackupLocation := fmt.Sprintf("%s.tmp", backupLocation)
+	defer func() {
+		// In case we errored out when taking the backup, clean up the temp file
+		_ = os.Remove(tempBackupLocation)
+	}()
+
 	if err := d.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		return tx.CopyFile(backupLocation, 0600)
+		return tx.CopyFile(tempBackupLocation, 0600)
 	}); err != nil {
 		return fmt.Errorf("backing up database: %w", err)
 	}
 
 	// Confirm file exists and is nonempty
-	if exists, err := nonEmptyFileExists(backupLocation); !exists {
-		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", backupLocation)
+	if exists, err := nonEmptyFileExists(tempBackupLocation); !exists {
+		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", tempBackupLocation)
 	} else if err != nil {
-		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
-	} else {
-		// Log success
-		d.slogger.Log(context.TODO(), slog.LevelDebug,
-			"took backup",
-			"backup_location", backupLocation,
-		)
+		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", tempBackupLocation, err)
+	}
+
+	// Perform rotation of older backups so we can move this backup to `backupLocation`
+	if err := d.rotate(); err != nil {
+		return fmt.Errorf("backup succeeded, but rotation did not: %w", err)
+	}
+
+	if err := os.Rename(tempBackupLocation, backupLocation); err != nil {
+		return fmt.Errorf("renaming temp backup %s to %s after rotation: %w", tempBackupLocation, backupLocation, err)
+	}
+
+	// Log success
+	d.slogger.Log(context.TODO(), slog.LevelDebug,
+		"took backup",
+		"backup_location", backupLocation,
+	)
+
+	return nil
+}
+
+func (d *databaseBackupSaver) rotate() error {
+	baseBackupPath := BackupLauncherDbLocation(d.knapsack.RootDirectory())
+
+	for i := numberOfOldBackupsToRetain; i > 0; i -= 1 {
+		currentBackupPath := fmt.Sprintf("%s.%d", baseBackupPath, i)
+
+		// This backup doesn't exist yet -- skip it
+		if _, err := os.Stat(currentBackupPath); err != nil && os.IsNotExist(err) {
+			continue
+		}
+
+		// If is the oldest backup, delete it so we can rotate a new one into its place
+		if i == numberOfOldBackupsToRetain {
+			if err := os.Remove(currentBackupPath); err != nil {
+				return fmt.Errorf("removing oldest backup %s during rotation: %w", currentBackupPath, err)
+			}
+			continue
+		}
+
+		// Rename from launcher.db.bak.<n> to launcher.db.bak.<n+1>
+		olderBackupPath := fmt.Sprintf("%s.%d", baseBackupPath, i+1)
+		if err := os.Rename(currentBackupPath, olderBackupPath); err != nil {
+			return fmt.Errorf("renaming %s to %s during rotation: %w", currentBackupPath, olderBackupPath, err)
+		}
+	}
+
+	if err := os.Rename(baseBackupPath, fmt.Sprintf("%s.1", baseBackupPath)); err != nil {
+		return fmt.Errorf("rotating %s: %w", baseBackupPath, err)
 	}
 
 	return nil
