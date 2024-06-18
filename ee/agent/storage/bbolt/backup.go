@@ -80,41 +80,31 @@ func (d *databaseBackupSaver) Interrupt(_ error) {
 }
 
 func (d *databaseBackupSaver) backupDb() error {
-	// Take backup in temporary location
-	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
-	tempBackupLocation := fmt.Sprintf("%s.tmp", backupLocation)
-	defer func() {
-		// In case we errored out when taking the backup, clean up the temp file
-		_ = os.Remove(tempBackupLocation)
-	}()
+	// Perform rotation of older backups to prepare for newer backup
+	if err := d.rotate(); err != nil {
+		return fmt.Errorf("backup succeeded, but rotation did not: %w", err)
+	}
 
+	// Take backup
+	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
 	if err := d.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		return tx.CopyFile(tempBackupLocation, 0600)
+		return tx.CopyFile(backupLocation, 0600)
 	}); err != nil {
 		return fmt.Errorf("backing up database: %w", err)
 	}
 
 	// Confirm file exists and is nonempty
-	if exists, err := nonEmptyFileExists(tempBackupLocation); !exists {
-		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", tempBackupLocation)
+	if exists, err := nonEmptyFileExists(backupLocation); !exists {
+		return fmt.Errorf("backup succeeded, but nonempty file does not exist at %s", backupLocation)
 	} else if err != nil {
-		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", tempBackupLocation, err)
+		return fmt.Errorf("backup succeeded, but error checking if file was created at %s: %w", backupLocation, err)
+	} else {
+		// Log success
+		d.slogger.Log(context.TODO(), slog.LevelDebug,
+			"took backup",
+			"backup_location", backupLocation,
+		)
 	}
-
-	// Perform rotation of older backups so we can move this backup to `backupLocation`
-	if err := d.rotate(); err != nil {
-		return fmt.Errorf("backup succeeded, but rotation did not: %w", err)
-	}
-
-	if err := os.Rename(tempBackupLocation, backupLocation); err != nil {
-		return fmt.Errorf("renaming temp backup %s to %s after rotation: %w", tempBackupLocation, backupLocation, err)
-	}
-
-	// Log success
-	d.slogger.Log(context.TODO(), slog.LevelDebug,
-		"took backup",
-		"backup_location", backupLocation,
-	)
 
 	return nil
 }
