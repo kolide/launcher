@@ -35,12 +35,14 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		)
 	}
 
-	backupDbPath := agentbbolt.BackupLauncherDbLocation(k.RootDirectory())
-	if err := os.Remove(backupDbPath); err != nil {
-		slogger.Log(ctx, slog.LevelError,
-			"removing backup database",
-			"err", err,
-		)
+	backupDbPaths := agentbbolt.BackupLauncherDbLocations(k.RootDirectory())
+	for _, db := range backupDbPaths {
+		if err := os.Remove(db); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"removing backup database",
+				"err", err,
+			)
+		}
 	}
 
 	if !exitOnCompletion {

@@ -86,7 +86,7 @@ func (d *databaseBackupSaver) backupDb() error {
 	}
 
 	// Take backup
-	backupLocation := BackupLauncherDbLocation(d.knapsack.RootDirectory())
+	backupLocation := backupLauncherDbLocation(d.knapsack.RootDirectory())
 	if err := d.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
 		return tx.CopyFile(backupLocation, 0600)
 	}); err != nil {
@@ -110,7 +110,7 @@ func (d *databaseBackupSaver) backupDb() error {
 }
 
 func (d *databaseBackupSaver) rotate() error {
-	baseBackupPath := BackupLauncherDbLocation(d.knapsack.RootDirectory())
+	baseBackupPath := backupLauncherDbLocation(d.knapsack.RootDirectory())
 
 	// Delete the oldest backup, if it exists
 	oldestBackupPath := fmt.Sprintf("%s.%d", baseBackupPath, numberOfOldBackupsToRetain)
@@ -201,12 +201,30 @@ func LauncherDbLocation(rootDir string) string {
 	return filepath.Join(rootDir, "launcher.db")
 }
 
-func BackupLauncherDbLocation(rootDir string) string {
+func backupLauncherDbLocation(rootDir string) string {
 	return filepath.Join(rootDir, "launcher.db.bak")
 }
 
+func BackupLauncherDbLocations(rootDir string) []string {
+	backupLocations := make([]string, 0)
+
+	backupLocation := backupLauncherDbLocation(rootDir)
+	if exists, _ := nonEmptyFileExists(backupLocation); exists {
+		backupLocations = append(backupLocations, backupLocation)
+	}
+
+	for i := 1; i <= numberOfOldBackupsToRetain; i += 1 {
+		currentBackupLocation := fmt.Sprintf("%s.%d", backupLocation, i)
+		if exists, _ := nonEmptyFileExists(currentBackupLocation); exists {
+			backupLocations = append(backupLocations, currentBackupLocation)
+		}
+	}
+
+	return backupLocations
+}
+
 func latestBackupDb(rootDir string) string {
-	backupLocation := BackupLauncherDbLocation(rootDir)
+	backupLocation := backupLauncherDbLocation(rootDir)
 	if exists, _ := nonEmptyFileExists(backupLocation); exists {
 		return backupLocation
 	}

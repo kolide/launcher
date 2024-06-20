@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -54,7 +55,7 @@ func TestUseBackupDbIfNeeded(t *testing.T) {
 			// Set up test databases
 			tempRootDir := t.TempDir()
 			originalDbFileLocation := LauncherDbLocation(tempRootDir)
-			backupDbFileLocation := BackupLauncherDbLocation(tempRootDir)
+			backupDbFileLocation := backupLauncherDbLocation(tempRootDir)
 			if tt.originalDbExists {
 				createNonEmptyBboltDb(t, originalDbFileLocation)
 			}
@@ -114,7 +115,7 @@ func Test_rotate(t *testing.T) {
 
 	// Set up test root dir
 	tempRootDir := t.TempDir()
-	backupDbFileLocation := BackupLauncherDbLocation(tempRootDir)
+	backupDbFileLocation := backupLauncherDbLocation(tempRootDir)
 
 	// Set up backup saver
 	testKnapsack := typesmocks.NewKnapsack(t)
@@ -151,6 +152,93 @@ func Test_rotate(t *testing.T) {
 	// Test rotation when backup db does not exist
 	_ = os.Remove(backupDbFileLocation)
 	require.NoError(t, d.rotate(), "must be able to rotate even when launcher.db.bak does not exist")
+}
+
+func TestBackupLauncherDbLocations(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testName         string
+		expectedDbStates map[string]bool
+	}{
+		{
+			testName: "all backup dbs exist",
+			expectedDbStates: map[string]bool{
+				"launcher.db.bak":   true,
+				"launcher.db.bak.1": true,
+				"launcher.db.bak.2": true,
+				"launcher.db.bak.3": true,
+			},
+		},
+		{
+			testName: "only primary backup exists",
+			expectedDbStates: map[string]bool{
+				"launcher.db.bak":   true,
+				"launcher.db.bak.1": false,
+				"launcher.db.bak.2": false,
+				"launcher.db.bak.3": false,
+			},
+		},
+		{
+			testName: "primary backup exists, an older one is missing",
+			expectedDbStates: map[string]bool{
+				"launcher.db.bak":   true,
+				"launcher.db.bak.1": true,
+				"launcher.db.bak.2": false,
+				"launcher.db.bak.3": true,
+			},
+		},
+		{
+			testName: "primary backup does not exist, an older one is missing",
+			expectedDbStates: map[string]bool{
+				"launcher.db.bak":   false,
+				"launcher.db.bak.1": false,
+				"launcher.db.bak.2": true,
+				"launcher.db.bak.3": true,
+			},
+		},
+		{
+			testName: "no backup dbs",
+			expectedDbStates: map[string]bool{
+				"launcher.db.bak":   false,
+				"launcher.db.bak.1": false,
+				"launcher.db.bak.2": false,
+				"launcher.db.bak.3": false,
+			},
+		},
+	} {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up test root dir and backup dbs
+			tempRootDir := t.TempDir()
+			for dbPath, exists := range tt.expectedDbStates {
+				if !exists {
+					continue
+				}
+				createNonEmptyBboltDb(t, filepath.Join(tempRootDir, dbPath))
+			}
+
+			// Validate we didn't return any paths that we didn't expect
+			foundBackupDbs := BackupLauncherDbLocations(tempRootDir)
+			actualDbs := make(map[string]bool)
+			for _, foundBackupDb := range foundBackupDbs {
+				db := filepath.Base(foundBackupDb)
+				require.Contains(t, tt.expectedDbStates, db, "backup db found not in original list")
+				require.True(t, tt.expectedDbStates[db], "found backup db that should not have been created")
+				actualDbs[db] = true
+			}
+
+			// Validate that we don't have any dbs missing from actualDbs that we expected to have
+			for expectedDb, exists := range tt.expectedDbStates {
+				if !exists {
+					continue
+				}
+				require.Contains(t, actualDbs, expectedDb, "missing db from results")
+			}
+		})
+	}
 }
 
 func TestInterrupt_Multiple(t *testing.T) {
