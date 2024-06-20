@@ -59,30 +59,35 @@ func (c *bboltdbCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (c *bboltdbCheckup) backupStats() (map[string]any, error) {
-	backupStatsMap := make(map[string]any)
+func (c *bboltdbCheckup) backupStats() (map[string]map[string]any, error) {
+	backupStatsMap := make(map[string]map[string]any)
 
-	backupDbLocation := agentbbolt.BackupLauncherDbLocation(c.k.RootDirectory())
-	if _, err := os.Stat(backupDbLocation); err != nil {
-		return nil, fmt.Errorf("backup db not found at %s: %w", backupDbLocation, err)
-	}
+	backupDbLocations := agentbbolt.BackupLauncherDbLocations(c.k.RootDirectory())
 
-	// Open a connection to the backup, since we don't have one available yet
-	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-	backupDb, err := bbolt.Open(backupDbLocation, 0600, boltOptions)
-	if err != nil {
-		return nil, fmt.Errorf("could not open backup db at %s: %w", backupDbLocation, err)
-	}
-	defer backupDb.Close()
+	for _, backupDbLocation := range backupDbLocations {
+		if _, err := os.Stat(backupDbLocation); err != nil {
+			continue
+		}
 
-	// Gather stats
-	backupStats, err := agent.GetStats(backupDb)
-	if err != nil {
-		return nil, fmt.Errorf("could not get backup db stats: %w", err)
-	}
+		backupStatsMap[backupDbLocation] = make(map[string]any)
 
-	for k, v := range backupStats.Buckets {
-		backupStatsMap[k] = v
+		// Open a connection to the backup, since we don't have one available yet
+		boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+		backupDb, err := bbolt.Open(backupDbLocation, 0600, boltOptions)
+		if err != nil {
+			return nil, fmt.Errorf("could not open backup db at %s: %w", backupDbLocation, err)
+		}
+		defer backupDb.Close()
+
+		// Gather stats
+		backupStats, err := agent.GetStats(backupDb)
+		if err != nil {
+			return nil, fmt.Errorf("could not get backup db stats: %w", err)
+		}
+
+		for k, v := range backupStats.Buckets {
+			backupStatsMap[backupDbLocation][k] = v
+		}
 	}
 
 	return backupStatsMap, nil

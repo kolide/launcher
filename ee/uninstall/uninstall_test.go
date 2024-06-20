@@ -10,7 +10,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage"
-	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
@@ -46,10 +45,16 @@ func TestUninstall(t *testing.T) {
 
 			// create a backup database to delete
 			tempRootDir := t.TempDir()
-			backupDbLocation := agentbbolt.BackupLauncherDbLocation(tempRootDir)
+			backupDbLocation := filepath.Join(tempRootDir, "launcher.db.bak")
 			db, err := bbolt.Open(backupDbLocation, 0600, &bbolt.Options{Timeout: time.Duration(5) * time.Second})
 			require.NoError(t, err, "creating db")
 			require.NoError(t, db.Close(), "closing db")
+
+			// create an older backup db to delete
+			olderBackupDbLocation := fmt.Sprintf("%s.2", backupDbLocation)
+			db2, err := bbolt.Open(olderBackupDbLocation, 0600, &bbolt.Options{Timeout: time.Duration(5) * time.Second})
+			require.NoError(t, err, "creating db")
+			require.NoError(t, db2.Close(), "closing db")
 
 			k := mocks.NewKnapsack(t)
 			k.On("EnrollSecretPath").Return(enrollSecretPath)
@@ -116,6 +121,10 @@ func TestUninstall(t *testing.T) {
 
 			// check that the backup database was removed
 			_, err = os.Stat(backupDbLocation)
+			require.True(t, os.IsNotExist(err), "checking that launcher.db.bak does not exist, and error is not ErrNotExist")
+
+			// check that the older backup database was removed
+			_, err = os.Stat(olderBackupDbLocation)
 			require.True(t, os.IsNotExist(err), "checking that launcher.db.bak does not exist, and error is not ErrNotExist")
 		})
 	}
