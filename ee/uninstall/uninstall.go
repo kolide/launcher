@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/kolide/launcher/ee/agent"
+	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
@@ -30,6 +31,14 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 	if err := agent.ResetDatabase(ctx, k, resetReasonUninstallRequested); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"resetting database",
+			"err", err,
+		)
+	}
+
+	backupDbPath := agentbbolt.BackupLauncherDbLocation(k.RootDirectory())
+	if err := os.Remove(backupDbPath); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"removing backup database",
 			"err", err,
 		)
 	}

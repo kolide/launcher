@@ -168,8 +168,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
+	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
 	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
 	}
@@ -258,6 +259,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(ctx, rootDirectory)
+
+	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
+	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
