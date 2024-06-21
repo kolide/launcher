@@ -20,13 +20,9 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	cmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	output, err := listSessions(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating loginctl command: %w", err)
-	}
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
+		return nil, fmt.Errorf("listing sessions: %w", err)
 	}
 
 	// unmarshall json output into listSessionsResult
@@ -72,4 +68,27 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	}
 
 	return uids, nil
+}
+
+func listSessions(ctx context.Context) ([]byte, error) {
+	// Try with `--output=json` first, to support the more widely-used older versions of systemd
+	legacyCmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
+	if err != nil {
+		return nil, fmt.Errorf("creating loginctl command --no-legend --no-pager --output=json: %w", err)
+	}
+	legacyOut, err := legacyCmd.Output()
+	if err == nil {
+		return legacyOut, nil
+	}
+
+	cmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--json=short")
+	if err != nil {
+		return nil, fmt.Errorf("loginctl list-sessions --no-legend --no-pager --json=short: %w", err)
+	}
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
+	}
+
+	return output, nil
 }
