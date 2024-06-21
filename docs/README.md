@@ -10,4 +10,3 @@ Launcher is an open-source osquery execution environment that aims to make using
 ### Using `package-builder`
 
 > If you're ready to package and distribute Launcher and Osquery, review the [documentation for the `package-builder` tool](./package-builder.md) that is provided with this repository.
-
