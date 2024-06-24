@@ -20,15 +20,9 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	output, err := listSessions(ctx)
+	sessions, err := listSessions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing sessions: %w", err)
-	}
-
-	// unmarshall json output into listSessionsResult
-	var sessions listSessionsResult
-	if err := json.Unmarshal(output, &sessions); err != nil {
-		return nil, fmt.Errorf("loginctl list-sessions unmarshall json output: %w", err)
 	}
 
 	var uids []string
@@ -70,7 +64,12 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	return uids, nil
 }
 
-func listSessions(ctx context.Context) ([]byte, error) {
+// listSessions execs `loginctl list-sessions` in order to retrieve the current list of sessions.
+// Depending on the systemd version, we have to use different flags to output the results as JSON.
+// We may want to attempt parsing the output regardless in the future -- see launcher #1522.
+func listSessions(ctx context.Context) (listSessionsResult, error) {
+	var sessions listSessionsResult
+
 	// Try with `--output=json` first, to support the more widely-used older versions of systemd
 	legacyCmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--output=json")
 	if err != nil {
@@ -78,7 +77,11 @@ func listSessions(ctx context.Context) ([]byte, error) {
 	}
 	legacyOut, err := legacyCmd.Output()
 	if err == nil {
-		return legacyOut, nil
+		// Newer versions of systemd ignore `--output=json` rather than returning an error, so we also
+		// need to unmarshal the result to confirm we got expected output.
+		if err := json.Unmarshal(legacyOut, &sessions); err == nil {
+			return sessions, nil
+		}
 	}
 
 	cmd, err := allowedcmd.Loginctl(ctx, "list-sessions", "--no-legend", "--no-pager", "--json=short")
@@ -89,6 +92,9 @@ func listSessions(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loginctl list-sessions: %w", err)
 	}
+	if err := json.Unmarshal(output, &sessions); err != nil {
+		return nil, fmt.Errorf("unmarshalling loginctl list-sessions output: %w", err)
+	}
 
-	return output, nil
+	return sessions, nil
 }
