@@ -1,5 +1,8 @@
 ### Watchdog Service
 
+Note that for the initial implementation, this service is windows only. It is intentionally designed to give room for alternate OS implementations if needed in the future.
+Most of the relevant code can be found in [ee/watchdog](../../ee/watchdog/)
+
 Here is a basic sequence diagram displaying the enable path for the windows watchdog service. The `launcher_watchdog_enabled` control flag will trigger the initial configuration and installation, and removal of the flag will trigger removal of the service.
 
 ```mermaid

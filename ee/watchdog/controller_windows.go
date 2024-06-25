@@ -26,7 +26,7 @@ const (
 
 	serviceDoesNotExistError string = "The specified service does not exist as an installed service."
 
-	serviceResetPeriod uint32 = 10800 // 3 hours in seconds
+	serviceResetPeriodSeconds uint32 = 3 * 60 * 60 // 3 hours in seconds
 )
 
 // WatchdogController is responsible for:
@@ -87,7 +87,9 @@ func (wc *WatchdogController) Run() error {
 }
 
 func (wc *WatchdogController) publishLogs(ctx context.Context) {
-	// do nothing if watchdog is not enabled
+	// note that there is a small window here where there could be pending logs before watchdog is disabled -
+	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
+	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
 	if !wc.knapsack.LauncherWatchdogEnabled() {
 		return
 	}
@@ -264,7 +266,7 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 		},
 	}
 
-	if err = restartService.SetRecoveryActions(recoveryActions, serviceResetPeriod); err != nil {
+	if err = restartService.SetRecoveryActions(recoveryActions, serviceResetPeriodSeconds); err != nil {
 		wc.slogger.Log(ctx, slog.LevelWarn,
 			"unable to set recovery actions for service installation, proceeding",
 			"err", err,
