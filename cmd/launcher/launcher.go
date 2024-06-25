@@ -71,6 +71,7 @@ const (
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
+	atcConfigSubsystemName   = "kolide_atc_config"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -400,6 +401,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
+		// atcConfigConsumer handles updates to Kolide's custom ATC tables
+		controlService.RegisterConsumer(atcConfigSubsystemName, keyvalueconsumer.New(k.AtcConfigStore()))
+		controlService.RegisterSubscriber(atcConfigSubsystemName, osqueryRunner)
 
 		runner, err = desktopRunner.New(
 			k,

@@ -1,6 +1,7 @@
 package table
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -37,7 +38,7 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func PlatformTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
 		ChromeLoginDataEmails(slogger),
@@ -65,5 +66,30 @@ func PlatformTables(slogger *slog.Logger, currentOsquerydBinaryPath string) []os
 	// add in the platform specific ones (as denoted by build tags)
 	tables = append(tables, platformSpecificTables(slogger, currentOsquerydBinaryPath)...)
 
+	// Add in the Kolide custom ATC tables
+	tables = append(tables, kolideCustomAtcTables(k, slogger)...)
+
 	return tables
+}
+
+// kolideCustomAtcTables will handle indexeddb tables and others in the future. For now,
+// it just logs the config.
+func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
+	loggableConfig := make(map[string]string)
+	if err := k.AtcConfigStore().ForEach(func(k []byte, v []byte) error {
+		loggableConfig[string(k)] = string(v)
+		return nil
+	}); err != nil {
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not retrieve contents of Kolide ATC config store",
+			"err", err,
+		)
+		return nil
+	}
+
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"retrieved contents of Kolide ATC config store",
+		"config", loggableConfig,
+	)
+	return nil
 }

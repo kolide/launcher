@@ -18,6 +18,7 @@ import (
 func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
 	var storeNames = []storage.Store{
 		storage.AgentFlagsStore,
+		storage.AtcConfigStore,
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
