@@ -5,7 +5,7 @@ import "github.com/kolide/launcher/ee/agent/storage"
 type Stores interface {
 	Stores() map[storage.Store]KVStore
 	AgentFlagsStore() KVStore
-	AtcConfigStore() KVStore
+	KatcConfigStore() KVStore
 	AutoupdateErrorsStore() KVStore
 	ConfigStore() KVStore
 	ControlStore() KVStore

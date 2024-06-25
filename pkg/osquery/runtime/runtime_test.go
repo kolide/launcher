@@ -336,9 +336,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner := New(
 		k,
@@ -371,9 +371,9 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	// Start the runner
 	runner := New(
@@ -467,9 +467,9 @@ func TestSimplePath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner := New(
 		k,
@@ -498,9 +498,9 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner := New(
 		k,
@@ -528,9 +528,9 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner := New(
 		k,
@@ -625,9 +625,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, teardown func()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner = New(
 		k,

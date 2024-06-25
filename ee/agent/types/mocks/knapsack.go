@@ -52,22 +52,6 @@ func (_m *Knapsack) AgentFlagsStore() types.GetterSetterDeleterIteratorUpdaterCo
 	return r0
 }
 
-// AtcConfigStore provides a mock function with given fields:
-func (_m *Knapsack) AtcConfigStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
-	ret := _m.Called()
-
-	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
-	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
-		}
-	}
-
-	return r0
-}
-
 // Autoupdate provides a mock function with given fields:
 func (_m *Knapsack) Autoupdate() bool {
 	ret := _m.Called()
@@ -505,6 +489,22 @@ func (_m *Knapsack) InsecureTransportTLS() bool {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// KatcConfigStore provides a mock function with given fields:
+func (_m *Knapsack) KatcConfigStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
 	}
 
 	return r0

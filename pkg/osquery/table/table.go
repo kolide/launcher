@@ -81,14 +81,14 @@ func PlatformTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinar
 // and others.
 func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	// Fetch tables from KVStore or from startup settings
-	config, err := kolideAtcConfigFromDb(k)
+	config, err := katcFromDb(k)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"could not retrieve Kolide ATC config from store, may not have access -- falling back to startup settings",
 			"err", err,
 		)
 
-		config, err = kolideAtcConfigFromStartupSettings(k)
+		config, err = katcFromStartupSettings(k)
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not retrieve Kolide ATC config from startup settings",
@@ -108,12 +108,12 @@ func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.Osq
 	return nil
 }
 
-func kolideAtcConfigFromDb(k types.Knapsack) (map[string]string, error) {
-	if k == nil || k.AtcConfigStore() == nil {
+func katcFromDb(k types.Knapsack) (map[string]string, error) {
+	if k == nil || k.KatcConfigStore() == nil {
 		return nil, errors.New("stores in knapsack not available")
 	}
 	loggableConfig := make(map[string]string)
-	if err := k.AtcConfigStore().ForEach(func(k []byte, v []byte) error {
+	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
 		loggableConfig[string(k)] = string(v)
 		return nil
 	}); err != nil {
@@ -123,21 +123,21 @@ func kolideAtcConfigFromDb(k types.Knapsack) (map[string]string, error) {
 	return loggableConfig, nil
 }
 
-func kolideAtcConfigFromStartupSettings(k types.Knapsack) (map[string]string, error) {
+func katcFromStartupSettings(k types.Knapsack) (map[string]string, error) {
 	r, err := startupsettings.OpenReader(context.TODO(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
 	defer r.Close()
 
-	atcConfig, err := r.Get("kolide_atc_config")
+	katcConfig, err := r.Get("katc_config")
 	if err != nil {
-		return nil, fmt.Errorf("error getting kolide_atc_config from startup settings: %w", err)
+		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)
 	}
 
 	var loggableConfig map[string]string
-	if err := json.Unmarshal([]byte(atcConfig), &loggableConfig); err != nil {
-		return nil, fmt.Errorf("unmarshalling kolide_atc_config: %w", err)
+	if err := json.Unmarshal([]byte(katcConfig), &loggableConfig); err != nil {
+		return nil, fmt.Errorf("unmarshalling katc_config: %w", err)
 	}
 
 	return loggableConfig, nil

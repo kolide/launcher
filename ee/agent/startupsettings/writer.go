@@ -52,7 +52,7 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 }
 
 // Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
-// the kolide_atc_config subsystem.
+// the katc_config subsystem.
 func (s *startupSettingsWriter) Ping() {
 	if err := s.WriteSettings(); err != nil {
 		s.knapsack.Slogger().Log(context.TODO(), slog.LevelWarn,
@@ -80,13 +80,13 @@ func (s *startupSettingsWriter) WriteSettings() error {
 		updatedFlags["auto_table_construction"] = atcConfig
 	}
 
-	if kolideAtcConfig, err := s.extractKolideAutoTableConstructionConfig(); err != nil {
+	if katcConfig, err := s.extractKATCConstructionConfig(); err != nil {
 		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-			"extracting kolide_atc_config",
+			"extracting katc_config",
 			"err", err,
 		)
 	} else {
-		updatedFlags["kolide_atc_config"] = kolideAtcConfig
+		updatedFlags["katc_config"] = katcConfig
 	}
 
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
@@ -140,9 +140,9 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, er
 	return string(atcJson), nil
 }
 
-func (s *startupSettingsWriter) extractKolideAutoTableConstructionConfig() (string, error) {
+func (s *startupSettingsWriter) extractKATCConstructionConfig() (string, error) {
 	kolideCfg := make(map[string]string)
-	if err := s.knapsack.AtcConfigStore().ForEach(func(k []byte, v []byte) error {
+	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
 		kolideCfg[string(k)] = string(v)
 		return nil
 	}); err != nil {
@@ -151,7 +151,7 @@ func (s *startupSettingsWriter) extractKolideAutoTableConstructionConfig() (stri
 
 	atcJson, err := json.Marshal(kolideCfg)
 	if err != nil {
-		return "", fmt.Errorf("could not marshal kolide_atc_config: %w", err)
+		return "", fmt.Errorf("could not marshal katc_config: %w", err)
 	}
 
 	return string(atcJson), nil

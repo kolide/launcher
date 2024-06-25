@@ -53,9 +53,9 @@ func TestOsquerySlowStart(t *testing.T) {
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	k.On("Slogger").Return(slogger.Logger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	runner := New(
 		k,
@@ -100,9 +100,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("AtcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(

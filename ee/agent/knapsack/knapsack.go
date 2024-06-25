@@ -87,8 +87,8 @@ func (k *knapsack) AgentFlagsStore() types.KVStore {
 	return k.getKVStore(storage.AgentFlagsStore)
 }
 
-func (k *knapsack) AtcConfigStore() types.KVStore {
-	return k.getKVStore(storage.AtcConfigStore)
+func (k *knapsack) KatcConfigStore() types.KVStore {
+	return k.getKVStore(storage.KatcConfigStore)
 }
 
 func (k *knapsack) AutoupdateErrorsStore() types.KVStore {

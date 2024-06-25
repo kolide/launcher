@@ -99,9 +99,9 @@ func TestProc(t *testing.T) {
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
 			mockSack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
-			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 			require.NoError(t, err)
-			mockSack.On("AtcConfigStore").Return(store)
+			mockSack.On("KatcConfigStore").Return(store)
 
 			proc, _, err := StartProcess(mockSack, rootDir)
 

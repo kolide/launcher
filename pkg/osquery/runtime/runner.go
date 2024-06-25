@@ -184,7 +184,7 @@ func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
 }
 
 // Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
-// the kolide_atc_config subsystem.
+// the katc_config subsystem.
 func (r *Runner) Ping() {
 	r.slogger.Log(context.TODO(), slog.LevelDebug,
 		"Kolide ATC configuration changed, restarting instance to apply",
