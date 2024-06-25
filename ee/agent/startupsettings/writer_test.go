@@ -34,6 +34,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("5.11.0")
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("AtcConfigStore").Return(inmemory.NewStore())
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
@@ -82,6 +83,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	// Set up dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("RootDirectory").Return(testRootDir)
+	k.On("AtcConfigStore").Return(inmemory.NewStore())
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
@@ -126,6 +128,7 @@ func TestFlagsChanged(t *testing.T) {
 	testRootDir := t.TempDir()
 	k := typesmocks.NewKnapsack(t)
 	k.On("RootDirectory").Return(testRootDir)
+	k.On("AtcConfigStore").Return(inmemory.NewStore())
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)

@@ -16,6 +16,8 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
@@ -97,6 +99,9 @@ func TestProc(t *testing.T) {
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
 			mockSack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
+			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AtcConfigStore.String())
+			require.NoError(t, err)
+			mockSack.On("AtcConfigStore").Return(store)
 
 			proc, _, err := StartProcess(mockSack, rootDir)
 
