@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/log/sqlitelogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -51,12 +50,14 @@ func RunWatchdogService(systemSlogger *multislogger.MultiSlogger, args []string)
 	// Create a local logger to drop logs into the sqlite DB. These will be collected and published
 	// to debug.json from the primary launcher invocation
 	if opts.RootDirectory != "" {
-		ll, err := sqlitelogger.NewSqliteLogWriter(ctx, opts.RootDirectory, agentsqlite.WatchdogLogStore)
+		logWriter, err := agentsqlite.OpenRW(ctx, opts.RootDirectory, agentsqlite.WatchdogLogStore)
 		if err != nil {
-			return fmt.Errorf("initializing sqlite log writer: %w", err)
+			return fmt.Errorf("opening log db in %s: %w", opts.RootDirectory, err)
 		}
 
-		localSloggerHandler := slog.NewJSONHandler(ll, &slog.HandlerOptions{Level: slog.LevelDebug})
+		defer logWriter.Close()
+
+		localSloggerHandler := slog.NewJSONHandler(logWriter, &slog.HandlerOptions{Level: slog.LevelDebug})
 
 		// add the sqlite handler to both local and systemSloggers
 		localSlogger.AddHandler(localSloggerHandler)

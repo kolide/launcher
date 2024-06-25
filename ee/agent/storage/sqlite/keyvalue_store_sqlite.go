@@ -19,18 +19,18 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type StoreName int
+type storeName int
 
 const (
-	StartupSettingsStore StoreName = iota
-	WatchdogLogStore     StoreName = 1
+	StartupSettingsStore storeName = iota
+	WatchdogLogStore     storeName = 1
 )
 
 var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
 
 // String translates the exported int constant to the actual name of the
 // supported table in the sqlite database.
-func (s StoreName) String() string {
+func (s storeName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
@@ -62,7 +62,7 @@ type sqliteColumns struct {
 
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, name StoreName) (*sqliteStore, error) {
+func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
@@ -82,7 +82,7 @@ func OpenRO(ctx context.Context, rootDirectory string, name StoreName) (*sqliteS
 
 // OpenRW creates a validated database connection to a validated database, performing
 // migrations if necessary.
-func OpenRW(ctx context.Context, rootDirectory string, name StoreName) (*sqliteStore, error) {
+func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}

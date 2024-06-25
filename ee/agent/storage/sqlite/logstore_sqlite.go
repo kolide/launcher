@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (s *sqliteStore) AppendValue(timestamp int64, value []byte) error {
@@ -97,4 +98,28 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 	}
 
 	return nil
+}
+
+// Write implements the io.Writer interface, allowing sqliteStore to be used as
+// a logging backend via multislogger handler
+func (s *sqliteStore) Write(p []byte) (n int, err error) {
+	if s.readOnly {
+		return 0, errors.New("cannot perform write with RO connection")
+	}
+
+	colInfo := s.getColumns()
+	if s == nil || s.conn == nil || colInfo == nil {
+		return 0, errors.New("store is nil")
+	}
+
+	if !colInfo.isLogstore {
+		return 0, errors.New("this table type is not supported for timestamped logging")
+	}
+
+	timestamp := time.Now().Unix()
+	if err := s.AppendValue(timestamp, p); err != nil {
+		return 0, err
+	}
+
+	return len(p), nil
 }
