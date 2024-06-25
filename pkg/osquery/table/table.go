@@ -2,8 +2,12 @@ package table
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
@@ -72,24 +76,69 @@ func PlatformTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinar
 	return tables
 }
 
-// kolideCustomAtcTables will handle indexeddb tables and others in the future. For now,
-// it just logs the config.
+// kolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s).
+// For now, it just logs the configuration. In the future, it will handle indexeddb tables
+// and others.
 func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
+	// Fetch tables from KVStore or from startup settings
+	config, err := kolideAtcConfigFromDb(k)
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"could not retrieve Kolide ATC config from store, may not have access -- falling back to startup settings",
+			"err", err,
+		)
+
+		config, err = kolideAtcConfigFromStartupSettings(k)
+		if err != nil {
+			slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not retrieve Kolide ATC config from startup settings",
+				"err", err,
+			)
+			return nil
+		}
+	}
+
+	// In the future, we would construct the plugins from the configuration here.
+	// For now, we just log.
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"retrieved Kolide ATC config",
+		"config", config,
+	)
+
+	return nil
+}
+
+func kolideAtcConfigFromDb(k types.Knapsack) (map[string]string, error) {
+	if k == nil || k.AtcConfigStore() == nil {
+		return nil, errors.New("stores in knapsack not available")
+	}
 	loggableConfig := make(map[string]string)
 	if err := k.AtcConfigStore().ForEach(func(k []byte, v []byte) error {
 		loggableConfig[string(k)] = string(v)
 		return nil
 	}); err != nil {
-		slogger.Log(context.TODO(), slog.LevelDebug,
-			"could not retrieve contents of Kolide ATC config store",
-			"err", err,
-		)
-		return nil
+		return nil, fmt.Errorf("retrieving contents of Kolide ATC config store: %w", err)
 	}
 
-	slogger.Log(context.TODO(), slog.LevelDebug,
-		"retrieved contents of Kolide ATC config store",
-		"config", loggableConfig,
-	)
-	return nil
+	return loggableConfig, nil
+}
+
+func kolideAtcConfigFromStartupSettings(k types.Knapsack) (map[string]string, error) {
+	r, err := startupsettings.OpenReader(context.TODO(), k.RootDirectory())
+	if err != nil {
+		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
+	}
+	defer r.Close()
+
+	atcConfig, err := r.Get("kolide_atc_config")
+	if err != nil {
+		return nil, fmt.Errorf("error getting kolide_atc_config from startup settings: %w", err)
+	}
+
+	var loggableConfig map[string]string
+	if err := json.Unmarshal([]byte(atcConfig), &loggableConfig); err != nil {
+		return nil, fmt.Errorf("unmarshalling kolide_atc_config: %w", err)
+	}
+
+	return loggableConfig, nil
 }

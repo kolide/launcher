@@ -243,13 +243,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
-	s, err := startupsettings.OpenWriter(ctx, k)
+	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}
-	defer s.Close()
+	defer startupSettingsWriter.Close()
 
-	if err := s.WriteSettings(); err != nil {
+	if err := startupSettingsWriter.WriteSettings(); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"writing startup settings",
 			"err", err,
@@ -404,6 +404,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// atcConfigConsumer handles updates to Kolide's custom ATC tables
 		controlService.RegisterConsumer(atcConfigSubsystemName, keyvalueconsumer.New(k.AtcConfigStore()))
 		controlService.RegisterSubscriber(atcConfigSubsystemName, osqueryRunner)
+		controlService.RegisterSubscriber(atcConfigSubsystemName, startupSettingsWriter)
 
 		runner, err = desktopRunner.New(
 			k,
