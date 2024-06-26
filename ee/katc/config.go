@@ -26,7 +26,8 @@ type katcTableType struct {
 }
 
 const (
-	sqliteTableType = "sqlite"
+	sqliteTableType    = "sqlite"
+	indexedDBTableType = "indexeddb"
 )
 
 func (ktt *katcTableType) UnmarshalJSON(data []byte) error {
@@ -41,6 +42,9 @@ func (ktt *katcTableType) UnmarshalJSON(data []byte) error {
 		ktt.name = sqliteTableType
 		ktt.dataFunc = sqliteData
 		return nil
+	case indexedDBTableType:
+		ktt.name = indexedDBTableType
+		return errors.New("indexeddb is not yet implemented")
 	default:
 		return fmt.Errorf("unknown table type %s", s)
 	}
@@ -52,8 +56,8 @@ type dataProcessingStep struct {
 }
 
 const (
-	snappyDecodeProcessingStep   = "snappy"
-	jsObjectDecodeProcessingStep = "js_object"
+	snappyDecodeProcessingStep               = "snappy"
+	structuredCloneDeserializeProcessingStep = "structured_clone"
 )
 
 func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
@@ -68,9 +72,10 @@ func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
 		d.name = snappyDecodeProcessingStep
 		d.processingFunc = snappyDecode
 		return nil
-	case jsObjectDecodeProcessingStep:
-		d.name = jsObjectDecodeProcessingStep
-		return errors.New("not yet implemented")
+	case structuredCloneDeserializeProcessingStep:
+		d.name = structuredCloneDeserializeProcessingStep
+		d.processingFunc = structuredCloneDeserialize
+		return nil
 	default:
 		return fmt.Errorf("unknown data processing step %s", s)
 	}

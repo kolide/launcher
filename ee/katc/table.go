@@ -40,7 +40,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			for _, dataProcessingStep := range k.cfg.DataProcessingSteps {
 				val, err = dataProcessingStep.processingFunc(ctx, val, k.slogger)
 				if err != nil {
-					return nil, fmt.Errorf("transforming data at key %s: %w", key, err)
+					return nil, fmt.Errorf("transforming data at key `%s`: %w", key, err)
 				}
 			}
 
