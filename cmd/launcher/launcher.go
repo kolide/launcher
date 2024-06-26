@@ -71,6 +71,7 @@ const (
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
+	katcSubsystemName        = "katc_config" // Kolide ATC
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -242,13 +243,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
-	s, err := startupsettings.OpenWriter(ctx, k)
+	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}
-	defer s.Close()
+	defer startupSettingsWriter.Close()
 
-	if err := s.WriteSettings(); err != nil {
+	if err := startupSettingsWriter.WriteSettings(); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"writing startup settings",
 			"err", err,
@@ -400,6 +401,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
+		// katcConfigConsumer handles updates to Kolide's custom ATC tables
+		controlService.RegisterConsumer(katcSubsystemName, keyvalueconsumer.New(k.KatcConfigStore()))
+		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
+		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 
 		runner, err = desktopRunner.New(
 			k,

@@ -183,6 +183,21 @@ func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 }
 
+// Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
+// the katc_config subsystem.
+func (r *Runner) Ping() {
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"Kolide ATC configuration changed, restarting instance to apply",
+	)
+
+	if err := r.Restart(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"could not restart osquery instance after Kolide ATC configuration changed",
+			"err", err,
+		)
+	}
+}
+
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
 func (r *Runner) Restart() error {
@@ -469,7 +484,7 @@ func (r *Runner) launchOsqueryInstance() error {
 		)
 	}
 
-	// Now spawn an extension manage to for the tables. We need to
+	// Now spawn an extension manager for the tables. We need to
 	// start this one in the background, because the runner.Start
 	// function needs to return promptly enough for osquery to use
 	// it to enroll. Very racy
@@ -482,7 +497,7 @@ func (r *Runner) launchOsqueryInstance() error {
 			"errgroup", "kolide extension manager server launch",
 		)
 
-		plugins := table.PlatformTables(r.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
+		plugins := table.PlatformTables(r.knapsack, r.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
 
 		if len(plugins) == 0 {
 			return nil

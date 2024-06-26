@@ -56,7 +56,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 	}
 
 	// start building list of osq plugins with the kolide tables
-	osqPlugins := table.PlatformTables(knapsack.Slogger(), knapsack.OsquerydPath())
+	osqPlugins := table.PlatformTables(knapsack, knapsack.Slogger(), knapsack.OsquerydPath())
 
 	osqueryFlags := knapsack.OsqueryFlags()
 	// if we were not provided a config path flag, try to add default config
