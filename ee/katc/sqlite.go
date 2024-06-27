@@ -11,19 +11,22 @@ import (
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string) ([]map[string][]byte, error) {
+func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string) ([]sourceData, error) {
 	sqliteDbs, err := filepath.Glob(pathPattern)
 	if err != nil {
 		return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
 	}
 
-	results := make([]map[string][]byte, 0)
+	results := make([]sourceData, 0)
 	for _, sqliteDb := range sqliteDbs {
-		resultsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
+		rowsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
 		if err != nil {
 			return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
 		}
-		results = append(results, resultsFromDb...)
+		results = append(results, sourceData{
+			path: sqliteDb,
+			rows: rowsFromDb,
+		})
 	}
 
 	return results, nil

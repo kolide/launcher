@@ -45,7 +45,7 @@ const (
 // * https://searchfox.org/mozilla-central/source/js/public/StructuredClone.h
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
 // * https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize
-func structuredCloneDeserialize(ctx context.Context, data []byte, slogger *slog.Logger) ([]byte, error) {
+func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, data []byte) ([]byte, error) {
 	srcReader := bytes.NewReader(data)
 
 	// First, read the header

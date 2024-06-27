@@ -22,7 +22,12 @@ TODOs:
 
 type katcSourceType struct {
 	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string) ([]sourceData, error)
+}
+
+type sourceData struct {
+	path string
+	rows []map[string][]byte
 }
 
 const (
@@ -52,7 +57,7 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 
 type dataProcessingStep struct {
 	name           string
-	processingFunc func(ctx context.Context, data []byte, slogger *slog.Logger) ([]byte, error)
+	processingFunc func(ctx context.Context, slogger *slog.Logger, data []byte) ([]byte, error)
 }
 
 const (
@@ -107,12 +112,17 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 			continue
 		}
 
-		columns := make([]table.ColumnDefinition, len(cfg.Columns))
+		columns := []table.ColumnDefinition{
+			{
+				Name: sourcePathColumnName,
+				Type: table.ColumnTypeText,
+			},
+		}
 		for i := 0; i < len(cfg.Columns); i += 1 {
-			columns[i] = table.ColumnDefinition{
+			columns = append(columns, table.ColumnDefinition{
 				Name: cfg.Columns[i],
 				Type: table.ColumnTypeText,
-			}
+			})
 		}
 
 		t := newKatcTable(tableName, cfg, slogger)
