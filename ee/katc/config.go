@@ -22,7 +22,7 @@ TODOs:
 
 type katcTableType struct {
 	name     string
-	dataFunc func(ctx context.Context, path string, query string, columns []string, slogger *slog.Logger) ([]map[string][]byte, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, columns []string) ([]map[string][]byte, error)
 }
 
 const (
