@@ -47,9 +47,9 @@ type (
 		OnStartup() error
 	}
 
-	// knapsackSubscriber implements the powerEventSubscriber interface and
+	// knapsackSleepStateUpdater implements the powerEventSubscriber interface and
 	// updates the knapsack.InModernStandby state based on the power events observed
-	knapsackSubscriber struct {
+	knapsackSleepStateUpdater struct {
 		knapsack types.Knapsack
 		slogger  *slog.Logger
 	}
@@ -63,14 +63,14 @@ const (
 	operationSuccessfulMsg = "The operation completed successfully."
 )
 
-func NewKnapsackSubscriber(slogger *slog.Logger, k types.Knapsack) *knapsackSubscriber {
-	return &knapsackSubscriber{
+func NewKnapsackSleepStateUpdater(slogger *slog.Logger, k types.Knapsack) *knapsackSleepStateUpdater {
+	return &knapsackSleepStateUpdater{
 		knapsack: k,
 		slogger:  slogger,
 	}
 }
 
-func (ks *knapsackSubscriber) OnPowerEvent(eventID int) error {
+func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
 	switch eventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		ks.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -106,7 +106,7 @@ func (ks *knapsackSubscriber) OnPowerEvent(eventID int) error {
 	return nil
 }
 
-func (ks *knapsackSubscriber) OnStartup() error {
+func (ks *knapsackSleepStateUpdater) OnStartup() error {
 	// Clear InModernStandby flag, in case it's cached. We may have missed wake/sleep events
 	// while launcher was not running, and we want to err on the side of assuming the device
 	// is awake.

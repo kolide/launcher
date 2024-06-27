@@ -293,7 +293,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// For now, remediation is not performed -- we only log the hardware change.
 	agent.DetectAndRemediateHardwareChange(ctx, k)
 
-	powerEventSubscriber := powereventwatcher.NewKnapsackSubscriber(slogger, k)
+	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
