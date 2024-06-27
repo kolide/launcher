@@ -16,6 +16,20 @@ type noOpPowerEventWatcher struct {
 	interrupted bool
 }
 
+type knapsackSubscriber struct{}
+
+func NewKnapsackSubscriber(_ *slog.Logger, _ types.Knapsack) *knapsackSubscriber {
+	return &knapsackSubscriber{}
+}
+
+func (ks *knapsackSubscriber) OnPowerEvent(_ int) error {
+	return nil
+}
+
+func (ks *knapsackSubscriber) OnStartup() error {
+	return nil
+}
+
 func New(ctx context.Context, _ types.Knapsack, _ *slog.Logger) (*noOpPowerEventWatcher, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
