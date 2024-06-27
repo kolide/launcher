@@ -17,7 +17,8 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	p, err := New(context.TODO(), typesmocks.NewKnapsack(t), multislogger.NewNopLogger())
+	ksubscriber := NewKnapsackSubscriber(multislogger.NewNopLogger(), typesmocks.NewKnapsack(t))
+	p, err := New(context.TODO(), multislogger.NewNopLogger(), ksubscriber)
 	require.NoError(t, err)
 
 	// Start and then interrupt
