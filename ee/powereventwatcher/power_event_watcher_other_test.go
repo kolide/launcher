@@ -17,7 +17,7 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	ksubscriber := NewKnapsackSubscriber(multislogger.NewNopLogger(), typesmocks.NewKnapsack(t))
+	ksubscriber := NewKnapsackSleepStateUpdater(multislogger.NewNopLogger(), typesmocks.NewKnapsack(t))
 	p, err := New(context.TODO(), multislogger.NewNopLogger(), ksubscriber)
 	require.NoError(t, err)
 
