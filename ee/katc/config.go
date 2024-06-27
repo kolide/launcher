@@ -22,7 +22,7 @@ TODOs:
 
 type katcSourceType struct {
 	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, columns []string) ([]map[string][]byte, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error)
 }
 
 const (

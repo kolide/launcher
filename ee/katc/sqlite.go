@@ -11,7 +11,7 @@ import (
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string, columns []string) ([]map[string][]byte, error) {
+func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string) ([]map[string][]byte, error) {
 	sqliteDbs, err := filepath.Glob(pathPattern)
 	if err != nil {
 		return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
@@ -19,7 +19,7 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, q
 
 	results := make([]map[string][]byte, 0)
 	for _, sqliteDb := range sqliteDbs {
-		resultsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query, columns)
+		resultsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
 		if err != nil {
 			return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
 		}
@@ -30,7 +30,7 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, q
 }
 
 // querySqliteDb queries the database at the given path, returning rows of results
-func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string, columns []string) ([]map[string][]byte, error) {
+func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error) {
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
@@ -59,7 +59,13 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 
 	results := make([]map[string][]byte, 0)
 
-	// Prepare destination for scan
+	// Fetch columns so we know how many values per row we will scan
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("getting columns from query result: %w", err)
+	}
+
+	// Prepare scan destination
 	rawResult := make([][]byte, len(columns))
 	scanDest := make([]any, len(columns))
 	for i := 0; i < len(columns); i += 1 {
