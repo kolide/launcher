@@ -18,7 +18,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) *
 		cfg: cfg,
 		slogger: slogger.With(
 			"table_name", tableName,
-			"table_type", cfg.Type,
+			"table_type", cfg.Source,
 			"table_path", cfg.Path,
 		),
 	}
@@ -26,7 +26,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) *
 
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fetch data from our table source
-	dataRaw, err := k.cfg.Type.dataFunc(ctx, k.slogger, k.cfg.Path, k.cfg.Query, k.cfg.Columns)
+	dataRaw, err := k.cfg.Source.dataFunc(ctx, k.slogger, k.cfg.Path, k.cfg.Query, k.cfg.Columns)
 	if err != nil {
 		return nil, fmt.Errorf("fetching data: %w", err)
 	}

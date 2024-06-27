@@ -22,7 +22,7 @@ func TestConstructKATCTables(t *testing.T) {
 			testCaseName: "snappy_sqlite",
 			katcConfig: map[string]string{
 				"kolide_snappy_sqlite_test": fmt.Sprintf(`{
-					"type": "sqlite",
+					"source": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
 					"path": "/some/path/to/db.sqlite",
@@ -40,10 +40,10 @@ func TestConstructKATCTables(t *testing.T) {
 			expectedPluginCount: 0,
 		},
 		{
-			testCaseName: "invalid table type",
+			testCaseName: "invalid table source",
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
-					"type": "unknown_type",
+					"source": "unknown_source",
 					"platform": "%s",
 					"columns": ["data"],
 					"path": "/some/path/to/db.sqlite",
@@ -56,7 +56,7 @@ func TestConstructKATCTables(t *testing.T) {
 			testCaseName: "invalid data processing step type",
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
-					"type": "sqlite",
+					"source": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
 					"path": "/some/path/to/db.sqlite",

@@ -20,17 +20,17 @@ TODOs:
 - Need to do queryContext filtering
 */
 
-type katcTableType struct {
+type katcSourceType struct {
 	name     string
 	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, columns []string) ([]map[string][]byte, error)
 }
 
 const (
-	sqliteTableType    = "sqlite"
-	indexedDBTableType = "indexeddb"
+	sqliteSourceType    = "sqlite"
+	indexedDBSourceType = "indexeddb"
 )
 
-func (ktt *katcTableType) UnmarshalJSON(data []byte) error {
+func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
 	if err != nil {
@@ -38,12 +38,12 @@ func (ktt *katcTableType) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case sqliteTableType:
-		ktt.name = sqliteTableType
-		ktt.dataFunc = sqliteData
+	case sqliteSourceType:
+		kst.name = sqliteSourceType
+		kst.dataFunc = sqliteData
 		return nil
-	case indexedDBTableType:
-		ktt.name = indexedDBTableType
+	case indexedDBSourceType:
+		kst.name = indexedDBSourceType
 		return errors.New("indexeddb is not yet implemented")
 	default:
 		return fmt.Errorf("unknown table type %s", s)
@@ -82,7 +82,7 @@ func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
 }
 
 type katcTableConfig struct {
-	Type                katcTableType        `json:"type"`
+	Source              katcSourceType       `json:"source"`
 	Platform            string               `json:"platform"`
 	Columns             []string             `json:"columns"`
 	Path                string               `json:"path"`  // Path to file holding data (e.g. sqlite file) -- wildcards supported
