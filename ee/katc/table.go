@@ -12,12 +12,15 @@ import (
 
 const sourcePathColumnName = "source_path"
 
+// katcTable is a Kolide ATC table. It queries the source and transforms the response data
+// per the configuration in its `cfg`.
 type katcTable struct {
 	cfg          katcTableConfig
 	columnLookup map[string]struct{}
 	slogger      *slog.Logger
 }
 
+// newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
 func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
 	columns := []table.ColumnDefinition{
 		{
@@ -47,6 +50,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	}, columns
 }
 
+// generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fetch data from our table source
 	dataRaw, err := k.cfg.Source.dataFunc(ctx, k.slogger, k.cfg.Path, k.cfg.Query, getSourceConstraint(queryContext))
@@ -110,6 +114,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	return filteredResults, nil
 }
 
+// getSourceConstraint retrieves any constraints against the `source_path` column
 func getSourceConstraint(queryContext table.QueryContext) *table.ConstraintList {
 	sourceConstraint, sourceConstraintExists := queryContext.Constraints[sourcePathColumnName]
 	if sourceConstraintExists {
@@ -118,6 +123,7 @@ func getSourceConstraint(queryContext table.QueryContext) *table.ConstraintList 
 	return nil
 }
 
+// checkSourcePathConstraints validates whether a given `sourcePath` matches the given constraints.
 func checkSourcePathConstraints(sourcePath string, sourceConstraints *table.ConstraintList) (bool, error) {
 	if sourceConstraints == nil {
 		return true, nil

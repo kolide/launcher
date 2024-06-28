@@ -12,11 +12,17 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
+// katcSourceType defines a source of data for a KATC table. The `name` is the
+// identifier parsed from the JSON KATC config, and the `dataFunc` is the function
+// that performs the query against the source.
 type katcSourceType struct {
 	name     string
 	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
 }
 
+// sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
+// source's path to the query results. (A config may have wildcards in the path,
+// allowing for querying against multiple source paths.)
 type sourceData struct {
 	path string
 	rows []map[string][]byte
@@ -47,6 +53,9 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// rowTransformStep defines an operation performed against a row of data
+// returned from a source. The `name` is the identifier parsed from the
+// JSON KATC config.
 type rowTransformStep struct {
 	name          string
 	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error)
@@ -78,6 +87,8 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	}
 }
 
+// katcTableConfig is the configuration for a specific KATC table. The control server
+// sends down these configurations.
 type katcTableConfig struct {
 	Source            katcSourceType     `json:"source"`
 	Platform          string             `json:"platform"`
@@ -87,6 +98,8 @@ type katcTableConfig struct {
 	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
 }
 
+// ConstructKATCTables takes stored configuration of KATC tables, parses the configuration,
+// and returns the constructed tables.
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	plugins := make([]osquery.OsqueryPlugin, 0)
 	for tableName, tableConfigStr := range config {

@@ -16,37 +16,24 @@ import (
 )
 
 const (
-	tagFloatMax            uint32 = 0xfff00000
-	tagHeader              uint32 = 0xfff10000
-	tagNull                uint32 = 0xffff0000
-	tagUndefined           uint32 = 0xffff0001
-	tagBoolean             uint32 = 0xffff0002
-	tagInt32               uint32 = 0xffff0003
-	tagString              uint32 = 0xffff0004
-	tagDateObject          uint32 = 0xffff0005
-	tagRegexpObject        uint32 = 0xffff0006
-	tagArrayObject         uint32 = 0xffff0007
-	tagObjectObject        uint32 = 0xffff0008
-	tagArrayBufferObjectV2 uint32 = 0xffff0009
-	tagBooleanObject       uint32 = 0xffff000a
-	tagStringObject        uint32 = 0xffff000b
-	tagNumberObject        uint32 = 0xffff000c
-	tagBackReferenceObject uint32 = 0xffff000d
-	tagDoNotUse1           uint32 = 0xffff000e
-	tagDoNotUse2           uint32 = 0xffff000f
-	tagTypedArrayObjectV2  uint32 = 0xffff0010
-	tagMapObject           uint32 = 0xffff0011
-	tagSetObject           uint32 = 0xffff0012
-	tagEndOfKeys           uint32 = 0xffff0013
+	tagHeader        uint32 = 0xfff10000
+	tagNull          uint32 = 0xffff0000
+	tagUndefined     uint32 = 0xffff0001
+	tagBoolean       uint32 = 0xffff0002
+	tagInt32         uint32 = 0xffff0003
+	tagString        uint32 = 0xffff0004
+	tagArrayObject   uint32 = 0xffff0007
+	tagObjectObject  uint32 = 0xffff0008
+	tagBooleanObject uint32 = 0xffff000a
+	tagStringObject  uint32 = 0xffff000b
+	tagEndOfKeys     uint32 = 0xffff0013
 )
 
-// structuredCloneDeserialize deserializes a JS object that has been stored in IndexedDB
-// by Firefox.
+// structuredCloneDeserialize deserializes a JS object that has been stored by Firefox
+// in IndexedDB sqlite-backed databases.
 // References:
 // * https://stackoverflow.com/a/59923297
-// * https://searchfox.org/mozilla-central/source/js/public/StructuredClone.h
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
-// * https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize
 func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
 	// IndexedDB data is stored by key "data" pointing to the serialized object. We want to
 	// extract that serialized object, and discard the top-level "data" key.
@@ -84,6 +71,7 @@ func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, row m
 	return resultObj, nil
 }
 
+// nextPair returns the next (tag, data) pair from `srcReader`.
 func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
 	// Tags and data are written as a singular little-endian uint64 value.
 	// For example, the pair (`tagBoolean`, 1) is written as 01 00 00 00 02 00 FF FF,
@@ -102,6 +90,7 @@ func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
 	return binary.BigEndian.Uint32(pairBytes[0:4]), binary.BigEndian.Uint32(pairBytes[4:]), nil
 }
 
+// deserializeObject deserializes the next object from `srcReader`.
 func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 	resultObj := make(map[string][]byte, 0)
 

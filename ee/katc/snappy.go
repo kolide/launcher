@@ -8,7 +8,8 @@ import (
 	"github.com/golang/snappy"
 )
 
-// snappyDecode is a dataProcessingStep that decodes data compressed with snappy
+// snappyDecode is a dataProcessingStep that decodes data compressed with snappy.
+// We use this to decode data retrieved from Firefox IndexedDB sqlite-backed databases.
 func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
 	decodedRow := make(map[string][]byte)
 
