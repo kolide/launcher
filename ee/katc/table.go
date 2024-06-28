@@ -91,10 +91,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 		filteredRow := make(map[string]string)
 		for column, data := range row {
 			if _, expectedColumn := k.columnLookup[column]; !expectedColumn {
-				k.slogger.Log(ctx, slog.LevelWarn,
-					"results contained unknown column, discarding",
-					"column", column,
-				)
+				// Silently discard the column+data
 				continue
 			}
 
