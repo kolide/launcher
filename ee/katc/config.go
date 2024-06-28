@@ -3,7 +3,6 @@ package katc
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -29,8 +28,7 @@ type sourceData struct {
 }
 
 const (
-	sqliteSourceType    = "sqlite"
-	indexedDBSourceType = "indexeddb"
+	sqliteSourceType = "sqlite"
 )
 
 func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
@@ -45,9 +43,6 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 		kst.name = sqliteSourceType
 		kst.dataFunc = sqliteData
 		return nil
-	case indexedDBSourceType:
-		kst.name = indexedDBSourceType
-		return errors.New("indexeddb is not yet implemented")
 	default:
 		return fmt.Errorf("unknown table type %s", s)
 	}
