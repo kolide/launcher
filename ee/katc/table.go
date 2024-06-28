@@ -118,7 +118,7 @@ func getSourceConstraint(queryContext table.QueryContext) *table.ConstraintList 
 	return nil
 }
 
-func sourcePathAdheresToSourceConstraints(sourcePath string, sourceConstraints *table.ConstraintList) (bool, error) {
+func checkSourcePathConstraints(sourcePath string, sourceConstraints *table.ConstraintList) (bool, error) {
 	if sourceConstraints == nil {
 		return true, nil
 	}

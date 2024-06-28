@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
+func Test_checkSourcePathConstraints(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
 		testCaseName  string
 		sourcePath    string
 		constraints   table.ConstraintList
-		adheres       bool
+		valid         bool
 		errorExpected bool
 	}{
 		{
@@ -29,7 +29,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -43,7 +43,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       false,
+			valid:         false,
 			errorExpected: false,
 		},
 		{
@@ -57,7 +57,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -71,7 +71,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -85,7 +85,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres: true,
+			valid: true,
 		},
 		{
 			testCaseName: "GLOB with * wildcard",
@@ -98,7 +98,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -112,7 +112,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -126,7 +126,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 		{
@@ -140,7 +140,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       false,
+			valid:         false,
 			errorExpected: true,
 		},
 		{
@@ -154,7 +154,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       false,
+			valid:         false,
 			errorExpected: true,
 		},
 		{
@@ -172,7 +172,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       false,
+			valid:         false,
 			errorExpected: false,
 		},
 		{
@@ -190,7 +190,7 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 					},
 				},
 			},
-			adheres:       true,
+			valid:         true,
 			errorExpected: false,
 		},
 	} {
@@ -198,14 +198,14 @@ func Test_sourcePathAdheresToSourceConstraints(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			adheres, err := sourcePathAdheresToSourceConstraints(tt.sourcePath, &tt.constraints)
+			valid, err := checkSourcePathConstraints(tt.sourcePath, &tt.constraints)
 			if tt.errorExpected {
 				require.Error(t, err, "expected error on checking constraints")
 			} else {
 				require.NoError(t, err, "expected no error on checking constraints")
 			}
 
-			require.Equal(t, tt.adheres, adheres, "incorrect result checking constraints")
+			require.Equal(t, tt.valid, valid, "incorrect result checking constraints")
 		})
 	}
 }
