@@ -12,14 +12,9 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-/*
-TODOs:
-- Need to do queryContext filtering
-*/
-
 type katcSourceType struct {
 	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string) ([]sourceData, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
 }
 
 type sourceData struct {
@@ -109,20 +104,7 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 			continue
 		}
 
-		columns := []table.ColumnDefinition{
-			{
-				Name: sourcePathColumnName,
-				Type: table.ColumnTypeText,
-			},
-		}
-		for i := 0; i < len(cfg.Columns); i += 1 {
-			columns = append(columns, table.ColumnDefinition{
-				Name: cfg.Columns[i],
-				Type: table.ColumnTypeText,
-			})
-		}
-
-		t := newKatcTable(tableName, cfg, slogger)
+		t, columns := newKatcTable(tableName, cfg, slogger)
 		plugins = append(plugins, table.NewPlugin(tableName, columns, t.generate))
 	}
 

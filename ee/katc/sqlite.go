@@ -7,11 +7,12 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string) ([]sourceData, error) {
+func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
 	sqliteDbs, err := filepath.Glob(pathPattern)
 	if err != nil {
 		return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
@@ -19,6 +20,15 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, q
 
 	results := make([]sourceData, 0)
 	for _, sqliteDb := range sqliteDbs {
+		// Check to make sure `sqliteDb` adheres to sourceConstraints
+		valid, err := sourcePathAdheresToSourceConstraints(sqliteDb, sourceConstraints)
+		if err != nil {
+			return nil, fmt.Errorf("checking source path constraints: %w", err)
+		}
+		if !valid {
+			continue
+		}
+
 		rowsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
 		if err != nil {
 			return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
