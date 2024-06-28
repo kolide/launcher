@@ -9,11 +9,17 @@ import (
 )
 
 // snappyDecode is a dataProcessingStep that decodes data compressed with snappy
-func snappyDecode(ctx context.Context, _ *slog.Logger, data []byte) ([]byte, error) {
-	decodedResultBytes, err := snappy.Decode(nil, data)
-	if err != nil {
-		return nil, fmt.Errorf("decoding column: %w", err)
+func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+	decodedRow := make(map[string][]byte)
+
+	for k, v := range row {
+		decodedResultBytes, err := snappy.Decode(nil, v)
+		if err != nil {
+			return nil, fmt.Errorf("decoding data for key %s: %w", k, err)
+		}
+
+		decodedRow[k] = decodedResultBytes
 	}
 
-	return decodedResultBytes, nil
+	return decodedRow, nil
 }

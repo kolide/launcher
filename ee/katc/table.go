@@ -37,17 +37,22 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	results := make([]map[string]string, 0)
 	for _, s := range dataRaw {
 		for _, dataRawRow := range s.rows {
+			// Make sure source is included in row data
 			rowData := map[string]string{
 				sourcePathColumnName: s.path,
 			}
-			for key, val := range dataRawRow {
-				// Run any processing steps on the data value
-				for _, dataProcessingStep := range k.cfg.DataProcessingSteps {
-					val, err = dataProcessingStep.processingFunc(ctx, k.slogger, val)
-					if err != nil {
-						return nil, fmt.Errorf("transforming data at key `%s`: %w", key, err)
-					}
+
+			// Run any needed transformations on the row data
+			for _, step := range k.cfg.RowTransformSteps {
+				dataRawRow, err = step.transformFunc(ctx, k.slogger, dataRawRow)
+				if err != nil {
+					return nil, fmt.Errorf("running transform func %s: %w", step.name, err)
 				}
+			}
+
+			// After transformations have been applied, we can cast the data from []byte
+			// to string to return to osquery.
+			for key, val := range dataRawRow {
 				rowData[key] = string(val)
 			}
 			results = append(results, rowData)

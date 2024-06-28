@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
 
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -45,7 +47,14 @@ const (
 // * https://searchfox.org/mozilla-central/source/js/public/StructuredClone.h
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
 // * https://html.spec.whatwg.org/multipage/structured-data.html#structureddeserialize
-func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, data []byte) ([]byte, error) {
+func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+	// IndexedDB data is stored by key "data" pointing to the serialized object. We want to
+	// extract that serialized object, and discard the top-level "data" key.
+	data, ok := row["data"]
+	if !ok {
+		return nil, errors.New("row missing top-level data key")
+	}
+
 	srcReader := bytes.NewReader(data)
 
 	// First, read the header
@@ -72,13 +81,7 @@ func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, data 
 		return nil, fmt.Errorf("reading top-level object: %w", err)
 	}
 
-	// Marshal the object to return
-	objRaw, err := json.Marshal(resultObj)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling result: %w", err)
-	}
-
-	return objRaw, nil
+	return resultObj, nil
 }
 
 func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
@@ -99,8 +102,8 @@ func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
 	return binary.BigEndian.Uint32(pairBytes[0:4]), binary.BigEndian.Uint32(pairBytes[4:]), nil
 }
 
-func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
-	resultObj := make(map[string]any, 0)
+func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
+	resultObj := make(map[string][]byte, 0)
 
 	for {
 		nextObjTag, nextObjData, err := nextPair(srcReader)
@@ -121,6 +124,7 @@ func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading string for tag %x: %w", nextObjTag, err)
 		}
+		nextKeyStr := string(nextKey)
 
 		// Read value
 		valTag, valData, err := nextPair(srcReader)
@@ -130,36 +134,36 @@ func deserializeObject(srcReader io.ByteReader) (map[string]any, error) {
 
 		switch valTag {
 		case tagInt32:
-			resultObj[nextKey] = valData
+			resultObj[nextKeyStr] = []byte(strconv.Itoa(int(valData)))
 		case tagString, tagStringObject:
 			str, err := deserializeString(valData, srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading string for key %s: %w", nextKey, err)
+				return nil, fmt.Errorf("reading string for key %s: %w", nextKeyStr, err)
 			}
-			resultObj[nextKey] = str
+			resultObj[nextKeyStr] = str
 		case tagObjectObject:
-			obj, err := deserializeObject(srcReader)
+			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading object for key %s: %w", nextKey, err)
+				return nil, fmt.Errorf("reading object for key %s: %w", nextKeyStr, err)
 			}
-			resultObj[nextKey] = obj
+			resultObj[nextKeyStr] = obj
 		case tagArrayObject:
 			arr, err := deserializeArray(valData, srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading array for key %s: %w", nextKey, err)
+				return nil, fmt.Errorf("reading array for key %s: %w", nextKeyStr, err)
 			}
-			resultObj[nextKey] = arr
+			resultObj[nextKeyStr] = arr
 		case tagNull, tagUndefined:
-			resultObj[nextKey] = nil
+			resultObj[nextKeyStr] = nil
 		default:
-			return nil, fmt.Errorf("cannot process %s: unknown tag type %x", nextKey, valTag)
+			return nil, fmt.Errorf("cannot process %s: unknown tag type %x", nextKeyStr, valTag)
 		}
 	}
 
 	return resultObj, nil
 }
 
-func deserializeString(strData uint32, srcReader io.ByteReader) (string, error) {
+func deserializeString(strData uint32, srcReader io.ByteReader) ([]byte, error) {
 	strLen := strData & bitMask(31)
 	isAscii := strData & (1 << 31)
 
@@ -170,7 +174,7 @@ func deserializeString(strData uint32, srcReader io.ByteReader) (string, error) 
 	return deserializeUtf16String(strLen, srcReader)
 }
 
-func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) (string, error) {
+func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) ([]byte, error) {
 	// Read bytes for string
 	var i uint32
 	var err error
@@ -178,7 +182,7 @@ func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) (string, err
 	for i = 0; i < strLen; i += 1 {
 		strBytes[i], err = srcReader.ReadByte()
 		if err != nil {
-			return "", fmt.Errorf("reading byte in string: %w", err)
+			return nil, fmt.Errorf("reading byte in string: %w", err)
 		}
 	}
 
@@ -191,10 +195,10 @@ func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) (string, err
 		}
 	}
 
-	return string(strBytes), nil
+	return strBytes, nil
 }
 
-func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) (string, error) {
+func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, error) {
 	// Two bytes per char
 	lenToRead := strLen * 2
 	var i uint32
@@ -203,7 +207,7 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) (string, err
 	for i = 0; i < lenToRead; i += 1 {
 		strBytes[i], err = srcReader.ReadByte()
 		if err != nil {
-			return "", fmt.Errorf("reading byte in string: %w", err)
+			return nil, fmt.Errorf("reading byte in string: %w", err)
 		}
 	}
 
@@ -220,12 +224,12 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) (string, err
 	utf16Reader := transform.NewReader(bytes.NewReader(strBytes), unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder())
 	decoded, err := io.ReadAll(utf16Reader)
 	if err != nil {
-		return "", fmt.Errorf("decoding: %w", err)
+		return nil, fmt.Errorf("decoding: %w", err)
 	}
-	return string(decoded), nil
+	return decoded, nil
 }
 
-func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]any, error) {
+func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, error) {
 	resultArr := make([]any, arrayLength)
 
 	// We discard the next pair before reading the array.
@@ -239,17 +243,42 @@ func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]any, error
 
 		switch itemTag {
 		case tagObjectObject:
-			obj, err := deserializeObject(srcReader)
+			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
 				return nil, fmt.Errorf("reading object at index %d in array: %w", i, err)
 			}
-			resultArr[i] = obj
+			resultArr[i] = string(obj) // cast to string so it's readable when marshalled again below
 		default:
 			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", i, itemTag)
 		}
 	}
 
-	return resultArr, nil
+	arrBytes, err := json.Marshal(resultArr)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling array: %w", err)
+	}
+
+	return arrBytes, nil
+}
+
+func deserializeNestedObject(srcReader io.ByteReader) ([]byte, error) {
+	nestedObj, err := deserializeObject(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing nested object: %w", err)
+	}
+
+	// Make nested object values readable -- cast []byte to string
+	readableNestedObj := make(map[string]string)
+	for k, v := range nestedObj {
+		readableNestedObj[k] = string(v)
+	}
+
+	resultObj, err := json.Marshal(readableNestedObj)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling nested object: %w", err)
+	}
+
+	return resultObj, nil
 }
 
 func bitMask(n uint32) uint32 {

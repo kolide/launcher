@@ -13,9 +13,6 @@ import (
 )
 
 /*
-Open qs:
-- Should we go with the EAV approach rather than with columns? Look at how dataflatten does it
-
 TODOs:
 - Need to do queryContext filtering
 */
@@ -55,17 +52,17 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	}
 }
 
-type dataProcessingStep struct {
-	name           string
-	processingFunc func(ctx context.Context, slogger *slog.Logger, data []byte) ([]byte, error)
+type rowTransformStep struct {
+	name          string
+	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error)
 }
 
 const (
-	snappyDecodeProcessingStep               = "snappy"
-	structuredCloneDeserializeProcessingStep = "structured_clone"
+	snappyDecodeTransformStep               = "snappy"
+	structuredCloneDeserializeTransformStep = "structured_clone"
 )
 
-func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
+func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	var s string
 	err := json.Unmarshal(data, &s)
 	if err != nil {
@@ -73,13 +70,13 @@ func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case snappyDecodeProcessingStep:
-		d.name = snappyDecodeProcessingStep
-		d.processingFunc = snappyDecode
+	case snappyDecodeTransformStep:
+		r.name = snappyDecodeTransformStep
+		r.transformFunc = snappyDecode
 		return nil
-	case structuredCloneDeserializeProcessingStep:
-		d.name = structuredCloneDeserializeProcessingStep
-		d.processingFunc = structuredCloneDeserialize
+	case structuredCloneDeserializeTransformStep:
+		r.name = structuredCloneDeserializeTransformStep
+		r.transformFunc = structuredCloneDeserialize
 		return nil
 	default:
 		return fmt.Errorf("unknown data processing step %s", s)
@@ -87,12 +84,12 @@ func (d *dataProcessingStep) UnmarshalJSON(data []byte) error {
 }
 
 type katcTableConfig struct {
-	Source              katcSourceType       `json:"source"`
-	Platform            string               `json:"platform"`
-	Columns             []string             `json:"columns"`
-	Path                string               `json:"path"`  // Path to file holding data (e.g. sqlite file) -- wildcards supported
-	Query               string               `json:"query"` // Query to run against `path`
-	DataProcessingSteps []dataProcessingStep `json:"data_processing_steps"`
+	Source            katcSourceType     `json:"source"`
+	Platform          string             `json:"platform"`
+	Columns           []string           `json:"columns"`
+	Path              string             `json:"path"`  // Path to file holding data (e.g. sqlite file) -- wildcards supported
+	Query             string             `json:"query"` // Query to run against `path`
+	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
 }
 
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
