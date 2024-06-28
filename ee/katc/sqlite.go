@@ -34,7 +34,8 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, q
 
 // querySqliteDb queries the database at the given path, returning rows of results
 func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error) {
-	conn, err := sql.Open("sqlite", path)
+	dsn := fmt.Sprintf("file://%s?mode=ro", path)
+	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
 	}
