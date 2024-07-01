@@ -22,7 +22,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 
 	// This test validates generation of table results. It uses a sqlite-backed
 	// IndexedDB as a source, which means it also exercises functionality from
-	// sqlite.go, snappy.go, and structured_clone.go.
+	// sqlite.go, snappy.go, and deserialize_firefox.go.
 
 	// First, set up the data we expect to retrieve.
 	expectedColumn := "uuid"
@@ -31,7 +31,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	expectedColumnValue := u.String()
 
 	// Serialize the row data, reversing the deserialization operation in
-	// structured_clone.go.
+	// deserialize_firefox.go.
 	serializedUuid := []byte(expectedColumnValue)
 	serializedObj := append([]byte{
 		// Header
@@ -96,8 +96,8 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 				transformFunc: snappyDecode,
 			},
 			{
-				name:          structuredCloneDeserializeTransformStep,
-				transformFunc: structuredCloneDeserialize,
+				name:          deserializeFirefoxTransformStep,
+				transformFunc: deserializeFirefox,
 			},
 		},
 	}

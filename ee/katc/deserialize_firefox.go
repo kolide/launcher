@@ -29,12 +29,12 @@ const (
 	tagEndOfKeys     uint32 = 0xffff0013
 )
 
-// structuredCloneDeserialize deserializes a JS object that has been stored by Firefox
+// deserializeFirefox deserializes a JS object that has been stored by Firefox
 // in IndexedDB sqlite-backed databases.
 // References:
 // * https://stackoverflow.com/a/59923297
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
-func structuredCloneDeserialize(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
 	// IndexedDB data is stored by key "data" pointing to the serialized object. We want to
 	// extract that serialized object, and discard the top-level "data" key.
 	data, ok := row["data"]
