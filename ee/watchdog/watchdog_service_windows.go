@@ -13,8 +13,10 @@ import (
 	"github.com/kolide/kit/version"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -24,6 +26,11 @@ import (
 type winWatchdogSvc struct {
 	systemSlogger, slogger *multislogger.MultiSlogger
 	opts                   *launcher.Options
+	sleepStateUpdater      *powereventwatcher.InMemorySleepStateUpdater
+	// cachedInModernStandby is held for comparison against the current value
+	// from sleepStateUpdater, to allow us to trigger a healthcheck
+	// more frequently than the routine timer value when waking from modern standby
+	cachedInModernStandby bool
 }
 
 func RunWatchdogService(systemSlogger *multislogger.MultiSlogger, args []string) error {
@@ -69,6 +76,8 @@ func RunWatchdogService(systemSlogger *multislogger.MultiSlogger, args []string)
 		"version", version.Version().Version,
 	)
 
+	sleepStateUpdater := powereventwatcher.NewInMemorySleepStateUpdater(localSlogger.Logger)
+
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
@@ -87,9 +96,10 @@ func RunWatchdogService(systemSlogger *multislogger.MultiSlogger, args []string)
 	}()
 
 	if err := svc.Run(launcherWatchdogServiceName, &winWatchdogSvc{
-		systemSlogger: systemSlogger,
-		slogger:       localSlogger,
-		opts:          opts,
+		systemSlogger:     systemSlogger,
+		slogger:           localSlogger,
+		opts:              opts,
+		sleepStateUpdater: sleepStateUpdater,
 	}); err != nil {
 		systemSlogger.Log(ctx, slog.LevelError,
 			"error in service run",
@@ -179,6 +189,10 @@ func (w *winWatchdogSvc) Execute(args []string, r <-chan svc.ChangeRequest, chan
 }
 
 func (w *winWatchdogSvc) checkLauncherStatus(ctx context.Context) error {
+	if w.sleepStateUpdater.InModernStandby() {
+		return nil
+	}
+
 	serviceManager, err := mgr.Connect()
 	if err != nil {
 		w.slogger.Log(ctx, slog.LevelError,
@@ -212,19 +226,63 @@ func (w *winWatchdogSvc) checkLauncherStatus(ctx context.Context) error {
 }
 
 func runLauncherWatchdogService(ctx context.Context, w *winWatchdogSvc) error {
-	ticker := time.NewTicker(1 * time.Minute)
+	// create a rungroup for all the actors we create to allow for easy start/stop
+	runGroup := rungroup.NewRunGroup(w.slogger.Logger)
+	powerEventWatcher, err := powereventwatcher.New(ctx, w.slogger.Logger, w.sleepStateUpdater)
+	if err != nil {
+		w.slogger.Log(ctx, slog.LevelDebug,
+			"could not init power event watcher",
+			"err", err,
+		)
+	} else {
+		runGroup.Add("powerEventWatcher", powerEventWatcher.Execute, powerEventWatcher.Interrupt)
+	}
+
+	go runLauncherWatchdogStatusChecker(ctx, w)
+
+	if err := runGroup.Run(); err != nil {
+		return fmt.Errorf("err from watchdog runGroup: %w", err)
+	}
+
+	return nil
+}
+
+func runLauncherWatchdogStatusChecker(ctx context.Context, w *winWatchdogSvc) error {
+	// to avoid constantly hitting windows service manager we run off of two timers:
+	// 1. a longer (routine) timer which always checks the current status
+	// 2. a shorter (sleepState) timer which will only trigger a check if we've recently
+	// woken up from modern standby
+	routineTicker := time.NewTicker(15 * time.Minute)
+	sleepStateTicker := time.NewTicker(1 * time.Minute)
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-routineTicker.C:
 			if err := w.checkLauncherStatus(ctx); err != nil {
 				w.slogger.Log(ctx, slog.LevelError,
 					"failure checking launcher health status",
 					"err", err,
 				)
 			}
+		case <-sleepStateTicker.C:
+			// if our last reading was in modern standby, but our current reading is awake,
+			// trigger the status check immediately
+			shouldCheckStatusNow := w.cachedInModernStandby && !w.sleepStateUpdater.InModernStandby()
+			// always persist the cached value for the next iteration, this must be done here before
+			// the checkLauncherStatus call to ensure we're operating off up to date sleep status there
+			w.cachedInModernStandby = w.sleepStateUpdater.InModernStandby()
+			if shouldCheckStatusNow {
+				if err := w.checkLauncherStatus(ctx); err != nil {
+					w.slogger.Log(ctx, slog.LevelError,
+						"failure checking launcher health status after detecting wake state",
+						"err", err,
+					)
+				}
+			}
+
 		case <-ctx.Done():
-			ticker.Stop()
+			routineTicker.Stop()
+			sleepStateTicker.Stop()
 			return ctx.Err()
 		}
 	}

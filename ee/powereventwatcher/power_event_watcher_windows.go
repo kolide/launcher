@@ -8,6 +8,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log/slog"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -53,6 +54,14 @@ type (
 		knapsack types.Knapsack
 		slogger  *slog.Logger
 	}
+
+	// InMemorySleepStateUpdater implements the powerEventSubscriber interface. When passed as
+	// the powerEventSubscriber, it will expose the last seen ModernStandby state for the caller
+	InMemorySleepStateUpdater struct {
+		sync.Mutex
+		slogger         *slog.Logger
+		inModernStandby bool
+	}
 )
 
 const (
@@ -68,6 +77,46 @@ func NewKnapsackSleepStateUpdater(slogger *slog.Logger, k types.Knapsack) *knaps
 		knapsack: k,
 		slogger:  slogger,
 	}
+}
+
+func NewInMemorySleepStateUpdater(slogger *slog.Logger) *InMemorySleepStateUpdater {
+	return &InMemorySleepStateUpdater{
+		slogger: slogger,
+	}
+}
+
+func (ims *InMemorySleepStateUpdater) OnStartup() error {
+	ims.Lock()
+	defer ims.Unlock()
+	// this should essentially be a no-op for our inmemory store since it will default false
+	ims.inModernStandby = false
+	return nil
+}
+
+func (ims *InMemorySleepStateUpdater) InModernStandby() bool {
+	ims.Lock()
+	defer ims.Unlock()
+
+	return ims.inModernStandby
+}
+
+func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
+	ims.Lock()
+	defer ims.Unlock()
+
+	switch eventID {
+	case eventIdEnteringModernStandby, eventIdEnteringSleep:
+		ims.inModernStandby = true
+	case eventIdExitingModernStandby:
+		ims.inModernStandby = false
+	default:
+		ims.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received unexpected event ID in log",
+			"event_id", eventID,
+		)
+	}
+
+	return nil
 }
 
 func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
