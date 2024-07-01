@@ -49,7 +49,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"columns": ["col1", "col2"],
 					"source": "/some/path/to/a/different/db.sqlite",
 					"query": "SELECT col1, col2 FROM some_table;",
-					"row_transform_steps": []
+					"row_transform_steps": ["camel_to_snake"]
 				}`, runtime.GOOS),
 			},
 			expectedPluginCount: 2,

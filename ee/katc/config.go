@@ -59,6 +59,7 @@ type rowTransformStep struct {
 const (
 	snappyDecodeTransformStep       = "snappy"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
+	camelToSnakeTransformStep       = "camel_to_snake"
 )
 
 func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
@@ -76,6 +77,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case deserializeFirefoxTransformStep:
 		r.name = deserializeFirefoxTransformStep
 		r.transformFunc = deserializeFirefox
+		return nil
+	case camelToSnakeTransformStep:
+		r.name = camelToSnakeTransformStep
+		r.transformFunc = camelToSnake
 		return nil
 	default:
 		return fmt.Errorf("unknown data processing step %s", s)
