@@ -87,7 +87,6 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	// Now, filter data to ensure we only return columns in k.columnLookup
 	filteredResults := make([]map[string]string, 0)
 	for _, row := range transformedResults {
-		includeRow := true
 		filteredRow := make(map[string]string)
 		for column, data := range row {
 			if _, expectedColumn := k.columnLookup[column]; !expectedColumn {
@@ -96,16 +95,9 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			}
 
 			filteredRow[column] = data
-
-			// No need to check the rest of the row
-			if !includeRow {
-				break
-			}
 		}
 
-		if includeRow {
-			filteredResults = append(filteredResults, filteredRow)
-		}
+		filteredResults = append(filteredResults, filteredRow)
 	}
 
 	return filteredResults, nil

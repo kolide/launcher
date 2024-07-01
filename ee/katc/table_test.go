@@ -122,7 +122,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate results
-	require.Equal(t, 1, len(results), "only one row expected")
+	require.Equal(t, 1, len(results), "exactly one row expected")
 	require.Contains(t, results[0], sourceColumnName, "missing source column")
 	require.Equal(t, sourceFilepath, results[0][sourceColumnName])
 	require.Contains(t, results[0], expectedColumn, "expected column missing")
