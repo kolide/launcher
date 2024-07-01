@@ -88,7 +88,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 		},
 		Platform: runtime.GOOS,
 		Columns:  []string{expectedColumn},
-		Source:   filepath.Join(databaseDir, "*.sqlite"), // All sqlite files in the test directory
+		Source:   filepath.Join(databaseDir, "%.sqlite"), // All sqlite files in the test directory
 		Query:    "SELECT data FROM object_data;",
 		RowTransformSteps: []rowTransformStep{
 			{

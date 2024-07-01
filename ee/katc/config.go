@@ -86,7 +86,7 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 // sends down these configurations.
 type katcTableConfig struct {
 	SourceType        katcSourceType     `json:"source_type"`
-	Source            string             `json:"source"` // Describes how to connect to source (e.g. path to db) -- wildcards supported
+	Source            string             `json:"source"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 	Platform          string             `json:"platform"`
 	Columns           []string           `json:"columns"`
 	Query             string             `json:"query"` // Query to run against `path`
