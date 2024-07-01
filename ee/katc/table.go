@@ -118,12 +118,11 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 		return true, nil
 	}
 
-	validSource := true
 	for _, sourceConstraint := range sourceConstraints.Constraints {
 		switch sourceConstraint.Operator {
 		case table.OperatorEquals:
 			if source != sourceConstraint.Expression {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorLike:
 			// Transform the expression into a regex to test if we have a match.
@@ -139,7 +138,7 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid LIKE statement: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorGlob:
 			// Transform the expression into a regex to test if we have a match.
@@ -154,7 +153,7 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid GLOB statement: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorRegexp:
 			r, err := regexp.Compile(sourceConstraint.Expression)
@@ -162,17 +161,12 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid regex: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		default:
 			return false, fmt.Errorf("operator %v not valid source constraint", sourceConstraint.Operator)
 		}
-
-		// No need to check other constraints
-		if !validSource {
-			break
-		}
 	}
 
-	return validSource, nil
+	return true, nil
 }
