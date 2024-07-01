@@ -22,15 +22,37 @@ func TestConstructKATCTables(t *testing.T) {
 			testCaseName: "snappy_sqlite",
 			katcConfig: map[string]string{
 				"kolide_snappy_sqlite_test": fmt.Sprintf(`{
-					"source": "sqlite",
+					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"path": "/some/path/to/db.sqlite",
+					"source": "/some/path/to/db.sqlite",
 					"query": "SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"testtable\";",
 					"row_transform_steps": ["snappy"]
 				}`, runtime.GOOS),
 			},
 			expectedPluginCount: 1,
+		},
+		{
+			testCaseName: "multiple plugins",
+			katcConfig: map[string]string{
+				"test_1": fmt.Sprintf(`{
+					"source_type": "sqlite",
+					"platform": "%s",
+					"columns": ["data"],
+					"source": "/some/path/to/db.sqlite",
+					"query": "SELECT data FROM object_data;",
+					"row_transform_steps": ["snappy"]
+				}`, runtime.GOOS),
+				"test_2": fmt.Sprintf(`{
+					"source_type": "sqlite",
+					"platform": "%s",
+					"columns": ["col1", "col2"],
+					"source": "/some/path/to/a/different/db.sqlite",
+					"query": "SELECT col1, col2 FROM some_table;",
+					"row_transform_steps": []
+				}`, runtime.GOOS),
+			},
+			expectedPluginCount: 2,
 		},
 		{
 			testCaseName: "malformed config",
@@ -43,10 +65,10 @@ func TestConstructKATCTables(t *testing.T) {
 			testCaseName: "invalid table source",
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
-					"source": "unknown_source",
+					"source_type": "unknown_source",
 					"platform": "%s",
 					"columns": ["data"],
-					"path": "/some/path/to/db.sqlite",
+					"source": "/some/path/to/db.sqlite",
 					"query": "SELECT data FROM object_data;"
 				}`, runtime.GOOS),
 			},
@@ -56,10 +78,10 @@ func TestConstructKATCTables(t *testing.T) {
 			testCaseName: "invalid data processing step type",
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
-					"source": "sqlite",
+					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"path": "/some/path/to/db.sqlite",
+					"source": "/some/path/to/db.sqlite",
 					"query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["unknown_step"]
 				}`, runtime.GOOS),

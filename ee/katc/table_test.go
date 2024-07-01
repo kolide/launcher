@@ -82,13 +82,13 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	// At long last, our source is adequately configured.
 	// Move on to constructing our KATC table.
 	cfg := katcTableConfig{
-		Source: katcSourceType{
+		SourceType: katcSourceType{
 			name:     sqliteSourceType,
 			dataFunc: sqliteData,
 		},
 		Platform: runtime.GOOS,
 		Columns:  []string{expectedColumn},
-		Path:     filepath.Join(databaseDir, "*.sqlite"), // All sqlite files in the test directory
+		Source:   filepath.Join(databaseDir, "*.sqlite"), // All sqlite files in the test directory
 		Query:    "SELECT data FROM object_data;",
 		RowTransformSteps: []rowTransformStep{
 			{
@@ -106,7 +106,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	// Make a query context restricting the source to our exact source sqlite database
 	queryContext := table.QueryContext{
 		Constraints: map[string]table.ConstraintList{
-			sourcePathColumnName: {
+			sourceColumnName: {
 				Constraints: []table.Constraint{
 					{
 						Operator:   table.OperatorEquals,
@@ -123,8 +123,8 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 
 	// Validate results
 	require.Equal(t, 1, len(results), "only one row expected")
-	require.Contains(t, results[0], sourcePathColumnName, "missing source_path column")
-	require.Equal(t, sourceFilepath, results[0][sourcePathColumnName])
+	require.Contains(t, results[0], sourceColumnName, "missing source column")
+	require.Equal(t, sourceFilepath, results[0][sourceColumnName])
 	require.Contains(t, results[0], expectedColumn, "expected column missing")
 	require.Equal(t, expectedColumnValue, results[0][expectedColumn], "data mismatch")
 }
@@ -134,14 +134,14 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 
 	for _, tt := range []struct {
 		testCaseName  string
-		sourcePath    string
+		source        string
 		constraints   table.ConstraintList
 		valid         bool
 		errorExpected bool
 	}{
 		{
 			testCaseName: "equals",
-			sourcePath:   filepath.Join("some", "path", "to", "a", "source"),
+			source:       filepath.Join("some", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -155,7 +155,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "not equals",
-			sourcePath:   filepath.Join("some", "path", "to", "a", "source"),
+			source:       filepath.Join("some", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -169,7 +169,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE with % wildcard",
-			sourcePath:   filepath.Join("a", "path", "to", "db.sqlite"),
+			source:       filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -183,7 +183,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE with underscore wildcard",
-			sourcePath:   filepath.Join("a", "path", "to", "db.sqlite"),
+			source:       filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -197,7 +197,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE is case-insensitive",
-			sourcePath:   filepath.Join("a", "path", "to", "db.sqlite"),
+			source:       filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -210,7 +210,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "GLOB with * wildcard",
-			sourcePath:   filepath.Join("another", "path", "to", "a", "source"),
+			source:       filepath.Join("another", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -224,7 +224,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "GLOB with ? wildcard",
-			sourcePath:   filepath.Join("another", "path", "to", "a", "source"),
+			source:       filepath.Join("another", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -238,7 +238,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "regexp",
-			sourcePath:   filepath.Join("test", "path", "to", "a", "source"),
+			source:       filepath.Join("test", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -252,7 +252,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "invalid regexp",
-			sourcePath:   filepath.Join("test", "path", "to", "a", "source"),
+			source:       filepath.Join("test", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -266,7 +266,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "unsupported",
-			sourcePath:   filepath.Join("test", "path", "to", "a", "source", "2"),
+			source:       filepath.Join("test", "path", "to", "a", "source", "2"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -280,7 +280,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "multiple constraints where one does not match",
-			sourcePath:   filepath.Join("test", "path", "to", "a", "source", "3"),
+			source:       filepath.Join("test", "path", "to", "a", "source", "3"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -298,7 +298,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "multiple constraints where all match",
-			sourcePath:   filepath.Join("test", "path", "to", "a", "source", "3"),
+			source:       filepath.Join("test", "path", "to", "a", "source", "3"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -319,7 +319,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			valid, err := checkSourcePathConstraints(tt.sourcePath, &tt.constraints)
+			valid, err := checkSourceConstraints(tt.source, &tt.constraints)
 			if tt.errorExpected {
 				require.Error(t, err, "expected error on checking constraints")
 			} else {

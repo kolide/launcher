@@ -20,8 +20,8 @@ type katcSourceType struct {
 }
 
 // sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
-// source's path to the query results. (A config may have wildcards in the path,
-// allowing for querying against multiple source paths.)
+// source to the query results. (A config may have wildcards in the source,
+// allowing for querying against multiple sources.)
 type sourceData struct {
 	path string
 	rows []map[string][]byte
@@ -85,10 +85,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 // katcTableConfig is the configuration for a specific KATC table. The control server
 // sends down these configurations.
 type katcTableConfig struct {
-	Source            katcSourceType     `json:"source"`
+	SourceType        katcSourceType     `json:"source_type"`
+	Source            string             `json:"source"` // Describes how to connect to source (e.g. path to db) -- wildcards supported
 	Platform          string             `json:"platform"`
 	Columns           []string           `json:"columns"`
-	Path              string             `json:"path"`  // Path to file holding data (e.g. sqlite file) -- wildcards supported
 	Query             string             `json:"query"` // Query to run against `path`
 	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
 }
