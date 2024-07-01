@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
+func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
+	pathPattern := sourcePatternToGlobbablePattern(sourcePattern)
 	sqliteDbs, err := filepath.Glob(pathPattern)
 	if err != nil {
 		return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
@@ -40,6 +42,17 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, pathPattern string, q
 	}
 
 	return results, nil
+}
+
+// sourcePatternToGlobbablePattern translates the source pattern, which adheres to LIKE
+// sqlite syntax for consistency with other osquery tables, into a pattern that can be
+// accepted by filepath.Glob.
+func sourcePatternToGlobbablePattern(sourcePattern string) string {
+	// % matches zero or more characters in LIKE, corresponds to * in glob syntax
+	globbablePattern := strings.Replace(sourcePattern, "%", `*`, -1)
+	// _ matches a single character in LIKE, corresponds to ? in glob syntax
+	globbablePattern = strings.Replace(globbablePattern, "_", `?`, -1)
+	return globbablePattern
 }
 
 // querySqliteDb queries the database at the given path, returning rows of results

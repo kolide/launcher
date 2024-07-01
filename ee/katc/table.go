@@ -87,7 +87,6 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	// Now, filter data to ensure we only return columns in k.columnLookup
 	filteredResults := make([]map[string]string, 0)
 	for _, row := range transformedResults {
-		includeRow := true
 		filteredRow := make(map[string]string)
 		for column, data := range row {
 			if _, expectedColumn := k.columnLookup[column]; !expectedColumn {
@@ -96,16 +95,9 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			}
 
 			filteredRow[column] = data
-
-			// No need to check the rest of the row
-			if !includeRow {
-				break
-			}
 		}
 
-		if includeRow {
-			filteredResults = append(filteredResults, filteredRow)
-		}
+		filteredResults = append(filteredResults, filteredRow)
 	}
 
 	return filteredResults, nil
@@ -126,12 +118,11 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 		return true, nil
 	}
 
-	validSource := true
 	for _, sourceConstraint := range sourceConstraints.Constraints {
 		switch sourceConstraint.Operator {
 		case table.OperatorEquals:
 			if source != sourceConstraint.Expression {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorLike:
 			// Transform the expression into a regex to test if we have a match.
@@ -147,7 +138,7 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid LIKE statement: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorGlob:
 			// Transform the expression into a regex to test if we have a match.
@@ -162,7 +153,7 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid GLOB statement: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		case table.OperatorRegexp:
 			r, err := regexp.Compile(sourceConstraint.Expression)
@@ -170,17 +161,12 @@ func checkSourceConstraints(source string, sourceConstraints *table.ConstraintLi
 				return false, fmt.Errorf("invalid regex: %w", err)
 			}
 			if !r.MatchString(source) {
-				validSource = false
+				return false, nil
 			}
 		default:
 			return false, fmt.Errorf("operator %v not valid source constraint", sourceConstraint.Operator)
 		}
-
-		// No need to check other constraints
-		if !validSource {
-			break
-		}
 	}
 
-	return validSource, nil
+	return true, nil
 }
