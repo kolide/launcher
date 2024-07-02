@@ -151,11 +151,19 @@ func (wc *WatchdogController) Interrupt(_ error) {
 
 func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	ctx := context.TODO()
+	var serviceManager *mgr.Mgr
+	var err error
 
-	serviceManager, err := mgr.Connect()
-	if err != nil {
+	if err := backoff.WaitFor(func() error {
+		serviceManager, err = mgr.Connect()
+		if err != nil {
+			return fmt.Errorf("err connecting to service control manager: %w", err)
+		}
+
+		return nil
+	}, 5*time.Second, 500*time.Millisecond); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError,
-			"connecting to service control manager",
+			"timed out connecting to service control manager",
 			"err", err,
 		)
 
@@ -305,8 +313,14 @@ func removeService(serviceManager *mgr.Mgr, serviceName string) error {
 
 	defer existingService.Close()
 
-	if err = existingService.Delete(); err != nil {
-		return err
+	if err := backoff.WaitFor(func() error {
+		if err = existingService.Delete(); err != nil {
+			return err
+		}
+
+		return nil
+	}, 3*time.Second, 500*time.Millisecond); err != nil {
+		return fmt.Errorf("timed out attempting service deletion: %w", err)
 	}
 
 	return nil
