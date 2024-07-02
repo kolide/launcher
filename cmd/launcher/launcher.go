@@ -293,7 +293,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		)
 	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
 		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
-		runGroup.Add("watchdog_controller", watchdogController.Run, watchdogController.Interrupt)
+		runGroup.Add("watchdogController", watchdogController.Run, watchdogController.Interrupt)
 	}
 
 	// Create a channel for signals
