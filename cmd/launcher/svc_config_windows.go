@@ -132,6 +132,8 @@ func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) 
 
 // checkRestartActions checks the current value of our `SERVICE_FAILURE_ACTIONS_FLAG` and
 // sets it to true if required. See https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_failure_actions_flag
+// if we choose to implement restart backoff, that logic must be added here (it is not exposed via wix). See the "Windows Service Manager"
+// doc in Notion for additional details on configurability
 func checkRestartActions(logger *slog.Logger) {
 	sman, err := mgr.Connect()
 	if err != nil {

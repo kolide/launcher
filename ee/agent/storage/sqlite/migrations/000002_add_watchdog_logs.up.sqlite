@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS watchdog_logs (
+    timestamp INT NOT NULL,
+    log TEXT
+);

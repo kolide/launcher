@@ -66,7 +66,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	}
 
 	// Confirm that service configuration is up-to-date
-	checkServiceConfiguration(systemSlogger.Logger, opts)
+	checkServiceConfiguration(localSlogger.Logger, opts)
 
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"launching service",

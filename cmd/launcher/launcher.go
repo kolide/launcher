@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -41,6 +42,7 @@ import (
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -282,6 +284,17 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
+
+	watchdogController, err := watchdog.NewController(ctx, k)
+	if err != nil { // log any issues here but move on, watchdog is not critical path
+		slogger.Log(ctx, slog.LevelError,
+			"could not init watchdog controller",
+			"err", err,
+		)
+	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
+		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
+		runGroup.Add("watchdogController", watchdogController.Run, watchdogController.Interrupt)
+	}
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)

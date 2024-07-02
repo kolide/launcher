@@ -139,6 +139,13 @@ func (k *knapsack) TokenStore() types.KVStore {
 	return k.getKVStore(storage.TokenStore)
 }
 
+func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
+	return k.flags.SetLauncherWatchdogEnabled(enabled)
+}
+func (k *knapsack) LauncherWatchdogEnabled() bool {
+	return k.flags.LauncherWatchdogEnabled()
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil
