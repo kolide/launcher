@@ -29,7 +29,7 @@ var indexeddbComparer = newChromeComparer()
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string]any, error) {
+func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
 	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.
 	tempDbCopyLocation, err := copyIndexeddb(dbLocation)
 	if err != nil {
@@ -91,21 +91,11 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		return nil, errors.New("unable to get object store ID")
 	}
 
-	// Get the key path for all objects in this store
-	keyPathRaw, err := db.Get(objectStoreKeyPathKey(databaseId, objectStoreId), nil)
-	if err != nil {
-		return nil, fmt.Errorf("getting key path: %w", err)
-	}
-	keyPath, err := decodeIDBKeyPath(keyPathRaw)
-	if err != nil {
-		return nil, fmt.Errorf("decoding key path: %w", err)
-	}
-
 	// Get the key prefix for all objects in this store.
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
-	// Now, we can read all records, parsing only the ones with our matching key prefix.
-	objs := make([]map[string]any, 0)
+	// Now, we can read all records, keeping only the ones with our matching key prefix.
+	objs := make([]map[string][]byte, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
 		key := iter.Key()
@@ -113,20 +103,9 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 			continue
 		}
 
-		keyVal, err := decodeIDBKey(key, keyPrefix)
-		if err != nil {
-			return objs, fmt.Errorf("decoding key: %w", err)
-		}
-
-		obj, err := deserializeIndexeddbValue(iter.Value())
-		if err != nil {
-			return objs, fmt.Errorf("decoding object: %w", err)
-		}
-
-		// Set the key path in the object -- add idb_ prefix to avoid collisions
-		obj[fmt.Sprintf("idb_%s", string(keyPath))] = keyVal
-
-		objs = append(objs, obj)
+		objs = append(objs, map[string][]byte{
+			"data": iter.Value(),
+		})
 	}
 	iter.Release()
 	if err := iter.Error(); err != nil {
