@@ -179,7 +179,7 @@ func (w *winWatchdogSvc) Execute(args []string, r <-chan svc.ChangeRequest, chan
 				"shutting down restart service after exit",
 			)
 			// We don't want to tell the service manager that we've stopped on purpose,
-			// so that the service manager will restart launcher correctly.
+			// so that the service manager will restart the watchdog correctly.
 			// We use this error code largely because the windows/svc code also uses it
 			// and it seems semantically correct enough; it doesn't appear to matter to us
 			// what the code is.
