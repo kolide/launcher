@@ -92,7 +92,7 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 type katcTableConfig struct {
 	SourceType        katcSourceType     `json:"source_type"`
 	SourcePaths       []string           `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
-	Platform          string             `json:"platform"`
+	Filter            string             `json:"filter"`
 	Columns           []string           `json:"columns"`
 	SourceQuery       string             `json:"source_query"` // Query to run against each source path
 	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
@@ -113,7 +113,8 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 			continue
 		}
 
-		if cfg.Platform != runtime.GOOS {
+		// For now, the filter is simply the OS
+		if cfg.Filter != runtime.GOOS {
 			continue
 		}
 

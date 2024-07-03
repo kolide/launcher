@@ -23,7 +23,7 @@ func TestConstructKATCTables(t *testing.T) {
 			katcConfig: map[string]string{
 				"kolide_snappy_sqlite_test": fmt.Sprintf(`{
 					"source_type": "sqlite",
-					"platform": "%s",
+					"filter": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"testtable\";",
@@ -37,7 +37,7 @@ func TestConstructKATCTables(t *testing.T) {
 			katcConfig: map[string]string{
 				"test_1": fmt.Sprintf(`{
 					"source_type": "sqlite",
-					"platform": "%s",
+					"filter": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data;",
@@ -45,7 +45,7 @@ func TestConstructKATCTables(t *testing.T) {
 				}`, runtime.GOOS),
 				"test_2": fmt.Sprintf(`{
 					"source_type": "sqlite",
-					"platform": "%s",
+					"filter": "%s",
 					"columns": ["col1", "col2"],
 					"source_paths": ["/some/path/to/a/different/db.sqlite"],
 					"source_query": "SELECT col1, col2 FROM some_table;",
@@ -66,7 +66,7 @@ func TestConstructKATCTables(t *testing.T) {
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
 					"source_type": "unknown_source",
-					"platform": "%s",
+					"filter": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data;"
@@ -79,7 +79,7 @@ func TestConstructKATCTables(t *testing.T) {
 			katcConfig: map[string]string{
 				"kolide_snappy_test": fmt.Sprintf(`{
 					"source_type": "sqlite",
-					"platform": "%s",
+					"filter": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data;",

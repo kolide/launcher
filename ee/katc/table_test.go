@@ -86,7 +86,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 			name:     sqliteSourceType,
 			dataFunc: sqliteData,
 		},
-		Platform:    runtime.GOOS,
+		Filter:      runtime.GOOS,
 		Columns:     []string{expectedColumn},
 		SourcePaths: []string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
 		SourceQuery: "SELECT data FROM object_data;",
