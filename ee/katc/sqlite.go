@@ -44,15 +44,12 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePattern string,
 	return results, nil
 }
 
-// sourcePatternToGlobbablePattern translates the source pattern, which adheres to LIKE
-// sqlite syntax for consistency with other osquery tables, into a pattern that can be
+// sourcePatternToGlobbablePattern translates the source pattern, which allows for
+// using % wildcards for consistency with other osquery tables, into a pattern that can be
 // accepted by filepath.Glob.
 func sourcePatternToGlobbablePattern(sourcePattern string) string {
-	// % matches zero or more characters in LIKE, corresponds to * in glob syntax
-	globbablePattern := strings.Replace(sourcePattern, "%", `*`, -1)
-	// _ matches a single character in LIKE, corresponds to ? in glob syntax
-	globbablePattern = strings.Replace(globbablePattern, "_", `?`, -1)
-	return globbablePattern
+	// % matches zero or more characters, corresponds to * in glob syntax
+	return strings.Replace(sourcePattern, "%", `*`, -1)
 }
 
 // querySqliteDb queries the database at the given path, returning rows of results
