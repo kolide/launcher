@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"runtime"
 
+	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -28,7 +29,8 @@ type sourceData struct {
 }
 
 const (
-	sqliteSourceType = "sqlite"
+	sqliteSourceType           = "sqlite"
+	indexeddbLeveldbSourceType = "indexeddb_leveldb"
 )
 
 func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
@@ -42,6 +44,10 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	case sqliteSourceType:
 		kst.name = sqliteSourceType
 		kst.dataFunc = sqliteData
+		return nil
+	case indexeddbLeveldbSourceType:
+		kst.name = indexeddbLeveldbSourceType
+		kst.dataFunc = indexeddbLeveldbData
 		return nil
 	default:
 		return fmt.Errorf("unknown table type %s", s)
@@ -59,6 +65,7 @@ type rowTransformStep struct {
 const (
 	snappyDecodeTransformStep       = "snappy"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
+	deserializeChromeTransformStep  = "deserialize_chrome"
 	camelToSnakeTransformStep       = "camel_to_snake"
 )
 
@@ -77,6 +84,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case deserializeFirefoxTransformStep:
 		r.name = deserializeFirefoxTransformStep
 		r.transformFunc = deserializeFirefox
+		return nil
+	case deserializeChromeTransformStep:
+		r.name = deserializeChromeTransformStep
+		r.transformFunc = indexeddb.DeserializeChrome
 		return nil
 	case camelToSnakeTransformStep:
 		r.name = camelToSnakeTransformStep
@@ -128,7 +139,7 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 		var cfg katcTableConfig
 		if err := json.Unmarshal(rawTableConfig, &cfg); err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
-				"unable to unmarshal config for Kolide ATC table, skipping",
+				"unable to unmarshal config for KATC table, skipping",
 				"err", err,
 			)
 			continue
