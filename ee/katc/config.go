@@ -94,7 +94,7 @@ type katcTableConfig struct {
 	SourcePaths       []string           `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 	Platform          string             `json:"platform"`
 	Columns           []string           `json:"columns"`
-	Query             string             `json:"query"` // Query to run against `path`
+	SourceQuery       string             `json:"source_query"` // Query to run against each source path
 	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
 }
 

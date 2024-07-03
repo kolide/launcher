@@ -26,7 +26,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"platform": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
-					"query": "SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"testtable\";",
+					"source_query": "SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"testtable\";",
 					"row_transform_steps": ["snappy"]
 				}`, runtime.GOOS),
 			},
@@ -40,7 +40,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"platform": "%s",
 					"columns": ["data"],
 					"source_paths": ["/some/path/to/db.sqlite"],
-					"query": "SELECT data FROM object_data;",
+					"source_query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["snappy"]
 				}`, runtime.GOOS),
 				"test_2": fmt.Sprintf(`{
@@ -48,7 +48,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"platform": "%s",
 					"columns": ["col1", "col2"],
 					"source_paths": ["/some/path/to/a/different/db.sqlite"],
-					"query": "SELECT col1, col2 FROM some_table;",
+					"source_query": "SELECT col1, col2 FROM some_table;",
 					"row_transform_steps": ["camel_to_snake"]
 				}`, runtime.GOOS),
 			},
@@ -69,7 +69,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"platform": "%s",
 					"columns": ["data"],
 					"source_paths": []"/some/path/to/db.sqlite"],
-					"query": "SELECT data FROM object_data;"
+					"source_query": "SELECT data FROM object_data;"
 				}`, runtime.GOOS),
 			},
 			expectedPluginCount: 0,
@@ -82,7 +82,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"platform": "%s",
 					"columns": ["data"],
 					"source_paths": []"/some/path/to/db.sqlite"],
-					"query": "SELECT data FROM object_data;",
+					"source_query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["unknown_step"]
 				}`, runtime.GOOS),
 			},

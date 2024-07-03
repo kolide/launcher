@@ -89,7 +89,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 		Platform:    runtime.GOOS,
 		Columns:     []string{expectedColumn},
 		SourcePaths: []string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
-		Query:       "SELECT data FROM object_data;",
+		SourceQuery: "SELECT data FROM object_data;",
 		RowTransformSteps: []rowTransformStep{
 			{
 				name:          snappyDecodeTransformStep,

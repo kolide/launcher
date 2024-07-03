@@ -53,7 +53,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fetch data from our table source
-	dataRaw, err := k.cfg.SourceType.dataFunc(ctx, k.slogger, k.cfg.SourcePaths, k.cfg.Query, getSourceConstraint(queryContext))
+	dataRaw, err := k.cfg.SourceType.dataFunc(ctx, k.slogger, k.cfg.SourcePaths, k.cfg.SourceQuery, getSourceConstraint(queryContext))
 	if err != nil {
 		return nil, fmt.Errorf("fetching data: %w", err)
 	}
