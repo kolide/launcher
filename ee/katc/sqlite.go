@@ -13,7 +13,7 @@ import (
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
+func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, pathConstraints *table.ConstraintList) ([]sourceData, error) {
 	results := make([]sourceData, 0)
 	for _, sourcePath := range sourcePaths {
 		pathPattern := sourcePatternToGlobbablePattern(sourcePath)
@@ -23,8 +23,8 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 		}
 
 		for _, sqliteDb := range sqliteDbs {
-			// Check to make sure `sqliteDb` adheres to sourceConstraints
-			valid, err := checkPathConstraints(sqliteDb, sourceConstraints)
+			// Check to make sure `sqliteDb` adheres to pathConstraints
+			valid, err := checkPathConstraints(sqliteDb, pathConstraints)
 			if err != nil {
 				return nil, fmt.Errorf("checking source path constraints: %w", err)
 			}

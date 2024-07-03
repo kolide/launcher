@@ -17,7 +17,7 @@ import (
 // that performs the query against the source.
 type katcSourceType struct {
 	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, pathConstraints *table.ConstraintList) ([]sourceData, error)
 }
 
 // sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
