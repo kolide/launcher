@@ -29,9 +29,7 @@ jobs:
       - run: make deps
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          skip-pkg-cache: true
+        uses: golangci/golangci-lint-action@v6
 
       # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
       - name: golangci-lint
