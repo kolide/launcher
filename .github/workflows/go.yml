@@ -90,7 +90,7 @@ jobs:
 
     # upload coverage here, because we don't cache it with the build
     - name: Upload coverage
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-coverage.out
         path: coverage.out
@@ -190,7 +190,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Upload Build
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifactos }}-build
         path: build/
