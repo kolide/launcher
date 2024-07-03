@@ -106,7 +106,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	// Make a query context restricting the source to our exact source sqlite database
 	queryContext := table.QueryContext{
 		Constraints: map[string]table.ConstraintList{
-			sourceColumnName: {
+			pathColumnName: {
 				Constraints: []table.Constraint{
 					{
 						Operator:   table.OperatorEquals,
@@ -123,8 +123,8 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 
 	// Validate results
 	require.Equal(t, 1, len(results), "exactly one row expected")
-	require.Contains(t, results[0], sourceColumnName, "missing source column")
-	require.Equal(t, sourceFilepath, results[0][sourceColumnName])
+	require.Contains(t, results[0], pathColumnName, "missing source column")
+	require.Equal(t, sourceFilepath, results[0][pathColumnName])
 	require.Contains(t, results[0], expectedColumn, "expected column missing")
 	require.Equal(t, expectedColumnValue, results[0][expectedColumn], "data mismatch")
 }
@@ -134,14 +134,14 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 
 	for _, tt := range []struct {
 		testCaseName  string
-		source        string
+		path          string
 		constraints   table.ConstraintList
 		valid         bool
 		errorExpected bool
 	}{
 		{
 			testCaseName: "equals",
-			source:       filepath.Join("some", "path", "to", "a", "source"),
+			path:         filepath.Join("some", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -155,7 +155,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "not equals",
-			source:       filepath.Join("some", "path", "to", "a", "source"),
+			path:         filepath.Join("some", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -169,7 +169,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE with % wildcard",
-			source:       filepath.Join("a", "path", "to", "db.sqlite"),
+			path:         filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -183,7 +183,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE with underscore wildcard",
-			source:       filepath.Join("a", "path", "to", "db.sqlite"),
+			path:         filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -197,7 +197,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "LIKE is case-insensitive",
-			source:       filepath.Join("a", "path", "to", "db.sqlite"),
+			path:         filepath.Join("a", "path", "to", "db.sqlite"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -210,7 +210,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "GLOB with * wildcard",
-			source:       filepath.Join("another", "path", "to", "a", "source"),
+			path:         filepath.Join("another", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -224,7 +224,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "GLOB with ? wildcard",
-			source:       filepath.Join("another", "path", "to", "a", "source"),
+			path:         filepath.Join("another", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -238,7 +238,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "regexp",
-			source:       filepath.Join("test", "path", "to", "a", "source"),
+			path:         filepath.Join("test", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -252,7 +252,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "invalid regexp",
-			source:       filepath.Join("test", "path", "to", "a", "source"),
+			path:         filepath.Join("test", "path", "to", "a", "source"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -266,7 +266,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "unsupported",
-			source:       filepath.Join("test", "path", "to", "a", "source", "2"),
+			path:         filepath.Join("test", "path", "to", "a", "source", "2"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -280,7 +280,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "multiple constraints where one does not match",
-			source:       filepath.Join("test", "path", "to", "a", "source", "3"),
+			path:         filepath.Join("test", "path", "to", "a", "source", "3"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -298,7 +298,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		},
 		{
 			testCaseName: "multiple constraints where all match",
-			source:       filepath.Join("test", "path", "to", "a", "source", "3"),
+			path:         filepath.Join("test", "path", "to", "a", "source", "3"),
 			constraints: table.ConstraintList{
 				Constraints: []table.Constraint{
 					{
@@ -319,7 +319,7 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			valid, err := checkSourceConstraints(tt.source, &tt.constraints)
+			valid, err := checkPathConstraints(tt.path, &tt.constraints)
 			if tt.errorExpected {
 				require.Error(t, err, "expected error on checking constraints")
 			} else {

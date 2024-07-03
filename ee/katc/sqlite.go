@@ -23,7 +23,7 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePattern string,
 	results := make([]sourceData, 0)
 	for _, sqliteDb := range sqliteDbs {
 		// Check to make sure `sqliteDb` adheres to sourceConstraints
-		valid, err := checkSourceConstraints(sqliteDb, sourceConstraints)
+		valid, err := checkPathConstraints(sqliteDb, sourceConstraints)
 		if err != nil {
 			return nil, fmt.Errorf("checking source path constraints: %w", err)
 		}
