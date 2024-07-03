@@ -68,7 +68,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "unknown_source",
 					"platform": "%s",
 					"columns": ["data"],
-					"source_paths": []"/some/path/to/db.sqlite"],
+					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data;"
 				}`, runtime.GOOS),
 			},
@@ -81,7 +81,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"source_paths": []"/some/path/to/db.sqlite"],
+					"source_paths": ["/some/path/to/db.sqlite"],
 					"source_query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["unknown_step"]
 				}`, runtime.GOOS),
