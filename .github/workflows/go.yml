@@ -44,13 +44,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -82,7 +82,7 @@ jobs:
       run: make test
 
     - name: Cache build output
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -106,7 +106,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -136,7 +136,7 @@ jobs:
     needs: version_baseline
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -183,7 +183,7 @@ jobs:
     needs: exec_testing
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ matrix.artifactos }}-${{ github.run_id }}
@@ -225,13 +225,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
