@@ -30,7 +30,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -212,7 +212,7 @@ jobs:
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version-file: './go.mod'
         check-latest: true
