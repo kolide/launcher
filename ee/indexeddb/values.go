@@ -41,9 +41,9 @@ const (
 	tokenNull              byte = 0x30
 )
 
-// deserializeChrome deserializes a JS object that has been stored by Chrome
+// DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func deserializeChrome(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
 	data, ok := row["data"]
 	if !ok {
 		return nil, errors.New("row missing top-level data key")

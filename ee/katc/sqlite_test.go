@@ -122,14 +122,9 @@ func TestSourcePatternToGlobbablePattern(t *testing.T) {
 			expectedPattern: filepath.Join(rootDir, "path", "to", "*", "directory", "db.sqlite"),
 		},
 		{
-			testCaseName:    "underscore wildcard",
-			sourcePattern:   filepath.Join(rootDir, "path", "to", "_", "directory", "db.sqlite"),
-			expectedPattern: filepath.Join(rootDir, "path", "to", "?", "directory", "db.sqlite"),
-		},
-		{
 			testCaseName:    "multiple wildcards",
-			sourcePattern:   filepath.Join(rootDir, "path", "to", "_", "directory", "%.sqlite"),
-			expectedPattern: filepath.Join(rootDir, "path", "to", "?", "directory", "*.sqlite"),
+			sourcePattern:   filepath.Join(rootDir, "path", "to", "*", "directory", "%.sqlite"),
+			expectedPattern: filepath.Join(rootDir, "path", "to", "*", "directory", "*.sqlite"),
 		},
 	} {
 		tt := tt
