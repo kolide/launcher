@@ -16,7 +16,7 @@ import (
 // that performs the query against the source.
 type katcSourceType struct {
 	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, path string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
+	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
 }
 
 // sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
@@ -91,7 +91,7 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 // sends down these configurations.
 type katcTableConfig struct {
 	SourceType        katcSourceType     `json:"source_type"`
-	Source            string             `json:"source"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
+	SourcePaths       []string           `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 	Platform          string             `json:"platform"`
 	Columns           []string           `json:"columns"`
 	Query             string             `json:"query"` // Query to run against `path`

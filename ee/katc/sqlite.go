@@ -13,32 +13,34 @@ import (
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
-func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
-	pathPattern := sourcePatternToGlobbablePattern(sourcePattern)
-	sqliteDbs, err := filepath.Glob(pathPattern)
-	if err != nil {
-		return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
-	}
-
+func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
 	results := make([]sourceData, 0)
-	for _, sqliteDb := range sqliteDbs {
-		// Check to make sure `sqliteDb` adheres to sourceConstraints
-		valid, err := checkPathConstraints(sqliteDb, sourceConstraints)
+	for _, sourcePath := range sourcePaths {
+		pathPattern := sourcePatternToGlobbablePattern(sourcePath)
+		sqliteDbs, err := filepath.Glob(pathPattern)
 		if err != nil {
-			return nil, fmt.Errorf("checking source path constraints: %w", err)
-		}
-		if !valid {
-			continue
+			return nil, fmt.Errorf("globbing for files with pattern %s: %w", pathPattern, err)
 		}
 
-		rowsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
-		if err != nil {
-			return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
+		for _, sqliteDb := range sqliteDbs {
+			// Check to make sure `sqliteDb` adheres to sourceConstraints
+			valid, err := checkPathConstraints(sqliteDb, sourceConstraints)
+			if err != nil {
+				return nil, fmt.Errorf("checking source path constraints: %w", err)
+			}
+			if !valid {
+				continue
+			}
+
+			rowsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
+			if err != nil {
+				return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
+			}
+			results = append(results, sourceData{
+				path: sqliteDb,
+				rows: rowsFromDb,
+			})
 		}
-		results = append(results, sourceData{
-			path: sqliteDb,
-			rows: rowsFromDb,
-		})
 	}
 
 	return results, nil

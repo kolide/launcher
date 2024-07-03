@@ -25,7 +25,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"source": "/some/path/to/db.sqlite",
+					"source_paths": ["/some/path/to/db.sqlite"],
 					"query": "SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"testtable\";",
 					"row_transform_steps": ["snappy"]
 				}`, runtime.GOOS),
@@ -39,7 +39,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"source": "/some/path/to/db.sqlite",
+					"source_paths": ["/some/path/to/db.sqlite"],
 					"query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["snappy"]
 				}`, runtime.GOOS),
@@ -47,7 +47,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["col1", "col2"],
-					"source": "/some/path/to/a/different/db.sqlite",
+					"source_paths": ["/some/path/to/a/different/db.sqlite"],
 					"query": "SELECT col1, col2 FROM some_table;",
 					"row_transform_steps": ["camel_to_snake"]
 				}`, runtime.GOOS),
@@ -68,7 +68,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "unknown_source",
 					"platform": "%s",
 					"columns": ["data"],
-					"source": "/some/path/to/db.sqlite",
+					"source_paths": []"/some/path/to/db.sqlite"],
 					"query": "SELECT data FROM object_data;"
 				}`, runtime.GOOS),
 			},
@@ -81,7 +81,7 @@ func TestConstructKATCTables(t *testing.T) {
 					"source_type": "sqlite",
 					"platform": "%s",
 					"columns": ["data"],
-					"source": "/some/path/to/db.sqlite",
+					"source_paths": []"/some/path/to/db.sqlite"],
 					"query": "SELECT data FROM object_data;",
 					"row_transform_steps": ["unknown_step"]
 				}`, runtime.GOOS),

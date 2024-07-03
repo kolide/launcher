@@ -59,7 +59,7 @@ func Test_sqliteData(t *testing.T) {
 	}
 
 	// Query data
-	results, err := sqliteData(context.TODO(), multislogger.NewNopLogger(), filepath.Join(sqliteDir, "*.sqlite"), "SELECT uuid, value FROM test_data;", nil)
+	results, err := sqliteData(context.TODO(), multislogger.NewNopLogger(), []string{filepath.Join(sqliteDir, "*.sqlite")}, "SELECT uuid, value FROM test_data;", nil)
 	require.NoError(t, err)
 
 	// Confirm we have the correct number of `sourceData` returned (one per db)
@@ -89,7 +89,7 @@ func Test_sqliteData_noSourcesFound(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	results, err := sqliteData(context.TODO(), multislogger.NewNopLogger(), filepath.Join(tmpDir, "db.sqlite"), "SELECT * FROM data;", nil)
+	results, err := sqliteData(context.TODO(), multislogger.NewNopLogger(), []string{filepath.Join(tmpDir, "db.sqlite")}, "SELECT * FROM data;", nil)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(results))
 }
