@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/katc"
 	"github.com/kolide/launcher/ee/tables/cryptoinfotable"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/desktopprocs"
@@ -98,29 +99,22 @@ func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.Osq
 		}
 	}
 
-	// In the future, we would construct the plugins from the configuration here.
-	// For now, we just log.
-	slogger.Log(context.TODO(), slog.LevelDebug,
-		"retrieved Kolide ATC config",
-		"config", config,
-	)
-
-	return nil
+	return katc.ConstructKATCTables(config, slogger)
 }
 
 func katcFromDb(k types.Knapsack) (map[string]string, error) {
 	if k == nil || k.KatcConfigStore() == nil {
 		return nil, errors.New("stores in knapsack not available")
 	}
-	loggableConfig := make(map[string]string)
+	katcCfg := make(map[string]string)
 	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
-		loggableConfig[string(k)] = string(v)
+		katcCfg[string(k)] = string(v)
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("retrieving contents of Kolide ATC config store: %w", err)
 	}
 
-	return loggableConfig, nil
+	return katcCfg, nil
 }
 
 func katcFromStartupSettings(k types.Knapsack) (map[string]string, error) {
@@ -135,10 +129,10 @@ func katcFromStartupSettings(k types.Knapsack) (map[string]string, error) {
 		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)
 	}
 
-	var loggableConfig map[string]string
-	if err := json.Unmarshal([]byte(katcConfig), &loggableConfig); err != nil {
+	var katcCfg map[string]string
+	if err := json.Unmarshal([]byte(katcConfig), &katcCfg); err != nil {
 		return nil, fmt.Errorf("unmarshalling katc_config: %w", err)
 	}
 
-	return loggableConfig, nil
+	return katcCfg, nil
 }
