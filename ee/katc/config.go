@@ -90,6 +90,7 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 // katcTableConfig is the configuration for a specific KATC table. The control server
 // sends down these configurations.
 type katcTableConfig struct {
+	Name              string             `json:"name"`
 	SourceType        katcSourceType     `json:"source_type"`
 	SourcePaths       []string           `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 	Filter            string             `json:"filter"`
@@ -102,12 +103,32 @@ type katcTableConfig struct {
 // and returns the constructed tables.
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	plugins := make([]osquery.OsqueryPlugin, 0)
-	for tableName, tableConfigStr := range config {
+
+	tableConfigs, tableConfigsExist := config["tables"]
+	if !tableConfigsExist {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"missing top-level tables key in KATC config, cannot construct tables",
+		)
+
+		return plugins
+	}
+
+	// We want to unmarshal each table config separately, so that we don't fail to configure all tables
+	// if only some are malformed.
+	var rawTableConfigs []json.RawMessage
+	if err := json.Unmarshal([]byte(tableConfigs), &rawTableConfigs); err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not unmarshal tables in KATC config",
+			"err", err,
+		)
+		return plugins
+	}
+
+	for _, rawTableConfig := range rawTableConfigs {
 		var cfg katcTableConfig
-		if err := json.Unmarshal([]byte(tableConfigStr), &cfg); err != nil {
+		if err := json.Unmarshal(rawTableConfig, &cfg); err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"unable to unmarshal config for Kolide ATC table, skipping",
-				"table_name", tableName,
 				"err", err,
 			)
 			continue
@@ -118,8 +139,8 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 			continue
 		}
 
-		t, columns := newKatcTable(tableName, cfg, slogger)
-		plugins = append(plugins, table.NewPlugin(tableName, columns, t.generate))
+		t, columns := newKatcTable(cfg, slogger)
+		plugins = append(plugins, table.NewPlugin(cfg.Name, columns, t.generate))
 	}
 
 	return plugins

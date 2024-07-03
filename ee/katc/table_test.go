@@ -82,6 +82,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	// At long last, our source is adequately configured.
 	// Move on to constructing our KATC table.
 	cfg := katcTableConfig{
+		Name: "test_katc_table",
 		SourceType: katcSourceType{
 			name:     sqliteSourceType,
 			dataFunc: sqliteData,
@@ -101,7 +102,7 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 			},
 		},
 	}
-	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+	testTable, _ := newKatcTable(cfg, multislogger.NewNopLogger())
 
 	// Make a query context restricting the source to our exact source sqlite database
 	queryContext := table.QueryContext{

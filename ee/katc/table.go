@@ -21,7 +21,7 @@ type katcTable struct {
 }
 
 // newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
-func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
+func newKatcTable(cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
 	columns := []table.ColumnDefinition{
 		{
 			Name: pathColumnName,
@@ -43,7 +43,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		cfg:          cfg,
 		columnLookup: columnLookup,
 		slogger: slogger.With(
-			"table_name", tableName,
+			"table_name", cfg.Name,
 			"table_type", cfg.SourceType,
 			"table_source_paths", cfg.SourcePaths,
 		),
