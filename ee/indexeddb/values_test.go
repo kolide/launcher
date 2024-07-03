@@ -31,7 +31,7 @@ func Test_deserializeIndexeddbValue(t *testing.T) {
 		0x01, // properties_written
 	}
 
-	obj, err := deserializeChrome(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
+	obj, err := DeserializeChrome(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
 	require.NoError(t, err, "deserializing object")
 
 	// Confirm we got an id property for the object

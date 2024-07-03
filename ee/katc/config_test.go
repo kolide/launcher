@@ -33,6 +33,20 @@ func TestConstructKATCTables(t *testing.T) {
 			expectedPluginCount: 1,
 		},
 		{
+			testCaseName: "indexeddb_leveldb",
+			katcConfig: map[string]string{
+				"kolide_indexeddb_leveldb_test": fmt.Sprintf(`{
+					"source_type": "indexeddb_leveldb",
+					"platform": "%s",
+					"columns": ["data"],
+					"source": "/some/path/to/db.indexeddb.leveldb",
+					"query": "db.store",
+					"row_transform_steps": ["deserialize_chrome"]
+				}`, runtime.GOOS),
+			},
+			expectedPluginCount: 1,
+		},
+		{
 			testCaseName: "multiple plugins",
 			katcConfig: map[string]string{
 				"test_1": fmt.Sprintf(`{
