@@ -126,9 +126,9 @@ type (
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	plugins := make([]osquery.OsqueryPlugin, 0)
 
-	for tableName, rawTableConfig := range config {
+	for tableName, tableConfigStr := range config {
 		var cfg katcTableConfig
-		if err := json.Unmarshal([]byte(rawTableConfig), &cfg); err != nil {
+		if err := json.Unmarshal([]byte(tableConfigStr), &cfg); err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"unable to unmarshal config for KATC table, skipping",
 				"table_name", tableName,

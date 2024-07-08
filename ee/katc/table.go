@@ -49,11 +49,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		sourceQuery:       cfg.SourceQuery,
 		rowTransformSteps: cfg.RowTransformSteps,
 		columnLookup:      columnLookup,
-		slogger: slogger.With(
-			"table_name", tableName,
-			"table_type", cfg.SourceType,
-			"table_source_paths", cfg.SourcePaths,
-		),
+		slogger:           slogger,
 	}
 
 	// Check overlays to see if any of the filters apply to us;
@@ -79,11 +75,18 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		break
 	}
 
+	// Add extra fields to slogger
+	k.slogger = slogger.With(
+		"table_name", tableName,
+		"table_type", cfg.SourceType,
+		"table_source_paths", cfg.SourcePaths,
+	)
+
 	return &k, columns
 }
 
 func filtersMatch(filters map[string]string) bool {
-	// Currently, the only filter we expect is for os.
+	// Currently, the only filter we expect is for OS.
 	if goos, goosFound := filters["goos"]; goosFound {
 		return goos == runtime.GOOS
 	}
