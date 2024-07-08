@@ -1,6 +1,4 @@
 run:
-  skip-dirs:
-    - test-cmds
   timeout: 5m
 
 linters:
@@ -15,7 +13,7 @@ linters:
     - nakedret
     - paralleltest
     - revive
-    # - sloglint # TODO -- re-enable once golangci-lint bumps to sloglint v0.7.1
+    - sloglint
     - sqlclosecheck
     - staticcheck
     - unconvert
@@ -28,7 +26,7 @@ linters:
 
 linters-settings:
   errcheck:
-    ignore: github.com/go-kit/kit/log:Log
+    exclude-functions: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
   forbidigo:
@@ -78,3 +76,5 @@ issues:
     - linters:
         - paralleltest
       text: "does not use range value in test Run"
+  exclude-dirs:
+    - test-cmds
