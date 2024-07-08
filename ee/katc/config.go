@@ -16,7 +16,10 @@ import (
 // identifier parsed from the JSON KATC config, and the `dataFunc` is the function
 // that performs the query against the source.
 type katcSourceType struct {
-	name     string
+	name string
+	// `pathConstraints` comes from the live query or scheduled query, and constrains `sourcePaths` to a particular value.
+	// For example, `sourcePaths` may allow for querying files belonging to any user ("/Users/%/path/to/file"), and
+	// `pathConstraints` may narrow the query to a path for a particular user ("/Users/example/path/to/file").
 	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, pathConstraints *table.ConstraintList) ([]sourceData, error)
 }
 
