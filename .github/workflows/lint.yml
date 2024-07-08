@@ -31,6 +31,8 @@ jobs:
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
+        with:
+          skip-save-cache: true
 
       # Run again as a workaround for https://github.com/golangci/golangci-lint-action/issues/362
       - name: golangci-lint
