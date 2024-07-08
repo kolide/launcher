@@ -25,15 +25,16 @@ jobs:
     steps:
     - name: Check out code
       id: checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
         go-version-file: './go.mod'
         check-latest: true
+        cache: false
       id: go
 
     # use bash, because the powershell syntax is different and this is a cross platform workflow
@@ -44,13 +45,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
@@ -82,7 +83,7 @@ jobs:
       run: make test
 
     - name: Cache build output
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -90,10 +91,11 @@ jobs:
 
     # upload coverage here, because we don't cache it with the build
     - name: Upload coverage
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-coverage.out
-        path: coverage.out
+        path: ./coverage.out
+        if-no-files-found: error
 
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
@@ -106,7 +108,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -136,7 +138,7 @@ jobs:
     needs: version_baseline
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
@@ -183,14 +185,14 @@ jobs:
     needs: exec_testing
     steps:
     - name: cache restore build output
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ matrix.artifactos }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
     - name: Upload Build
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifactos }}-build
         path: build/
@@ -208,14 +210,15 @@ jobs:
           - macos-12
           - windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version-file: './go.mod'
         check-latest: true
+        cache: false
       id: go
 
     - id: go-cache-paths
@@ -225,13 +228,13 @@ jobs:
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
     - name: Go Build Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 
     - name: Go Mod Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
