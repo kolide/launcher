@@ -94,7 +94,8 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-coverage.out
-        path: coverage.out
+        path: ./coverage.out
+        if-no-files-found: error
 
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
