@@ -216,6 +216,7 @@ jobs:
       with:
         go-version-file: './go.mod'
         check-latest: true
+        cache: false
       id: go
 
     - id: go-cache-paths
