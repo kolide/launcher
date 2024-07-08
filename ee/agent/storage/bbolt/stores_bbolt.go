@@ -20,6 +20,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 
 	var storeNames = []storage.Store{
 		storage.AgentFlagsStore,
+		storage.KatcConfigStore,
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,

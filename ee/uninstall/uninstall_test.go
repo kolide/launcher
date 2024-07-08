@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -14,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 func TestUninstall(t *testing.T) {
@@ -41,9 +43,23 @@ func TestUninstall(t *testing.T) {
 			_, err = os.Stat(enrollSecretPath)
 			require.NoError(t, err)
 
+			// create a backup database to delete
+			tempRootDir := t.TempDir()
+			backupDbLocation := filepath.Join(tempRootDir, "launcher.db.bak")
+			db, err := bbolt.Open(backupDbLocation, 0600, &bbolt.Options{Timeout: time.Duration(5) * time.Second})
+			require.NoError(t, err, "creating db")
+			require.NoError(t, db.Close(), "closing db")
+
+			// create an older backup db to delete
+			olderBackupDbLocation := fmt.Sprintf("%s.2", backupDbLocation)
+			db2, err := bbolt.Open(olderBackupDbLocation, 0600, &bbolt.Options{Timeout: time.Duration(5) * time.Second})
+			require.NoError(t, err, "creating db")
+			require.NoError(t, db2.Close(), "closing db")
+
 			k := mocks.NewKnapsack(t)
 			k.On("EnrollSecretPath").Return(enrollSecretPath)
 			k.On("Slogger").Return(multislogger.NewNopLogger())
+			k.On("RootDirectory").Return(tempRootDir)
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			k.On("ConfigStore").Return(testConfigStore)
@@ -102,6 +118,14 @@ func TestUninstall(t *testing.T) {
 			require.Equal(t, resetReasonUninstallRequested, resetRecord.ResetReason, "expected reset record to indicate the uninstall requested")
 			require.Equal(t, string(testSerial), resetRecord.Serial, "expected reset record to indicate the serial number from the original installation")
 			require.Equal(t, string(testHardwareUUID), resetRecord.HardwareUUID, "expected reset record to indicate the hardware UUID from the original installation")
+
+			// check that the backup database was removed
+			_, err = os.Stat(backupDbLocation)
+			require.True(t, os.IsNotExist(err), "checking that launcher.db.bak does not exist, and error is not ErrNotExist")
+
+			// check that the older backup database was removed
+			_, err = os.Stat(olderBackupDbLocation)
+			require.True(t, os.IsNotExist(err), "checking that launcher.db.bak does not exist, and error is not ErrNotExist")
 		})
 	}
 }

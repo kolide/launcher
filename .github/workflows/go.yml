@@ -125,12 +125,12 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-software
+          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu-20.04
           - ubuntu-22.04
-          - macos-11
           - macos-12
           - macos-13
+          - macos-14
           - windows-2019
           - windows-2022
     needs: version_baseline

@@ -1,8 +1,10 @@
 package indexeddb
 
 import (
+	"context"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,12 +31,9 @@ func Test_deserializeIndexeddbValue(t *testing.T) {
 		0x01, // properties_written
 	}
 
-	obj, err := deserializeIndexeddbValue(testBytes)
+	obj, err := DeserializeChrome(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
 	require.NoError(t, err, "deserializing object")
 
-	// Confirm we got a version and data top-level property
-	require.Contains(t, obj, "version", "expected version property")
-	require.Contains(t, obj, "data", "expected data property")
 	// Confirm we got an id property for the object
-	require.Contains(t, obj["data"], "id", "expected id property")
+	require.Contains(t, obj, "id", "expected id property")
 }

@@ -16,7 +16,13 @@ type noOpPowerEventWatcher struct {
 	interrupted bool
 }
 
-func New(ctx context.Context, _ types.Knapsack, _ *slog.Logger) (*noOpPowerEventWatcher, error) {
+type noOpKnapsackSleepStateUpdater struct{}
+
+func NewKnapsackSleepStateUpdater(_ *slog.Logger, _ types.Knapsack) *noOpKnapsackSleepStateUpdater {
+	return &noOpKnapsackSleepStateUpdater{}
+}
+
+func New(ctx context.Context, _ *slog.Logger, _ *noOpKnapsackSleepStateUpdater) (*noOpPowerEventWatcher, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 

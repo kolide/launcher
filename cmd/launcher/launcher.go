@@ -71,6 +71,7 @@ const (
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
+	katcSubsystemName        = "katc_config" // Kolide ATC
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -168,8 +169,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
+	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
 	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
 	}
@@ -241,13 +243,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
-	s, err := startupsettings.OpenWriter(ctx, k)
+	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}
-	defer s.Close()
+	defer startupSettingsWriter.Close()
 
-	if err := s.WriteSettings(); err != nil {
+	if err := startupSettingsWriter.WriteSettings(); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"writing startup settings",
 			"err", err,
@@ -258,6 +260,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(ctx, rootDirectory)
+
+	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
+	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -288,7 +293,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// For now, remediation is not performed -- we only log the hardware change.
 	agent.DetectAndRemediateHardwareChange(ctx, k)
 
-	powerEventWatcher, err := powereventwatcher.New(ctx, k, slogger)
+	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
+	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"could not init power event watcher",
@@ -396,6 +402,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
+		// katcConfigConsumer handles updates to Kolide's custom ATC tables
+		controlService.RegisterConsumer(katcSubsystemName, keyvalueconsumer.New(k.KatcConfigStore()))
+		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
+		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 
 		runner, err = desktopRunner.New(
 			k,
