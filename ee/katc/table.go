@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/osquery/osquery-go/plugin/table"
@@ -15,13 +16,16 @@ const pathColumnName = "path"
 // katcTable is a Kolide ATC table. It queries the source and transforms the response data
 // per the configuration in its `cfg`.
 type katcTable struct {
-	cfg          katcTableConfig
-	columnLookup map[string]struct{}
-	slogger      *slog.Logger
+	sourceType        katcSourceType
+	sourcePaths       []string
+	sourceQuery       string
+	rowTransformSteps []rowTransformStep
+	columnLookup      map[string]struct{}
+	slogger           *slog.Logger
 }
 
 // newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
-func newKatcTable(cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
+func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
 	columns := []table.ColumnDefinition{
 		{
 			Name: pathColumnName,
@@ -39,21 +43,57 @@ func newKatcTable(cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []tabl
 		columnLookup[cfg.Columns[i]] = struct{}{}
 	}
 
-	return &katcTable{
-		cfg:          cfg,
-		columnLookup: columnLookup,
+	k := katcTable{
+		sourceType:        cfg.SourceType,
+		sourcePaths:       cfg.SourcePaths,
+		sourceQuery:       cfg.SourceQuery,
+		rowTransformSteps: cfg.RowTransformSteps,
+		columnLookup:      columnLookup,
 		slogger: slogger.With(
-			"table_name", cfg.Name,
+			"table_name", tableName,
 			"table_type", cfg.SourceType,
 			"table_source_paths", cfg.SourcePaths,
 		),
-	}, columns
+	}
+
+	// Check overlays to see if any of the filters apply to us;
+	// use the overlay definition if so.
+	for _, overlay := range cfg.Overlays {
+		if !filtersMatch(overlay.Filters) {
+			continue
+		}
+
+		if overlay.SourceType != nil {
+			k.sourceType = *overlay.SourceType
+		}
+		if overlay.SourcePaths != nil {
+			k.sourcePaths = *overlay.SourcePaths
+		}
+		if overlay.SourceQuery != nil {
+			k.sourceQuery = *overlay.SourceQuery
+		}
+		if overlay.RowTransformSteps != nil {
+			k.rowTransformSteps = *overlay.RowTransformSteps
+		}
+
+		break
+	}
+
+	return &k, columns
+}
+
+func filtersMatch(filters map[string]string) bool {
+	// Currently, the only filter we expect is for os.
+	if goos, goosFound := filters["goos"]; goosFound {
+		return goos == runtime.GOOS
+	}
+	return false
 }
 
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fetch data from our table source
-	dataRaw, err := k.cfg.SourceType.dataFunc(ctx, k.slogger, k.cfg.SourcePaths, k.cfg.SourceQuery, getSourceConstraint(queryContext))
+	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, getSourceConstraint(queryContext))
 	if err != nil {
 		return nil, fmt.Errorf("fetching data: %w", err)
 	}
@@ -68,7 +108,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			}
 
 			// Run any needed transformations on the row data
-			for _, step := range k.cfg.RowTransformSteps {
+			for _, step := range k.rowTransformSteps {
 				dataRawRow, err = step.transformFunc(ctx, k.slogger, dataRawRow)
 				if err != nil {
 					return nil, fmt.Errorf("running transform func %s: %w", step.name, err)

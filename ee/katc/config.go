@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"runtime"
 
 	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/osquery/osquery-go"
@@ -101,60 +100,45 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	}
 }
 
-// katcTableConfig is the configuration for a specific KATC table. The control server
-// sends down these configurations.
-type katcTableConfig struct {
-	Name              string             `json:"name"`
-	SourceType        katcSourceType     `json:"source_type"`
-	SourcePaths       []string           `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
-	Filter            string             `json:"filter"`
-	Columns           []string           `json:"columns"`
-	SourceQuery       string             `json:"source_query"` // Query to run against each source path
-	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
-}
+type (
+	// katcTableConfig is the configuration for a specific KATC table. The control server
+	// sends down these configurations.
+	katcTableConfig struct {
+		Columns           []string                 `json:"columns"`
+		SourceType        katcSourceType           `json:"source_type"`
+		SourcePaths       []string                 `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
+		SourceQuery       string                   `json:"source_query"` // Query to run against each source path
+		RowTransformSteps []rowTransformStep       `json:"row_transform_steps"`
+		Overlays          []katcTableConfigOverlay `json:"overlays"`
+	}
+
+	katcTableConfigOverlay struct {
+		Filters           map[string]string   `json:"filters"` // determines if this overlay is applicable to this launcher installation
+		SourceType        *katcSourceType     `json:"source_type,omitempty"`
+		SourcePaths       *[]string           `json:"source_paths,omitempty"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
+		SourceQuery       *string             `json:"source_query,omitempty"` // Query to run against each source path
+		RowTransformSteps *[]rowTransformStep `json:"row_transform_steps,omitempty"`
+	}
+)
 
 // ConstructKATCTables takes stored configuration of KATC tables, parses the configuration,
 // and returns the constructed tables.
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	plugins := make([]osquery.OsqueryPlugin, 0)
 
-	tableConfigs, tableConfigsExist := config["tables"]
-	if !tableConfigsExist {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"missing top-level tables key in KATC config, cannot construct tables",
-		)
-
-		return plugins
-	}
-
-	// We want to unmarshal each table config separately, so that we don't fail to configure all tables
-	// if only some are malformed.
-	var rawTableConfigs []json.RawMessage
-	if err := json.Unmarshal([]byte(tableConfigs), &rawTableConfigs); err != nil {
-		slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not unmarshal tables in KATC config",
-			"err", err,
-		)
-		return plugins
-	}
-
-	for _, rawTableConfig := range rawTableConfigs {
+	for tableName, rawTableConfig := range config {
 		var cfg katcTableConfig
-		if err := json.Unmarshal(rawTableConfig, &cfg); err != nil {
+		if err := json.Unmarshal([]byte(rawTableConfig), &cfg); err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"unable to unmarshal config for KATC table, skipping",
+				"table_name", tableName,
 				"err", err,
 			)
 			continue
 		}
 
-		// For now, the filter is simply the OS
-		if cfg.Filter != runtime.GOOS {
-			continue
-		}
-
-		t, columns := newKatcTable(cfg, slogger)
-		plugins = append(plugins, table.NewPlugin(cfg.Name, columns, t.generate))
+		t, columns := newKatcTable(tableName, cfg, slogger)
+		plugins = append(plugins, table.NewPlugin(tableName, columns, t.generate))
 	}
 
 	return plugins

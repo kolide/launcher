@@ -82,14 +82,12 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 	// At long last, our source is adequately configured.
 	// Move on to constructing our KATC table.
 	cfg := katcTableConfig{
-		Name: "test_katc_table",
 		SourceType: katcSourceType{
 			name:     sqliteSourceType,
 			dataFunc: sqliteData,
 		},
-		Filter:      runtime.GOOS,
 		Columns:     []string{expectedColumn},
-		SourcePaths: []string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
+		SourcePaths: []string{filepath.Join("some", "incorrect", "path")},
 		SourceQuery: "SELECT data FROM object_data;",
 		RowTransformSteps: []rowTransformStep{
 			{
@@ -101,8 +99,16 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 				transformFunc: deserializeFirefox,
 			},
 		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				SourcePaths: &[]string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
+			},
+		},
 	}
-	testTable, _ := newKatcTable(cfg, multislogger.NewNopLogger())
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
 
 	// Make a query context restricting the source to our exact source sqlite database
 	queryContext := table.QueryContext{
