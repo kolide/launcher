@@ -75,7 +75,11 @@ func (d *dbusNotifier) Listen() error {
 
 	for {
 		select {
-		case signal := <-d.signal:
+		case signal, open := <-d.signal:
+			if !open {
+				return fmt.Errorf("dbus signal channel closed, cannot proceed")
+			}
+
 			if signal == nil || signal.Name != signalActionInvoked {
 				continue
 			}
