@@ -93,7 +93,8 @@ func (g *Group) Run() error {
 
 	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
-		"err", initialActorErr,
+		"err", initialActorErr.err,
+		"error_source", initialActorErr.errorSourceName,
 	)
 
 	defer g.slogger.Log(context.TODO(), slog.LevelDebug,
