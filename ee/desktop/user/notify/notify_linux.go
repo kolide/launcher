@@ -5,6 +5,7 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -75,7 +76,11 @@ func (d *dbusNotifier) Listen() error {
 
 	for {
 		select {
-		case signal := <-d.signal:
+		case signal, open := <-d.signal:
+			if !open {
+				return errors.New("dbus signal channel closed, cannot proceed")
+			}
+
 			if signal == nil || signal.Name != signalActionInvoked {
 				continue
 			}
