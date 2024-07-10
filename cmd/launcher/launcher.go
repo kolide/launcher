@@ -40,6 +40,7 @@ import (
 	"github.com/kolide/launcher/ee/localserver"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
+	"github.com/kolide/launcher/ee/restartservice"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -282,6 +283,17 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
+
+	healthCheckStore, err := restartservice.OpenWriter(ctx, k.RootDirectory())
+	if err != nil { // log an error but don't stop runLauncher from continuing
+		slogger.Log(ctx, slog.LevelError,
+			"could not init health check result writer store, history will be absent for this run",
+			"err", err,
+		)
+	} else {
+		healthchecker := checkups.NewHealthChecker(slogger, k, healthCheckStore)
+		runGroup.Add("healthchecker", healthchecker.Run, healthchecker.Interrupt)
+	}
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
