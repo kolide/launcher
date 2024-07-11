@@ -96,7 +96,7 @@ func filtersMatch(filters map[string]string) bool {
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	// Fetch data from our table source
-	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, getSourceConstraint(queryContext))
+	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, queryContext)
 	if err != nil {
 		return nil, fmt.Errorf("fetching data: %w", err)
 	}
@@ -146,11 +146,10 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	return filteredResults, nil
 }
 
-// getSourceConstraint retrieves any constraints against the `path` column
-func getSourceConstraint(queryContext table.QueryContext) *table.ConstraintList {
-	sourceConstraint, sourceConstraintExists := queryContext.Constraints[pathColumnName]
-	if sourceConstraintExists {
-		return &sourceConstraint
+// getPathConstraint retrieves any constraints against the `path` column
+func getPathConstraint(queryContext table.QueryContext) *table.ConstraintList {
+	if pathConstraint, pathConstraintExists := queryContext.Constraints[pathColumnName]; pathConstraintExists {
+		return &pathConstraint
 	}
 	return nil
 }

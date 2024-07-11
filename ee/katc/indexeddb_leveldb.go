@@ -15,7 +15,10 @@ import (
 // found at the filepath in `sourcePattern`. It retrieves all rows from the database
 // and object store specified in `query`, which it expects to be in the format
 // `<db name>.<object store name>`.
-func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, pathConstraints *table.ConstraintList) ([]sourceData, error) {
+func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.
+	pathConstraintsFromQuery := getPathConstraint(queryContext)
+
 	results := make([]sourceData, 0)
 	for _, sourcePath := range sourcePaths {
 		pathPattern := sourcePatternToGlobbablePattern(sourcePath)
@@ -32,8 +35,8 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 
 		// Query databases
 		for _, db := range leveldbs {
-			// Check to make sure `db` adheres to pathConstraints
-			valid, err := checkPathConstraints(db, pathConstraints)
+			// Check to make sure `db` adheres to pathConstraintsFromQuery
+			valid, err := checkPathConstraints(db, pathConstraintsFromQuery)
 			if err != nil {
 				return nil, fmt.Errorf("checking source path constraints: %w", err)
 			}
