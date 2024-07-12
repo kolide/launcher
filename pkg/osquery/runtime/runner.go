@@ -187,12 +187,12 @@ func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
 // the katc_config subsystem.
 func (r *Runner) Ping() {
 	r.slogger.Log(context.TODO(), slog.LevelDebug,
-		"Kolide ATC configuration changed, restarting instance to apply",
+		"KATC configuration changed, restarting instance to apply",
 	)
 
 	if err := r.Restart(); err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelError,
-			"could not restart osquery instance after Kolide ATC configuration changed",
+			"could not restart osquery instance after KATC configuration changed",
 			"err", err,
 		)
 	}
