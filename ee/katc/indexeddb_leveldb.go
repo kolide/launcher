@@ -36,8 +36,7 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 		// Query databases
 		for _, db := range leveldbs {
 			// Check to make sure `db` adheres to pathConstraintsFromQuery. This is an
-			// optimization to avoid work -- no point in querying a leveldb file that a filter
-			// will exclude anyway.
+			// optimization to avoid work, if osquery sqlite filtering is going to exclude it.
 			valid, err := checkPathConstraints(db, pathConstraintsFromQuery)
 			if err != nil {
 				return nil, fmt.Errorf("checking source path constraints: %w", err)
