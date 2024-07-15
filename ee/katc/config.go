@@ -102,16 +102,17 @@ type (
 	// katcTableConfig is the configuration for a specific KATC table. The control server
 	// sends down these configurations.
 	katcTableConfig struct {
-		Columns           []string                 `json:"columns"`
-		SourceType        katcSourceType           `json:"source_type"`
-		SourcePaths       []string                 `json:"source_paths"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
-		SourceQuery       string                   `json:"source_query"` // Query to run against each source path
-		RowTransformSteps []rowTransformStep       `json:"row_transform_steps"`
-		Overlays          []katcTableConfigOverlay `json:"overlays"`
+		Columns []string `json:"columns"`
+		katcTableDefinition
+		Overlays []katcTableConfigOverlay `json:"overlays"`
 	}
 
 	katcTableConfigOverlay struct {
-		Filters           map[string]string   `json:"filters"` // determines if this overlay is applicable to this launcher installation
+		Filters map[string]string `json:"filters"` // determines if this overlay is applicable to this launcher installation
+		katcTableDefinition
+	}
+
+	katcTableDefinition struct {
 		SourceType        *katcSourceType     `json:"source_type,omitempty"`
 		SourcePaths       *[]string           `json:"source_paths,omitempty"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
 		SourceQuery       *string             `json:"source_query,omitempty"` // Query to run against each source path

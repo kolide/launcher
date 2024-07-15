@@ -81,22 +81,25 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 
 	// At long last, our source is adequately configured.
 	// Move on to constructing our KATC table.
+	sourceQuery := "SELECT data FROM object_data;"
 	cfg := katcTableConfig{
-		SourceType: katcSourceType{
-			name:     sqliteSourceType,
-			dataFunc: sqliteData,
-		},
-		Columns:     []string{expectedColumn},
-		SourcePaths: []string{filepath.Join("some", "incorrect", "path")},
-		SourceQuery: "SELECT data FROM object_data;",
-		RowTransformSteps: []rowTransformStep{
-			{
-				name:          snappyDecodeTransformStep,
-				transformFunc: snappyDecode,
+		Columns: []string{expectedColumn},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     sqliteSourceType,
+				dataFunc: sqliteData,
 			},
-			{
-				name:          deserializeFirefoxTransformStep,
-				transformFunc: deserializeFirefox,
+			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          snappyDecodeTransformStep,
+					transformFunc: snappyDecode,
+				},
+				{
+					name:          deserializeFirefoxTransformStep,
+					transformFunc: deserializeFirefox,
+				},
 			},
 		},
 		Overlays: []katcTableConfigOverlay{
@@ -104,7 +107,9 @@ func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
 				Filters: map[string]string{
 					"goos": runtime.GOOS,
 				},
-				SourcePaths: &[]string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
+				},
 			},
 		},
 	}

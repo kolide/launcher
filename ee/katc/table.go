@@ -2,6 +2,7 @@ package katc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -44,12 +45,21 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	}
 
 	k := katcTable{
-		sourceType:        cfg.SourceType,
-		sourcePaths:       cfg.SourcePaths,
-		sourceQuery:       cfg.SourceQuery,
-		rowTransformSteps: cfg.RowTransformSteps,
-		columnLookup:      columnLookup,
-		slogger:           slogger,
+		columnLookup: columnLookup,
+		slogger:      slogger,
+	}
+
+	if cfg.SourceType != nil {
+		k.sourceType = *cfg.SourceType
+	}
+	if cfg.SourcePaths != nil {
+		k.sourcePaths = *cfg.SourcePaths
+	}
+	if cfg.SourceQuery != nil {
+		k.sourceQuery = *cfg.SourceQuery
+	}
+	if cfg.RowTransformSteps != nil {
+		k.rowTransformSteps = *cfg.RowTransformSteps
 	}
 
 	// Check overlays to see if any of the filters apply to us;
@@ -94,6 +104,10 @@ func filtersMatch(filters map[string]string) bool {
 
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	if k.sourceType.dataFunc == nil {
+		return nil, errors.New("table source type not set")
+	}
+
 	// Fetch data from our table source
 	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, queryContext)
 	if err != nil {
