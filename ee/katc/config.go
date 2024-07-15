@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"runtime"
 
 	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/osquery/osquery-go"
@@ -16,8 +15,9 @@ import (
 // identifier parsed from the JSON KATC config, and the `dataFunc` is the function
 // that performs the query against the source.
 type katcSourceType struct {
-	name     string
-	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error)
+	name string
+	// queryContext contains the constraints from the WHERE clause of the query against the KATC table.
+	dataFunc func(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error)
 }
 
 // sourceData holds the result of calling `katcSourceType.dataFunc`. It maps the
@@ -98,33 +98,41 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	}
 }
 
-// katcTableConfig is the configuration for a specific KATC table. The control server
-// sends down these configurations.
-type katcTableConfig struct {
-	SourceType        katcSourceType     `json:"source_type"`
-	Source            string             `json:"source"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
-	Platform          string             `json:"platform"`
-	Columns           []string           `json:"columns"`
-	Query             string             `json:"query"` // Query to run against `path`
-	RowTransformSteps []rowTransformStep `json:"row_transform_steps"`
-}
+type (
+	// katcTableConfig is the configuration for a specific KATC table. The control server
+	// sends down these configurations.
+	katcTableConfig struct {
+		Columns []string `json:"columns"`
+		katcTableDefinition
+		Overlays []katcTableConfigOverlay `json:"overlays"`
+	}
+
+	katcTableConfigOverlay struct {
+		Filters map[string]string `json:"filters"` // determines if this overlay is applicable to this launcher installation
+		katcTableDefinition
+	}
+
+	katcTableDefinition struct {
+		SourceType        *katcSourceType     `json:"source_type,omitempty"`
+		SourcePaths       *[]string           `json:"source_paths,omitempty"` // Describes how to connect to source (e.g. path to db) -- % and _ wildcards supported
+		SourceQuery       *string             `json:"source_query,omitempty"` // Query to run against each source path
+		RowTransformSteps *[]rowTransformStep `json:"row_transform_steps,omitempty"`
+	}
+)
 
 // ConstructKATCTables takes stored configuration of KATC tables, parses the configuration,
 // and returns the constructed tables.
 func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	plugins := make([]osquery.OsqueryPlugin, 0)
+
 	for tableName, tableConfigStr := range config {
 		var cfg katcTableConfig
 		if err := json.Unmarshal([]byte(tableConfigStr), &cfg); err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
-				"unable to unmarshal config for Kolide ATC table, skipping",
+				"unable to unmarshal config for KATC table, skipping",
 				"table_name", tableName,
 				"err", err,
 			)
-			continue
-		}
-
-		if cfg.Platform != runtime.GOOS {
 			continue
 		}
 

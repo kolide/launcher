@@ -15,39 +15,45 @@ import (
 // found at the filepath in `sourcePattern`. It retrieves all rows from the database
 // and object store specified in `query`, which it expects to be in the format
 // `<db name>.<object store name>`.
-func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePattern string, query string, sourceConstraints *table.ConstraintList) ([]sourceData, error) {
-	pathPattern := sourcePatternToGlobbablePattern(sourcePattern)
-	leveldbs, err := filepath.Glob(pathPattern)
-	if err != nil {
-		return nil, fmt.Errorf("globbing for leveldb files: %w", err)
-	}
+func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.
+	pathConstraintsFromQuery := getPathConstraint(queryContext)
 
-	// Extract database and table from query
-	dbName, objectStoreName, err := extractQueryTargets(query)
-	if err != nil {
-		return nil, fmt.Errorf("getting db and object store names: %w", err)
-	}
-
-	// Query databases
 	results := make([]sourceData, 0)
-	for _, db := range leveldbs {
-		// Check to make sure `db` adheres to sourceConstraints
-		valid, err := checkSourceConstraints(db, sourceConstraints)
+	for _, sourcePath := range sourcePaths {
+		pathPattern := sourcePatternToGlobbablePattern(sourcePath)
+		leveldbs, err := filepath.Glob(pathPattern)
 		if err != nil {
-			return nil, fmt.Errorf("checking source path constraints: %w", err)
-		}
-		if !valid {
-			continue
+			return nil, fmt.Errorf("globbing for leveldb files: %w", err)
 		}
 
-		rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(db, dbName, objectStoreName)
+		// Extract database and table from query
+		dbName, objectStoreName, err := extractQueryTargets(query)
 		if err != nil {
-			return nil, fmt.Errorf("querying %s: %w", db, err)
+			return nil, fmt.Errorf("getting db and object store names: %w", err)
 		}
-		results = append(results, sourceData{
-			path: db,
-			rows: rowsFromDb,
-		})
+
+		// Query databases
+		for _, db := range leveldbs {
+			// Check to make sure `db` adheres to pathConstraintsFromQuery. This is an
+			// optimization to avoid work, if osquery sqlite filtering is going to exclude it.
+			valid, err := checkPathConstraints(db, pathConstraintsFromQuery)
+			if err != nil {
+				return nil, fmt.Errorf("checking source path constraints: %w", err)
+			}
+			if !valid {
+				continue
+			}
+
+			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(db, dbName, objectStoreName)
+			if err != nil {
+				return nil, fmt.Errorf("querying %s: %w", db, err)
+			}
+			results = append(results, sourceData{
+				path: db,
+				rows: rowsFromDb,
+			})
+		}
 	}
 
 	return results, nil

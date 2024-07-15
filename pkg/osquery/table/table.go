@@ -77,22 +77,21 @@ func PlatformTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinar
 	return tables
 }
 
-// kolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s).
-// For now, it just logs the configuration. In the future, it will handle indexeddb tables
-// and others.
+// kolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s),
+// then constructs the tables.
 func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	// Fetch tables from KVStore or from startup settings
 	config, err := katcFromDb(k)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
-			"could not retrieve Kolide ATC config from store, may not have access -- falling back to startup settings",
+			"could not retrieve KATC config from store, may not have access -- falling back to startup settings",
 			"err", err,
 		)
 
 		config, err = katcFromStartupSettings(k)
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not retrieve Kolide ATC config from startup settings",
+				"could not retrieve KATC config from startup settings",
 				"err", err,
 			)
 			return nil
