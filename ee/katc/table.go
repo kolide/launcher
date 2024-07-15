@@ -79,7 +79,6 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	k.slogger = slogger.With(
 		"table_name", tableName,
 		"table_type", cfg.SourceType,
-		"table_source_paths", cfg.SourcePaths,
 	)
 
 	return &k, columns
