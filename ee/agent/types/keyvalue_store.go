@@ -61,10 +61,14 @@ type GetterSetter interface {
 	Setter
 }
 
+type Closer interface {
+	Close() error
+}
+
 // GetterCloser extends the Getter interface with a Close method.
 type GetterCloser interface {
 	Getter
-	Close() error
+	Closer
 }
 
 // GetterUpdaterCloser groups the Get, Update, and Close methods.
