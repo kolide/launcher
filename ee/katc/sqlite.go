@@ -26,7 +26,8 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 		}
 
 		for _, sqliteDb := range sqliteDbs {
-			// Check to make sure `sqliteDb` adheres to pathConstraintsFromQuery
+			// Check to make sure `db` adheres to pathConstraintsFromQuery. This is an
+			// optimization to avoid work, if sqlite filtering is going to exclude it.
 			valid, err := checkPathConstraints(sqliteDb, pathConstraintsFromQuery)
 			if err != nil {
 				return nil, fmt.Errorf("checking source path constraints: %w", err)
