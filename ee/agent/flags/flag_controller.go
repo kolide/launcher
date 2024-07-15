@@ -531,6 +531,16 @@ func (fc *FlagController) ExportTraces() bool {
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
 
+func (fc *FlagController) SetLauncherWatchdogEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.LauncherWatchdogEnabled, boolToBytes(enabled))
+}
+
+func (fc *FlagController) LauncherWatchdogEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.LauncherWatchdogEnabled))
+}
+
 func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
 	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
 }
