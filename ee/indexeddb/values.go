@@ -150,21 +150,21 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 			// Object nested inside this object
 			nestedObj, err := deserializeNestedObject(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding nested object: %w", err)
+				return obj, fmt.Errorf("decoding nested object for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = nestedObj
 		case tokenAsciiStr:
 			// ASCII string
 			strVal, err := deserializeAsciiStr(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string: %w", err)
+				return obj, fmt.Errorf("decoding ascii string for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = strVal
 		case tokenUtf16Str:
 			// UTF-16 string
 			strVal, err := deserializeUtf16Str(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string: %w", err)
+				return obj, fmt.Errorf("decoding ascii string for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = strVal
 		case tokenTrue:
@@ -176,14 +176,14 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tokenInt32:
 			propertyInt, err := binary.ReadVarint(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding int32: %w", err)
+				return obj, fmt.Errorf("decoding int32 for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
 		case tokenBeginSparseArray:
 			// This is the only type of array I've encountered so far, so it's the only one implemented.
 			arr, err := deserializeSparseArray(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding array: %w", err)
+				return obj, fmt.Errorf("decoding array for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenPadding, tokenVerifyObjectCount:
@@ -301,7 +301,7 @@ func deserializeAsciiStr(srcReader io.ByteReader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte in string: %w", err)
+			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte
@@ -321,7 +321,7 @@ func deserializeUtf16Str(srcReader io.ByteReader) ([]byte, error) {
 	for i := 0; i < int(strLen); i += 1 {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte in string: %w", err)
+			return nil, fmt.Errorf("reading next byte at index %d in string with length %d: %w", i, strLen, err)
 		}
 
 		strBytes[i] = nextByte
