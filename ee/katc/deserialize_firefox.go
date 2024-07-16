@@ -130,6 +130,12 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 				return nil, fmt.Errorf("reading string for key %s: %w", nextKeyStr, err)
 			}
 			resultObj[nextKeyStr] = str
+		case tagBoolean:
+			if valData > 0 {
+				resultObj[nextKeyStr] = []byte("true")
+			} else {
+				resultObj[nextKeyStr] = []byte("false")
+			}
 		case tagObjectObject:
 			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
