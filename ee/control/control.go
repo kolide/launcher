@@ -29,6 +29,8 @@ type ControlService struct {
 	requestTicker        *time.Ticker
 	fetcher              dataProvider
 	fetchMutex           sync.Mutex
+	fetchFull            bool
+	fetchFullMutex       sync.Mutex
 	store                types.GetterSetter
 	lastFetched          map[string]string
 	consumers            map[string]consumer
@@ -98,7 +100,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	startUpMessageSuccess := false
 
 	for {
-		fetchErr := cs.Fetch(false)
+		fetchErr := cs.Fetch()
 		switch {
 		case fetchErr != nil:
 			cs.slogger.Log(ctx, slog.LevelWarn,
@@ -210,7 +212,7 @@ func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
 	// Perform a fetch now, to retrieve data faster in case this change
 	// was triggered by localserver or the user clicking on the menu bar app
 	// instead of by a control server change.
-	if err := cs.Fetch(false); err != nil {
+	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
 		cs.slogger.Log(context.TODO(), slog.LevelWarn,
 			"failed to fetch data from control server. Not fatal, moving on",
@@ -250,7 +252,7 @@ func (cs *ControlService) readRequestInterval() time.Duration {
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
-func (cs *ControlService) Fetch(fetchFull bool) error {
+func (cs *ControlService) Fetch() error {
 	// Do not block in the case where:
 	// 1. `Start` called `Fetch` on an interval
 	// 2. The control service received an updated `ControlRequestInterval` from the server
@@ -277,6 +279,14 @@ func (cs *ControlService) Fetch(fetchFull bool) error {
 	if err := json.NewDecoder(data).Decode(&subsystems); err != nil {
 		return fmt.Errorf("decoding subsystems map: %w", err)
 	}
+
+	fetchFull := false
+	cs.fetchFullMutex.Lock()
+	if cs.fetchFull {
+		fetchFull = true     // fetch all subsystems during this Fetch
+		cs.fetchFull = false // reset for next Fetch
+	}
+	cs.fetchFullMutex.Unlock()
 
 	for subsystem, hash := range subsystems {
 		lastHash, ok := cs.lastFetched[subsystem]
@@ -391,5 +401,13 @@ func (cs *ControlService) Do(data io.Reader) error {
 		"received request to perform full fetch of all subsystems",
 	)
 
-	return cs.Fetch(true)
+	// We receive this request in the middle of a `Fetch`, so we can't call
+	// `Fetch` again immediately. Instead, set `fetchFull` so that the next
+	// call to `Fetch` will fetch all subsystems.
+	cs.fetchFullMutex.Lock()
+	defer cs.fetchFullMutex.Unlock()
+	cs.fetchFull = true
+
+	// Treat this action as best-effort: try to do it once, no need to retry.
+	return nil
 }

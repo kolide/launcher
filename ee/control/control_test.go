@@ -247,7 +247,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			// Repeat fetches to verify no changes
 			for i := 0; i < tt.fetches; i++ {
-				err = cs.Fetch(false)
+				err = cs.Fetch()
 				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
@@ -353,7 +353,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
-				err = cs.Fetch(false)
+				err = cs.Fetch()
 				require.NoError(t, err)
 			}
 
