@@ -60,7 +60,7 @@ func sourcePatternToGlobbablePattern(sourcePattern string) string {
 
 // querySqliteDb queries the database at the given path, returning rows of results
 func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error) {
-	dsn := fmt.Sprintf("file:%s?mode=ro", path)
+	dsn := fmt.Sprintf("file:%s?mode=ro&immutable=1", path)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
