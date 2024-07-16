@@ -35,6 +35,7 @@ type ControlService struct {
 	lastFetched          map[string]string
 	consumers            map[string]consumer
 	subscribers          map[string][]subscriber
+	knownSubsystems      map[string]struct{}
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -67,6 +68,7 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 		lastFetched:          make(map[string]string),
 		consumers:            make(map[string]consumer),
 		subscribers:          make(map[string][]subscriber),
+		knownSubsystems:      make(map[string]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -289,6 +291,11 @@ func (cs *ControlService) Fetch() error {
 	cs.fetchFullMutex.Unlock()
 
 	for subsystem, hash := range subsystems {
+		if _, subsystemIsKnown := cs.knownSubsystems[subsystem]; !subsystemIsKnown {
+			// Ignore unknown subsystems.
+			continue
+		}
+
 		lastHash, ok := cs.lastFetched[subsystem]
 		if !ok && cs.store != nil {
 			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
@@ -365,12 +372,14 @@ func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) 
 		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
 	}
 	cs.consumers[subsystem] = consumer
+	cs.knownSubsystems[subsystem] = struct{}{}
 	return nil
 }
 
 // Registers a subscriber for subsystem update notifications
 func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
 	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
+	cs.knownSubsystems[subsystem] = struct{}{}
 }
 
 func (cs *ControlService) SendMessage(method string, params interface{}) error {

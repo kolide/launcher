@@ -236,7 +236,7 @@ func TestControlServiceFetch(t *testing.T) {
 			mockKnapsack.On("ForceControlSubsystems").Return(false)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-			data := &TestClient{tt.subsystems, tt.hashData}
+			data, _ := NewControlTestClient(tt.subsystems, tt.hashData)
 			controlOpts := []Option{}
 			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -260,6 +260,53 @@ func TestControlServiceFetch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("ForceControlSubsystems").Return(false)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	unknownSubsystemHash := "602a42f1"
+	subsystems := map[string]string{"desktop": "502a42f0", "unknown": unknownSubsystemHash}
+	hashData := map[string]any{"502a42f0": "status"}
+
+	// The test client will panic if it receives a request for the `unknown` subsystem hash,
+	// validating that we don't process data for the `unknown` subsystem.
+	data, _ := NewControlTestClient(subsystems, hashData)
+	controlOpts := []Option{}
+	cs := New(mockKnapsack, data, controlOpts...)
+
+	// Register consumer/subscriber for `desktop` subsystem only
+	desktopConsumer := &mockConsumer{}
+	err := cs.RegisterConsumer("desktop", desktopConsumer)
+	require.NoError(t, err)
+	desktopSubscriber := &mockSubscriber{}
+	cs.RegisterSubscriber("desktop", desktopSubscriber)
+
+	// Run fetch for the first time
+	require.NoError(t, cs.Fetch())
+
+	// Expect desktop consumer to have gotten exactly one update
+	assert.Equal(t, 1, desktopConsumer.updates)
+
+	// Expect desktop subscriber to have gotten exactly one ping
+	assert.Equal(t, 1, desktopSubscriber.pings)
+
+	// Expect no requests to unknown hash
+	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
+
+	// Run fetch again. This time, data should be cached, so there should be no updates or pings.
+	require.NoError(t, cs.Fetch())
+	assert.Equal(t, 1, desktopConsumer.updates)
+	assert.Equal(t, 1, desktopSubscriber.pings)
+
+	// Expect no requests to unknown hash
+	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
 }
 
 func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
@@ -336,7 +383,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 			// Make several instances of control service
 			for j := 0; j < tt.instances; j++ {
-				data := &TestClient{tt.subsystems, tt.hashData}
+				data, _ := NewControlTestClient(tt.subsystems, tt.hashData)
 				controlOpts := []Option{WithStore(store)}
 
 				mockKnapsack := typesMocks.NewKnapsack(t)
