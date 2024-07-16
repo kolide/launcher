@@ -16,6 +16,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
+
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
@@ -96,7 +98,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	startUpMessageSuccess := false
 
 	for {
-		fetchErr := cs.Fetch()
+		fetchErr := cs.Fetch(false)
 		switch {
 		case fetchErr != nil:
 			cs.slogger.Log(ctx, slog.LevelWarn,
@@ -208,7 +210,7 @@ func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
 	// Perform a fetch now, to retrieve data faster in case this change
 	// was triggered by localserver or the user clicking on the menu bar app
 	// instead of by a control server change.
-	if err := cs.Fetch(); err != nil {
+	if err := cs.Fetch(false); err != nil {
 		// if we got an error, log it and move on
 		cs.slogger.Log(context.TODO(), slog.LevelWarn,
 			"failed to fetch data from control server. Not fatal, moving on",
@@ -248,7 +250,7 @@ func (cs *ControlService) readRequestInterval() time.Duration {
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
-func (cs *ControlService) Fetch() error {
+func (cs *ControlService) Fetch(fetchFull bool) error {
 	// Do not block in the case where:
 	// 1. `Start` called `Fetch` on an interval
 	// 2. The control service received an updated `ControlRequestInterval` from the server
@@ -286,7 +288,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() && !fetchFull {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
@@ -381,4 +383,13 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 	}
 
 	return nil
+}
+
+// Do handles the force_full_control_data_fetch action.
+func (cs *ControlService) Do(data io.Reader) error {
+	cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received request to perform full fetch of all subsystems",
+	)
+
+	return cs.Fetch(true)
 }
