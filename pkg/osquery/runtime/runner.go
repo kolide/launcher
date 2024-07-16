@@ -62,9 +62,13 @@ func New(k types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
 }
 
 func (r *Runner) Run() error {
+	// Ensure we don't try to restart the instance before it's launched
+	r.instanceLock.Lock()
 	if err := r.launchOsqueryInstance(); err != nil {
+		r.instanceLock.Unlock()
 		return fmt.Errorf("starting instance: %w", err)
 	}
+	r.instanceLock.Unlock()
 
 	// This loop waits for the completion of the async routines,
 	// and either restarts the instance (if Shutdown was not
