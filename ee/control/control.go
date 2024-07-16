@@ -16,6 +16,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
+
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
@@ -27,6 +29,8 @@ type ControlService struct {
 	requestTicker        *time.Ticker
 	fetcher              dataProvider
 	fetchMutex           sync.Mutex
+	fetchFull            bool
+	fetchFullMutex       sync.Mutex
 	store                types.GetterSetter
 	lastFetched          map[string]string
 	consumers            map[string]consumer
@@ -276,6 +280,14 @@ func (cs *ControlService) Fetch() error {
 		return fmt.Errorf("decoding subsystems map: %w", err)
 	}
 
+	fetchFull := false
+	cs.fetchFullMutex.Lock()
+	if cs.fetchFull {
+		fetchFull = true     // fetch all subsystems during this Fetch
+		cs.fetchFull = false // reset for next Fetch
+	}
+	cs.fetchFullMutex.Unlock()
+
 	for subsystem, hash := range subsystems {
 		lastHash, ok := cs.lastFetched[subsystem]
 		if !ok && cs.store != nil {
@@ -286,7 +298,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() && !fetchFull {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
@@ -380,5 +392,22 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 		subscriber.Ping()
 	}
 
+	return nil
+}
+
+// Do handles the force_full_control_data_fetch action.
+func (cs *ControlService) Do(data io.Reader) error {
+	cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received request to perform full fetch of all subsystems",
+	)
+
+	// We receive this request in the middle of a `Fetch`, so we can't call
+	// `Fetch` again immediately. Instead, set `fetchFull` so that the next
+	// call to `Fetch` will fetch all subsystems.
+	cs.fetchFullMutex.Lock()
+	defer cs.fetchFullMutex.Unlock()
+	cs.fetchFull = true
+
+	// Treat this action as best-effort: try to do it once, no need to retry.
 	return nil
 }
