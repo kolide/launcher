@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -60,7 +63,18 @@ func sourcePatternToGlobbablePattern(sourcePattern string) string {
 
 // querySqliteDb queries the database at the given path, returning rows of results
 func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error) {
-	dsn := fmt.Sprintf("file:%s?mode=ro", path)
+	// If the database is in use, we won't be able to query it. So, copy it to a temporary location first.
+	tempDbCopyLocation, err := copySqliteDb(path)
+	if err != nil {
+		if tempDbCopyLocation != "" {
+			_ = os.RemoveAll(tempDbCopyLocation)
+		}
+		return nil, fmt.Errorf("unable to copy db: %w", err)
+	}
+	// The copy was successful -- make sure we clean it up after we're done
+	defer os.RemoveAll(filepath.Base(tempDbCopyLocation))
+
+	dsn := fmt.Sprintf("file:%s?mode=ro", tempDbCopyLocation)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite db: %w", err)
@@ -117,4 +131,35 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 	}
 
 	return results, nil
+}
+
+// copySqliteDb makes a temporary directory and copies the given db into it.
+func copySqliteDb(path string) (string, error) {
+	dbCopyDir, err := agent.MkdirTemp("sqlite-temp")
+	if err != nil {
+		return "", fmt.Errorf("making temporary directory: %w", err)
+	}
+
+	srcFh, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("opening %s: %w", path, err)
+	}
+	defer srcFh.Close()
+
+	dbCopyDest := filepath.Join(dbCopyDir, filepath.Base(path))
+	destFh, err := os.Create(dbCopyDest)
+	if err != nil {
+		return "", fmt.Errorf("opening %s: %w", dbCopyDest, err)
+	}
+
+	if _, err := io.Copy(destFh, srcFh); err != nil {
+		_ = destFh.Close()
+		return "", fmt.Errorf("copying %s to %s: %w", path, dbCopyDest, err)
+	}
+
+	if err := destFh.Close(); err != nil {
+		return "", fmt.Errorf("completing write from %s to %s: %w", path, dbCopyDest, err)
+	}
+
+	return dbCopyDest, nil
 }
