@@ -367,13 +367,14 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 // knownSubsystem checks our registered consumers and subscribers to see if the given
 // subsystem is one that has been registered with the control service.
 func (cs *ControlService) knownSubsystem(subsystem string) bool {
-	if _, subsystemFromConsumer := cs.consumers[subsystem]; !subsystemFromConsumer {
-		if _, subsystemFromSubscriber := cs.subscribers[subsystem]; !subsystemFromSubscriber {
-			return false
-		}
+	if _, subsystemFromConsumer := cs.consumers[subsystem]; subsystemFromConsumer {
+		return true
+	}
+	if _, subsystemFromSubscriber := cs.subscribers[subsystem]; subsystemFromSubscriber {
+		return true
 	}
 
-	return true
+	return false
 }
 
 // Registers a consumer for ingesting subsystem updates
