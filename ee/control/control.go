@@ -35,7 +35,6 @@ type ControlService struct {
 	lastFetched          map[string]string
 	consumers            map[string]consumer
 	subscribers          map[string][]subscriber
-	knownSubsystems      map[string]struct{}
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -68,7 +67,6 @@ func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService
 		lastFetched:          make(map[string]string),
 		consumers:            make(map[string]consumer),
 		subscribers:          make(map[string][]subscriber),
-		knownSubsystems:      make(map[string]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -291,7 +289,7 @@ func (cs *ControlService) Fetch() error {
 	cs.fetchFullMutex.Unlock()
 
 	for subsystem, hash := range subsystems {
-		if _, subsystemIsKnown := cs.knownSubsystems[subsystem]; !subsystemIsKnown {
+		if !cs.knownSubsystem(subsystem) {
 			// Ignore unknown subsystems.
 			continue
 		}
@@ -366,20 +364,30 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	return nil
 }
 
+// knownSubsystem checks our registered consumers and subscribers to see if the given
+// subsystem is one that has been registered with the control service.
+func (cs *ControlService) knownSubsystem(subsystem string) bool {
+	if _, subsystemFromConsumer := cs.consumers[subsystem]; !subsystemFromConsumer {
+		if _, subsystemFromSubscriber := cs.subscribers[subsystem]; !subsystemFromSubscriber {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Registers a consumer for ingesting subsystem updates
 func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
 	if _, ok := cs.consumers[subsystem]; ok {
 		return fmt.Errorf("subsystem %s already has registered consumer", subsystem)
 	}
 	cs.consumers[subsystem] = consumer
-	cs.knownSubsystems[subsystem] = struct{}{}
 	return nil
 }
 
 // Registers a subscriber for subsystem update notifications
 func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscriber) {
 	cs.subscribers[subsystem] = append(cs.subscribers[subsystem], subscriber)
-	cs.knownSubsystems[subsystem] = struct{}{}
 }
 
 func (cs *ControlService) SendMessage(method string, params interface{}) error {
