@@ -410,6 +410,71 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 	}
 }
 
+func Test_knownSubsystem(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName   string
+		subsystemName  string
+		consumers      []string
+		subscribers    []string
+		subsystemKnown bool
+	}{
+		{
+			testCaseName:   "subsystem in consumers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"subsystem_to_query", "some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "a_third_subsystem"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem in subscribers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "subsystem_to_query"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem in consumers and subscribers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"subsystem_to_query", "some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "subsystem_to_query"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem is unknown",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"some_other_subsystem", "another_test_subsystem"},
+			subscribers:    []string{"some_other_subsystem"},
+			subsystemKnown: false,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+			controlOpts := []Option{}
+			cs := New(mockKnapsack, nil, controlOpts...)
+
+			// Register known consumers and subscribers
+			for _, c := range tt.consumers {
+				require.NoError(t, cs.RegisterConsumer(c, &mockConsumer{}))
+			}
+			for _, s := range tt.subscribers {
+				cs.RegisterSubscriber(s, &mockSubscriber{})
+			}
+
+			known := cs.knownSubsystem(tt.subsystemName)
+			require.Equal(t, tt.subsystemKnown, known)
+		})
+	}
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
