@@ -16,6 +16,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
+
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
@@ -27,6 +29,8 @@ type ControlService struct {
 	requestTicker        *time.Ticker
 	fetcher              dataProvider
 	fetchMutex           sync.Mutex
+	fetchFull            bool
+	fetchFullMutex       sync.Mutex
 	store                types.GetterSetter
 	lastFetched          map[string]string
 	consumers            map[string]consumer
@@ -276,7 +280,20 @@ func (cs *ControlService) Fetch() error {
 		return fmt.Errorf("decoding subsystems map: %w", err)
 	}
 
+	fetchFull := false
+	cs.fetchFullMutex.Lock()
+	if cs.fetchFull {
+		fetchFull = true     // fetch all subsystems during this Fetch
+		cs.fetchFull = false // reset for next Fetch
+	}
+	cs.fetchFullMutex.Unlock()
+
 	for subsystem, hash := range subsystems {
+		if !cs.knownSubsystem(subsystem) {
+			// Ignore unknown subsystems.
+			continue
+		}
+
 		lastHash, ok := cs.lastFetched[subsystem]
 		if !ok && cs.store != nil {
 			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
@@ -286,7 +303,7 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() && !fetchFull {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
@@ -347,6 +364,19 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	return nil
 }
 
+// knownSubsystem checks our registered consumers and subscribers to see if the given
+// subsystem is one that has been registered with the control service.
+func (cs *ControlService) knownSubsystem(subsystem string) bool {
+	if _, subsystemFromConsumer := cs.consumers[subsystem]; subsystemFromConsumer {
+		return true
+	}
+	if _, subsystemFromSubscriber := cs.subscribers[subsystem]; subsystemFromSubscriber {
+		return true
+	}
+
+	return false
+}
+
 // Registers a consumer for ingesting subsystem updates
 func (cs *ControlService) RegisterConsumer(subsystem string, consumer consumer) error {
 	if _, ok := cs.consumers[subsystem]; ok {
@@ -380,5 +410,22 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 		subscriber.Ping()
 	}
 
+	return nil
+}
+
+// Do handles the force_full_control_data_fetch action.
+func (cs *ControlService) Do(data io.Reader) error {
+	cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received request to perform full fetch of all subsystems",
+	)
+
+	// We receive this request in the middle of a `Fetch`, so we can't call
+	// `Fetch` again immediately. Instead, set `fetchFull` so that the next
+	// call to `Fetch` will fetch all subsystems.
+	cs.fetchFullMutex.Lock()
+	defer cs.fetchFullMutex.Unlock()
+	cs.fetchFull = true
+
+	// Treat this action as best-effort: try to do it once, no need to retry.
 	return nil
 }

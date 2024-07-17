@@ -9,14 +9,16 @@ import (
 
 // TestClient is useful for clients in tests
 type TestClient struct {
-	subsystemMap map[string]string
-	hashData     map[string]any
+	subsystemMap      map[string]string
+	hashData          map[string]any
+	hashRequestCounts map[string]int
 }
 
 func NewControlTestClient(subsystemMap map[string]string, hashData map[string]any) (*TestClient, error) {
 	c := &TestClient{
-		subsystemMap: subsystemMap,
-		hashData:     hashData,
+		subsystemMap:      subsystemMap,
+		hashData:          hashData,
+		hashRequestCounts: make(map[string]int),
 	}
 	return c, nil
 }
@@ -31,6 +33,12 @@ func (c *TestClient) GetConfig() (data io.Reader, err error) {
 }
 
 func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
+	if _, ok := c.hashRequestCounts[hash]; !ok {
+		c.hashRequestCounts[hash] = 1
+	} else {
+		c.hashRequestCounts[hash] += 1
+	}
+
 	bodyBytes, err := json.Marshal(c.hashData[hash])
 	if err != nil {
 		return nil, fmt.Errorf("marshaling json: %w", err)
