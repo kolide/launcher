@@ -103,8 +103,10 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 			continue
 		}
 
+		tmp := make([]byte, len(iter.Value()))
+		copy(tmp, iter.Value())
 		objs = append(objs, map[string][]byte{
-			"data": iter.Value(),
+			"data": tmp,
 		})
 	}
 	iter.Release()
