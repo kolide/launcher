@@ -203,7 +203,7 @@ func nextNonPaddingByte(srcReader io.ByteReader) (byte, error) {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
 			if err == io.EOF {
-				return 0, nil
+				return 0, fmt.Errorf("did not expect EOF reading next byte: %w", err)
 			}
 			return 0, fmt.Errorf("reading next byte: %w", err)
 		}
