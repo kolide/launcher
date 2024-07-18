@@ -111,6 +111,10 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 	// Fetch data from our table source
 	dataRaw, err := k.sourceType.dataFunc(ctx, k.slogger, k.sourcePaths, k.sourceQuery, queryContext)
 	if err != nil {
+		k.slogger.Log(ctx, slog.LevelWarn,
+			"running data func",
+			"err", err,
+		)
 		return nil, fmt.Errorf("fetching data: %w", err)
 	}
 
@@ -127,6 +131,11 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 			for _, step := range k.rowTransformSteps {
 				dataRawRow, err = step.transformFunc(ctx, k.slogger, dataRawRow)
 				if err != nil {
+					k.slogger.Log(ctx, slog.LevelWarn,
+						"running transform func",
+						"transform_step", step.name,
+						"err", err,
+					)
 					return nil, fmt.Errorf("running transform func %s: %w", step.name, err)
 				}
 			}
