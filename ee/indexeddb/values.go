@@ -43,7 +43,7 @@ const (
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
-func DeserializeChrome(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
 	data, ok := row["data"]
 	if !ok {
 		return nil, errors.New("row missing top-level data key")
@@ -57,7 +57,7 @@ func DeserializeChrome(_ context.Context, _ *slog.Logger, row map[string][]byte)
 	}
 
 	// Now, parse the actual data in this row
-	objData, err := deserializeObject(srcReader)
+	objData, err := deserializeObject(ctx, slogger, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("decoding obj for indexeddb version %d: %w", version, err)
 	}
@@ -96,7 +96,7 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 }
 
 // deserializeObject deserializes the next object from the srcReader.
-func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
+func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) (map[string][]byte, error) {
 	obj := make(map[string][]byte)
 
 	for {
@@ -136,11 +136,8 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		currentPropertyName := string(objPropertyBytes)
 
 		// Now process the object property's value. The next byte will tell us its type.
-		nextByte, err := srcReader.ReadByte()
+		nextByte, err := nextNonPaddingByte(srcReader)
 		if err != nil {
-			if err == io.EOF {
-				return obj, nil
-			}
 			return obj, fmt.Errorf("reading next byte: %w", err)
 		}
 
@@ -148,7 +145,7 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		switch nextByte {
 		case tokenObjectBegin:
 			// Object nested inside this object
-			nestedObj, err := deserializeNestedObject(srcReader)
+			nestedObj, err := deserializeNestedObject(ctx, slogger, srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding nested object for %s: %w", currentPropertyName, err)
 			}
@@ -181,22 +178,45 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
 		case tokenBeginSparseArray:
 			// This is the only type of array I've encountered so far, so it's the only one implemented.
-			arr, err := deserializeSparseArray(srcReader)
+			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
 			if err != nil {
 				return obj, fmt.Errorf("decoding array for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenPadding, tokenVerifyObjectCount:
-			fallthrough
+			// We don't care about these types
+			continue
 		default:
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown token type",
+				"token", fmt.Sprintf("%02x", nextByte),
+			)
 			continue
 		}
 	}
 }
 
+// nextNonPaddingByte reads from srcReader and discards `tokenPadding` until
+// it reaches the next non-padded byte.
+func nextNonPaddingByte(srcReader io.ByteReader) (byte, error) {
+	for {
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				return 0, nil
+			}
+			return 0, fmt.Errorf("reading next byte: %w", err)
+		}
+		if nextByte == tokenPadding {
+			continue
+		}
+		return nextByte, nil
+	}
+}
+
 // deserializeSparseArray deserializes the next array from the srcReader.
 // Currently, it only handles an array of objects.
-func deserializeSparseArray(srcReader io.ByteReader) ([]byte, error) {
+func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -252,7 +272,7 @@ func deserializeSparseArray(srcReader io.ByteReader) ([]byte, error) {
 		}
 		switch nextByte {
 		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(srcReader)
+			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
 			if err != nil {
 				return nil, fmt.Errorf("decoding object in array: %w", err)
 			}
@@ -270,8 +290,8 @@ func deserializeSparseArray(srcReader io.ByteReader) ([]byte, error) {
 	return arrBytes, nil
 }
 
-func deserializeNestedObject(srcReader io.ByteReader) ([]byte, error) {
-	nestedObj, err := deserializeObject(srcReader)
+func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
+	nestedObj, err := deserializeObject(ctx, slogger, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
 	}
