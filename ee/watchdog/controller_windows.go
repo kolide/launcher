@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -230,11 +232,23 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	}
 }
 
+func (wc *WatchdogController) getExecutablePath() (string, error) {
+	defaultBinDir := launcher.DefaultPath(launcher.BinDirectory)
+	defaultLauncherLocation := filepath.Join(defaultBinDir, "launcher.exe")
+	// do some basic sanity checking to prevent installation from a bad path
+	_, err := os.Stat(defaultLauncherLocation)
+	if err != nil {
+		return "", err
+	}
+
+	return defaultLauncherLocation, nil
+}
+
 func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 	ctx := context.TODO()
-	currentExe, err := os.Executable()
+	installedExePath, err := wc.getExecutablePath()
 	if err != nil {
-		return fmt.Errorf("collecting current executable path: %w", err)
+		return fmt.Errorf("determining watchdog executable path: %w", err)
 	}
 
 	svcMgrConf := mgr.Config{
@@ -255,7 +269,7 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 
 	restartService, err := serviceManager.CreateService(
 		launcherWatchdogServiceName,
-		currentExe,
+		installedExePath,
 		svcMgrConf,
 		serviceArgs...,
 	)
