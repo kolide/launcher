@@ -246,7 +246,7 @@ func (wc *WatchdogController) getExecutablePath() (string, error) {
 
 func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 	ctx := context.TODO()
-	currentExe, err := wc.getExecutablePath()
+	installedExePath, err := wc.getExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining watchdog executable path: %w", err)
 	}
@@ -269,7 +269,7 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 
 	restartService, err := serviceManager.CreateService(
 		launcherWatchdogServiceName,
-		currentExe,
+		installedExePath,
 		svcMgrConf,
 		serviceArgs...,
 	)
