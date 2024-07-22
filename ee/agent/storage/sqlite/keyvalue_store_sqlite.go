@@ -16,7 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	sqlitemigrationdriver "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type storeName int

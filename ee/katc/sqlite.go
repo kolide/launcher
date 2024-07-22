@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/osquery/osquery-go/plugin/table"
-	_ "modernc.org/sqlite"
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables

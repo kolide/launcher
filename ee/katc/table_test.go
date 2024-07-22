@@ -14,7 +14,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func Test_generate_SqliteBackedIndexedDB(t *testing.T) {

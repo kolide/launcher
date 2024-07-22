@@ -13,9 +13,9 @@ import (
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	_ "modernc.org/sqlite"
 )
 
 func TestOpenWriter_NewDatabase(t *testing.T) {

@@ -17,7 +17,7 @@ require (
 	github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50
 	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121
 	github.com/mat/besticon v3.9.0+incompatible
-	github.com/mattn/go-sqlite3 v1.14.19
+	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/osquery/osquery-go v0.0.0-20231006172600-d6f325f636a9
@@ -49,6 +49,7 @@ require (
 	github.com/apache/thrift v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
+	github.com/golang/snappy v0.0.4
 	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
 	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
 	github.com/kolide/toast v1.0.2
@@ -56,14 +57,12 @@ require (
 	github.com/spf13/pflag v1.0.5
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.19.0
-	modernc.org/sqlite v1.28.0
 )
 
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -84,6 +83,7 @@ require (
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
 	modernc.org/opt v0.1.3 // indirect
+	modernc.org/sqlite v1.28.0 // indirect
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.1 // indirect
 )
