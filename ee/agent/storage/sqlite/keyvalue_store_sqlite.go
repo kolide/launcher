@@ -99,7 +99,7 @@ func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 		tableName:     name.String(),
 	}
 
-	if err := s.migrate(ctx); err != nil {
+	if err := s.migrate(); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("migrating the database: %w", err)
 	}
@@ -169,7 +169,7 @@ func dbLocation(rootDirectory string) string {
 }
 
 // migrate makes sure that the database schema is correct.
-func (s *sqliteStore) migrate(ctx context.Context) error {
+func (s *sqliteStore) migrate() error {
 	d, err := iofs.New(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("loading migration files: %w", err)
