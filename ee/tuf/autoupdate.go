@@ -62,7 +62,8 @@ const AutoupdateSubsystemName = "autoupdate"
 
 type (
 	controlServerAutoupdateRequest struct {
-		BinariesToUpdate []binaryToUpdate `json:"binaries_to_update"`
+		BinariesToUpdate   []binaryToUpdate `json:"binaries_to_update"`
+		BypassInitialDelay bool             `json:"bypass_initial_delay,omitempty"`
 	}
 
 	// In the future, we may allow for setting a particular version here as well
@@ -278,16 +279,6 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
 // requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
-	if time.Now().Before(ta.initialDelayEnd) {
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"received update request during initial delay, discarding",
-			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
-		)
-		// We don't return an error because there's no need for the actionqueue to retry this request --
-		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
-		return nil
-	}
-
 	var updateRequest controlServerAutoupdateRequest
 	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -295,6 +286,16 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 			"err", err,
 		)
 		// We don't return an error because we don't want the actionqueue to retry this request
+		return nil
+	}
+
+	if time.Now().Before(ta.initialDelayEnd) && !updateRequest.BypassInitialDelay {
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received update request during initial delay, discarding",
+			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
+		)
+		// We don't return an error because there's no need for the actionqueue to retry this request --
+		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
 		return nil
 	}
 
