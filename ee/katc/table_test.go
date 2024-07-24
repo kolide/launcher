@@ -1,15 +1,17 @@
 package katc
 
 import (
+	"archive/zip"
 	"context"
-	"database/sql"
+	_ "embed"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
-	"github.com/golang/snappy"
-	"github.com/google/uuid"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
@@ -17,128 +19,129 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func Test_generate_SqliteBackedIndexedDB(t *testing.T) {
+//go:embed test_data/indexeddbs/1985929987lbadutnscehter.sqlite.zip
+var basicIndexeddb []byte
+
+func TestQueryFirefoxIndexedDB(t *testing.T) {
 	t.Parallel()
 
 	// This test validates generation of table results. It uses a sqlite-backed
 	// IndexedDB as a source, which means it also exercises functionality from
 	// sqlite.go, snappy.go, and deserialize_firefox.go.
 
-	// First, set up the data we expect to retrieve.
-	expectedColumn := "uuid"
-	u, err := uuid.NewRandom()
-	require.NoError(t, err, "generating test UUID")
-	expectedColumnValue := u.String()
-
-	// Serialize the row data, reversing the deserialization operation in
-	// deserialize_firefox.go.
-	serializedUuid := []byte(expectedColumnValue)
-	serializedObj := append([]byte{
-		// Header
-		0x00, 0x00, 0x00, 0x00, // header tag data -- discarded
-		0x00, 0x00, 0xf1, 0xff, // LE `tagHeader`
-		// Begin object
-		0x00, 0x00, 0x00, 0x00, // object tag data -- discarded
-		0x08, 0x00, 0xff, 0xff, // LE `tagObject`
-		// Begin UUID key
-		0x04, 0x00, 0x00, 0x80, // LE data about upcoming string: length 4 (remaining bytes), is ASCII
-		0x04, 0x00, 0xff, 0xff, // LE `tagString`
-		0x75, 0x75, 0x69, 0x64, // "uuid"
-		0x00, 0x00, 0x00, 0x00, // padding to get to 8-byte word boundary
-		// End UUID key
-		// Begin UUID value
-		0x24, 0x00, 0x00, 0x80, // LE data about upcoming string: length 36 (remaining bytes), is ASCII
-		0x04, 0x00, 0xff, 0xff, // LE `tagString`
-	},
-		serializedUuid...,
-	)
-	serializedObj = append(serializedObj,
-		0x00, 0x00, 0x00, 0x00, // padding to get to 8-byte word boundary for UUID string
-		// End UUID value
-		0x00, 0x00, 0x00, 0x00, // tag data -- discarded
-		0x13, 0x00, 0xff, 0xff, // LE `tagEndOfKeys` 0xffff0013
-	)
-
-	// Now compress the serialized row data, reversing the decompression operation
-	// in snappy.go
-	compressedObj := snappy.Encode(nil, serializedObj)
-
-	// Now, create a sqlite database to store this data in.
-	databaseDir := t.TempDir()
-	sourceFilepath := filepath.Join(databaseDir, "test.sqlite")
-	f, err := os.Create(sourceFilepath)
-	require.NoError(t, err, "creating source db")
-	require.NoError(t, f.Close(), "closing source db file")
-	conn, err := sql.Open("sqlite", sourceFilepath)
-	require.NoError(t, err)
-	_, err = conn.Exec(`CREATE TABLE object_data(data TEXT NOT NULL PRIMARY KEY) WITHOUT ROWID;`)
-	require.NoError(t, err, "creating test table")
-
-	// Insert compressed object into the database
-	_, err = conn.Exec("INSERT INTO object_data (data) VALUES (?);", compressedObj)
-	require.NoError(t, err, "inserting into sqlite database")
-	require.NoError(t, conn.Close(), "closing sqlite database")
-
-	// At long last, our source is adequately configured.
-	// Move on to constructing our KATC table.
-	sourceQuery := "SELECT data FROM object_data;"
-	cfg := katcTableConfig{
-		Columns: []string{expectedColumn},
-		katcTableDefinition: katcTableDefinition{
-			SourceType: &katcSourceType{
-				name:     sqliteSourceType,
-				dataFunc: sqliteData,
-			},
-			SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
-			SourceQuery: &sourceQuery,
-			RowTransformSteps: &[]rowTransformStep{
-				{
-					name:          snappyDecodeTransformStep,
-					transformFunc: snappyDecode,
-				},
-				{
-					name:          deserializeFirefoxTransformStep,
-					transformFunc: deserializeFirefox,
-				},
-			},
+	for _, tt := range []struct {
+		fileName     string
+		objStoreName string
+		expectedRows int
+		zipBytes     []byte
+	}{
+		{
+			fileName:     "1985929987lbadutnscehter.sqlite.zip",
+			objStoreName: "launchertestobjstore",
+			expectedRows: 2,
+			zipBytes:     basicIndexeddb,
 		},
-		Overlays: []katcTableConfigOverlay{
-			{
-				Filters: map[string]string{
-					"goos": runtime.GOOS,
-				},
+	} {
+		tt := tt
+		t.Run(tt.fileName, func(t *testing.T) {
+			t.Parallel()
+
+			// Write zip bytes to file
+			tempDir := t.TempDir()
+			zipFile := filepath.Join(tempDir, tt.fileName)
+			require.NoError(t, os.WriteFile(zipFile, tt.zipBytes, 0755), "writing zip to temp dir")
+
+			// Unzip to file in temp dir
+			indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+			zipReader, err := zip.OpenReader(zipFile)
+			require.NoError(t, err, "opening reader to zip file")
+			defer zipReader.Close()
+			for _, fileInZip := range zipReader.File {
+				fileInZipReader, err := fileInZip.Open()
+				require.NoError(t, err, "opening file in zip")
+				defer fileInZipReader.Close()
+
+				idbFilePath := filepath.Join(tempDir, fileInZip.Name)
+
+				if fileInZip.FileInfo().IsDir() {
+					require.NoError(t, os.MkdirAll(idbFilePath, fileInZip.Mode()), "creating dir")
+					continue
+				}
+
+				outFile, err := os.OpenFile(idbFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
+				require.NoError(t, err, "opening output file")
+				defer outFile.Close()
+
+				_, err = io.Copy(outFile, fileInZipReader)
+				require.NoError(t, err, "copying from zip to temp dir")
+			}
+
+			// Construct table
+			sourceQuery := fmt.Sprintf("SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"%s\";", tt.objStoreName)
+			cfg := katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
 				katcTableDefinition: katcTableDefinition{
-					SourcePaths: &[]string{filepath.Join(databaseDir, "%.sqlite")}, // All sqlite files in the test directory
-				},
-			},
-		},
-	}
-	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
-
-	// Make a query context restricting the source to our exact source sqlite database
-	queryContext := table.QueryContext{
-		Constraints: map[string]table.ConstraintList{
-			pathColumnName: {
-				Constraints: []table.Constraint{
-					{
-						Operator:   table.OperatorEquals,
-						Expression: sourceFilepath,
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &sourceQuery,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
 					},
 				},
-			},
-		},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{indexeddbDest}, // All sqlite files in the test directory
+						},
+					},
+				},
+			}
+			testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+			// Make a query context restricting the source to our exact source sqlite database
+			queryContext := table.QueryContext{
+				Constraints: map[string]table.ConstraintList{
+					pathColumnName: {
+						Constraints: []table.Constraint{
+							{
+								Operator:   table.OperatorEquals,
+								Expression: indexeddbDest,
+							},
+						},
+					},
+				},
+			}
+
+			// At long last: run a query
+			results, err := testTable.generate(context.TODO(), queryContext)
+			require.NoError(t, err)
+
+			// We should have the expected number of results in the row
+			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned")
+
+			// Make sure we have the expected number of columns
+			for i := 0; i < tt.expectedRows; i += 1 {
+				require.Contains(t, results[i], pathColumnName, "missing source column")
+				require.Equal(t, indexeddbDest, results[i][pathColumnName])
+				require.Contains(t, results[i], "uuid", "expected uuid column missing")
+				require.Contains(t, results[i], "name", "expected name column missing")
+				require.Contains(t, results[i], "version", "expected version column missing")
+			}
+		})
 	}
-
-	// At long last: run a query
-	results, err := testTable.generate(context.TODO(), queryContext)
-	require.NoError(t, err)
-
-	// Validate results
-	require.Equal(t, 1, len(results), "exactly one row expected")
-	require.Contains(t, results[0], pathColumnName, "missing source column")
-	require.Equal(t, sourceFilepath, results[0][pathColumnName])
-	require.Contains(t, results[0], expectedColumn, "expected column missing")
-	require.Equal(t, expectedColumnValue, results[0][expectedColumn], "data mismatch")
 }
 
 func Test_checkSourcePathConstraints(t *testing.T) {
