@@ -54,6 +54,13 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	}
 }
 
+func (kst *katcSourceType) String() string {
+	if kst == nil {
+		return ""
+	}
+	return kst.name
+}
+
 // rowTransformStep defines an operation performed against a row of data
 // returned from a source. The `name` is the identifier parsed from the
 // JSON KATC config.
