@@ -22,7 +22,7 @@
         const storeData = [
             {
                 uuid: "0b438872-8b65-4e99-9cd4-95f0eeac2ad6", // ASCII string
-                name: "⏰", // UTF-16 string
+                name: String.fromCodePoint(0x1F920), // UTF-16 string -- this is a 🤠 cowboy hat face emoji
                 version: 35, // Integer: int32
                 preferences: null, // Null
                 flags: // Nested object
@@ -59,7 +59,7 @@
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
-                name: "🎟️", // UTF-16 string
+                name: String.fromCodePoint(0x1F354), // UTF-16 string -- this is a 🍔 burger emoji
                 version: 100000, // Integer: int32
                 preferences: null, // Null
                 flags: // Nested object
