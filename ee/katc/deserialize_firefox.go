@@ -231,7 +231,7 @@ func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, erro
 	_, _, _ = nextPair(srcReader)
 
 	for i := 0; i < int(arrayLength); i += 1 {
-		itemTag, _, err := nextPair(srcReader)
+		itemTag, itemData, err := nextPair(srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", i, err)
 		}
@@ -243,6 +243,12 @@ func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, erro
 				return nil, fmt.Errorf("reading object at index %d in array: %w", i, err)
 			}
 			resultArr[i] = string(obj) // cast to string so it's readable when marshalled again below
+		case tagString:
+			str, err := deserializeString(itemData, srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading string at index %d in array: %w", i, err)
+			}
+			resultArr[i] = string(str) // cast to string so it's readable when marshalled again below
 		default:
 			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", i, itemTag)
 		}
