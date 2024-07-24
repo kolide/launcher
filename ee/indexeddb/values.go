@@ -34,6 +34,8 @@ const (
 	// types: array
 	tokenBeginSparseArray byte = 0x61 // a
 	tokenEndSparseArray   byte = 0x40 // @
+	tokenBeginDenseArray  byte = 0x41 // A
+	tokenEndDenseArray    byte = 0x24 // $
 	// misc
 	tokenPadding           byte = 0x00
 	tokenVerifyObjectCount byte = 0x3f // ?
@@ -177,10 +179,15 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 			}
 			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
 		case tokenBeginSparseArray:
-			// This is the only type of array I've encountered so far, so it's the only one implemented.
 			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding array for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding sparse array for %s: %w", currentPropertyName, err)
+			}
+			obj[currentPropertyName] = arr
+		case tokenBeginDenseArray:
+			arr, err := deserializeDenseArray(ctx, slogger, srcReader)
+			if err != nil {
+				return obj, fmt.Errorf("decoding dense array for %s: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenPadding, tokenVerifyObjectCount:
@@ -214,8 +221,7 @@ func nextNonPaddingByte(srcReader io.ByteReader) (byte, error) {
 	}
 }
 
-// deserializeSparseArray deserializes the next array from the srcReader.
-// Currently, it only handles an array of objects.
+// deserializeSparseArray deserializes the next sparse array from the srcReader.
 func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
@@ -285,6 +291,69 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
 		default:
 			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
+		}
+	}
+
+	arrBytes, err := json.Marshal(arrItems)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling array: %w", err)
+	}
+
+	return arrBytes, nil
+}
+
+// deserializeDenseArray deserializes the next dense array from the srcReader.
+// Dense arrays are arrays of items that are NOT paired with indices, as in sparse arrays.
+func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
+	// After an array start, the next byte will be the length of the array.
+	arrayLen, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint: %w", err)
+	}
+
+	// Read from srcReader until we've filled the array to the correct size.
+	arrItems := make([]any, arrayLen)
+	reachedEndOfArray := false
+	i := 0
+	for {
+		if reachedEndOfArray {
+			break
+		}
+
+		// Read item at index
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		switch nextByte {
+		case tokenObjectBegin:
+			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding object in array: %w", err)
+			}
+			arrItems[i] = string(obj) // cast to string so it's readable when marshalled again below
+		case tokenAsciiStr:
+			str, err := deserializeAsciiStr(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding string in array: %w", err)
+			}
+			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
+		case tokenEndDenseArray:
+			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
+			// respectively. We don't care about checking them, so we read and discard them.
+			_, _ = srcReader.ReadByte()
+			_, _ = srcReader.ReadByte()
+			reachedEndOfArray = true
+		case 0x01, 0x03:
+			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
+			continue
+		default:
+			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
+		}
+
+		i += 1
+		if i >= int(arrayLen) {
+			reachedEndOfArray = true
 		}
 	}
 
