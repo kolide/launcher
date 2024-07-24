@@ -5,7 +5,7 @@
 
     // Open database. Second arg is database version. We're not dealing with
     // migrations at the moment, so just leave it at 1.
-    const request = window.indexedDB.open(databaseName, 2);
+    const request = window.indexedDB.open(databaseName, 1);
     request.onupgradeneeded = (event) => {
         // Create an object store. We're going to skip creating indices for now
         // because this package doesn't make use of them.
