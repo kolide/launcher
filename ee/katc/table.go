@@ -88,7 +88,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	// Add extra fields to slogger
 	k.slogger = slogger.With(
 		"table_name", tableName,
-		"table_type", cfg.SourceType,
+		"table_type", cfg.SourceType.String(),
 	)
 
 	return &k, columns
