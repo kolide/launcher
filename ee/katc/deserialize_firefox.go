@@ -227,10 +227,10 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, err
 func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, error) {
 	resultArr := make([]any, arrayLength)
 
-	// We discard the next pair before reading the array.
-	_, _, _ = nextPair(srcReader)
-
 	for i := 0; i < int(arrayLength); i += 1 {
+		// The next pair is the index, which we can discard
+		_, _, _ = nextPair(srcReader)
+
 		itemTag, itemData, err := nextPair(srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", i, err)
