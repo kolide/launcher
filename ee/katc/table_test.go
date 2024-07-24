@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,10 @@ import (
 )
 
 //go:embed test_data/indexeddbs/1985929987lbadutnscehter.sqlite.zip
-var basicIndexeddb []byte
+var basicFirefoxIndexeddb []byte
+
+//go:embed test_data/indexeddbs/file__0.indexeddb.leveldb.zip
+var basicChromeIndexeddb []byte
 
 func TestQueryFirefoxIndexedDB(t *testing.T) {
 	t.Parallel()
@@ -39,7 +43,7 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			fileName:     "1985929987lbadutnscehter.sqlite.zip",
 			objStoreName: "launchertestobjstore",
 			expectedRows: 2,
-			zipBytes:     basicIndexeddb,
+			zipBytes:     basicFirefoxIndexeddb,
 		},
 	} {
 		tt := tt
@@ -112,6 +116,129 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
 
 			// Make a query context restricting the source to our exact source sqlite database
+			queryContext := table.QueryContext{
+				Constraints: map[string]table.ConstraintList{
+					pathColumnName: {
+						Constraints: []table.Constraint{
+							{
+								Operator:   table.OperatorEquals,
+								Expression: indexeddbDest,
+							},
+						},
+					},
+				},
+			}
+
+			// At long last: run a query
+			results, err := testTable.generate(context.TODO(), queryContext)
+			require.NoError(t, err)
+
+			// We should have the expected number of results in the row
+			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned")
+
+			// Make sure we have the expected number of columns
+			for i := 0; i < tt.expectedRows; i += 1 {
+				require.Contains(t, results[i], pathColumnName, "missing source column")
+				require.Equal(t, indexeddbDest, results[i][pathColumnName])
+				require.Contains(t, results[i], "uuid", "expected uuid column missing")
+				require.Contains(t, results[i], "name", "expected name column missing")
+				require.Contains(t, results[i], "version", "expected version column missing")
+			}
+		})
+	}
+}
+
+func TestQueryChromeIndexedDB(t *testing.T) {
+	t.Parallel()
+
+	// This test validates generation of table results. It uses a sqlite-backed
+	// IndexedDB as a source, which means it also exercises functionality from
+	// sqlite.go, snappy.go, and deserialize_firefox.go.
+
+	for _, tt := range []struct {
+		fileName     string
+		dbName       string
+		objStoreName string
+		expectedRows int
+		zipBytes     []byte
+	}{
+		{
+			fileName:     "file__0.indexeddb.leveldb.zip",
+			dbName:       "launchertestdb",
+			objStoreName: "launchertestobjstore",
+			expectedRows: 2,
+			zipBytes:     basicChromeIndexeddb,
+		},
+	} {
+		tt := tt
+		t.Run(tt.fileName, func(t *testing.T) {
+			t.Parallel()
+
+			// Write zip bytes to file
+			tempDir := t.TempDir()
+			zipFile := filepath.Join(tempDir, tt.fileName)
+			require.NoError(t, os.WriteFile(zipFile, tt.zipBytes, 0755), "writing zip to temp dir")
+
+			// Prepare indexeddb dir
+			indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+			require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+			// Unzip to temp dir
+			zipReader, err := zip.OpenReader(zipFile)
+			require.NoError(t, err, "opening reader to zip file")
+			defer zipReader.Close()
+			for _, fileInZip := range zipReader.File {
+				fileInZipReader, err := fileInZip.Open()
+				require.NoError(t, err, "opening file in zip")
+				defer fileInZipReader.Close()
+
+				idbFilePath := filepath.Join(tempDir, fileInZip.Name)
+
+				if fileInZip.FileInfo().IsDir() {
+					require.NoError(t, os.MkdirAll(idbFilePath, fileInZip.Mode()), "creating dir")
+					continue
+				}
+
+				outFile, err := os.OpenFile(idbFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
+				require.NoError(t, err, "opening output file")
+				defer outFile.Close()
+
+				_, err = io.Copy(outFile, fileInZipReader)
+				require.NoError(t, err, "copying from zip to temp dir")
+			}
+
+			// Construct table
+			sourceQuery := fmt.Sprintf("%s.%s", tt.dbName, tt.objStoreName)
+			cfg := katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     indexeddbLeveldbSourceType,
+						dataFunc: indexeddbLeveldbData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &sourceQuery,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          deserializeChromeTransformStep,
+							transformFunc: indexeddb.DeserializeChrome,
+						},
+					},
+				},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{indexeddbDest}, // All indexeddb files in the test directory
+						},
+					},
+				},
+			}
+			testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+			// Make a query context restricting the source to our exact source indexeddb database
 			queryContext := table.QueryContext{
 				Constraints: map[string]table.ConstraintList{
 					pathColumnName: {
