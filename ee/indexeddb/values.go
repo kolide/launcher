@@ -303,7 +303,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 }
 
 // deserializeDenseArray deserializes the next dense array from the srcReader.
-// Dense arrays are arrays of items that are NOT paired with indices, as in spare arrays.
+// Dense arrays are arrays of items that are NOT paired with indices, as in sparse arrays.
 func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
