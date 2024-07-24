@@ -1,4 +1,4 @@
-# Testing deserialization of IndexedDB data
+# Testing deserialization of Chrome IndexedDB data
 
 Handcrafting data to test deserialization byte-by-byte is time-consuming and error-prone.
 The JavaScript in this directory creates an IndexedDB database seeded with data
