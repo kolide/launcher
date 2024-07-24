@@ -19,7 +19,7 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	logger := log.With(ctxlog.FromContext(ctx), "library", "detectLauncherVersion")
 	level.Debug(logger).Log("msg", "Attempting launcher autodetection")
 
-	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir))
+	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch)))
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
 		return fmt.Errorf("failed to exec -- possibly can't autodetect while cross compiling: out `%s`: %w", stdout, err)

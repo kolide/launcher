@@ -38,6 +38,14 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 		return "", errors.New("empty cache dir argument")
 	}
 
+	// put binaries in arch specific directory to avoid naming collisions in wix msi building
+	// where a single destination will have multiple, mutally exclusive sources
+	localCacheDir = filepath.Join(localCacheDir, string(target.Arch))
+
+	if err := os.MkdirAll(localCacheDir, fsutil.DirMode); err != nil {
+		return "", fmt.Errorf("could not create cache directory: %w", err)
+	}
+
 	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, channelOrVersion), binaryName)
 	localPackagePath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s.tar.gz", name, target.Platform, channelOrVersion))
 

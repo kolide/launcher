@@ -32,37 +32,39 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion    string
-	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
-	LauncherVersion   string
-	ExtensionVersion  string
-	Hostname          string
-	Secret            string
-	Transport         string
-	Insecure          bool
-	InsecureTransport bool
-	UpdateChannel     string
-	InitialRunner     bool
-	Identifier        string
-	Title             string
-	OmitSecret        bool
-	CertPins          string
-	RootPEM           string
-	BinRootDir        string
-	CacheDir          string
-	TufServerURL      string
-	MirrorURL         string
-	WixPath           string
-	MSIUI             bool
-	WixSkipCleanup    bool
-	DisableService    bool
+	PackageVersion     string // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion     string
+	OsqueryFlags       []string // Additional flags to pass to the runtime osquery instance
+	LauncherVersion    string
+	LauncherArmVersion string
+	ExtensionVersion   string
+	Hostname           string
+	Secret             string
+	Transport          string
+	Insecure           bool
+	InsecureTransport  bool
+	UpdateChannel      string
+	InitialRunner      bool
+	Identifier         string
+	Title              string
+	OmitSecret         bool
+	CertPins           string
+	RootPEM            string
+	BinRootDir         string
+	CacheDir           string
+	TufServerURL       string
+	MirrorURL          string
+	WixPath            string
+	MSIUI              bool
+	WixSkipCleanup     bool
+	DisableService     bool
 
 	// Normally we'd download the same version we bake into the
 	// autoupdate. But occasionally, it's handy to make a package
 	// with a different version.
-	LauncherDownloadVersionOverride string
-	OsqueryDownloadVersionOverride  string
+	LauncherDownloadVersionOverride    string
+	LauncherArmDownloadVersionOverride string
+	OsqueryDownloadVersionOverride     string
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
@@ -231,6 +233,29 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("fetching binary launcher: %w", err)
 	}
 
+	// for windows, make a separate target for arm64
+	if p.target.Platform == Windows {
+		// make a copy of P
+		packageOptsCopy := *p
+		packageOptsCopy.target.Arch = Arm64
+
+		if packageOptsCopy.OsqueryDownloadVersionOverride == "" {
+			packageOptsCopy.OsqueryDownloadVersionOverride = packageOptsCopy.OsqueryVersion
+		}
+
+		if err := packageOptsCopy.getBinary(ctx, "osqueryd", packageOptsCopy.target.PlatformBinaryName("osqueryd"), packageOptsCopy.OsqueryDownloadVersionOverride); err != nil {
+			return fmt.Errorf("fetching binary osqueryd: %w", err)
+		}
+
+		if packageOptsCopy.LauncherArmDownloadVersionOverride == "" {
+			packageOptsCopy.LauncherDownloadVersionOverride = packageOptsCopy.LauncherArmVersion
+		}
+
+		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), packageOptsCopy.LauncherDownloadVersionOverride); err != nil {
+			return fmt.Errorf("fetching binary launcher: %w", err)
+		}
+	}
+
 	// Some darwin specific bits
 	if p.target.Platform == Darwin {
 		if err := p.renderNewSyslogConfig(ctx); err != nil {
@@ -366,10 +391,15 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
+	binPath := filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	if err := os.MkdirAll(filepath.Dir(binPath), fsutil.DirMode); err != nil {
+		return fmt.Errorf("could not create directory for binary %s: %w", binaryName, err)
+	}
+
 	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
-		filepath.Join(p.packageRoot, p.binDir, binaryName),
+		binPath,
 	); err != nil {
 		return fmt.Errorf("could not copy binary %s: %w", binaryName, err)
 	}

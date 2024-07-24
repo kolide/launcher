@@ -62,7 +62,6 @@ type ServiceInstall struct {
 	Start             StartType          `xml:",attr,omitempty"`
 	Type              string             `xml:",attr,omitempty"`
 	Vital             YesNoType          `xml:",attr,omitempty"` // The overall install should fail if this service fails to install
-	UtilServiceConfig *UtilServiceConfig `xml:",omitempty"`
 	ServiceConfig     *ServiceConfig     `xml:",omitempty"`
 	ServiceDependency *ServiceDependency `xml:",omitempty"`
 }
@@ -90,30 +89,12 @@ type ServiceControl struct {
 // This is used needed to set DelayedAutoStart
 type ServiceConfig struct {
 	// TODO: this should need a namespace, and yet. See https://github.com/golang/go/issues/36813
+	Id               string    `xml:",attr,omitempty"`
 	XMLName          xml.Name  `xml:"http://schemas.microsoft.com/wix/2006/wi ServiceConfig"`
 	DelayedAutoStart YesNoType `xml:",attr,omitempty"`
 	OnInstall        YesNoType `xml:",attr,omitempty"`
 	OnReinstall      YesNoType `xml:",attr,omitempty"`
 	OnUninstall      YesNoType `xml:",attr,omitempty"`
-}
-
-// UtilServiceConfig implements
-// http://wixtoolset.org/documentation/manual/v3/xsd/util/serviceconfig.html
-// This is used to set FailureActions. There are some
-// limitations. Notably, reset period is in days here, though the
-// underlying `sc.exe` command supports seconds. (See
-// https://github.com/wixtoolset/issues/issues/5963)
-//
-// Docs are a bit confusing. This schema is supported, and should
-// work. The non-util ServiceConfig generates unsupported CNDL1150
-// errors.
-type UtilServiceConfig struct {
-	XMLName                      xml.Name `xml:"http://schemas.microsoft.com/wix/UtilExtension ServiceConfig"`
-	FirstFailureActionType       string   `xml:",attr,omitempty"`
-	SecondFailureActionType      string   `xml:",attr,omitempty"`
-	ThirdFailureActionType       string   `xml:",attr,omitempty"`
-	RestartServiceDelayInSeconds int      `xml:",attr,omitempty"`
-	ResetPeriodInDays            int      `xml:",attr,omitempty"`
 }
 
 // Service represents a wix service. It provides an interface to both
@@ -194,16 +175,6 @@ func ServiceArgs(args []string) ServiceOpt {
 
 // New returns a service
 func NewService(matchString string, opts ...ServiceOpt) *Service {
-	// Set some defaults. It's not clear we can reset in under a
-	// day. See https://github.com/wixtoolset/issues/issues/5963
-	utilServiceConfig := &UtilServiceConfig{
-		FirstFailureActionType:       "restart",
-		SecondFailureActionType:      "restart",
-		ThirdFailureActionType:       "restart",
-		ResetPeriodInDays:            1,
-		RestartServiceDelayInSeconds: 5,
-	}
-
 	serviceConfig := &ServiceConfig{
 		OnInstall:        Yes,
 		OnReinstall:      Yes,
@@ -215,16 +186,16 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// probably better to specific a ServiceName, but this might be an
 	// okay default.
 	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
+
 	si := &ServiceInstall{
-		Name:              defaultName,
-		Id:                defaultName,
-		Account:           `[SERVICEACCOUNT]`, // Wix resolves this to `LocalSystem`
-		Start:             StartAuto,
-		Type:              "ownProcess",
-		ErrorControl:      ErrorControlNormal,
-		Vital:             Yes,
-		UtilServiceConfig: utilServiceConfig,
-		ServiceConfig:     serviceConfig,
+		Name:          defaultName,
+		Id:            defaultName,
+		Account:       `[SERVICEACCOUNT]`, // Wix resolves this to `LocalSystem`
+		Start:         StartAuto,
+		Type:          "ownProcess",
+		ErrorControl:  ErrorControlNormal,
+		Vital:         Yes,
+		ServiceConfig: serviceConfig,
 	}
 
 	sc := &ServiceControl{
@@ -237,8 +208,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	s := &Service{
-		matchString:    matchString,
-		expectedCount:  1,
+		matchString: matchString,
+		// one count for arm64 and ond for amd64
+		expectedCount:  2,
 		count:          0,
 		serviceInstall: si,
 		serviceControl: sc,

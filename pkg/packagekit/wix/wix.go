@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
@@ -223,19 +224,81 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	}
 	defer heatWrite.Close()
 
+	type archSpecificBinDir string
+
+	const (
+		none  archSpecificBinDir = ""
+		amd64 archSpecificBinDir = "amd64"
+		arm64 archSpecificBinDir = "arm64"
+	)
+	currentArchSpecificBinDir := none
+
+	baseSvcName := wo.services[0].serviceInstall.Id
+
 	lines := strings.Split(string(heatContent), "\n")
 	for _, line := range lines {
+
+		if currentArchSpecificBinDir != none && strings.Contains(line, "</Directory>") {
+			// were in a arch specific bin dir that we want to remove, don't write closing tag
+			currentArchSpecificBinDir = none
+			continue
+		}
+
+		if strings.Contains(line, "Directory") {
+			if strings.Contains(line, string(amd64)) {
+				// were in a arch specific bin dir that we want to remove so when we hit closing tag, we'll skip it
+				currentArchSpecificBinDir = amd64
+				continue
+			}
+
+			if strings.Contains(line, string(arm64)) {
+				// were in a arch specific bin dir that we want to remove so when we hit closing tag, we'll skip it
+				currentArchSpecificBinDir = arm64
+				continue
+			}
+		}
+
 		heatWrite.WriteString(line)
 		heatWrite.WriteString("\n")
+
 		for _, service := range wo.services {
+
 			isMatch, err := service.Match(line)
 			if err != nil {
 				return fmt.Errorf("match error: %w", err)
 			}
+
 			if isMatch {
+				if currentArchSpecificBinDir == none {
+					return fmt.Errorf("service found, but not in a bin directory")
+				}
+
+				// make sure elements are not duplicated in any service
+				serviceId := fmt.Sprintf("%s%s", baseSvcName, ulid.New())
+				service.serviceControl.Id = serviceId
+				service.serviceInstall.Id = serviceId
+				service.serviceInstall.ServiceConfig.Id = serviceId
+
+				// create a condition based on architecture
+				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				heatWrite.WriteString("\n")
+
 				if err := service.Xml(heatWrite); err != nil {
 					return fmt.Errorf("adding service: %w", err)
 				}
+
+				continue
+			}
+
+			if strings.Contains(line, "osqueryd.exe") {
+				if currentArchSpecificBinDir == none {
+					return fmt.Errorf("osqueryd.exe found, but not in a bin directory")
+				}
+
+				// create a condition based on architecture
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", currentArchSpecificBinDir))
+				heatWrite.WriteString("\n")
 			}
 		}
 	}

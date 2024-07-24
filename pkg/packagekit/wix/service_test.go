@@ -17,17 +17,22 @@ func TestService(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, expectFalse)
 
+	// first match
 	expectTrue, err := service.Match("daemon.exe")
 	require.NoError(t, err)
 	require.True(t, expectTrue)
 
-	// Should error. count now exceeds expectedCount.
+	// second match
 	expectTrue2, err := service.Match("daemon.exe")
-	require.Error(t, err)
+	require.NoError(t, err)
 	require.True(t, expectTrue2)
 
+	// third match, should error
+	expectTrue3, err := service.Match("daemon.exe")
+	require.Error(t, err)
+	require.True(t, expectTrue3)
+
 	expectedXml := `<ServiceInstall Account="[SERVICEACCOUNT]" ErrorControl="normal" Id="DaemonSvc" Name="DaemonSvc" Start="auto" Type="ownProcess" Vital="yes">
-                        <ServiceConfig xmlns="http://schemas.microsoft.com/wix/UtilExtension" FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart" RestartServiceDelayInSeconds="5" ResetPeriodInDays="1"></ServiceConfig>
                         <ServiceConfig xmlns="http://schemas.microsoft.com/wix/2006/wi" DelayedAutoStart="no" OnInstall="yes" OnReinstall="yes"></ServiceConfig>
                     </ServiceInstall>
                     <ServiceControl Name="DaemonSvc" Id="DaemonSvc" Remove="uninstall" Start="install" Stop="both" Wait="no"></ServiceControl>`
