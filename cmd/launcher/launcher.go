@@ -540,6 +540,33 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if actionsQueue != nil {
 			actionsQueue.RegisterActor(tuf.AutoupdateSubsystemName, tufAutoupdater)
 		}
+
+		// in some cases, (e.g. rolling back a windows installation to a previous osquery version) it is possible that
+		// the installer leaves us in a situation where there is no osqueryd on disk.
+		// we can detect this and attempt to download the correct version into the TUF update library to run from that.
+		// This must be done as a blocking operation before the rungroups start, because the osquery runner will fail to
+		// launch and trigger a restart immediately
+		currentOsquerydBinaryPath := k.LatestOsquerydPath(ctx)
+		if _, err = os.Stat(currentOsquerydBinaryPath); os.IsNotExist(err) {
+			slogger.Log(ctx, slog.LevelInfo,
+				"detected missing osqueryd executable, will attempt to download",
+			)
+
+			// simulate control server request for immediate update, noting to bypass the initial delay window
+			actionReader := strings.NewReader(`{
+				"bypass_initial_delay": true,
+				"binaries_to_update": [
+					{ "name": "osqueryd" }
+				]
+			}`)
+
+			if err = tufAutoupdater.Do(actionReader); err != nil {
+				slogger.Log(ctx, slog.LevelError,
+					"failure triggering immediate osquery update",
+					"err", err,
+				)
+			}
+		}
 	}
 
 	startupSpan.End()
