@@ -151,9 +151,9 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 func TestQueryChromeIndexedDB(t *testing.T) {
 	t.Parallel()
 
-	// This test validates generation of table results. It uses a sqlite-backed
+	// This test validates generation of table results. It uses a leveldb-backed
 	// IndexedDB as a source, which means it also exercises functionality from
-	// sqlite.go, snappy.go, and deserialize_firefox.go.
+	// indexeddb_leveldb.go and the ee/indexeddb package.
 
 	for _, tt := range []struct {
 		fileName     string
