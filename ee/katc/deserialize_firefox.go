@@ -227,24 +227,38 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, err
 func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, error) {
 	resultArr := make([]any, arrayLength)
 
-	// We discard the next pair before reading the array.
-	_, _, _ = nextPair(srcReader)
-
-	for i := 0; i < int(arrayLength); i += 1 {
-		itemTag, _, err := nextPair(srcReader)
+	for {
+		// The next pair is the index.
+		idxTag, idx, err := nextPair(srcReader)
 		if err != nil {
-			return nil, fmt.Errorf("reading item at index %d in array: %w", i, err)
+			return nil, fmt.Errorf("reading next index in array: %w", err)
+		}
+
+		if idxTag == tagEndOfKeys {
+			break
+		}
+
+		// Now, read the data for this index.
+		itemTag, itemData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
 
 		switch itemTag {
 		case tagObjectObject:
 			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading object at index %d in array: %w", i, err)
+				return nil, fmt.Errorf("reading object at index %d in array: %w", idx, err)
 			}
-			resultArr[i] = string(obj) // cast to string so it's readable when marshalled again below
+			resultArr[idx] = string(obj) // cast to string so it's readable when marshalled again below
+		case tagString:
+			str, err := deserializeString(itemData, srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading string at index %d in array: %w", idx, err)
+			}
+			resultArr[idx] = string(str) // cast to string so it's readable when marshalled again below
 		default:
-			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", i, itemTag)
+			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", idx, itemTag)
 		}
 	}
 
