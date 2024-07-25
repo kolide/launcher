@@ -244,15 +244,19 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 			continue
 		}
 
-		if strings.Contains(line, "Directory") {
+		// the directory tag will like like "<Directory Id="xxxx"...>"
+		// so we just check for the first part of the string
+		if strings.Contains(line, "<Directory") {
 			if strings.Contains(line, string(amd64)) {
-				// were in a arch specific bin dir that we want to remove so when we hit closing tag, we'll skip it
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
 				currentArchSpecificBinDir = amd64
 				continue
 			}
 
 			if strings.Contains(line, string(arm64)) {
-				// were in a arch specific bin dir that we want to remove so when we hit closing tag, we'll skip it
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
 				currentArchSpecificBinDir = arm64
 				continue
 			}

@@ -209,7 +209,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 
 	s := &Service{
 		matchString: matchString,
-		// one count for arm64 and ond for amd64
+		// one count for arm64, one for amd64
 		expectedCount:  2,
 		count:          0,
 		serviceInstall: si,
