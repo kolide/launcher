@@ -78,11 +78,11 @@ func TestOsquerySlowStart(t *testing.T) {
 		}),
 	)
 	go runner.Run()
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, &logBytes)
 
 	// ensure that we actually had to wait on the socket
 	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
@@ -94,11 +94,17 @@ func TestExtensionSocketPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rmRootDirectory()
 
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
@@ -113,7 +119,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	)
 	go runner.Run()
 
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, &logBytes)
 
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
@@ -127,7 +133,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 // TestRestart tests that the launcher can restart the osqueryd process.
@@ -135,13 +141,13 @@ func TestExtensionSocketPath(t *testing.T) {
 // Should investigate why this is the case.
 func TestRestart(t *testing.T) {
 	t.Parallel()
-	runner, teardown := setupOsqueryInstanceForTests(t)
+	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
 	previousStats := runner.instance.stats
 
 	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
 	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
@@ -152,7 +158,7 @@ func TestRestart(t *testing.T) {
 	previousStats = runner.instance.stats
 
 	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
 	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")

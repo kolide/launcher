@@ -43,17 +43,17 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 
 	opts := &opt.Options{
 		Comparer:               indexeddbComparer,
-		DisableSeeksCompaction: true, // no need to perform compaction
-		Strict:                 opt.StrictAll,
+		DisableSeeksCompaction: true,               // no need to perform compaction
+		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
-	db, err := leveldb.OpenFile(tempDbCopyLocation, opts)
-	if err != nil {
+	db, dbOpenErr := leveldb.OpenFile(tempDbCopyLocation, opts)
+	if dbOpenErr != nil {
 		// Perform recover in case we missed something while copying
-		db, err = leveldb.RecoverFile(tempDbCopyLocation, opts)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("opening db: %w", err)
+		var dbRecoverErr error
+		db, dbRecoverErr = leveldb.RecoverFile(tempDbCopyLocation, opts)
+		if dbRecoverErr != nil {
+			return nil, fmt.Errorf("opening db: `%+v`; recovering db: %w", dbOpenErr, dbRecoverErr)
+		}
 	}
 	defer db.Close()
 

@@ -60,7 +60,7 @@ func SocketPath(rootDir string) string {
 	// launcher and osquery. We would like to be able to run multiple
 	// launchers.
 	//
-	// We could use something based on the laumcher root, but given the
+	// We could use something based on the launcher root, but given the
 	// context this runs in a ulid seems simpler.
 	return fmt.Sprintf(`\\.\pipe\kolide-osquery-%s`, ulid.New())
 }
