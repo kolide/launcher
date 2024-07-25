@@ -129,7 +129,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		for i := 0; i < int(objPropertyNameLen); i += 1 {
 			nextByte, err := srcReader.ReadByte()
 			if err != nil {
-				return obj, fmt.Errorf("reading next byte in object property name string: %w", err)
+				return obj, fmt.Errorf("reading next byte in object property name string: %w; partial object property name: `%s`", err, string(objPropertyBytes))
 			}
 
 			objPropertyBytes[i] = nextByte
