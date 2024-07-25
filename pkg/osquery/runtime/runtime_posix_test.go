@@ -82,7 +82,7 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	// ensure that we actually had to wait on the socket
 	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
@@ -133,7 +133,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 // TestRestart tests that the launcher can restart the osqueryd process.

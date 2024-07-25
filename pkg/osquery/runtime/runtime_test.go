@@ -357,7 +357,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	waitHealthy(t, runner, &logBytes)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -454,7 +454,27 @@ func TestFlagsChanged(t *testing.T) {
 
 	k.AssertExpectations(t)
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
+}
+
+func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
+	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
+	// they return nil immediately, which would give `backoff` the impression that shutdown has
+	// completed when it hasn't.
+	// Instead, call `Shutdown` once, wait for our timeout (2 minutes), and report failure if
+	// `Shutdown` has not returned.
+	shutdownErr := make(chan error)
+	go func() {
+		shutdownErr <- runner.Shutdown()
+	}()
+
+	select {
+	case err := <-shutdownErr:
+		require.NoError(t, err, fmt.Sprintf("runner logs: %s", logBytes.String()))
+	case <-time.After(2 * time.Minute):
+		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
+		t.FailNow()
+	}
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
@@ -503,7 +523,7 @@ func TestSimplePath(t *testing.T) {
 	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
 	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 func TestMultipleShutdowns(t *testing.T) {
@@ -538,7 +558,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	waitHealthy(t, runner, &logBytes)
 
 	for i := 0; i < 3; i += 1 {
-		require.NoError(t, runner.Shutdown(), "expected no error on calling shutdown but received error on attempt: ", i)
+		waitShutdown(t, runner, &logBytes)
 	}
 }
 
@@ -586,7 +606,7 @@ func TestOsqueryDies(t *testing.T) {
 	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
 
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, &logBytes)
 }
 
 func TestNotStarted(t *testing.T) {
@@ -679,7 +699,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 
 	teardown = func() {
 		defer rmRootDirectory()
-		require.NoError(t, runner.Shutdown())
+		waitShutdown(t, runner, logBytes)
 	}
 	return runner, logBytes, teardown
 }
