@@ -127,7 +127,7 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tagString, tagStringObject:
 			str, err := deserializeString(valData, srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading string for key %s: %w", nextKeyStr, err)
+				return nil, fmt.Errorf("reading string for key `%s`: %w", nextKeyStr, err)
 			}
 			resultObj[nextKeyStr] = str
 		case tagBoolean:
@@ -139,19 +139,19 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tagObjectObject:
 			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading object for key %s: %w", nextKeyStr, err)
+				return nil, fmt.Errorf("reading object for key `%s`: %w", nextKeyStr, err)
 			}
 			resultObj[nextKeyStr] = obj
 		case tagArrayObject:
 			arr, err := deserializeArray(valData, srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("reading array for key %s: %w", nextKeyStr, err)
+				return nil, fmt.Errorf("reading array for key `%s`: %w", nextKeyStr, err)
 			}
 			resultObj[nextKeyStr] = arr
 		case tagNull, tagUndefined:
 			resultObj[nextKeyStr] = nil
 		default:
-			return nil, fmt.Errorf("cannot process %s: unknown tag type %x", nextKeyStr, valTag)
+			return nil, fmt.Errorf("cannot process key `%s`: unknown tag type %x", nextKeyStr, valTag)
 		}
 	}
 

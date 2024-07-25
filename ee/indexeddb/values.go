@@ -140,7 +140,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		// Now process the object property's value. The next byte will tell us its type.
 		nextByte, err := nextNonPaddingByte(srcReader)
 		if err != nil {
-			return obj, fmt.Errorf("reading next byte for %s: %w", currentPropertyName, err)
+			return obj, fmt.Errorf("reading next byte for `%s`: %w", currentPropertyName, err)
 		}
 
 		// Handle the object property value by its type.
@@ -149,21 +149,21 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 			// Object nested inside this object
 			nestedObj, err := deserializeNestedObject(ctx, slogger, srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding nested object for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding nested object for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = nestedObj
 		case tokenAsciiStr:
 			// ASCII string
 			strVal, err := deserializeAsciiStr(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = strVal
 		case tokenUtf16Str:
 			// UTF-16 string
 			strVal, err := deserializeUtf16Str(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = strVal
 		case tokenTrue:
@@ -175,19 +175,19 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		case tokenInt32:
 			propertyInt, err := binary.ReadVarint(srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding int32 for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding int32 for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
 		case tokenBeginSparseArray:
 			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding sparse array for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding sparse array for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenBeginDenseArray:
 			arr, err := deserializeDenseArray(ctx, slogger, srcReader)
 			if err != nil {
-				return obj, fmt.Errorf("decoding dense array for %s: %w", currentPropertyName, err)
+				return obj, fmt.Errorf("decoding dense array for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = arr
 		case tokenPadding, tokenVerifyObjectCount:
