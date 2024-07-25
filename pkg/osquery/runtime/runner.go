@@ -612,9 +612,16 @@ func (r *Runner) launchOsqueryInstance() error {
 		)
 
 		<-o.doneCtx.Done()
-		if err := os.Remove(paths.pidfilePath); err != nil {
+		// We do a couple retries -- on Windows, the PID file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing PID file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
 			r.slogger.Log(ctx, slog.LevelInfo,
-				"could not remove PID file",
+				"could not remove PID file, despite retries",
 				"pid_file", paths.pidfilePath,
 				"err", err,
 			)
