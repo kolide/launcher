@@ -196,6 +196,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		default:
 			slogger.Log(ctx, slog.LevelWarn,
 				"unknown token type",
+				"current_property_name", currentPropertyName,
 				"token", fmt.Sprintf("%02x", nextByte),
 			)
 			continue
