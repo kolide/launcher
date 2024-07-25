@@ -448,10 +448,11 @@ func TestFlagsChanged(t *testing.T) {
 // fatals the test
 func waitHealthy(t *testing.T, runner *Runner) {
 	require.NoError(t, backoff.WaitFor(func() error {
-		if runner.Healthy() == nil {
-			return nil
+		err := runner.Healthy()
+		if err != nil {
+			return fmt.Errorf("instance not healthy: %w", err)
 		}
-		return fmt.Errorf("instance not healthy")
+		return nil
 	}, 30*time.Second, 1*time.Second))
 }
 
