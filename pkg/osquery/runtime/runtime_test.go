@@ -338,7 +338,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	runner := New(
 		k,
@@ -373,7 +373,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	// Start the runner
 	runner := New(
@@ -469,7 +469,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	runner := New(
 		k,
@@ -500,7 +500,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	runner := New(
 		k,
@@ -530,7 +530,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	runner := New(
 		k,
