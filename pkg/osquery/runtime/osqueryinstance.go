@@ -596,8 +596,7 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		<-o.doneCtx.Done()
 
 		o.slogger.Log(context.TODO(), slog.LevelDebug,
-			"exiting errgroup",
-			"errgroup", "starting extension shutdown",
+			"starting extension shutdown",
 			"extension_name", name,
 		)
 
