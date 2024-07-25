@@ -481,13 +481,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		span.AddEvent("extension_server_created")
 	}
 
-	if err := o.stats.Connected(o); err != nil {
-		r.slogger.Log(ctx, slog.LevelWarn,
-			"could not set connection time for osquery instance history",
-			"err", err,
-		)
-	}
-
 	// Now spawn an extension manager for the tables. We need to
 	// start this one in the background, because the runner.Start
 	// function needs to return promptly enough for osquery to use
@@ -516,6 +509,15 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		return nil
 	})
+
+	// All done with osquery setup! Mark instance as connected, then proceed
+	// with setting up remaining errgroups.
+	if err := o.stats.Connected(o); err != nil {
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"could not set connection time for osquery instance history",
+			"err", err,
+		)
+	}
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
