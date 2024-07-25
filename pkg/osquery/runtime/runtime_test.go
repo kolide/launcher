@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -358,7 +357,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	waitHealthy(t, runner, &logBytes)
 	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
 
-	runner.Interrupt(errors.New("test error"))
+	require.NoError(t, runner.Shutdown())
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -455,7 +454,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	k.AssertExpectations(t)
 
-	runner.Interrupt(errors.New("test error"))
+	require.NoError(t, runner.Shutdown())
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
