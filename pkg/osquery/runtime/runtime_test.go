@@ -461,7 +461,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
 	// they return nil immediately, which would give `backoff` the impression that shutdown has
 	// completed when it hasn't.
-	// Instead, call `Shutdown` once, wait for our timeout (2 minutes), and report failure if
+	// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
 	// `Shutdown` has not returned.
 	shutdownErr := make(chan error)
 	go func() {
@@ -471,7 +471,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 	select {
 	case err := <-shutdownErr:
 		require.NoError(t, err, fmt.Sprintf("runner logs: %s", logBytes.String()))
-	case <-time.After(2 * time.Minute):
+	case <-time.After(1 * time.Minute):
 		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
 		t.FailNow()
 	}
