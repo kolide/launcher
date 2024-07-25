@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -478,15 +479,25 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
-// fatals the test
+// fatals the test.
 func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
 	require.NoError(t, backoff.WaitFor(func() error {
-		err := runner.Healthy()
-		if err != nil {
+		// Instance self-reports as healthy
+		if err := runner.Healthy(); err != nil {
 			return fmt.Errorf("instance not healthy: %w", err)
 		}
+
+		// Confirms osquery instance setup is complete
+		if runner.instance != nil && runner.instance.stats.ConnectTime == "" {
+			return errors.New("no connect time set yet")
+		}
+
+		// Good to go
 		return nil
 	}, 30*time.Second, 1*time.Second), fmt.Sprintf("runner logs: %s", logBytes.String()))
+
+	// Give the instance just a little bit of buffer before we proceed
+	time.Sleep(2 * time.Second)
 }
 
 func TestSimplePath(t *testing.T) {
