@@ -151,7 +151,7 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tagNull, tagUndefined:
 			resultObj[nextKeyStr] = nil
 		default:
-			return nil, fmt.Errorf("cannot process key `%s`: unknown tag type %x", nextKeyStr, valTag)
+			return nil, fmt.Errorf("cannot process object key `%s`: unknown tag type `%x` with data `%d`", nextKeyStr, valTag, valData)
 		}
 	}
 
