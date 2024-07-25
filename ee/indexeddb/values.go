@@ -140,7 +140,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		// Now process the object property's value. The next byte will tell us its type.
 		nextByte, err := nextNonPaddingByte(srcReader)
 		if err != nil {
-			return obj, fmt.Errorf("reading next byte: %w", err)
+			return obj, fmt.Errorf("reading next byte for %s: %w", currentPropertyName, err)
 		}
 
 		// Handle the object property value by its type.
