@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/launcher"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -163,6 +164,16 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 		wc.slogger.Log(ctx, slog.LevelDebug,
 			"skipping ServiceEnabledChanged for launcher watchdog in non-prod environment",
 			"server_url", wc.knapsack.KolideServerURL(),
+			"enabled", enabled,
+		)
+
+		return
+	}
+
+	// we also don't alter watchdog installation if we're running without elevated permissions
+	if !windows.GetCurrentProcessToken().IsElevated() {
+		wc.slogger.Log(ctx, slog.LevelDebug,
+			"skipping ServiceEnabledChanged for launcher watchdog running without elevated permissions",
 			"enabled", enabled,
 		)
 
