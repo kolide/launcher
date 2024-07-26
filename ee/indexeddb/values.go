@@ -106,7 +106,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 
 		// First, we'll want the object property name. Typically, we'll get " (denoting a string),
 		// then the length of the string, then the string itself.
-		objPropertyStart, err := srcReader.ReadByte()
+		objPropertyStart, err := nextNonPaddingByte(srcReader)
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
 		}
