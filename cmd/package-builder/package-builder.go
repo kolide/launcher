@@ -79,12 +79,12 @@ func runMake(args []string) error {
 			env.String("LAUNCHER_VERSION", "stable"),
 			"What TUF channel to download launcher from. Supports filesystem paths",
 		)
-		// flLauncherArmVersion primarily exists to be able to provide the path to a local launcher binary
+		// flLauncherArmVersion primarily exists to be able to provide the path to a local launcher arm binary
 		// for testing
 		flLauncherArmVersion = flagset.String(
 			"launcher_arm_version",
-			env.String("LAUNCHER_ARM_VERSION", "stable"),
-			"What TUF channel to download launcher from for ARM. Supports filesystem paths",
+			"",
+			"What TUF channel to download launcher from for ARM. Supports filesystem paths, defaults to value of launcher_version",
 		)
 		flExtensionVersion = flagset.String(
 			"extension_version",
@@ -262,6 +262,10 @@ func runMake(args []string) error {
 		WixPath:            *flWixPath,
 		WixSkipCleanup:     *flWixSkipCleanup,
 		DisableService:     *flDisableService,
+	}
+
+	if packageOptions.LauncherArmVersion == "" {
+		packageOptions.LauncherArmVersion = packageOptions.LauncherVersion
 	}
 
 	outputDir := *flOutputDir
