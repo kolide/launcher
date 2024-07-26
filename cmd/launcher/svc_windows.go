@@ -167,7 +167,6 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
-
 	w.systemSlogger.Log(ctx, slog.LevelInfo,
 		"windows service starting",
 	)
