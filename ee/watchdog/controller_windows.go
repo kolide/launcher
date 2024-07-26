@@ -156,7 +156,8 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	// we don't alter watchdog installation (install or remove) if this is a non-prod deployment
 	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
 		wc.slogger.Log(ctx, slog.LevelDebug,
-			"skipping ServiceEnabledChanged for launcher watchdog",
+			"skipping ServiceEnabledChanged for launcher watchdog in non-prod environment",
+			"server_url", wc.knapsack.KolideServerURL(),
 			"enabled", enabled,
 		)
 
