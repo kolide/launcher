@@ -27,6 +27,7 @@ const (
 	tagBooleanObject uint32 = 0xffff000a
 	tagStringObject  uint32 = 0xffff000b
 	tagEndOfKeys     uint32 = 0xffff0013
+	tagFloatMax      uint32 = 0xfff00000
 )
 
 // deserializeFirefox deserializes a JS object that has been stored by Firefox
@@ -151,7 +152,13 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tagNull, tagUndefined:
 			resultObj[nextKeyStr] = nil
 		default:
-			return nil, fmt.Errorf("cannot process object key `%s`: unknown tag type `%x` with data `%d`", nextKeyStr, valTag, valData)
+			if valTag < tagFloatMax {
+				// We want to reinterpret (valTag, valData) as a single double value instead
+				d := uint64(valData) | uint64(valTag)<<32
+				resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
+			} else {
+				return nil, fmt.Errorf("cannot process object key `%s`: unknown tag type `%x` with data `%d`", nextKeyStr, valTag, valData)
+			}
 		}
 	}
 
