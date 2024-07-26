@@ -118,6 +118,12 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 			return obj, nil
 		}
 
+		// Handle unexpected tokens here. Likely, if we run into this issue, we've
+		// already committed an error when parsing.
+		if objPropertyStart != tokenAsciiStr && objPropertyStart != tokenUtf16Str {
+			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
+		}
+
 		// Now read the length of the object property name string
 		objPropertyNameLen, err := binary.ReadUvarint(srcReader)
 		if err != nil {
@@ -313,9 +319,8 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	// Read from srcReader until we've filled the array to the correct size.
-	arrItems := make([]any, arrayLen)
+	arrItems := make([]any, 0)
 	reachedEndOfArray := false
-	i := 0
 	for {
 		if reachedEndOfArray {
 			break
@@ -330,15 +335,15 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 		case tokenObjectBegin:
 			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("decoding object in array: %w", err)
+				return nil, fmt.Errorf("decoding object in array of length %d: %w", arrayLen, err)
 			}
-			arrItems[i] = string(obj) // cast to string so it's readable when marshalled again below
+			arrItems = append(arrItems, string(obj)) // cast to string so it's readable when marshalled again below
 		case tokenAsciiStr:
 			str, err := deserializeAsciiStr(srcReader)
 			if err != nil {
-				return nil, fmt.Errorf("decoding string in array: %w", err)
+				return nil, fmt.Errorf("decoding string in array of length %d: %w", arrayLen, err)
 			}
-			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
+			arrItems = append(arrItems, string(str)) // cast to string so it's readable when marshalled again below
 		case tokenEndDenseArray:
 			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
@@ -349,12 +354,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
-		}
-
-		i += 1
-		if i >= int(arrayLen) {
-			reachedEndOfArray = true
+			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s` in array of length %d", nextByte, string(nextByte), arrayLen)
 		}
 	}
 
