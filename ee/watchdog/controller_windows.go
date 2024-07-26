@@ -96,6 +96,11 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		return
 	}
 
+	// we don't install watchdog for non-prod deployments, so we should also skip log publication
+	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
+		return
+	}
+
 	logsToDelete := make([]any, 0)
 
 	if err := wc.logPublisher.ForEach(func(rowid, timestamp int64, v []byte) error {
