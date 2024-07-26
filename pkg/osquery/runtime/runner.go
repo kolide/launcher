@@ -468,6 +468,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 	span.AddEvent("extension_client_created")
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"osquery extension client created",
+	)
 
 	if len(o.opts.extensionPlugins) > 0 {
 		if err := o.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, o.extensionManagerClient, o.opts.extensionPlugins); err != nil {
@@ -480,6 +483,9 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 		span.AddEvent("extension_server_created")
 	}
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"osquery extension manager server created",
+	)
 
 	// Now spawn an extension manager for the tables. We need to
 	// start this one in the background, because the runner.Start
