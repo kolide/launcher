@@ -170,7 +170,7 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	w.systemSlogger.Log(ctx, slog.LevelInfo,
 		"windows service starting",
 	)
-	// after this point windows service control manager will know that we've' successfully started,
+	// after this point windows service control manager will know that we've successfully started,
 	// it is safe to begin longer running operations
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
