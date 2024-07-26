@@ -494,7 +494,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("runner logs: %s", logBytes.String()))
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs: %s", time.Now().String(), logBytes.String()))
 
 	// Give the instance just a little bit of buffer before we proceed
 	time.Sleep(2 * time.Second)
