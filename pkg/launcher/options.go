@@ -627,3 +627,9 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 }
+
+// IsKolideHostedServerURL is a convenience function to enable gating functionality for
+// developer (or other non-production) deployments
+func IsKolideHostedServerURL(serverURL string) bool {
+	return serverURL == "k2device.kolide.com" || serverURL == "k2device-preprod.kolide.com"
+}

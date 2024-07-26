@@ -153,6 +153,16 @@ func (wc *WatchdogController) Interrupt(_ error) {
 
 func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	ctx := context.TODO()
+	// we don't alter watchdog installation (install or remove) if this is a non-prod deployment
+	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
+		wc.slogger.Log(ctx, slog.LevelDebug,
+			"skipping ServiceEnabledChanged for launcher watchdog",
+			"enabled", enabled,
+		)
+
+		return
+	}
+
 	var serviceManager *mgr.Mgr
 	var err error
 
