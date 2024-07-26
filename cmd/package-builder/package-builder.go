@@ -79,6 +79,8 @@ func runMake(args []string) error {
 			env.String("LAUNCHER_VERSION", "stable"),
 			"What TUF channel to download launcher from. Supports filesystem paths",
 		)
+		// flLauncherArmVersion primarily exists to be able to provide the path to a local launcher binary
+		// for testing
 		flLauncherArmVersion = flagset.String(
 			"launcher_arm_version",
 			env.String("LAUNCHER_ARM_VERSION", "stable"),
