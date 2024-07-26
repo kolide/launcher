@@ -377,6 +377,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	span.AddEvent("socket_created")
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"osquery socket created",
+	)
 
 	stats, err := history.NewInstance()
 	if err != nil {
