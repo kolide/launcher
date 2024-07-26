@@ -518,6 +518,9 @@ func (r *Runner) launchOsqueryInstance() error {
 			"err", err,
 		)
 	}
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"osquery instance connected",
+	)
 
 	// Health check on interval
 	o.errgroup.Go(func() error {
