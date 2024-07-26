@@ -31,6 +31,14 @@ const serviceName = "launcher"
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
+// This method is responsible for calling svc.Run, which eventually translates into the
+// Execute function below. Each device has a global ServicesPipeTimeout value (typically at
+// 30-45 seconds but depends on the configuration of the device). We have that many seconds
+// to get from here to the point in Execute where we return a service status of Running before
+// service control manager will consider the start attempt to have timed out, cancel it,
+// and proceed without attempting restart.
+// Wherever possible, we should keep any connections or timely operations out of this method,
+// and ensure they are added late enough in Execute to avoid hitting this timeout.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"service start requested",
@@ -64,9 +72,6 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
 	}
-
-	// Confirm that service configuration is up-to-date
-	checkServiceConfiguration(localSlogger.Logger, opts)
 
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"launching service",
@@ -162,10 +167,16 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
+
 	w.systemSlogger.Log(ctx, slog.LevelInfo,
 		"windows service starting",
 	)
+	// after this point windows service control manager will know that we've' successfully started,
+	// it is safe to begin longer running operations
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+
+	// Confirm that service configuration is up-to-date
+	go checkServiceConfiguration(w.slogger.Logger, w.opts)
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 	runLauncherResults := make(chan struct{})
