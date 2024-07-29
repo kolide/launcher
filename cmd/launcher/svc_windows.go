@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -40,20 +41,23 @@ const serviceName = "launcher"
 // Wherever possible, we should keep any connections or timely operations out of this method,
 // and ensure they are added late enough in Execute to avoid hitting this timeout.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
-	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+	ctx, startupSpan := traces.StartSpan(context.Background())
+
+	systemSlogger.Log(ctx, slog.LevelInfo,
 		"service start requested",
 		"version", version.Version().Version,
 	)
 
 	opts, err := launcher.ParseOptions("", os.Args[2:])
 	if err != nil {
-		systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		systemSlogger.Log(ctx, slog.LevelInfo,
 			"error parsing options",
 			"err", err,
 		)
 		return fmt.Errorf("parsing options: %w", err)
 	}
 
+	startupSpan.AddEvent("logger_setup_init")
 	localSlogger := multislogger.New()
 	logger := log.NewNopLogger()
 
@@ -73,7 +77,9 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		systemSlogger.AddHandler(localSloggerHandler)
 	}
 
-	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+	startupSpan.AddEvent("logger_setup_completed")
+
+	systemSlogger.Log(ctx, slog.LevelInfo,
 		"launching service",
 		"version", version.Version().Version,
 	)
@@ -81,12 +87,12 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			systemSlogger.Log(context.TODO(), slog.LevelInfo,
+			systemSlogger.Log(ctx, slog.LevelInfo,
 				"panic occurred in windows service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				systemSlogger.Log(context.TODO(), slog.LevelInfo,
+				systemSlogger.Log(ctx, slog.LevelInfo,
 					"panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)
@@ -94,6 +100,8 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 			time.Sleep(time.Second)
 		}
 	}()
+
+	startupSpan.End()
 
 	if err := svc.Run(serviceName, &winSvc{
 		logger:        logger,
@@ -104,7 +112,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		// TODO The caller doesn't have the event log configured, so we
 		// need to log here. this implies we need some deeper refactoring
 		// of the logging
-		systemSlogger.Log(context.TODO(), slog.LevelInfo,
+		systemSlogger.Log(ctx, slog.LevelInfo,
 			"error in service run",
 			"err", err,
 		)
@@ -112,7 +120,7 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		return err
 	}
 
-	systemSlogger.Log(context.TODO(), slog.LevelInfo,
+	systemSlogger.Log(ctx, slog.LevelInfo,
 		"service exited",
 	)
 
