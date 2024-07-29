@@ -31,7 +31,7 @@ const (
 
 func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	// If this isn't a Kolide installation, do not update the configuration
-	if opts.KolideServerURL != "k2device.kolide.com" && opts.KolideServerURL != "k2device-preprod.kolide.com" {
+	if !launcher.IsKolideHostedServerURL(opts.KolideServerURL) {
 		return
 	}
 
