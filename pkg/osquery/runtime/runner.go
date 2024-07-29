@@ -65,6 +65,10 @@ func (r *Runner) Run() error {
 	// Ensure we don't try to restart the instance before it's launched
 	r.instanceLock.Lock()
 	if err := r.launchOsqueryInstance(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to launch osquery instance",
+			"err", err,
+		)
 		r.instanceLock.Unlock()
 		return fmt.Errorf("starting instance: %w", err)
 	}
@@ -387,6 +391,10 @@ func (r *Runner) launchOsqueryInstance() error {
 			"could not create new osquery instance history",
 			"err", err,
 		)
+	} else {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"created osquery instance version history",
+		)
 	}
 	o.stats = stats
 
@@ -468,6 +476,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
+		r.slogger.Log(ctx, slog.LevelError,
+			"error creating extension client",
+			"err", err,
+		)
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 	span.AddEvent("extension_client_created")
