@@ -79,12 +79,15 @@ func runMake(args []string) error {
 			env.String("LAUNCHER_VERSION", "stable"),
 			"What TUF channel to download launcher from. Supports filesystem paths",
 		)
-		// flLauncherArmVersion primarily exists to be able to provide the path to a local launcher arm binary
-		// for testing
-		flLauncherArmVersion = flagset.String(
-			"launcher_arm_version",
+		flLauncherPath = flagset.String(
+			"launcher_path",
 			"",
-			"What TUF channel to download launcher from for ARM. Supports filesystem paths, defaults to value of launcher_version",
+			"Path of local launcher binary to use in packaging",
+		)
+		flLauncherArmPath = flagset.String(
+			"launcher_arm_path",
+			"",
+			"Path of local launcher arm64 binary to use in packaging",
 		)
 		flExtensionVersion = flagset.String(
 			"extension_version",
@@ -237,35 +240,34 @@ func runMake(args []string) error {
 	}
 
 	packageOptions := packaging.PackageOptions{
-		PackageVersion:     *flPackageVersion,
-		OsqueryVersion:     *flOsqueryVersion,
-		OsqueryFlags:       flOsqueryFlags,
-		LauncherVersion:    *flLauncherVersion,
-		LauncherArmVersion: *flLauncherArmVersion,
-		ExtensionVersion:   *flExtensionVersion,
-		Hostname:           *flHostname,
-		Secret:             *flEnrollSecret,
-		AppleSigningKey:    *flSigningKey,
-		Transport:          *flTransport,
-		Insecure:           *flInsecure,
-		InsecureTransport:  *flInsecureTransport,
-		UpdateChannel:      *flUpdateChannel,
-		InitialRunner:      *flInitialRunner,
-		Identifier:         *flIdentifier,
-		OmitSecret:         *flOmitSecret,
-		CertPins:           *flCertPins,
-		RootPEM:            *flRootPEM,
-		BinRootDir:         *flBinRootDir,
-		CacheDir:           cacheDir,
-		TufServerURL:       *flTufURL,
-		MirrorURL:          *flMirrorURL,
-		WixPath:            *flWixPath,
-		WixSkipCleanup:     *flWixSkipCleanup,
-		DisableService:     *flDisableService,
-	}
-
-	if packageOptions.LauncherArmVersion == "" {
-		packageOptions.LauncherArmVersion = packageOptions.LauncherVersion
+		PackageVersion:  *flPackageVersion,
+		OsqueryVersion:  *flOsqueryVersion,
+		OsqueryFlags:    flOsqueryFlags,
+		LauncherVersion: *flLauncherVersion,
+		LauncherPath:    *flLauncherPath,
+		// LauncherArmPath can be used for windows arm64 packages when you want
+		// to specify a local path to the launcher binary
+		LauncherArmPath:   *flLauncherArmPath,
+		ExtensionVersion:  *flExtensionVersion,
+		Hostname:          *flHostname,
+		Secret:            *flEnrollSecret,
+		AppleSigningKey:   *flSigningKey,
+		Transport:         *flTransport,
+		Insecure:          *flInsecure,
+		InsecureTransport: *flInsecureTransport,
+		UpdateChannel:     *flUpdateChannel,
+		InitialRunner:     *flInitialRunner,
+		Identifier:        *flIdentifier,
+		OmitSecret:        *flOmitSecret,
+		CertPins:          *flCertPins,
+		RootPEM:           *flRootPEM,
+		BinRootDir:        *flBinRootDir,
+		CacheDir:          cacheDir,
+		TufServerURL:      *flTufURL,
+		MirrorURL:         *flMirrorURL,
+		WixPath:           *flWixPath,
+		WixSkipCleanup:    *flWixSkipCleanup,
+		DisableService:    *flDisableService,
 	}
 
 	outputDir := *flOutputDir

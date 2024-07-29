@@ -66,7 +66,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 
 	checkRestartActions(logger)
 
-	setRecoveryActions(logger)
+	setRecoveryActions(context.TODO(), logger)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -190,7 +190,7 @@ func checkRestartActions(logger *slog.Logger) {
 
 // setRecoveryActions sets the recovery actions for the launcher service.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
-func setRecoveryActions(logger *slog.Logger) {
+func setRecoveryActions(_ context.Context, logger *slog.Logger) {
 	sman, err := mgr.Connect()
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,

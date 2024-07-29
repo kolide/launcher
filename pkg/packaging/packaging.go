@@ -32,32 +32,33 @@ const (
 // PackageOptions encapsulates the launcher build options. It's
 // populated by callers, such as command line flags. It may change.
 type PackageOptions struct {
-	PackageVersion     string // What version in this package. If unset, autodetection will be attempted.
-	OsqueryVersion     string
-	OsqueryFlags       []string // Additional flags to pass to the runtime osquery instance
-	LauncherVersion    string
-	LauncherArmVersion string
-	ExtensionVersion   string
-	Hostname           string
-	Secret             string
-	Transport          string
-	Insecure           bool
-	InsecureTransport  bool
-	UpdateChannel      string
-	InitialRunner      bool
-	Identifier         string
-	Title              string
-	OmitSecret         bool
-	CertPins           string
-	RootPEM            string
-	BinRootDir         string
-	CacheDir           string
-	TufServerURL       string
-	MirrorURL          string
-	WixPath            string
-	MSIUI              bool
-	WixSkipCleanup     bool
-	DisableService     bool
+	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
+	OsqueryVersion    string
+	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
+	LauncherVersion   string
+	LauncherPath      string
+	LauncherArmPath   string
+	ExtensionVersion  string
+	Hostname          string
+	Secret            string
+	Transport         string
+	Insecure          bool
+	InsecureTransport bool
+	UpdateChannel     string
+	InitialRunner     bool
+	Identifier        string
+	Title             string
+	OmitSecret        bool
+	CertPins          string
+	RootPEM           string
+	BinRootDir        string
+	CacheDir          string
+	TufServerURL      string
+	MirrorURL         string
+	WixPath           string
+	MSIUI             bool
+	WixSkipCleanup    bool
+	DisableService    bool
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
@@ -214,7 +215,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("fetching binary osqueryd: %w", err)
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherVersion); err != nil {
+	launcherVersion := p.LauncherVersion
+	if p.LauncherPath != "" {
+		launcherVersion = p.LauncherPath
+	}
+
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
 		return fmt.Errorf("fetching binary launcher: %w", err)
 	}
 
@@ -228,7 +234,12 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			return fmt.Errorf("fetching binary osqueryd: %w", err)
 		}
 
-		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), packageOptsCopy.LauncherArmVersion); err != nil {
+		launcherVersion := packageOptsCopy.LauncherVersion
+		if packageOptsCopy.LauncherArmPath != "" {
+			launcherVersion = packageOptsCopy.LauncherArmPath
+		}
+
+		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
 			return fmt.Errorf("fetching binary launcher: %w", err)
 		}
 	}

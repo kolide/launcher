@@ -162,6 +162,12 @@ func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts .
 // Cleanup removes temp directories. Meant to be called in a defer.
 func (wo *wixTool) Cleanup() {
 	if wo.skipCleanup {
+
+		fmt.Print("skipping cleanup of temp directories\n")
+		for _, d := range wo.cleanDirs {
+			fmt.Printf("skipping cleanup of %s\n", d)
+		}
+
 		return
 	}
 
