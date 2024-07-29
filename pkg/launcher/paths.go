@@ -93,7 +93,7 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 	}
 
 	// don't mess with the path if this installation isn't pointing to a kolide server URL
-	if kolideServerURL != "k2device.kolide.com" && kolideServerURL != "k2device-preprod.kolide.com" {
+	if !IsKolideHostedServerURL(kolideServerURL) {
 		return optsRootDirectory
 	}
 
