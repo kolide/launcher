@@ -83,7 +83,7 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 
 		switch nextByte {
 		case tokenVersion:
-			version, err = binary.ReadUvarint(srcReader)
+			version, err = readVersion(srcReader)
 			if err != nil {
 				return 0, fmt.Errorf("decoding uint32: %w", err)
 			}
@@ -95,6 +95,10 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 			continue
 		}
 	}
+}
+
+func readVersion(srcReader io.ByteReader) (uint64, error) {
+	return binary.ReadUvarint(srcReader)
 }
 
 // deserializeObject deserializes the next object from the srcReader.
@@ -121,6 +125,24 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		// Handle unexpected tokens here. Likely, if we run into this issue, we've
 		// already committed an error when parsing.
 		if objPropertyStart != tokenAsciiStr && objPropertyStart != tokenUtf16Str {
+			// We shouldn't have a version tag inside an object, but we're seeing it happen occasionally --
+			// gather additional data about the error.
+			if objPropertyStart == tokenVersion {
+				version, versionReadErr := readVersion(srcReader)
+				nextToken, err := nextNonPaddingByte(srcReader)
+				slogger.Log(ctx, slog.LevelWarn,
+					"got version token instead of string when attempting to read object property name",
+					"version", version,
+					"version_read_err", versionReadErr,
+					"next_token", fmt.Sprintf("%02x", nextToken),
+					"err", err,
+				)
+				// The only valid state where we could possibly attempt to continue parsing
+				if nextToken == tokenObjectBegin {
+					continue
+				}
+				return obj, fmt.Errorf("object property name has unexpected non-string type 0xff (version tag) with version %d, followed by tag %02x", version, nextToken)
+			}
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
 		}
 
