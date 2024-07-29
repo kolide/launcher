@@ -83,7 +83,7 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 
 		switch nextByte {
 		case tokenVersion:
-			version, err = readVersion(srcReader)
+			version, err = binary.ReadUvarint(srcReader)
 			if err != nil {
 				return 0, fmt.Errorf("decoding uint32: %w", err)
 			}
@@ -95,10 +95,6 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 			continue
 		}
 	}
-}
-
-func readVersion(srcReader io.ByteReader) (uint64, error) {
-	return binary.ReadUvarint(srcReader)
 }
 
 // deserializeObject deserializes the next object from the srcReader.
@@ -114,56 +110,37 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
 		}
-		// No more properties. We've reached the end of the object -- return.
-		if objPropertyStart == tokenObjectEnd {
+
+		var currentPropertyName string
+		switch objPropertyStart {
+		case tokenObjectEnd:
+			// No more properties. We've reached the end of the object -- return.
 			// The next byte is `properties_written`, which we don't care about -- read it
 			// so it doesn't affect future parsing.
 			_, _ = srcReader.ReadByte()
 			return obj, nil
-		}
-
-		// Handle unexpected tokens here. Likely, if we run into this issue, we've
-		// already committed an error when parsing.
-		if objPropertyStart != tokenAsciiStr && objPropertyStart != tokenUtf16Str {
-			// We shouldn't have a version tag inside an object, but we're seeing it happen occasionally --
-			// gather additional data about the error.
-			if objPropertyStart == tokenVersion {
-				version, versionReadErr := readVersion(srcReader)
-				nextToken, err := nextNonPaddingByte(srcReader)
-				slogger.Log(ctx, slog.LevelWarn,
-					"got version token instead of string when attempting to read object property name",
-					"version", version,
-					"version_read_err", versionReadErr,
-					"next_token", fmt.Sprintf("%02x", nextToken),
-					"err", err,
-				)
-				// The only valid state where we could possibly attempt to continue parsing
-				if nextToken == tokenObjectBegin {
-					continue
-				}
-				return obj, fmt.Errorf("object property name has unexpected non-string type 0xff (version tag) with version %d, followed by tag %02x", version, nextToken)
+		case tokenAsciiStr:
+			objectPropertyNameBytes, err := deserializeAsciiStr(srcReader)
+			if err != nil {
+				return obj, fmt.Errorf("deserializing object property ascii string: %w", err)
 			}
+			currentPropertyName = string(objectPropertyNameBytes)
+		case tokenUtf16Str:
+			objectPropertyNameBytes, err := deserializeUtf16Str(srcReader)
+			if err != nil {
+				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
+			}
+			currentPropertyName = string(objectPropertyNameBytes)
+		default:
+			// Handle unexpected tokens here. Likely, if we run into this issue, we've
+			// already committed an error when parsing.
+			slogger.Log(ctx, slog.LevelWarn,
+				"object property name has unexpected non-string type",
+				"tag", fmt.Sprintf("%02x", objPropertyStart),
+				"current_object_size", len(obj),
+			)
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
 		}
-
-		// Now read the length of the object property name string
-		objPropertyNameLen, err := binary.ReadUvarint(srcReader)
-		if err != nil {
-			return obj, fmt.Errorf("reading uvarint: %w", err)
-		}
-
-		// Now read the next `strLen` bytes as the object property name.
-		objPropertyBytes := make([]byte, objPropertyNameLen)
-		for i := 0; i < int(objPropertyNameLen); i += 1 {
-			nextByte, err := srcReader.ReadByte()
-			if err != nil {
-				return obj, fmt.Errorf("reading next byte in object property name string of length %d: %w; partial object property name: `%s`", objPropertyNameLen, err, string(objPropertyBytes))
-			}
-
-			objPropertyBytes[i] = nextByte
-		}
-
-		currentPropertyName := string(objPropertyBytes)
 
 		// Now process the object property's value. The next byte will tell us its type.
 		nextByte, err := nextNonPaddingByte(srcReader)
