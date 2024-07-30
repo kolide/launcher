@@ -142,6 +142,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				objKeys[i] = k
 				i++
 			}
+			nextByte, err := srcReader.ReadByte() // peek ahead to see if next byte gives us useful information
 			slogger.Log(ctx, slog.LevelWarn,
 				"object property name has unexpected non-string type",
 				"tag", fmt.Sprintf("%02x", objPropertyStart),
@@ -149,6 +150,8 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"current_obj_properties", strings.Join(objKeys, ","),
 				"unread_byte_count", srcReader.Len(),
 				"total_byte_count", srcReader.Size(),
+				"next_byte", fmt.Sprintf("%02x", nextByte),
+				"next_byte_read_err", err,
 			)
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
 		}
