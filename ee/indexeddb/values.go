@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -70,7 +71,7 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 // readHeader reads through the header bytes at the start of `srcReader`.
 // It parses the version, if found. It stops as soon as it reaches the first
 // object reference.
-func readHeader(srcReader io.ByteReader) (uint64, error) {
+func readHeader(srcReader *bytes.Reader) (uint64, error) {
 	var version uint64
 	for {
 		nextByte, err := srcReader.ReadByte()
@@ -98,7 +99,7 @@ func readHeader(srcReader io.ByteReader) (uint64, error) {
 }
 
 // deserializeObject deserializes the next object from the srcReader.
-func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) (map[string][]byte, error) {
+func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) (map[string][]byte, error) {
 	obj := make(map[string][]byte)
 
 	for {
@@ -133,11 +134,24 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 			currentPropertyName = string(objectPropertyNameBytes)
 		default:
 			// Handle unexpected tokens here. Likely, if we run into this issue, we've
-			// already committed an error when parsing.
+			// already committed an error when parsing. Collect as much information as
+			// we can, so that we can use logs to troubleshoot the issue.
+			i := 0
+			objKeys := make([]string, len(obj))
+			for k := range obj {
+				objKeys[i] = k
+				i++
+			}
+			nextByte, err := srcReader.ReadByte() // peek ahead to see if next byte gives us useful information
 			slogger.Log(ctx, slog.LevelWarn,
 				"object property name has unexpected non-string type",
 				"tag", fmt.Sprintf("%02x", objPropertyStart),
 				"current_object_size", len(obj),
+				"current_obj_properties", strings.Join(objKeys, ","),
+				"unread_byte_count", srcReader.Len(),
+				"total_byte_count", srcReader.Size(),
+				"next_byte", fmt.Sprintf("%02x", nextByte),
+				"next_byte_read_err", err,
 			)
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
 		}
@@ -211,7 +225,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 
 // nextNonPaddingByte reads from srcReader and discards `tokenPadding` until
 // it reaches the next non-padded byte.
-func nextNonPaddingByte(srcReader io.ByteReader) (byte, error) {
+func nextNonPaddingByte(srcReader *bytes.Reader) (byte, error) {
 	for {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
@@ -228,7 +242,7 @@ func nextNonPaddingByte(srcReader io.ByteReader) (byte, error) {
 }
 
 // deserializeSparseArray deserializes the next sparse array from the srcReader.
-func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
+func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -310,7 +324,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 
 // deserializeDenseArray deserializes the next dense array from the srcReader.
 // Dense arrays are arrays of items that are NOT paired with indices, as in sparse arrays.
-func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
+func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	// After an array start, the next byte will be the length of the array.
 	arrayLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
@@ -365,7 +379,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	return arrBytes, nil
 }
 
-func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader io.ByteReader) ([]byte, error) {
+func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	nestedObj, err := deserializeObject(ctx, slogger, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
@@ -386,7 +400,7 @@ func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReade
 }
 
 // deserializeAsciiStr handles the upcoming ascii string in srcReader.
-func deserializeAsciiStr(srcReader io.ByteReader) ([]byte, error) {
+func deserializeAsciiStr(srcReader *bytes.Reader) ([]byte, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading uvarint: %w", err)
@@ -406,7 +420,7 @@ func deserializeAsciiStr(srcReader io.ByteReader) ([]byte, error) {
 }
 
 // deserializeUtf16Str handles the upcoming utf-16 string in srcReader.
-func deserializeUtf16Str(srcReader io.ByteReader) ([]byte, error) {
+func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	strLen, err := binary.ReadUvarint(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading uvarint: %w", err)

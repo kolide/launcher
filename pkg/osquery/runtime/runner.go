@@ -65,6 +65,10 @@ func (r *Runner) Run() error {
 	// Ensure we don't try to restart the instance before it's launched
 	r.instanceLock.Lock()
 	if err := r.launchOsqueryInstance(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to launch osquery instance",
+			"err", err,
+		)
 		r.instanceLock.Unlock()
 		return fmt.Errorf("starting instance: %w", err)
 	}
@@ -377,6 +381,9 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 
 	span.AddEvent("socket_created")
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"osquery socket created",
+	)
 
 	stats, err := history.NewInstance()
 	if err != nil {

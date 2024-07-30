@@ -487,14 +487,17 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 			return fmt.Errorf("instance not healthy: %w", err)
 		}
 
-		// Confirms osquery instance setup is complete
-		if runner.instance != nil && runner.instance.stats.ConnectTime == "" {
+		// Confirm osquery instance setup is complete
+		if runner.instance == nil {
+			return errors.New("instance does not exist yet")
+		}
+		if runner.instance.stats.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("runner logs: %s", logBytes.String()))
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs: %s", time.Now().String(), logBytes.String()))
 
 	// Give the instance just a little bit of buffer before we proceed
 	time.Sleep(2 * time.Second)
