@@ -307,7 +307,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 				}
 
 				// create a condition based on architecture
-				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", currentArchSpecificBinDir))
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
 				heatWrite.WriteString("\n")
 			}
 		}
