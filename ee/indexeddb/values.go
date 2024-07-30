@@ -110,38 +110,37 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader io.B
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
 		}
-		// No more properties. We've reached the end of the object -- return.
-		if objPropertyStart == tokenObjectEnd {
+
+		var currentPropertyName string
+		switch objPropertyStart {
+		case tokenObjectEnd:
+			// No more properties. We've reached the end of the object -- return.
 			// The next byte is `properties_written`, which we don't care about -- read it
 			// so it doesn't affect future parsing.
 			_, _ = srcReader.ReadByte()
 			return obj, nil
-		}
-
-		// Handle unexpected tokens here. Likely, if we run into this issue, we've
-		// already committed an error when parsing.
-		if objPropertyStart != tokenAsciiStr && objPropertyStart != tokenUtf16Str {
+		case tokenAsciiStr:
+			objectPropertyNameBytes, err := deserializeAsciiStr(srcReader)
+			if err != nil {
+				return obj, fmt.Errorf("deserializing object property ascii string: %w", err)
+			}
+			currentPropertyName = string(objectPropertyNameBytes)
+		case tokenUtf16Str:
+			objectPropertyNameBytes, err := deserializeUtf16Str(srcReader)
+			if err != nil {
+				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
+			}
+			currentPropertyName = string(objectPropertyNameBytes)
+		default:
+			// Handle unexpected tokens here. Likely, if we run into this issue, we've
+			// already committed an error when parsing.
+			slogger.Log(ctx, slog.LevelWarn,
+				"object property name has unexpected non-string type",
+				"tag", fmt.Sprintf("%02x", objPropertyStart),
+				"current_object_size", len(obj),
+			)
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
 		}
-
-		// Now read the length of the object property name string
-		objPropertyNameLen, err := binary.ReadUvarint(srcReader)
-		if err != nil {
-			return obj, fmt.Errorf("reading uvarint: %w", err)
-		}
-
-		// Now read the next `strLen` bytes as the object property name.
-		objPropertyBytes := make([]byte, objPropertyNameLen)
-		for i := 0; i < int(objPropertyNameLen); i += 1 {
-			nextByte, err := srcReader.ReadByte()
-			if err != nil {
-				return obj, fmt.Errorf("reading next byte in object property name string of length %d: %w; partial object property name: `%s`", objPropertyNameLen, err, string(objPropertyBytes))
-			}
-
-			objPropertyBytes[i] = nextByte
-		}
-
-		currentPropertyName := string(objPropertyBytes)
 
 		// Now process the object property's value. The next byte will tell us its type.
 		nextByte, err := nextNonPaddingByte(srcReader)
