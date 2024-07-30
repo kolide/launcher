@@ -472,10 +472,6 @@ func (r *Runner) launchOsqueryInstance() error {
 	o.extensionManagerClient, err = o.StartOsqueryClient(paths)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
-		r.slogger.Log(ctx, slog.LevelError,
-			"error creating extension client",
-			"err", err,
-		)
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 	span.AddEvent("extension_client_created")
