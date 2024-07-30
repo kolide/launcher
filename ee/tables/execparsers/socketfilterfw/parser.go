@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var lineRegex = regexp.MustCompile("(state|block|signed|stealth|log mode|log option)(?:.*\\s)([0-9a-z]+)")
+var lineRegex = regexp.MustCompile("(state|block|built-in|downloaded|stealth|log mode|log option)(?:.*\\s)([0-9a-z]+)")
 var disabledStateRegex = regexp.MustCompile("(0|off|disabled)")
 
 // socketfilterfw returns lines for each `get` argument supplied.
@@ -37,8 +37,10 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 			key = "global_state_enabled"
 		case "block":
 			key = "block_all_enabled"
-		case "signed":
-			key = "allow_signed_enabled"
+		case "built-in":
+			key = "allow_built-in_signed_enabled"
+		case "downloaded":
+			key = "allow_downloaded_signed_enabled"
 		case "stealth":
 			key = "stealth_enabled"
 		case "log mode":
@@ -57,7 +59,9 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 
 	// There should only be one row of data for application firewall,
 	// so this append is slightly awkward but should be fine.
-	results = append(results, row)
+	if len(row) > 0 {
+		results = append(results, row)
+	}
 
 	return results, nil
 }
