@@ -11,7 +11,7 @@ rtadvd (state: 1)
 com.docker.backend (state: 1)
 sshd-keygen-wrapper (state: 1)
 
-Automatically allow downloaded signed software ENABLED.
+Automatically allow downloaded signed software DISABLEDENABLED.
 Firewall stealth mode is off
-Log mode is on\r\n\r\n
+Log mode is onr\r\n\r\n
 Log Option is throttled 
