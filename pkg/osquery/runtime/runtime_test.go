@@ -487,7 +487,19 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 			return fmt.Errorf("instance not healthy: %w", err)
 		}
 
-		// Confirms osquery instance setup is complete
+		// Make sure the socket exists
+		if runner.instance == nil {
+			return errors.New("instance does not exist yet")
+		}
+		extensionSocketPath := runner.instance.opts.extensionSocketPath
+		if extensionSocketPath == "" {
+			extensionSocketPath = SocketPath(runner.instance.opts.rootDirectory)
+		}
+		if _, err := os.Stat(extensionSocketPath); err != nil {
+			return fmt.Errorf("could not stat extension socket path %s: %w", extensionSocketPath, err)
+		}
+
+		// Confirm osquery instance setup is complete
 		if runner.instance != nil && runner.instance.stats.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
