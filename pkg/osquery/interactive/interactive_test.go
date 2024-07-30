@@ -9,18 +9,20 @@ package interactive
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -94,31 +96,58 @@ func TestProc(t *testing.T) {
 			rootDir := t.TempDir()
 			require.NoError(t, downloadOsquery(rootDir))
 
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			}))
+
 			mockSack := mocks.NewKnapsack(t)
 			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
-			mockSack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockSack.On("Slogger").Return(slogger)
 			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
-			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
+			store, err := storageci.NewStore(t, slogger, storage.KatcConfigStore.String())
 			require.NoError(t, err)
 			mockSack.On("KatcConfigStore").Return(store)
 
-			proc, _, err := StartProcess(mockSack, rootDir)
+			// Make sure the process starts in a timely fashion
+			var proc *os.Process
+			startErr := make(chan error)
+			go func() {
+				proc, _, err = StartProcess(mockSack, rootDir)
+				startErr <- err
+			}()
 
-			if tt.errContainsStr != "" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errContainsStr)
-			} else {
-				require.NoError(t, err)
+			select {
+			case err := <-startErr:
+				if tt.errContainsStr != "" {
+					require.Error(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
+					require.Contains(t, err.Error(), tt.errContainsStr)
+				} else {
+					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
+				}
+			case <-time.After(2 * time.Minute):
+				t.Error("process did not start before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+				t.FailNow()
 			}
 
 			if tt.wantProc {
-				require.NotNil(t, proc)
+				require.NotNil(t, proc, fmt.Sprintf("logs: %s", logBytes.String()))
 
 				// Wait until proc exits
-				_, err := proc.Wait()
-				if err != nil {
-					require.NoError(t, err)
+				procExitErr := make(chan error)
+				go func() {
+					_, err := proc.Wait()
+					procExitErr <- err
+				}()
+
+				select {
+				case err := <-procExitErr:
+					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
+				case <-time.After(2 * time.Minute):
+					t.Error("process did not exit before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+					t.FailNow()
 				}
 			} else {
 				require.Nil(t, proc)
