@@ -19,6 +19,8 @@ func Test_deserializeIndexeddbValue(t *testing.T) {
 		0x00, // padding, ignore
 		0x00, // padding, ignore
 		0x00, // padding, ignore
+		0xff, // version tag (indicates end of header)
+		0x0f, // version
 		// object
 		0x6f, // object begin
 		0x22, // string tag
@@ -49,9 +51,11 @@ func Test_deserializeIndexeddbValue_InvalidType(t *testing.T) {
 		0x00, // padding, ignore
 		0x00, // padding, ignore
 		0x00, // padding, ignore
+		0xff, // version tag (indicates end of header)
+		0x0f, // version
 		// object
 		0x6f, // object begin
-		0xff, // version tag -- invalid data!
+		0x54, // boolean true tag -- invalid data!
 		0x7b, // object end
 		0x00, // properties_written
 	}
