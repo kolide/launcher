@@ -29,31 +29,31 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
-			name: "apps",
+			name:  "apps",
 			input: apps,
 			expected: []map[string]string{
 				{
-					"name": "replicatord",
+					"name":                       "replicatord",
 					"allow_incoming_connections": "1",
 				},
 				{
-					"name": "Pop Helper.app",
+					"name":                       "Pop Helper.app",
 					"allow_incoming_connections": "0",
 				},
 				{
-					"name": "Google Chrome",
+					"name":                       "Google Chrome",
 					"allow_incoming_connections": "0",
 				},
 				{
-					"name": "rtadvd",
+					"name":                       "rtadvd",
 					"allow_incoming_connections": "1",
 				},
 				{
-					"name": "com.docker.backend",
+					"name":                       "com.docker.backend",
 					"allow_incoming_connections": "1",
 				},
 				{
-					"name": "sshd-keygen-wrapper",
+					"name":                       "sshd-keygen-wrapper",
 					"allow_incoming_connections": "1",
 				},
 			},
