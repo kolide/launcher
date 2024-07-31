@@ -69,8 +69,9 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 }
 
 // readHeader reads through the header bytes at the start of `srcReader`.
-// It parses the version, if found. It stops as soon as it reaches the first
-// object reference.
+// It parses the version, if found. The header always ends with the byte
+// 0xff (tokenVersion), followed by the version (a varint), followed by 0x6f (tokenObjectBegin)
+// -- we stop reading the header at this point.
 func readHeader(srcReader *bytes.Reader) (uint64, error) {
 	var version uint64
 	for {
@@ -84,16 +85,25 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 
 		switch nextByte {
 		case tokenVersion:
+			// Read the version first. It is fine to overwrite version if we saw the version token
+			// before -- the last instance of the version token is the correct one.
 			version, err = binary.ReadUvarint(srcReader)
 			if err != nil {
 				return 0, fmt.Errorf("decoding uint32: %w", err)
 			}
-		case tokenObjectBegin:
-			// Done reading header
-			return version, nil
+
+			// Next, determine whether this is the 0xff token at the end of the header
+			peekByte, err := srcReader.ReadByte()
+			if err != nil {
+				return 0, fmt.Errorf("peeking at next byte after version tag: %w", err)
+			}
+
+			if peekByte == tokenObjectBegin {
+				// Our last two bytes are 0xff 0x6f -- we have completed reading the header.
+				return version, nil
+			}
 		default:
 			// Padding -- ignore
-			continue
 		}
 	}
 }
