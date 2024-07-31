@@ -8,6 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//go:embed test-data/apps.txt
+var apps []byte
+
 //go:embed test-data/data.txt
 var data []byte
 
@@ -26,8 +29,34 @@ func TestParse(t *testing.T) {
 		expected []map[string]string
 	}{
 		{
-			name:  "empty input",
-			input: empty,
+			name: "apps",
+			input: apps,
+			expected: []map[string]string{
+				{
+					"name": "replicatord",
+					"allow_incoming_connections": "1",
+				},
+				{
+					"name": "Pop Helper.app",
+					"allow_incoming_connections": "0",
+				},
+				{
+					"name": "Google Chrome",
+					"allow_incoming_connections": "0",
+				},
+				{
+					"name": "rtadvd",
+					"allow_incoming_connections": "1",
+				},
+				{
+					"name": "com.docker.backend",
+					"allow_incoming_connections": "1",
+				},
+				{
+					"name": "sshd-keygen-wrapper",
+					"allow_incoming_connections": "1",
+				},
+			},
 		},
 		{
 			name:  "data",
@@ -43,6 +72,10 @@ func TestParse(t *testing.T) {
 					"logging_option":                  "throttled",
 				},
 			},
+		},
+		{
+			name:  "empty input",
+			input: empty,
 		},
 		{
 			name:  "malformed",

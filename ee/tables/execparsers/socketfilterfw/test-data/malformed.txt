@@ -3,14 +3,6 @@ Firewall is blocking all non-essential incoming connections.x^CFS.
 %#UO
 Automatically allow built-in signed software DISABLED.
 
-Total number of apps = 6
-replicatord (state: 1)
-Pop Helper.app (state: 1)
-Google Chrome (state: 1)
-rtadvd (state: 1)
-com.docker.backend (state: 1)
-sshd-keygen-wrapper (state: 1)
-
 Automatically allow downloaded signed software DISABLEDENABLED.
 Firewall stealth mode is off
 Log mode is onr\r\n\r\n
