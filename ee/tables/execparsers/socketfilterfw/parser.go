@@ -40,7 +40,7 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 			continue
 		}
 
-		matches := make([]string, 0)
+		var matches []string
 		if parse_app_data {
 			matches = appRegex.FindStringSubmatch(line)
 		} else {
