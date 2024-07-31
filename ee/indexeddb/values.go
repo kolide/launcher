@@ -99,7 +99,7 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 			}
 
 			if peekByte == tokenObjectBegin {
-				// Our last two bytes are 0xff 0x6f -- we have completed reading the header.
+				// We read the version followed by 0x6f -- we have completed reading the header.
 				return version, nil
 			}
 		default:
