@@ -428,7 +428,7 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		if ta.knapsack != nil {
 			latestOsqdPath := ta.knapsack.LatestOsquerydPath(context.TODO())
 			if _, statErr := os.Stat(latestOsqdPath); os.IsNotExist(statErr) {
-				return "", fmt.Errorf("finding current running version: osqueryd binary does not exist")
+				return "", fmt.Errorf("finding current running version: osqueryd binary does not exist at `%s`", latestOsqdPath)
 			}
 		}
 
