@@ -21,7 +21,7 @@ var lineRegex = regexp.MustCompile("(state|block|built-in|downloaded|stealth|log
 func socketfilterfwParse(reader io.Reader) (any, error) {
 	results := make([]map[string]string, 0)
 	row := make(map[string]string)
-	parse_app_data := false
+	parseAppData := false
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -30,55 +30,23 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 		// When parsing the app list, the first line of output is a total
 		// count of apps. We can break on this line to start parsing apps.
 		if strings.Contains(line, "Total number of apps") {
-			parse_app_data = true
+			parseAppData = true
+			continue
+		}
 
-			if len(row) > 0 {
-				results = append(results, row)
-				row = make(map[string]string)
+		if parseAppData {
+			appRow := parseAppList(line)
+			if appRow != nil {
+				results = append(results, appRow)
 			}
 
 			continue
 		}
 
-		var matches []string
-		if parse_app_data {
-			matches = appRegex.FindStringSubmatch(line)
-		} else {
-			matches = lineRegex.FindStringSubmatch(strings.ToLower(line))
+		k, v := parseLine(line)
+		if k != "" {
+			row[k] = v
 		}
-
-		if len(matches) != 3 {
-			continue
-		}
-
-		var key string
-		switch matches[1] {
-		case "state":
-			key = "global_state_enabled"
-		case "block":
-			key = "block_all_enabled"
-		case "built-in":
-			key = "allow_built-in_signed_enabled"
-		case "downloaded":
-			key = "allow_downloaded_signed_enabled"
-		case "stealth":
-			key = "stealth_enabled"
-		case "log mode":
-			key = "logging_enabled"
-		case "log option":
-			key = "logging_option"
-		default:
-			if parse_app_data {
-				row["name"] = matches[1]
-				row["allow_incoming_connections"] = sanitizeState(matches[2])
-				results = append(results, row)
-				row = make(map[string]string)
-			}
-
-			continue
-		}
-
-		row[key] = sanitizeState(matches[2])
 	}
 
 	if len(row) > 0 {
@@ -86,6 +54,52 @@ func socketfilterfwParse(reader io.Reader) (any, error) {
 	}
 
 	return results, nil
+}
+
+// parseAppList parses the current line and returns the app name and
+// state matches as a row of data.
+func parseAppList(line string) map[string]string {
+	matches := appRegex.FindStringSubmatch(line)
+	if len(matches) != 3 {
+		return nil
+	}
+
+	return map[string]string{
+		"name":                       matches[1],
+		"allow_incoming_connections": sanitizeState(matches[2]),
+	}
+}
+
+// parseLine parse the current line and returns a feature key with the
+// respective state/mode of said feature. We want all features to be a
+// part of the same row of data, so we do not return this pair as a row.
+func parseLine(line string) (string, string) {
+	matches := lineRegex.FindStringSubmatch(strings.ToLower(line))
+	if len(matches) != 3 {
+		return "", ""
+	}
+
+	var key string
+	switch matches[1] {
+	case "state":
+		key = "global_state_enabled"
+	case "block":
+		key = "block_all_enabled"
+	case "built-in":
+		key = "allow_built-in_signed_enabled"
+	case "downloaded":
+		key = "allow_downloaded_signed_enabled"
+	case "stealth":
+		key = "stealth_enabled"
+	case "log mode":
+		key = "logging_enabled"
+	case "log option":
+		key = "logging_option"
+	default:
+		return "", ""
+	}
+
+	return key, sanitizeState(matches[2])
 }
 
 // sanitizeState takes in a state like string and returns
