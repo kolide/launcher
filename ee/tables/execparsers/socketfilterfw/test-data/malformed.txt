@@ -1,0 +1,9 @@
+Firewall is enabled. (State %#)*Q&^= 0)
+Firewall is blocking all non-essential incoming connections.x^CFS.
+%#UO
+Automatically allow built-in signed software DISABLED.
+
+Automatically allow downloaded signed software DISABLEDENABLED.
+Firewall stealth mode is off
+Log mode is onr\r\n\r\n
+Log Option is throttled 
