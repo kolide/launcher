@@ -53,8 +53,15 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 	}
 	srcReader := bytes.NewReader(data)
 
-	// First, read through the header to extract top-level data
-	indexeddbVersion, serializerVersion, err := readHeader(srcReader)
+	// First, read the indexeddb version, which precedes the serialized value.
+	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
+	indexeddbVersion, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as indexeddb version: %w", err)
+	}
+
+	// Next, read through the header to extract top-level data
+	serializerVersion, err := readHeader(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading header with indexeddb version %d and serializer version %d: %w", indexeddbVersion, serializerVersion, err)
 	}
@@ -68,26 +75,19 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 	return objData, nil
 }
 
-// readHeader reads through the header bytes at the start of `srcReader`.
-// First is the version for the LevelDB-backed IndexedDB. Next is the header
-// attached to the serialized object. The header always ends with the byte
-// 0xff (tokenVersion), followed by the version (a varint), followed by 0x6f (tokenObjectBegin)
-// -- we stop reading the header at this point.
-func readHeader(srcReader *bytes.Reader) (uint64, uint64, error) {
-	// See: https://github.com/chromium/chromium/blob/master/content/browser/indexed_db/docs/leveldb_coding_scheme.md#object-store-data
-	indexeddbVersion, err := binary.ReadUvarint(srcReader)
-	if err != nil {
-		return 0, 0, fmt.Errorf("reading uvarint as indexeddb version: %w", err)
-	}
-
+// readHeader reads through the header bytes at the start of `srcReader`,
+// after reading the indexeddb version. The header always ends with the byte
+// 0xff (tokenVersion), followed by the serializer version (a varint),
+// followed by 0x6f (tokenObjectBegin) -- we stop reading the header at this point.
+func readHeader(srcReader *bytes.Reader) (uint64, error) {
 	var serializerVersion uint64
 	for {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
 			if err == io.EOF {
-				return indexeddbVersion, serializerVersion, errors.New("unexpected EOF reading header")
+				return serializerVersion, errors.New("unexpected EOF reading header")
 			}
-			return indexeddbVersion, serializerVersion, fmt.Errorf("reading next byte in header: %w", err)
+			return serializerVersion, fmt.Errorf("reading next byte in header: %w", err)
 		}
 
 		switch nextByte {
@@ -96,18 +96,18 @@ func readHeader(srcReader *bytes.Reader) (uint64, uint64, error) {
 			// before -- the last instance of the version token is the correct one.
 			serializerVersion, err = binary.ReadUvarint(srcReader)
 			if err != nil {
-				return indexeddbVersion, serializerVersion, fmt.Errorf("decoding uint32 for version in header: %w", err)
+				return serializerVersion, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
 
 			// Next, determine whether this is the 0xff token at the end of the header
 			peekByte, err := srcReader.ReadByte()
 			if err != nil {
-				return indexeddbVersion, serializerVersion, fmt.Errorf("peeking at next byte after version tag and version: %w", err)
+				return serializerVersion, fmt.Errorf("peeking at next byte after version tag and version: %w", err)
 			}
 
 			if peekByte == tokenObjectBegin {
 				// We read the version followed by 0x6f -- we have completed reading the header.
-				return indexeddbVersion, serializerVersion, nil
+				return serializerVersion, nil
 			}
 		default:
 			// Padding -- ignore
