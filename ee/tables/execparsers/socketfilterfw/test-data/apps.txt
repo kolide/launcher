@@ -1,0 +1,7 @@
+Total number of apps = 6
+replicatord (state: 1)
+Pop Helper.app (state: 4)
+Google Chrome (state: 4)
+rtadvd (state: 1)
+com.docker.backend (state: 1)
+sshd-keygen-wrapper (state: 1)

@@ -423,6 +423,15 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
+		// first verify that the osqueryd binary exists. if it doesn't, there's no reason to wait
+		// for initialization below
+		if ta.knapsack != nil {
+			latestOsqdPath := ta.knapsack.LatestOsquerydPath(context.TODO())
+			if _, statErr := os.Stat(latestOsqdPath); os.IsNotExist(statErr) {
+				return "", fmt.Errorf("finding current running version: osqueryd binary does not exist at `%s`", latestOsqdPath)
+			}
+		}
+
 		// The osqueryd client may not have initialized yet, so retry the version
 		// check a couple times before giving up
 		osquerydVersionCheckRetries := 5

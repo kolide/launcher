@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
 	"github.com/kolide/launcher/ee/tables/execparsers/repcli"
+	"github.com/kolide/launcher/ee/tables/execparsers/socketfilterfw"
 	"github.com/kolide/launcher/ee/tables/execparsers/softwareupdate"
 	"github.com/kolide/launcher/ee/tables/filevault"
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
@@ -123,6 +124,8 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		munki.MunkiReport(),
 		dataflattentable.TablePluginExec(slogger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode", "--getloggingmode", "--getloggingopt"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(slogger, "kolide_socketfilterfw_apps", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--listapps"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
