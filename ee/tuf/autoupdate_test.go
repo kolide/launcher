@@ -76,7 +76,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -177,7 +177,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -260,7 +260,7 @@ func TestExecute_downgrade(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -416,7 +416,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	tufServerUrl, _ := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -477,7 +477,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -613,7 +613,7 @@ func TestDo(t *testing.T) {
 			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 			s := setupStorage(t)
 			// setup fake osqueryd binary to mock file existence for currentRunningVersion
-			fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+			fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 			_, err := os.Create(fakeOsqBinaryPath)
 			require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -686,7 +686,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -771,7 +771,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -853,7 +853,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -920,7 +920,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, pinnedOsquerydVersion)
 	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
@@ -1045,7 +1045,7 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	mockQuerier := newMockQuerier(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	testBinDir := t.TempDir()
-	fakeOsqBinaryPath := filepath.Join(testBinDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testBinDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
@@ -1073,7 +1073,7 @@ func Test_currentRunningVersion_osqueryd_missing_binary(t *testing.T) {
 	testBinDir := t.TempDir()
 	// create a tmp dir to point at but do not populate with osqueryd binary-
 	// we expect to error immediately for the case of a missing osqueryd
-	fakeOsqBinaryPath := filepath.Join(testBinDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testBinDir, "osqueryd")
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
 
 	autoupdater := &TufAutoupdater{
@@ -1114,7 +1114,7 @@ func Test_storeError(t *testing.T) {
 	}))
 	defer testTufServer.Close()
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := filepath.Join(testRootDir, "osqueryd")
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
 	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
