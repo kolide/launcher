@@ -76,9 +76,10 @@ func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string
 }
 
 // readHeader reads through the header bytes at the start of `srcReader`,
-// after reading the indexeddb version. The header always ends with the byte
-// 0xff (tokenVersion), followed by the serializer version (a varint),
-// followed by 0x6f (tokenObjectBegin) -- we stop reading the header at this point.
+// after reading the indexeddb version. The header usually contains
+// 0xff (tokenVersion), followed by the serializer version (a varint).
+// The end of the header is signaled by 0x6f (tokenObjectBegin) -- we stop
+// reading the header at this point.
 func readHeader(srcReader *bytes.Reader) (uint64, error) {
 	var serializerVersion uint64
 	for {
@@ -98,17 +99,9 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 			if err != nil {
 				return serializerVersion, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
-
-			// Next, determine whether this is the 0xff token at the end of the header
-			peekByte, err := srcReader.ReadByte()
-			if err != nil {
-				return serializerVersion, fmt.Errorf("peeking at next byte after version tag and version: %w", err)
-			}
-
-			if peekByte == tokenObjectBegin {
-				// We read the version followed by 0x6f -- we have completed reading the header.
-				return serializerVersion, nil
-			}
+		case tokenObjectBegin:
+			// Done reading header
+			return serializerVersion, nil
 		default:
 			// Padding -- ignore
 		}
