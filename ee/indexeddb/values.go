@@ -78,9 +78,9 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
 			if err == io.EOF {
-				return 0, fmt.Errorf("unexpected EOF reading header")
+				return 0, fmt.Errorf("unexpected EOF reading header: version: %d", version)
 			}
-			return 0, fmt.Errorf("reading next byte: %w", err)
+			return 0, fmt.Errorf("reading next byte in header with version %d: %w", version, err)
 		}
 
 		switch nextByte {
@@ -89,13 +89,13 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 			// before -- the last instance of the version token is the correct one.
 			version, err = binary.ReadUvarint(srcReader)
 			if err != nil {
-				return 0, fmt.Errorf("decoding uint32: %w", err)
+				return 0, fmt.Errorf("decoding uint32 for version in header: %w", err)
 			}
 
 			// Next, determine whether this is the 0xff token at the end of the header
 			peekByte, err := srcReader.ReadByte()
 			if err != nil {
-				return 0, fmt.Errorf("peeking at next byte after version tag: %w", err)
+				return 0, fmt.Errorf("peeking at next byte after version tag and version %d: %w", version, err)
 			}
 
 			if peekByte == tokenObjectBegin {
