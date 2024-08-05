@@ -119,6 +119,10 @@ func Scutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/scutil", arg...)
 }
 
+func Socketfilterfw(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/libexec/ApplicationFirewall/socketfilterfw", arg...)
+}
+
 func Softwareupdate(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/softwareupdate", arg...)
 }

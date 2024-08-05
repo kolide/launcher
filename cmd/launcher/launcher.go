@@ -552,6 +552,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 				"detected missing osqueryd executable, will attempt to download",
 			)
 
+			startupSpan.AddEvent("osqueryd_startup_download_start")
 			// simulate control server request for immediate update, noting to bypass the initial delay window
 			actionReader := strings.NewReader(`{
 				"bypass_initial_delay": true,
@@ -566,6 +567,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 					"err", err,
 				)
 			}
+
+			startupSpan.AddEvent("osqueryd_startup_download_completed")
 		}
 	}
 
