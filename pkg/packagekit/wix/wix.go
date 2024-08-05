@@ -289,6 +289,14 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 				service.serviceInstall.Id = serviceId
 				service.serviceInstall.ServiceConfig.Id = serviceId
 
+				// unfortunately, the UtilServiceConfig uses the name of the launcher service as a primary key
+				// since we have multiple services with the same name, we can't have multiple UtilServiceConfigs
+				// so we are skipping it for arm64 since it's a much smaller portion of our user base. The correct
+				// UtilServiceConfig will set when launcher starts up.
+				if currentArchSpecificBinDir == arm64 {
+					service.serviceInstall.UtilServiceConfig = nil
+				}
+
 				// create a condition based on architecture
 				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
 				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
