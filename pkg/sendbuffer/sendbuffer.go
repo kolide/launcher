@@ -149,6 +149,11 @@ func (sb *SendBuffer) Run(ctx context.Context) error {
 		case <-sb.sendTicker.C:
 			continue
 		case <-ctx.Done():
+			// Send one final batch, if possible, so that we can get logs related to shutdowns
+			time.Sleep(1 * time.Second)
+			if err := sb.sendAndPurge(); err != nil {
+				sb.logger.Log("msg", "failed to send final batch of logs on shutdown", "err", err)
+			}
 			return nil
 		}
 	}
