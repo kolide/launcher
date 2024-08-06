@@ -3,6 +3,7 @@ package wix
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -162,7 +163,10 @@ func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts .
 // Cleanup removes temp directories. Meant to be called in a defer.
 func (wo *wixTool) Cleanup() {
 	if wo.skipCleanup {
-
+		// if the wix_skip_cleanup flag is set, we don't want to clean up the temp directories
+		// this is useful when debugging wix generation
+		// print the directories that would be cleaned up so they can be easily found
+		// and inspected
 		fmt.Print("skipping cleanup of temp directories\n")
 		for _, d := range wo.cleanDirs {
 			fmt.Printf("skipping cleanup of %s\n", d)
@@ -250,7 +254,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 			continue
 		}
 
-		// the directory tag will like like "<Directory Id="xxxx"...>"
+		// the directory tag will look like "<Directory Id="xxxx"...>"
 		// so we just check for the first part of the string
 		if strings.Contains(line, "<Directory") {
 			if strings.Contains(line, string(amd64)) {
@@ -280,7 +284,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 
 			if isMatch {
 				if currentArchSpecificBinDir == none {
-					return fmt.Errorf("service found, but not in a bin directory")
+					return errors.New("service found, but not in a bin directory")
 				}
 
 				// make sure elements are not duplicated in any service

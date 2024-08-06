@@ -190,10 +190,10 @@ func checkRestartActions(logger *slog.Logger) {
 
 // setRecoveryActions sets the recovery actions for the launcher service.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
-func setRecoveryActions(_ context.Context, logger *slog.Logger) {
+func setRecoveryActions(ctx context.Context, logger *slog.Logger) {
 	sman, err := mgr.Connect()
 	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		logger.Log(ctx, slog.LevelError,
 			"connecting to service control manager",
 			"err", err,
 		)
@@ -205,7 +205,7 @@ func setRecoveryActions(_ context.Context, logger *slog.Logger) {
 
 	launcherService, err := sman.OpenService(launcherServiceName)
 	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
+		logger.Log(ctx, slog.LevelError,
 			"opening the launcher service from control manager",
 			"err", err,
 		)
@@ -234,7 +234,7 @@ func setRecoveryActions(_ context.Context, logger *slog.Logger) {
 	}
 
 	if err := launcherService.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
-		logger.Log(context.TODO(), slog.LevelError,
+		logger.Log(ctx, slog.LevelError,
 			"setting RecoveryActions",
 			"err", err,
 		)
