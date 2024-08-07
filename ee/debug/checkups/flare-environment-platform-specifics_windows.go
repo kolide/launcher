@@ -3,6 +3,8 @@
 
 package checkups
 
+import "golang.org/x/sys/windows"
+
 func flareEnvironmentPlatformSpecifics(flareEnv map[string]any) {
-	return
+	flareEnv["invoked_with_elevated_permissions"] = windows.GetCurrentProcessToken().IsElevated()
 }
