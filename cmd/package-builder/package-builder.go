@@ -79,6 +79,16 @@ func runMake(args []string) error {
 			env.String("LAUNCHER_VERSION", "stable"),
 			"What TUF channel to download launcher from. Supports filesystem paths",
 		)
+		flLauncherPath = flagset.String(
+			"launcher_path",
+			"",
+			"Path of local launcher binary to use in packaging",
+		)
+		flLauncherArmPath = flagset.String(
+			"launcher_arm_path",
+			"",
+			"Path of local launcher arm64 binary to use in packaging",
+		)
 		flExtensionVersion = flagset.String(
 			"extension_version",
 			env.String("EXTENSION_VERSION", "stable"),
@@ -230,10 +240,14 @@ func runMake(args []string) error {
 	}
 
 	packageOptions := packaging.PackageOptions{
-		PackageVersion:    *flPackageVersion,
-		OsqueryVersion:    *flOsqueryVersion,
-		OsqueryFlags:      flOsqueryFlags,
-		LauncherVersion:   *flLauncherVersion,
+		PackageVersion:  *flPackageVersion,
+		OsqueryVersion:  *flOsqueryVersion,
+		OsqueryFlags:    flOsqueryFlags,
+		LauncherVersion: *flLauncherVersion,
+		LauncherPath:    *flLauncherPath,
+		// LauncherArmPath can be used for windows arm64 packages when you want
+		// to specify a local path to the launcher binary
+		LauncherArmPath:   *flLauncherArmPath,
 		ExtensionVersion:  *flExtensionVersion,
 		Hostname:          *flHostname,
 		Secret:            *flEnrollSecret,

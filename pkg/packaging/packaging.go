@@ -36,6 +36,8 @@ type PackageOptions struct {
 	OsqueryVersion    string
 	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
 	LauncherVersion   string
+	LauncherPath      string
+	LauncherArmPath   string
 	ExtensionVersion  string
 	Hostname          string
 	Secret            string
@@ -57,12 +59,6 @@ type PackageOptions struct {
 	MSIUI             bool
 	WixSkipCleanup    bool
 	DisableService    bool
-
-	// Normally we'd download the same version we bake into the
-	// autoupdate. But occasionally, it's handy to make a package
-	// with a different version.
-	LauncherDownloadVersionOverride string
-	OsqueryDownloadVersionOverride  string
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
@@ -215,20 +211,37 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization
 	// TODO windows file extensions
-
-	if p.OsqueryDownloadVersionOverride == "" {
-		p.OsqueryDownloadVersionOverride = p.OsqueryVersion
-	}
-	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryDownloadVersionOverride); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
 		return fmt.Errorf("fetching binary osqueryd: %w", err)
 	}
 
-	if p.LauncherDownloadVersionOverride == "" {
-		p.LauncherDownloadVersionOverride = p.LauncherVersion
+	launcherVersion := p.LauncherVersion
+	if p.LauncherPath != "" {
+		launcherVersion = p.LauncherPath
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherDownloadVersionOverride); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
 		return fmt.Errorf("fetching binary launcher: %w", err)
+	}
+
+	// for windows, make a separate target for arm64
+	if p.target.Platform == Windows {
+		// make a copy of P
+		packageOptsCopy := *p
+		packageOptsCopy.target.Arch = Arm64
+
+		if err := packageOptsCopy.getBinary(ctx, "osqueryd", packageOptsCopy.target.PlatformBinaryName("osqueryd"), packageOptsCopy.OsqueryVersion); err != nil {
+			return fmt.Errorf("fetching binary osqueryd: %w", err)
+		}
+
+		launcherVersion := packageOptsCopy.LauncherVersion
+		if packageOptsCopy.LauncherArmPath != "" {
+			launcherVersion = packageOptsCopy.LauncherArmPath
+		}
+
+		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
+			return fmt.Errorf("fetching binary launcher: %w", err)
+		}
 	}
 
 	// Some darwin specific bits
@@ -366,10 +379,15 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
+	binPath := filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	if err := os.MkdirAll(filepath.Dir(binPath), fsutil.DirMode); err != nil {
+		return fmt.Errorf("could not create directory for binary %s: %w", binaryName, err)
+	}
+
 	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
-		filepath.Join(p.packageRoot, p.binDir, binaryName),
+		binPath,
 	); err != nil {
 		return fmt.Errorf("could not copy binary %s: %w", binaryName, err)
 	}

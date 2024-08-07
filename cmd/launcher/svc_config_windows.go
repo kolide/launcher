@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/kolide/launcher/pkg/launcher"
 
@@ -64,6 +65,8 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	checkDependOnService(launcherServiceKey, logger)
 
 	checkRestartActions(logger)
+
+	setRecoveryActions(context.TODO(), logger)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -183,4 +186,57 @@ func checkRestartActions(logger *slog.Logger) {
 	}
 
 	logger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
+}
+
+// setRecoveryActions sets the recovery actions for the launcher service.
+// previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
+func setRecoveryActions(ctx context.Context, logger *slog.Logger) {
+	sman, err := mgr.Connect()
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"connecting to service control manager",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer sman.Disconnect()
+
+	launcherService, err := sman.OpenService(launcherServiceName)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"opening the launcher service from control manager",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer launcherService.Close()
+
+	recoveryActions := []mgr.RecoveryAction{
+		{
+			// first failure
+			Type:  mgr.ServiceRestart,
+			Delay: 5 * time.Second,
+		},
+		{
+			// second failure
+			Type:  mgr.ServiceRestart,
+			Delay: 5 * time.Second,
+		},
+		{
+			// subsequent failures
+			Type:  mgr.ServiceRestart,
+			Delay: 5 * time.Second,
+		},
+	}
+
+	if err := launcherService.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
+		logger.Log(ctx, slog.LevelError,
+			"setting RecoveryActions",
+			"err", err,
+		)
+	}
 }
