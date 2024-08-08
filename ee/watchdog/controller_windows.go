@@ -202,7 +202,7 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	defer serviceManager.Disconnect()
 
 	if !enabled {
-		err := removeService(serviceManager, launcherWatchdogServiceName)
+		err := RemoveService(serviceManager)
 		if err != nil {
 			if err.Error() == serviceDoesNotExistError {
 				wc.slogger.Log(ctx, slog.LevelDebug, "watchdog service was not previously installed")
@@ -344,15 +344,19 @@ func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
 	return nil
 }
 
-// removeService utilizes the passed serviceManager to remove the existing service
-// after looking up the handle from serviceName
-func removeService(serviceManager *mgr.Mgr, serviceName string) error {
-	existingService, err := serviceManager.OpenService(serviceName)
+// RemoveService utilizes the passed serviceManager to remove any existing watchdog service if it exists
+func RemoveService(serviceManager *mgr.Mgr) error {
+	existingService, err := serviceManager.OpenService(launcherWatchdogServiceName)
 	if err != nil {
 		return err
 	}
 
 	defer existingService.Close()
+
+	// attempt to stop the service first, we don't care if this fails because we are going to
+	// remove the service next anyway (the removal happens faster if stopped first, but will
+	// happen eventually regardless)
+	existingService.Control(svc.Stop)
 
 	if err := backoff.WaitFor(func() error {
 		if err = existingService.Delete(); err != nil {
