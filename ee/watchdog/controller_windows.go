@@ -353,6 +353,11 @@ func RemoveService(serviceManager *mgr.Mgr) error {
 
 	defer existingService.Close()
 
+	// attempt to stop the service first, we don't care if this fails because we are going to
+	// remove the service next anyway (the removal happens faster if stopped first, but will
+	// happen eventually regardless)
+	existingService.Control(svc.Stop)
+
 	if err := backoff.WaitFor(func() error {
 		if err = existingService.Delete(); err != nil {
 			return err
