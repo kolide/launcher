@@ -197,7 +197,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
 
-	if k.Debug() {
+	if k.Debug() && runtime.GOOS != "windows" {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
 		k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 			AddSource: true,
