@@ -156,6 +156,7 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 	// indexeddb_leveldb.go and the ee/indexeddb package.
 
 	for _, tt := range []struct {
+		testName     string
 		fileName     string
 		dbName       string
 		objStoreName string
@@ -163,15 +164,32 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 		zipBytes     []byte
 	}{
 		{
+			testName:     "file__0.indexeddb.leveldb.zip",
 			fileName:     "file__0.indexeddb.leveldb.zip",
 			dbName:       "launchertestdb",
 			objStoreName: "launchertestobjstore",
 			expectedRows: 2,
 			zipBytes:     basicChromeIndexeddb,
 		},
+		{
+			testName:     "file__0.indexeddb.leveldb.zip -- db does not exist",
+			fileName:     "file__0.indexeddb.leveldb.zip",
+			dbName:       "not-the-correct-db-name",
+			objStoreName: "launchertestobjstore",
+			expectedRows: 0,
+			zipBytes:     basicChromeIndexeddb,
+		},
+		{
+			testName:     "file__0.indexeddb.leveldb.zip -- object store does not exist",
+			fileName:     "file__0.indexeddb.leveldb.zip",
+			dbName:       "launchertestdb",
+			objStoreName: "not-the-correct-obj-store-name",
+			expectedRows: 0,
+			zipBytes:     basicChromeIndexeddb,
+		},
 	} {
 		tt := tt
-		t.Run(tt.fileName, func(t *testing.T) {
+		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
 			// Write zip bytes to file

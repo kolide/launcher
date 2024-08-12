@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/kolide/goleveldb/leveldb"
+	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/agent"
 )
@@ -41,6 +42,8 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	// The copy was successful -- make sure we clean it up after we're done
 	defer os.RemoveAll(tempDbCopyLocation)
 
+	objs := make([]map[string][]byte, 0)
+
 	opts := &opt.Options{
 		Comparer:               indexeddbComparer,
 		DisableSeeksCompaction: true,               // no need to perform compaction
@@ -64,7 +67,11 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	}
 	databaseIdRaw, err := db.Get(databaseNameKey, nil)
 	if err != nil {
-		return nil, fmt.Errorf("querying for database id: %w", err)
+		// If the database doesn't exist, return an empty list of objects
+		if errors.Is(err, leveldberrors.ErrNotFound) {
+			return objs, nil
+		}
+		return nil, fmt.Errorf("querying for database id: %w", err) // TODO if leveldb: not found, return no rows?
 	}
 	databaseId, _ := binary.Uvarint(databaseIdRaw)
 
@@ -88,14 +95,14 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	}
 
 	if objectStoreId == 0 {
-		return nil, errors.New("unable to get object store ID")
+		// If the object store doesn't exist, return an empty list of objects
+		return objs, nil
 	}
 
 	// Get the key prefix for all objects in this store.
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
 	// Now, we can read all records, keeping only the ones with our matching key prefix.
-	objs := make([]map[string][]byte, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
 		key := iter.Key()
