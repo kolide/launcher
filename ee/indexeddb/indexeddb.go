@@ -71,7 +71,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		if errors.Is(err, leveldberrors.ErrNotFound) {
 			return objs, nil
 		}
-		return nil, fmt.Errorf("querying for database id: %w", err) // TODO if leveldb: not found, return no rows?
+		return nil, fmt.Errorf("querying for database id: %w", err)
 	}
 	databaseId, _ := binary.Uvarint(databaseIdRaw)
 
