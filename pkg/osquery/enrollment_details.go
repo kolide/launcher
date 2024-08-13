@@ -19,25 +19,51 @@ import (
 	"github.com/pkg/errors"
 )
 
-func getEnrollDetails(ctx context.Context, osquerydPath string) (service.EnrollmentDetails, error) {
+func getRuntimeEnrollDetails() service.EnrollmentDetails {
+	details := service.EnrollmentDetails{
+		OSPlatform:      runtime.GOOS,
+		OSPlatformLike:  runtime.GOOS,
+		LauncherVersion: version.Version().Version,
+		GOOS:            runtime.GOOS,
+		GOARCH:          runtime.GOARCH,
+	}
+
+	// Pull in some launcher key info. These depend on the agent package, and we'll need to check for nils
+	if agent.LocalDbKeys().Public() != nil {
+		if key, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public()); err == nil {
+			// der is a binary format, so convert to b64
+			details.LauncherLocalKey = base64.StdEncoding.EncodeToString(key)
+		}
+	}
+
+	if agent.HardwareKeys().Public() != nil {
+		if key, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
+			// der is a binary format, so convert to b64
+			details.LauncherHardwareKey = base64.StdEncoding.EncodeToString(key)
+			details.LauncherHardwareKeySource = agent.HardwareKeys().Type()
+		}
+	}
+
+	return details
+}
+
+func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *service.EnrollmentDetails) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
-
-	var details service.EnrollmentDetails
 
 	// To facilitate manual testing around missing enrollment details,
 	// there is a environmental variable to trigger the failure condition
 	if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_ERROR") == "true" {
-		return details, errors.New("Skipping enrollment details")
+		return errors.New("Skipping enrollment details")
 	}
 
 	// If the binary doesn't exist, bail out early.
 	if info, err := os.Stat(osquerydPath); os.IsNotExist(err) {
-		return details, fmt.Errorf("no binary at %s", osquerydPath)
+		return fmt.Errorf("no binary at %s", osquerydPath)
 	} else if info.IsDir() {
-		return details, fmt.Errorf("%s is a directory", osquerydPath)
+		return fmt.Errorf("%s is a directory", osquerydPath)
 	} else if err != nil {
-		return details, fmt.Errorf("statting %s: %w", osquerydPath, err)
+		return fmt.Errorf("statting %s: %w", osquerydPath, err)
 	}
 
 	query := `
@@ -45,8 +71,6 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 		osquery_info.version as osquery_version,
 		os_version.build as os_build,
 		os_version.name as os_name,
-		os_version.platform as os_platform,
-		os_version.platform_like as os_platform_like,
 		os_version.version as os_version,
 		system_info.hardware_model,
 		system_info.hardware_serial,
@@ -57,7 +81,6 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 		os_version,
 		system_info,
 		osquery_info;
-
 `
 
 	var respBytes bytes.Buffer
@@ -69,25 +92,25 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 		runsimple.WithStderr(&stderrBytes),
 	)
 	if err != nil {
-		return details, fmt.Errorf("create osquery for enrollment details: %w", err)
+		return fmt.Errorf("create osquery for enrollment details: %w", err)
 	}
 
 	osqCtx, osqCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer osqCancel()
 
 	if sqlErr := osq.RunSql(osqCtx, []byte(query)); osqCtx.Err() != nil {
-		return details, fmt.Errorf("query enrollment details context error: %w: stderr: %s", osqCtx.Err(), stderrBytes.String())
+		return fmt.Errorf("query enrollment details context error: %w: stderr: %s", osqCtx.Err(), stderrBytes.String())
 	} else if sqlErr != nil {
-		return details, fmt.Errorf("query enrollment details: %w; stderr: %s", sqlErr, stderrBytes.String())
+		return fmt.Errorf("query enrollment details: %w; stderr: %s", sqlErr, stderrBytes.String())
 	}
 
 	var resp []map[string]string
 	if err := json.Unmarshal(respBytes.Bytes(), &resp); err != nil {
-		return details, fmt.Errorf("json decode enrollment details: %w; stderr: %s", err, stderrBytes.String())
+		return fmt.Errorf("json decode enrollment details: %w; stderr: %s", err, stderrBytes.String())
 	}
 
 	if len(resp) < 1 {
-		return details, fmt.Errorf("expected at least one row from the enrollment details query: stderr: %s", stderrBytes.String())
+		return fmt.Errorf("expected at least one row from the enrollment details query: stderr: %s", stderrBytes.String())
 	}
 
 	if val, ok := resp[0]["os_version"]; ok {
@@ -98,12 +121,6 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 	}
 	if val, ok := resp[0]["os_name"]; ok {
 		details.OSName = val
-	}
-	if val, ok := resp[0]["os_platform"]; ok {
-		details.OSPlatform = val
-	}
-	if val, ok := resp[0]["os_platform_like"]; ok {
-		details.OSPlatformLike = val
 	}
 	if val, ok := resp[0]["osquery_version"]; ok {
 		details.OsqueryVersion = val
@@ -122,26 +139,5 @@ func getEnrollDetails(ctx context.Context, osquerydPath string) (service.Enrollm
 		details.HardwareUUID = val
 	}
 
-	// This runs before the extensions are registered. These mirror the
-	// underlying tables.
-	details.LauncherVersion = version.Version().Version
-	details.GOOS = runtime.GOOS
-	details.GOARCH = runtime.GOARCH
-
-	// Pull in some launcher key info. These depend on the agent package, and we'll need to check for nils
-	if agent.LocalDbKeys().Public() != nil {
-		if key, err := x509.MarshalPKIXPublicKey(agent.LocalDbKeys().Public()); err == nil {
-			// der is a binary format, so convert to b64
-			details.LauncherLocalKey = base64.StdEncoding.EncodeToString(key)
-		}
-	}
-	if agent.HardwareKeys().Public() != nil {
-		if key, err := x509.MarshalPKIXPublicKey(agent.HardwareKeys().Public()); err == nil {
-			// der is a binary format, so convert to b64
-			details.LauncherHardwareKey = base64.StdEncoding.EncodeToString(key)
-			details.LauncherHardwareKeySource = agent.HardwareKeys().Type()
-		}
-	}
-
-	return details, nil
+	return nil
 }
