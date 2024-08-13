@@ -10,7 +10,7 @@ import (
 )
 
 var homeDirLocations = map[string][]string{
-	"windows": {"/Users"},
+	"windows": {`\Users`},
 	"darwin":  {"/Users"},
 	"linux":   {"/home"},
 }
