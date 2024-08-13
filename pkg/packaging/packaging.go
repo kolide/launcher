@@ -124,6 +124,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		"root_directory":     p.canonicalizeRootDir(p.rootDir),
 		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
 		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
+		"identifier":         p.Identifier,
 	}
 
 	launcherBoolFlags := []string{}

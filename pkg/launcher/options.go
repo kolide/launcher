@@ -134,6 +134,9 @@ type Options struct {
 
 	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
 	LocalDevelopmentPath string
+
+	// Identifier is the key used to identify/namespace a single launcher installation (e.g. kolide-k2)
+	Identifier string
 }
 
 // ConfigFilePath returns the path to launcher's launcher.flags file. If the path
@@ -254,6 +257,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
 		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
+		flPackageIdentifier    = flagset.String("identifier", "kolide-k2", "packaging identifier used to determine service names, paths, etc. (default: kolide-k2)")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -388,6 +392,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		Debug:                              *flDebug,
 		DelayStart:                         *flDelayStart,
 		DisableControlTLS:                  disableControlTLS,
+		Identifier:                         *flPackageIdentifier,
 		InsecureControlTLS:                 insecureControlTLS,
 		EnableInitialRunner:                *flInitialRunner,
 		WatchdogEnabled:                    *flWatchdogEnabled,
