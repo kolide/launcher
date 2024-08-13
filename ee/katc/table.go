@@ -129,7 +129,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 
 			// Run any needed transformations on the row data
 			for _, step := range k.rowTransformSteps {
-				dataRawRow, err = step.transformFunc(ctx, k.slogger, dataRawRow)
+				dataRawRow, err = step.transformFunc(ctx, k.slogger, s.path, dataRawRow)
 				if err != nil {
 					k.slogger.Log(ctx, slog.LevelWarn,
 						"running transform func",

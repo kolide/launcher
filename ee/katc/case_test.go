@@ -31,7 +31,7 @@ func Test_camelToSnake(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			outputRows, err := camelToSnake(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{
+			outputRows, err := camelToSnake(context.TODO(), multislogger.NewNopLogger(), "", map[string][]byte{
 				tt.input: nil,
 			})
 			require.NoError(t, err)

@@ -21,6 +21,7 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
+// DEPRECATED use katc_chrome_login_data_emails
 func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
 		slogger: slogger.With("table", "kolide_chrome_login_data_emails"),

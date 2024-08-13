@@ -35,7 +35,7 @@ const (
 // References:
 // * https://stackoverflow.com/a/59923297
 // * https://searchfox.org/mozilla-central/source/js/src/vm/StructuredClone.cpp (see especially JSStructuredCloneReader::read)
-func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func deserializeFirefox(ctx context.Context, slogger *slog.Logger, _ string, row map[string][]byte) (map[string][]byte, error) {
 	// IndexedDB data is stored by key "data" pointing to the serialized object. We want to
 	// extract that serialized object, and discard the top-level "data" key.
 	data, ok := row["data"]

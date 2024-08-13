@@ -7,7 +7,7 @@ import (
 	"github.com/serenize/snaker"
 )
 
-func camelToSnake(_ context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+func camelToSnake(_ context.Context, _ *slog.Logger, _ string, row map[string][]byte) (map[string][]byte, error) {
 	snakeCaseRow := make(map[string][]byte)
 	for k, v := range row {
 		snakeCaseKey := snaker.CamelToSnake(k)

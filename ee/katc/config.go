@@ -66,7 +66,7 @@ func (kst *katcSourceType) String() string {
 // JSON KATC config.
 type rowTransformStep struct {
 	name          string
-	transformFunc func(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error)
+	transformFunc func(ctx context.Context, slogger *slog.Logger, sourcePath string, row map[string][]byte) (map[string][]byte, error)
 }
 
 const (
@@ -74,6 +74,7 @@ const (
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
 	camelToSnakeTransformStep       = "camel_to_snake"
+	addUsernameFromFilePathStep     = "add_username_from_filepath"
 )
 
 func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
@@ -99,6 +100,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case camelToSnakeTransformStep:
 		r.name = camelToSnakeTransformStep
 		r.transformFunc = camelToSnake
+		return nil
+	case addUsernameFromFilePathStep:
+		r.name = addUsernameFromFilePathStep
+		r.transformFunc = addUsernameFromFilePath
 		return nil
 	default:
 		return fmt.Errorf("unknown data processing step %s", s)
