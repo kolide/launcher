@@ -268,7 +268,17 @@ func enrollSecret(k types.Knapsack) string {
 		return k.EnrollSecret()
 	}
 
+	if k != nil && k.EnrollSecretPath() != "" {
+		secret, err := os.ReadFile(k.EnrollSecretPath())
+		if err != nil {
+			return ""
+		}
+
+		return string(secret)
+	}
+
 	// TODO this will need to respect the identifier when determining the secret file location for dual-launcher installations
+	// this will specifically be an issue when flare is triggered standalone (without config path specified)
 	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
 	if err != nil {
 		return ""
