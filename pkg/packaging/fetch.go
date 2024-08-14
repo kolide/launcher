@@ -198,5 +198,5 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (s
 	targetFilename := filepath.Base(custom.Target)
 
 	// Target looks like <binary>-<version>.tar.gz -- strip off extension and binary name to get version
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, fmt.Sprintf(binaryName+"-")), ".tar.gz"), nil
+	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, binaryName+"-"), ".tar.gz"), nil
 }
