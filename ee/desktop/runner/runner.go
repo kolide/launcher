@@ -39,6 +39,7 @@ import (
 )
 
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
+const systrayNeedsRestartErr = "tray not ready yet"
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
 
@@ -873,11 +874,32 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 	scanner := bufio.NewScanner(combined)
 
 	for scanner.Scan() {
+		logLine := scanner.Text()
 		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
-			scanner.Text(),
+			logLine,
 			"uid", uid,
 			"subprocess", "desktop",
 		)
+
+		// Now check log to see if we need to restart systray.
+		// We don't want to perform restarts when in modern standby.
+		if r.knapsack.InModernStandby() {
+			continue
+		}
+
+		// We assume that if we see this log even once, we will need to restart.
+		// Need to check logs to see if that's actually true.
+		if !strings.Contains(logLine, systrayNeedsRestartErr) {
+			continue
+		}
+
+		// For now, kill all desktop processes instead of only the affected one.
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"noticed systray error -- shutting down and restarting desktop processes",
+			"systray_log", logLine,
+			"uid", uid,
+		)
+		r.killDesktopProcesses(context.Background())
 	}
 }
 
