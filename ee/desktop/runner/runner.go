@@ -862,20 +862,23 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go func() {
-		combined := io.MultiReader(stdErr, stdOut)
-		scanner := bufio.NewScanner(combined)
-
-		for scanner.Scan() {
-			r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
-				scanner.Text(),
-				"uid", uid,
-				"subprocess", "desktop",
-			)
-		}
-	}()
+	go r.processLogs(uid, stdErr, stdOut)
 
 	return cmd, nil
+}
+
+// processLogs scans logs from the desktop process stdout/stderr and logs them.
+func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadCloser, stdOut io.ReadCloser) {
+	combined := io.MultiReader(stdErr, stdOut)
+	scanner := bufio.NewScanner(combined)
+
+	for scanner.Scan() {
+		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
+			scanner.Text(),
+			"uid", uid,
+			"subprocess", "desktop",
+		)
+	}
 }
 
 func (r *DesktopUsersProcessesRunner) writeIconFile() {
