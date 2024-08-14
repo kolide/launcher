@@ -268,6 +268,7 @@ func enrollSecret(k types.Knapsack) string {
 		return k.EnrollSecret()
 	}
 
+	// TODO this will need to respect the identifier when determining the secret file location for dual-launcher installations
 	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
 	if err != nil {
 		return ""
