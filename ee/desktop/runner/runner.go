@@ -351,6 +351,61 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 	)
 }
 
+// killDesktopProcess kills the existing desktop process for the given uid
+func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) {
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		r.slogger.Log(ctx, slog.LevelWarn,
+			"could not find desktop proc for uid, cannot kill process",
+			"uid", uid,
+		)
+		return
+	}
+
+	// unregistering client from runner server so server will not respond to its requests
+	r.runnerServer.DeRegisterClient(uid)
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	err := client.Shutdown(ctx)
+	if err == nil {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"killed user desktop process",
+			"uid", uid,
+		)
+		delete(r.uidProcs, uid)
+		return
+	}
+
+	// We didn't successfully send a shutdown request -- check to see if it's because
+	// the process is already gone.
+	if !r.processExists(proc) {
+		delete(r.uidProcs, uid)
+		return
+	}
+
+	r.slogger.Log(ctx, slog.LevelWarn,
+		"failed to send shutdown command to user desktop process, killing process instead",
+		"uid", uid,
+		"pid", proc.Process.Pid,
+		"path", proc.path,
+		"err", err,
+	)
+
+	if err := proc.Process.Kill(); err != nil {
+		r.slogger.Log(ctx, slog.LevelError,
+			"could not kill desktop process",
+			"uid", uid,
+			"pid", proc.Process.Pid,
+			"path", proc.path,
+			"err", err,
+		)
+		return
+	}
+
+	// Successfully killed process
+	delete(r.uidProcs, uid)
+}
+
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
 	if r.knapsack.InModernStandby() {
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -897,13 +952,16 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 			continue
 		}
 
-		// For now, kill all desktop processes instead of only the affected one.
+		// Kill the desktop process for the given uid to force it to restart systray.
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"noticed systray error -- shutting down and restarting desktop processes",
 			"systray_log", logLine,
 			"uid", uid,
 		)
-		r.killDesktopProcesses(context.Background())
+		r.killDesktopProcess(context.Background(), uid)
+
+		// No need to keep processing logs.
+		return
 	}
 }
 
