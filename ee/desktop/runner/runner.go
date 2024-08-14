@@ -868,27 +868,31 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	return cmd, nil
 }
 
-// processLogs scans logs from the desktop process stdout/stderr and logs them.
+// processLogs scans logs from the desktop process stdout/stderr, logs them,
+// and examines them to see if any action should be taken in response.
 func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadCloser, stdOut io.ReadCloser) {
 	combined := io.MultiReader(stdErr, stdOut)
 	scanner := bufio.NewScanner(combined)
 
 	for scanner.Scan() {
 		logLine := scanner.Text()
+
+		// First, log the incoming log.
 		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
 			logLine,
 			"uid", uid,
 			"subprocess", "desktop",
 		)
 
-		// Now check log to see if we need to restart systray.
+		// Now, check log to see if we need to restart systray.
 		// We don't want to perform restarts when in modern standby.
 		if r.knapsack.InModernStandby() {
 			continue
 		}
 
-		// We assume that if we see this log even once, we will need to restart.
-		// Need to check logs to see if that's actually true.
+		// Check to see if the log line contains systrayNeedsRestartErr.
+		// systray is not able to self-recover from the systrayNeedsRestartErr,
+		// so if we see it even once, we should take action.
 		if !strings.Contains(logLine, systrayNeedsRestartErr) {
 			continue
 		}
