@@ -17,6 +17,8 @@ import (
 	"github.com/peterbourgon/ff/v3"
 )
 
+const defaultLauncherIdentifier string = "kolide-k2"
+
 // Options is the set of options that may be configured for Launcher.
 type Options struct {
 	// KolideServerURL is the URL of the management server to connect to.
@@ -257,7 +259,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
 		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
-		flPackageIdentifier    = flagset.String("identifier", "kolide-k2", "packaging identifier used to determine service names, paths, etc. (default: kolide-k2)")
+		flPackageIdentifier    = flagset.String("identifier", defaultLauncherIdentifier, "packaging identifier used to determine service names, paths, etc. (default: kolide-k2)")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")

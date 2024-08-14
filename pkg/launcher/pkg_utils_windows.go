@@ -13,8 +13,6 @@ import (
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
-const defaultLauncherIdentifier string = "kolide-k2"
-
 // ServiceName embeds the given identifier into our service name template after sanitization,
 // and returns the camelCased service name generated to match our packaging logic
 func ServiceName(identifier string) string {
