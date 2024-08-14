@@ -417,32 +417,32 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We used to see the enrollment details fail, but now that we're running as an exec,
 	// it seems less likely. Try a couple times, but backoff fast.
-	var enrollDetails service.EnrollmentDetails
+	enrollDetails := getRuntimeEnrollDetails()
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
 		e.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment details, no osqueryd path, this is probably CI",
+			"skipping enrollment osquery details, no osqueryd path, this is probably CI",
 		)
 		span.AddEvent("skipping_enrollment_details")
 	} else {
 		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(ctx, osqPath)
+			err = getOsqEnrollDetails(ctx, osqPath, &enrollDetails)
 			if err != nil {
 				e.slogger.Log(ctx, slog.LevelDebug,
-					"getEnrollDetails failed in backoff",
+					"getOsqEnrollDetails failed in backoff",
 					"err", err,
 				)
 			}
 			return err
 		}, 30*time.Second, 5*time.Second); err != nil {
 			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return "", true, fmt.Errorf("query enrollment details: %w", err)
+				return "", true, fmt.Errorf("query osq enrollment details: %w", err)
 			}
 
 			e.slogger.Log(ctx, slog.LevelError,
-				"failed to get enrollment details with retries, moving on",
+				"failed to get osq enrollment details with retries, moving on",
 				"err", err,
 			)
-			traces.SetError(span, fmt.Errorf("query enrollment details: %w", err))
+			traces.SetError(span, fmt.Errorf("query osq enrollment details: %w", err))
 		} else {
 			span.AddEvent("got_enrollment_details")
 		}
