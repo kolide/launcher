@@ -70,6 +70,8 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
+	updatedFlags[keys.DesktopRunnerServerUrl.String()] = s.knapsack.DesktopRunnerServerURL()
+
 	atcConfig, err := s.extractAutoTableConstructionConfig()
 	if err != nil {
 		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,

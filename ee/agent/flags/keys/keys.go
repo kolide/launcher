@@ -56,6 +56,7 @@ const (
 	InModernStandby                 FlagKey = "in_modern_standby"
 	LocalDevelopmentPath            FlagKey = "localdev_path"
 	LauncherWatchdogEnabled         FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
+	DesktopRunnerServerUrl          FlagKey = "desktop_runner_server_url"
 )
 
 func (key FlagKey) String() string {

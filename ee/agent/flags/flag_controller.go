@@ -647,3 +647,10 @@ func (fc *FlagController) LocalDevelopmentPath() string {
 		WithDefaultString(fc.cmdLineOpts.LocalDevelopmentPath),
 	).get(nil)
 }
+
+func (fc *FlagController) SetDesktopRunnerServerURL(url string) error {
+	return fc.setControlServerValue(keys.DesktopRunnerServerUrl, []byte(url))
+}
+func (fc *FlagController) DesktopRunnerServerURL() string {
+	return NewStringFlagValue().get(fc.getControlServerValue(keys.DesktopRunnerServerUrl))
+}
