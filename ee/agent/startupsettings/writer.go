@@ -38,9 +38,10 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 		kvStore:  store,
 		knapsack: knapsack,
 		storedFlags: map[keys.FlagKey]func() string{
-			keys.UpdateChannel:         func() string { return knapsack.UpdateChannel() },
-			keys.PinnedLauncherVersion: func() string { return knapsack.PinnedLauncherVersion() },
-			keys.PinnedOsquerydVersion: func() string { return knapsack.PinnedOsquerydVersion() },
+			keys.UpdateChannel:          func() string { return knapsack.UpdateChannel() },
+			keys.PinnedLauncherVersion:  func() string { return knapsack.PinnedLauncherVersion() },
+			keys.PinnedOsquerydVersion:  func() string { return knapsack.PinnedOsquerydVersion() },
+			keys.DesktopRunnerServerUrl: func() string { return knapsack.DesktopRunnerServerURL() },
 		},
 	}
 
@@ -69,8 +70,6 @@ func (s *startupSettingsWriter) WriteSettings() error {
 		updatedFlags[flag.String()] = getter()
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
-
-	updatedFlags[keys.DesktopRunnerServerUrl.String()] = s.knapsack.DesktopRunnerServerURL()
 
 	atcConfig, err := s.extractAutoTableConstructionConfig()
 	if err != nil {
