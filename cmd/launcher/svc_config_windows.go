@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -15,8 +16,7 @@ import (
 )
 
 const (
-	launcherServiceName            = `LauncherKolideK2Svc`
-	launcherServiceRegistryKeyName = `SYSTEM\CurrentControlSet\Services\LauncherKolideK2Svc`
+	launcherServiceRegistryKeyNameFmt = `SYSTEM\CurrentControlSet\Services\%s`
 
 	// DelayedAutostart is type REG_DWORD, i.e. uint32. We want to turn off delayed autostart.
 	delayedAutostartName            = `DelayedAutostart`
@@ -34,6 +34,10 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	if !launcher.IsKolideHostedServerURL(opts.KolideServerURL) {
 		return
 	}
+
+	// get the service name to generate the service key
+	launcherServiceName := launcher.ServiceName(opts.Identifier)
+	launcherServiceRegistryKeyName := fmt.Sprintf(launcherServiceRegistryKeyNameFmt, launcherServiceName)
 
 	// Get launcher service key
 	launcherServiceKey, err := registry.OpenKey(registry.LOCAL_MACHINE, launcherServiceRegistryKeyName, registry.ALL_ACCESS)
@@ -64,9 +68,33 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	// Check to see if we need to update the service to depend on Dnscache
 	checkDependOnService(launcherServiceKey, logger)
 
-	checkRestartActions(logger)
+	sman, err := mgr.Connect()
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"connecting to service control manager",
+			"err", err,
+		)
 
-	setRecoveryActions(context.TODO(), logger)
+		return
+	}
+
+	defer sman.Disconnect()
+
+	launcherService, err := sman.OpenService(launcherServiceName)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"opening the launcher service from control manager",
+			"err", err,
+		)
+
+		return
+	}
+
+	defer launcherService.Close()
+
+	checkRestartActions(logger, launcherService)
+
+	setRecoveryActions(context.TODO(), logger, launcherService)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -137,32 +165,8 @@ func checkDependOnService(launcherServiceKey registry.Key, logger *slog.Logger) 
 // sets it to true if required. See https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_failure_actions_flag
 // if we choose to implement restart backoff, that logic must be added here (it is not exposed via wix). See the "Windows Service Manager"
 // doc in Notion for additional details on configurability
-func checkRestartActions(logger *slog.Logger) {
-	sman, err := mgr.Connect()
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"connecting to service control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer sman.Disconnect()
-
-	launcherService, err := sman.OpenService(launcherServiceName)
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"opening the launcher service from control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer launcherService.Close()
-
-	curFlag, err := launcherService.RecoveryActionsOnNonCrashFailures()
+func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
+	curFlag, err := service.RecoveryActionsOnNonCrashFailures()
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"querying for current RecoveryActionsOnNonCrashFailures flag",
@@ -176,7 +180,7 @@ func checkRestartActions(logger *slog.Logger) {
 		return
 	}
 
-	if err = launcherService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
+	if err = service.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"setting RecoveryActionsOnNonCrashFailures flag",
 			"err", err,
@@ -190,31 +194,7 @@ func checkRestartActions(logger *slog.Logger) {
 
 // setRecoveryActions sets the recovery actions for the launcher service.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
-func setRecoveryActions(ctx context.Context, logger *slog.Logger) {
-	sman, err := mgr.Connect()
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"connecting to service control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer sman.Disconnect()
-
-	launcherService, err := sman.OpenService(launcherServiceName)
-	if err != nil {
-		logger.Log(ctx, slog.LevelError,
-			"opening the launcher service from control manager",
-			"err", err,
-		)
-
-		return
-	}
-
-	defer launcherService.Close()
-
+func setRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			// first failure
@@ -233,7 +213,7 @@ func setRecoveryActions(ctx context.Context, logger *slog.Logger) {
 		},
 	}
 
-	if err := launcherService.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
+	if err := service.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
 		logger.Log(ctx, slog.LevelError,
 			"setting RecoveryActions",
 			"err", err,

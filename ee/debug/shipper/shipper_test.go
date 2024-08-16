@@ -32,6 +32,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
+				k.On("EnrollSecretPath").Return("")
 				return k
 			},
 			assertion:            assert.NoError,
@@ -45,6 +46,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
+				k.On("EnrollSecretPath").Return("")
 				return k
 			},
 			assertion:            assert.NoError,
