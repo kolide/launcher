@@ -265,7 +265,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		WatchdogDelaySec:                120,
 		WatchdogMemoryLimitMB:           600,
 		WatchdogUtilizationLimitPercent: 50,
-		Identifier:                      defaultLauncherIdentifier,
+		Identifier:                      DefaultLauncherIdentifier,
 	}
 
 	return args, opts

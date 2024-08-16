@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/packagekit"
 
 	"go.opencensus.io/trace"
@@ -124,7 +125,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		"root_directory":     p.canonicalizeRootDir(p.rootDir),
 		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
 		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
-		"identifier":         p.Identifier,
+	}
+
+	// to avoid writing additional flags without a real need (newly introduced flags
+	// can cause issues with rolling back), we only set the identifier in the flags file
+	// if it is not the default value
+	if p.Identifier != launcher.DefaultLauncherIdentifier {
+		launcherMapFlags["identifier"] = p.Identifier
 	}
 
 	launcherBoolFlags := []string{}
