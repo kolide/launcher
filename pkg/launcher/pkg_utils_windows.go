@@ -18,7 +18,7 @@ var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 func ServiceName(identifier string) string {
 	// this check might be overkill but is intended to prevent any backwards compatibility/misconfiguration issues
 	if strings.TrimSpace(identifier) == "" {
-		identifier = defaultLauncherIdentifier
+		identifier = DefaultLauncherIdentifier
 	}
 
 	sanitizedServiceName := nonAlphanumericRegex.ReplaceAllString(identifier, "_") // e.g. identifier=kolide-k2 becomes kolide_k2
