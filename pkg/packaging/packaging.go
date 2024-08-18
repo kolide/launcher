@@ -36,6 +36,7 @@ type PackageOptions struct {
 	PackageVersion    string // What version in this package. If unset, autodetection will be attempted.
 	OsqueryVersion    string
 	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
+	ContainerTool     string
 	LauncherVersion   string
 	LauncherPath      string
 	LauncherArmPath   string
@@ -315,6 +316,7 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		Title:                    p.Title,
 		Root:                     p.packageRoot,
 		Scripts:                  p.scriptRoot,
+		ContainerTool:            p.ContainerTool,
 		AppleNotarizeAccountId:   p.AppleNotarizeAccountId,
 		AppleNotarizeAppPassword: p.AppleNotarizeAppPassword,
 		AppleNotarizeUserId:      p.AppleNotarizeUserId,
