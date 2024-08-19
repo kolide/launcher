@@ -39,6 +39,8 @@ import (
 )
 
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
+
+// systrayNeedsRestartErr is systray.ErrTrayNotReadyYet
 const systrayNeedsRestartErr = "tray not ready yet"
 
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
