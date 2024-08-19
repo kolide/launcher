@@ -40,9 +40,6 @@ import (
 
 const nonWindowsDesktopSocketPrefix = "desktop.sock"
 
-// systrayNeedsRestartErr is systray.ErrTrayNotReadyYet
-const systrayNeedsRestartErr = "tray not ready yet"
-
 type desktopUsersProcessesRunnerOption func(*DesktopUsersProcessesRunner)
 
 // WithExecutablePath sets the path to the executable that will be run for each desktop.
@@ -950,7 +947,7 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 		// Check to see if the log line contains systrayNeedsRestartErr.
 		// systray is not able to self-recover from the systrayNeedsRestartErr,
 		// so if we see it even once, we should take action.
-		if !strings.Contains(logLine, systrayNeedsRestartErr) {
+		if !logIndicatesSystrayNeedsRestart(logLine) {
 			continue
 		}
 

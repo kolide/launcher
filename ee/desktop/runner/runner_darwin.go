@@ -60,3 +60,8 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 func osversion() (string, error) {
 	return unix.Sysctl("kern.osrelease")
 }
+
+// logIndicatesSystrayNeedsRestart is Windows-only functionality
+func logIndicatesSystrayNeedsRestart(_ string) bool {
+	return false
+}
