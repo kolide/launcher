@@ -23,13 +23,16 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type Status string
@@ -302,8 +305,60 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 		}
 	}
 
+	// note we do not check errors or do anything to complicate the normal flare process
+	// from the multiple installation check. this is not (at this time) an expected production complication
+	noteMultipleInstallations(flare)
+
 	// we could defer this close, but we want to return any errors
 	return close()
+}
+
+// noteMultipleInstallations checks for whether the results of running flare for this installation may be complicated
+// by multiple installations. This is less of an issue when the flare is run in situ, but should be noted because
+// we may need to pay closer attention to the results. When run standalone without a config argument passed, it would be
+// possible for flare to default to reading the directories for the wrong installation
+func noteMultipleInstallations(z *zip.Writer) {
+	defaultPath := strings.TrimSuffix(launcher.DefaultPath(launcher.BinDirectory), string(filepath.Separator))
+	pathParts := strings.Split(defaultPath, string(filepath.Separator))
+
+	if len(pathParts) < 3 {
+		return
+	}
+
+	if runtime.GOOS == "windows" { // strip the bin for windows
+		pathParts = pathParts[:len(pathParts)-1]
+	}
+
+	// now strip off the directory which should note the identifier. we are
+	// going to list everything in the parent directory and count kolide references
+	// to get an idea of the total potential installations
+	pathParts = pathParts[:len(pathParts)-1]
+
+	// now put the path back together
+	baseDir := strings.Join(pathParts, string(filepath.Separator))
+
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return
+	}
+
+	matchingDirs := make([]string, 0)
+	for _, e := range entries {
+		if strings.Contains(strings.ToLower(e.Name()), "kolide") {
+			matchingDirs = append(matchingDirs, e.Name())
+		}
+	}
+
+	if len(matchingDirs) <= 1 {
+		return // nothing to note, standard single installation
+	}
+
+	w, err := z.Create("MULTIPLE_LAUNCHER_INSTALLS_DETECTED")
+	if err != nil {
+		return
+	}
+
+	json.NewEncoder(w).Encode(matchingDirs)
 }
 
 func writeFlareEnv(z *zip.Writer, runtimeEnvironment runtimeEnvironmentType) error {
