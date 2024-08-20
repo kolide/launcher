@@ -114,7 +114,7 @@ func sanitizeState(state string) string {
 	// include a state like string, which is why we match on
 	// the string value of "connections" for that mode.
 	//
-	// When both the Firewall and Stealth mode is enabled,
+	// When both the Firewall and Stealth Mode are enabled,
 	// the global firewall state value is `2` instead of `1`.
 	case "1", "2", "on", "enabled", "connections":
 		return "1"
