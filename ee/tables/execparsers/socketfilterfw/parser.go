@@ -113,7 +113,10 @@ func sanitizeState(state string) string {
 	// When the "block all" firewall option is enabled, it doesn't
 	// include a state like string, which is why we match on
 	// the string value of "connections" for that mode.
-	case "1", "on", "enabled", "connections":
+	//
+	// When both the Firewall and Stealth Mode are enabled,
+	// the global firewall state value is `2` instead of `1`.
+	case "1", "2", "on", "enabled", "connections":
 		return "1"
 	case "throttled", "brief", "detail":
 		// The "logging option" value differs from the booleans.

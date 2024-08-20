@@ -67,7 +67,7 @@ func TestParse(t *testing.T) {
 					"block_all_enabled":               "0",
 					"allow_built-in_signed_enabled":   "1",
 					"allow_downloaded_signed_enabled": "1",
-					"stealth_enabled":                 "0",
+					"stealth_enabled":                 "1",
 					"logging_enabled":                 "1",
 					"logging_option":                  "throttled",
 				},
