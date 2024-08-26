@@ -375,7 +375,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 
 	if runtime.GOOS == "windows" {
 		// check for old root directories before returning the configured option in case we've stomped over with windows MSI install
-		updatedRootDirectory := DetermineRootDirectoryOverride(*flRootDirectory, *flKolideServerURL)
+		updatedRootDirectory := DetermineRootDirectoryOverride(*flRootDirectory, *flKolideServerURL, *flPackageIdentifier)
 		if updatedRootDirectory != *flRootDirectory {
 			*flRootDirectory = updatedRootDirectory
 		}
