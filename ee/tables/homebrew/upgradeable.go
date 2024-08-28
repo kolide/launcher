@@ -20,8 +20,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const allowedCharacters = "0123456789"
-
 type Table struct {
 	slogger *slog.Logger
 }
