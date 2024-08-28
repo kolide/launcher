@@ -22,7 +22,7 @@ func Bputil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/homebrew/bin/brew"} {
+	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
 		validatedCmd, err := validatedCommand(ctx, p, arg...)
 		if err != nil {
 			continue
