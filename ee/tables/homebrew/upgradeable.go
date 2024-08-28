@@ -8,7 +8,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -38,42 +41,55 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	uids := tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters))
-	if len(uids) < 1 {
-		return results, fmt.Errorf("kolide_brew_upgradeable requires at least one user id to be specified")
+	// Brew is owned by a single user on a system. Brew is only intended to run with the context of
+	// that user. To reduce duplicating the WithUid table helper, we can find the owner of the binary,
+	// and pass the said owner to the WIthUid method to handle setting the appropriate env vars.
+	cmd, err := allowedcmd.Brew(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failure allocating allowedcmd.Brew: %w", err)
 	}
 
-	for _, uid := range uids {
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
-			var output bytes.Buffer
-			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo,
-					"failure querying user brew installed packages",
-					"err", err,
-					"target_uid", uid,
-					"output", output.String(),
-				)
-				continue
-			}
+	info, err := os.Stat(cmd.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failure getting FileInfo: %s. err: %w", cmd.Path, err)
+	}
 
-			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithSlogger(t.slogger),
-				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-			}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil, fmt.Errorf("failure getting Sys data source: %s", cmd.Path)
+	}
 
-			flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
-				continue
-			}
+	uid := strconv.FormatUint(uint64(stat.Uid), 10)
 
-			rowData := map[string]string{
-				"uid": uid,
-			}
-
-			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
+	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+		// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
+		var output bytes.Buffer
+		if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"failure querying user brew installed packages",
+				"err", err,
+				"target_uid", uid,
+				"output", output.String(),
+			)
+			continue
 		}
+
+		flattenOpts := []dataflatten.FlattenOpts{
+			dataflatten.WithSlogger(t.slogger),
+			dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+		}
+
+		flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
+		if err != nil {
+			t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
+			continue
+		}
+
+		rowData := map[string]string{
+			"uid": uid,
+		}
+
+		results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
 	}
 
 	return results, nil
