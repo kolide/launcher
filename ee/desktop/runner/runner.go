@@ -939,6 +939,11 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 		)
 
 		// Now, check log to see if we need to restart systray.
+		// Only perform the restart if the feature flag is enabled.
+		if !r.knapsack.SystrayRestartEnabled() {
+			continue
+		}
+
 		// We don't want to perform restarts when in modern standby.
 		if r.knapsack.InModernStandby() {
 			continue
