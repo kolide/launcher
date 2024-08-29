@@ -5,6 +5,7 @@ package allowedcmd
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 )
 
@@ -21,14 +22,18 @@ func Bputil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	cmd, err := validatedCommand(ctx, "/opt/homebrew/bin/brew", arg...)
-	if err != nil {
-		return nil, err
+	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
+		validatedCmd, err := validatedCommand(ctx, p, arg...)
+		if err != nil {
+			continue
+		}
+
+		validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
+
+		return validatedCmd, nil
 	}
 
-	cmd.Env = append(cmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
-
-	return cmd, nil
+	return nil, errors.New("homebrew not found")
 }
 
 func Diskutil(ctx context.Context, arg ...string) (*exec.Cmd, error) {

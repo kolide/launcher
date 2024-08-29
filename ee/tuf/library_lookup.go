@@ -28,6 +28,7 @@ type autoupdateConfig struct {
 	channel              string
 	localDevelopmentPath string
 	hostname             string
+	identifier           string
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
@@ -48,7 +49,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 	}
 
 	// check for old root directories before returning final config in case we've stomped over with windows MSI install
-	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(cfg.rootDirectory, cfg.hostname)
+	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(cfg.rootDirectory, cfg.hostname, cfg.identifier)
 	if updatedRootDirectory != cfg.rootDirectory {
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"old root directory contents detected, overriding for autoupdate config",
@@ -125,13 +126,14 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	pflagSet.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
 
 	// Extract the config flag plus the autoupdate flags
-	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath, flHostname string
+	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath, flHostname, flIdentifier string
 	pflagSet.StringVar(&flConfigFilePath, "config", "", "")
 	pflagSet.StringVar(&flRootDirectory, "root_directory", "", "")
 	pflagSet.StringVar(&flUpdateDirectory, "update_directory", "", "")
 	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
 	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
 	pflagSet.StringVar(&flHostname, "hostname", "", "")
+	pflagSet.StringVar(&flIdentifier, "identifier", "", "")
 
 	if err := pflagSet.Parse(argsToParse); err != nil {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
@@ -156,6 +158,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 		updateDirectory:      flUpdateDirectory,
 		channel:              flUpdateChannel,
 		localDevelopmentPath: flLocalDevelopmentPath,
+		identifier:           flIdentifier,
 	}
 
 	return cfg, nil
@@ -187,6 +190,8 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 			cfg.localDevelopmentPath = value
 		case "hostname":
 			cfg.hostname = value
+		case "identifier":
+			cfg.identifier = value
 		}
 		return nil
 	}); err != nil {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 var (
@@ -37,6 +38,8 @@ const (
 )
 
 var likelyWindowsRootDirPaths = []string{
+	"C:\\ProgramData\\Kolide\\Launcher-kolide-nababe-k2\\data",
+	"C:\\Program Files\\Kolide\\Launcher-kolide-nababe-k2\\data",
 	"C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data",
 	"C:\\Program Files\\Kolide\\Launcher-kolide-k2\\data",
 }
@@ -87,7 +90,7 @@ func DefaultPath(path defaultPath) string {
 // configured root directory if another well known location containing a launcher DB already exists
 // This is used by ParseOptions which doesn't have access to a logger, we should add more logging here
 // when we have that available
-func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) string {
+func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL, packageIdentifier string) string {
 	if runtime.GOOS != "windows" {
 		return optsRootDirectory
 	}
@@ -116,6 +119,11 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL string) s
 	// check likely locations and return updated rootDirectory if found
 	for _, path := range likelyWindowsRootDirPaths {
 		if path == optsRootDirectory { // we already know this does not contain an enrolled DB
+			continue
+		}
+
+		// If the identifier is set, the path MUST contain the identifier
+		if packageIdentifier != "" && !strings.Contains(path, packageIdentifier) {
 			continue
 		}
 

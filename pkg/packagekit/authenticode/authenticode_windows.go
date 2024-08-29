@@ -45,7 +45,7 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 	so := &signtoolOptions{
 		signtoolPath:    "signtool.exe",
 		timestampServer: "http://timestamp.verisign.com/scripts/timstamp.dll",
-		rfc3161Server:   "http://sha256timestamp.ws.symantec.com/sha256/timestamp",
+		rfc3161Server:   "http://timestamp.digicert.com",
 		execCC:          exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 	}
 
