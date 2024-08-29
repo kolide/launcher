@@ -88,6 +88,13 @@ func TestRootServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 
+	// recheck endpoint should always work since it's unauthenticated
+	messenger.On("SendMessage", "recheck", mock.Anything).Return(nil).Once()
+	response, err = client.Get(endpointUrl(monitorServer.Url(), RecheckEndpoint))
+	require.NoError(t, response.Body.Close())
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, response.StatusCode)
+
 	require.NoError(t, monitorServer.Shutdown(context.Background()))
 }
 

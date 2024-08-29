@@ -28,6 +28,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.DesktopRunnerServerUrl)
 	updateChannelVal := "stable"
 	k.On("UpdateChannel").Return(updateChannelVal)
 	k.On("PinnedLauncherVersion").Return("")
@@ -35,6 +36,8 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("KatcConfigStore").Return(inmemory.NewStore())
+
+	k.On("DesktopRunnerServerURL").Return(ulid.New())
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
@@ -87,6 +90,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.DesktopRunnerServerUrl)
 
 	// Set up flag
 	updateChannelVal := "alpha"
@@ -98,6 +102,8 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 
 	k.On("ConfigStore").Return(inmemory.NewStore())
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+
+	k.On("DesktopRunnerServerURL").Return(ulid.New())
 
 	// Set up storage db, which should create the database and set all flags
 	s, err := OpenWriter(context.TODO(), k)
@@ -132,12 +138,15 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.DesktopRunnerServerUrl)
 	updateChannelVal := "beta"
 	k.On("UpdateChannel").Return(updateChannelVal).Once()
 	pinnedLauncherVersion := "1.2.3"
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
+
+	k.On("DesktopRunnerServerURL").Return(ulid.New())
 
 	autoTableConstructionValue := ulid.New()
 

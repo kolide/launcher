@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	runnerserver "github.com/kolide/launcher/ee/desktop/runner/server"
@@ -195,6 +196,24 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 			)
 		}
 	}()
+
+	runner.knapsack.SetDesktopRunnerServerURL(runner.runnerServer.Url())
+
+	settingsWriter, err := startupsettings.OpenWriter(context.TODO(), runner.knapsack)
+	if err != nil {
+		runner.slogger.Log(context.TODO(), slog.LevelError,
+			"opening startup settings writer to write desktop runner server url",
+			"err", err,
+		)
+	} else {
+		defer settingsWriter.Close()
+		if err := settingsWriter.WriteSettings(); err != nil {
+			runner.slogger.Log(context.TODO(), slog.LevelError,
+				"writing startup settings to write desktop runner server url",
+				"err", err,
+			)
+		}
+	}
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()

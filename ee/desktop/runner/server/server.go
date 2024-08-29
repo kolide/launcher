@@ -31,6 +31,7 @@ const (
 	HealthCheckEndpoint                = "/health"
 	MenuOpenedEndpoint                 = "/menuopened"
 	MessageEndpoint                    = "/message"
+	RecheckEndpoint                    = "/recheck"
 	controlRequestAccelerationInterval = 5 * time.Second
 	controlRequestAcclerationDuration  = 1 * time.Minute
 )
@@ -65,17 +66,18 @@ func New(slogger *slog.Logger,
 
 	rs.slogger = slogger.With("component", "desktop_runner_root_server")
 
-	mux := http.NewServeMux()
+	authedMux := http.NewServeMux()
+	unauthedMux := http.NewServeMux()
 
 	// health check endpoint
-	mux.HandleFunc(HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
+	authedMux.HandleFunc(HealthCheckEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
 		}
 	})
 
 	// menu opened endpoint
-	mux.HandleFunc(MenuOpenedEndpoint, func(w http.ResponseWriter, r *http.Request) {
+	authedMux.HandleFunc(MenuOpenedEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil {
 			r.Body.Close()
 		}
@@ -83,10 +85,39 @@ func New(slogger *slog.Logger,
 		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
 
-	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))
+	authedMux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))
+	authMuxHandler := rs.authMiddleware(authedMux)
+
+	unauthedMux.Handle(RecheckEndpoint, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body.Close()
+		}
+
+		if err := messenger.SendMessage("recheck", nil); err != nil {
+			rs.slogger.Log(r.Context(), slog.LevelError,
+				"error sending recheck message",
+				"err", err,
+			)
+
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	mainMux := http.NewServeMux()
+
+	// authed endpoints
+	mainMux.Handle(HealthCheckEndpoint, authMuxHandler)
+	mainMux.Handle(MenuOpenedEndpoint, authMuxHandler)
+	mainMux.Handle(MessageEndpoint, authMuxHandler)
+
+	// unauthed endpoints
+	mainMux.Handle(RecheckEndpoint, unauthedMux)
 
 	rs.server = &http.Server{
-		Handler: rs.authMiddleware(mux),
+		Handler: mainMux,
 	}
 
 	return rs, err

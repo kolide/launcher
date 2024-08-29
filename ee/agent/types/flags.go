@@ -226,4 +226,8 @@ type Flags interface {
 	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
 	SetLauncherWatchdogEnabled(enabled bool) error
 	LauncherWatchdogEnabled() bool
+
+	// DesktopRunnerServerURL is the URL of the desktop runner server
+	SetDesktopRunnerServerURL(url string) error
+	DesktopRunnerServerURL() string
 }

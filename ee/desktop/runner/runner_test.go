@@ -16,6 +16,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -120,12 +121,22 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(slogger)
 			mockKnapsack.On("InModernStandby").Return(false)
+			mockKnapsack.On("SetDesktopRunnerServerURL", mock.Anything).Return(nil)
+			mockKnapsack.On("RootDirectory").Return(t.TempDir())
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, mock.Anything)
+			mockKnapsack.On("PinnedLauncherVersion").Return("0.0.0")
+			mockKnapsack.On("PinnedOsquerydVersion").Return("0.0.0")
+			mockKnapsack.On("UpdateChannel").Return("stable")
+			mockKnapsack.On("DesktopRunnerServerURL").Return(ulid.New())
+			mockKnapsack.On("ConfigStore").Return(inmemory.NewStore())
+			mockKnapsack.On("KatcConfigStore").Return(inmemory.NewStore())
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect
@@ -300,6 +311,15 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
+			mockKnapsack.On("SetDesktopRunnerServerURL", mock.Anything).Return(nil)
+			mockKnapsack.On("RootDirectory").Return(t.TempDir())
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, mock.Anything)
+			mockKnapsack.On("PinnedLauncherVersion").Return("0.0.0")
+			mockKnapsack.On("PinnedOsquerydVersion").Return("0.0.0")
+			mockKnapsack.On("UpdateChannel").Return("stable")
+			mockKnapsack.On("DesktopRunnerServerURL").Return(ulid.New())
+			mockKnapsack.On("ConfigStore").Return(inmemory.NewStore())
+			mockKnapsack.On("KatcConfigStore").Return(inmemory.NewStore())
 
 			dir := t.TempDir()
 			r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
@@ -335,6 +355,15 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack.On("DesktopEnabled").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("InModernStandby").Return(false)
+	mockKnapsack.On("SetDesktopRunnerServerURL", mock.Anything).Return(nil)
+	mockKnapsack.On("RootDirectory").Return(t.TempDir())
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, mock.Anything)
+	mockKnapsack.On("PinnedLauncherVersion").Return("0.0.0")
+	mockKnapsack.On("PinnedOsquerydVersion").Return("0.0.0")
+	mockKnapsack.On("UpdateChannel").Return("stable")
+	mockKnapsack.On("DesktopRunnerServerURL").Return(ulid.New())
+	mockKnapsack.On("ConfigStore").Return(inmemory.NewStore())
+	mockKnapsack.On("KatcConfigStore").Return(inmemory.NewStore())
 
 	dir := t.TempDir()
 	r, err := New(mockKnapsack, nil, WithUsersFilesRoot(dir))
