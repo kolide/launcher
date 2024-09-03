@@ -364,7 +364,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, ui
 	err := client.Shutdown(ctx)
 	if err == nil {
 		r.slogger.Log(ctx, slog.LevelInfo,
-			"killed user desktop process",
+			"shut down user desktop process",
 			"uid", uid,
 		)
 		delete(r.uidProcs, uid)
@@ -391,6 +391,10 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, ui
 	}
 
 	// Successfully killed process
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"killed user desktop process",
+		"uid", uid,
+	)
 	delete(r.uidProcs, uid)
 	return nil
 }
