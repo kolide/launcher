@@ -351,14 +351,10 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 }
 
 // killDesktopProcess kills the existing desktop process for the given uid
-func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) {
+func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) error {
 	proc, ok := r.uidProcs[uid]
 	if !ok {
-		r.slogger.Log(ctx, slog.LevelWarn,
-			"could not find desktop proc for uid, cannot kill process",
-			"uid", uid,
-		)
-		return
+		return fmt.Errorf("could not find desktop proc for uid %s, cannot kill process", uid)
 	}
 
 	// unregistering client from runner server so server will not respond to its requests
@@ -372,14 +368,14 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, ui
 			"uid", uid,
 		)
 		delete(r.uidProcs, uid)
-		return
+		return nil
 	}
 
 	// We didn't successfully send a shutdown request -- check to see if it's because
 	// the process is already gone.
 	if !r.processExists(proc) {
 		delete(r.uidProcs, uid)
-		return
+		return nil
 	}
 
 	r.slogger.Log(ctx, slog.LevelWarn,
@@ -391,18 +387,12 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, ui
 	)
 
 	if err := proc.Process.Kill(); err != nil {
-		r.slogger.Log(ctx, slog.LevelError,
-			"could not kill desktop process",
-			"uid", uid,
-			"pid", proc.Process.Pid,
-			"path", proc.path,
-			"err", err,
-		)
-		return
+		return fmt.Errorf("could not kill desktop process for uid %s with pid %d: %w", uid, proc.Process.Pid, err)
 	}
 
 	// Successfully killed process
 	delete(r.uidProcs, uid)
+	return nil
 }
 
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
@@ -962,11 +952,24 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 			"systray_log", logLine,
 			"uid", uid,
 		)
-		r.killDesktopProcess(context.Background(), uid)
+		if err := r.killDesktopProcess(context.Background(), uid); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"could not kill desktop process",
+				"err", err,
+				"uid", uid,
+			)
+			// Keep processing logs, since we couldn't kill the process
+			continue
+		}
 
-		// No need to keep processing logs.
-		return
+		// Successfully killed desktop process -- no need to keep processing logs.
+		break
 	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"ending log processing for desktop process",
+		"uid", uid,
+	)
 }
 
 func (r *DesktopUsersProcessesRunner) writeIconFile() {
