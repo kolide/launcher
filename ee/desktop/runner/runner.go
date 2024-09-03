@@ -350,6 +350,55 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 	)
 }
 
+// killDesktopProcess kills the existing desktop process for the given uid
+func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) error {
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return fmt.Errorf("could not find desktop proc for uid %s, cannot kill process", uid)
+	}
+
+	// unregistering client from runner server so server will not respond to its requests
+	r.runnerServer.DeRegisterClient(uid)
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	err := client.Shutdown(ctx)
+	if err == nil {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"shut down user desktop process",
+			"uid", uid,
+		)
+		delete(r.uidProcs, uid)
+		return nil
+	}
+
+	// We didn't successfully send a shutdown request -- check to see if it's because
+	// the process is already gone.
+	if !r.processExists(proc) {
+		delete(r.uidProcs, uid)
+		return nil
+	}
+
+	r.slogger.Log(ctx, slog.LevelWarn,
+		"failed to send shutdown command to user desktop process, killing process instead",
+		"uid", uid,
+		"pid", proc.Process.Pid,
+		"path", proc.path,
+		"err", err,
+	)
+
+	if err := proc.Process.Kill(); err != nil {
+		return fmt.Errorf("could not kill desktop process for uid %s with pid %d: %w", uid, proc.Process.Pid, err)
+	}
+
+	// Successfully killed process
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"killed user desktop process",
+		"uid", uid,
+	)
+	delete(r.uidProcs, uid)
+	return nil
+}
+
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
 	if r.knapsack.InModernStandby() {
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -862,20 +911,69 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go func() {
-		combined := io.MultiReader(stdErr, stdOut)
-		scanner := bufio.NewScanner(combined)
-
-		for scanner.Scan() {
-			r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
-				scanner.Text(),
-				"uid", uid,
-				"subprocess", "desktop",
-			)
-		}
-	}()
+	go r.processLogs(uid, stdErr, stdOut)
 
 	return cmd, nil
+}
+
+// processLogs scans logs from the desktop process stdout/stderr, logs them,
+// and examines them to see if any action should be taken in response.
+func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadCloser, stdOut io.ReadCloser) {
+	combined := io.MultiReader(stdErr, stdOut)
+	scanner := bufio.NewScanner(combined)
+
+	for scanner.Scan() {
+		logLine := scanner.Text()
+
+		// First, log the incoming log.
+		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
+			logLine,
+			"uid", uid,
+			"subprocess", "desktop",
+		)
+
+		// Now, check log to see if we need to restart systray.
+		// Only perform the restart if the feature flag is enabled.
+		if !r.knapsack.SystrayRestartEnabled() {
+			continue
+		}
+
+		// We don't want to perform restarts when in modern standby.
+		if r.knapsack.InModernStandby() {
+			continue
+		}
+
+		// Check to see if the log line contains systrayNeedsRestartErr.
+		// systray is not able to self-recover from the systrayNeedsRestartErr,
+		// so if we see it even once, we should take action.
+		if !logIndicatesSystrayNeedsRestart(logLine) {
+			continue
+		}
+
+		// Kill the desktop process for the given uid to force it to restart systray.
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"noticed systray error -- shutting down and restarting desktop processes",
+			"systray_log", logLine,
+			"uid", uid,
+		)
+		if err := r.killDesktopProcess(context.Background(), uid); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"could not kill desktop process",
+				"err", err,
+				"uid", uid,
+			)
+			// Keep processing logs, since we couldn't kill the process
+			continue
+		}
+
+		// Successfully killed desktop process -- no need to keep processing logs.
+		break
+	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"ending log processing for desktop process",
+		"uid", uid,
+	)
 }
 
 func (r *DesktopUsersProcessesRunner) writeIconFile() {

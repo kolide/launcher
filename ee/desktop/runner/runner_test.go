@@ -126,6 +126,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(slogger)
 			mockKnapsack.On("InModernStandby").Return(false)
+			mockKnapsack.On("SystrayRestartEnabled").Return(false).Maybe()
 
 			if os.Getenv("CI") != "true" || runtime.GOOS != "linux" {
 				// Only expect that we call Debug (to set the DEBUG flag on the process) if we actually expect

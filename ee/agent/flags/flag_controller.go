@@ -541,6 +541,16 @@ func (fc *FlagController) LauncherWatchdogEnabled() bool {
 	).get(fc.getControlServerValue(keys.LauncherWatchdogEnabled))
 }
 
+func (fc *FlagController) SetSystrayRestartEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.SystrayRestartEnabled, boolToBytes(enabled))
+}
+
+func (fc *FlagController) SystrayRestartEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.SystrayRestartEnabled))
+}
+
 func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
 	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
 }

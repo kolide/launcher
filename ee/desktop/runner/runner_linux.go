@@ -387,3 +387,8 @@ func getXdgRuntimeDir(uid string) string {
 func osversion() (string, error) {
 	return "", errors.New("not implemented")
 }
+
+// logIndicatesSystrayNeedsRestart is Windows-only functionality
+func logIndicatesSystrayNeedsRestart(_ string) bool {
+	return false
+}

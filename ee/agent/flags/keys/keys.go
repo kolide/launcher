@@ -5,8 +5,8 @@ type FlagKey string
 
 // When adding a new FlagKey:
 // 1. Define the FlagKey identifier, and the string key value it corresponds to, in the block below
-// 2. Add a getter and setter to the Flags interface (flags.go)
-// 3. Implement the getter and setter in the FlagController, providing defaults, limits, and overrides
+// 2. Add a getter and setter to the Flags interface (ee/agent/types/flags.go)
+// 3. Implement the getter and setter in the FlagController (ee/agent/flags/flag_controller.go), providing defaults, limits, and overrides
 // 4. Implement tests for any new APIs, sanitizers, limits, overrides.
 // 5. Update mocks -- in ee/agent/types, run `mockery --name Knapsack` and `mockery --name Flags`.
 const (
@@ -56,6 +56,7 @@ const (
 	InModernStandby                 FlagKey = "in_modern_standby"
 	LocalDevelopmentPath            FlagKey = "localdev_path"
 	LauncherWatchdogEnabled         FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
+	SystrayRestartEnabled           FlagKey = "systray_restart_enabled"
 )
 
 func (key FlagKey) String() string {
