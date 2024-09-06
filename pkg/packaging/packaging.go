@@ -379,7 +379,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 
 		// Create a symlink from <bin dir>/<binary> to the actual binary location within the app bundle
 		target := filepath.Join("..", appBundleName, "Contents", "MacOS", binaryName)
-		symlinkFile := filepath.Join(p.packageRoot, p.binDir, binaryName)
+		symlinkFile := p.fullPathToBareBinary(binaryName)
 		if err := os.Symlink(target, symlinkFile); err != nil {
 			return fmt.Errorf("could not create symlink after copying app bundle: %w", err)
 		}
@@ -387,10 +387,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
-	binPath := filepath.Join(p.packageRoot, p.binDir, binaryName)
-	if p.target.Platform == Windows {
-		binPath = filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
-	}
+	binPath := p.fullPathToBareBinary(binaryName)
 	if err := os.MkdirAll(filepath.Dir(binPath), fsutil.DirMode); err != nil {
 		return fmt.Errorf("could not create directory for binary %s: %w", binaryName, err)
 	}
@@ -403,6 +400,16 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return fmt.Errorf("could not copy binary %s: %w", binaryName, err)
 	}
 	return nil
+}
+
+// fullPathToBareBinary returns the path to the binary (including arch only on Windows).
+// On macOS, this location is a symlink to inside the app bundle.
+func (p *PackageOptions) fullPathToBareBinary(binaryName string) string {
+	if p.target.Platform == Windows {
+		return filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	}
+
+	return filepath.Join(p.packageRoot, p.binDir, binaryName)
 }
 
 func (p *PackageOptions) makePackage(ctx context.Context) error {
