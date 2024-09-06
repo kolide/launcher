@@ -40,7 +40,9 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 
 	// put binaries in arch specific directory to avoid naming collisions in wix msi building
 	// where a single destination will have multiple, mutally exclusive sources
-	localCacheDir = filepath.Join(localCacheDir, string(target.Arch))
+	if target.Platform == Windows {
+		localCacheDir = filepath.Join(localCacheDir, string(target.Arch))
+	}
 
 	if err := os.MkdirAll(localCacheDir, fsutil.DirMode); err != nil {
 		return "", fmt.Errorf("could not create cache directory: %w", err)
@@ -140,7 +142,11 @@ func dlTarPath(name, channelOrVersion, platform, arch string) (string, error) {
 }
 
 func dlTarPathFromVersion(name, version, platform, arch string) string {
-	return path.Join("kolide", name, platform, arch, fmt.Sprintf("%s-%s.tar.gz", name, version))
+	// Include arch for Windows
+	if platform == string(Windows) {
+		return path.Join("kolide", name, platform, arch, fmt.Sprintf("%s-%s.tar.gz", name, version))
+	}
+	return path.Join("kolide", name, platform, fmt.Sprintf("%s-%s.tar.gz", name, version))
 }
 
 //go:embed assets/tuf/root.json

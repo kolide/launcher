@@ -387,7 +387,10 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
-	binPath := filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	binPath := filepath.Join(p.packageRoot, p.binDir, binaryName)
+	if p.target.Platform == Windows {
+		binPath = filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	}
 	if err := os.MkdirAll(filepath.Dir(binPath), fsutil.DirMode); err != nil {
 		return fmt.Errorf("could not create directory for binary %s: %w", binaryName, err)
 	}

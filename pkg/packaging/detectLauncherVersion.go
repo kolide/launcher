@@ -19,7 +19,10 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	logger := log.With(ctxlog.FromContext(ctx), "library", "detectLauncherVersion")
 	level.Debug(logger).Log("msg", "Attempting launcher autodetection")
 
-	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch)))
+	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir))
+	if p.target.Platform == Windows {
+		launcherPath = p.launcherLocation(filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch)))
+	}
 
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
@@ -51,9 +54,8 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 // fall back to the common location if it doesn't.
 func (p *PackageOptions) launcherLocation(binDir string) string {
 	if p.target.Platform == Darwin {
-		// We want /usr/local/Kolide.app, not /usr/local/bin/universal/Kolide.app, so we use Dir to strip out `bin`
-		// and universal
-		appBundleBinaryPath := filepath.Join(filepath.Dir(filepath.Dir(binDir)), "Kolide.app", "Contents", "MacOS", "launcher")
+		// We want /usr/local/Kolide.app, not /usr/local/bin/Kolide.app, so we use Dir to strip out `bin`
+		appBundleBinaryPath := filepath.Join(filepath.Dir(binDir), "Kolide.app", "Contents", "MacOS", "launcher")
 		if info, err := os.Stat(appBundleBinaryPath); err == nil && !info.IsDir() {
 			return appBundleBinaryPath
 		}

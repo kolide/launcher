@@ -95,7 +95,7 @@ func TestLauncherLocation(t *testing.T) {
 
 	// Create a temp directory with an app bundle in it
 	tmpDir := t.TempDir()
-	binDir := filepath.Join(tmpDir, "bin", "universal")
+	binDir := filepath.Join(tmpDir, "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0755))
 	baseDir := filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS")
 	require.NoError(t, os.MkdirAll(baseDir, 0755))
