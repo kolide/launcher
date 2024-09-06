@@ -277,3 +277,65 @@ func testedTargets() []Target {
 		},
 	}
 }
+
+func Test_fullPathToBareBinary(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName string
+		binaryName   string
+		identifier   string
+		packageRoot  string
+		binDir       string
+		target       Target
+		expectedPath string
+	}{
+		{
+			testCaseName: "darwin",
+			binaryName:   "launcher",
+			packageRoot:  filepath.Join("test", "root"),
+			binDir:       filepath.Join("usr", "local", "test-identifier", "bin"),
+			target: Target{
+				Platform: Darwin,
+				Arch:     Arm64,
+			},
+			expectedPath: filepath.Join("test", "root", "usr", "local", "test-identifier", "bin", "launcher"),
+		},
+		{
+			testCaseName: "linux",
+			binaryName:   "launcher",
+			packageRoot:  filepath.Join("test", "root"),
+			binDir:       filepath.Join("usr", "local", "test-identifier", "bin"),
+			target: Target{
+				Platform: Linux,
+				Arch:     Amd64,
+			},
+			expectedPath: filepath.Join("test", "root", "usr", "local", "test-identifier", "bin", "launcher"),
+		},
+		{
+			testCaseName: "windows",
+			binaryName:   "launcher.exe",
+			packageRoot:  filepath.Join("test", "root"),
+			binDir:       filepath.Join("Launcher-test-identifier", "bin"),
+			target: Target{
+				Platform: Windows,
+				Arch:     Amd64,
+			},
+			expectedPath: filepath.Join("test", "root", "Launcher-test-identifier", "bin", "amd64", "launcher.exe"),
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			p := &PackageOptions{
+				packageRoot: tt.packageRoot,
+				binDir:      tt.binDir,
+				target:      tt.target,
+			}
+
+			actualPath := p.fullPathToBareBinary(tt.binaryName)
+			require.Equal(t, tt.expectedPath, actualPath)
+		})
+	}
+}

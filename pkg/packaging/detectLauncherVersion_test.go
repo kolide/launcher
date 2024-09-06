@@ -85,19 +85,25 @@ func TestFormatVersion(t *testing.T) {
 	}
 }
 
-func TestLauncherLocation(t *testing.T) {
+func TestLauncherLocation_Darwin(t *testing.T) {
 	t.Parallel()
 
-	pDarwin := &PackageOptions{target: Target{Platform: Darwin}}
+	pDarwin := &PackageOptions{
+		target: Target{
+			Platform: Darwin,
+		},
+		packageRoot: t.TempDir(),
+		binDir:      "bin",
+	}
 
 	// First, test that if the app bundle doesn't exist, we fall back to the top-level binary
-	require.Equal(t, filepath.Join("some", "dir", "launcher"), pDarwin.launcherLocation(filepath.Join("some", "dir")))
+	expectedFallbackLauncherLocation := filepath.Join(pDarwin.packageRoot, pDarwin.binDir, "launcher")
+	require.Equal(t, expectedFallbackLauncherLocation, pDarwin.launcherLocation())
 
 	// Create a temp directory with an app bundle in it
-	tmpDir := t.TempDir()
-	binDir := filepath.Join(tmpDir, "bin", "universal")
+	binDir := filepath.Join(pDarwin.packageRoot, pDarwin.binDir)
 	require.NoError(t, os.MkdirAll(binDir, 0755))
-	baseDir := filepath.Join(tmpDir, "Kolide.app", "Contents", "MacOS")
+	baseDir := filepath.Join(pDarwin.packageRoot, "Kolide.app", "Contents", "MacOS")
 	require.NoError(t, os.MkdirAll(baseDir, 0755))
 	expectedLauncherBinaryPath := filepath.Join(baseDir, "launcher")
 	f, err := os.Create(expectedLauncherBinaryPath)
@@ -106,13 +112,38 @@ func TestLauncherLocation(t *testing.T) {
 	defer os.Remove(expectedLauncherBinaryPath)
 
 	// Now, confirm that we find the binary inside the app bundle
-	require.Equal(t, expectedLauncherBinaryPath, pDarwin.launcherLocation(binDir))
+	require.Equal(t, expectedLauncherBinaryPath, pDarwin.launcherLocation())
+}
+
+func TestLauncherLocation_Windows(t *testing.T) {
+	t.Parallel()
+
+	pWindows := &PackageOptions{
+		target: Target{
+			Platform: Windows,
+			Arch:     Amd64,
+		},
+		packageRoot: t.TempDir(),
+		binDir:      "bin",
+	}
 
 	// No file check for windows, just expect the binary in the given location
-	pWindows := &PackageOptions{target: Target{Platform: Windows}}
-	require.Equal(t, filepath.Join("some", "dir", "launcher.exe"), pWindows.launcherLocation(filepath.Join("some", "dir")))
+	expectedLauncherLocation := filepath.Join(pWindows.packageRoot, pWindows.binDir, string(pWindows.target.Arch), "launcher.exe")
+	require.Equal(t, expectedLauncherLocation, pWindows.launcherLocation())
+}
 
-	// Same as for windows: no file check, just expect the binary in the given location
-	pLinux := &PackageOptions{target: Target{Platform: Linux}}
-	require.Equal(t, filepath.Join("some", "dir", "launcher"), pLinux.launcherLocation(filepath.Join("some", "dir")))
+func TestLauncherLocation_Linux(t *testing.T) {
+	t.Parallel()
+
+	pLinux := &PackageOptions{
+		target: Target{
+			Platform: Linux,
+		},
+		packageRoot: t.TempDir(),
+		binDir:      "bin",
+	}
+
+	// No file check for Linux, just expect the binary in the given location
+	expectedLauncherLocation := filepath.Join(pLinux.packageRoot, pLinux.binDir, "launcher")
+	require.Equal(t, expectedLauncherLocation, pLinux.launcherLocation())
 }
