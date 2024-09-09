@@ -69,7 +69,10 @@ func osversion() (string, error) {
 
 // logIndicatesSystrayNeedsRestart checks to see if the log line contains
 // "tray not ready yet", which indicates that the systray had an irrecoverable
-// error during initialization and requires restart.
+// error during initialization and requires restart. Sometimes the tray may
+// also fail to initialize with "Unspecified error", so we check for the generic
+// initialization failed message as well.
 func logIndicatesSystrayNeedsRestart(logLine string) bool {
-	return strings.Contains(logLine, systray.ErrTrayNotReadyYet.Error())
+	return strings.Contains(logLine, systray.ErrTrayNotReadyYet.Error()) ||
+		strings.Contains(logLine, "systray error: unable to init instance")
 }
