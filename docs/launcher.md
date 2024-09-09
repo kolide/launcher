@@ -17,7 +17,7 @@ make launcher
 
 Note that this style of build is generally only for development
 instances of Launcher. You should have `osqueryd` already installed on
-your system, as `launcher` will fall-back to looking for it in your
+your system, as `launcher` will fall back to looking for it in your
 `$PATH` in this case. For additional, more distributable, build
 options and commands, see the [Additional Build
 Options](#additional-build-options) section.
