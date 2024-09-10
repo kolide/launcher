@@ -2,7 +2,6 @@ package tuf
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -243,7 +242,7 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
-		return nil, errors.New("could not initialize TUF client, cannot find release")
+		return nil, fmt.Errorf("could not initialize TUF client, cannot find release: %w", err)
 	}
 
 	// From already-downloaded metadata, look for the release version
