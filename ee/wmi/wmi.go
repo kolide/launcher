@@ -36,6 +36,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -154,7 +155,12 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	defer serviceRaw.Clear()
 
 	service := serviceRaw.ToIDispatch()
-	defer service.Release()
+	if runtime.GOARCH != "arm64" {
+		// calling service.Release() and the serviceRaw.Clear() (or the reverse) causes
+		// a panic on arm64 (Exception 0xc0000005: Access Violation). The hunch is that on arm64
+		// one clears the memory of the other.
+		defer service.Release()
+	}
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"running WMI query",
@@ -169,7 +175,12 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	defer resultRaw.Clear()
 
 	result := resultRaw.ToIDispatch()
-	defer result.Release()
+	if runtime.GOARCH != "arm64" {
+		// calling result.Release() and then resultRaw.Clear() (or the reverse) causes
+		// a panic on arm64 (Exception 0xc0000005: Access Violation). The hunch is that on arm64
+		// one clears the memory of the other.
+		defer result.Release()
+	}
 
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
 		return nil, fmt.Errorf("ole foreach: %w", err)
