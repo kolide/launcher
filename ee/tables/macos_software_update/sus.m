@@ -7,6 +7,7 @@
 
 void getSoftwareUpdateConfiguration(int os_version,
                                     int* isMacOSAutoUpdateManaged,
+                                    int* isAutomaticallyCheckForUpdatesManaged,
                                     int* isAutomaticallyCheckForUpdatesEnabled,
                                     int* doesBackgroundDownload,
                                     int* doesAppStoreAutoUpdates,
@@ -25,6 +26,11 @@ void getSoftwareUpdateConfiguration(int os_version,
   BOOL val = [manager isMacOSAutoUpdateManaged];
   if (val) {
     *isMacOSAutoUpdateManaged = 1;
+  }
+
+  val = [manager isAutomaticallyCheckForUpdatesManaged];
+  if (val) {
+    *isAutomaticallyCheckForUpdatesManaged = 1;
   }
 
   val = [manager isAutomaticallyCheckForUpdatesEnabled];
