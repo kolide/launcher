@@ -225,7 +225,7 @@ func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr
 	}
 
 	// If the recovery actions are already set, we don't need to do anything
-	if len(curRecoveryActions) == len(recoveryActions) { // nothing to do, the flag was already set correctly
+	if curRecoveryActions != nil && len(curRecoveryActions) == len(recoveryActions) {
 		return
 	}
 
