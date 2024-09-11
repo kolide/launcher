@@ -94,7 +94,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 
 	checkRestartActions(logger, launcherService)
 
-	setRecoveryActions(context.TODO(), logger, launcherService)
+	checkRecoveryActions(context.TODO(), logger, launcherService)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -194,7 +194,21 @@ func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
 
 // setRecoveryActions sets the recovery actions for the launcher service.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
-func setRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
+func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
+	curFlag, err := service.RecoveryActionsOnNonCrashFailures()
+
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"querying for current RecoveryActionsOnNonCrashFailures flag",
+			"err", err,
+		)
+
+		return
+	}
+
+	if curFlag { // nothing to do, the flag was already set correctly
+		return
+	}
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			// first failure
