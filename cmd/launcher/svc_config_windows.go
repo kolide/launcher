@@ -236,7 +236,7 @@ func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr
 	}
 }
 
-// Define the recoveryActionsAreSet function
+// recoveryActionsAreSet checks if the current recovery actions are set to the desired recovery actions
 func recoveryActionsAreSet(curRecoveryActions []mgr.RecoveryAction, recoveryActions []mgr.RecoveryAction) bool {
 	if curRecoveryActions != nil {
 		if len(curRecoveryActions) == len(recoveryActions) {
