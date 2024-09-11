@@ -192,7 +192,8 @@ func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
 	logger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
 }
 
-// setRecoveryActions sets the recovery actions for the launcher service.
+// checkRecoveryActions checks if the recovery actions for the launcher service are set.
+// sets if one or more of the recovery actions are not set.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
 func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
 	curRecoveryActions, err := service.RecoveryActions()
