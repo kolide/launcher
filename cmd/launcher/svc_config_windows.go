@@ -196,7 +196,6 @@ func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
 func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
 	curRecoveryActions, err := service.RecoveryActions()
-
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"querying for current RecoveryActions",
