@@ -195,20 +195,17 @@ func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
 // setRecoveryActions sets the recovery actions for the launcher service.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
 func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
-	curFlag, err := service.RecoveryActionsOnNonCrashFailures()
+	curRecoveryActions, err := service.RecoveryActions()
 
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
-			"querying for current RecoveryActionsOnNonCrashFailures flag",
+			"querying for current RecoveryActions",
 			"err", err,
 		)
 
 		return
 	}
 
-	if curFlag { // nothing to do, the flag was already set correctly
-		return
-	}
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			// first failure
@@ -225,6 +222,11 @@ func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr
 			Type:  mgr.ServiceRestart,
 			Delay: 5 * time.Second,
 		},
+	}
+
+	// If the recovery actions are already set, we don't need to do anything
+	if len(curRecoveryActions) == len(recoveryActions) { // nothing to do, the flag was already set correctly
+		return
 	}
 
 	if err := service.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
