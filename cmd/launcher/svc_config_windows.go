@@ -224,7 +224,7 @@ func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr
 	}
 
 	// If the recovery actions are already set, we don't need to do anything
-	if curRecoveryActions != nil && len(curRecoveryActions) == len(recoveryActions) {
+	if recoveryActionsAreSet(curRecoveryActions, recoveryActions) {
 		return
 	}
 
@@ -234,4 +234,19 @@ func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr
 			"err", err,
 		)
 	}
+}
+
+// Define the recoveryActionsAreSet function
+func recoveryActionsAreSet(curRecoveryActions []mgr.RecoveryAction, recoveryActions []mgr.RecoveryAction) bool {
+	if curRecoveryActions != nil {
+		if len(curRecoveryActions) == len(recoveryActions) {
+			for i := range curRecoveryActions {
+				if curRecoveryActions[i].Type != recoveryActions[i].Type && curRecoveryActions[i].Delay != recoveryActions[i].Delay {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
