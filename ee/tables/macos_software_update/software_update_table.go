@@ -49,7 +49,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	}
 	var (
 		version                               = C.int(table.macOSBuildVersionPrefix)
-		isAutomaticallyCheckForUpdatesManaged = C.int(0)
+		isMacOSAutoUpdateManaged              = C.int(0)
 		isAutomaticallyCheckForUpdatesEnabled = C.int(0)
 		doesBackgroundDownload                = C.int(0)
 		doesAppStoreAutoUpdates               = C.int(0)
@@ -59,7 +59,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 	)
 	C.getSoftwareUpdateConfiguration(
 		version,
-		&isAutomaticallyCheckForUpdatesManaged,
+		&isMacOSAutoUpdateManaged,
 		&isAutomaticallyCheckForUpdatesEnabled,
 		&doesBackgroundDownload,
 		&doesAppStoreAutoUpdates,
@@ -70,7 +70,7 @@ func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext 
 
 	resp := []map[string]string{
 		{
-			"autoupdate_managed":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesManaged),
+			"autoupdate_managed":              fmt.Sprintf("%d", isMacOSAutoUpdateManaged),
 			"autoupdate_enabled":              fmt.Sprintf("%d", isAutomaticallyCheckForUpdatesEnabled),
 			"download":                        fmt.Sprintf("%d", doesBackgroundDownload),
 			"app_updates":                     fmt.Sprintf("%d", doesAppStoreAutoUpdates),

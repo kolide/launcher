@@ -6,7 +6,7 @@
 #import <SUUpdateProduct.h>
 
 void getSoftwareUpdateConfiguration(int os_version,
-                                    int* isAutomaticallyCheckForUpdatesManaged,
+                                    int* isMacOSAutoUpdateManaged,
                                     int* isAutomaticallyCheckForUpdatesEnabled,
                                     int* doesBackgroundDownload,
                                     int* doesAppStoreAutoUpdates,
@@ -22,9 +22,9 @@ void getSoftwareUpdateConfiguration(int os_version,
   Class SUSharedPrefs = [bundle classNamed:@"SUSharedPrefs"];
   id manager = [SUSharedPrefs sharedPrefManager];
 
-  BOOL val = [manager isAutomaticallyCheckForUpdatesManaged];
+  BOOL val = [manager isMacOSAutoUpdateManaged];
   if (val) {
-    *isAutomaticallyCheckForUpdatesManaged = 1;
+    *isMacOSAutoUpdateManaged = 1;
   }
 
   val = [manager isAutomaticallyCheckForUpdatesEnabled];

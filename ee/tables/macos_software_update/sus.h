@@ -7,7 +7,7 @@ extern void productNestedKeyValueFound(unsigned int, char*, char*, char*);
 
 // Gets software update config flags from SUSharedPrefs API
 void getSoftwareUpdateConfiguration(int os_version,
-                                    int* isAutomaticallyCheckForUpdatesManaged,
+                                    int* isMacOSAutoUpdateManaged,
                                     int* isAutomaticallyCheckForUpdatesEnabled,
                                     int* doesBackgroundDownload,
                                     int* doesAppStoreAutoUpdates,
