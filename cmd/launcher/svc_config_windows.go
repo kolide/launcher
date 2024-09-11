@@ -243,7 +243,10 @@ func recoveryActionsAreSet(curRecoveryActions, recoveryActions []mgr.RecoveryAct
 		return false
 	}
 	for i := range curRecoveryActions {
-		if curRecoveryActions[i].Type != recoveryActions[i].Type && curRecoveryActions[i].Delay != recoveryActions[i].Delay {
+		if curRecoveryActions[i].Type != recoveryActions[i].Type {
+			return false
+		}
+		if curRecoveryActions[i].Delay != recoveryActions[i].Delay {
 			return false
 		}
 	}
