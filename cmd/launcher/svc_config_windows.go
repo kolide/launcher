@@ -94,7 +94,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 
 	checkRestartActions(logger, launcherService)
 
-	setRecoveryActions(context.TODO(), logger, launcherService)
+	checkRecoveryActions(context.TODO(), logger, launcherService)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -192,9 +192,20 @@ func checkRestartActions(logger *slog.Logger, service *mgr.Service) {
 	logger.Log(context.TODO(), slog.LevelInfo, "successfully set RecoveryActionsOnNonCrashFailures flag")
 }
 
-// setRecoveryActions sets the recovery actions for the launcher service.
+// checkRecoveryActions checks if the recovery actions for the launcher service are set.
+// sets if one or more of the recovery actions are not set.
 // previously defined via wix ServicConfig Element (Util Extension) https://wixtoolset.org/docs/v3/xsd/util/serviceconfig/
-func setRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
+func checkRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.Service) {
+	curRecoveryActions, err := service.RecoveryActions()
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"querying for current RecoveryActions",
+			"err", err,
+		)
+
+		return
+	}
+
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			// first failure
@@ -213,10 +224,31 @@ func setRecoveryActions(ctx context.Context, logger *slog.Logger, service *mgr.S
 		},
 	}
 
+	// If the recovery actions are already set, we don't need to do anything
+	if recoveryActionsAreSet(curRecoveryActions, recoveryActions) {
+		return
+	}
+
 	if err := service.SetRecoveryActions(recoveryActions, 24*60*60); err != nil { // 24 hours
 		logger.Log(ctx, slog.LevelError,
 			"setting RecoveryActions",
 			"err", err,
 		)
 	}
+}
+
+// recoveryActionsAreSet checks if the current recovery actions are set to the desired recovery actions
+func recoveryActionsAreSet(curRecoveryActions, recoveryActions []mgr.RecoveryAction) bool {
+	if curRecoveryActions == nil || len(curRecoveryActions) != len(recoveryActions) {
+		return false
+	}
+	for i := range curRecoveryActions {
+		if curRecoveryActions[i].Type != recoveryActions[i].Type {
+			return false
+		}
+		if curRecoveryActions[i].Delay != recoveryActions[i].Delay {
+			return false
+		}
+	}
+	return true
 }
