@@ -153,8 +153,10 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	}
 	defer serviceRaw.Clear()
 
+	// the memory of result is released by `defer serviceRaw.Clear()` above,
+	// on windows arm64 machines, calling `service.Clear()` after `serviceRaw.Release()`
+	// would cause a panic
 	service := serviceRaw.ToIDispatch()
-	defer service.Release()
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"running WMI query",
@@ -168,8 +170,10 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	}
 	defer resultRaw.Clear()
 
+	// the memory of result is released by `defer resultRaw.Clear()` above,
+	// on windows arm64 machines, calling `resultRaw.Clear()` after `result.Release()`
+	// would cause a panic
 	result := resultRaw.ToIDispatch()
-	defer result.Release()
 
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
 		return nil, fmt.Errorf("ole foreach: %w", err)
