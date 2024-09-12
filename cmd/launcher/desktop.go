@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/desktop/user/universallink"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/authedclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -181,6 +182,8 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 			)
 		}
 	}()
+
+	go presencedetection.WindowsHello(context.TODO(), slogger.With("component", "windows_hello"))
 
 	// blocks until shutdown called
 	m.Init()
