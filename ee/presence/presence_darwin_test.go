@@ -15,10 +15,10 @@ const testPresenceEnvVar = "launcher_test_presence"
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presence/ -run Test_biometricDetectSuccess
+// launcher_test_presence=true go test ./ee/presence/ -run Test_detectSuccess
 //
 // then successfully auth with the pop up
-func Test_biometricDetectSuccess(t *testing.T) {
+func Test_detectSuccess(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv(testPresenceEnvVar) == "" {
@@ -32,10 +32,10 @@ func Test_biometricDetectSuccess(t *testing.T) {
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presence/ -run Test_biometricDetectCancel
+// launcher_test_presence=true go test ./ee/presence/ -run Test_detectCancel
 //
 // then cancel the biometric auth that pops up
-func Test_biometricDetectCancel(t *testing.T) {
+func Test_detectCancel(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv(testPresenceEnvVar) == "" {
