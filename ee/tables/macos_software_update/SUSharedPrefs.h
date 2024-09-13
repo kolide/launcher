@@ -62,6 +62,7 @@
 - (BOOL)bridgeOSUpdatesEnabled;
 - (BOOL)skipAPFSSnapshotting;
 - (BOOL)doesAllowBGStageWithoutInactivity;
+- (BOOL)isMacOSAutoUpdateManaged;
 - (BOOL)isAutomaticallyCheckForUpdatesManaged;
 - (BOOL)isAutomaticallyCheckForUpdatesEnabled;
 - (BOOL)adminDeferredInstallEnabled;
@@ -108,4 +109,3 @@
 - (void)reloadPreferences;
 
 @end
-

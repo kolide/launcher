@@ -153,8 +153,17 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	}
 	defer serviceRaw.Clear()
 
+	// In testing, we find we do not need to `service.Release()`. The memory of result is released
+	// by `defer serviceRaw.Clear()` above, furthermore on windows arm64 machines, calling
+	// `service.Clear()` after `serviceRaw.Release()` causes a panic.
+	//
+	// Looking at the `serviceRaw.ToIDispatch()` implementation, it's just a cast that returns
+	// a pointer to the same memory. Which would explain why calling `serviceRaw.Release()` after
+	// `service.Clear()` causes a panic. It's unclear why this causes a panic on arm64 machines and
+	// not on amd64 machines.
+	//
+	// This also applies to the `resultRaw` and `results` variables below.
 	service := serviceRaw.ToIDispatch()
-	defer service.Release()
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"running WMI query",
@@ -168,8 +177,8 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	}
 	defer resultRaw.Clear()
 
+	// see above comment about `service.Release()` to explain why `result.Release()` isn't called
 	result := resultRaw.ToIDispatch()
-	defer result.Release()
 
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
 		return nil, fmt.Errorf("ole foreach: %w", err)
