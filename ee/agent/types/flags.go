@@ -230,4 +230,7 @@ type Flags interface {
 	// SystrayRestartEnabled controls whether launcher's desktop runner will restart systray on error
 	SetSystrayRestartEnabled(enabled bool) error
 	SystrayRestartEnabled() bool
+
+	// Identifier is the package build identifier used to namespace our paths and service names
+	Identifier() string
 }
