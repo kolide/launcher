@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
-func disableAutoStart(ctx context.Context) error {
+func disableAutoStart(ctx context.Context, k types.Knapsack) error {
 	// the --now flag will disable and stop the service
 	cmd, err := allowedcmd.Systemctl(ctx, "disable", "--now", "launcher.kolide-k2.service")
 	if err != nil {

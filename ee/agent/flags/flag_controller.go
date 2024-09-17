@@ -657,3 +657,9 @@ func (fc *FlagController) LocalDevelopmentPath() string {
 		WithDefaultString(fc.cmdLineOpts.LocalDevelopmentPath),
 	).get(nil)
 }
+
+func (fc *FlagController) Identifier() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.Identifier),
+	).get(nil)
+}

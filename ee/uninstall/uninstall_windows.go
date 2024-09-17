@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/watchdog"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-func disableAutoStart(ctx context.Context) error {
+func disableAutoStart(ctx context.Context, k types.Knapsack) error {
 	svcMgr, err := mgr.Connect()
 	if err != nil {
 		return fmt.Errorf("connecting to windows service manager: %w", err)
