@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -38,15 +39,19 @@ const (
 	executeReturnTimeout = 5 * time.Second  // After interrupted, how long for all actors to exit their `execute` functions
 )
 
-func NewRunGroup(slogger *slog.Logger) *Group {
+func NewRunGroup() *Group {
 	return &Group{
-		slogger: slogger.With("component", "run_group"),
+		slogger: multislogger.NewNopLogger(),
 		actors:  make([]rungroupActor, 0),
 	}
 }
 
 func (g *Group) Add(name string, execute func() error, interrupt func(error)) {
 	g.actors = append(g.actors, rungroupActor{name, execute, interrupt})
+}
+
+func (g *Group) SetSlogger(slogger *slog.Logger) {
+	g.slogger = slogger.With("component", "run_group")
 }
 
 func (g *Group) Run() error {

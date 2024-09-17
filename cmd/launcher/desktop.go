@@ -111,7 +111,8 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		)
 	}
 
-	runGroup := rungroup.NewRunGroup(slogger)
+	runGroup := rungroup.NewRunGroup()
+	runGroup.SetSlogger(slogger)
 
 	// listen for signals
 	runGroup.Add("desktopSignalListener", func() error {
