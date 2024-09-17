@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -56,6 +57,8 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
+
+	presenceDetector presencedetection.PresenceDetector
 }
 
 const (
@@ -121,9 +124,15 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 
 	srv := &http.Server{
-		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-			return r.URL.Path
-		})),
+		Handler: otelhttp.NewHandler(
+			ls.requestLoggingHandler(
+				ls.preflightCorsHandler(
+					ls.rateLimitHandler(
+						ls.presenceDetectionHandler(mux),
+					),
+				)), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.URL.Path
+			})),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
@@ -387,6 +396,24 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 				"over rate limit",
 			)
 
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		success, err := ls.presenceDetector.DetectForConsoleUser("sign you into a thing...", 1*time.Minute)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if !success {
+			http.Error(w, "presence detection failed", http.StatusInternalServerError)
 			return
 		}
 

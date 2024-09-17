@@ -1,4 +1,7 @@
-package presence
+//go:build darwin
+// +build darwin
+
+package presencedetection
 
 /*
 #cgo CFLAGS: -x objective-c -fmodules -fblocks
@@ -81,7 +84,7 @@ import (
 	"unsafe"
 )
 
-func detect(reason string) (bool, error) {
+func Detect(reason string) (bool, error) {
 	reasonStr := C.CString(reason)
 	defer C.free(unsafe.Pointer(reasonStr))
 

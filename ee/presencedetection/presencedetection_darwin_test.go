@@ -1,4 +1,4 @@
-package presence
+package presencedetection
 
 import (
 	"os"
@@ -15,24 +15,24 @@ const testPresenceEnvVar = "launcher_test_presence"
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presence/ -run Test_detectSuccess
+// launcher_test_presence=true go test ./ee/presencedetection/ -run Test_detectSuccess
 //
 // then successfully auth with the pop up
 func Test_detectSuccess(t *testing.T) {
 	t.Parallel()
 
 	if os.Getenv(testPresenceEnvVar) == "" {
-		t.Skip("Skipping test_biometricDetectSuccess")
+		t.Skip("Skipping Test_detectSuccess")
 	}
 
-	success, err := detect("IS TRYING TO TEST SUCCESS, PLEASE AUTHENTICATE")
+	success, err := Detect("IS TRYING TO TEST SUCCESS, PLEASE AUTHENTICATE")
 	require.NoError(t, err, "should not get an error on successful detect")
 	assert.True(t, success, "should be successful")
 }
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presence/ -run Test_detectCancel
+// launcher_test_presence=true go test ./ee/presencedetection/ -run Test_detectCancel
 //
 // then cancel the biometric auth that pops up
 func Test_detectCancel(t *testing.T) {
@@ -42,7 +42,7 @@ func Test_detectCancel(t *testing.T) {
 		t.Skip("Skipping test_biometricDetectCancel")
 	}
 
-	success, err := detect("IS TRYING TO TEST CANCEL, PLEASE PRESS CANCEL")
+	success, err := Detect("IS TRYING TO TEST CANCEL, PLEASE PRESS CANCEL")
 	require.Error(t, err, "should get an error on failed detect")
 	assert.False(t, success, "should not be successful")
 }
