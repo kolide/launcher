@@ -124,6 +124,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
 		{&uninstallHistoryCheckup{k: k}, flareSupported},
 		{&desktopMenu{k: k}, flareSupported},
+		{&coredumpCheckup{}, doctorSupported | flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)

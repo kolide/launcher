@@ -24,6 +24,10 @@ func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCmd, nil
 }
 
+func Coredumpctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
+	return validatedCommand(ctx, "/usr/bin/coredumpctl", arg...)
+}
+
 func Cryptsetup(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	for _, p := range []string{"/usr/sbin/cryptsetup", "/sbin/cryptsetup"} {
 		validatedCmd, err := validatedCommand(ctx, p, arg...)
