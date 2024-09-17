@@ -45,7 +45,7 @@ func (c *coredumpCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 		}
 
 		// At least one coredump exists for at least one binary
-		c.status = Failing
+		c.status = Warning
 		c.summary += fmt.Sprintf("%s has at least one coredump; ", binaryName)
 		c.data[binaryName] = strings.TrimSpace(string(coredumpListRaw))
 	}
