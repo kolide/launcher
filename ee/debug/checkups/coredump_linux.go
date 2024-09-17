@@ -60,6 +60,9 @@ func (c *coredumpCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
 	for _, binaryName := range []string{"launcher", "osqueryd"} {
+		if c.data[binaryName] == "N/A" {
+			continue
+		}
 		if err := c.writeCoredumpInfo(ctx, binaryName, extraZip); err != nil {
 			fmt.Fprintf(extraWriter, "Writing coredump info for %s: %v", binaryName, err)
 		}
@@ -75,13 +78,11 @@ func (c *coredumpCheckup) coredumpList(ctx context.Context, binaryName string) (
 	}
 
 	out, err := coredumpctlListCmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("running coredumpctl list %s: %w", binaryName, err)
-	}
-
-	// No coredumps!
 	if strings.Contains(string(out), "No coredumps found") {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("running coredumpctl list %s: out `%s`; %w", binaryName, string(out), err)
 	}
 
 	return out, nil
@@ -95,7 +96,7 @@ func (c *coredumpCheckup) writeCoredumpInfo(ctx context.Context, binaryName stri
 	}
 	infoOut, err := coredumpctlInfoCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("running coredumpctl info %s: %w", binaryName, err)
+		return fmt.Errorf("running coredumpctl info %s: out `%s`; %w", binaryName, string(infoOut), err)
 	}
 	coredumpctlInfoFile, err := z.Create(filepath.Join(".", fmt.Sprintf("coredumpctl-info-%s.txt", binaryName)))
 	if err != nil {
