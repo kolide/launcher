@@ -659,7 +659,13 @@ func (fc *FlagController) LocalDevelopmentPath() string {
 }
 
 func (fc *FlagController) Identifier() string {
-	return NewStringFlagValue(
+	identifier := NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.Identifier),
 	).get(nil)
+
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	return identifier
 }

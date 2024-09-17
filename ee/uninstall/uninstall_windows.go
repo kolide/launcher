@@ -6,6 +6,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/watchdog"
+	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
@@ -16,7 +17,8 @@ func disableAutoStart(ctx context.Context, k types.Knapsack) error {
 	}
 	defer svcMgr.Disconnect()
 
-	launcherSvc, err := svcMgr.OpenService("LauncherKolideK2Svc")
+	serviceName := launcher.ServiceName(k.Identifier())
+	launcherSvc, err := svcMgr.OpenService(serviceName)
 	if err != nil {
 		return fmt.Errorf("opening launcher service: %w", err)
 	}

@@ -49,7 +49,7 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		return
 	}
 
-	if err := disableAutoStart(ctx); err != nil {
+	if err := disableAutoStart(ctx, k); err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
 			"disabling auto start",
 			"err", err,
