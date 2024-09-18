@@ -25,15 +25,17 @@ import (
 )
 
 const (
-	timestampValidityRange             = 150
-	kolideKryptoEccHeader20230130Value = "2023-01-30"
-	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
-	kolideSessionIdHeaderKey           = "X-Kolide-Session"
+	timestampValidityRange                    = 150
+	kolideKryptoEccHeader20230130Value        = "2023-01-30"
+	kolideKryptoHeaderKey                     = "X-Kolide-Krypto"
+	kolideSessionIdHeaderKey                  = "X-Kolide-Session"
+	kolidePresenceDetectionIntervalSecondsKey = "X-Kolide-Presence-Detection-Interval"
 )
 
 type v2CmdRequestType struct {
 	Path            string
 	Body            []byte
+	Headers         map[string][]string
 	CallbackUrl     string
 	CallbackHeaders map[string][]string
 	AllowedOrigins  []string
@@ -283,6 +285,12 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				Host:   r.Host,
 				Path:   cmdReq.Path,
 			},
+		}
+
+		for h, vals := range cmdReq.Headers {
+			for _, v := range vals {
+				newReq.Header.Add(h, v)
+			}
 		}
 
 		newReq.Header.Set("Origin", r.Header.Get("Origin"))

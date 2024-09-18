@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -406,14 +407,29 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		success, err := ls.presenceDetector.DetectForConsoleUser("sign you into a thing...", 1*time.Minute)
+		// can test this by adding an unauthed endpoint to the mux and running, for example:
+		// curl -H "X-Kolide-Presence-Detection-Interval: 0" localhost:12519/id
+		detectionIntervalSecondsStr := r.Header.Get(kolidePresenceDetectionIntervalSecondsKey)
+
+		// no presence detection requested
+		if detectionIntervalSecondsStr == "" {
+			next.ServeHTTP(w, r)
+		}
+
+		detectionIntervalSeconds, err := strconv.Atoi(detectionIntervalSecondsStr)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		success, err := ls.presenceDetector.DetectForConsoleUser("detect user presence", time.Duration(detectionIntervalSeconds)*time.Second)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		if !success {
-			http.Error(w, "presence detection failed", http.StatusInternalServerError)
+			http.Error(w, "presence detection failed", http.StatusUnauthorized)
 			return
 		}
 
