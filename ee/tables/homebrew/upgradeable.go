@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"errors"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
@@ -43,7 +44,12 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	// that user. To reduce duplicating the WithUid table helper, we can find the owner of the binary,
 	// and pass the said owner to the WIthUid method to handle setting the appropriate env vars.
 	cmd, err := allowedcmd.Brew(ctx)
+		
 	if err != nil {
+		if errors.Is(err, allowedcmd.ErrHomebrewNotFound) {
+			// No data, no error
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failure allocating allowedcmd.Brew: %w", err)
 	}
 
