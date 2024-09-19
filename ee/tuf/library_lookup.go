@@ -230,7 +230,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
-	return mostRecentVersion(ctx, binary, updateDirectory, channel)
+	return mostRecentVersion(ctx, slogger, binary, updateDirectory, channel)
 }
 
 // findExecutable looks at our local TUF repository to find the release for our
@@ -270,12 +270,12 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
+func mostRecentVersion(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	// Pull all available versions from library
-	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, binary, baseUpdateDirectory)
+	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, slogger, binary, baseUpdateDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
