@@ -121,7 +121,7 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 		Level:     slog.LevelDebug,
 	}))
 
-	server, err := New(slogger, authHeader, socketPath, shutdownChan, nil)
+	server, err := New(slogger, authHeader, socketPath, shutdownChan, make(chan<- struct{}), nil)
 	require.NoError(t, err)
 	return server, shutdownChan
 }

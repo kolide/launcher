@@ -55,6 +55,10 @@ func (c *client) Refresh() error {
 	return c.get("refresh")
 }
 
+func (c *client) ShowDesktop() error {
+	return c.get("show")
+}
+
 func (c *client) Notify(n notify.Notification) error {
 	notificationToSend := notify.Notification{
 		Title:     n.Title,

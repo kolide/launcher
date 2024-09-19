@@ -13,6 +13,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/launcher/ee/desktop/user/notify"
@@ -30,19 +31,26 @@ type UserServer struct {
 	server           *http.Server
 	listener         net.Listener
 	shutdownChan     chan<- struct{}
+	showDesktopChan  chan<- struct{}
 	authToken        string
 	socketPath       string
 	notifier         notificationSender
 	refreshListeners []func()
 }
 
-func New(slogger *slog.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*UserServer, error) {
+func New(slogger *slog.Logger,
+	authToken string,
+	socketPath string,
+	shutdownChan chan<- struct{},
+	showDesktopChan chan<- struct{},
+	notifier notificationSender) (*UserServer, error) {
 	userServer := &UserServer{
-		shutdownChan: shutdownChan,
-		authToken:    authToken,
-		slogger:      slogger.With("component", "desktop_server"),
-		socketPath:   socketPath,
-		notifier:     notifier,
+		shutdownChan:    shutdownChan,
+		showDesktopChan: showDesktopChan,
+		authToken:       authToken,
+		slogger:         slogger.With("component", "desktop_server"),
+		socketPath:      socketPath,
+		notifier:        notifier,
 	}
 
 	authedMux := http.NewServeMux()
@@ -50,6 +58,7 @@ func New(slogger *slog.Logger, authToken string, socketPath string, shutdownChan
 	authedMux.HandleFunc("/ping", userServer.pingHandler)
 	authedMux.HandleFunc("/notification", userServer.notificationHandler)
 	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
+	authedMux.HandleFunc("/show", userServer.showDesktop)
 
 	userServer.server = &http.Server{
 		Handler: userServer.authMiddleware(authedMux),
@@ -150,6 +159,15 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *UserServer) showDesktop(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	sync.OnceFunc(func() {
+		s.showDesktopChan <- struct{}{}
+	})()
 }
 
 func (s *UserServer) refreshHandler(w http.ResponseWriter, req *http.Request) {
