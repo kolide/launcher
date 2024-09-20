@@ -48,7 +48,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	if err != nil {
 		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
 			// No data, no error
-			return nil, err
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failure allocating allowedcmd.Brew: %w", err)
 	}

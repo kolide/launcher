@@ -16,7 +16,7 @@ func Apt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	validatedCmd, err := validatedCommand(ctx, "/home/linuxbrew/.linuxbrew/bin/brew", arg...)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
