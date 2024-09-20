@@ -548,10 +548,9 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 		return
 	}
 
-	// Tell any running desktop user processes that they should show menu and refresh the latest menu data
+	// Tell any running desktop user processes that they should refresh the latest menu data
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
-
 		if err := client.Refresh(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelError,
 				"sending refresh command to user desktop process",
@@ -714,6 +713,10 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	client := client.New(r.userServerAuthToken, socketPath)
 
 	pingFunc := client.Ping
+
+	// if the desktop is enabled, we want to show the desktop
+	// just perform this instead of ping to verify the desktop is running
+	// and show it right away
 	if r.knapsack.DesktopEnabled() {
 		pingFunc = client.ShowDesktop
 	}

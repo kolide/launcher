@@ -20,7 +20,6 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -58,8 +57,6 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
-
-	presenceDetector presencedetection.PresenceDetector
 }
 
 const (
