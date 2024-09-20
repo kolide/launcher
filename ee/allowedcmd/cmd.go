@@ -34,7 +34,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 	// We expect to know the exact location for allowlisted commands on all
 	// OSes except for a few Linux distros.
 	if !allowSearchPath() {
-		return nil, fmt.Errorf("%w: %s",ErrCommandNotFound, knownPath)
+		return nil, fmt.Errorf("%w: %s", ErrCommandNotFound, knownPath)
 	}
 
 	cmdName := filepath.Base(knownPath)
@@ -42,7 +42,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 		return newCmd(ctx, foundPath, arg...), nil
 	}
 
-	return nil, fmt.Errorf("%w: %s and could not be located elsewhere", ErrCommandNotFound, knownPath)
+	return nil, fmt.Errorf("%w: not found at %s and could not be located elsewhere", ErrCommandNotFound, knownPath)
 }
 
 func allowSearchPath() bool {
