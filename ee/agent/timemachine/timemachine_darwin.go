@@ -33,10 +33,17 @@ func AddExclusions(ctx context.Context, k types.Knapsack) {
 		launcher.pid
 	*/
 
-	exclusionPatterns := []string{
+	exclusionPatternsFirstBatch := []string{
 		"*.json",
 		"*.json.gz",
 		"*.db",
+	}
+
+	addExclusionsFromPathPatterns(ctx, k, exclusionPatternsFirstBatch)
+
+	// Attempting to run this with a single tmutil call we see a lot of tmutil failures logged with error "argument list too long".
+	// To avoid this we run in two separate batches, attempting to cut the post-glob argument list roughly in half
+	exclusionPatternsSecondBatch := []string{
 		"*.sqlite",
 		"desktop_*",
 		"*.pid",
@@ -45,6 +52,10 @@ func AddExclusions(ctx context.Context, k types.Knapsack) {
 		"osquery*",
 	}
 
+	addExclusionsFromPathPatterns(ctx, k, exclusionPatternsSecondBatch)
+}
+
+func addExclusionsFromPathPatterns(ctx context.Context, k types.Knapsack, exclusionPatterns []string) {
 	var exclusionPaths []string
 	for _, pattern := range exclusionPatterns {
 		matches, err := filepath.Glob(filepath.Join(k.RootDirectory(), pattern))
