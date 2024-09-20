@@ -13,12 +13,10 @@ func Apt(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	return validatedCommand(ctx, "/usr/bin/apt", arg...)
 }
 
-var ErrHomebrewNotFound = errors.New("homebrew not found")
-
 func Brew(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 	validatedCmd, err := validatedCommand(ctx, "/home/linuxbrew/.linuxbrew/bin/brew", arg...)
 	if err != nil {
-		return nil, ErrHomebrewNotFound
+		return nil, nil
 	}
 
 	validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")

@@ -46,7 +46,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	cmd, err := allowedcmd.Brew(ctx)
 		
 	if err != nil {
-		if errors.Is(err, allowedcmd.ErrHomebrewNotFound) {
+		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
 			// No data, no error
 			return nil, nil
 		}

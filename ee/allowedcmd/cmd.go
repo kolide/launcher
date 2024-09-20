@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"errors"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
@@ -19,6 +20,8 @@ type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
 }
+
+var ErrCommandNotFound = errors.New("command not found")
 
 func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*exec.Cmd, error) {
 	knownPath = filepath.Clean(knownPath)
@@ -31,7 +34,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 	// We expect to know the exact location for allowlisted commands on all
 	// OSes except for a few Linux distros.
 	if !allowSearchPath() {
-		return nil, fmt.Errorf("not found: %s", knownPath)
+		return nil, fmt.Errorf("%w: %s",ErrCommandNotFound, knownPath)
 	}
 
 	cmdName := filepath.Base(knownPath)
@@ -39,7 +42,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 		return newCmd(ctx, foundPath, arg...), nil
 	}
 
-	return nil, fmt.Errorf("%s not found at %s and could not be located elsewhere", cmdName, knownPath)
+	return nil, fmt.Errorf("%w: %s and could not be located elsewhere", ErrCommandNotFound, knownPath)
 }
 
 func allowSearchPath() bool {
