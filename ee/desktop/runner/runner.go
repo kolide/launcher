@@ -88,6 +88,32 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 	return instance.uidProcs
 }
 
+func InstanceDetectPresence(reason string, interval time.Duration) (bool, error) {
+	if instance == nil {
+		return false, errors.New("no instance of DesktopUsersProcessesRunner")
+	}
+
+	if instance.uidProcs == nil || len(instance.uidProcs) == 0 {
+		return false, errors.New("no desktop processes running")
+	}
+
+	var lastErr error
+	for _, proc := range instance.uidProcs {
+		client := client.New(instance.userServerAuthToken, proc.socketPath)
+		success, err := client.DetectPresence(reason, interval)
+
+		// not sure how to handle the possiblity of multiple users
+		// so just return the first success
+		if success {
+			return success, err
+		}
+
+		lastErr = err
+	}
+
+	return false, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -522,19 +548,9 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 		return
 	}
 
-	// Tell any running desktop user processes that they should refresh the latest menu data
+	// Tell any running desktop user processes that they should show menu and refresh the latest menu data
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
-
-		if err := client.ShowDesktop(); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
-				"sending refresh command to user desktop process",
-				"uid", uid,
-				"pid", proc.Process.Pid,
-				"path", proc.path,
-				"err", err,
-			)
-		}
 
 		if err := client.Refresh(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelError,
@@ -696,13 +712,19 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	r.waitOnProcessAsync(uid, cmd.Process)
 
 	client := client.New(r.userServerAuthToken, socketPath)
-	if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+
+	pingFunc := client.Ping
+	if r.knapsack.DesktopEnabled() {
+		pingFunc = client.ShowDesktop
+	}
+
+	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
 		if err := cmd.Process.Kill(); err != nil {
 			r.slogger.Log(ctx, slog.LevelError,
-				"killing user desktop process after startup ping failed",
+				"killing user desktop process after startup ping / show desktop failed",
 				"uid", uid,
 				"pid", cmd.Process.Pid,
 				"path", cmd.Path,

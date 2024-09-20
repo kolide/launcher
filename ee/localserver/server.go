@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
@@ -123,6 +123,8 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	// curl localhost:40978/id
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
@@ -406,23 +408,23 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
-		// curl -H "X-Kolide-Presence-Detection-Interval: 0" localhost:12519/id
-		detectionIntervalSecondsStr := r.Header.Get(kolidePresenceDetectionIntervalSecondsKey)
+		// curl -H "X-Kolide-Presence-Detection-Interval: 10s" localhost:12519/id
+		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
 
 		// no presence detection requested
-		if detectionIntervalSecondsStr == "" {
+		if detectionIntervalStr == "" {
 			next.ServeHTTP(w, r)
 		}
 
-		detectionIntervalSeconds, err := strconv.Atoi(detectionIntervalSecondsStr)
+		detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		success, err := ls.presenceDetector.DetectForConsoleUser("detect user presence", time.Duration(detectionIntervalSeconds)*time.Second)
+		// TODO: decide how we want to get the reason. Pull from header?
+		success, err := runner.InstanceDetectPresence("authenticate a thing", detectionIntervalDuration)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return

@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/desktop/user/server"
 )
 
 type transport struct {
@@ -57,6 +60,32 @@ func (c *client) Refresh() error {
 
 func (c *client) ShowDesktop() error {
 	return c.get("show")
+}
+
+func (c *client) DetectPresence(reason string, interval time.Duration) (bool, error) {
+	encodedReason := url.QueryEscape(reason)
+	encodedInterval := url.QueryEscape(interval.String())
+
+	resp, requestErr := c.base.Get(fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval))
+	if requestErr != nil {
+		return false, fmt.Errorf("getting presence: %w", requestErr)
+	}
+
+	var response server.DetectPresenceResponse
+	if resp.Body != nil {
+		defer resp.Body.Close()
+
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			return false, fmt.Errorf("decoding response: %w", err)
+		}
+	}
+
+	var err error
+	if response.Error != "" {
+		err = errors.New(response.Error)
+	}
+
+	return response.Success, err
 }
 
 func (c *client) Notify(n notify.Notification) error {
