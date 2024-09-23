@@ -206,7 +206,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(slogger)
+	runGroup := rungroup.NewRunGroup()
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -245,6 +245,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		startupSpan.AddEvent("log_shipper_init_completed")
 	}
+
+	// Now that log shipping is set up, set the slogger on the rungroup so that rungroup logs
+	// will also be shipped.
+	runGroup.SetSlogger(k.Slogger())
 
 	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {

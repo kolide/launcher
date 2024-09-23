@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
@@ -15,14 +14,14 @@ import (
 func TestRun_NoActors(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
+	testRunGroup := NewRunGroup()
 	require.NoError(t, testRunGroup.Run())
 }
 
 func TestRun_MultipleActors(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
+	testRunGroup := NewRunGroup()
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -93,7 +92,7 @@ func TestRun_MultipleActors(t *testing.T) {
 func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
+	testRunGroup := NewRunGroup()
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -166,7 +165,7 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	t.Parallel()
 
-	testRunGroup := NewRunGroup(multislogger.NewNopLogger())
+	testRunGroup := NewRunGroup()
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 	// Keep track of when `execute`s return so we give testRunGroup.Run enough time to do its thing
@@ -250,7 +249,8 @@ func TestRun_RecoversAndLogsPanic(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 
-	testRunGroup := NewRunGroup(slogger)
+	testRunGroup := NewRunGroup()
+	testRunGroup.SetSlogger(slogger)
 
 	// Actor that will panic in its execute function
 	testRunGroup.Add("panickingActor", func() error {

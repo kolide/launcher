@@ -114,6 +114,16 @@ func (ses *secureEnclaveSigner) Public() crypto.PublicKey {
 		return nil
 	}
 
+	// currentConsoleUserKey may return no error and a nil pointer where the inability
+	// to get the key is expected (see logic around calling firstConsoleUser). In this case,
+	// k will be a "typed" nil, as an uninitialized pointer to a ecdsa.PublicKey. We're returning
+	// this typed nil assigned as the crypto.PublicKey interface. This means that the interface's value
+	// will be nil, but it's underlying type will not be - so it will pass nil checks but panic
+	// when typecasted later. Explicitly return an untyped nil in this case to prevent confusion and panics later
+	if k == nil {
+		return nil
+	}
+
 	return k
 }
 

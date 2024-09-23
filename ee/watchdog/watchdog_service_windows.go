@@ -227,7 +227,8 @@ func (w *winWatchdogSvc) checkLauncherStatus(ctx context.Context) error {
 
 func runLauncherWatchdogService(ctx context.Context, w *winWatchdogSvc) error {
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(w.slogger.Logger)
+	runGroup := rungroup.NewRunGroup()
+	runGroup.SetSlogger(w.slogger.Logger)
 	powerEventWatcher, err := powereventwatcher.New(ctx, w.slogger.Logger, w.sleepStateUpdater)
 	if err != nil {
 		w.slogger.Log(ctx, slog.LevelDebug,

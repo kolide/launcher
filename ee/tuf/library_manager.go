@@ -366,7 +366,7 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 	const numberOfVersionsToKeep = 3
 
-	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), binary, ulm.baseDir)
+	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), ulm.slogger, binary, ulm.baseDir)
 	if err != nil {
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not get versions in library to tidy update library",
@@ -410,7 +410,7 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
-func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -425,6 +425,13 @@ func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, ba
 		rawVersion := filepath.Base(rawVersionWithPath)
 		v, err := semver.NewVersion(rawVersion)
 		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"detected invalid binary version while parsing raw version",
+				"raw_version", rawVersion,
+				"binary", binary,
+				"err", err,
+			)
+
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
 		}
@@ -432,6 +439,13 @@ func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, ba
 		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
 		if err := CheckExecutable(ctx, executableLocation(versionDir, binary), "--version"); err != nil {
 			traces.SetError(span, err)
+			slogger.Log(ctx, slog.LevelWarn,
+				"detected invalid binary version while checking executable",
+				"version_dir", versionDir,
+				"binary", binary,
+				"err", err,
+			)
+
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
 		}
