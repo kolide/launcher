@@ -121,7 +121,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	mux.Handle("/id", ls.requestIdHandler())
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
