@@ -170,7 +170,7 @@ func Test_mostRecentVersion(t *testing.T) {
 			tufci.CopyBinary(t, secondVersionPath)
 			require.NoError(t, os.Chmod(secondVersionPath, 0755))
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
+			latest, err := mostRecentVersion(context.TODO(), multislogger.NewNopLogger(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, secondVersionPath, latest.Path)
 			require.Equal(t, secondVersion, latest.Version)
@@ -202,7 +202,7 @@ func Test_mostRecentVersion_DoesNotReturnInvalidExecutables(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Dir(secondVersionPath), 0755))
 			os.WriteFile(secondVersionPath, []byte{}, 0755)
 
-			latest, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
+			latest, err := mostRecentVersion(context.TODO(), multislogger.NewNopLogger(), binary, testBaseDir, "nightly")
 			require.NoError(t, err, "did not expect error getting most recent version")
 			require.Equal(t, firstVersionPath, latest.Path)
 			require.Equal(t, firstVersion, latest.Version)
@@ -221,7 +221,7 @@ func Test_mostRecentVersion_ReturnsErrorOnNoUpdatesDownloaded(t *testing.T) {
 			// Create update directories
 			testBaseDir := t.TempDir()
 
-			_, err := mostRecentVersion(context.TODO(), binary, testBaseDir, "nightly")
+			_, err := mostRecentVersion(context.TODO(), multislogger.NewNopLogger(), binary, testBaseDir, "nightly")
 			require.Error(t, err, "should have returned error when there are no available updates")
 		})
 	}
@@ -239,7 +239,7 @@ func Test_mostRecentVersion_requiresLauncher_v1_4_1(t *testing.T) {
 	tufci.CopyBinary(t, firstVersionPath)
 	require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
-	_, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	_, err := mostRecentVersion(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir, "stable")
 	require.Error(t, err, "should not select launcher version under v1.4.1")
 }
 
@@ -255,7 +255,7 @@ func Test_mostRecentVersion_acceptsLauncher_v1_4_1(t *testing.T) {
 	tufci.CopyBinary(t, firstVersionPath)
 	require.NoError(t, os.Chmod(firstVersionPath, 0755))
 
-	latest, err := mostRecentVersion(context.TODO(), binaryLauncher, testBaseDir, "stable")
+	latest, err := mostRecentVersion(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir, "stable")
 	require.NoError(t, err, "should be able to select launcher version equal to v1.4.1")
 	require.Equal(t, firstVersionPath, latest.Path)
 }
