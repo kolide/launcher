@@ -88,32 +88,6 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 	return instance.uidProcs
 }
 
-func InstanceDetectPresence(reason string, interval time.Duration) (bool, error) {
-	if instance == nil {
-		return false, errors.New("no instance of DesktopUsersProcessesRunner")
-	}
-
-	if instance.uidProcs == nil || len(instance.uidProcs) == 0 {
-		return false, errors.New("no desktop processes running")
-	}
-
-	var lastErr error
-	for _, proc := range instance.uidProcs {
-		client := client.New(instance.userServerAuthToken, proc.socketPath)
-		success, err := client.DetectPresence(reason, interval)
-
-		// not sure how to handle the possiblity of multiple users
-		// so just return the first success
-		if success {
-			return success, err
-		}
-
-		lastErr = err
-	}
-
-	return false, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
-}
-
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -306,6 +280,28 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	r.slogger.Log(ctx, slog.LevelInfo,
 		"desktop runner shutdown complete",
 	)
+}
+
+func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (bool, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return false, errors.New("no desktop processes running")
+	}
+
+	var lastErr error
+	for _, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath)
+		success, err := client.DetectPresence(reason, interval)
+
+		// not sure how to handle the possiblity of multiple users
+		// so just return the first success
+		if success {
+			return success, err
+		}
+
+		lastErr = err
+	}
+
+	return false, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
 }
 
 // killDesktopProcesses kills any existing desktop processes

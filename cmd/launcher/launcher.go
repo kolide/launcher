@@ -504,6 +504,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		ls, err := localserver.New(
 			ctx,
 			k,
+			runner,
 		)
 
 		if err != nil {

@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -57,6 +56,8 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
+
+	presenceDetector presenceDetector
 }
 
 const (
@@ -64,7 +65,11 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
+type presenceDetector interface {
+	DetectPresence(reason string, interval time.Duration) (bool, error)
+}
+
+func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetector) (*localServer, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -75,6 +80,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		kolideServer:          k.KolideServerURL(),
 		myLocalDbSigner:       agent.LocalDbKeys(),
 		myLocalHardwareSigner: agent.HardwareKeys(),
+		presenceDetector:      presenceDetector,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -427,7 +433,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 			reason = reasonHeader
 		}
 
-		success, err := runner.InstanceDetectPresence(reason, detectionIntervalDuration)
+		success, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
