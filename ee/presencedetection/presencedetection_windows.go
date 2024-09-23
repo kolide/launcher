@@ -4,10 +4,8 @@
 package presencedetection
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"syscall"
 	"time"
 	"unsafe"
@@ -107,27 +105,24 @@ type KeyCredentialAttestationResultVTable struct {
 	GetStatus                 uintptr
 }
 
-// windowsHello is a proof-of-concept that exercises prompting the user via Hello.
+// Detect prompts the user via Hello.
 // TODO RM:
 // * the syscalls panic easily; we will probably need to wrap this in a recovery routine
 // * for readability, we should refactor individual calls into functions hanging off the appropriate structs above
-func WindowsHello(ctx context.Context, slogger *slog.Logger) {
+func Detect(reason string) (bool, error) {
 	if err := ole.RoInitialize(1); err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not initialize", "err", err)
-		return
+		return false, fmt.Errorf("initializing: %w", err)
 	}
 
 	// Get access to the KeyCredentialManager
 	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.KeyCredentialManager", ole.IID_IInspectable)
 	if err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not get activation factory for KeyCredentialManager", "err", err)
-		return
+		return false, fmt.Errorf("getting activation factory for KeyCredentialManager: %w", err)
 	}
 	defer factory.Release()
 	managerObj, err := factory.QueryInterface(keyCredentialManagerGuid)
 	if err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not get KeyCredentialManager from factory", "err", err)
-		return
+		return false, fmt.Errorf("getting KeyCredentialManager from factory: %w", err)
 	}
 	defer managerObj.Release()
 	keyCredentialManager := (*KeyCredentialManager)(unsafe.Pointer(managerObj))
@@ -135,36 +130,30 @@ func WindowsHello(ctx context.Context, slogger *slog.Logger) {
 	// Check to see if Hello is an option
 	isHelloSupported, err := isSupported(keyCredentialManager)
 	if err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not determine whether Hello is supported", "err", err)
-		return
+		return false, fmt.Errorf("determining whether Hello is supported: %w", err)
 	}
 	if !isHelloSupported {
-		slogger.Log(ctx, slog.LevelError, "Hello is not supported")
-		return
+		return false, errors.New("Hello is not supported")
 	}
 
 	// Create a credential that will be tied to the current user and this application
 	credentialName := ulid.New()
-	pubkeyBytes, keyCredentialObj, err := requestCreate(keyCredentialManager, credentialName)
+	_, keyCredentialObj, err := requestCreate(keyCredentialManager, credentialName)
 	defer func() {
 		if keyCredentialObj != nil {
 			keyCredentialObj.Release()
 		}
 	}()
 	if err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not create credential", "err", err)
-		return
+		return false, fmt.Errorf("creating credential, %w", err)
 	}
-	slogger.Log(ctx, slog.LevelInfo, "created credential for user", "credential_name", credentialName, "pubkey_len", len(pubkeyBytes))
 
 	credential := (*KeyCredential)(unsafe.Pointer(keyCredentialObj))
-	attestationBytes, err := getAttestationAsync(credential)
-	if err != nil {
-		slogger.Log(ctx, slog.LevelError, "could not get attestation from credential", "err", err)
-		return
+	if _, err := getAttestationAsync(credential); err != nil {
+		return false, fmt.Errorf("getting attestation from credential: %w", err)
 	}
 
-	slogger.Log(ctx, slog.LevelInfo, "got attestation", "attestation_len", len(attestationBytes))
+	return true, nil
 }
 
 // isSupported calls Windows.Security.Credentials.KeyCredentialManager.IsSupportedAsync.
