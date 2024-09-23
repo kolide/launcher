@@ -121,7 +121,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	// mux.Handle("/id", ls.requestIdHandler())
+	mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
@@ -406,7 +406,7 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
-		// curl -H "X-Kolide-Presence-Detection-Interval: 10s" localhost:12519/id
+		// curl -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
 
 		// no presence detection requested
@@ -420,8 +420,14 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 			return
 		}
 
-		// TODO: decide how we want to get the reason. Pull from header?
-		success, err := runner.InstanceDetectPresence("authenticate a thing", detectionIntervalDuration)
+		// set a default reason, on macos the popup will look like "Kolide is trying to authenticate."
+		reason := "authenticate"
+		reasonHeader := r.Header.Get(kolidePresenceDetectionReason)
+		if reasonHeader != "" {
+			reason = reasonHeader
+		}
+
+		success, err := runner.InstanceDetectPresence(reason, detectionIntervalDuration)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return

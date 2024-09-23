@@ -30,6 +30,7 @@ const (
 	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
 	kolideSessionIdHeaderKey           = "X-Kolide-Session"
 	kolidePresenceDetectionInterval    = "X-Kolide-Presence-Detection-Interval"
+	kolidePresenceDetectionReason      = "X-Kolide-Presence-Detection-Reason"
 )
 
 type v2CmdRequestType struct {

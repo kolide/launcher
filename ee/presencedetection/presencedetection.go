@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-type PresenceDetectionResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
-}
-
 type PresenceDetector struct {
 	lastDetectionUTC time.Time
 	mutext           sync.Mutex
