@@ -267,7 +267,7 @@ func createWindow() (syscall.Handle, error) {
 	)
 	handle := syscall.Handle(r0)
 	if handle == 0 {
-		return syscall.InvalidHandle, fmt.Errorf("could not create window: %v", e0)
+		return syscall.InvalidHandle, fmt.Errorf("calling CreateWindowExW: %v", e0)
 	}
 
 	return syscall.Handle(r0), nil
@@ -277,12 +277,8 @@ func getInstance() (syscall.Handle, error) {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	procGetModuleHandleW := kernel32.NewProc("GetModuleHandleW")
 
-	var modname *uint16
 	r0, _, e0 := syscall.SyscallN(
 		procGetModuleHandleW.Addr(),
-		1,
-		uintptr(unsafe.Pointer(modname)),
-		0,
 		0,
 	)
 	instanceHandle := syscall.Handle(r0)
