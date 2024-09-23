@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 // auth.h
 #ifndef AUTH_H
 #define AUTH_H
