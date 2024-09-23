@@ -20,11 +20,15 @@ import (
 
 // GUIDs retrieved from:
 // https://github.com/tpn/winsdk-10/blob/master/Include/10.0.14393.0/winrt/windows.security.credentials.idl
+// https://github.com/tpn/winsdk-10/blob/master/Include/10.0.16299.0/um/UserConsentVerifierInterop.idl
+// https://github.com/tpn/winsdk-10/blob/master/Include/10.0.16299.0/winrt/windows.ui.xaml.idl
 var (
 	keyCredentialManagerGuid           = ole.NewGUID("6AAC468B-0EF1-4CE0-8290-4106DA6A63B5")
 	keyCredentialRetrievalResultGuid   = ole.NewGUID("58CD7703-8D87-4249-9B58-F6598CC9644E")
 	keyCredentialGuid                  = ole.NewGUID("9585EF8D-457B-4847-B11A-FA960BBDB138")
 	keyCredentialAttestationResultGuid = ole.NewGUID("78AAB3A1-A3C1-4103-B6CC-472C44171CBB")
+	userConsentVerifierInteropGuid     = ole.NewGUID("39E050C3-4E74-441A-8DC0-B81104DF949C")
+	windowGuid                         = ole.NewGUID("3276167D-C9F6-462D-9DE2-AE4C1FD8C2E5")
 )
 
 // Signatures were generated following the guidance in
@@ -35,7 +39,51 @@ const (
 	keyCredentialRetrievalResultSignature   = "rc(Windows.Security.Credentials.KeyCredentialRetrievalResult;{58cd7703-8d87-4249-9b58-f6598cc9644e})"
 	keyCredentialAttestationResultSignature = "rc(Windows.Security.Credentials.KeyCredentialAttestationResult;{78aab3a1-a3c1-4103-b6cc-472c44171cbb})"
 	booleanSignature                        = "b1"
+	userConsentVerificationResultSignature  = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;u4)" // Underlying type of uint32
 )
+
+// UserConsentVerifier is defined here, with references to IUserConsentVerifierInterop below:
+// https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
+type UserConsentVerifierInterop struct {
+	ole.IInspectable
+}
+
+func (v *UserConsentVerifierInterop) VTable() *UserConsentVerifierInteropVTable {
+	return (*UserConsentVerifierInteropVTable)(unsafe.Pointer(v.RawVTable))
+}
+
+type UserConsentVerifierInteropVTable struct {
+	ole.IInspectableVtbl
+	RequestVerificationForWindowAsync uintptr
+}
+
+type Window struct {
+	ole.IInspectable
+}
+
+func (v *Window) VTable() *WindowVTable {
+	return (*WindowVTable)(unsafe.Pointer(v.RawVTable))
+}
+
+type WindowVTable struct {
+	ole.IInspectableVtbl
+	GetBounds               uintptr
+	GetVisible              uintptr
+	GetContent              uintptr
+	SetContent              uintptr
+	GetCoreWindow           uintptr
+	GetDispatcher           uintptr
+	AddActivated            uintptr
+	RemoveActivated         uintptr
+	AddClosed               uintptr
+	RemoveClosed            uintptr
+	AddSizeChanged          uintptr
+	RemoveSizeChanged       uintptr
+	AddVisibilityChanged    uintptr
+	RemoveVisibilityChanged uintptr
+	Activate                uintptr
+	Close                   uintptr
+}
 
 // KeyCredentialManager is defined here:
 // https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialmanager?view=winrt-26100
@@ -116,6 +164,12 @@ var roInitialize = sync.OnceFunc(func() {
 func Detect(reason string) (bool, error) {
 	roInitialize()
 
+	if err := requestVerification(reason); err != nil {
+		return false, fmt.Errorf("requesting verification: %w", err)
+	}
+
+	return true, nil
+
 	// Check to see if Hello is an option
 	isHelloSupported, err := isSupported()
 	if err != nil {
@@ -132,6 +186,100 @@ func Detect(reason string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// requestVerification calls calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync.
+// See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier.requestverificationasync?view=winrt-26100
+func requestVerification(reason string) error {
+	// Make a window
+	windowInspectable, err := ole.RoActivateInstance("Windows.UI.Xaml.Window")
+	if err != nil {
+		return fmt.Errorf("creating a new window: %w", err)
+	}
+	windowObj, err := windowInspectable.QueryInterface(windowGuid)
+	if err != nil {
+		return fmt.Errorf("getting window object: %w", err)
+	}
+	defer windowObj.Release()
+	window := (*Window)(unsafe.Pointer(windowObj))
+	windowActivateReturn, _, _ := syscall.SyscallN(
+		window.VTable().Activate,
+		uintptr(unsafe.Pointer(window)), // Not a static function, need a reference to `this`
+	)
+	if windowActivateReturn != 0 {
+		return fmt.Errorf("calling Activate: %w", ole.NewError(windowActivateReturn))
+	}
+
+	// Close the window when we're done with it
+	defer func() {
+		_, _, _ = syscall.SyscallN(
+			window.VTable().Close,
+			uintptr(unsafe.Pointer(window)), // Not a static function, need a reference to `this`
+		)
+	}()
+
+	// Get access to UserConsentVerifier via factory
+	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", ole.IID_IInspectable)
+	if err != nil {
+		return fmt.Errorf("getting activation factory for UserConsentVerifier: %w", err)
+	}
+	defer factory.Release()
+	verifierObj, err := factory.QueryInterface(userConsentVerifierInteropGuid)
+	if err != nil {
+		return fmt.Errorf("getting UserConsentVerifier from factory: %w", err)
+	}
+	defer verifierObj.Release()
+	verifier := (*UserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
+
+	// Create hstring for "reason" message
+	reasonHString, err := ole.NewHString(reason)
+	if err != nil {
+		return fmt.Errorf("creating reason hstring: %w", err)
+	}
+	defer ole.DeleteHString(reasonHString)
+
+	var requestVerificationAsyncOperation *foundation.IAsyncOperation
+	requestVerificationReturn, _, _ := syscall.SyscallN(
+		verifier.VTable().RequestVerificationForWindowAsync,
+		0,                                       // Because this is a static function, we don't pass in a reference to `this`
+		uintptr(unsafe.Pointer(window)),         // HWND to our window
+		uintptr(unsafe.Pointer(&reasonHString)), // The message to include in the verification request
+		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
+	)
+	if requestVerificationReturn != 0 {
+		return fmt.Errorf("calling RequestVerificationForWindowAsync: %w", ole.NewError(requestVerificationReturn))
+	}
+
+	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
+	iid := winrt.ParameterizedInstanceGUID(foundation.GUIDAsyncOperationCompletedHandler, userConsentVerificationResultSignature)
+	statusChan := make(chan foundation.AsyncStatus)
+	handler := foundation.NewAsyncOperationCompletedHandler(ole.NewGUID(iid), func(instance *foundation.AsyncOperationCompletedHandler, asyncInfo *foundation.IAsyncOperation, asyncStatus foundation.AsyncStatus) {
+		statusChan <- asyncStatus
+	})
+	defer handler.Release()
+	requestVerificationAsyncOperation.SetCompleted(handler)
+
+	select {
+	case operationStatus := <-statusChan:
+		if operationStatus != foundation.AsyncStatusCompleted {
+			return fmt.Errorf("RequestVerificationForWindowAsync operation did not complete: status %d", operationStatus)
+		}
+	case <-time.After(1 * time.Minute):
+		return errors.New("timed out waiting for RequestVerificationForWindowAsync operation to complete")
+	}
+
+	// Retrieve the results from the async operation
+	resPtr, err := requestVerificationAsyncOperation.GetResults()
+	if err != nil {
+		return fmt.Errorf("getting results of RequestVerificationForWindowAsync: %w", err)
+	}
+
+	if uintptr(resPtr) == 0x0 {
+		return errors.New("no response to RequestVerificationForWindowAsync")
+	}
+
+	// TODO RM
+	return fmt.Errorf("response to RequestVerificationForWindowAsync: %+v", resPtr)
 }
 
 // isSupported calls Windows.Security.Credentials.KeyCredentialManager.IsSupportedAsync.
