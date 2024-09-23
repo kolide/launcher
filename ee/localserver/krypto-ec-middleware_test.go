@@ -36,6 +36,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	challengeData := []byte(ulid.New())
 
 	koldieSessionId := ulid.New()
+	cmdRequestHeaders := map[string][]string{
+		"some_key":  {ulid.New()},
+		"other_key": {ulid.New()},
+	}
+
 	cmdReqCallBackHeaders := map[string][]string{
 		kolideSessionIdHeaderKey: {koldieSessionId},
 	}
@@ -44,6 +49,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	cmdReq := mustMarshal(t, v2CmdRequestType{
 		Path:            "whatevs",
 		Body:            cmdReqBody,
+		Headers:         cmdRequestHeaders,
 		CallbackHeaders: cmdReqCallBackHeaders,
 	})
 
@@ -143,6 +149,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			// this should match the responseData in the opened response
 			if testHandler == nil {
 				testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+					// make sure all the request headers are present
+					for k, v := range cmdRequestHeaders {
+						require.Equal(t, v[0], r.Header.Get(k))
+					}
+
 					reqBodyRaw, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
 					defer r.Body.Close()
