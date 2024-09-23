@@ -135,24 +135,8 @@ func Register(credentialName string) error {
 	}
 
 	// Create a credential that will be tied to the current user and this application
-	keyCredentialObj, err := register(keyCredentialManager, credentialName)
-	defer func() {
-		if keyCredentialObj != nil {
-			keyCredentialObj.Release()
-		}
-	}()
-	if err != nil {
+	if err := register(keyCredentialManager, credentialName); err != nil {
 		return fmt.Errorf("creating credential: %w", err)
-	}
-
-	// For now, we retrieve but do not store the pubkey and attestation. In the future
-	// we may want to store these.
-	credential := (*KeyCredential)(unsafe.Pointer(keyCredentialObj))
-	if _, err := getPubkey(credential); err != nil {
-		return fmt.Errorf("getting pubkey from credential: %w", err)
-	}
-	if _, err := getAttestation(credential); err != nil {
-		return fmt.Errorf("getting attestation from credential: %w", err)
 	}
 
 	return nil
@@ -178,24 +162,8 @@ func Detect(_ string, credentialName string) (bool, error) {
 	keyCredentialManager := (*KeyCredentialManager)(unsafe.Pointer(managerObj))
 
 	// Create a credential that will be tied to the current user and this application
-	keyCredentialObj, err := authenticate(keyCredentialManager, credentialName)
-	defer func() {
-		if keyCredentialObj != nil {
-			keyCredentialObj.Release()
-		}
-	}()
-	if err != nil {
-		return false, fmt.Errorf("creating credential: %w", err)
-	}
-
-	// For now, we retrieve but do not store the pubkey and attestation. In the future
-	// we may want to store these.
-	credential := (*KeyCredential)(unsafe.Pointer(keyCredentialObj))
-	if _, err := getPubkey(credential); err != nil {
-		return false, fmt.Errorf("getting pubkey from credential: %w", err)
-	}
-	if _, err := getAttestation(credential); err != nil {
-		return false, fmt.Errorf("getting attestation from credential: %w", err)
+	if err := authenticate(keyCredentialManager, credentialName); err != nil {
+		return false, fmt.Errorf("authenticating with credential: %w", err)
 	}
 
 	return true, nil
@@ -244,10 +212,10 @@ func isSupported(keyCredentialManager *KeyCredentialManager) (bool, error) {
 // register calls Windows.Security.Credentials.KeyCredentialManager.RequestCreateAsync.
 // It creates a new key credential for the current user and application.
 // See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialmanager.requestcreateasync?view=winrt-26100
-func register(keyCredentialManager *KeyCredentialManager, credentialName string) (*ole.IDispatch, error) {
+func register(keyCredentialManager *KeyCredentialManager, credentialName string) error {
 	credentialNameHString, err := ole.NewHString(credentialName)
 	if err != nil {
-		return nil, fmt.Errorf("creating credential name hstring: %w", err)
+		return fmt.Errorf("creating credential name hstring: %w", err)
 	}
 	defer ole.DeleteHString(credentialNameHString)
 
@@ -260,7 +228,7 @@ func register(keyCredentialManager *KeyCredentialManager, credentialName string)
 		uintptr(unsafe.Pointer(&requestCreateAsyncOperation)), // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
 	)
 	if requestCreateReturn != 0 {
-		return nil, fmt.Errorf("calling RequestCreateAsync: %w", ole.NewError(requestCreateReturn))
+		return fmt.Errorf("calling RequestCreateAsync: %w", ole.NewError(requestCreateReturn))
 	}
 
 	// RequestCreateAsync returns Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
@@ -275,25 +243,25 @@ func register(keyCredentialManager *KeyCredentialManager, credentialName string)
 	select {
 	case operationStatus := <-statusChan:
 		if operationStatus != foundation.AsyncStatusCompleted {
-			return nil, fmt.Errorf("RequestCreateAsync operation did not complete: status %d", operationStatus)
+			return fmt.Errorf("RequestCreateAsync operation did not complete: status %d", operationStatus)
 		}
 	case <-time.After(1 * time.Minute):
-		return nil, errors.New("timed out waiting for RequestCreateAsync operation to complete")
+		return errors.New("timed out waiting for RequestCreateAsync operation to complete")
 	}
 
 	// Retrieve the results from the async operation
 	resPtr, err := requestCreateAsyncOperation.GetResults()
 	if err != nil {
-		return nil, fmt.Errorf("getting results of RequestCreateAsync: %w", err)
+		return fmt.Errorf("getting results of RequestCreateAsync: %w", err)
 	}
 
 	if uintptr(resPtr) == 0x0 {
-		return nil, errors.New("no response to RequestCreateAsync")
+		return errors.New("no response to RequestCreateAsync")
 	}
 
 	resultObj, err := (*ole.IUnknown)(resPtr).QueryInterface(keyCredentialRetrievalResultGuid)
 	if err != nil {
-		return nil, fmt.Errorf("could not get KeyCredentialRetrievalResult from result of RequestCreateAsync: %w", err)
+		return fmt.Errorf("could not get KeyCredentialRetrievalResult from result of RequestCreateAsync: %w", err)
 	}
 	defer resultObj.Release()
 	result := (*KeyCredentialRetrievalResult)(unsafe.Pointer(resultObj))
@@ -306,24 +274,35 @@ func register(keyCredentialManager *KeyCredentialManager, credentialName string)
 		uintptr(unsafe.Pointer(&credentialPointer)),
 	)
 	if getCredentialReturn != 0 {
-		return nil, fmt.Errorf("calling GetCredential on KeyCredentialRetrievalResult: %w", ole.NewError(getCredentialReturn))
+		return fmt.Errorf("calling GetCredential on KeyCredentialRetrievalResult: %w", ole.NewError(getCredentialReturn))
 	}
 
 	keyCredentialObj, err := (*ole.IUnknown)(credentialPointer).QueryInterface(keyCredentialGuid)
 	if err != nil {
-		return nil, fmt.Errorf("could not get KeyCredential from KeyCredentialRetrievalResult: %w", err)
+		return fmt.Errorf("could not get KeyCredential from KeyCredentialRetrievalResult: %w", err)
+	}
+	defer keyCredentialObj.Release()
+
+	// For now, we retrieve but do not return/store the pubkey and attestation. In the future
+	// we may want to store these.
+	credential := (*KeyCredential)(unsafe.Pointer(keyCredentialObj))
+	if _, err := getPubkey(credential); err != nil {
+		return fmt.Errorf("getting pubkey from credential: %w", err)
+	}
+	if _, err := getAttestation(credential); err != nil {
+		return fmt.Errorf("getting attestation from credential: %w", err)
 	}
 
-	return keyCredentialObj, nil
+	return nil
 }
 
 // authenticate calls Windows.Security.Credentials.KeyCredentialManager.OpenAsync.
 // It retrieves the key credential stored under `credentialName` for the given user and application.
 // See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialmanager.openasync?view=winrt-26100
-func authenticate(keyCredentialManager *KeyCredentialManager, credentialName string) (*ole.IDispatch, error) {
+func authenticate(keyCredentialManager *KeyCredentialManager, credentialName string) error {
 	credentialNameHString, err := ole.NewHString(credentialName)
 	if err != nil {
-		return nil, fmt.Errorf("creating credential name hstring: %w", err)
+		return fmt.Errorf("creating credential name hstring: %w", err)
 	}
 	defer ole.DeleteHString(credentialNameHString)
 
@@ -335,7 +314,7 @@ func authenticate(keyCredentialManager *KeyCredentialManager, credentialName str
 		uintptr(unsafe.Pointer(&openAsyncOperation)),    // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
 	)
 	if openReturn != 0 {
-		return nil, fmt.Errorf("calling OpenAsync: %w", ole.NewError(openReturn))
+		return fmt.Errorf("calling OpenAsync: %w", ole.NewError(openReturn))
 	}
 
 	// OpenAsync returns Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
@@ -350,25 +329,25 @@ func authenticate(keyCredentialManager *KeyCredentialManager, credentialName str
 	select {
 	case operationStatus := <-statusChan:
 		if operationStatus != foundation.AsyncStatusCompleted {
-			return nil, fmt.Errorf("OpenAsync operation did not complete: status %d", operationStatus)
+			return fmt.Errorf("OpenAsync operation did not complete: status %d", operationStatus)
 		}
 	case <-time.After(1 * time.Minute):
-		return nil, errors.New("timed out waiting for OpenAsync operation to complete")
+		return errors.New("timed out waiting for OpenAsync operation to complete")
 	}
 
 	// Retrieve the results from the async operation
 	resPtr, err := openAsyncOperation.GetResults()
 	if err != nil {
-		return nil, fmt.Errorf("getting results of OpenAsync: %w", err)
+		return fmt.Errorf("getting results of OpenAsync: %w", err)
 	}
 
 	if uintptr(resPtr) == 0x0 {
-		return nil, errors.New("no response to OpenAsync")
+		return errors.New("no response to OpenAsync")
 	}
 
 	resultObj, err := (*ole.IUnknown)(resPtr).QueryInterface(keyCredentialRetrievalResultGuid)
 	if err != nil {
-		return nil, fmt.Errorf("could not get KeyCredentialRetrievalResult from result of OpenAsync: %w", err)
+		return fmt.Errorf("could not get KeyCredentialRetrievalResult from result of OpenAsync: %w", err)
 	}
 	defer resultObj.Release()
 	result := (*KeyCredentialRetrievalResult)(unsafe.Pointer(resultObj))
@@ -381,15 +360,26 @@ func authenticate(keyCredentialManager *KeyCredentialManager, credentialName str
 		uintptr(unsafe.Pointer(&credentialPointer)),
 	)
 	if getCredentialReturn != 0 {
-		return nil, fmt.Errorf("calling GetCredential on KeyCredentialRetrievalResult: %w", ole.NewError(getCredentialReturn))
+		return fmt.Errorf("calling GetCredential on KeyCredentialRetrievalResult: %w", ole.NewError(getCredentialReturn))
 	}
 
 	keyCredentialObj, err := (*ole.IUnknown)(credentialPointer).QueryInterface(keyCredentialGuid)
 	if err != nil {
-		return nil, fmt.Errorf("could not get KeyCredential from KeyCredentialRetrievalResult: %w", err)
+		return fmt.Errorf("could not get KeyCredential from KeyCredentialRetrievalResult: %w", err)
+	}
+	defer keyCredentialObj.Release()
+
+	// For now, we retrieve but do not return/store the pubkey and attestation. In the future
+	// we may want to store these.
+	credential := (*KeyCredential)(unsafe.Pointer(keyCredentialObj))
+	if _, err := getPubkey(credential); err != nil {
+		return fmt.Errorf("getting pubkey from credential: %w", err)
+	}
+	if _, err := getAttestation(credential); err != nil {
+		return fmt.Errorf("getting attestation from credential: %w", err)
 	}
 
-	return keyCredentialObj, nil
+	return nil
 }
 
 // getPubkey calls Windows.Security.Credentials.KeyCredential.RetrievePubkey.
