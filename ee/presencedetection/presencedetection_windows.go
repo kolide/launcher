@@ -90,6 +90,8 @@ type KeyCredentialVTable struct {
 	GetAttestationAsync                  uintptr
 }
 
+// KeyCredentialAttestationResult is defined here:
+// https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialattestationresult?view=winrt-26100
 type KeyCredentialAttestationResult struct {
 	ole.IInspectable
 }
@@ -303,7 +305,6 @@ func requestCreate(keyCredentialManager *KeyCredentialManager, credentialName st
 	}
 
 	return pubkeyBytes, keyCredentialObj, nil
-
 }
 
 // getAttestationAsync calls Windows.Security.Credentials.KeyCredential.GetAttestationAsync.
@@ -392,6 +393,7 @@ func getAttestationAsync(credential *KeyCredential) ([]byte, error) {
 	return attestationBytes, nil
 }
 
+/*
 // waitForAsyncOperation should allow us to abstract away the details of waiting for an async operation,
 // but right now it only works for IsSupportedAsync; it results in an error 3 being returned from RequestCreateAsync.
 // TODO RM -- fix.
@@ -417,3 +419,4 @@ func waitForAsyncOperation(signature string, timeout time.Duration, asyncOperati
 
 	return asyncOperation.GetResults()
 }
+*/
