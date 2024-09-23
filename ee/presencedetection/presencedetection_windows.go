@@ -57,34 +57,6 @@ type UserConsentVerifierInteropVTable struct {
 	RequestVerificationForWindowAsync uintptr
 }
 
-type Window struct {
-	ole.IInspectable
-}
-
-func (v *Window) VTable() *WindowVTable {
-	return (*WindowVTable)(unsafe.Pointer(v.RawVTable))
-}
-
-type WindowVTable struct {
-	ole.IInspectableVtbl
-	GetBounds               uintptr
-	GetVisible              uintptr
-	GetContent              uintptr
-	SetContent              uintptr
-	GetCoreWindow           uintptr
-	GetDispatcher           uintptr
-	AddActivated            uintptr
-	RemoveActivated         uintptr
-	AddClosed               uintptr
-	RemoveClosed            uintptr
-	AddSizeChanged          uintptr
-	RemoveSizeChanged       uintptr
-	AddVisibilityChanged    uintptr
-	RemoveVisibilityChanged uintptr
-	Activate                uintptr
-	Close                   uintptr
-}
-
 // KeyCredentialManager is defined here:
 // https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialmanager?view=winrt-26100
 type KeyCredentialManager struct {
@@ -191,33 +163,6 @@ func Detect(reason string) (bool, error) {
 // requestVerification calls calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync.
 // See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier.requestverificationasync?view=winrt-26100
 func requestVerification(reason string) error {
-	// Make a window
-	windowInspectable, err := ole.RoActivateInstance("Windows.UI.Xaml.Window")
-	if err != nil {
-		return fmt.Errorf("creating a new window: %w", err)
-	}
-	windowObj, err := windowInspectable.QueryInterface(windowGuid)
-	if err != nil {
-		return fmt.Errorf("getting window object: %w", err)
-	}
-	defer windowObj.Release()
-	window := (*Window)(unsafe.Pointer(windowObj))
-	windowActivateReturn, _, _ := syscall.SyscallN(
-		window.VTable().Activate,
-		uintptr(unsafe.Pointer(window)), // Not a static function, need a reference to `this`
-	)
-	if windowActivateReturn != 0 {
-		return fmt.Errorf("calling Activate: %w", ole.NewError(windowActivateReturn))
-	}
-
-	// Close the window when we're done with it
-	defer func() {
-		_, _, _ = syscall.SyscallN(
-			window.VTable().Close,
-			uintptr(unsafe.Pointer(window)), // Not a static function, need a reference to `this`
-		)
-	}()
-
 	// Get access to UserConsentVerifier via factory
 	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", ole.IID_IInspectable)
 	if err != nil {
@@ -231,6 +176,12 @@ func requestVerification(reason string) error {
 	defer verifierObj.Release()
 	verifier := (*UserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
 
+	// Create a window
+	windowHwnd, err := createWindow()
+	if err != nil {
+		return fmt.Errorf("creating window: %w", err)
+	}
+
 	// Create hstring for "reason" message
 	reasonHString, err := ole.NewHString(reason)
 	if err != nil {
@@ -242,7 +193,7 @@ func requestVerification(reason string) error {
 	requestVerificationReturn, _, _ := syscall.SyscallN(
 		verifier.VTable().RequestVerificationForWindowAsync,
 		0,                                       // Because this is a static function, we don't pass in a reference to `this`
-		uintptr(unsafe.Pointer(window)),         // HWND to our window
+		uintptr(windowHwnd),                     // HWND to our window
 		uintptr(unsafe.Pointer(&reasonHString)), // The message to include in the verification request
 		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
 	)
@@ -280,6 +231,66 @@ func requestVerification(reason string) error {
 
 	// TODO RM
 	return fmt.Errorf("response to RequestVerificationForWindowAsync: %+v", resPtr)
+}
+
+func createWindow() (syscall.Handle, error) {
+	instance, err := getInstance()
+	if err != nil {
+		return syscall.InvalidHandle, fmt.Errorf("getting instance: %w", err)
+	}
+
+	user32 := syscall.NewLazyDLL("user32.dll")
+	procCreateWindowExW := user32.NewProc("CreateWindowExW")
+
+	title, err := syscall.UTF16PtrFromString("Kolide")
+	if err != nil {
+		return syscall.InvalidHandle, fmt.Errorf("creating title string: %w", err)
+	}
+
+	overlappedWindow := 0 | 0x800000 | 0x400000 | 0x80000 | 0x40000 | 0x20000 | 0x10000
+	defaultWindowPosition := 0x80000000 - 0x100000000
+
+	r0, _, e0 := syscall.SyscallN(
+		procCreateWindowExW.Addr(),
+		uintptr(0),                     // style
+		0,                              // class name, optional
+		uintptr(unsafe.Pointer(title)), // window name, optional
+		uintptr(overlappedWindow),      // DWORD dwStyle
+		uintptr(defaultWindowPosition),
+		uintptr(defaultWindowPosition),
+		uintptr(defaultWindowPosition),
+		uintptr(defaultWindowPosition),
+		uintptr(0),
+		uintptr(0),
+		uintptr(instance),
+		uintptr(0),
+	)
+	handle := syscall.Handle(r0)
+	if handle == 0 {
+		return syscall.InvalidHandle, fmt.Errorf("could not create window: %v", e0)
+	}
+
+	return syscall.Handle(r0), nil
+}
+
+func getInstance() (syscall.Handle, error) {
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	procGetModuleHandleW := kernel32.NewProc("GetModuleHandleW")
+
+	var modname *uint16
+	r0, _, e0 := syscall.SyscallN(
+		procGetModuleHandleW.Addr(),
+		1,
+		uintptr(unsafe.Pointer(modname)),
+		0,
+		0,
+	)
+	instanceHandle := syscall.Handle(r0)
+	if instanceHandle == 0 {
+		return syscall.InvalidHandle, fmt.Errorf("could not get module handle: %v", e0)
+	}
+
+	return instanceHandle, nil
 }
 
 // isSupported calls Windows.Security.Credentials.KeyCredentialManager.IsSupportedAsync.
