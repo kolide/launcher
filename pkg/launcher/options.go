@@ -278,6 +278,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	ffOpts := []ff.Option{
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
+		ff.WithIgnoreUndefined(true), // silently discard any unknown options and keep parsing
 	}
 
 	// Windows doesn't really support environmental variables in quite
@@ -290,6 +291,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		ffOpts = append(ffOpts, ff.WithEnvVarPrefix("KOLIDE_LAUNCHER"))
 	}
 
+	// TODO for discussion - i suspect with WithIgnoreUndefined set we could
+	// check for and return errors here and that would be less confusing if there
+	// are ever other parsing issues. Currently we would have no idea
 	ff.Parse(flagset, args, ffOpts...)
 
 	// handle --version
