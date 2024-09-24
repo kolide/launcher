@@ -476,7 +476,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 
 	r.slogger.Log(context.TODO(), slog.LevelDebug,
 		"desktop enabled set by control server",
-		"process_spawning_enabled", r.knapsack.DesktopEnabled(),
+		"desktop_enabled", r.knapsack.DesktopEnabled(),
 	)
 
 	if !r.knapsack.DesktopEnabled() {
