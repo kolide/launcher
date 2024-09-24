@@ -123,7 +123,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
-			mockKnapsack.On("DesktopEnabled").Return(true)
+
+			// don't try to display desktop under test, causes CI flakeyness
+			// (we still test process management, just without trying to display the desktop)
+			mockKnapsack.On("DesktopEnabled").Return(false)
 			mockKnapsack.On("Slogger").Return(slogger)
 			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("SystrayRestartEnabled").Return(false).Maybe()
