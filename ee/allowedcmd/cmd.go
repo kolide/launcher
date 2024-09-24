@@ -8,11 +8,11 @@ package allowedcmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"errors"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
