@@ -44,7 +44,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	// that user. To reduce duplicating the WithUid table helper, we can find the owner of the binary,
 	// and pass the said owner to the WIthUid method to handle setting the appropriate env vars.
 	cmd, err := allowedcmd.Brew(ctx)
-		
+
 	if err != nil {
 		if errors.Is(err, allowedcmd.ErrCommandNotFound) {
 			// No data, no error
