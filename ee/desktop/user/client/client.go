@@ -81,9 +81,9 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 		}
 	}
 
-	var err error
+	var detectionErr error
 	if response.Error != "" {
-		err = errors.New(response.Error)
+		detectionErr = errors.New(response.Error)
 	}
 
 	durationSinceLastDetection, parseErr := time.ParseDuration(response.DurationSinceLastDetection)
@@ -91,7 +91,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("parsing time since last detection: %w", parseErr)
 	}
 
-	return durationSinceLastDetection, err
+	return durationSinceLastDetection, detectionErr
 }
 
 func (c *client) Notify(n notify.Notification) error {

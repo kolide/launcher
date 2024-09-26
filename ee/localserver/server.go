@@ -128,7 +128,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	mux.Handle("/id", ls.requestIdHandler())
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
@@ -419,7 +419,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		}
 
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
-		// curl -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
+		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
 
 		// no presence detection requested
