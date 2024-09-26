@@ -2,85 +2,106 @@ package presencedetection
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/presencedetection/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestPresenceDetector_DetectPresence(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                       string
-		interval                   time.Duration
-		detectFunc                 func(string) (bool, error)
-		initialLastDetectionUTC    time.Time
-		hadOneSuccessfulDetection  bool
-		errAssertion               assert.ErrorAssertionFunc
-		expectedLastDetectionDelta time.Duration
+		name                    string
+		interval                time.Duration
+		detector                func(t *testing.T) detectorIface
+		initialLastDetectionUTC time.Time
+		expectError             bool
 	}{
 		{
-			name: "first detection success",
-			detectFunc: func(string) (bool, error) {
-				return true, nil
+			name:     "first detection success",
+			interval: 0,
+			detector: func(t *testing.T) detectorIface {
+				d := mocks.NewDetectorIface(t)
+				d.On("Detect", mock.AnythingOfType("string")).Return(true, nil)
+				return d
 			},
-			errAssertion:               assert.NoError,
-			expectedLastDetectionDelta: 0,
 		},
 		{
-			name: "detection within interval",
-			detectFunc: func(string) (bool, error) {
-				return false, errors.New("should not have called detectFunc, since within interval")
+			name:     "detection outside interval",
+			interval: time.Minute,
+			detector: func(t *testing.T) detectorIface {
+				d := mocks.NewDetectorIface(t)
+				d.On("Detect", mock.AnythingOfType("string")).Return(true, nil)
+				return d
 			},
-			errAssertion:              assert.NoError,
-			initialLastDetectionUTC:   time.Now().UTC(),
-			interval:                  time.Minute,
-			hadOneSuccessfulDetection: true,
+			initialLastDetectionUTC: time.Now().UTC().Add(-time.Minute),
 		},
 		{
-			name: "error first detection",
-			detectFunc: func(string) (bool, error) {
-				return false, errors.New("error")
+			name:     "detection within interval",
+			interval: time.Minute,
+			detector: func(t *testing.T) detectorIface {
+				// should not be called, will get error if it is
+				return mocks.NewDetectorIface(t)
 			},
-			errAssertion:               assert.Error,
-			expectedLastDetectionDelta: -1,
+			initialLastDetectionUTC: time.Now().UTC(),
 		},
 		{
-			name: "error after first detection",
-			detectFunc: func(string) (bool, error) {
-				return false, errors.New("error")
+			name:     "error first detection",
+			interval: 0,
+			detector: func(t *testing.T) detectorIface {
+				d := mocks.NewDetectorIface(t)
+				d.On("Detect", mock.AnythingOfType("string")).Return(true, errors.New("error"))
+				return d
 			},
-			errAssertion:              assert.Error,
-			initialLastDetectionUTC:   time.Now().UTC(),
-			hadOneSuccessfulDetection: true,
+			expectError: true,
 		},
 		{
-			name: "detection failed without OS error",
-			detectFunc: func(string) (bool, error) {
-				return false, nil
+			name:     "error after first detection",
+			interval: 0,
+			detector: func(t *testing.T) detectorIface {
+				d := mocks.NewDetectorIface(t)
+				d.On("Detect", mock.AnythingOfType("string")).Return(true, errors.New("error"))
+				return d
 			},
-			errAssertion:              assert.Error,
-			initialLastDetectionUTC:   time.Now().UTC(),
-			hadOneSuccessfulDetection: true,
+			initialLastDetectionUTC: time.Now().UTC(),
+			expectError:             true,
+		},
+		{
+			name:     "detection failed without OS error",
+			interval: 0,
+			detector: func(t *testing.T) detectorIface {
+				d := mocks.NewDetectorIface(t)
+				d.On("Detect", mock.AnythingOfType("string")).Return(false, nil)
+				return d
+			},
+			initialLastDetectionUTC: time.Now().UTC(),
+			expectError:             true,
 		},
 	}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			pd := &PresenceDetector{
-				detectFunc:                tt.detectFunc,
-				lastDetectionUTC:          tt.initialLastDetectionUTC,
-				hadOneSuccessfulDetection: tt.hadOneSuccessfulDetection,
+				detector:         tt.detector(t),
+				lastDetectionUTC: tt.initialLastDetectionUTC,
 			}
 
 			timeSinceLastDetection, err := pd.DetectPresence("this is a test", tt.interval)
-			tt.errAssertion(t, err)
 
-			delta := timeSinceLastDetection - tt.expectedLastDetectionDelta
-			assert.LessOrEqual(t, delta, time.Second)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			absDelta := math.Abs(timeSinceLastDetection.Seconds() - tt.interval.Seconds())
+			assert.LessOrEqual(t, absDelta, tt.interval.Seconds())
 		})
 	}
 }
