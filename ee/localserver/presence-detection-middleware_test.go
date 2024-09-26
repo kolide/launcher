@@ -3,6 +3,7 @@ package localserver
 import (
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,6 +17,10 @@ import (
 
 func TestPresenceDetectionHandler(t *testing.T) {
 	t.Parallel()
+
+	if runtime.GOOS != "darwin" {
+		t.Skip("test only runs on darwin until implemented for other OSes")
+	}
 
 	tests := []struct {
 		name                                              string

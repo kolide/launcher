@@ -413,6 +413,7 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
+		// presence detection is only supported on macos currently
 		if runtime.GOOS != "darwin" {
 			next.ServeHTTP(w, r)
 			return
