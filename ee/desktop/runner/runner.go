@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -282,26 +283,25 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	)
 }
 
-func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (bool, error) {
+func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
 	if r.uidProcs == nil || len(r.uidProcs) == 0 {
-		return false, errors.New("no desktop processes running")
+		return presencedetection.DetectionFailedDurationValue, errors.New("no desktop processes running")
 	}
 
 	var lastErr error
 	for _, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
-		success, err := client.DetectPresence(reason, interval)
+		durationSinceLastDetection, err := client.DetectPresence(reason, interval)
 
-		// not sure how to handle the possiblity of multiple users
-		// so just return the first success
-		if success {
-			return success, err
+		if err != nil {
+			lastErr = err
+			continue
 		}
 
-		lastErr = err
+		return durationSinceLastDetection, nil
 	}
 
-	return false, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
+	return presencedetection.DetectionFailedDurationValue, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
 }
 
 // killDesktopProcesses kills any existing desktop processes

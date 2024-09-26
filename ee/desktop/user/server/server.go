@@ -174,8 +174,8 @@ func (s *UserServer) showDesktop(w http.ResponseWriter, req *http.Request) {
 }
 
 type DetectPresenceResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
+	DurationSinceLastDetection string `json:"duration_since_last_detection,omitempty"`
+	Error                      string `json:"error,omitempty"`
 }
 
 func (s *UserServer) detectPresence(w http.ResponseWriter, req *http.Request) {
@@ -201,13 +201,20 @@ func (s *UserServer) detectPresence(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// detect presence
-	success, err := s.presenceDetector.DetectPresence(reason, interval)
+	durationSinceLastDetection, err := s.presenceDetector.DetectPresence(reason, interval)
 	response := DetectPresenceResponse{
-		Success: success,
+		DurationSinceLastDetection: durationSinceLastDetection.String(),
 	}
 
 	if err != nil {
 		response.Error = err.Error()
+
+		s.slogger.Log(context.TODO(), slog.LevelDebug,
+			"detecting presence",
+			"reason", reason,
+			"interval", interval,
+			"err", err,
+		)
 	}
 
 	// convert response to json

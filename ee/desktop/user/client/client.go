@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/presencedetection"
 )
 
 type transport struct {
@@ -62,13 +63,13 @@ func (c *client) ShowDesktop() error {
 	return c.get("show")
 }
 
-func (c *client) DetectPresence(reason string, interval time.Duration) (bool, error) {
+func (c *client) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
 	encodedReason := url.QueryEscape(reason)
 	encodedInterval := url.QueryEscape(interval.String())
 
 	resp, requestErr := c.base.Get(fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval))
 	if requestErr != nil {
-		return false, fmt.Errorf("getting presence: %w", requestErr)
+		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("getting presence: %w", requestErr)
 	}
 
 	var response server.DetectPresenceResponse
@@ -76,7 +77,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (bool, er
 		defer resp.Body.Close()
 
 		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-			return false, fmt.Errorf("decoding response: %w", err)
+			return presencedetection.DetectionFailedDurationValue, fmt.Errorf("decoding response: %w", err)
 		}
 	}
 
@@ -85,7 +86,12 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (bool, er
 		err = errors.New(response.Error)
 	}
 
-	return response.Success, err
+	durationSinceLastDetection, parseErr := time.ParseDuration(response.DurationSinceLastDetection)
+	if parseErr != nil {
+		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("parsing time since last detection: %w", parseErr)
+	}
+
+	return durationSinceLastDetection, err
 }
 
 func (c *client) Notify(n notify.Notification) error {

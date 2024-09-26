@@ -25,12 +25,13 @@ import (
 )
 
 const (
-	timestampValidityRange             = 150
-	kolideKryptoEccHeader20230130Value = "2023-01-30"
-	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
-	kolideSessionIdHeaderKey           = "X-Kolide-Session"
-	kolidePresenceDetectionInterval    = "X-Kolide-Presence-Detection-Interval"
-	kolidePresenceDetectionReason      = "X-Kolide-Presence-Detection-Reason"
+	timestampValidityRange                   = 150
+	kolideKryptoEccHeader20230130Value       = "2023-01-30"
+	kolideKryptoHeaderKey                    = "X-Kolide-Krypto"
+	kolideSessionIdHeaderKey                 = "X-Kolide-Session"
+	kolidePresenceDetectionInterval          = "X-Kolide-Presence-Detection-Interval"
+	kolidePresenceDetectionReason            = "X-Kolide-Presence-Detection-Reason"
+	kolideDurationSinceLastPresenceDetection = "X-Kolide-Duration-Since-Last-Presence-Detection"
 )
 
 type v2CmdRequestType struct {

@@ -14,22 +14,22 @@ type PresenceDetector struct {
 }
 
 // DetectPresence provides a mock function with given fields: reason, interval
-func (_m *PresenceDetector) DetectPresence(reason string, interval time.Duration) (bool, error) {
+func (_m *PresenceDetector) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
 	ret := _m.Called(reason, interval)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DetectPresence")
 	}
 
-	var r0 bool
+	var r0 time.Duration
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, time.Duration) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, time.Duration) (time.Duration, error)); ok {
 		return rf(reason, interval)
 	}
-	if rf, ok := ret.Get(0).(func(string, time.Duration) bool); ok {
+	if rf, ok := ret.Get(0).(func(string, time.Duration) time.Duration); ok {
 		r0 = rf(reason, interval)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(time.Duration)
 	}
 
 	if rf, ok := ret.Get(1).(func(string, time.Duration) error); ok {

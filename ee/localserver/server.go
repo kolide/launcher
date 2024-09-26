@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -66,7 +67,7 @@ const (
 )
 
 type presenceDetector interface {
-	DetectPresence(reason string, interval time.Duration) (bool, error)
+	DetectPresence(reason string, interval time.Duration) (time.Duration, error)
 }
 
 func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetector) (*localServer, error) {
@@ -127,7 +128,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	// mux.Handle("/id", ls.requestIdHandler())
+	mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
@@ -411,6 +412,12 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if runtime.GOOS != "darwin" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
@@ -422,6 +429,8 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr)
 		if err != nil {
+			// this is the only time this should returna non-200 status code
+			// asked for presence detection, but the interval is invalid
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -433,17 +442,21 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 			reason = reasonHeader
 		}
 
-		success, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
+		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
 
-		if !success {
-			http.Error(w, "presence detection failed", http.StatusUnauthorized)
-			return
-		}
+		ls.slogger.Log(r.Context(), slog.LevelError,
+			"presence_detection",
+			"reason", reason,
+			"interval", detectionIntervalDuration,
+			"duration_since_last_detection", durationSinceLastDetection,
+			"err", err,
+		)
 
+		// if there was an error, we still want to return a 200 status code
+		// and send the request through
+		// allow the server to decide what to do based on last detection duration
+
+		w.Header().Add(kolideDurationSinceLastPresenceDetection, durationSinceLastDetection.String())
 		next.ServeHTTP(w, r)
 	})
 }
