@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -210,7 +211,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NotEmpty(t, rr.Body.String())
 
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
-					require.Equal(t, (0 * time.Second).String(), rr.Header().Get(kolideDurationSinceLastPresenceDetection))
+
+					if runtime.GOOS == "darwin" {
+						require.Equal(t, (0 * time.Second).String(), rr.Header().Get(kolideDurationSinceLastPresenceDetection))
+					}
 
 					// try to open the response
 					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
