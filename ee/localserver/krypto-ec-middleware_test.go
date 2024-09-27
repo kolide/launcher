@@ -21,8 +21,11 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/keys"
+	"github.com/kolide/launcher/ee/localserver/mocks"
+
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,8 +40,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 	koldieSessionId := ulid.New()
 	cmdRequestHeaders := map[string][]string{
-		"some_key":  {ulid.New()},
-		"other_key": {ulid.New()},
+		kolidePresenceDetectionInterval: {"0s"},
 	}
 
 	cmdReqCallBackHeaders := map[string][]string{
@@ -181,8 +183,15 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
 					require.NoError(t, err)
 
+					mockPresenceDetector := mocks.NewPresenceDetector(t)
+					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
+					localServer := &localServer{
+						presenceDetector: mockPresenceDetector,
+						slogger:          multislogger.NewNopLogger(),
+					}
+
 					// give our middleware with the test handler to the determiner
-					h := kryptoEcMiddleware.Wrap(testHandler)
+					h := kryptoEcMiddleware.Wrap(localServer.presenceDetectionHandler(testHandler))
 
 					rr := httptest.NewRecorder()
 					h.ServeHTTP(rr, req)
@@ -201,6 +210,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NotEmpty(t, rr.Body.String())
 
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
+					require.Equal(t, (0 * time.Second).String(), rr.Header().Get(kolideDurationSinceLastPresenceDetection))
 
 					// try to open the response
 					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())

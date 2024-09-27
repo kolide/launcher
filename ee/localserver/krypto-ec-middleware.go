@@ -344,6 +344,14 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
 
+		for k, v := range bhr.Header() {
+			if len(v) == 0 {
+				continue
+			}
+
+			w.Header().Add(k, v[0])
+		}
+
 		// arguable the png things here should be their own handler. But doing that means another layer
 		// buffering the http response, so it feels a bit silly. When we ditch the v1/v2 switcher, we can
 		// be a bit more clever and move this.
