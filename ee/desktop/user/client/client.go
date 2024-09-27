@@ -67,6 +67,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 	encodedReason := url.QueryEscape(reason)
 	encodedInterval := url.QueryEscape(interval.String())
 
+	// default time out of 30s is set in New()
 	resp, requestErr := c.base.Get(fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval))
 	if requestErr != nil {
 		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("getting presence: %w", requestErr)

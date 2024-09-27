@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testPresenceEnvVar = "launcher_test_presence"
+const testPresenceEnvVar = "LAUNCHER_TEST_PRESENCE"
 
 // Since there is no way to test user presence in a CI / automated fashion,
 // these test are expected to be run manually via cmd line when needed.
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presencedetection/ -run Test_detectSuccess
+// LAUNCHER_TEST_PRESENCE=true go test ./ee/presencedetection/ -run Test_detectSuccess
 //
 // then successfully auth with the pop up
 func Test_detectSuccess(t *testing.T) {
@@ -32,7 +32,7 @@ func Test_detectSuccess(t *testing.T) {
 
 // To test this run
 //
-// launcher_test_presence=true go test ./ee/presencedetection/ -run Test_detectCancel
+// LAUNCHER_TEST_PRESENCE=true go test ./ee/presencedetection/ -run Test_detectCancel
 //
 // then cancel the biometric auth that pops up
 func Test_detectCancel(t *testing.T) {

@@ -71,6 +71,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			expectError:             true,
 		},
 		{
+			// this should never happen, but it is here for completeness
 			name:     "detection failed without OS error",
 			interval: 0,
 			detector: func(t *testing.T) detectorIface {
@@ -89,8 +90,8 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			t.Parallel()
 
 			pd := &PresenceDetector{
-				detector:         tt.detector(t),
-				lastDetectionUTC: tt.initialLastDetectionUTC,
+				detector:      tt.detector(t),
+				lastDetection: tt.initialLastDetectionUTC,
 			}
 
 			timeSinceLastDetection, err := pd.DetectPresence("this is a test", tt.interval)
