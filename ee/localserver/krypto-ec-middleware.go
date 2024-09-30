@@ -316,15 +316,44 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
+		// add headers to the response map
+		var responseMap map[string]interface{}
+		bhrBytes := bhr.Bytes()
+		if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
+			traces.SetError(span, err)
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"unable to unmarshal response",
+				"err", err,
+			)
+			responseMap = map[string]any{
+				"headers": bhr.Header(),
+
+				// the request body was not in json format, just pass it through as "msg"
+				// property of json
+				"msg": string(bhrBytes),
+			}
+		} else {
+			responseMap["headers"] = bhr.Header()
+		}
+
+		responseBytes, err := json.Marshal(responseMap)
+		if err != nil {
+			traces.SetError(span, err)
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"unable to marshal response",
+				"err", err,
+			)
+		}
+
 		var response []byte
 		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 		// pass nil to krypto
 		// hardware signing is not implemented for darwin
 		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
+			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, responseBytes)
 		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
+			response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
 		}
 
 		if err != nil {
@@ -343,14 +372,6 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		callbackData.Response = base64.StdEncoding.EncodeToString(response)
 
 		w.Header().Add(kolideKryptoHeaderKey, kolideKryptoEccHeader20230130Value)
-
-		for k, v := range bhr.Header() {
-			if len(v) == 0 {
-				continue
-			}
-
-			w.Header().Add(k, v[0])
-		}
 
 		// arguable the png things here should be their own handler. But doing that means another layer
 		// buffering the http response, so it feels a bit silly. When we ditch the v1/v2 switcher, we can

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
@@ -139,11 +140,17 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			responseData := tt.responseData
-			// generate the response we want the handler to return
-			if responseData == nil {
-				responseData = []byte(ulid.New())
+			responseMap := make(map[string]any)
+			const testMsgKey = "msg"
+
+			responseValue := string(tt.responseData)
+			if responseValue == "" {
+				responseValue = ulid.New()
 			}
+
+			responseMap[testMsgKey] = responseValue
+
+			responseDataRaw := mustMarshal(t, responseMap)
 
 			testHandler := tt.handler
 
@@ -163,7 +170,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					defer r.Body.Close()
 
 					require.Equal(t, cmdReqBody, reqBodyRaw)
-					w.Write(responseData)
+					w.Write(responseDataRaw)
 				})
 			}
 
@@ -212,10 +219,6 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
 
-					if runtime.GOOS == "darwin" {
-						require.Equal(t, (0 * time.Second).String(), rr.Header().Get(kolideDurationSinceLastPresenceDetection))
-					}
-
 					// try to open the response
 					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
 					require.NoError(t, err)
@@ -227,8 +230,20 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
-					require.Equal(t, responseData, opened.ResponseData)
+
+					opendResponseValue, err := extractJsonProperty[string](opened.ResponseData, testMsgKey)
+					require.NoError(t, err)
+					require.Equal(t, responseValue, opendResponseValue)
+
 					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+
+					responseHeaders, err := extractJsonProperty[map[string][]string](opened.ResponseData, "headers")
+					require.NoError(t, err)
+
+					// check that the presence detection interval is present
+					if runtime.GOOS == "darwin" {
+						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetection][0])
+					}
 				})
 			}
 		})
@@ -383,7 +398,11 @@ func Test_AllowedOrigin(t *testing.T) {
 			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
-			require.Equal(t, responseData, opened.ResponseData)
+
+			openedResponseValue, err := extractJsonProperty[string](opened.ResponseData, "msg")
+			require.NoError(t, err)
+
+			require.Equal(t, responseData, []byte(openedResponseValue))
 			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 
 		})
@@ -447,4 +466,29 @@ func mustMarshal(t *testing.T, v interface{}) []byte {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
+}
+
+func extractJsonProperty[T any](jsonData []byte, property string) (T, error) {
+	var result map[string]json.RawMessage
+
+	// Unmarshal the JSON data into a map with json.RawMessage
+	err := json.Unmarshal(jsonData, &result)
+	if err != nil {
+		return *new(T), err
+	}
+
+	// Retrieve the field from the map
+	value, ok := result[property]
+	if !ok {
+		return *new(T), fmt.Errorf("property %s not found", property)
+	}
+
+	// Unmarshal the value into the type T
+	var extractedValue T
+	err = json.Unmarshal(value, &extractedValue)
+	if err != nil {
+		return *new(T), err
+	}
+
+	return extractedValue, nil
 }
