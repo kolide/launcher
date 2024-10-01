@@ -141,7 +141,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			t.Parallel()
 
 			responseMap := make(map[string]any)
-			const testMsgKey = "msg"
+			const testMsgKey = "body"
 
 			responseValue := string(tt.responseData)
 			if responseValue == "" {
@@ -399,7 +399,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
 
-			openedResponseValue, err := extractJsonProperty[string](opened.ResponseData, "msg")
+			openedResponseValue, err := extractJsonProperty[string](opened.ResponseData, "body")
 			require.NoError(t, err)
 
 			require.Equal(t, responseData, []byte(openedResponseValue))
