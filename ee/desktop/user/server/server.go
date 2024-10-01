@@ -209,7 +209,7 @@ func (s *UserServer) detectPresence(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		response.Error = err.Error()
 
-		s.slogger.Log(context.TODO(), slog.LevelDebug,
+		s.slogger.Log(req.Context(), slog.LevelDebug,
 			"detecting presence",
 			"reason", reason,
 			"interval", interval,

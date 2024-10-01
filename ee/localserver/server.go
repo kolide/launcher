@@ -446,13 +446,15 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
 
-		ls.slogger.Log(r.Context(), slog.LevelError,
-			"presence_detection",
-			"reason", reason,
-			"interval", detectionIntervalDuration,
-			"duration_since_last_detection", durationSinceLastDetection,
-			"err", err,
-		)
+		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"presence_detection",
+				"reason", reason,
+				"interval", detectionIntervalDuration,
+				"duration_since_last_detection", durationSinceLastDetection,
+				"err", err,
+			)
+		}
 
 		// if there was an error, we still want to return a 200 status code
 		// and send the request through

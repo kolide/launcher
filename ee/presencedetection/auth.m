@@ -29,7 +29,7 @@ struct AuthResult Authenticate(char const* reason) {
                     if (error.code == LAErrorUserFallback || error.code == LAErrorAuthenticationFailed) {
                         // Prompting for password
                         [myContext evaluatePolicy:LAPolicyDeviceOwnerAuthentication
-                            localizedReason:@"Please enter your password"
+                            localizedReason:nsReason
                             reply:^(BOOL pwdSuccess, NSError *error) {
                                 if (pwdSuccess) {
                                     success = true;
