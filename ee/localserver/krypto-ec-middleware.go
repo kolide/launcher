@@ -317,6 +317,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		next.ServeHTTP(bhr, newReq)
 
 		// add headers to the response map
+		// this assumes that the response to `bhr` was a json encoded blob.
 		var responseMap map[string]interface{}
 		bhrBytes := bhr.Bytes()
 		if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
@@ -328,9 +329,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			responseMap = map[string]any{
 				"headers": bhr.Header(),
 
-				// the request body was not in json format, just pass it through as "msg"
-				// property of json
-				"msg": string(bhrBytes),
+				// the request body was not in json format, just pass it through as "body"
+				"body": string(bhrBytes),
 			}
 		} else {
 			responseMap["headers"] = bhr.Header()
