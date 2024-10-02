@@ -414,19 +414,19 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		// presence detection is only supported on macos currently
-		if runtime.GOOS != "darwin" {
-			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
 
 		// no presence detection requested
 		if detectionIntervalStr == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// presence detection is only supported on macos currently
+		if runtime.GOOS != "darwin" {
+			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
 			next.ServeHTTP(w, r)
 			return
 		}
