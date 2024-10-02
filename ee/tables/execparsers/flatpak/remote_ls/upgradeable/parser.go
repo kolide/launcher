@@ -6,8 +6,8 @@ import (
 	"regexp"
 )
 
-// The app id conforms to: [dbus specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names)
-var flatpakAppIdRegexp = regexp.MustCompile(`((?:[a-zA-Z]+[a-zA-Z0-9_]*\.){1,}[a-zA-Z]+[a-zA-Z0-9_]*)`)
+// The app id conforms to: [dbus bus name specification](https://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names)
+var flatpakAppIdRegexp = regexp.MustCompile(`((?:[a-zA-Z_-]+[a-zA-Z0-9_-]*\.){1,}[a-zA-Z_-]+[a-zA-Z0-9_-]*)`)
 
 // Wow this has been a head-pounding bugger of a thing.
 //
