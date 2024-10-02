@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -56,6 +57,8 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
+
+	presenceDetector presenceDetector
 }
 
 const (
@@ -63,7 +66,11 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
+type presenceDetector interface {
+	DetectPresence(reason string, interval time.Duration) (time.Duration, error)
+}
+
+func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetector) (*localServer, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -74,6 +81,7 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		kolideServer:          k.KolideServerURL(),
 		myLocalDbSigner:       agent.LocalDbKeys(),
 		myLocalHardwareSigner: agent.HardwareKeys(),
+		presenceDetector:      presenceDetector,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -103,13 +111,13 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ls.presenceDetectionHandler(ecAuthedMux)))
 
 	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.presenceDetectionHandler(ecAuthedMux)))
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -119,11 +127,19 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	// curl localhost:40978/id
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
-		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-			return r.URL.Path
-		})),
+		Handler: otelhttp.NewHandler(
+			ls.requestLoggingHandler(
+				ls.preflightCorsHandler(
+					ls.rateLimitHandler(
+						mux,
+					),
+				)), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.URL.Path
+			})),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
@@ -390,6 +406,61 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// presence detection is only supported on macos currently
+		if runtime.GOOS != "darwin" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// can test this by adding an unauthed endpoint to the mux and running, for example:
+		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
+		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
+
+		// no presence detection requested
+		if detectionIntervalStr == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr)
+		if err != nil {
+			// this is the only time this should returna non-200 status code
+			// asked for presence detection, but the interval is invalid
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// set a default reason, on macos the popup will look like "Kolide is trying to authenticate."
+		reason := "authenticate"
+		reasonHeader := r.Header.Get(kolidePresenceDetectionReason)
+		if reasonHeader != "" {
+			reason = reasonHeader
+		}
+
+		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
+
+		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"presence_detection",
+				"reason", reason,
+				"interval", detectionIntervalDuration,
+				"duration_since_last_detection", durationSinceLastDetection,
+				"err", err,
+			)
+		}
+
+		// if there was an error, we still want to return a 200 status code
+		// and send the request through
+		// allow the server to decide what to do based on last detection duration
+
+		w.Header().Add(kolideDurationSinceLastPresenceDetection, durationSinceLastDetection.String())
 		next.ServeHTTP(w, r)
 	})
 }

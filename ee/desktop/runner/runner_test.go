@@ -153,7 +153,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			}()
 
 			// let it run a few intervals
-			time.Sleep(r.updateInterval * 3)
+			time.Sleep(r.updateInterval * 6)
 			r.Interrupt(nil)
 
 			user, err := user.Current()

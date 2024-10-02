@@ -7,12 +7,14 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -21,8 +23,11 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/keys"
+	"github.com/kolide/launcher/ee/localserver/mocks"
+
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,6 +41,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	challengeData := []byte(ulid.New())
 
 	koldieSessionId := ulid.New()
+	cmdRequestHeaders := map[string][]string{
+		kolidePresenceDetectionInterval: {"0s"},
+	}
+
 	cmdReqCallBackHeaders := map[string][]string{
 		kolideSessionIdHeaderKey: {koldieSessionId},
 	}
@@ -44,6 +53,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	cmdReq := mustMarshal(t, v2CmdRequestType{
 		Path:            "whatevs",
 		Body:            cmdReqBody,
+		Headers:         cmdRequestHeaders,
 		CallbackHeaders: cmdReqCallBackHeaders,
 	})
 
@@ -130,11 +140,17 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			responseData := tt.responseData
-			// generate the response we want the handler to return
-			if responseData == nil {
-				responseData = []byte(ulid.New())
+			responseMap := make(map[string]any)
+			const testMsgKey = "body"
+
+			responseValue := string(tt.responseData)
+			if responseValue == "" {
+				responseValue = ulid.New()
 			}
+
+			responseMap[testMsgKey] = responseValue
+
+			responseDataRaw := mustMarshal(t, responseMap)
 
 			testHandler := tt.handler
 
@@ -143,12 +159,18 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			// this should match the responseData in the opened response
 			if testHandler == nil {
 				testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+					// make sure all the request headers are present
+					for k, v := range cmdRequestHeaders {
+						require.Equal(t, v[0], r.Header.Get(k))
+					}
+
 					reqBodyRaw, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
 					defer r.Body.Close()
 
 					require.Equal(t, cmdReqBody, reqBodyRaw)
-					w.Write(responseData)
+					w.Write(responseDataRaw)
 				})
 			}
 
@@ -169,8 +191,15 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
 					require.NoError(t, err)
 
+					mockPresenceDetector := mocks.NewPresenceDetector(t)
+					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
+					localServer := &localServer{
+						presenceDetector: mockPresenceDetector,
+						slogger:          multislogger.NewNopLogger(),
+					}
+
 					// give our middleware with the test handler to the determiner
-					h := kryptoEcMiddleware.Wrap(testHandler)
+					h := kryptoEcMiddleware.Wrap(localServer.presenceDetectionHandler(testHandler))
 
 					rr := httptest.NewRecorder()
 					h.ServeHTTP(rr, req)
@@ -201,8 +230,20 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
-					require.Equal(t, responseData, opened.ResponseData)
+
+					opendResponseValue, err := extractJsonProperty[string](opened.ResponseData, testMsgKey)
+					require.NoError(t, err)
+					require.Equal(t, responseValue, opendResponseValue)
+
 					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+
+					responseHeaders, err := extractJsonProperty[map[string][]string](opened.ResponseData, "headers")
+					require.NoError(t, err)
+
+					// check that the presence detection interval is present
+					if runtime.GOOS == "darwin" {
+						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetection][0])
+					}
 				})
 			}
 		})
@@ -357,7 +398,11 @@ func Test_AllowedOrigin(t *testing.T) {
 			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
-			require.Equal(t, responseData, opened.ResponseData)
+
+			openedResponseValue, err := extractJsonProperty[string](opened.ResponseData, "body")
+			require.NoError(t, err)
+
+			require.Equal(t, responseData, []byte(openedResponseValue))
 			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
 
 		})
@@ -421,4 +466,29 @@ func mustMarshal(t *testing.T, v interface{}) []byte {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
+}
+
+func extractJsonProperty[T any](jsonData []byte, property string) (T, error) {
+	var result map[string]json.RawMessage
+
+	// Unmarshal the JSON data into a map with json.RawMessage
+	err := json.Unmarshal(jsonData, &result)
+	if err != nil {
+		return *new(T), err
+	}
+
+	// Retrieve the field from the map
+	value, ok := result[property]
+	if !ok {
+		return *new(T), fmt.Errorf("property %s not found", property)
+	}
+
+	// Unmarshal the value into the type T
+	var extractedValue T
+	err = json.Unmarshal(value, &extractedValue)
+	if err != nil {
+		return *new(T), err
+	}
+
+	return extractedValue, nil
 }

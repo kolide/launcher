@@ -131,7 +131,9 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
+	showDesktopChan := make(chan struct{})
+
+	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
 	if err != nil {
 		return err
 	}
@@ -183,9 +185,10 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
+	// block until a send on showDesktopChan
+	<-showDesktopChan
 	// blocks until shutdown called
 	m.Init()
-
 	return nil
 }
 
