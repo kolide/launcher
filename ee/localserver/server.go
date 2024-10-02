@@ -421,7 +421,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
-		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
+		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
 
 		// no presence detection requested
 		if detectionIntervalStr == "" {
@@ -439,7 +439,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		// set a default reason, on macos the popup will look like "Kolide is trying to authenticate."
 		reason := "authenticate"
-		reasonHeader := r.Header.Get(kolidePresenceDetectionReason)
+		reasonHeader := r.Header.Get(kolidePresenceDetectionReasonHeaderKey)
 		if reasonHeader != "" {
 			reason = reasonHeader
 		}
@@ -460,7 +460,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		// and send the request through
 		// allow the server to decide what to do based on last detection duration
 
-		w.Header().Add(kolideDurationSinceLastPresenceDetection, durationSinceLastDetection.String())
+		w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, durationSinceLastDetection.String())
 		next.ServeHTTP(w, r)
 	})
 }
