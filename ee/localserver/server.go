@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -415,6 +416,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		// presence detection is only supported on macos currently
 		if runtime.GOOS != "darwin" {
+			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
 			next.ServeHTTP(w, r)
 			return
 		}
