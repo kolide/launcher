@@ -109,7 +109,7 @@ func TestPresenceDetectionHandler(t *testing.T) {
 			handlerToTest.ServeHTTP(rr, req)
 
 			if tt.shouldHavePresenceDetectionDurationResponseHeader {
-				require.NotEmpty(t, rr.Header().Get(kolideDurationSinceLastPresenceDetection))
+				require.NotEmpty(t, rr.Header().Get(kolideDurationSinceLastPresenceDetectionHeaderKey))
 			}
 			require.Equal(t, tt.expectedStatusCode, rr.Code)
 		})
