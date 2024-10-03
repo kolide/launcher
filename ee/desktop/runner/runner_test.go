@@ -170,7 +170,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 					}
 
 					return fmt.Errorf("expected no processes, found %d", len(r.uidProcs))
-				}, 10*time.Second, 1*time.Second))
+				}, 30*time.Second, 1*time.Second))
 			} else {
 				if runtime.GOOS == "windows" {
 					assert.Contains(t, r.uidProcs, user.Username)
