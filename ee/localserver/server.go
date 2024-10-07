@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -413,18 +414,19 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		// presence detection is only supported on macos currently
-		if runtime.GOOS != "darwin" {
+		// can test this by adding an unauthed endpoint to the mux and running, for example:
+		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
+		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
+
+		// no presence detection requested
+		if detectionIntervalStr == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		// can test this by adding an unauthed endpoint to the mux and running, for example:
-		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
-		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionInterval)
-
-		// no presence detection requested
-		if detectionIntervalStr == "" {
+		// presence detection is only supported on macos currently
+		if runtime.GOOS != "darwin" {
+			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -439,7 +441,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 
 		// set a default reason, on macos the popup will look like "Kolide is trying to authenticate."
 		reason := "authenticate"
-		reasonHeader := r.Header.Get(kolidePresenceDetectionReason)
+		reasonHeader := r.Header.Get(kolidePresenceDetectionReasonHeaderKey)
 		if reasonHeader != "" {
 			reason = reasonHeader
 		}
@@ -460,7 +462,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		// and send the request through
 		// allow the server to decide what to do based on last detection duration
 
-		w.Header().Add(kolideDurationSinceLastPresenceDetection, durationSinceLastDetection.String())
+		w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, durationSinceLastDetection.String())
 		next.ServeHTTP(w, r)
 	})
 }
