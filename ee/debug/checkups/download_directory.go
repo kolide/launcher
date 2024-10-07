@@ -95,8 +95,10 @@ func getDownloadDirs() []string {
 
 	if runtime.GOOS == "windows" {
 		baseDir = "C:\\Users"
-	} else {
+	} else if runtime.GOOS == "darwin" {
 		baseDir = "/Users"
+	} else {
+		baseDir = "/home"
 	}
 
 	entries, err := os.ReadDir(baseDir)
