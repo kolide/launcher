@@ -232,25 +232,27 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("fetching binary launcher: %w", err)
 	}
 
+	// Disabling the addition of arm64 binaries until arm64 is stable
+
 	// for windows, make a separate target for arm64
-	if p.target.Platform == Windows {
-		// make a copy of P
-		packageOptsCopy := *p
-		packageOptsCopy.target.Arch = Arm64
+	// if p.target.Platform == Windows {
+	// 	// make a copy of P
+	// 	packageOptsCopy := *p
+	// 	packageOptsCopy.target.Arch = Arm64
 
-		if err := packageOptsCopy.getBinary(ctx, "osqueryd", packageOptsCopy.target.PlatformBinaryName("osqueryd"), packageOptsCopy.OsqueryVersion); err != nil {
-			return fmt.Errorf("fetching binary osqueryd: %w", err)
-		}
+	// 	if err := packageOptsCopy.getBinary(ctx, "osqueryd", packageOptsCopy.target.PlatformBinaryName("osqueryd"), packageOptsCopy.OsqueryVersion); err != nil {
+	// 		return fmt.Errorf("fetching binary osqueryd: %w", err)
+	// 	}
 
-		launcherVersion := packageOptsCopy.LauncherVersion
-		if packageOptsCopy.LauncherArmPath != "" {
-			launcherVersion = packageOptsCopy.LauncherArmPath
-		}
+	// 	launcherVersion := packageOptsCopy.LauncherVersion
+	// 	if packageOptsCopy.LauncherArmPath != "" {
+	// 		launcherVersion = packageOptsCopy.LauncherArmPath
+	// 	}
 
-		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
-			return fmt.Errorf("fetching binary launcher: %w", err)
-		}
-	}
+	// 	if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
+	// 		return fmt.Errorf("fetching binary launcher: %w", err)
+	// 	}
+	// }
 
 	// Some darwin specific bits
 	if p.target.Platform == Darwin {
