@@ -25,13 +25,15 @@ import (
 )
 
 const (
-	timestampValidityRange                   = 150
-	kolideKryptoEccHeader20230130Value       = "2023-01-30"
-	kolideKryptoHeaderKey                    = "X-Kolide-Krypto"
-	kolideSessionIdHeaderKey                 = "X-Kolide-Session"
-	kolidePresenceDetectionInterval          = "X-Kolide-Presence-Detection-Interval"
-	kolidePresenceDetectionReason            = "X-Kolide-Presence-Detection-Reason"
-	kolideDurationSinceLastPresenceDetection = "X-Kolide-Duration-Since-Last-Presence-Detection"
+	timestampValidityRange                            = 150
+	kolideKryptoEccHeader20230130Value                = "2023-01-30"
+	kolideKryptoHeaderKey                             = "X-Kolide-Krypto"
+	kolideSessionIdHeaderKey                          = "X-Kolide-Session"
+	kolidePresenceDetectionIntervalHeaderKey          = "X-Kolide-Presence-Detection-Interval"
+	kolidePresenceDetectionReasonHeaderKey            = "X-Kolide-Presence-Detection-Reason"
+	kolideDurationSinceLastPresenceDetectionHeaderKey = "X-Kolide-Duration-Since-Last-Presence-Detection"
+	kolideOsHeaderKey                                 = "X-Kolide-Os"
+	kolideArchHeaderKey                               = "X-Kolide-Arch"
 )
 
 type v2CmdRequestType struct {
@@ -315,6 +317,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
+
+		bhr.Header().Add(kolideOsHeaderKey, runtime.GOOS)
+		bhr.Header().Add(kolideArchHeaderKey, runtime.GOARCH)
 
 		// add headers to the response map
 		// this assumes that the response to `bhr` was a json encoded blob.

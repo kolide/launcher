@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/ee/presencedetection"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 	koldieSessionId := ulid.New()
 	cmdRequestHeaders := map[string][]string{
-		kolidePresenceDetectionInterval: {"0s"},
+		kolidePresenceDetectionIntervalHeaderKey: {"0s"},
 	}
 
 	cmdReqCallBackHeaders := map[string][]string{
@@ -240,10 +241,16 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					responseHeaders, err := extractJsonProperty[map[string][]string](opened.ResponseData, "headers")
 					require.NoError(t, err)
 
+					require.Equal(t, runtime.GOOS, responseHeaders[kolideOsHeaderKey][0])
+
 					// check that the presence detection interval is present
 					if runtime.GOOS == "darwin" {
-						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetection][0])
+						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
+						return
 					}
+
+					// not darwin
+					require.Equal(t, presencedetection.DetectionFailedDurationValue.String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
 				})
 			}
 		})
