@@ -10,51 +10,57 @@ import (
 	"strings"
 )
 
-type DownloadDirectory struct {
+type downloadDirectory struct {
 	status  Status
 	summary string
-	files   []string
+	files   []fileInfo
 }
 
-func (c *DownloadDirectory) Name() string {
-	return "Download directory contents"
+func (c *downloadDirectory) Name() string {
+	return "Download directory contents for all users"
 }
 
-func (c *DownloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
-	downloadDir := getDownloadDir()
-	if downloadDir == "" {
-		return fmt.Errorf("no default download directory")
+func (c *downloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
+	downloadDirs := getDownloadDirs()
+	if len(downloadDirs) == 0 {
+		c.status = Erroring
+		c.summary = "No download directories found"
+		return nil
 	}
 
-	err := filepath.Walk(downloadDir, func(path string, info os.FileInfo, err error) error {
+	for _, downloadDir := range downloadDirs {
+		pattern := filepath.Join(downloadDir, "kolide-launcher*")
+		matches, err := filepath.Glob(pattern)
+
 		if err != nil {
-			return err
+			fmt.Fprintf(extraFH, "Error listing files in directory (%s): %s\n", downloadDir, err)
+			continue
 		}
-		if !info.IsDir() && isKolideInstaller(info.Name()) {
-			c.files = append(c.files, path)
+
+		for _, match := range matches {
+			if info, err := os.Stat(match); err == nil {
+				c.files = append(c.files, fileInfo{
+					Name:    match,
+					ModTime: info.ModTime(),
+				})
+			}
 		}
-		return nil
-	})
+	}
 
 	switch {
-	case os.IsNotExist(err):
-		c.status = Warning
-		c.summary = fmt.Sprintf("download directory (%s) not present", downloadDir)
-	case err != nil:
-		c.status = Erroring
-		c.summary = fmt.Sprintf("error listing files in directory (%s): %s", downloadDir, err)
 	case len(c.files) == 0:
-		c.status = Warning
-		c.summary = fmt.Sprintf("no Kolide installers found in directory (%s)", downloadDir)
+		c.status = Informational
+		c.summary = "No Kolide installers found in any user's download directory"
 	default:
-		c.status = Passing
-		fileNames := make([]string, len(c.files))
+		c.status = Informational
+		fileInfos := make([]string, len(c.files))
 		for i, file := range c.files {
-			fileNames[i] = filepath.Base(file)
+			fileName := filepath.Base(file.Name)
+			modTime := file.ModTime.Format("Mon, 02 Jan 2006 15:04:05 MST")
+			fileInfos[i] = fmt.Sprintf("%s (Modified: %s)", fileName, modTime)
 		}
-		installerList := strings.Join(fileNames, ", ")
-		c.summary = fmt.Sprintf("Found Kolide installer(s) in directory (%s): %s", downloadDir, installerList)
-
+		installerList := strings.Join(fileInfos, ", ")
+		c.summary = fmt.Sprintf("Found Kolide installer(s) across user download directories: %s", installerList)
 	}
 
 	if len(c.files) > 0 {
@@ -67,51 +73,45 @@ func (c *DownloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
 	return nil
 }
 
-func (c *DownloadDirectory) ExtraFileName() string {
-	return "kolide-installers"
+func (c *downloadDirectory) ExtraFileName() string {
+	return "kolide-installers-all-users.txt"
 }
 
-func (c *DownloadDirectory) Status() Status {
+func (c *downloadDirectory) Status() Status {
 	return c.status
 }
 
-func (c *DownloadDirectory) Summary() string {
+func (c *downloadDirectory) Summary() string {
 	return c.summary
 }
 
-func (c *DownloadDirectory) Data() any {
+func (c *downloadDirectory) Data() any {
 	return c.files
 }
 
-func getDownloadDir() string {
-	homeDir, err := os.UserHomeDir()
+func getDownloadDirs() []string {
+	var userDirs []string
+	var baseDir string
+
+	if runtime.GOOS == "windows" {
+		baseDir = "C:\\Users"
+	} else {
+		baseDir = "/Users"
+	}
+
+	entries, err := os.ReadDir(baseDir)
 	if err != nil {
-		return ""
+		return nil
 	}
 
-	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(homeDir, "Downloads")
-	case "linux":
-		return filepath.Join(homeDir, "Downloads")
-	case "windows":
-		return filepath.Join(homeDir, "Downloads")
+	for _, entry := range entries {
+		if entry.IsDir() {
+			userDir := filepath.Join(baseDir, entry.Name(), "Downloads")
+			if _, err := os.Stat(userDir); err == nil {
+				userDirs = append(userDirs, userDir)
+			}
+		}
 	}
 
-	return ""
-}
-
-func isKolideInstaller(filename string) bool {
-	lowerFilename := strings.ToLower(filename)
-	switch runtime.GOOS {
-	case "darwin":
-		return strings.HasSuffix(lowerFilename, "kolide-launcher.pkg")
-	case "linux":
-		return strings.HasSuffix(lowerFilename, "kolide-launcher.rpm") ||
-			strings.HasSuffix(lowerFilename, "kolide-launcher.deb") ||
-			strings.HasSuffix(lowerFilename, "kolide-launcher.pacman")
-	case "windows":
-		return strings.HasSuffix(lowerFilename, "kolide-launcher.msi")
-	}
-	return false
+	return userDirs
 }
