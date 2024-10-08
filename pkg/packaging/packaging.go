@@ -28,6 +28,8 @@ var assets embed.FS
 const (
 	// Enroll secret should be readable only by root
 	secretPerms = 0600
+	// Internal kolide identifier
+	nababeIdentifier = "kolide-nababe-k2"
 )
 
 // PackageOptions encapsulates the launcher build options. It's
@@ -232,8 +234,11 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		return fmt.Errorf("fetching binary launcher: %w", err)
 	}
 
+	// Disabling the addition of arm64 binaries until arm64 is stable
+
 	// for windows, make a separate target for arm64
-	if p.target.Platform == Windows {
+	// feature flag only for nababe
+	if p.target.Platform == Windows && p.Identifier == nababeIdentifier {
 		// make a copy of P
 		packageOptsCopy := *p
 		packageOptsCopy.target.Arch = Arm64
