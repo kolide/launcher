@@ -17,6 +17,11 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
+const (
+	// Internal kolide identifier
+	nababeIdentifier = "kolide-nababe-k2"
+)
+
 type wixTool struct {
 	wixPath         string     // Where is wix installed
 	packageRoot     string     // What's the root of the packaging files?
@@ -303,7 +308,10 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 
 				// create a condition based on architecture
 				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
-				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				// feature flag only for nababe
+				if wo.identifier == nababeIdentifier {
+					heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				}
 				heatWrite.WriteString("\n")
 
 				if err := service.Xml(heatWrite); err != nil {
@@ -319,7 +327,10 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 				}
 
 				// create a condition based on architecture
-				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				// feature flag only for nababe
+				if wo.identifier == nababeIdentifier {
+					heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				}
 				heatWrite.WriteString("\n")
 			}
 		}
