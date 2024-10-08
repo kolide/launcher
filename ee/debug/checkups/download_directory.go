@@ -17,7 +17,7 @@ type downloadDirectory struct {
 }
 
 func (c *downloadDirectory) Name() string {
-	return "Download directory contents for all users"
+	return "Kolide Downloads"
 }
 
 func (c *downloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
@@ -107,11 +107,12 @@ func getDownloadDirs() []string {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			userDir := filepath.Join(baseDir, entry.Name(), "Downloads")
-			if _, err := os.Stat(userDir); err == nil {
-				userDirs = append(userDirs, userDir)
-			}
+		if !entry.IsDir() {
+			continue
+		}
+		userDir := filepath.Join(baseDir, entry.Name(), "Downloads")
+		if _, err := os.Stat(userDir); err == nil {
+			userDirs = append(userDirs, userDir)
 		}
 	}
 
