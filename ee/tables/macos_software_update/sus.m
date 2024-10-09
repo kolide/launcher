@@ -1,72 +1,125 @@
 #include "sus.h"
 
 #import <Cocoa/Cocoa.h>
+#import <SUOSUClientDelegate-Protocol.h>
+#import <SUOSUClientProtocol-Protocol.h>
 #import <SUScanController.h>
 #import <SUSharedPrefs.h>
 #import <SUUpdateProduct.h>
 
-void getSoftwareUpdateConfiguration(int os_version,
-                                    int* isMacOSAutoUpdateManaged,
-                                    int* isAutomaticallyCheckForUpdatesManaged,
-                                    int* isAutomaticallyCheckForUpdatesEnabled,
-                                    int* doesBackgroundDownload,
-                                    int* doesAppStoreAutoUpdates,
-                                    int* doesOSXAutoUpdates,
-                                    int* doesAutomaticCriticalUpdateInstall,
-                                    int* lastCheckTimestamp) {
-  NSBundle* bundle;
-  bundle = [NSBundle
+void getSoftwareUpdateConfiguration(
+    int os_version,
+    int* isAutomaticallyCheckForUpdatesManaged,
+    int* isAutomaticallyCheckForUpdatesEnabled,
+    int* isdoBackgroundDownloadManaged,
+    int* doesBackgroundDownload,
+    int* isAppStoreAutoUpdatesManaged,
+    int* doesAppStoreAutoUpdates,
+    int* doesOSXAutoUpdatesManaged,
+    int* doesOSXAutoUpdates,
+    int* isAutomaticConfigDataCriticalUpdateInstallManaged,
+    int* doesAutomaticConfigDataInstall,
+    int* doesAutomaticCriticalUpdateInstall,
+    int* lastCheckTimestamp) {
+  // Starting with MacOS 15 (build version 24), the OSUpdate framework is used
+  // over the SoftwareUpdate framework.
+  BOOL os_framework = os_version >= 24;
+
+  NSBundle* suBundle;
+  suBundle = [NSBundle
       bundleWithPath:
           @"/System/Library/PrivateFrameworks/SoftwareUpdate.framework"];
-  [bundle load];
+  [suBundle load];
 
-  Class SUSharedPrefs = [bundle classNamed:@"SUSharedPrefs"];
+  Class SUSharedPrefs = [suBundle classNamed:@"SUSharedPrefs"];
   id manager = [SUSharedPrefs sharedPrefManager];
 
-  BOOL val = [manager isMacOSAutoUpdateManaged];
-  if (val) {
-    *isMacOSAutoUpdateManaged = 1;
-  }
+  NSBundle* osBundle;
+  osBundle = [NSBundle
+      bundleWithPath:@"/System/Library/PrivateFrameworks/OSUpdate.framework"];
+  [osBundle load];
 
-  val = [manager isAutomaticallyCheckForUpdatesManaged];
-  if (val) {
-    *isAutomaticallyCheckForUpdatesManaged = 1;
-  }
+  Class SUOSUMacBuddyController =
+      [osBundle classNamed:@"SUOSUMacBuddyController"];
+  id<SUOSUClientDelegate> delegate = [SUOSUMacBuddyController new];
+  //[SUOSUMacBuddyController initialize];
+  NSLog(@"%@", delegate);
 
-  val = [manager isAutomaticallyCheckForUpdatesEnabled];
-  if (val) {
-    *isAutomaticallyCheckForUpdatesEnabled = 1;
-  }
+  Class SUOSUClient = [osBundle classNamed:@"SUOSUClient"];
+  // Type of 0 is not specific to anything, but it does not appear to matter.
+  id<SUOSUClientProtocol> client =
+      [[SUOSUClient new] initWithDelegate:delegate type:(NSUInteger)0];
+  NSLog(@"%@", client);
 
-  val = [manager doesBackgroundDownload];
-  if (val) {
-    *doesBackgroundDownload = 1;
-  }
+  _Bool value = os_framework
+                    ? [client isAutomaticallyCheckForUpdatesPreferenceManaged]
+                    : [manager isAutomaticallyCheckForUpdatesManaged];
+  *isAutomaticallyCheckForUpdatesManaged = value ? 1 : 0;
 
-  val = [manager doesAppStoreAutoUpdates];
-  if (val) {
-    *doesAppStoreAutoUpdates = 1;
-  }
+  value = os_framework
+              ? [client isAutomaticallyCheckForUpdatesPreferenceEnabled]
+              : [manager isAutomaticallyCheckForUpdatesEnabled];
+  *isAutomaticallyCheckForUpdatesEnabled = value ? 1 : 0;
 
-  // before 10.13 (build ver 17) it's called doesMacOSAutoUpdate.
-  if (os_version >= 18) {
-    val = [manager doesMacOSAutoUpdate];
-    if (val) {
-      *doesOSXAutoUpdates = 1;
-    }
+  value = os_framework
+              ? [client isAutomaticallyDownloadUpdatesPreferenceManaged]
+              : [manager isdoBackgroundDownloadManaged];
+  *isdoBackgroundDownloadManaged = value ? 1 : 0;
+
+  value = os_framework
+              ? [client isAutomaticallyDownloadUpdatesPreferenceEnabled]
+              : [manager doesBackgroundDownload];
+  *doesBackgroundDownload = value ? 1 : 0;
+
+  value = os_framework
+              ? [client isAutomaticallyInstallAppUpdatesPreferenceManaged]
+              : [manager isAppStoreAutoUpdatesManaged];
+  *isAppStoreAutoUpdatesManaged = value ? 1 : 0;
+
+  value = os_framework
+              ? [client isAutomaticallyInstallAppUpdatesPreferenceEnabled]
+              : [manager doesAppStoreAutoUpdates];
+  *doesAppStoreAutoUpdates = value ? 1 : 0;
+
+  value = os_framework
+              ? [client isAutomaticallyInstallMacOSUpdatesPreferenceManaged]
+              : [manager isMacOSAutoUpdateManaged];
+  *doesOSXAutoUpdatesManaged = value ? 1 : 0;
+
+  if (os_framework) {
+    value = [client isAutomaticallyInstallMacOSUpdatesPreferenceEnabled];
+    // Starting with MacOS 10.14 (build version 18), the method changed.
+  } else if (os_version < 18) {
+    value = [manager doesOSXAutoUpdates];
   } else {
-    val = [manager doesOSXAutoUpdates];
-    if (val) {
-      *doesOSXAutoUpdates = 1;
-    }
+    value = [manager doesMacOSAutoUpdate];
   }
+  *doesOSXAutoUpdates = value ? 1 : 0;
 
-  val = [manager doesAutomaticCriticalUpdateInstall];
-  if (val) {
-    *doesAutomaticCriticalUpdateInstall = 1;
-  }
+  value =
+      os_framework
+          ? [client
+                isAutomaticallyInstallSecurityAndConfigUpdatesPreferenceManaged]
+          : [manager isAutomaticConfigDataCriticalUpdateInstallManaged];
+  *isAutomaticConfigDataCriticalUpdateInstallManaged = value ? 1 : 0;
+
+  value =
+      os_framework
+          ? [client
+                isAutomaticallyInstallSecurityAndConfigUpdatesPreferenceEnabled]
+          : [manager doesAutomaticConfigDataInstall];
+  *doesAutomaticConfigDataInstall = value ? 1 : 0;
+
+  value =
+      os_framework
+          ? [client
+                isAutomaticallyInstallSecurityAndConfigUpdatesPreferenceEnabled]
+          : [manager doesAutomaticCriticalUpdateInstall];
+  *doesAutomaticCriticalUpdateInstall = value ? 1 : 0;
+
   NSDate* lastCheckSuccessfulDate = (NSDate*)[manager lastCheckSuccessfulDate];
   *lastCheckTimestamp = [lastCheckSuccessfulDate timeIntervalSince1970];
+
   return;
 }
 

@@ -6,15 +6,20 @@ extern void productKeyValueFound(unsigned int, char*, char*);
 extern void productNestedKeyValueFound(unsigned int, char*, char*, char*);
 
 // Gets software update config flags from SUSharedPrefs API
-void getSoftwareUpdateConfiguration(int os_version,
-                                    int* isMacOSAutoUpdateManaged,
-                                    int* isAutomaticallyCheckForUpdatesManaged,
-                                    int* isAutomaticallyCheckForUpdatesEnabled,
-                                    int* doesBackgroundDownload,
-                                    int* doesAppStoreAutoUpdates,
-                                    int* doesOSXAutoUpdates,
-                                    int* doesAutomaticCriticalUpdateInstall,
-                                    int* lastCheckTimestamp);
+void getSoftwareUpdateConfiguration(
+    int os_version,
+    int* isAutomaticallyCheckForUpdatesManaged,
+    int* isAutomaticallyCheckForUpdatesEnabled,
+    int* isdoBackgroundDownloadManaged,
+    int* doesBackgroundDownload,
+    int* isAppStoreAutoUpdatesManaged,
+    int* doesAppStoreAutoUpdates,
+    int* doesOSXAutoUpdatesManaged,
+    int* doesOSXAutoUpdates,
+    int* isAutomaticConfigDataCriticalUpdateInstallManaged,
+    int* doesAutomaticConfigDataInstall,
+    int* doesAutomaticCriticalUpdateInstall,
+    int* lastCheckTimestamp);
 
 // Gets recommended updates from the SUSharedPrefs API
 void getRecommendedUpdates();
