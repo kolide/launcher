@@ -1,6 +1,6 @@
 # Flags
 
-The `Flags` interface provides a simple API for storing and retrieving launcher flags at runtime. Currently, flags are of types `bool`, `int64` and `string`.
+The `Flags` interface provides a simple API for storing and retrieving launcher flags at runtime.
 
 Launcher flags are identified by a `FlagKey` and can be specified through various means:
 
