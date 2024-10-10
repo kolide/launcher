@@ -17,7 +17,7 @@ import (
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 func Test_newUpdateLibraryManager(t *testing.T) {
@@ -95,16 +95,11 @@ func TestAddToLibrary(t *testing.T) {
 			testBaseDir := t.TempDir()
 			testReleaseVersion := "1.2.4"
 			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-			metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
+			metadataClient, err := refreshedMetadataClient(context.TODO(), rootJson, testBaseDir, tufServerUrl)
 			require.NoError(t, err, "creating metadata client")
 
-			// Re-initialize the metadata client with our test root JSON
-			require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-			_, err = metadataClient.Update()
-			require.NoError(t, err, "could not update metadata client")
-
 			// Get the target metadata
-			targetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", b, runtime.GOOS, PlatformArch(), b, testReleaseVersion))
+			targetMeta, err := metadataClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", b, runtime.GOOS, PlatformArch(), b, testReleaseVersion))
 			require.NoError(t, err, "could not get test metadata for target")
 
 			targetFile := fmt.Sprintf("%s-%s.tar.gz", b, testReleaseVersion)
@@ -169,7 +164,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, currentRunningVersion)
 			require.Equal(t, currentRunningVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, currentRunningVersion, targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, currentRunningVersion, targetFilename, nil), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version was not downloaded
 			_, err := os.Stat(filepath.Join(updatesDirectory(binary, testBaseDir), currentRunningVersion))
@@ -214,7 +209,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
 			require.Equal(t, testVersion, versionFromTarget(binary, targetFilename), "incorrectly formed target filename")
-			require.NoError(t, testLibraryManager.AddToLibrary(binary, "", targetFilename, data.TargetFileMeta{}), "expected no error on adding already-downloaded version to library")
+			require.NoError(t, testLibraryManager.AddToLibrary(binary, "", targetFilename, nil), "expected no error on adding already-downloaded version to library")
 
 			// Confirm the requested version is still there
 			_, err = os.Stat(executablePath)
@@ -231,23 +226,19 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := refreshedMetadataClient(context.TODO(), rootJson, testBaseDir, tufServerUrl)
 	require.NoError(t, err, "creating metadata client")
-	// Re-initialize the metadata client with our test root JSON
-	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-	_, err = metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client")
 
 	// Get the target metadata
-	launcherTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
+	launcherTargetMeta, err := metadataClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher target")
-	osquerydTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
+	osquerydTargetMeta, err := metadataClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher target")
 
 	testCases := []struct {
 		binary     autoupdatableBinary
 		targetFile string
-		targetMeta data.TargetFileMeta
+		targetMeta *metadata.TargetFiles
 	}{
 		{
 			binary:     binaryLauncher,

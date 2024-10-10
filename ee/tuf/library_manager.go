@@ -2,7 +2,6 @@ package tuf
 
 import (
 	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -21,8 +20,8 @@ import (
 	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/theupdateframework/go-tuf/data"
-	tufutil "github.com/theupdateframework/go-tuf/util"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 // updateLibraryManager manages the update libraries for launcher and osquery.
@@ -82,7 +81,7 @@ func pathToTargetVersionExecutable(binary autoupdatableBinary, targetFilename st
 
 // AddToLibrary adds the given target file to the library for the given binary,
 // downloading and verifying it if it's not already there.
-func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata data.TargetFileMeta) error {
+func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, currentVersion string, targetFilename string, targetMetadata *metadata.TargetFiles) error {
 	// Acquire lock for modifying the library
 	ulm.lock.Lock(binary)
 	defer ulm.lock.Unlock(binary)
@@ -125,51 +124,31 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 
 // stageAndVerifyUpdate downloads the update indicated by `targetFilename` and verifies it against
 // the given, validated local metadata.
-func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata data.TargetFileMeta) (string, error) {
+func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary, targetFilename string, localTargetMetadata *metadata.TargetFiles) (string, error) {
 	stagingDir, err := ulm.tempDir(binary, fmt.Sprintf("staged-updates-%s", versionFromTarget(binary, targetFilename)))
 	if err != nil {
 		return "", fmt.Errorf("could not create temporary directory for downloading target: %w", err)
 	}
 	stagedUpdatePath := filepath.Join(stagingDir, targetFilename)
 
-	// Request download from mirror
-	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + downloadPath)
+	// Request download from mirror. The fetcher ensures we don't download a file any larger than we expect.
+	downloader := &fetcher.DefaultFetcher{}
+	downloadPath := path.Join("kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
+	fileData, err := downloader.DownloadFile(fmt.Sprintf("%s/%s", ulm.mirrorUrl, downloadPath), localTargetMetadata.Length, 8*time.Minute)
 	if err != nil {
-		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
-	}
-	defer resp.Body.Close()
-
-	// Wrap the download in a LimitReader so we read at most localMeta.Length bytes
-	stream := io.LimitReader(resp.Body, localTargetMetadata.Length)
-	var fileBuffer bytes.Buffer
-
-	// Read the target file, simultaneously writing it to our file buffer and generating its metadata
-	actualTargetMeta, err := tufutil.GenerateTargetFileMeta(io.TeeReader(stream, io.Writer(&fileBuffer)), localTargetMetadata.HashAlgorithms()...)
-	if err != nil {
-		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and compute its metadata: %w", targetFilename, stagedUpdatePath, err)
+		return stagedUpdatePath, fmt.Errorf("downloading target %s: %w", targetFilename, err)
 	}
 
-	// Verify the actual download against the confirmed local metadata
-	if err := tufutil.TargetFileMetaEqual(actualTargetMeta, localTargetMetadata); err != nil {
-		return stagedUpdatePath, fmt.Errorf("verification failed for target %s staged at %s: %w", targetFilename, stagedUpdatePath, err)
+	// Perform verification on download
+	if err := localTargetMetadata.VerifyLengthHashes(fileData); err != nil {
+		return stagedUpdatePath, fmt.Errorf("verification failed for target %s: %w", targetFilename, err)
 	}
 
 	// Everything looks good: create the file and write it to disk.
 	// We create the file with 0655 permissions to prevent any other user from writing to this file
 	// before we can copy to it.
-	out, err := os.OpenFile(stagedUpdatePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0655)
-	if err != nil {
-		return "", fmt.Errorf("could not create file at %s: %w", stagedUpdatePath, err)
-	}
-	if _, err := io.Copy(out, &fileBuffer); err != nil {
-		if err := out.Close(); err != nil {
-			return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s and could not close file: %w", targetFilename, stagedUpdatePath, err)
-		}
-		return stagedUpdatePath, fmt.Errorf("could not write downloaded target %s to file %s: %w", targetFilename, stagedUpdatePath, err)
-	}
-	if err := out.Close(); err != nil {
-		return stagedUpdatePath, fmt.Errorf("could not close downloaded target file %s after writing: %w", targetFilename, err)
+	if err := os.WriteFile(stagedUpdatePath, fileData, 0655); err != nil {
+		return "", fmt.Errorf("writing target data to file at %s: %w", stagedUpdatePath, err)
 	}
 
 	return stagedUpdatePath, nil

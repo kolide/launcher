@@ -16,7 +16,7 @@ import (
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
-	"github.com/theupdateframework/go-tuf/data"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"golang.org/x/sys/windows"
 )
 
@@ -28,23 +28,19 @@ func TestAddToLibrary_WindowsACLs(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "1.2.4"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := refreshedMetadataClient(context.TODO(), rootJson, testBaseDir, tufServerUrl)
 	require.NoError(t, err, "creating metadata client")
-	// Re-initialize the metadata client with our test root JSON
-	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-	_, err = metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client")
 
 	// Get the target metadata
-	launcherTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
+	launcherTargetMeta, err := metadataClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher target")
-	osquerydTargetMeta, err := metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
+	osquerydTargetMeta, err := metadataClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher target")
 
 	testCases := []struct {
 		binary     autoupdatableBinary
 		targetFile string
-		targetMeta data.TargetFileMeta
+		targetMeta *metadata.TargetFiles
 	}{
 		{
 			binary:     binaryLauncher,

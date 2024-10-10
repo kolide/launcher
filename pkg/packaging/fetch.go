@@ -16,8 +16,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-	"github.com/theupdateframework/go-tuf/client"
-	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
+	"github.com/theupdateframework/go-tuf/v2/metadata/config"
+	"github.com/theupdateframework/go-tuf/v2/metadata/updater"
 	"go.opencensus.io/trace"
 )
 
@@ -161,31 +161,24 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (s
 		return "", fmt.Errorf("chmodding local TUF directory %s: %w", tempDir, err)
 	}
 
-	// Set up our local store i.e. point to the directory in our filesystem
-	localStore, err := filejsonstore.NewFileJSONStore(tempDir)
+	cfg, err := config.New("https://tuf.kolide.com/repository", rootJson)
 	if err != nil {
-		return "", fmt.Errorf("could not initialize local TUF store: %w", err)
+		return "", fmt.Errorf("creating TUF config: %w", err)
 	}
-
-	// Set up our remote store i.e. tuf.kolide.com
-	remoteStore, err := client.HTTPRemoteStore("https://tuf.kolide.com", &client.HTTPRemoteOptions{
-		MetadataPath: "/repository",
-	}, http.DefaultClient)
+	cfg.LocalMetadataDir = tempDir
+	cfg.LocalTargetsDir = tempDir // This is unused, but must be set to avoid validation errors when creating the updater below
+	client, err := updater.New(cfg)
 	if err != nil {
-		return "", fmt.Errorf("could not initialize remote TUF store: %w", err)
+		return "", fmt.Errorf("creating TUF client: %w", err)
 	}
 
-	metadataClient := client.NewClient(localStore, remoteStore)
-	if err := metadataClient.Init(rootJson); err != nil {
-		return "", fmt.Errorf("failed to initialize TUF client with root JSON: %w", err)
-	}
-
-	if _, err := metadataClient.Update(); err != nil {
-		return "", fmt.Errorf("failed to update metadata: %w", err)
+	// Fetch remote metadata
+	if err := client.Refresh(); err != nil {
+		return "", fmt.Errorf("fetching updated metadata: %w", err)
 	}
 
 	targetToFind := path.Join(binaryName, platform, arch, channel, "release.json")
-	foundTarget, err := metadataClient.Target(targetToFind)
+	foundTarget, err := client.GetTargetInfo(targetToFind)
 	if err != nil {
 		return "", fmt.Errorf("finding target metadata %s: %w", targetToFind, err)
 	}

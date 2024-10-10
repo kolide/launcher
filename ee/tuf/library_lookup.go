@@ -245,13 +245,7 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 		return nil, fmt.Errorf("could not initialize TUF client, cannot find release: %w", err)
 	}
 
-	// From already-downloaded metadata, look for the release version
-	targets, err := metadataClient.Targets()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target: %w", err)
-	}
-
-	targetName, _, err := findTarget(ctx, binary, targets, pinnedVersion, channel, slogger)
+	targetName, _, err := findTarget(ctx, binary, metadataClient, pinnedVersion, channel, slogger)
 	if err != nil {
 		return nil, fmt.Errorf("could not find release: %w", err)
 	}
