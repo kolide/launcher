@@ -26,7 +26,6 @@ require (
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/stretchr/testify v1.9.0
-	github.com/theupdateframework/go-tuf v0.7.0
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
@@ -54,6 +53,7 @@ require (
 	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
 	github.com/kolide/toast v1.0.2
 	github.com/shirou/gopsutil/v3 v3.23.3
+	github.com/sigstore/sigstore v1.8.4
 	github.com/spf13/pflag v1.0.5
 	github.com/theupdateframework/go-tuf/v2 v2.0.2
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0
@@ -75,7 +75,6 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/samber/lo v1.38.1 // indirect
-	github.com/sigstore/sigstore v1.8.4 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

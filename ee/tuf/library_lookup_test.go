@@ -35,14 +35,10 @@ func Test_getUpdateSettingsFromStartupSettings(t *testing.T) {
 	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
 }
 
-func TestCheckOutLatest_withTufRepository(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
+func TestCheckOutLatest_withTufRepository(t *testing.T) { //nolint:paralleltest
+	for _, binary := range binaries { //nolint:paralleltest
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
 			// Set up an update library
 			rootDir := t.TempDir()
 			updateDir := DefaultLibraryDirectory(rootDir)
@@ -52,7 +48,9 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 			require.NoError(t, os.MkdirAll(tufDir, 488))
 			testReleaseVersion := "1.0.30"
 			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, testReleaseVersion)
-			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+
+			// Override package-level rootJson with test JSON
+			rootJson = tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
 
 			// Create a corresponding downloaded target
 			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
@@ -76,14 +74,10 @@ func TestCheckOutLatest_withTufRepository(t *testing.T) {
 	}
 }
 
-func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
-	t.Parallel()
-
-	for _, binary := range binaries {
+func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) { //nolint:paralleltest
+	for _, binary := range binaries { //nolint:paralleltest
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
 			// Set up an update library
 			rootDir := t.TempDir()
 			updateDir := DefaultLibraryDirectory(rootDir)
@@ -94,7 +88,9 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 			pinnedVersion := tufci.NonReleaseVersion
 			expectedTargetName := fmt.Sprintf("%s-%s.tar.gz", binary, pinnedVersion)
 			testReleaseVersion := "2.3.3"
-			tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
+
+			// Override package-level rootJson with test JSON
+			rootJson = tufci.SeedLocalTufRepo(t, testReleaseVersion, rootDir)
 
 			// Create a corresponding downloaded target for the pinned version
 			executablePath, executableVersion := pathToTargetVersionExecutable(binary, expectedTargetName, updateDir)
@@ -118,13 +114,10 @@ func TestCheckOutLatest_withTufRepository_withPinnedVersion(t *testing.T) {
 	}
 }
 
-func TestCheckOutLatest_withoutTufRepository(t *testing.T) {
-	t.Parallel()
-	for _, binary := range binaries {
+func TestCheckOutLatest_withoutTufRepository(t *testing.T) { //nolint:paralleltest
+	for _, binary := range binaries { //nolint:paralleltest
 		binary := binary
 		t.Run(string(binary), func(t *testing.T) {
-			t.Parallel()
-
 			// Set up an update library, but no TUF repo
 			rootDir := t.TempDir()
 			updateDir := DefaultLibraryDirectory(rootDir)

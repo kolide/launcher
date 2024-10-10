@@ -38,7 +38,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return("https://example.com")
+	mockKnapsack.On("TufServerURL").Return("https://example.com").Maybe()
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
@@ -59,9 +59,6 @@ func TestNewTufAutoupdater(t *testing.T) {
 
 	_, err = os.Stat(exposedRootDir)
 	require.NoError(t, err, "could not stat TUF directory that should have been initialized in test")
-
-	_, err = os.Stat(filepath.Join(exposedRootDir, "root.json"))
-	require.NoError(t, err, "could not stat root.json that should have been created in test")
 
 	// Confirm that the library manager's base directory was set correctly
 	_, err = os.Stat(filepath.Join(testRootDir, "updates"))
@@ -106,15 +103,15 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
-	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
+	tempClient, err := refreshedMetadataClient(context.TODO(), autoupdater.rootJson, autoupdater.tufDirectory, tufServerUrl)
+	require.NoError(t, err, "could not get metadata client to fetch target metadata")
+	osquerydMetadata, err := tempClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for osqueryd")
-	launcherMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
+	launcherMetadata, err := tempClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryLauncher, runtime.GOOS, PlatformArch(), binaryLauncher, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for launcher")
 
 	// Expect that we attempt to tidy the library first before running execute loop
@@ -206,13 +203,13 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
-	osquerydMetadata, err := autoupdater.metadataClient.Target(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
+	tempClient, err := refreshedMetadataClient(context.TODO(), autoupdater.rootJson, autoupdater.tufDirectory, tufServerUrl)
+	require.NoError(t, err, "could not get metadata client to fetch target metadata")
+	osquerydMetadata, err := tempClient.GetTargetInfo(fmt.Sprintf("%s/%s/%s/%s-%s.tar.gz", binaryOsqueryd, runtime.GOOS, PlatformArch(), binaryOsqueryd, testReleaseVersion))
 	require.NoError(t, err, "could not get test metadata for osqueryd")
 
 	// Expect that we attempt to tidy the library first before running execute loop
@@ -289,12 +286,8 @@ func TestExecute_downgrade(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Expect that we attempt to tidy the library first before running execute loop
 	mockLibraryManager := NewMocklibrarian(t)
@@ -360,7 +353,7 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl).Maybe()
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateChannel").Return("nightly")
@@ -425,7 +418,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
+	mockKnapsack.On("TufServerURL").Return(tufServerUrl).Maybe()
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateChannel").Return("nightly")
@@ -464,15 +457,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	// We don't need a real metadata server for this one
-	testMetadataServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("{}"))
-	}))
-
-	// Make sure we close the server at the end of our test
-	t.Cleanup(func() {
-		testMetadataServer.Close()
-	})
+	tufServerURL, rootJson := tufci.InitRemoteTufServer(t, "1.2.3")
 
 	testRootDir := t.TempDir()
 	s := setupStorage(t)
@@ -486,7 +471,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
+	mockKnapsack.On("TufServerURL").Return(tufServerURL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
@@ -503,11 +488,15 @@ func TestInterrupt_Multiple(t *testing.T) {
 		mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
+
 	// Set up normal library and querier interactions
 	mockLibraryManager := NewMocklibrarian(t)
 	autoupdater.libraryManager = mockLibraryManager
 	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
 	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil)
+	mockLibraryManager.On("Available", mock.Anything, mock.Anything).Return(true)
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
@@ -638,12 +627,8 @@ func TestDo(t *testing.T) {
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-			// Update the metadata client with our test root JSON
-			require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-			// Get metadata for each release
-			_, err = autoupdater.metadataClient.Update()
-			require.NoError(t, err, "could not update metadata client to fetch target metadata")
+			// Substitute in our test root JSON
+			autoupdater.rootJson = rootJson
 
 			// Expect that we attempt to update the library, only for the selected, valid binary/binaries
 			mockLibraryManager := NewMocklibrarian(t)
@@ -713,12 +698,8 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Expect that we attempt to tidy the library first before running execute loop
 	mockLibraryManager := NewMocklibrarian(t)
@@ -798,12 +779,8 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Set up expectations for Execute function: tidying library, checking for updates
 	mockLibraryManager := NewMocklibrarian(t)
@@ -843,6 +820,10 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
+
+	// Shut down the autoupdater
+	autoupdater.Interrupt(errors.New("test error"))
+	time.Sleep(initialDelay + interval)
 }
 
 func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
@@ -882,12 +863,8 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "beta", autoupdater.updateChannel)
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Expect that we attempt to update the library
 	mockLibraryManager := NewMocklibrarian(t)
@@ -949,12 +926,8 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "", autoupdater.pinnedVersions[binaryOsqueryd])
 
-	// Update the metadata client with our test root JSON
-	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
-
-	// Get metadata for each release
-	_, err = autoupdater.metadataClient.Update()
-	require.NoError(t, err, "could not update metadata client to fetch target metadata")
+	// Substitute in our test root JSON
+	autoupdater.rootJson = rootJson
 
 	// Expect that we attempt to update the library
 	mockLibraryManager := NewMocklibrarian(t)
@@ -991,7 +964,7 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	initialDelay := 1 * time.Second
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
 	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
-	mockKnapsack.On("TufServerURL").Return("https://example.com")
+	mockKnapsack.On("TufServerURL").Return("https://example.com").Maybe()
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockQuerier := newMockQuerier(t)
