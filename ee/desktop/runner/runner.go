@@ -210,6 +210,8 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
+
+	r.knapsack.SetDesktopEnabled(true)
 	updateTicker := time.NewTicker(r.updateInterval)
 	defer updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
@@ -425,6 +427,10 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 			"modern standby detected, skipping notification send",
 		)
 		return errors.New("modern standby detected, skipping notification send")
+	}
+
+	if !r.knapsack.DesktopEnabled() {
+		return errors.New("desktop is not enabled, cannot send notification")
 	}
 
 	if len(r.uidProcs) == 0 {
