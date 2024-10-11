@@ -57,10 +57,12 @@ jobs:
           output-format: json
           output-file: govulncheck.json
 
+      # Exclude GO-2024-3166 since we do not believe it applies to go-tuf before v2, and additionally
+      # because we do not believe it applies to our usage since we do not use delegates.
       - name: Evaluate govulncheck results
         shell: bash
         run: |
-          findingCount=$(jq -r '.finding | select ( . != null ) | .osv' govulncheck.json | wc -l)
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv | select ( . != "GO-2024-3166")' govulncheck.json | wc -l)
           findingCount=$((findingCount + 0))
           if [[ $findingCount -ne 0 ]]; then
             printf "govulncheck reports %d findings" "$findingCount"
