@@ -210,8 +210,6 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-
-	r.knapsack.SetDesktopEnabled(true)
 	updateTicker := time.NewTicker(r.updateInterval)
 	defer updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
