@@ -51,9 +51,22 @@ jobs:
       - id: govulncheck
         uses: golang/govulncheck-action@v1
         with:
-           go-version-file: './go.mod'
-           check-latest: true
-           go-package: ./...
+          go-version-file: './go.mod'
+          check-latest: true
+          go-package: ./...
+          output-format: json
+          output-file: govulncheck.json
+
+      - name: Evaluate govulncheck results
+        shell: bash
+        run: |
+          findingCount=$(jq -r '.finding | select ( . != null ) | .osv' govulncheck.json | wc -l)
+          findingCount=$((findingCount + 0))
+          if [[ $findingCount -ne 0 ]]; then
+            printf "govulncheck reports %d findings" "$findingCount"
+            jq -r '.finding | select ( . != null )' govulncheck.json
+            exit 1
+          fi
 
   # This job is here as a github status check -- it allows us to move
   # the merge dependency from being on all the jobs to this single
