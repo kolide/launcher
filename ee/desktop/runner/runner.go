@@ -427,6 +427,10 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("modern standby detected, skipping notification send")
 	}
 
+	if !r.knapsack.DesktopEnabled() {
+		return errors.New("desktop is not enabled, cannot send notification")
+	}
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
