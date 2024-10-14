@@ -28,7 +28,7 @@ var (
 // The GUIDs themselves came from the same source as above (windows.security.credentials.idl).
 // The GUIDs must be lowercase in the parameterized types.
 const (
-	userConsentVerificationResultSignature = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;u4)" // u4 is underlying type of uint32
+	userConsentVerificationResultSignature = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;i4)" // i4 is underlying type of int32
 )
 
 // UserConsentVerifier is defined here, with references to IUserConsentVerifierInterop below:
@@ -136,14 +136,15 @@ func requestVerification(reason string) error {
 
 	// https://learn.microsoft.com/en-us/windows/win32/api/userconsentverifierinterop/nf-userconsentverifierinterop-iuserconsentverifierinterop-requestverificationforwindowasync
 	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
+	refiid := winrt.ParameterizedInstanceGUID(foundation.GUIDIAsyncOperation, userConsentVerificationResultSignature)
 	var requestVerificationAsyncOperation *foundation.IAsyncOperation
 	requestVerificationReturn, _, _ := syscall.SyscallN(
 		verifier.VTable().RequestVerificationForWindowAsync,
-		uintptr(unsafe.Pointer(verifier)),                                    // Reference to our interop
-		uintptr(windowHwnd),                                                  // HWND to our window
-		uintptr(unsafe.Pointer(&reasonHString)),                              // The message to include in the verification request
-		uintptr(unsafe.Pointer(ole.NewGUID(foundation.GUIDIAsyncOperation))), // REFIID -- reference to the interface identifier for the return value (below)
-		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)),          // Return value -- Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
+		uintptr(unsafe.Pointer(verifier)),                           // Reference to our interop
+		uintptr(windowHwnd),                                         // HWND to our window
+		uintptr(unsafe.Pointer(&reasonHString)),                     // The message to include in the verification request
+		uintptr(unsafe.Pointer(ole.NewGUID(refiid))),                // REFIID -- reference to the interface identifier for the return value (below)
+		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Return value -- Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
 	)
 	if requestVerificationReturn != 0 {
 		return fmt.Errorf("calling RequestVerificationForWindowAsync: %w", ole.NewError(requestVerificationReturn))
