@@ -29,6 +29,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -118,9 +119,6 @@ type DesktopUsersProcessesRunner struct {
 	// usersFilesRoot is the launcher root dir with will be the parent dir
 	// for kolide desktop files on a per user basis
 	usersFilesRoot string
-	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
-	// This effectively represents whether or not the launcher desktop GUI is enabled or not
-	processSpawningEnabled bool
 	// knapsack is the almighty sack of knaps
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
@@ -155,17 +153,16 @@ func (pr processRecord) String() string {
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
 func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
-		interrupt:              make(chan struct{}),
-		uidProcs:               make(map[string]processRecord),
-		updateInterval:         k.DesktopUpdateInterval(),
-		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
-		procsWg:                &sync.WaitGroup{},
-		interruptTimeout:       time.Second * 5,
-		hostname:               k.KolideServerURL(),
-		usersFilesRoot:         agent.TempPath("kolide-desktop"),
-		processSpawningEnabled: k.DesktopEnabled(),
-		knapsack:               k,
-		cachedMenuData:         newMenuItemCache(),
+		interrupt:           make(chan struct{}),
+		uidProcs:            make(map[string]processRecord),
+		updateInterval:      k.DesktopUpdateInterval(),
+		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
+		procsWg:             &sync.WaitGroup{},
+		interruptTimeout:    time.Second * 5,
+		hostname:            k.KolideServerURL(),
+		usersFilesRoot:      agent.TempPath("kolide-desktop"),
+		knapsack:            k,
+		cachedMenuData:      newMenuItemCache(),
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
@@ -284,6 +281,29 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	r.slogger.Log(ctx, slog.LevelInfo,
 		"desktop runner shutdown complete",
 	)
+}
+
+func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return presencedetection.DetectionFailedDurationValue, errors.New("no desktop processes running")
+	}
+
+	var lastErr error
+	var lastDurationSinceLastDetection time.Duration
+
+	for _, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath)
+		lastDurationSinceLastDetection, err := client.DetectPresence(reason, interval)
+
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		return lastDurationSinceLastDetection, nil
+	}
+
+	return lastDurationSinceLastDetection, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
 }
 
 // killDesktopProcesses kills any existing desktop processes
@@ -407,6 +427,10 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("modern standby detected, skipping notification send")
 	}
 
+	if !r.knapsack.DesktopEnabled() {
+		return errors.New("desktop is not enabled, cannot send notification")
+	}
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -452,12 +476,35 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 }
 
 func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if slices.Contains(flagKeys, keys.DesktopEnabled) {
-		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
-		r.slogger.Log(context.TODO(), slog.LevelDebug,
-			"runner processSpawningEnabled set by control server",
-			"process_spawning_enabled", r.processSpawningEnabled,
-		)
+	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
+		return
+	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"desktop enabled set by control server",
+		"desktop_enabled", r.knapsack.DesktopEnabled(),
+	)
+
+	if !r.knapsack.DesktopEnabled() {
+		// there is no way to "hide" the menu, so we will just kill any existing processes
+		// they will respawn in "silent" mode
+		r.killDesktopProcesses(context.TODO())
+		return
+	}
+
+	// DesktopEnabled() == true
+	// Tell any running desktop user processes that they should show the menu
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath)
+		if err := client.ShowDesktop(); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"sending refresh command to user desktop process",
+				"uid", uid,
+				"pid", proc.Process.Pid,
+				"path", proc.path,
+				"err", err,
+			)
+		}
 	}
 }
 
@@ -483,6 +530,10 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 
 // refreshMenu updates the menu file and tells desktop processes to refresh their menus
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
+	if !r.knapsack.DesktopEnabled() {
+		return
+	}
+
 	if err := r.generateMenuFile(); err != nil {
 		if r.knapsack.DebugServerData() {
 			r.slogger.Log(context.TODO(), slog.LevelError,
@@ -503,7 +554,6 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
-
 			r.slogger.Log(context.TODO(), slog.LevelError,
 				"sending refresh command to user desktop process",
 				"uid", uid,
@@ -601,12 +651,6 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
-	if !r.processSpawningEnabled {
-		// Desktop is disabled, kill any existing desktop user processes
-		r.killDesktopProcesses(context.Background())
-		return nil
-	}
-
 	executablePath, err := r.determineExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining executable path: %w", err)
@@ -669,13 +713,23 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	r.waitOnProcessAsync(uid, cmd.Process)
 
 	client := client.New(r.userServerAuthToken, socketPath)
-	if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+
+	pingFunc := client.Ping
+
+	// if the desktop is enabled, we want to show the desktop
+	// just perform this instead of ping to verify the desktop is running
+	// and show it right away
+	if r.knapsack.DesktopEnabled() {
+		pingFunc = client.ShowDesktop
+	}
+
+	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
 		if err := cmd.Process.Kill(); err != nil {
 			r.slogger.Log(ctx, slog.LevelError,
-				"killing user desktop process after startup ping failed",
+				"killing user desktop process after startup ping / show desktop failed",
 				"uid", uid,
 				"pid", cmd.Process.Pid,
 				"path", cmd.Path,

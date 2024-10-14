@@ -25,15 +25,21 @@ import (
 )
 
 const (
-	timestampValidityRange             = 150
-	kolideKryptoEccHeader20230130Value = "2023-01-30"
-	kolideKryptoHeaderKey              = "X-Kolide-Krypto"
-	kolideSessionIdHeaderKey           = "X-Kolide-Session"
+	timestampValidityRange                            = 150
+	kolideKryptoEccHeader20230130Value                = "2023-01-30"
+	kolideKryptoHeaderKey                             = "X-Kolide-Krypto"
+	kolideSessionIdHeaderKey                          = "X-Kolide-Session"
+	kolidePresenceDetectionIntervalHeaderKey          = "X-Kolide-Presence-Detection-Interval"
+	kolidePresenceDetectionReasonHeaderKey            = "X-Kolide-Presence-Detection-Reason"
+	kolideDurationSinceLastPresenceDetectionHeaderKey = "X-Kolide-Duration-Since-Last-Presence-Detection"
+	kolideOsHeaderKey                                 = "X-Kolide-Os"
+	kolideArchHeaderKey                               = "X-Kolide-Arch"
 )
 
 type v2CmdRequestType struct {
 	Path            string
 	Body            []byte
+	Headers         map[string][]string
 	CallbackUrl     string
 	CallbackHeaders map[string][]string
 	AllowedOrigins  []string
@@ -285,6 +291,12 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			},
 		}
 
+		for h, vals := range cmdReq.Headers {
+			for _, v := range vals {
+				newReq.Header.Add(h, v)
+			}
+		}
+
 		newReq.Header.Set("Origin", r.Header.Get("Origin"))
 		newReq.Header.Set("Referer", r.Header.Get("Referer"))
 
@@ -306,15 +318,47 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
+		bhr.Header().Add(kolideOsHeaderKey, runtime.GOOS)
+		bhr.Header().Add(kolideArchHeaderKey, runtime.GOARCH)
+
+		// add headers to the response map
+		// this assumes that the response to `bhr` was a json encoded blob.
+		var responseMap map[string]interface{}
+		bhrBytes := bhr.Bytes()
+		if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
+			traces.SetError(span, err)
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"unable to unmarshal response",
+				"err", err,
+			)
+			responseMap = map[string]any{
+				"headers": bhr.Header(),
+
+				// the request body was not in json format, just pass it through as "body"
+				"body": string(bhrBytes),
+			}
+		} else {
+			responseMap["headers"] = bhr.Header()
+		}
+
+		responseBytes, err := json.Marshal(responseMap)
+		if err != nil {
+			traces.SetError(span, err)
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"unable to marshal response",
+				"err", err,
+			)
+		}
+
 		var response []byte
 		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 		// pass nil to krypto
 		// hardware signing is not implemented for darwin
 		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, bhr.Bytes())
+			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, responseBytes)
 		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, bhr.Bytes())
+			response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
 		}
 
 		if err != nil {

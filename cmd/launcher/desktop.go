@@ -120,10 +120,6 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		return nil
 	}, func(error) {})
 
-	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
-	runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
-
 	// monitor parent
 	runGroup.Add("desktopMonitorParentProcess", func() error {
 		monitorParentProcess(slogger, *flRunnerServerUrl, *flRunnerServerAuthToken, 2*time.Second)
@@ -131,14 +127,16 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
+	showDesktopChan := make(chan struct{})
+
+	// Set up notification sending and listening
+	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
+	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
 	if err != nil {
 		return err
 	}
 
 	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
-	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
-
 	// Pass through channel so that systray can alert the link handler when it receives a universal link request
 	m := menu.New(slogger, *flhostname, *flmenupath, urlInput)
 	refreshMenu := func() {
@@ -183,9 +181,19 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
+	go func() {
+		// wait to show desktop until we get the signal from root
+		<-showDesktopChan
+
+		// once desktop enabled, add notifier and universal link handler
+		runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
+		runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
+
+		systray.Show()
+	}()
+
 	// blocks until shutdown called
 	m.Init()
-
 	return nil
 }
 

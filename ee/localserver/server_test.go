@@ -36,7 +36,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	recalculateInterval = 100 * time.Millisecond
 
 	// Create the localserver
-	ls, err := New(context.TODO(), k)
+	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Set the querier

@@ -51,7 +51,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
 	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
-	github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db
+	github.com/kolide/systray v1.10.5-0.20241011144003-35bc09a9664f
 	github.com/kolide/toast v1.0.2
 	github.com/saltosystems/winrt-go v0.0.0-20240510082706-db61b37f5877
 	github.com/shirou/gopsutil/v3 v3.23.3
@@ -125,3 +125,5 @@ require (
 go 1.22
 
 toolchain go1.22.2
+
+replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767

@@ -69,8 +69,6 @@ github.com/go-logr/logr v1.4.2/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ4
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
 github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
 github.com/go-ole/go-ole v1.2.6/go.mod h1:pprOEPIfldk/42T2oK7lQ4v4JSDwmV0As9GaiUsvbm0=
-github.com/go-ole/go-ole v1.3.0 h1:Dt6ye7+vXGIKZ7Xtk4s6/xVdGDQynvom7xCFEdWr6uE=
-github.com/go-ole/go-ole v1.3.0/go.mod h1:5LS6F96DhAwUc7C+1HLexzMXY1xGRSryjyPPKW6zv78=
 github.com/go-stack/stack v1.8.0 h1:5SgMzNM5HxrEjV0ww2lTmX6E2Izsfxas4+YHWRs3Lsk=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
@@ -172,14 +170,16 @@ github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvW
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQD5Q2jXmPdTJS8L8JfA1GquHnFeK3PDcl26E/k=
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
+github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767 h1:kcLxfX6wdtztSwpgzgrjUaC9kfyihXBUNnOIfoN5u4Y=
+github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767/go.mod h1:5LS6F96DhAwUc7C+1HLexzMXY1xGRSryjyPPKW6zv78=
 github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6 h1:6/RKW8FQlrtaBeL7We3SdpdoiGZk3Pm5STXsSxbm9ho=
 github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6/go.mod h1:zgOxCKTwS/xpJtz6LH60b3lZoQ30kqtc252N+SM4enc=
 github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50 h1:N7RaYBPTK5o4y2z1z8kl/G3iAeP73QCfAUH4y39GRCc=
 github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50/go.mod h1:pFbEKXFww1uqu4RRO7qCnUmQ2EIwKYRzUqpJbODNlfc=
 github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121 h1:f7APX9VNsCkD/tdlAjbU4A22FyfTOCF6QadlvnzZElg=
 github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121/go.mod h1:/0sxd3OIxciTlMTeZI/9WTaUHsx/K/+3f+NbD5dywTY=
-github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db h1:bOEgeG+7TOrK8ZOwXP49W1OKFfUWrWnXc7jstFRNDbQ=
-github.com/kolide/systray v0.0.0-20240530130728-8265cd4e35db/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
+github.com/kolide/systray v1.10.5-0.20241011144003-35bc09a9664f h1:v3y9fZGNWLyX21t4Oh0J/mR0AUD2IT8XdSMEz7727+w=
+github.com/kolide/systray v1.10.5-0.20241011144003-35bc09a9664f/go.mod h1:FwK9yUmU3JO+vA7TOLQSFRgEQ3euLxOqic5qlBtFrik=
 github.com/kolide/toast v1.0.2 h1:BQlIfO3wbKIEWfF0c8v4UkdhSIZYnSWaKkZl+Yarptk=
 github.com/kolide/toast v1.0.2/go.mod h1:OguLiOUf57YSEuZqjfk4uP4KdT0QOblGoySOI8F1I0Y=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

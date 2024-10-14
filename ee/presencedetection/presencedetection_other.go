@@ -1,10 +1,11 @@
-//go:build !windows
-// +build !windows
+//go:build linux
+// +build linux
 
 package presencedetection
 
 import "errors"
 
 func Detect(reason string) (bool, error) {
-	return false, errors.New("not implemented")
+	// Implement detection logic for non-Darwin platforms
+	return false, errors.New("detection not implemented for this platform")
 }

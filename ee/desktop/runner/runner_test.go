@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
@@ -153,7 +154,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			}()
 
 			// let it run a few intervals
-			time.Sleep(r.updateInterval * 3)
+			time.Sleep(r.updateInterval * 6)
 			r.Interrupt(nil)
 
 			user, err := user.Current()
@@ -163,7 +164,13 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			// does not have a console user, so we don't expect any processes
 			// to be started.
 			if tt.cleanShutdown || (os.Getenv("CI") == "true" && runtime.GOOS == "linux") {
-				assert.Len(t, r.uidProcs, 0, "unexpected process: logs: %s", logBytes.String())
+				require.NoError(t, backoff.WaitFor(func() error {
+					if len(r.uidProcs) == 0 {
+						return nil
+					}
+
+					return fmt.Errorf("expected no processes, found %d", len(r.uidProcs))
+				}, 30*time.Second, 1*time.Second))
 			} else {
 				if runtime.GOOS == "windows" {
 					assert.Contains(t, r.uidProcs, user.Username)

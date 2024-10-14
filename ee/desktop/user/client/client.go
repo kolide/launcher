@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/presencedetection"
 )
 
 type transport struct {
@@ -53,6 +57,42 @@ func (c *client) Ping() error {
 
 func (c *client) Refresh() error {
 	return c.get("refresh")
+}
+
+func (c *client) ShowDesktop() error {
+	return c.get("show")
+}
+
+func (c *client) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
+	encodedReason := url.QueryEscape(reason)
+	encodedInterval := url.QueryEscape(interval.String())
+
+	// default time out of 30s is set in New()
+	resp, requestErr := c.base.Get(fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval))
+	if requestErr != nil {
+		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("getting presence: %w", requestErr)
+	}
+
+	var response server.DetectPresenceResponse
+	if resp.Body != nil {
+		defer resp.Body.Close()
+
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			return presencedetection.DetectionFailedDurationValue, fmt.Errorf("decoding response: %w", err)
+		}
+	}
+
+	var detectionErr error
+	if response.Error != "" {
+		detectionErr = errors.New(response.Error)
+	}
+
+	durationSinceLastDetection, parseErr := time.ParseDuration(response.DurationSinceLastDetection)
+	if parseErr != nil {
+		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("parsing time since last detection: %w", parseErr)
+	}
+
+	return durationSinceLastDetection, detectionErr
 }
 
 func (c *client) Notify(n notify.Notification) error {
