@@ -86,6 +86,9 @@ const (
 
 	cWM_DESTROY = 0x0002
 	cWM_CLOSE   = 0x0010
+
+	// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+	SW_SHOWNORMAL = 1
 )
 
 var roInitialize = sync.OnceFunc(func() {
@@ -199,6 +202,8 @@ func createWindow() (syscall.Handle, error) {
 
 	user32 := syscall.NewLazyDLL("user32.dll")
 	procCreateWindowExW := user32.NewProc("CreateWindowExW")
+	procShowWindow := user32.NewProc("ShowWindow")
+	procUpdateWindow := user32.NewProc("UpdateWindow")
 
 	title, err := syscall.UTF16PtrFromString("Kolide")
 	if err != nil {
@@ -223,7 +228,17 @@ func createWindow() (syscall.Handle, error) {
 		return syscall.InvalidHandle, fmt.Errorf("calling CreateWindowExW: %v", e0)
 	}
 
-	return syscall.Handle(r0), nil
+	if _, _, err := procShowWindow.Call(
+		uintptr(handle),
+		uintptr(SW_SHOWNORMAL)); err != nil && err.Error() != "The operation completed successfully." {
+		return syscall.InvalidHandle, fmt.Errorf("calling ShowWindow: %v", err)
+	}
+
+	if _, _, err := procUpdateWindow.Call(uintptr(handle)); err != nil && err.Error() != "The operation completed successfully." {
+		return syscall.InvalidHandle, fmt.Errorf("calling UpdateWindow: %v", err)
+	}
+
+	return handle, nil
 }
 
 // getInstance calls GetModuleHandleW to get a HINSTANCE reference to the current launcher.exe process.
