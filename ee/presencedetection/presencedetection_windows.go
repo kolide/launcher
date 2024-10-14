@@ -27,8 +27,8 @@ var (
 	keyCredentialRetrievalResultGuid   = ole.NewGUID("58CD7703-8D87-4249-9B58-F6598CC9644E")
 	keyCredentialGuid                  = ole.NewGUID("9585EF8D-457B-4847-B11A-FA960BBDB138")
 	keyCredentialAttestationResultGuid = ole.NewGUID("78AAB3A1-A3C1-4103-B6CC-472C44171CBB")
-	userConsentVerifierInteropGuid     = ole.NewGUID("39E050C3-4E74-441A-8DC0-B81104DF949C")
-	windowGuid                         = ole.NewGUID("3276167D-C9F6-462D-9DE2-AE4C1FD8C2E5")
+	iUserConsentVerifierStaticsGuid    = ole.NewGUID("AF4F3F91-564C-4DDC-B8B5-973447627C65")
+	iUserConsentVerifierInteropGuid    = ole.NewGUID("39E050C3-4E74-441A-8DC0-B81104DF949C")
 )
 
 // Signatures were generated following the guidance in
@@ -39,20 +39,20 @@ const (
 	keyCredentialRetrievalResultSignature   = "rc(Windows.Security.Credentials.KeyCredentialRetrievalResult;{58cd7703-8d87-4249-9b58-f6598cc9644e})"
 	keyCredentialAttestationResultSignature = "rc(Windows.Security.Credentials.KeyCredentialAttestationResult;{78aab3a1-a3c1-4103-b6cc-472c44171cbb})"
 	booleanSignature                        = "b1"
-	userConsentVerificationResultSignature  = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;u4)" // Underlying type of uint32
+	userConsentVerificationResultSignature  = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;u4)" // u4 is underlying type of uint32
 )
 
 // UserConsentVerifier is defined here, with references to IUserConsentVerifierInterop below:
 // https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
-type UserConsentVerifierInterop struct {
+type IUserConsentVerifierInterop struct {
 	ole.IInspectable
 }
 
-func (v *UserConsentVerifierInterop) VTable() *UserConsentVerifierInteropVTable {
-	return (*UserConsentVerifierInteropVTable)(unsafe.Pointer(v.RawVTable))
+func (v *IUserConsentVerifierInterop) VTable() *IUserConsentVerifierInteropVTable {
+	return (*IUserConsentVerifierInteropVTable)(unsafe.Pointer(v.RawVTable))
 }
 
-type UserConsentVerifierInteropVTable struct {
+type IUserConsentVerifierInteropVTable struct {
 	ole.IInspectableVtbl
 	RequestVerificationForWindowAsync uintptr
 }
@@ -164,17 +164,17 @@ func Detect(reason string) (bool, error) {
 // See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier.requestverificationasync?view=winrt-26100
 func requestVerification(reason string) error {
 	// Get access to UserConsentVerifier via factory
-	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", ole.IID_IInspectable)
+	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", iUserConsentVerifierStaticsGuid)
 	if err != nil {
 		return fmt.Errorf("getting activation factory for UserConsentVerifier: %w", err)
 	}
 	defer factory.Release()
-	verifierObj, err := factory.QueryInterface(userConsentVerifierInteropGuid)
+	verifierObj, err := factory.QueryInterface(iUserConsentVerifierInteropGuid)
 	if err != nil {
 		return fmt.Errorf("getting UserConsentVerifier from factory: %w", err)
 	}
 	defer verifierObj.Release()
-	verifier := (*UserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
+	verifier := (*IUserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
 
 	// Create a window
 	windowHwnd, err := createWindow()
@@ -189,19 +189,21 @@ func requestVerification(reason string) error {
 	}
 	defer ole.DeleteHString(reasonHString)
 
+	// https://learn.microsoft.com/en-us/windows/win32/api/userconsentverifierinterop/nf-userconsentverifierinterop-iuserconsentverifierinterop-requestverificationforwindowasync
+	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
 	var requestVerificationAsyncOperation *foundation.IAsyncOperation
 	requestVerificationReturn, _, _ := syscall.SyscallN(
 		verifier.VTable().RequestVerificationForWindowAsync,
-		0,                                       // Because this is a static function, we don't pass in a reference to `this`
-		uintptr(windowHwnd),                     // HWND to our window
-		uintptr(unsafe.Pointer(&reasonHString)), // The message to include in the verification request
-		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
+		uintptr(unsafe.Pointer(verifier)),
+		uintptr(windowHwnd),                                                  // HWND to our window
+		uintptr(unsafe.Pointer(&reasonHString)),                              // The message to include in the verification request
+		uintptr(unsafe.Pointer(ole.NewGUID(foundation.GUIDIAsyncOperation))), // REFIID
+		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)),          // Windows.Foundation.IAsyncOperation<KeyCredentialRetrievalResult>
 	)
 	if requestVerificationReturn != 0 {
 		return fmt.Errorf("calling RequestVerificationForWindowAsync: %w", ole.NewError(requestVerificationReturn))
 	}
 
-	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
 	iid := winrt.ParameterizedInstanceGUID(foundation.GUIDAsyncOperationCompletedHandler, userConsentVerificationResultSignature)
 	statusChan := make(chan foundation.AsyncStatus)
 	handler := foundation.NewAsyncOperationCompletedHandler(ole.NewGUID(iid), func(instance *foundation.AsyncOperationCompletedHandler, asyncInfo *foundation.IAsyncOperation, asyncStatus foundation.AsyncStatus) {
@@ -239,6 +241,14 @@ func createWindow() (syscall.Handle, error) {
 		return syscall.InvalidHandle, fmt.Errorf("getting instance: %w", err)
 	}
 
+	// TODO need to close handles
+
+	className := "launcher"
+	classHandle, err := registerClass(className, instance)
+	if err != nil {
+		return syscall.InvalidHandle, fmt.Errorf("registering class: %w", err)
+	}
+
 	user32 := syscall.NewLazyDLL("user32.dll")
 	procCreateWindowExW := user32.NewProc("CreateWindowExW")
 
@@ -247,24 +257,19 @@ func createWindow() (syscall.Handle, error) {
 		return syscall.InvalidHandle, fmt.Errorf("creating title string: %w", err)
 	}
 
-	overlappedWindow := 0 | 0x800000 | 0x400000 | 0x80000 | 0x40000 | 0x20000 | 0x10000
-	defaultWindowPosition := 0x80000000 - 0x100000000
-
-	r0, _, e0 := syscall.SyscallN(
-		procCreateWindowExW.Addr(),
-		uintptr(0),                     // style
-		0,                              // class name, optional
-		uintptr(unsafe.Pointer(title)), // window name, optional
-		uintptr(overlappedWindow),      // DWORD dwStyle
-		uintptr(defaultWindowPosition),
-		uintptr(defaultWindowPosition),
-		uintptr(defaultWindowPosition),
-		uintptr(defaultWindowPosition),
-		uintptr(0),
-		uintptr(0),
-		uintptr(instance),
-		uintptr(0),
-	)
+	r0, _, e0 := procCreateWindowExW.Call(
+		uintptr(0),                     // DWORD dwExStyle
+		uintptr(classHandle),           // LPCWSTR lpClassName (allegedly optional)
+		uintptr(unsafe.Pointer(title)), // LPCWSTR lpWindowName (optional)
+		uintptr(WS_OVERLAPPEDWINDOW),   // DWORD dwStyle
+		uintptr(CW_USEDEFAULT),         // int x
+		uintptr(CW_USEDEFAULT),         // int y
+		uintptr(CW_USEDEFAULT),         // int nWidth
+		uintptr(CW_USEDEFAULT),         // int nHeight
+		uintptr(0),                     // HWND hWndParent (optional)
+		uintptr(0),                     // HMENU hMenu (optional)
+		uintptr(instance),              // HINSTANCE hInstance
+		uintptr(0))                     // LPVOID lpParam (optional)
 	handle := syscall.Handle(r0)
 	if handle == 0 {
 		return syscall.InvalidHandle, fmt.Errorf("calling CreateWindowExW: %v", e0)
@@ -287,6 +292,102 @@ func getInstance() (syscall.Handle, error) {
 	}
 
 	return instanceHandle, nil
+}
+
+// See: https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-wndclassexa
+type WNDCLASSEX struct {
+	cbSize        uint32 // Size of struct
+	style         uint32
+	lpfnWndProc   uintptr // Pointer to the Windows procedure
+	cbClsExtra    int32   // The number of extra bytes to allocate following the window-class structure
+	cbWndExtra    int32   // The number of extra bytes to allocate following the window instance
+	hInstance     syscall.Handle
+	hIcon         syscall.Handle // Null for default icon
+	hCursor       syscall.Handle // Handle for cursor resource
+	hbrBackground syscall.Handle // Color value must be one of the standard system colors with 1 added
+	lpszMenuName  *uint16        // Null if no menu
+	lpszClassName *uint16        // Identifies this class
+	hIconSm       syscall.Handle // Handle to small icon, can also be null
+}
+
+const (
+	COLOR_WINDOW = 5
+
+	// https://learn.microsoft.com/en-us/windows/win32/winmsg/window-class-styles
+	CS_SAVEBITS   = 0x0800
+	CS_DROPSHADOW = 0x00020000
+
+	// https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles
+	WS_EX_WINDOWEDGE       = 0x00000100
+	WS_EX_CLIENTEDGE       = 0x00000200
+	WS_EX_OVERLAPPEDWINDOW = WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE
+
+	// 	overlappedWindow := 0 | 0x800000 | 0x400000 | 0x80000 | 0x40000 | 0x20000 | 0x10000
+	CW_USEDEFAULT       = 0x80000000
+	WS_OVERLAPPED       = 0x00000000
+	WS_CAPTION          = 0x00C00000
+	WS_SYSMENU          = 0x00080000
+	WS_THICKFRAME       = 0x00040000
+	WS_MINIMIZEBOX      = 0x20000000
+	WS_MAXIMIZEBOX      = 0x01000000
+	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+
+	cWM_DESTROY = 0x0002
+	cWM_CLOSE   = 0x0010
+)
+
+func registerClass(className string, instance syscall.Handle) (syscall.Handle, error) {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	procRegisterClassExW := user32.NewProc("RegisterClassExW")
+	procDestroyWindow := user32.NewProc("DestroyWindow")
+	procPostQuitMessage := user32.NewProc("PostQuitMessage")
+	procDefWindowProcW := user32.NewProc("DefWindowProcW")
+
+	classNamePtr, err := syscall.UTF16PtrFromString(className)
+	if err != nil {
+		return syscall.InvalidHandle, fmt.Errorf("creating pointer to class name: %w", err)
+	}
+
+	fn := func(hWnd syscall.Handle, uMsg uint32, wParam, lParam uintptr) uintptr {
+		switch uMsg {
+		case cWM_CLOSE:
+			procDestroyWindow.Call(uintptr(hWnd))
+			return 0
+		case cWM_DESTROY:
+			procPostQuitMessage.Call(uintptr(0))
+			return 0
+		default:
+			r0, _, _ := procDefWindowProcW.Call(
+				uintptr(hWnd),
+				uintptr(uMsg),
+				uintptr(wParam),
+				uintptr(lParam),
+			)
+			return uintptr(r0)
+		}
+	}
+
+	class := WNDCLASSEX{
+		// style:       CS_SAVEBITS | CS_DROPSHADOW,
+		lpfnWndProc: syscall.NewCallback(fn),
+		hInstance:   instance,
+		// hCursor:       0,
+		// hbrBackground: COLOR_WINDOW + 1,
+		lpszClassName: classNamePtr,
+	}
+	class.cbSize = uint32(unsafe.Sizeof(class))
+
+	r0, _, e0 := syscall.SyscallN(
+		procRegisterClassExW.Addr(),
+		uintptr(unsafe.Pointer(&class)),
+	)
+
+	classHandle := syscall.Handle(r0)
+	if classHandle == 0 {
+		return syscall.InvalidHandle, fmt.Errorf("could not get module handle: %v", e0)
+	}
+
+	return classHandle, nil
 }
 
 // isSupported calls Windows.Security.Credentials.KeyCredentialManager.IsSupportedAsync.
