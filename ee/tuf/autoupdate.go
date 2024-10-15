@@ -225,6 +225,11 @@ func (ta *TufAutoupdater) Execute() (err error) {
 			"received external interrupt during initial delay, stopping",
 		)
 		return nil
+	case signalRestartErr := <-ta.signalRestart:
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received interrupt to restart launcher after update during initial delay, stopping",
+		)
+		return signalRestartErr
 	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
