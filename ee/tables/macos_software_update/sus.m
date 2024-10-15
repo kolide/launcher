@@ -45,7 +45,7 @@ void getSoftwareUpdateConfiguration(
   _Bool value;
 
   *isAutomaticallyCheckForUpdatesManaged =
-      os_framework || [manager isAutomaticallyCheckForUpdatesManaged] ? 1 : 0;
+      [manager isAutomaticallyCheckForUpdatesManaged] ? 1 : 0;
   *isAutomaticallyCheckForUpdatesEnabled =
       os_framework || [manager isAutomaticallyCheckForUpdatesEnabled] ? 1 : 0;
 
