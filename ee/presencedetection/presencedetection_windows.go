@@ -98,13 +98,27 @@ func requestVerification(reason string) error {
 	defer ole.DeleteHString(reasonHString)
 
 	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
+	// -- prepare the return values.
 	refiid := winrt.ParameterizedInstanceGUID(foundation.GUIDIAsyncOperation, userConsentVerificationResultSignature)
 	var requestVerificationAsyncOperation *foundation.IAsyncOperation
+
+	// In a lot of places, when passing HSTRINGs into `syscall.SyscallN`, we see it passed in
+	// as `uintptr(unsafe.Pointer(&reasonHString))`. However, this does not work for
+	// RequestVerificationForWindowAsync -- the window displays an incorrectly-encoded message.
+	//
+	// We CAN pass the message in as `uintptr(unsafe.Pointer(reasonHString))` -- this works, and
+	// is a choice that the ole library makes in several places (see RoActivateInstance,
+	// RoGetActiviationFactory). However, Golang's unsafeptr analysis flags this as potentially
+	// unsafe use of a pointer.
+	//
+	// To avoid the unsafeptr warning, we therefore pass in the message as simply `uintptr(reasonHString)`.
+	// This is safe and effective.
+
 	requestVerificationReturn, _, _ := syscall.SyscallN(
 		verifier.VTable().RequestVerificationForWindowAsync,
 		uintptr(unsafe.Pointer(verifier)),                           // Reference to our interop
 		uintptr(windowHwnd),                                         // HWND to our window
-		uintptr(unsafe.Pointer(&reasonHString)),                     // The message to include in the verification request
+		uintptr(reasonHString),                                      // The message to include in the verification request
 		uintptr(unsafe.Pointer(ole.NewGUID(refiid))),                // REFIID -- reference to the interface identifier for the return value (below)
 		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Return value -- Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
 	)
