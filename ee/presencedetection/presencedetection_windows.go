@@ -67,8 +67,7 @@ func Detect(reason string) (bool, error) {
 }
 
 // requestVerification calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync via the interop interface.
-// See documentation for RequestVerificationForWindowAsync in example here:
-// https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
+// See: https://learn.microsoft.com/en-us/windows/win32/api/userconsentverifierinterop/nf-userconsentverifierinterop-iuserconsentverifierinterop-requestverificationforwindowasync
 func requestVerification(reason string) error {
 	// Get access to UserConsentVerifier via factory
 	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", iUserConsentVerifierStaticsGuid)
@@ -98,7 +97,6 @@ func requestVerification(reason string) error {
 	}
 	defer ole.DeleteHString(reasonHString)
 
-	// https://learn.microsoft.com/en-us/windows/win32/api/userconsentverifierinterop/nf-userconsentverifierinterop-iuserconsentverifierinterop-requestverificationforwindowasync
 	// RequestVerificationForWindowAsync returns Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
 	refiid := winrt.ParameterizedInstanceGUID(foundation.GUIDIAsyncOperation, userConsentVerificationResultSignature)
 	var requestVerificationAsyncOperation *foundation.IAsyncOperation
