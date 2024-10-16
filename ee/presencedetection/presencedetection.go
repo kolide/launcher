@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-const DetectionFailedDurationValue = -1 * time.Second
+const (
+	DetectionFailedDurationValue = -1 * time.Second
+	DetectionTimeout             = 1 * time.Minute
+)
 
 type PresenceDetector struct {
 	lastDetection time.Time
