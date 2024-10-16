@@ -32,8 +32,23 @@ const (
 
 // Values for result come from https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverificationresult?view=winrt-26100
 const (
-	resultVerified = uintptr(0)
+	resultVerified             uintptr = 0x0
+	resultDeviceNotPresent     uintptr = 0x1
+	resultNotConfiguredForUser uintptr = 0x2
+	resultDisabledByPolicy     uintptr = 0x3
+	resultDeviceBusy           uintptr = 0x4
+	resultRetriesExhausted     uintptr = 0x5
+	resultCanceled             uintptr = 0x6
 )
+
+var resultErrorMessageMap = map[uintptr]string{
+	resultDeviceNotPresent:     "There is no authentication device available.",
+	resultNotConfiguredForUser: "An authentication verifier device is not configured for this user.",
+	resultDisabledByPolicy:     "Group policy has disabled authentication device verification.",
+	resultDeviceBusy:           "The authentication device is performing an operation and is unavailable.",
+	resultRetriesExhausted:     "After 10 attempts, the original verification request and all subsequent attempts at the same verification were not verified.",
+	resultCanceled:             "The verification operation was canceled.",
+}
 
 // IUserConsentVerifierInterop is the interop interface for UserConsentVerifier. Both are documented here:
 // https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
@@ -150,9 +165,14 @@ func requestVerification(reason string) error {
 		return fmt.Errorf("getting results of RequestVerificationForWindowAsync: %w", err)
 	}
 
-	if uintptr(resPtr) == resultVerified {
+	verificationResult := uintptr(resPtr)
+	if verificationResult == resultVerified {
 		return nil
 	}
 
-	return fmt.Errorf("RequestVerificationForWindowAsync failed with result %+v", resPtr)
+	if errMsg, ok := resultErrorMessageMap[verificationResult]; ok {
+		return fmt.Errorf("requesting verification failed: %s", errMsg)
+	}
+
+	return fmt.Errorf("RequestVerificationForWindowAsync failed with unknown result %+v", verificationResult)
 }
