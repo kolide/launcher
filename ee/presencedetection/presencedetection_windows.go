@@ -20,22 +20,22 @@ import (
 // GUIDs retrieved from:
 // https://github.com/tpn/winsdk-10/blob/master/Include/10.0.16299.0/um/UserConsentVerifierInterop.idl
 var (
-	iUserConsentVerifierStaticsGuid = ole.NewGUID("AF4F3F91-564C-4DDC-B8B5-973447627C65")
-	iUserConsentVerifierInteropGuid = ole.NewGUID("39E050C3-4E74-441A-8DC0-B81104DF949C")
+	iUserConsentVerifierStaticsGuid = ole.NewGUID("AF4F3F91-564C-4DDC-B8B5-973447627C65") // Windows.Security.Credentials.UI.UserConsentVerifier
+	iUserConsentVerifierInteropGuid = ole.NewGUID("39E050C3-4E74-441A-8DC0-B81104DF949C") // UserConsentVerifierInterop
 )
 
 // Signatures were generated following the guidance in
 // https://learn.microsoft.com/en-us/uwp/winrt-cref/winrt-type-system#guid-generation-for-parameterized-types.
-// The GUIDs themselves came from the same source as above (windows.security.credentials.idl).
-// The GUIDs must be lowercase in the parameterized types.
 const (
 	userConsentVerificationResultSignature = "enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;i4)" // i4 is underlying type of int32
 )
 
 // Values for result come from https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverificationresult?view=winrt-26100
-const resultVerified = uintptr(0)
+const (
+	resultVerified = uintptr(0)
+)
 
-// UserConsentVerifier is defined here, with references to IUserConsentVerifierInterop below:
+// IUserConsentVerifierInterop is the interop interface for UserConsentVerifier. Both are documented here:
 // https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
 type IUserConsentVerifierInterop struct {
 	ole.IInspectable
@@ -51,6 +51,7 @@ type IUserConsentVerifierInteropVTable struct {
 }
 
 var roInitialize = sync.OnceFunc(func() {
+	// Call ole.RoInitialize(1) only once
 	ole.RoInitialize(1)
 })
 
@@ -65,8 +66,9 @@ func Detect(reason string) (bool, error) {
 	return true, nil
 }
 
-// requestVerification calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync.
-// See: https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier.requestverificationasync?view=winrt-26100
+// requestVerification calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync via the interop interface.
+// See documentation for RequestVerificationForWindowAsync in example here:
+// https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.ui.userconsentverifier?view=winrt-26100#desktop-apps-using-cwinrt
 func requestVerification(reason string) error {
 	// Get access to UserConsentVerifier via factory
 	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", iUserConsentVerifierStaticsGuid)
@@ -83,7 +85,7 @@ func requestVerification(reason string) error {
 	defer verifierObj.Release()
 	verifier := (*IUserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
 
-	// Get the window handle from systray
+	// Get the current window handle from systray
 	windowHwnd, err := systray.WindowHandle()
 	if err != nil {
 		return fmt.Errorf("getting current window handle: %w", err)
@@ -126,7 +128,7 @@ func requestVerification(reason string) error {
 		if operationStatus != foundation.AsyncStatusCompleted {
 			return fmt.Errorf("RequestVerificationForWindowAsync operation did not complete: status %d", operationStatus)
 		}
-	case <-time.After(1 * time.Minute):
+	case <-time.After(DetectionTimeout):
 		return errors.New("timed out waiting for RequestVerificationForWindowAsync operation to complete")
 	}
 
