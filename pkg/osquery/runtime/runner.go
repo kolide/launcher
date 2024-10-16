@@ -693,12 +693,29 @@ func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquer
 		return
 	}
 
-	r.knapsack.SetCurrrentRunningOsqueryVersion(outTrimmed)
+	versionNumber := extractVersionNumber(outTrimmed)
+	if versionNumber != "" {
+		r.knapsack.SetCurrrentRunningOsqueryVersion(versionNumber)
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"checked osqueryd version from runner",
+			"osqueryd_version", versionNumber,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	} else {
+		r.slogger.Log(ctx, slog.LevelError,
+			"unexpected osqueryd version format",
+			"output", outTrimmed,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	}
+}
 
-	r.slogger.Log(ctx, slog.LevelInfo,
-		"checked osqueryd version from runner",
-		"osqueryd_version", outTrimmed,
-		"execution_time_ms", executionTimeMs,
-		"osqueryd_path", osquerydPath,
-	)
+func extractVersionNumber(versionString string) string {
+	parts := strings.Fields(versionString)
+	if len(parts) >= 3 && parts[0] == "osqueryd" && parts[1] == "version" {
+		return parts[2]
+	}
+	return ""
 }

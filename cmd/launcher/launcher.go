@@ -638,13 +638,30 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 		return
 	}
 
-	// log the version to the knappsack
-	k.SetCurrrentRunningOsqueryVersion(outTrimmed)
+	versionNumber := extractVersionNumber(outTrimmed)
 
-	slogger.Log(ctx, slog.LevelDebug,
-		"checked osqueryd version",
-		"osqueryd_version", outTrimmed,
-		"execution_time_ms", executionTimeMs,
-		"osqueryd_path", osquerydPath,
-	)
+	if versionNumber != "" {
+		k.SetCurrrentRunningOsqueryVersion(versionNumber)
+		slogger.Log(ctx, slog.LevelInfo,
+			"checked osqueryd version from launcher",
+			"osqueryd_version", versionNumber,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	} else {
+		slogger.Log(ctx, slog.LevelError,
+			"unexpected osqueryd version format",
+			"output", outTrimmed,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	}
+}
+
+func extractVersionNumber(versionString string) string {
+	parts := strings.Fields(versionString)
+	if len(parts) >= 3 && parts[0] == "osqueryd" && parts[1] == "version" {
+		return parts[2]
+	}
+	return ""
 }
