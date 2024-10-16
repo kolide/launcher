@@ -99,8 +99,8 @@ func requestVerification(reason string) error {
 	defer verifierObj.Release()
 	verifier := (*IUserConsentVerifierInterop)(unsafe.Pointer(verifierObj))
 
-	// Get the current window handle from systray
-	windowHwnd, err := systray.WindowHandle()
+	// Get the current window handle (a HWND) from systray
+	windowHandle, err := systray.WindowHandle()
 	if err != nil {
 		return fmt.Errorf("getting current window handle: %w", err)
 	}
@@ -132,7 +132,7 @@ func requestVerification(reason string) error {
 	requestVerificationReturn, _, _ := syscall.SyscallN(
 		verifier.VTable().RequestVerificationForWindowAsync,
 		uintptr(unsafe.Pointer(verifier)),                           // Reference to our interop
-		uintptr(windowHwnd),                                         // HWND to our window
+		uintptr(windowHandle),                                       // HWND to our application's window
 		uintptr(reasonHString),                                      // The message to include in the verification request
 		uintptr(unsafe.Pointer(ole.NewGUID(refiid))),                // REFIID -- reference to the interface identifier for the return value (below)
 		uintptr(unsafe.Pointer(&requestVerificationAsyncOperation)), // Return value -- Windows.Foundation.IAsyncOperation<UserConsentVerificationResult>
