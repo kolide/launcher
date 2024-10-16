@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 
 	"github.com/kolide/launcher/pkg/backoff"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/traces"
@@ -394,6 +396,8 @@ func (r *Runner) launchOsqueryInstance() error {
 	}
 	o.stats = stats
 
+	go r.runOsqueryVersionCheckAddToKnapsack(ctx, currentOsquerydBinaryPath)
+
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
@@ -655,4 +659,46 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 		shutdown: make(chan struct{}),
 		opts:     opts,
 	}
+}
+
+func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquerydPath string) {
+	var output bytes.Buffer
+
+	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
+	if err != nil {
+		r.slogger.Log(ctx, slog.LevelError,
+			"unable to create process",
+			"err", err,
+		)
+		return
+	}
+
+	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer versionCancel()
+
+	startTime := time.Now().UnixMilli()
+
+	osqErr := osq.RunVersion(versionCtx)
+	executionTimeMs := time.Now().UnixMilli() - startTime
+	outTrimmed := strings.TrimSpace(output.String())
+
+	if osqErr != nil {
+		r.slogger.Log(ctx, slog.LevelError,
+			"could not check osqueryd version",
+			"output", outTrimmed,
+			"err", err,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+		return
+	}
+
+	r.knapsack.SetCurrrentRunningOsqueryVersion(outTrimmed)
+
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"checked osqueryd version from runner",
+		"osqueryd_version", outTrimmed,
+		"execution_time_ms", executionTimeMs,
+		"osqueryd_path", osquerydPath,
+	)
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/timemachine"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
@@ -194,7 +195,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
+	go runOsqueryVersionCheck(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
 
 	if k.Debug() && runtime.GOOS != "windows" {
@@ -598,7 +599,7 @@ func writePidFile(path string) error {
 // be due to the notarization check taking too long, we execute the binary here ahead
 // of time in the hopes of getting the check out of the way. This is expected to be called
 // from a goroutine, and thus does not return an error.
-func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydPath string) {
+func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.Knapsack, osquerydPath string) {
 	if runtime.GOOS != "darwin" {
 		return
 	}
@@ -636,6 +637,9 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 		)
 		return
 	}
+
+	// log the version to the knappsack
+	k.SetCurrrentRunningOsqueryVersion(outTrimmed)
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
