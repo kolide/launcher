@@ -20,7 +20,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-12
+          - macos-13
           - windows-latest
     steps:
     - name: Check out code
@@ -130,9 +130,9 @@ jobs:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu-20.04
           - ubuntu-22.04
-          - macos-12
           - macos-13
           - macos-14
+          - macos-15
           - windows-2019
           - windows-2022
     needs: version_baseline
@@ -207,7 +207,7 @@ jobs:
       matrix:
         os:
           - ubuntu-20.04
-          - macos-12
+          - macos-13
           - windows-latest
     steps:
     - uses: actions/checkout@v4
