@@ -42,6 +42,7 @@ func TestLogShipper(t *testing.T) {
 
 			tokenStore := testKVStore(t, storage.TokenStore.String())
 			knapsack.On("TokenStore").Return(tokenStore)
+			knapsack.On("OsqueryVersion").Return("5.13.1")
 
 			// no auth token
 			ls := New(knapsack, log.NewNopLogger())
@@ -139,6 +140,7 @@ func TestStop_Multiple(t *testing.T) {
 	knapsack.On("LogShippingLevel").Return("debug")
 	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+	knapsack.On("OsqueryVersion").Return("5.13.1")
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -194,6 +196,7 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("LogShippingLevel").Return("debug")
 	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+	knapsack.On("OsqueryVersion").Return("5.13.1")
 
 	ls := New(knapsack, log.NewNopLogger())
 

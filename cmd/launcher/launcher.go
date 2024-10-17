@@ -611,7 +611,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
 	if err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"unable to create process",
+			"unable to create runsimple process to check osquery version",
 			"err", err,
 		)
 		return

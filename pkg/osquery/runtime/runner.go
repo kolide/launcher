@@ -661,13 +661,14 @@ func newRunner(opts ...OsqueryInstanceOption) *Runner {
 	}
 }
 
+// runOsqueryVersionCheckAddToKnapsack checks the version of osquery at the given osquerydPath and saves it to the knapsack, so that it is available to add when logshipping
 func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquerydPath string) {
 	var output bytes.Buffer
 
 	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
 	if err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
-			"unable to create process",
+			"unable to create runsimple process to check osquery version",
 			"err", err,
 		)
 		return
@@ -676,10 +677,8 @@ func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquer
 	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer versionCancel()
 
-	startTime := time.Now().UnixMilli()
-
 	osqErr := osq.RunVersion(versionCtx)
-	executionTimeMs := time.Now().UnixMilli() - startTime
+
 	outTrimmed := strings.TrimSpace(output.String())
 
 	if osqErr != nil {
@@ -687,7 +686,6 @@ func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquer
 			"could not check osqueryd version",
 			"output", outTrimmed,
 			"err", err,
-			"execution_time_ms", executionTimeMs,
 			"osqueryd_path", osquerydPath,
 		)
 		return
@@ -699,14 +697,12 @@ func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquer
 		r.slogger.Log(ctx, slog.LevelInfo,
 			"checked osqueryd version from runner",
 			"osqueryd_version", versionNumber,
-			"execution_time_ms", executionTimeMs,
 			"osqueryd_path", osquerydPath,
 		)
 	} else {
 		r.slogger.Log(ctx, slog.LevelError,
 			"unexpected osqueryd version format",
 			"output", outTrimmed,
-			"execution_time_ms", executionTimeMs,
 			"osqueryd_path", osquerydPath,
 		)
 	}
