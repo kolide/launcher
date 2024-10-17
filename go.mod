@@ -36,7 +36,7 @@ require (
 	golang.org/x/image v0.18.0
 	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/sys v0.25.0
+	golang.org/x/sys v0.26.0
 	golang.org/x/text v0.16.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.58.3
@@ -51,7 +51,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
 	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
-	github.com/kolide/systray v1.10.5-0.20241015212527-e67ebef13666
+	github.com/kolide/systray v1.10.5-0.20241017184621-82afdf172150
 	github.com/kolide/toast v1.0.2
 	github.com/saltosystems/winrt-go v0.0.0-20240510082706-db61b37f5877
 	github.com/shirou/gopsutil/v3 v3.23.3
