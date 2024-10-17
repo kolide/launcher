@@ -347,6 +347,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner := New(
 		k,
@@ -388,6 +389,7 @@ func TestFlagsChanged(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	// Start the runner
 	runner := New(
@@ -524,6 +526,7 @@ func TestSimplePath(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner := New(
 		k,
@@ -561,6 +564,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner := New(
 		k,
@@ -597,6 +601,7 @@ func TestOsqueryDies(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner := New(
 		k,
@@ -700,6 +705,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store)
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner = New(
 		k,

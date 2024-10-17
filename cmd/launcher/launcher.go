@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/timemachine"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
@@ -194,7 +195,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
+	go runOsqueryVersionCheck(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
 
 	if k.Debug() && runtime.GOOS != "windows" {
@@ -598,7 +599,7 @@ func writePidFile(path string) error {
 // be due to the notarization check taking too long, we execute the binary here ahead
 // of time in the hopes of getting the check out of the way. This is expected to be called
 // from a goroutine, and thus does not return an error.
-func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydPath string) {
+func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.Knapsack, osquerydPath string) {
 	if runtime.GOOS != "darwin" {
 		return
 	}
@@ -610,7 +611,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 	osq, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
 	if err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"unable to create process",
+			"unable to create runsimple process to check osquery version",
 			"err", err,
 		)
 		return
@@ -637,10 +638,30 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 		return
 	}
 
-	slogger.Log(ctx, slog.LevelDebug,
-		"checked osqueryd version",
-		"osqueryd_version", outTrimmed,
-		"execution_time_ms", executionTimeMs,
-		"osqueryd_path", osquerydPath,
-	)
+	versionNumber := extractVersionNumber(outTrimmed)
+
+	if versionNumber != "" {
+		k.SetCurrentRunningOsqueryVersion(versionNumber)
+		slogger.Log(ctx, slog.LevelInfo,
+			"checked osqueryd version from launcher",
+			"osqueryd_version", versionNumber,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	} else {
+		slogger.Log(ctx, slog.LevelError,
+			"unexpected osqueryd version format",
+			"output", outTrimmed,
+			"execution_time_ms", executionTimeMs,
+			"osqueryd_path", osquerydPath,
+		)
+	}
+}
+
+func extractVersionNumber(versionString string) string {
+	parts := strings.Fields(versionString)
+	if len(parts) >= 3 && parts[0] == "osqueryd" && parts[1] == "version" {
+		return parts[2]
+	}
+	return ""
 }

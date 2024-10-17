@@ -420,6 +420,14 @@ func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
 	return fc.cmdLineOpts.OsqueryTlsDistributedWriteEndpoint
 }
 
+func (fc *FlagController) OsqueryVersion() string {
+	return NewStringFlagValue(WithDefaultString("")).get(fc.getControlServerValue(keys.RunningOsqueryVersion))
+}
+
+func (fc *FlagController) SetCurrentRunningOsqueryVersion(osqueryversion string) error {
+	return fc.setControlServerValue(keys.RunningOsqueryVersion, []byte(osqueryversion))
+}
+
 func (fc *FlagController) SetAutoupdate(enabled bool) error {
 	return fc.setControlServerValue(keys.Autoupdate, boolToBytes(enabled))
 }
