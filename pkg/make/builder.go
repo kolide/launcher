@@ -309,6 +309,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if b.os == "darwin" {
 			// Suppress warnings like "ld: warning: ignoring duplicate libraries: '-lobjc'"
+			// See: https://github.com/golang/go/issues/67799
 			ldFlags = append(ldFlags, "-extldflags=-Wl,-no_warn_duplicate_libraries")
 		}
 
