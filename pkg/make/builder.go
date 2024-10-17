@@ -307,6 +307,11 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-H windowsgui")
 		}
 
+		if b.os == "darwin" {
+			// Suppress warnings like "ld: warning: ignoring duplicate libraries: '-lobjc'"
+			ldFlags = append(ldFlags, "-extldflags=-Wl,-no_warn_duplicate_libraries")
+		}
+
 		if b.stampVersion {
 			v, err := b.getVersion(ctx)
 			if err != nil {
