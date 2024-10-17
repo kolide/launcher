@@ -693,7 +693,7 @@ func (r *Runner) runOsqueryVersionCheckAddToKnapsack(ctx context.Context, osquer
 
 	versionNumber := extractVersionNumber(outTrimmed)
 	if versionNumber != "" {
-		r.knapsack.SetCurrrentRunningOsqueryVersion(versionNumber)
+		r.knapsack.SetCurrentRunningOsqueryVersion(versionNumber)
 		r.slogger.Log(ctx, slog.LevelInfo,
 			"checked osqueryd version from runner",
 			"osqueryd_version", versionNumber,

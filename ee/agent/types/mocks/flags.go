@@ -991,12 +991,12 @@ func (_m *Flags) SetControlServerURL(url string) error {
 	return r0
 }
 
-// SetCurrrentRunningOsqueryVersion provides a mock function with given fields: version
-func (_m *Flags) SetCurrrentRunningOsqueryVersion(version string) error {
+// SetCurrentRunningOsqueryVersion provides a mock function with given fields: version
+func (_m *Flags) SetCurrentRunningOsqueryVersion(version string) error {
 	ret := _m.Called(version)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetCurrrentRunningOsqueryVersion")
+		panic("no return value specified for SetCurrentRunningOsqueryVersion")
 	}
 
 	var r0 error

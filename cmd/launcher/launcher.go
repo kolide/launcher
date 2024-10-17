@@ -641,7 +641,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 	versionNumber := extractVersionNumber(outTrimmed)
 
 	if versionNumber != "" {
-		k.SetCurrrentRunningOsqueryVersion(versionNumber)
+		k.SetCurrentRunningOsqueryVersion(versionNumber)
 		slogger.Log(ctx, slog.LevelInfo,
 			"checked osqueryd version from launcher",
 			"osqueryd_version", versionNumber,
