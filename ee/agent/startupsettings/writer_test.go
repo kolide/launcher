@@ -138,6 +138,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
 	pinnedOsquerydVersion := "5.3.2"
 	k.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion).Once()
+	k.On("SetCurrentRunningOsqueryVersion", mock.Anything).Return().Maybe()
 
 	autoTableConstructionValue := ulid.New()
 
