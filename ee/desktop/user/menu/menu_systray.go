@@ -40,6 +40,11 @@ func (m *menu) Build() {
 	buildMutex.Lock()
 	defer buildMutex.Unlock()
 
+	if !systray.IsReady() {
+		// if we never started the menu, don't do anything
+		return
+	}
+
 	// Remove all menu items each time we rebuild the menu
 	systray.ResetMenu()
 
