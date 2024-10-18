@@ -56,6 +56,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store)
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	runner := New(
 		k,
@@ -109,6 +110,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store)
+	k.On("SetCurrentRunningOsqueryVersion", mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(
