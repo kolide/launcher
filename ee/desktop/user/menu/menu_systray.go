@@ -40,7 +40,7 @@ func (m *menu) Build() {
 	buildMutex.Lock()
 	defer buildMutex.Unlock()
 
-	if !systray.IsShowing() {
+	if !systray.IsReady() {
 		// if we never started the menu, don't do anything
 		return
 	}
