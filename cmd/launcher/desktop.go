@@ -131,6 +131,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 
 	// Set up notification sending and listening
 	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
+	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
 	if err != nil {
@@ -183,13 +184,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
-	go func() {
-		// wait to show desktop until we get the signal from root
-		<-showDesktopChan
-		runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
-		systray.Show()
-	}()
-
+	<-showDesktopChan
+	// on darwin, if notifier.Listen() is called on a blocked main thread, it causes a crash,
+	// so we wait until the main thread is unblocked to call it before initializing the menu.
+	// this is noop for non-darwin
+	notifier.Listen()
 	// blocks until shutdown called
 	m.Init()
 	return nil

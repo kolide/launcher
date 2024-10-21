@@ -178,8 +178,8 @@ github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50 h1:N7RaYBPTK5o4y2z1z8kl
 github.com/kolide/kit v0.0.0-20240411131714-94dd1939cf50/go.mod h1:pFbEKXFww1uqu4RRO7qCnUmQ2EIwKYRzUqpJbODNlfc=
 github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121 h1:f7APX9VNsCkD/tdlAjbU4A22FyfTOCF6QadlvnzZElg=
 github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121/go.mod h1:/0sxd3OIxciTlMTeZI/9WTaUHsx/K/+3f+NbD5dywTY=
-github.com/kolide/systray v1.10.5-0.20241018174140-3d1b0664c945 h1:NO+UQe89tISQj+rS0l+hrB4BAF3oKdLGhZLddC5weXM=
-github.com/kolide/systray v1.10.5-0.20241018174140-3d1b0664c945/go.mod h1:rnPcECLGM9DY/+fb3O9WNKiPBPMCdNg3rkyadLWOCTU=
+github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb h1:d2pfEh5Yd6+C+D096YQlHwcq28TPOjoeoG+lCQojkJM=
+github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb/go.mod h1:rnPcECLGM9DY/+fb3O9WNKiPBPMCdNg3rkyadLWOCTU=
 github.com/kolide/toast v1.0.2 h1:BQlIfO3wbKIEWfF0c8v4UkdhSIZYnSWaKkZl+Yarptk=
 github.com/kolide/toast v1.0.2/go.mod h1:OguLiOUf57YSEuZqjfk4uP4KdT0QOblGoySOI8F1I0Y=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

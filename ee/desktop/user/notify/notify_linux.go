@@ -55,7 +55,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *dbusNotifier
 	}
 }
 
-func (d *dbusNotifier) Listen() error {
+func (d *dbusNotifier) Execute() error {
 	if d.conn != nil {
 		if err := d.conn.AddMatchSignal(
 			dbus.WithMatchObjectPath(notificationServiceObj),
@@ -137,6 +137,9 @@ func (d *dbusNotifier) Interrupt(err error) {
 		dbus.WithMatchInterface(notificationServiceInterface),
 	)
 }
+
+// just make compiler happy, this is only needed on darwin
+func (d *dbusNotifier) Listen() {}
 
 func (d *dbusNotifier) SendNotification(n Notification) error {
 	if err := d.sendNotificationViaDbus(n); err == nil {
