@@ -57,7 +57,7 @@ const (
 	LocalDevelopmentPath            FlagKey = "localdev_path"
 	LauncherWatchdogEnabled         FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
 	SystrayRestartEnabled           FlagKey = "systray_restart_enabled"
-	OsqueryVersion                  FlagKey = "osquery_version"
+	CurrentRunningOsqueryVersion    FlagKey = "osquery_version"
 )
 
 func (key FlagKey) String() string {
