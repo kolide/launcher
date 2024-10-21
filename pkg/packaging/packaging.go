@@ -93,7 +93,6 @@ func NewPackager() *PackageOptions {
 }
 
 func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, target Target) error {
-
 	p.target = target
 	p.packageWriter = packageWriter
 
@@ -283,6 +282,9 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			return fmt.Errorf("version detection: %w", err)
 		}
 	}
+
+	// Record the osquery version, now that we've downloaded it
+	p.setOsqueryVersionInCtx(ctx)
 
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",
