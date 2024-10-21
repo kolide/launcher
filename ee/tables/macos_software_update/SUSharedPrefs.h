@@ -107,5 +107,6 @@
 - (BOOL)isValidAnyUserPreference:(id)arg1;
 - (BOOL)useBackgroundNSURLSession;
 - (void)reloadPreferences;
+- (BOOL)isAppStoreAutoUpdatesManaged;
 
 @end
