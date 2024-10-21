@@ -185,6 +185,9 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}()
 
 	<-showDesktopChan
+	// on darwin, if notifier.Listen() is called on a blocked main thread, it casues a crash,
+	// so we wait until the main thread is unblocked to call it before initializing the menu.
+	// this is noop for non-darwin
 	notifier.Listen()
 	// blocks until shutdown called
 	m.Init()
