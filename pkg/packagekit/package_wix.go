@@ -175,7 +175,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		return fmt.Errorf("copying output: %w", err)
 	}
 
-	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+	SetInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
 }
