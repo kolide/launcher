@@ -54,7 +54,7 @@ func TestContext(t *testing.T) {
 	}
 
 	for _, pair := range contextPairs {
-		setInContext(ctx, pair.key, pair.val)
+		SetInContext(ctx, pair.key, pair.val)
 	}
 
 	for _, pair := range contextPairs {

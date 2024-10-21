@@ -32,7 +32,7 @@ func InitContext(ctx context.Context) context.Context {
 	return ctx
 }
 
-func setInContext(ctx context.Context, key contextKey, val string) {
+func SetInContext(ctx context.Context, key contextKey, val string) {
 	// If there's no pointer, then there's no point in setting
 	// this. It won't get back to the caller.
 	ptr, ok := ctx.Value(key).(*string)

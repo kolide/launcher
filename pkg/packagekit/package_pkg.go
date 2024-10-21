@@ -61,7 +61,7 @@ func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions, arch strin
 		return fmt.Errorf("copying output: %w", err)
 	}
 
-	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+	SetInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
 }
@@ -89,7 +89,7 @@ func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
 		"uuid", uuid,
 	)
 
-	setInContext(ctx, ContextNotarizationUuidKey, uuid)
+	SetInContext(ctx, ContextNotarizationUuidKey, uuid)
 
 	return nil
 }
