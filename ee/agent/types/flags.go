@@ -147,7 +147,7 @@ type Flags interface {
 
 	// Osquery Version is the version of osquery that is being used.
 	SetCurrrentRunningOsqueryVersion(version string) error
-	OsqueryVersion() string
+	CurrentRunningOsqueryVersion() string
 
 	// Autoupdate enables the autoupdate functionality.
 	SetAutoupdate(enabled bool) error

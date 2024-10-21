@@ -274,6 +274,24 @@ func (_m *Knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	return r0, r1
 }
 
+// CurrentRunningOsqueryVersion provides a mock function with given fields:
+func (_m *Knapsack) CurrentRunningOsqueryVersion() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CurrentRunningOsqueryVersion")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // Debug provides a mock function with given fields:
 func (_m *Knapsack) Debug() bool {
 	ret := _m.Called()
@@ -997,24 +1015,6 @@ func (_m *Knapsack) OsqueryVerbose() bool {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// OsqueryVersion provides a mock function with given fields:
-func (_m *Knapsack) OsqueryVersion() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryVersion")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
 	}
 
 	return r0
