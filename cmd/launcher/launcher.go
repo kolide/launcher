@@ -195,7 +195,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	go runOsqueryVersionCheck(ctx, slogger, k, k.LatestOsquerydPath(ctx))
+	go runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
 
 	if k.Debug() && runtime.GOOS != "windows" {
@@ -594,15 +594,10 @@ func writePidFile(path string) error {
 	return nil
 }
 
-// runOsqueryVersionCheck execs the osqueryd binary in the background when we're running
-// on darwin. Operating on our theory that some startup delay issues for osquery might
-// be due to the notarization check taking too long, we execute the binary here ahead
-// of time in the hopes of getting the check out of the way. This is expected to be called
+// runOsqueryVersionCheckAndAddToKnapsack execs the osqueryd binary in the background when we're running
+// on to check the version and save it in the Knapsack. This is expected to be called
 // from a goroutine, and thus does not return an error.
-func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.Knapsack, osquerydPath string) {
-	if runtime.GOOS != "darwin" {
-		return
-	}
+func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.Logger, k types.Knapsack, osquerydPath string) {
 
 	slogger = slogger.With("component", "osquery-version-check")
 
@@ -621,10 +616,7 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer versionCancel()
 
-	startTime := time.Now().UnixMilli()
-
 	osqErr := osq.RunVersion(versionCtx)
-	executionTimeMs := time.Now().UnixMilli() - startTime
 	outTrimmed := strings.TrimSpace(output.String())
 
 	if osqErr != nil {
@@ -632,7 +624,6 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 			"could not check osqueryd version",
 			"output", outTrimmed,
 			"err", err,
-			"execution_time_ms", executionTimeMs,
 			"osqueryd_path", osquerydPath,
 		)
 		return
@@ -644,7 +635,6 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, k types.K
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
 		"osqueryd_version", outTrimmed,
-		"execution_time_ms", executionTimeMs,
 		"osqueryd_path", osquerydPath,
 	)
 }
