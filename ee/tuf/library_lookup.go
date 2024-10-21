@@ -264,7 +264,7 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 
 	return &BinaryUpdateInfo{
 		Path:    targetPath,
-		Version: targetVersion,
+		Version: trimVersionString(targetVersion),
 	}, nil
 }
 
@@ -304,6 +304,14 @@ func mostRecentVersion(ctx context.Context, slogger *slog.Logger, binary autoupd
 	versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), mostRecentVersionInLibraryRaw)
 	return &BinaryUpdateInfo{
 		Path:    executableLocation(versionDir, binary),
-		Version: mostRecentVersionInLibraryRaw,
+		Version: trimVersionString(mostRecentVersionInLibraryRaw),
 	}, nil
+}
+
+func trimVersionString(version string) string {
+	parts := strings.Fields(version)
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return version
 }
