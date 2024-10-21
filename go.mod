@@ -127,3 +127,5 @@ go 1.22
 toolchain go1.22.2
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
+
+replace github.com/kolide/systray v1.10.5-0.20241018174140-3d1b0664c945 => github.com/james-pickett/systray v0.0.0-20241021161128-fcaf831e0b6b

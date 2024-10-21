@@ -33,17 +33,19 @@ func NewDesktopNotifier(_ *slog.Logger, _ string) *macNotifier {
 	}
 }
 
-func (m *macNotifier) Listen() error {
-	if isBundle() {
-		C.runNotificationListenerApp()
-	}
-
+func (m *macNotifier) Execute() error {
 	<-m.interrupt
 	return nil
 }
 
 func (m *macNotifier) Interrupt(err error) {
 	m.interrupt <- struct{}{}
+}
+
+func (m *macNotifier) Listen() {
+	if isBundle() {
+		C.runNotificationListenerApp()
+	}
 }
 
 func (m *macNotifier) SendNotification(n Notification) error {

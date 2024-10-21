@@ -131,7 +131,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 
 	// Set up notification sending and listening
 	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
-	runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
+	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
 	if err != nil {
@@ -184,12 +184,8 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
-	go func() {
-		// wait to show desktop until we get the signal from root
-		<-showDesktopChan
-		systray.Show()
-	}()
-
+	<-showDesktopChan
+	notifier.Listen()
 	// blocks until shutdown called
 	m.Init()
 	return nil
