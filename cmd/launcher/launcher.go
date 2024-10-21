@@ -630,7 +630,7 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 	}
 
 	// log the version to the knappsack
-	k.SetCurrrentRunningOsqueryVersion(outTrimmed)
+	k.SetCurrentRunningOsqueryVersion(outTrimmed)
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",

@@ -146,7 +146,7 @@ type Flags interface {
 	OsqueryTlsDistributedWriteEndpoint() string
 
 	// Osquery Version is the version of osquery that is being used.
-	SetCurrrentRunningOsqueryVersion(version string) error
+	SetCurrentRunningOsqueryVersion(version string) error
 	CurrentRunningOsqueryVersion() string
 
 	// Autoupdate enables the autoupdate functionality.

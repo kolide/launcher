@@ -424,7 +424,7 @@ func (fc *FlagController) CurrentRunningOsqueryVersion() string {
 	return NewStringFlagValue(WithDefaultString("")).get(fc.getControlServerValue(keys.CurrentRunningOsqueryVersion))
 }
 
-func (fc *FlagController) SetCurrrentRunningOsqueryVersion(osqueryversion string) error {
+func (fc *FlagController) SetCurrentRunningOsqueryVersion(osqueryversion string) error {
 	return fc.setControlServerValue(keys.CurrentRunningOsqueryVersion, []byte(osqueryversion))
 }
 

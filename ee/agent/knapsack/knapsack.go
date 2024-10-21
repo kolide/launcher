@@ -159,7 +159,7 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.PinnedOsquerydVersion(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
-		k.SetCurrrentRunningOsqueryVersion(latestBin.Version)
+		k.SetCurrentRunningOsqueryVersion(latestBin.Version)
 		return k.OsquerydPath()
 	}
 
