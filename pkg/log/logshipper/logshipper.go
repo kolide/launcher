@@ -193,6 +193,7 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	versionInfo := version.Version()
 	deviceInfo["launcher_version"] = versionInfo.Version
 	deviceInfo["os"] = runtime.GOOS
+	deviceInfo["osquery_version"] = ls.knapsack.CurrentRunningOsqueryVersion()
 
 	ls.shippingLogger = log.With(ls.shippingLogger, "launcher_version", versionInfo.Version)
 

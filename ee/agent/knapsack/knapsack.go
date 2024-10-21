@@ -161,7 +161,7 @@ func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	if err != nil {
 		return k.OsquerydPath()
 	}
-
+	k.SetCurrentRunningOsqueryVersion(latestBin.Version)
 	return latestBin.Path
 }
 
