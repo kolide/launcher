@@ -2,7 +2,10 @@ package checkups
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/kolide/launcher/ee/agent/types"
 )
@@ -23,7 +26,7 @@ type serverDataCheckup struct {
 }
 
 func (sdc *serverDataCheckup) Data() any             { return sdc.data }
-func (sdc *serverDataCheckup) ExtraFileName() string { return "" }
+func (sdc *serverDataCheckup) ExtraFileName() string { return "metadata.json" }
 func (sdc *serverDataCheckup) Name() string          { return "Server Data" }
 func (sdc *serverDataCheckup) Status() Status        { return sdc.status }
 func (sdc *serverDataCheckup) Summary() string       { return sdc.summary }
@@ -31,6 +34,12 @@ func (sdc *serverDataCheckup) Summary() string       { return sdc.summary }
 func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	store := sdc.k.ServerProvidedDataStore()
 	sdc.data = make(map[string]any)
+
+	if err := sdc.addMetadata(extraFH); err != nil {
+		sdc.status = Warning
+		sdc.summary += "; failed to add metadata.json"
+		return fmt.Errorf("adding metadata.json: %w", err)
+	}
 
 	if store == nil {
 		sdc.status = Warning
@@ -54,6 +63,24 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 		}
 
 		sdc.data[key] = string(val)
+	}
+
+	return nil
+}
+
+func (sdc *serverDataCheckup) addMetadata(extraFH io.Writer) error {
+	rootDir := sdc.k.RootDirectory()
+	metadataPath := filepath.Join(rootDir, "metadata.json")
+
+	metadataFile, err := os.Open(metadataPath)
+	if err != nil {
+		return fmt.Errorf("opening metadata.json: %w", err)
+	}
+	defer metadataFile.Close()
+
+	// Copy the contents of metadata.json directly to extraFH
+	if _, err := io.Copy(extraFH, metadataFile); err != nil {
+		return fmt.Errorf("writing metadata.json to extra file handler: %w", err)
 	}
 
 	return nil
