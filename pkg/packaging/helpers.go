@@ -33,9 +33,11 @@ func (p *PackageOptions) setOsqueryVersionInCtx(ctx context.Context) {
 		return
 	}
 
-	osquerydVersionTrimmed := strings.TrimPrefix(strings.TrimSpace(stdout), "osqueryd version ")
+	packagekit.SetInContext(ctx, packagekit.ContextOsqueryVersionKey, osqueryVersionFromVersionOutput(stdout))
+}
 
-	packagekit.SetInContext(ctx, packagekit.ContextOsqueryVersionKey, osquerydVersionTrimmed)
+func osqueryVersionFromVersionOutput(output string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(output), "osqueryd.exe version "), "osqueryd version ")
 }
 
 // osqueryLocation returns the location of the osquery binary within `binDir`. For darwin,
