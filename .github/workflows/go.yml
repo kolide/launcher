@@ -81,7 +81,7 @@ jobs:
 
     - name: Test
       env:
-        GOMAXPROCS: 1
+        GOMAXPROCS: 5
       run: make test
 
 
