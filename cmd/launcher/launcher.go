@@ -356,12 +356,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		osqueryruntime.WithKnapsack(k),
-		osqueryruntime.WithRootDirectory(k.RootDirectory()),
 		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
-		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
-		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
-		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
 		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
 			k.Slogger().With(
 				"component", "osquery",
@@ -379,8 +374,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			kolidelog.WithLevel(slog.LevelInfo),
 		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
-		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
 		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
 		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
 		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),
