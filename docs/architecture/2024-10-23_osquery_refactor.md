@@ -26,9 +26,22 @@ erDiagram
     OSQUERYRUNNER ||--|| STATS : updates
 ```
 
-When we run multiple osquery instances, we will want one osquery extension per osquery instance in order to avoid socket contention and to be able to identify which osquery process is talking to the extension.
+In our current implementation, the extension is created by `runLauncher` and run via our rungroup, and passed into the osquery runner for use when creating the instances. To run multiple osquery instances using our _current_ implementation, we have two choices:
 
-In our current implementation, the extension is created by `runLauncher` and run via our rungroup, and passed into the osquery runner for use when creating the instances. To run multiple osquery instances, we would have to create multiple extensions inside `runLauncher`, pass them into the runner, and make sure we adequately map which extension belongs to which osquery instance in the process. This would also require a full launcher restart if the runner needed to increase the number of osquery instances running (for example, if a single-tenant launcher enrolls with a new tenant to become a multi-tenant launcher).
+1. We could share one osquery extension with all osquery instances
+2. We could create multiple extensions inside `runLauncher` and pass them into the runner to distribute one per osquery instance
+
+Ultimately, I rejected both of these options as unsuitable.
+
+We don't want to share the osquery extension among all osquery instances -- we will be unable to identify which osquery instance is talking to the extension, which makes this option untenable. Additionally, we may run into socket contention issues.
+
+Creating multiple extensions in `runLauncher` and passing them into the runner requires some tedious mapping to make sure we tie the correct extension to the correct osquery instance. This option would also require a full launcher restart if the runner needed to increase the number of osquery instances running (for example, if a single-tenant launcher enrolls with a new tenant to become a multi-tenant launcher); I think requiring a full restart is unnecessary and undesirable in this case.
+
+Therefore, we will want to refactor our current implementation with the following goals in mind:
+
+1. We want one osquery extension per osquery instance
+2. We want to be able to add new osquery instances without requiring a full launcher restart
+3. We do not want onerously complex setup for the osquery instances or their extensions, since our osquery process management and osquery data exchange is already a complicated system
 
 ## Decision
 
