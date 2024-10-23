@@ -168,10 +168,6 @@ func runMain() int {
 func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 	var run func(*multislogger.MultiSlogger, []string) error
 	switch os.Args[1] {
-	case "socket":
-		run = runSocket
-	case "query":
-		run = runQuery
 	case "doctor":
 		run = runDoctor
 	case "flare":
