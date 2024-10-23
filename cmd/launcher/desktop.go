@@ -72,7 +72,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		flDesktopEnabled = flagset.Bool(
 			"desktop_enabled",
 			false,
-			"show desktop immediatly",
+			"if desktop already enabled, show desktop immediately",
 		)
 	)
 
