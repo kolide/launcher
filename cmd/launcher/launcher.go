@@ -140,6 +140,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"using default system root directory",
 			"path", rootDirectory,
 		)
+		// Make sure we have record of this new root directory in the opts, so it will be set
+		// correctly in the knapsack later.
+		opts.RootDirectory = rootDirectory
 	}
 
 	if err := os.MkdirAll(rootDirectory, fsutil.DirMode); err != nil {
