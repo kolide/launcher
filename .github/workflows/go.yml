@@ -80,7 +80,10 @@ jobs:
       if: ${{ contains(matrix.os, 'macos') }}
 
     - name: Test
+      env:
+        GOMAXPROCS: 1
       run: make test
+
 
     - name: Cache build output
       uses: actions/cache@v4
