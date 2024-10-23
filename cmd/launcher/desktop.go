@@ -69,6 +69,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 			"",
 			"path to icon file",
 		)
+		flDesktopEnabled = flagset.Bool(
+			"desktop_enabled",
+			false,
+			"show desktop immediatly",
+		)
 	)
 
 	if err := ff.Parse(flagset, args, ff.WithEnvVarNoPrefix()); err != nil {
@@ -127,7 +132,13 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	showDesktopChan := make(chan struct{})
+
+	// if desktop is not enabled, we will wait for a signal to show it
+	// on this channel
+	var showDesktopChan chan struct{}
+	if !*flDesktopEnabled {
+		showDesktopChan = make(chan struct{})
+	}
 
 	// Set up notification sending and listening
 	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
@@ -184,7 +195,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
-	<-showDesktopChan
+	// if desktop is not enabled at start up, wait for send on show desktop channel
+	if !*flDesktopEnabled {
+		<-showDesktopChan
+	}
+
 	// on darwin, if notifier.Listen() is called on a blocked main thread, it causes a crash,
 	// so we wait until the main thread is unblocked to call it before initializing the menu.
 	// this is noop for non-darwin
