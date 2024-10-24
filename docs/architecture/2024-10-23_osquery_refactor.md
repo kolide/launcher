@@ -6,7 +6,9 @@
 
 ## Context
 
-We want to be able to run between 0 and n osquery instances; currently, we run exactly one. In the short term, we want to be able to split up where Kolide queries run versus where tenant queries run, so that if a tenant creates a query that causes issues with osquery, the Kolide queries will still run. (This amounts to running 2 osquery instances.) In the longer term, we want to support multitenant installations. This will mean 1 osquery instance for Kolide queries, and 1 osquery instance per tenant.
+Throughout this ADR, `osquery instance` refers to the `OsqueryInstance` struct that is responsible for running the osquery process and its extension servers, and providing access to the process via the extension client. The `osquery process` refers specifically to the process created by execing the osqueryd binary. The `osquery runner` or `runner` refers to the `Runner` struct that is responsible for managing the osquery instance. The `osquery extension` refers primarily to the `Extension` struct, which is used by the `kolide_grpc` plugin. The table plugin is largely elided from discussion here, as that extension is much more trivial to move around in the codebase.
+
+We want to be able to run between 0 and n osquery processes; currently, we run exactly one. In the short term, we want to be able to split up where Kolide queries run versus where tenant queries run, so that if a tenant creates a query that causes issues with the osquery process, the Kolide queries will still run. (This amounts to running 2 osquery processes.) In the longer term, we want to support multitenant installations. This will mean 1 osquery process for Kolide queries, and 1 osquery process per tenant. We will accomplish this by running 1 osquery instance for Kolide queries, and 1 osquery instance per tenant.
 
 ### Current implementation
 
@@ -26,7 +28,7 @@ erDiagram
     OSQUERYRUNNER ||--|| STATS : updates
 ```
 
-In our current implementation, the extension is created by `runLauncher` and run via our rungroup, and passed into the osquery runner for use when creating the instances. To run multiple osquery instances using our _current_ implementation, we have two choices:
+In our current implementation, the extension is created by `runLauncher` and run via our rungroup, and passed into the osquery runner for use when creating the osquery instances. To run multiple osquery instances using our _current_ implementation, we have two choices:
 
 1. We could share one osquery extension with all osquery instances
 2. We could create multiple extensions inside `runLauncher` and pass them into the runner to distribute one per osquery instance
@@ -83,7 +85,7 @@ erDiagram
 
 ## Consequences
 
-As a result of having multiple extensions, we will have more go actors to manage, more CPU overhead, and the potential for Windows sleep to get in the way in more places.
+As a result of having multiple extensions, we will have more goroutines to manage, more CPU overhead, and the potential for Windows sleep to get in the way in more places.
 
 The osquery instance will now be responsible for managing extension health -- if the extension exits, the instance will need to take corrective action. (This is potentially a better outcome than before, since now extension shutdown can be remediated without a full launcher restart.)
 
