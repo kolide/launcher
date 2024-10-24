@@ -102,16 +102,20 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	datatypeQ, ok := queryContext.Constraints["datatype"]
 	if !ok || len(datatypeQ.Constraints) == 0 {
-		return results, fmt.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
+		return results, fmt.Errorf("the %s table requires that you specify a constraint for datatype", t.tableName)
+	}
+
+	// Check for maximum number of datatypes
+	if len(datatypeQ.Constraints) > 3 {
+		return results, fmt.Errorf("maximum of 3 datatypes allowed per query, got %d", len(datatypeQ.Constraints))
 	}
 
 	for _, datatypeConstraint := range datatypeQ.Constraints {
 		dt := datatypeConstraint.Expression
 
-		// If the constraint is the magic "%", it's eqivlent to an `all` style
+		// Block the % wildcard
 		if dt == "%" {
-			requestedDatatypes = []string{}
-			break
+			return results, fmt.Errorf("wildcard %% is not allowed as a datatype constraint")
 		}
 
 		requestedDatatypes = append(requestedDatatypes, dt)
