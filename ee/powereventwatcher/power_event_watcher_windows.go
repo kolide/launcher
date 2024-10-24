@@ -68,6 +68,7 @@ const (
 	eventIdEnteringModernStandby = 506
 	eventIdExitingModernStandby  = 507
 	eventIdEnteringSleep         = 42
+	eventIdResumedFromSleep      = 107
 
 	operationSuccessfulMsg = "The operation completed successfully."
 )
@@ -107,7 +108,7 @@ func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
 	switch eventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		ims.inModernStandby = true
-	case eventIdExitingModernStandby:
+	case eventIdExitingModernStandby, eventIdResumedFromSleep:
 		ims.inModernStandby = false
 	default:
 		ims.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -133,7 +134,7 @@ func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
 				"err", err,
 			)
 		}
-	case eventIdExitingModernStandby:
+	case eventIdExitingModernStandby, eventIdResumedFromSleep:
 		ks.slogger.Log(context.TODO(), slog.LevelDebug,
 			"system is waking",
 			"event_id", eventID,
@@ -184,10 +185,11 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 		return nil, fmt.Errorf("could not create pointer to channel path: %w", err)
 	}
 
-	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d)]]",
+	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d or EventID=%d)]]",
 		eventIdEnteringModernStandby,
 		eventIdExitingModernStandby,
 		eventIdEnteringSleep,
+		eventIdResumedFromSleep,
 	)
 	query, err := syscall.UTF16PtrFromString(queryStr)
 	if err != nil {
