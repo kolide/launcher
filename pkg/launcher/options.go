@@ -65,13 +65,6 @@ type Options struct {
 	// will check for updates from the control server.
 	ControlRequestInterval time.Duration
 
-	// Osquery TLS options
-	OsqueryTlsConfigEndpoint           string
-	OsqueryTlsEnrollEndpoint           string
-	OsqueryTlsLoggerEndpoint           string
-	OsqueryTlsDistributedReadEndpoint  string
-	OsqueryTlsDistributedWriteEndpoint string
-
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
 	// TufServerURL is the URL for the tuf server.
@@ -234,13 +227,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flTraceIngestServerURL            = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
-		// osquery TLS endpoints
-		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
-		flOsqTlsEnroll    = flagset.String("enroll_tls_endpoint", "", "Enroll endpoint for the osquery tls transport")
-		flOsqTlsLogger    = flagset.String("logger_tls_endpoint", "", "Logger endpoint for the osquery tls transport")
-		flOsqTlsDistRead  = flagset.String("distributed_tls_read_endpoint", "", "Distributed read endpoint for the osquery tls transport")
-		flOsqTlsDistWrite = flagset.String("distributed_tls_write_endpoint", "", "Distributed write endpoint for the osquery tls transport")
-
 		// Autoupdate options
 		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
 		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
@@ -268,6 +254,11 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.Bool("disable_control_tls", false, "DEPRECATED")
 		_ = flagset.String("notary_url", "", "DEPRECATED")
 		_ = flagset.String("notary_prefix", "", "DEPRECATED")
+		_ = flagset.String("config_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("enroll_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("logger_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("distributed_tls_read_endpoint", "", "DEPRECATED")
+		_ = flagset.String("distributed_tls_write_endpoint", "", "DEPRECATED")
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -382,56 +373,51 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	}
 
 	opts := &Options{
-		Autoupdate:                         *flAutoupdate,
-		AutoupdateInterval:                 *flAutoupdateInterval,
-		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
-		CertPins:                           certPins,
-		CompactDbMaxTx:                     *flCompactDbMaxTx,
-		ConfigFilePath:                     *flConfigFilePath,
-		Control:                            false,
-		ControlServerURL:                   controlServerURL,
-		ControlRequestInterval:             *flControlRequestInterval,
-		Debug:                              *flDebug,
-		DelayStart:                         *flDelayStart,
-		DisableControlTLS:                  disableControlTLS,
-		Identifier:                         *flPackageIdentifier,
-		InsecureControlTLS:                 insecureControlTLS,
-		EnableInitialRunner:                *flInitialRunner,
-		WatchdogEnabled:                    *flWatchdogEnabled,
-		EnrollSecret:                       *flEnrollSecret,
-		EnrollSecretPath:                   *flEnrollSecretPath,
-		ExportTraces:                       *flExportTraces,
-		LogIngestServerURL:                 *flLogIngestServerURL,
-		LocalDevelopmentPath:               *flLocalDevelopmentPath,
-		TraceIngestServerURL:               *flTraceIngestServerURL,
-		DisableTraceIngestTLS:              *flDisableIngestTLS,
-		IAmBreakingEELicense:               *flIAmBreakingEELicense,
-		InsecureTLS:                        *flInsecureTLS,
-		InsecureTransport:                  *flInsecureTransport,
-		KolideHosted:                       *flKolideHosted,
-		KolideServerURL:                    *flKolideServerURL,
-		LogMaxBytesPerBatch:                *flLogMaxBytesPerBatch,
-		LoggingInterval:                    *flLoggingInterval,
-		MirrorServerURL:                    *flMirrorURL,
-		TufServerURL:                       *flTufServerURL,
-		OsqueryFlags:                       flOsqueryFlags,
-		OsqueryTlsConfigEndpoint:           *flOsqTlsConfig,
-		OsqueryTlsDistributedReadEndpoint:  *flOsqTlsDistRead,
-		OsqueryTlsDistributedWriteEndpoint: *flOsqTlsDistWrite,
-		OsqueryTlsEnrollEndpoint:           *flOsqTlsEnroll,
-		OsqueryTlsLoggerEndpoint:           *flOsqTlsLogger,
-		OsqueryVerbose:                     *flOsqueryVerbose,
-		OsquerydPath:                       osquerydPath,
-		OsqueryHealthcheckStartupDelay:     *flOsqueryHealthcheckStartupDelay,
-		RootDirectory:                      *flRootDirectory,
-		RootPEM:                            *flRootPEM,
-		TraceSamplingRate:                  *flTraceSamplingRate,
-		Transport:                          *flTransport,
-		UpdateChannel:                      updateChannel,
-		UpdateDirectory:                    *flUpdateDirectory,
-		WatchdogDelaySec:                   *flWatchdogDelaySec,
-		WatchdogMemoryLimitMB:              *flWatchdogMemoryLimitMB,
-		WatchdogUtilizationLimitPercent:    *flWatchdogUtilizationLimitPercent,
+		Autoupdate:                      *flAutoupdate,
+		AutoupdateInterval:              *flAutoupdateInterval,
+		AutoupdateInitialDelay:          *flAutoupdateInitialDelay,
+		CertPins:                        certPins,
+		CompactDbMaxTx:                  *flCompactDbMaxTx,
+		ConfigFilePath:                  *flConfigFilePath,
+		Control:                         false,
+		ControlServerURL:                controlServerURL,
+		ControlRequestInterval:          *flControlRequestInterval,
+		Debug:                           *flDebug,
+		DelayStart:                      *flDelayStart,
+		DisableControlTLS:               disableControlTLS,
+		Identifier:                      *flPackageIdentifier,
+		InsecureControlTLS:              insecureControlTLS,
+		EnableInitialRunner:             *flInitialRunner,
+		WatchdogEnabled:                 *flWatchdogEnabled,
+		EnrollSecret:                    *flEnrollSecret,
+		EnrollSecretPath:                *flEnrollSecretPath,
+		ExportTraces:                    *flExportTraces,
+		LogIngestServerURL:              *flLogIngestServerURL,
+		LocalDevelopmentPath:            *flLocalDevelopmentPath,
+		TraceIngestServerURL:            *flTraceIngestServerURL,
+		DisableTraceIngestTLS:           *flDisableIngestTLS,
+		IAmBreakingEELicense:            *flIAmBreakingEELicense,
+		InsecureTLS:                     *flInsecureTLS,
+		InsecureTransport:               *flInsecureTransport,
+		KolideHosted:                    *flKolideHosted,
+		KolideServerURL:                 *flKolideServerURL,
+		LogMaxBytesPerBatch:             *flLogMaxBytesPerBatch,
+		LoggingInterval:                 *flLoggingInterval,
+		MirrorServerURL:                 *flMirrorURL,
+		TufServerURL:                    *flTufServerURL,
+		OsqueryFlags:                    flOsqueryFlags,
+		OsqueryVerbose:                  *flOsqueryVerbose,
+		OsquerydPath:                    osquerydPath,
+		OsqueryHealthcheckStartupDelay:  *flOsqueryHealthcheckStartupDelay,
+		RootDirectory:                   *flRootDirectory,
+		RootPEM:                         *flRootPEM,
+		TraceSamplingRate:               *flTraceSamplingRate,
+		Transport:                       *flTransport,
+		UpdateChannel:                   updateChannel,
+		UpdateDirectory:                 *flUpdateDirectory,
+		WatchdogDelaySec:                *flWatchdogDelaySec,
+		WatchdogMemoryLimitMB:           *flWatchdogMemoryLimitMB,
+		WatchdogUtilizationLimitPercent: *flWatchdogUtilizationLimitPercent,
 	}
 
 	return opts, nil
