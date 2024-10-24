@@ -40,15 +40,17 @@ func hasPermissionsToRunTest() bool {
 // out how to suspend and resume a process on Windows via golang.
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryVerbose").Return(true).Maybe()
+	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	k.On("Slogger").Return(slogger.Logger)
@@ -59,9 +61,6 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	runner := New(
 		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithSlogger(slogger.Logger),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
 			if err != nil {
@@ -90,9 +89,7 @@ func TestOsquerySlowStart(t *testing.T) {
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -105,6 +102,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryVerbose").Return(true).Maybe()
+	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
@@ -113,8 +113,6 @@ func TestExtensionSocketPath(t *testing.T) {
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(
 		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
 		WithExtensionSocketPath(extensionSocketPath),
 	)
 	go runner.Run()

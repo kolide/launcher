@@ -128,16 +128,6 @@ func TestControllerStringFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.Transport()
 				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsConfigEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsEnrollEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsLoggerEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsDistributedReadEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsDistributedWriteEndpoint()
-				assert.Equal(t, expectedValue, value)
 			}
 
 			assertGettersValues("")

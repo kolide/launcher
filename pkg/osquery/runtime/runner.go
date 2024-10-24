@@ -50,7 +50,7 @@ type Runner struct {
 }
 
 func New(k types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
-	runner := newRunner(opts...)
+	runner := newRunner(k, opts...)
 	runner.slogger = k.Slogger().With("component", "osquery_runner")
 	runner.knapsack = k
 
@@ -114,7 +114,7 @@ func (r *Runner) Run() error {
 
 		r.instanceLock.Lock()
 		opts := r.instance.opts
-		r.instance = newInstance()
+		r.instance = newInstance(r.knapsack)
 		r.instance.opts = opts
 		for _, opt := range r.opts {
 			opt(r.instance)
@@ -236,22 +236,9 @@ func (r *Runner) launchOsqueryInstance() error {
 
 	o := r.instance
 
-	// If the caller did not define the directory which all of the osquery file
-	// artifacts should be stored in, use a temporary directory.
-	if o.opts.rootDirectory == "" {
-		rootDirectory, rmRootDirectory, err := osqueryTempDir()
-		if err != nil {
-			traces.SetError(span, fmt.Errorf("couldn't create temp directory for osquery instance: %w", err))
-			return fmt.Errorf("couldn't create temp directory for osquery instance: %w", err)
-		}
-		o.opts.rootDirectory = rootDirectory
-		o.rmRootDirectory = rmRootDirectory
-		o.usingTempDir = true
-	}
-
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(o.opts)
+	paths, err := calculateOsqueryPaths(o.knapsack.RootDirectory(), o.opts)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
@@ -599,20 +586,6 @@ func (r *Runner) launchOsqueryInstance() error {
 		}
 	})
 
-	// Cleanup temp dir
-	o.errgroup.Go(func() error {
-		defer r.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "cleanup temp dir",
-		)
-
-		<-o.doneCtx.Done()
-		if o.usingTempDir && o.rmRootDirectory != nil {
-			o.rmRootDirectory()
-		}
-		return o.doneCtx.Err()
-	})
-
 	// Clean up PID file on shutdown
 	o.errgroup.Go(func() error {
 		defer r.slogger.Log(ctx, slog.LevelInfo,
@@ -641,10 +614,10 @@ func (r *Runner) launchOsqueryInstance() error {
 	return nil
 }
 
-func newRunner(opts ...OsqueryInstanceOption) *Runner {
+func newRunner(knapsack types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
 	// Create an OsqueryInstance and apply the functional options supplied by the
 	// caller.
-	i := newInstance()
+	i := newInstance(knapsack)
 
 	for _, opt := range opts {
 		opt(i)
