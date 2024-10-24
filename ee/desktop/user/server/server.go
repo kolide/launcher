@@ -53,6 +53,9 @@ func New(slogger *slog.Logger,
 		socketPath:   socketPath,
 		notifier:     notifier,
 		showDesktopOnceFunc: sync.OnceFunc(func() {
+			if showDesktopChan == nil {
+				return
+			}
 			showDesktopChan <- struct{}{}
 		}),
 	}
