@@ -4,6 +4,7 @@
 package checkups
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -40,15 +41,44 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 	defer sprHandle.Close()
 
-	if _, err := io.Copy(extraWriter, sprHandle); err != nil {
+	extraZip := zip.NewWriter(extraWriter)
+	defer extraZip.Close()
+
+	zippedPowerReport, err := extraZip.Create("power.html")
+	if err != nil {
+		return fmt.Errorf("creating power report zip file: %w", err)
+	}
+
+	if _, err := io.Copy(zippedPowerReport, sprHandle); err != nil {
 		return fmt.Errorf("copying system power report: %w", err)
+	}
+
+	powerCfgSleepStatesCmd, err := allowedcmd.Powercfg(ctx, "/availablesleepstates")
+	if err != nil {
+		return fmt.Errorf("creating powercfg sleep states command: %w", err)
+	}
+
+	hideWindow(powerCfgSleepStatesCmd)
+	availableSleepStatesOutput, err := powerCfgSleepStatesCmd.CombinedOutput()
+
+	if err != nil {
+		return fmt.Errorf("running powercfg.exe: error %w, output %s", err, string(availableSleepStatesOutput))
+	}
+
+	zippedSleepStates, err := extraZip.Create("available_sleep_states.txt")
+	if err != nil {
+		return fmt.Errorf("creating available sleep states output file: %w", err)
+	}
+
+	if _, err := zippedSleepStates.Write(availableSleepStatesOutput); err != nil {
+		return fmt.Errorf("writing available sleep states output file: %w", err)
 	}
 
 	return nil
 }
 
 func (p *powerCheckup) ExtraFileName() string {
-	return "power.html"
+	return "power.zip"
 }
 
 func (p *powerCheckup) Status() Status {
