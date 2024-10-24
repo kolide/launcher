@@ -83,6 +83,8 @@ erDiagram
 
 ## Consequences
 
+As a result of having multiple extensions, we will have more go actors to manage, more CPU overhead, and the potential for Windows sleep to get in the way in more places.
+
 The osquery instance will now be responsible for managing extension health -- if the extension exits, the instance will need to take corrective action. (This is potentially a better outcome than before, since now extension shutdown can be remediated without a full launcher restart.)
 
 This decision does preserve a shared JSONRPC client to talk to Kolide SaaS. If we determine this is not optimal, it would be fairly easy to update to a model where we have one JSONRPC client per extension.
