@@ -2,6 +2,7 @@ package tuf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -248,7 +249,10 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 	// From already-downloaded metadata, look for the release version
 	targets, err := metadataClient.Targets()
 	if err != nil {
-		return nil, fmt.Errorf("could not get target: %w", err)
+		return nil, fmt.Errorf("could not get targets: %w", err)
+	}
+	if len(targets) == 0 {
+		return nil, errors.New("no local TUF metadata available -- likely new install")
 	}
 
 	targetName, _, err := findTarget(ctx, binary, targets, pinnedVersion, channel, slogger)
