@@ -61,7 +61,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	hideWindow(powerCfgSleepStatesCmd)
 	availableSleepStatesOutput, err := powerCfgSleepStatesCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("running powercfg.exe for sleep states: error %w", err)
+		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
 	}
 
 	zippedSleepStates, err := extraZip.Create("available_sleep_states.txt")
