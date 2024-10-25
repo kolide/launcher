@@ -76,7 +76,7 @@ func (lf *launcherFlags) Data() any {
 }
 
 func (lf *launcherFlags) flagsFilePath() string {
-	identifier := "kolide-k2"
+	identifier := launcher.DefaultLauncherIdentifier
 	if lf.k.Identifier() != "" {
 		identifier = lf.k.Identifier()
 	}
