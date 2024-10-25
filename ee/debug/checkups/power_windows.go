@@ -73,7 +73,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("writing available sleep states output file: %w", err)
 	}
 
-	eventFilter := `Get-Winevent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Power-Troubleshooter','Microsoft-Windows-Kernel-Power'} -MaxEvents 500 | Select-Object -Property 'Id','LogName','ProviderName','Message','TimeCreated' | ConvertTo-Json`
+	eventFilter := `Get-Winevent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Power-Troubleshooter','Microsoft-Windows-Kernel-Power'} -MaxEvents 500 | Select-Object @{name='Time'; expression={$_.TimeCreated.ToString("O")}},Id,LogName,ProviderName,Message,TimeCreated | ConvertTo-Json`
 	getWinEventCmd, err := allowedcmd.Powershell(ctx, eventFilter)
 	if err != nil {
 		return fmt.Errorf("creating powershell get-winevent command: %w", err)
