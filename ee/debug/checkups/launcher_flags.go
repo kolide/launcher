@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type launcherFlags struct {
+	k       types.Knapsack
 	status  Status
 	summary string
 }
@@ -74,10 +76,14 @@ func (lf *launcherFlags) Data() any {
 }
 
 func (lf *launcherFlags) flagsFilePath() string {
+	identifier := "kolide-k2"
+	if lf.k.Identifier() != "" {
+		identifier = lf.k.Identifier()
+	}
 	if runtime.GOOS == "windows" {
-		return filepath.Join(`C:\Program Files\Kolide\Launcher-kolide-k2\conf`, "launcher.flags")
+		return filepath.Join(fmt.Sprintf(`C:\Program Files\Kolide\Launcher-%s\conf`, identifier), "launcher.flags")
 	}
 
 	// non-windows
-	return "/etc/kolide-k2/launcher.flags"
+	return fmt.Sprintf("/etc/%s/launcher.flags", identifier)
 }
