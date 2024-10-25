@@ -79,15 +79,18 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("creating powershell get-winevent command: %w", err)
 	}
 
-	outFile, err := extraZip.Create("windows_power_events.json")
+	powerEventFile, err := extraZip.Create("windows_power_events.json")
 	if err != nil {
 		return fmt.Errorf("creating windows_power_events.json: %w", err)
 	}
 
-	getWinEventCmd.Stderr = outFile
-	getWinEventCmd.Stdout = outFile
-	if err = getWinEventCmd.Run(); err != nil {
-		return fmt.Errorf("running get-winevent command: %w", err)
+	powerEventsOut, err := getWinEventCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("running get-winevent command: %w, output %s", err, string(powerEventsOut))
+	}
+
+	if _, err := powerEventFile.Write(powerEventsOut); err != nil {
+		return fmt.Errorf("writing power events to output file: %w", err)
 	}
 
 	return nil
