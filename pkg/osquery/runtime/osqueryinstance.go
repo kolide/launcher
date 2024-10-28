@@ -16,10 +16,8 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
@@ -40,28 +38,6 @@ type OsqueryInstanceOption func(*OsqueryInstance)
 func WithOsqueryExtensionPlugins(plugins ...osquery.OsqueryPlugin) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugins...)
-	}
-}
-
-// WithRootDirectory is a functional option which allows the user to define the
-// path where filesystem artifacts will be stored. This may include pidfiles,
-// RocksDB database files, etc. If this is not defined, a temporary directory
-// will be used.
-func WithRootDirectory(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.rootDirectory = path
-	}
-}
-
-func WithUpdateDirectory(path string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.updateDirectory = path
-	}
-}
-
-func WithUpdateChannel(channel string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.updateChannel = channel
 	}
 }
 
@@ -125,76 +101,6 @@ func WithStderr(w io.Writer) OsqueryInstanceOption {
 	}
 }
 
-// WithSlogger is a functional option which allows the user to pass a *slog.Logger
-// to be used for logging osquery instance status.
-func WithSlogger(slogger *slog.Logger) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.slogger = slogger
-	}
-}
-
-// WithOsqueryVerbose sets whether or not osquery is in verbose mode
-func WithOsqueryVerbose(v bool) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.verbose = v
-	}
-}
-
-func WithEnrollSecretPath(secretPath string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.enrollSecretPath = secretPath
-	}
-}
-
-func WithTlsHostname(hostname string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsHostname = hostname
-	}
-}
-
-func WithTlsConfigEndpoint(ep string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsConfigEndpoint = ep
-	}
-}
-
-func WithTlsEnrollEndpoint(ep string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsEnrollEndpoint = ep
-	}
-}
-
-func WithTlsLoggerEndpoint(ep string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsLoggerEndpoint = ep
-	}
-}
-
-func WithTlsDistributedReadEndpoint(ep string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsDistReadEndpoint = ep
-	}
-}
-
-func WithTlsDistributedWriteEndpoint(ep string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsDistWriteEndpoint = ep
-	}
-}
-
-func WithTlsServerCerts(s string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.tlsServerCerts = s
-	}
-}
-
-// WithOsqueryFlags sets additional flags to pass to osquery
-func WithOsqueryFlags(flags []string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.osqueryFlags = flags
-	}
-}
-
 // WithAugeasLensFunction defines a callback function. This can be
 // used during setup to populate the augeas lenses directory.
 func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
@@ -203,17 +109,12 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 	}
 }
 
-func WithKnapsack(k types.Knapsack) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.knapsack = k
-	}
-}
-
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	opts    osqueryOptions
-	slogger *slog.Logger
+	opts     osqueryOptions
+	knapsack types.Knapsack
+	slogger  *slog.Logger
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	errgroup                *errgroup.Group
@@ -223,11 +124,8 @@ type OsqueryInstance struct {
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers []*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
-	rmRootDirectory         func()
-	usingTempDir            bool
 	stats                   *history.Instance
 	startFunc               func(cmd *exec.Cmd) error
-	knapsack                types.Knapsack
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -298,22 +196,9 @@ type osqueryOptions struct {
 	distributedPluginFlag string
 	extensionPlugins      []osquery.OsqueryPlugin
 	extensionSocketPath   string
-	enrollSecretPath      string
 	loggerPluginFlag      string
-	osqueryFlags          []string
-	rootDirectory         string
 	stderr                io.Writer
 	stdout                io.Writer
-	tlsConfigEndpoint     string
-	tlsDistReadEndpoint   string
-	tlsDistWriteEndpoint  string
-	tlsEnrollEndpoint     string
-	tlsHostname           string
-	tlsLoggerEndpoint     string
-	tlsServerCerts        string
-	updateChannel         string
-	updateDirectory       string
-	verbose               bool
 }
 
 // requiredExtensions returns a unique list of external
@@ -340,14 +225,15 @@ func (o osqueryOptions) requiredExtensions() []string {
 	return requiredExtensions
 }
 
-func newInstance() *OsqueryInstance {
-	i := &OsqueryInstance{}
+func newInstance(knapsack types.Knapsack) *OsqueryInstance {
+	i := &OsqueryInstance{
+		knapsack: knapsack,
+		slogger:  knapsack.Slogger().With("component", "osquery_instance"),
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	i.cancel = cancel
 	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
-
-	i.slogger = multislogger.NewNopLogger()
 
 	i.startFunc = func(cmd *exec.Cmd) error {
 		return cmd.Start()
@@ -371,22 +257,22 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(opts osqueryOptions) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDirectory string, opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
 	if extensionSocketPath == "" {
-		extensionSocketPath = SocketPath(opts.rootDirectory)
+		extensionSocketPath = SocketPath(rootDirectory)
 	}
 
-	extensionAutoloadPath := filepath.Join(opts.rootDirectory, "osquery.autoload")
+	extensionAutoloadPath := filepath.Join(rootDirectory, "osquery.autoload")
 
 	// We want to use a unique pidfile per launcher run to avoid file locking issues.
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
-		pidfilePath:           filepath.Join(opts.rootDirectory, fmt.Sprintf("osquery-%s.pid", ulid.New())),
-		databasePath:          filepath.Join(opts.rootDirectory, "osquery.db"),
-		augeasPath:            filepath.Join(opts.rootDirectory, "augeas-lenses"),
+		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", ulid.New())),
+		databasePath:          filepath.Join(rootDirectory, "osquery.db"),
+		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
 	}
@@ -415,7 +301,7 @@ func (o *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		"--utc",
 	}
 
-	if o.knapsack != nil && o.knapsack.WatchdogEnabled() {
+	if o.knapsack.WatchdogEnabled() {
 		args = append(args, fmt.Sprintf("--watchdog_memory_limit=%d", o.knapsack.WatchdogMemoryLimitMB()))
 		args = append(args, fmt.Sprintf("--watchdog_utilization_limit=%d", o.knapsack.WatchdogUtilizationLimitPercent()))
 		args = append(args, fmt.Sprintf("--watchdog_delay=%d", o.knapsack.WatchdogDelaySec()))
@@ -428,40 +314,8 @@ func (o *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		args...,
 	)
 
-	if o.opts.verbose {
+	if o.knapsack.OsqueryVerbose() {
 		cmd.Args = append(cmd.Args, "--verbose")
-	}
-
-	if o.opts.tlsHostname != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_hostname=%s", o.opts.tlsHostname))
-	}
-
-	if o.opts.tlsConfigEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--config_tls_endpoint=%s", o.opts.tlsConfigEndpoint))
-	}
-
-	if o.opts.tlsEnrollEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_tls_endpoint=%s", o.opts.tlsEnrollEndpoint))
-	}
-
-	if o.opts.tlsLoggerEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--logger_tls_endpoint=%s", o.opts.tlsLoggerEndpoint))
-	}
-
-	if o.opts.tlsDistReadEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_read_endpoint=%s", o.opts.tlsDistReadEndpoint))
-	}
-
-	if o.opts.tlsDistWriteEndpoint != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--distributed_tls_write_endpoint=%s", o.opts.tlsDistWriteEndpoint))
-	}
-
-	if o.opts.tlsServerCerts != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--tls_server_certs=%s", o.opts.tlsServerCerts))
-	}
-
-	if o.opts.enrollSecretPath != "" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--enroll_secret_path=%s", o.opts.enrollSecretPath))
 	}
 
 	// Configs aren't expected to change often, so refresh configs
@@ -487,7 +341,7 @@ func (o *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 
 	// Apply user-provided flags last so that they can override other flags set
 	// by Launcher (besides the flags below)
-	for _, flag := range o.opts.osqueryFlags {
+	for _, flag := range o.knapsack.OsqueryFlags() {
 		cmd.Args = append(cmd.Args, "--"+flag)
 	}
 
@@ -616,17 +470,6 @@ func (o *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	)
 
 	return nil
-}
-
-func osqueryTempDir() (string, func(), error) {
-	tempPath, err := agent.MkdirTemp("")
-	if err != nil {
-		return "", func() {}, fmt.Errorf("could not make temp path: %w", err)
-	}
-
-	return tempPath, func() {
-		os.Remove(tempPath)
-	}, nil
 }
 
 // getOsqueryInfoForLog will log info about an osquery instance. It's

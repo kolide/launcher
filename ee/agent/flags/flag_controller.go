@@ -404,22 +404,6 @@ func (fc *FlagController) OsqueryFlags() []string {
 	return fc.cmdLineOpts.OsqueryFlags
 }
 
-func (fc *FlagController) OsqueryTlsConfigEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsConfigEndpoint
-}
-func (fc *FlagController) OsqueryTlsEnrollEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsEnrollEndpoint
-}
-func (fc *FlagController) OsqueryTlsLoggerEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsLoggerEndpoint
-}
-func (fc *FlagController) OsqueryTlsDistributedReadEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsDistributedReadEndpoint
-}
-func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsDistributedWriteEndpoint
-}
-
 func (fc *FlagController) CurrentRunningOsqueryVersion() string {
 	return NewStringFlagValue(WithDefaultString("")).get(fc.getControlServerValue(keys.CurrentRunningOsqueryVersion))
 }
