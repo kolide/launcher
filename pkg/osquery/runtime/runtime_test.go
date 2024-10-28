@@ -617,8 +617,9 @@ func TestNotStarted(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	runner := newRunner(k)
+	runner := New(k)
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
