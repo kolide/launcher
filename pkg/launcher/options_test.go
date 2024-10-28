@@ -238,7 +238,6 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		"-autoupdate_interval": "48h",
 		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
 		"-osqueryd_path":       windowsAddExe("/dev/null"),
-		"-transport":           "grpc",
 	}
 
 	opts := &Options{
@@ -258,7 +257,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		TufServerURL:                    "https://tuf.kolide.com",
 		OsquerydPath:                    windowsAddExe("/dev/null"),
 		OsqueryHealthcheckStartupDelay:  10 * time.Minute,
-		Transport:                       "grpc",
+		Transport:                       "jsonrpc",
 		UpdateChannel:                   "stable",
 		DelayStart:                      0 * time.Second,
 		WatchdogEnabled:                 false,
