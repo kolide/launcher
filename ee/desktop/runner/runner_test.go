@@ -305,7 +305,6 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
-			mockKnapsack.On("DesktopEnabled").Return(true)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
 
