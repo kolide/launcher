@@ -213,7 +213,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flInitialRunner                   = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL                 = flagset.String("hostname", "", "The hostname of the gRPC server")
 		flKolideHosted                    = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport                       = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flTransport                       = flagset.String("transport", "jsonrpc", "The transport protocol that should be used to communicate with remote (default: jsonrpc)")
 		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
