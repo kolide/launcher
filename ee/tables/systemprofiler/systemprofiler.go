@@ -51,6 +51,11 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
+const (
+	typeAllowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+	maxDataTypesPerQuery  = 3
+)
+
 var knownDetailLevels = []string{
 	"mini",  // short report (contains no identifying or personal information)
 	"basic", // basic hardware and network information
@@ -98,40 +103,35 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	var results []map[string]string
 
-	requestedDatatypes := []string{}
+	requestedDatatypes := tablehelpers.GetConstraints(queryContext, "datatype",
+		tablehelpers.WithAllowedCharacters(typeAllowedCharacters),
+		tablehelpers.WithSlogger(t.slogger),
+	)
 
-	datatypeQ, ok := queryContext.Constraints["datatype"]
-	if !ok || len(datatypeQ.Constraints) == 0 {
-		return results, fmt.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
+	if len(requestedDatatypes) == 0 {
+		return results, fmt.Errorf("the %s table requires that you specify a constraint for datatype", t.tableName)
 	}
 
-	for _, datatypeConstraint := range datatypeQ.Constraints {
-		dt := datatypeConstraint.Expression
-
-		// If the constraint is the magic "%", it's eqivlent to an `all` style
-		if dt == "%" {
-			requestedDatatypes = []string{}
-			break
-		}
-
-		requestedDatatypes = append(requestedDatatypes, dt)
+	// Check for maximum number of datatypes
+	if len(requestedDatatypes) > maxDataTypesPerQuery {
+		return results, fmt.Errorf("maximum of %d datatypes allowed per query", maxDataTypesPerQuery)
 	}
 
-	var detailLevel string
-	if q, ok := queryContext.Constraints["detaillevel"]; ok && len(q.Constraints) != 0 {
-		if len(q.Constraints) > 1 {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"received multiple detaillevel constraints, only using the first one",
-			)
-		}
+	// Get detaillevel constraints
+	detailLevel := ""
+	detailLevels := tablehelpers.GetConstraints(queryContext, "detaillevel",
+		tablehelpers.WithAllowedValues(knownDetailLevels),
+		tablehelpers.WithSlogger(t.slogger),
+	)
 
-		dl := q.Constraints[0].Expression
-		for _, known := range knownDetailLevels {
-			if known == dl {
-				detailLevel = dl
-			}
-		}
+	if len(detailLevels) > 0 {
+		detailLevel = detailLevels[0]
+	}
 
+	if len(detailLevels) > 1 {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"received multiple detaillevel constraints, only using the first one",
+		)
 	}
 
 	systemProfilerOutput, err := t.execSystemProfiler(ctx, detailLevel, requestedDatatypes)
