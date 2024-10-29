@@ -18,7 +18,7 @@ const (
 	ServerProvidedDataStore     Store = "server_provided_data"     // The store used for pushing values from server-backed tables.
 	TokenStore                  Store = "token_store"              // The store used for holding bearer auth tokens, e.g. the ones used to authenticate with the observability ingest server.
 	ControlServerActionsStore   Store = "action_store"             // The store used for storing actions sent by control server.
-	LauncherHistoryStore        Store = "launcher_history"         // The store used for storing uptime history.
+	LauncherHistoryStore        Store = "launcher_history"         // The store used for storing launcher start time history currently.
 )
 
 func (storeType Store) String() string {
