@@ -57,7 +57,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -372,7 +371,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
 		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
 			k.Slogger().With(
 				"component", "osquery",
@@ -390,13 +388,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			kolidelog.WithLevel(slog.LevelInfo),
 		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
-		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
-		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),
 		osqueryruntime.WithOsqueryExtensionPlugins(
-			config.NewPlugin("kolide_grpc", extension.GenerateConfigs),
-			distributed.NewPlugin("kolide_grpc", extension.GetQueries, extension.WriteResults),
-			osquerylogger.NewPlugin("kolide_grpc", extension.LogString),
+			config.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.GenerateConfigs),
+			distributed.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.GetQueries, extension.WriteResults),
+			osquerylogger.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.LogString),
 		),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)

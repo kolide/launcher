@@ -22,13 +22,21 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
-	"github.com/osquery/osquery-go/plugin/config"
-	"github.com/osquery/osquery-go/plugin/distributed"
-	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	// KolideSaasExtensionName is the name of the extension that provides the config,
+	// distributed queries, and log destination for the osquery process. This extension
+	// is required for osquery startup. It is called kolide_grpc for mostly historic reasons;
+	// communication with Kolide SaaS happens over JSONRPC.
+	KolideSaasExtensionName = "kolide_grpc"
+	// kolideTablesExtensionName is the name of the extension that provides Kolide's additional
+	// tables: platform tables and launcher tables.
+	kolideTablesExtensionName = "kolide"
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -53,39 +61,6 @@ func WithOsqueryExtensionPlugins(plugins ...osquery.OsqueryPlugin) OsqueryInstan
 func WithExtensionSocketPath(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.extensionSocketPath = path
-	}
-}
-
-// WithConfigPluginFlag is a functional option which allows the user to define
-// which config plugin osqueryd should use to retrieve the config. If this is not
-// defined, it is assumed that no configuration is needed and a no-op config
-// will be used. This should only be configured once and cannot be changed once
-// osqueryd is running.
-func WithConfigPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.configPluginFlag = plugin
-	}
-}
-
-// WithLoggerPluginFlag is a functional option which allows the user to define
-// which logger plugin osqueryd should use to log status and result logs. If this
-// is not defined, logs will be logged via the application's default logger. The
-// logger plugin which osquery uses can be changed at any point during the
-// osqueryd execution lifecycle by defining the option via the config.
-func WithLoggerPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.loggerPluginFlag = plugin
-	}
-}
-
-// WithDistributedPluginFlag is a functional option which allows the user to define
-// which distributed plugin osqueryd should use to log status and result logs. If this
-// is not defined, logs will be logged via the application's default distributed. The
-// distributed plugin which osquery uses can be changed at any point during the
-// osqueryd execution lifecycle by defining the option via the config.
-func WithDistributedPluginFlag(plugin string) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.distributedPluginFlag = plugin
 	}
 }
 
@@ -197,38 +172,11 @@ func (i *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
-	augeasLensFunc        func(dir string) error
-	configPluginFlag      string
-	distributedPluginFlag string
-	extensionPlugins      []osquery.OsqueryPlugin
-	extensionSocketPath   string
-	loggerPluginFlag      string
-	stderr                io.Writer
-	stdout                io.Writer
-}
-
-// requiredExtensions returns a unique list of external
-// extensions. These are extensions we expect osquery to pause start
-// for.
-func (o osqueryOptions) requiredExtensions() []string {
-	extensionsMap := make(map[string]bool)
-	requiredExtensions := make([]string, 0)
-
-	for _, extension := range []string{o.loggerPluginFlag, o.configPluginFlag, o.distributedPluginFlag} {
-		// skip the osquery build-ins, since requiring them will cause osquery to needlessly wait.
-		if extension == "tls" {
-			continue
-		}
-
-		if _, ok := extensionsMap[extension]; ok {
-			continue
-		}
-
-		extensionsMap[extension] = true
-		requiredExtensions = append(requiredExtensions, extension)
-	}
-
-	return requiredExtensions
+	augeasLensFunc      func(dir string) error
+	extensionPlugins    []osquery.OsqueryPlugin
+	extensionSocketPath string
+	stderr              io.Writer
+	stdout              io.Writer
 }
 
 func newInstance(knapsack types.Knapsack, opts ...OsqueryInstanceOption) *OsqueryInstance {
@@ -275,40 +223,6 @@ func (i *OsqueryInstance) launch() error {
 			traces.SetError(span, fmt.Errorf("setting up augeas lenses: %w", err))
 			return fmt.Errorf("setting up augeas lenses: %w", err)
 		}
-	}
-
-	// If a config plugin has not been set by the caller, then it is likely
-	// that the instance will just be used for executing queries, so we
-	// will use a minimal config plugin that basically is a no-op.
-	if i.opts.configPluginFlag == "" {
-		generateConfigs := func(ctx context.Context) (map[string]string, error) {
-			return map[string]string{}, nil
-		}
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, config.NewPlugin("internal_noop", generateConfigs))
-		i.opts.configPluginFlag = "internal_noop"
-	}
-
-	// If a logger plugin has not been set by the caller, we set a logger
-	// plugin that outputs logs to the default application logger.
-	if i.opts.loggerPluginFlag == "" {
-		logString := func(ctx context.Context, typ osquerylogger.LogType, logText string) error {
-			return nil
-		}
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, osquerylogger.NewPlugin("internal_noop", logString))
-		i.opts.loggerPluginFlag = "internal_noop"
-	}
-
-	// If a distributed plugin has not been set by the caller, we set a
-	// distributed plugin that returns no queries.
-	if i.opts.distributedPluginFlag == "" {
-		getQueries := func(ctx context.Context) (*distributed.GetQueriesResult, error) {
-			return &distributed.GetQueriesResult{}, nil
-		}
-		writeResults := func(ctx context.Context, results []distributed.Result) error {
-			return nil
-		}
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, distributed.NewPlugin("internal_noop", getQueries, writeResults))
-		i.opts.distributedPluginFlag = "internal_noop"
 	}
 
 	// The knapsack will retrieve the correct version of osqueryd from the download library if available.
@@ -475,7 +389,7 @@ func (i *OsqueryInstance) launch() error {
 	// ordering issues.
 
 	// Start an extension manager for the extensions that osquery
-	// needs for config/log/etc. It's called `kolide_grpc` for mostly historic reasons
+	// needs for config/log/etc.
 	i.extensionManagerClient, err = i.StartOsqueryClient(paths)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
@@ -484,13 +398,13 @@ func (i *OsqueryInstance) launch() error {
 	span.AddEvent("extension_client_created")
 
 	if len(i.opts.extensionPlugins) > 0 {
-		if err := i.StartOsqueryExtensionManagerServer("kolide_grpc", paths.extensionSocketPath, i.extensionManagerClient, i.opts.extensionPlugins); err != nil {
+		if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, i.opts.extensionPlugins); err != nil {
 			i.slogger.Log(ctx, slog.LevelInfo,
-				"unable to create initial extension server, stopping",
+				"unable to create Kolide SaaS extension server, stopping",
 				"err", err,
 			)
-			traces.SetError(span, fmt.Errorf("could not create an extension server: %w", err))
-			return fmt.Errorf("could not create an extension server: %w", err)
+			traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension server: %w", err))
+			return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
 		}
 		span.AddEvent("extension_server_created")
 	}
@@ -505,21 +419,22 @@ func (i *OsqueryInstance) launch() error {
 	i.errgroup.Go(func() error {
 		defer i.slogger.Log(ctx, slog.LevelInfo,
 			"exiting errgroup",
-			"errgroup", "kolide extension manager server launch",
+			"errgroup", "kolide tables extension manager server launch",
 		)
 
 		plugins := table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
+		plugins = append(plugins, table.LauncherTables(i.knapsack)...)
 
 		if len(plugins) == 0 {
 			return nil
 		}
 
-		if err := i.StartOsqueryExtensionManagerServer("kolide", paths.extensionSocketPath, i.extensionManagerClient, plugins); err != nil {
+		if err := i.StartOsqueryExtensionManagerServer(kolideTablesExtensionName, paths.extensionSocketPath, i.extensionManagerClient, plugins); err != nil {
 			i.slogger.Log(ctx, slog.LevelWarn,
-				"unable to create tables extension server, stopping",
+				"unable to create Kolide tables extension server, stopping",
 				"err", err,
 			)
-			return fmt.Errorf("could not create a table extension server: %w", err)
+			return fmt.Errorf("could not create Kolide tables extension server: %w", err)
 		}
 		return nil
 	})
@@ -683,8 +598,8 @@ func calculateOsqueryPaths(rootDirectory string, opts osqueryOptions) (*osqueryF
 func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	args := []string{
-		fmt.Sprintf("--logger_plugin=%s", i.opts.loggerPluginFlag),
-		fmt.Sprintf("--distributed_plugin=%s", i.opts.distributedPluginFlag),
+		fmt.Sprintf("--logger_plugin=%s", KolideSaasExtensionName),
+		fmt.Sprintf("--distributed_plugin=%s", KolideSaasExtensionName),
 		"--disable_distributed=false",
 		"--distributed_interval=5",
 		"--pack_delimiter=:",
@@ -747,8 +662,8 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
-		fmt.Sprintf("--config_plugin=%s", i.opts.configPluginFlag),
-		fmt.Sprintf("--extensions_require=%s", strings.Join(i.opts.requiredExtensions(), ",")),
+		fmt.Sprintf("--config_plugin=%s", KolideSaasExtensionName),
+		fmt.Sprintf("--extensions_require=%s", KolideSaasExtensionName),
 	)
 
 	// On darwin, run osquery using a magic macOS variable to ensure we
