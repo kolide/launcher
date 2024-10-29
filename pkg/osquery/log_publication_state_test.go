@@ -24,8 +24,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
+		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
 
@@ -61,8 +60,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
+		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
 
@@ -113,8 +111,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
-		MaxBytesPerBatch:      startingBatchLimitBytes,
-		skipHardwareKeysSetup: true,
+		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
 

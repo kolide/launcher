@@ -91,9 +91,6 @@ type ExtensionOpts struct {
 	// RunDifferentialQueriesImmediately allows the client to execute a new query the first time it sees it,
 	// bypassing the scheduler.
 	RunDifferentialQueriesImmediately bool
-	// skipHardwareKeysSetup is a flag to indicate if we should skip setting up hardware keys.
-	// This is useful for testing environments where we don't have required hardware.
-	skipHardwareKeysSetup bool
 }
 
 type iterationTerminatedError struct{}
