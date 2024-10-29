@@ -19,7 +19,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStore types.GetterSetter) *table.Plugin {
+func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -47,10 +47,10 @@ func LauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStore types.
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(configStore, upTimeHistoryStore))
+	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
 }
 
-func generateLauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStore types.GetterSetter) table.GenerateFunc {
+func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		identifier, err := osquery.IdentifierFromDB(configStore)
 		if err != nil {
@@ -69,14 +69,15 @@ func generateLauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStor
 			fingerprint = ""
 		}
 
-		uptimeBytes, _ := upTimeHistoryStore.Get([]byte("process_start_time"))
-		uptime := ""
-
+		uptimeBytes, err := LauncherHistoryStore.Get([]byte("process_start_time"))
+		if err != nil {
+			uptimeBytes = nil
+		}
+		uptime := "uptime not available"
 		if uptimeBytes != nil {
-			startTime, _ := time.Parse(time.RFC3339, string(uptimeBytes))
-			uptime = fmt.Sprintf("%d", int64(time.Since(startTime).Seconds()))
-		} else {
-			uptime = "uptime not available"
+			if startTime, err := time.Parse(time.RFC3339, string(uptimeBytes)); err == nil {
+				uptime = fmt.Sprintf("%d", int64(time.Since(startTime).Seconds()))
+			}
 		}
 
 		results := []map[string]string{

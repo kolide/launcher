@@ -199,9 +199,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
 	// start counting uptime
-	processStartTime := time.Now()
+	processStartTime := time.Now().UTC()
 
-	k.UpTimeHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
+	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
 
 	go runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)

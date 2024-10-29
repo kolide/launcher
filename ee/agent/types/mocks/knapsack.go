@@ -2088,12 +2088,12 @@ func (_m *Knapsack) TufServerURL() string {
 	return r0
 }
 
-// UpTimeHistoryStore provides a mock function with given fields:
-func (_m *Knapsack) UpTimeHistoryStore() types.KVStore {
+// LauncherHistoryStore provides a mock function with given fields:
+func (_m *Knapsack) LauncherHistoryStore() types.KVStore {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for UpTimeHistoryStore")
+		panic("no return value specified for LauncherHistoryStore")
 	}
 
 	var r0 types.KVStore

@@ -33,7 +33,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 		storage.ServerProvidedDataStore,
 		storage.TokenStore,
 		storage.ControlServerActionsStore,
-		storage.UpTimeHistoryStore,
+		storage.LauncherHistoryStore,
 	}
 
 	for _, storeName := range storeNames {
