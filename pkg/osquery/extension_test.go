@@ -1208,21 +1208,12 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.Equal(t, expectedResults, gotResults)
 }
 
-func TestLauncherRsaKeys(t *testing.T) {
-	m := &mock.KolideService{}
-
+func TestSetupLauncherKeys(t *testing.T) {
 	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	k := mocks.NewKnapsack(t)
-	k.On("ConfigStore").Return(configStore)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-
-	_, err = NewExtension(context.TODO(), m, k, ExtensionOpts{
-		skipHardwareKeysSetup: true,
-	})
-	require.NoError(t, err)
+	require.NoError(t, SetupLauncherKeys(configStore))
 
 	key, err := PrivateRSAKeyFromDB(configStore)
 	require.NoError(t, err)

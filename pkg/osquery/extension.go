@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
@@ -129,14 +128,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	}
 
 	configStore := k.ConfigStore()
-
-	if err := SetupLauncherKeys(configStore); err != nil {
-		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
-	}
-
-	if err := agent.SetupKeys(ctx, slogger, configStore, opts.skipHardwareKeysSetup); err != nil {
-		return nil, fmt.Errorf("setting up agent keys: %w", err)
-	}
 
 	nodekey, err := NodeKey(configStore)
 	if err != nil {
