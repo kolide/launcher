@@ -573,23 +573,23 @@ func (o *OsqueryInstance) launch() error {
 				// hardcodes the timing. Might be
 				// better for a Limiter
 				maxHealthChecks := 5
-				for i := 1; i <= maxHealthChecks; i++ {
+				for idx := 1; idx <= maxHealthChecks; idx++ {
 					err := o.Healthy()
 					if err == nil {
 						// err was nil, clear failed attempts
-						if i > 1 {
+						if idx > 1 {
 							o.slogger.Log(ctx, slog.LevelDebug,
 								"healthcheck passed, clearing error",
-								"attempt", i,
+								"attempt", idx,
 							)
 						}
 						break
 					}
 
-					if i == maxHealthChecks {
+					if idx == maxHealthChecks {
 						o.slogger.Log(ctx, slog.LevelInfo,
 							"healthcheck failed, giving up",
-							"attempt", i,
+							"attempt", idx,
 							"err", err,
 						)
 						return fmt.Errorf("health check failed: %w", err)
@@ -597,7 +597,7 @@ func (o *OsqueryInstance) launch() error {
 
 					o.slogger.Log(ctx, slog.LevelDebug,
 						"healthcheck failed, will retry",
-						"attempt", i,
+						"attempt", idx,
 						"err", err,
 					)
 					time.Sleep(1 * time.Second)
