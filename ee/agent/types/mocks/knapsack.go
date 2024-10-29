@@ -912,96 +912,6 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.KVStore {
 	return r0
 }
 
-// OsqueryTlsConfigEndpoint provides a mock function with given fields:
-func (_m *Knapsack) OsqueryTlsConfigEndpoint() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryTlsConfigEndpoint")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryTlsDistributedReadEndpoint provides a mock function with given fields:
-func (_m *Knapsack) OsqueryTlsDistributedReadEndpoint() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryTlsDistributedReadEndpoint")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryTlsDistributedWriteEndpoint provides a mock function with given fields:
-func (_m *Knapsack) OsqueryTlsDistributedWriteEndpoint() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryTlsDistributedWriteEndpoint")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryTlsEnrollEndpoint provides a mock function with given fields:
-func (_m *Knapsack) OsqueryTlsEnrollEndpoint() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryTlsEnrollEndpoint")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryTlsLoggerEndpoint provides a mock function with given fields:
-func (_m *Knapsack) OsqueryTlsLoggerEndpoint() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryTlsLoggerEndpoint")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // OsqueryVerbose provides a mock function with given fields:
 func (_m *Knapsack) OsqueryVerbose() bool {
 	ret := _m.Called()
@@ -2173,6 +2083,26 @@ func (_m *Knapsack) TufServerURL() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// UpTimeHistoryStore provides a mock function with given fields:
+func (_m *Knapsack) UpTimeHistoryStore() types.KVStore {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpTimeHistoryStore")
+	}
+
+	var r0 types.KVStore
+	if rf, ok := ret.Get(0).(func() types.KVStore); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.KVStore)
+		}
 	}
 
 	return r0

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
@@ -18,7 +19,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherInfoTable(store types.GetterSetter) *table.Plugin {
+func LauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStore types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -31,6 +32,7 @@ func LauncherInfoTable(store types.GetterSetter) *table.Plugin {
 		table.TextColumn("version_chain"),
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
+		table.TextColumn("uptime"),
 
 		// Signing key info
 		table.TextColumn("signing_key"),
@@ -45,12 +47,12 @@ func LauncherInfoTable(store types.GetterSetter) *table.Plugin {
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(store))
+	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(configStore, upTimeHistoryStore))
 }
 
-func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
+func generateLauncherInfoTable(configStore types.GetterSetter, upTimeHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		identifier, err := osquery.IdentifierFromDB(store)
+		identifier, err := osquery.IdentifierFromDB(configStore)
 		if err != nil {
 			return nil, err
 		}
@@ -60,11 +62,21 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 			return nil, err
 		}
 
-		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(store)
+		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(configStore)
 		if err != nil {
 			// No logger here, so we can't easily log. Move on with blank values
 			publicKey = ""
 			fingerprint = ""
+		}
+
+		uptimeBytes, _ := upTimeHistoryStore.Get([]byte("process_start_time"))
+		uptime := ""
+
+		if uptimeBytes != nil {
+			startTime, _ := time.Parse(time.RFC3339, string(uptimeBytes))
+			uptime = fmt.Sprintf("%d", int64(time.Since(startTime).Seconds()))
+		} else {
+			uptime = "uptime not available"
 		}
 
 		results := []map[string]string{
@@ -82,6 +94,7 @@ func generateLauncherInfoTable(store types.GetterSetter) table.GenerateFunc {
 				"osquery_instance_id": osqueryInstance.InstanceId,
 				"fingerprint":         fingerprint,
 				"public_key":          publicKey,
+				"uptime":              uptime,
 			},
 		}
 

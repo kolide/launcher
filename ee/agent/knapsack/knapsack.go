@@ -139,6 +139,10 @@ func (k *knapsack) TokenStore() types.KVStore {
 	return k.getKVStore(storage.TokenStore)
 }
 
+func (k *knapsack) UpTimeHistoryStore() types.KVStore {
+	return k.getKVStore(storage.UpTimeHistoryStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
 	return k.flags.SetLauncherWatchdogEnabled(enabled)
 }
