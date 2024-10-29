@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -55,9 +53,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	k.On("Slogger").Return(slogger.Logger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	setUpMockStores(t, k)
 
 	runner := New(
 		k,
@@ -106,9 +102,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(

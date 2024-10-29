@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -118,11 +119,8 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	osquerydPath := testOsqueryBinaryDirectory
 
 	osqOpts := &osqueryOptions{
-		configPluginFlag:      "config_plugin",
-		loggerPluginFlag:      "logger_plugin",
-		distributedPluginFlag: "distributed_plugin",
-		stdout:                os.Stdout,
-		stderr:                os.Stderr,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
 	}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
@@ -325,6 +323,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
+	setUpMockStores(t, k)
 
 	runner := New(k)
 	assert.Error(t, runner.Run())
@@ -351,9 +350,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	setUpMockStores(t, k)
 
 	runner := New(k)
 	go runner.Run()
@@ -386,9 +383,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	setUpMockStores(t, k)
 
 	// Start the runner
 	runner := New(k)
@@ -518,9 +513,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	setUpMockStores(t, k)
 
 	runner := New(k)
 	go runner.Run()
@@ -552,9 +545,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	setUpMockStores(t, k)
 
 	runner := New(k)
 	go runner.Run()
@@ -585,13 +576,10 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
+	setUpMockStores(t, k)
 
 	runner := New(k)
 	go runner.Run()
-	require.NoError(t, err)
 
 	waitHealthy(t, runner, &logBytes)
 
@@ -686,9 +674,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
-	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
-	require.NoError(t, err)
-	k.On("KatcConfigStore").Return(store)
+	setUpMockStores(t, k)
 
 	runner = New(k)
 	go runner.Run()
@@ -700,4 +686,17 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 		waitShutdown(t, runner, logBytes)
 	}
 	return runner, logBytes, teardown
+}
+
+// setUpMockStores creates test stores in the test knapsack
+func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
+	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
+	require.NoError(t, err)
+	k.On("KatcConfigStore").Return(store).Maybe()
+	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
+	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AutoupdateErrorsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 }
