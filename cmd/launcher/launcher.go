@@ -350,6 +350,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 	}
 
+	// make sure keys exist -- we expect these keys to exist before rungroup starts
+	if err := osquery.SetupLauncherKeys(k.ConfigStore()); err != nil {
+		return fmt.Errorf("setting up initial launcher keys: %w", err)
+	}
+	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore(), false); err != nil {
+		return fmt.Errorf("setting up agent keys: %w", err)
+	}
+
 	// init osquery instance history
 	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
