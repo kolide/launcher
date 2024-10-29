@@ -17,6 +17,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -41,12 +42,12 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	binDirectory, rmBinDirectory, err := osqueryTempDir()
+	binDirectory, err := agent.MkdirTemp("")
 	if err != nil {
 		fmt.Println("Failed to make temp dir for test binaries")
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
-	defer rmBinDirectory()
+	defer os.Remove(binDirectory)
 
 	s, err := storageci.NewStore(nil, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
 	if err != nil {
@@ -88,9 +89,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	binDir, err := getBinDir()
 	require.NoError(t, err)
 
-	paths, err := calculateOsqueryPaths(osqueryOptions{
-		rootDirectory: binDir,
-	})
+	paths, err := calculateOsqueryPaths(binDir, osqueryOptions{})
 
 	require.NoError(t, err)
 
@@ -130,8 +129,11 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
+	k.On("OsqueryVerbose").Return(true)
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance()
+	i := newInstance(k)
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -145,16 +147,17 @@ func TestCreateOsqueryCommand(t *testing.T) {
 
 func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	t.Parallel()
-	osqOpts := &osqueryOptions{
-		osqueryFlags: []string{"verbose=false", "windows_event_channels=foo,bar"},
-	}
+	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
+	k.On("OsqueryFlags").Return([]string{"verbose=false", "windows_event_channels=foo,bar"})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance()
+	i := newInstance(k)
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -186,8 +189,11 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("OsqueryVerbose").Return(true)
+	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance()
+	i := newInstance(k)
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -235,8 +241,11 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(false)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("OsqueryVerbose").Return(true)
+	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance()
+	i := newInstance(k)
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -305,9 +314,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -315,12 +322,11 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryVerbose").Return(true)
+	k.On("OsqueryFlags").Return([]string{})
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-	)
+	runner := New(k)
 	assert.Error(t, runner.Run())
 
 	k.AssertExpectations(t)
@@ -328,9 +334,7 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -344,29 +348,23 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{"verbose=false"})
+	k.On("OsqueryVerbose").Return(false)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithOsqueryFlags([]string{"verbose=false"}),
-	)
+	runner := New(k)
 	go runner.Run()
 	waitHealthy(t, runner, &logBytes)
-	assert.Equal(t, []string{"verbose=false"}, runner.instance.opts.osqueryFlags)
-
 	waitShutdown(t, runner, &logBytes)
 }
 
 func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -385,17 +383,15 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{"verbose=false"})
+	k.On("OsqueryVerbose").Return(false)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
 	// Start the runner
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithOsqueryFlags([]string{"verbose=false"}),
-	)
+	runner := New(k)
 	go runner.Run()
 
 	// Wait for the instance to start
@@ -505,9 +501,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -521,15 +515,14 @@ func TestSimplePath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-	)
+	runner := New(k)
 	go runner.Run()
 
 	waitHealthy(t, runner, &logBytes)
@@ -542,9 +535,7 @@ func TestSimplePath(t *testing.T) {
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -558,15 +549,14 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-	)
+	runner := New(k)
 	go runner.Run()
 
 	waitHealthy(t, runner, &logBytes)
@@ -578,9 +568,7 @@ func TestMultipleShutdowns(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -594,15 +582,14 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store).Maybe() // attempt to make this test less flaky
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-	)
+	runner := New(k)
 	go runner.Run()
 	require.NoError(t, err)
 
@@ -625,14 +612,14 @@ func TestOsqueryDies(t *testing.T) {
 
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	runner := newRunner(WithKnapsack(k), WithRootDirectory(rootDirectory))
-	require.NoError(t, err)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	runner := New(k)
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -679,8 +666,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 // sets up an osquery instance with a running extension to be used in tests.
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
+	rootDirectory := t.TempDir()
 
 	logBytes = &threadsafebuffer.ThreadSafeBuffer{}
 	slogger := slog.New(slog.NewTextHandler(logBytes, &slog.HandlerOptions{
@@ -697,22 +683,20 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{}).Maybe()
+	k.On("OsqueryVerbose").Return(true).Maybe()
 	store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
 	require.NoError(t, err)
 	k.On("KatcConfigStore").Return(store)
 
-	runner = New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-	)
+	runner = New(k)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
 	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
 
 	teardown = func() {
-		defer rmRootDirectory()
 		waitShutdown(t, runner, logBytes)
 	}
 	return runner, logBytes, teardown

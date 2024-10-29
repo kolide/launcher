@@ -140,6 +140,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"using default system root directory",
 			"path", rootDirectory,
 		)
+		// Make sure we have record of this new root directory in the opts, so it will be set
+		// correctly in the knapsack later.
+		opts.RootDirectory = rootDirectory
 	}
 
 	if err := os.MkdirAll(rootDirectory, fsutil.DirMode); err != nil {
@@ -194,6 +197,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
+
+	// start counting uptime
+	processStartTime := time.Now().UTC()
+
+	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
 
 	go runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	go timemachine.AddExclusions(ctx, k)
@@ -342,6 +350,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 	}
 
+	// make sure keys exist -- we expect these keys to exist before rungroup starts
+	if err := osquery.SetupLauncherKeys(k.ConfigStore()); err != nil {
+		return fmt.Errorf("setting up initial launcher keys: %w", err)
+	}
+	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore(), false); err != nil {
+		return fmt.Errorf("setting up agent keys: %w", err)
+	}
+
 	// init osquery instance history
 	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
@@ -356,12 +372,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		osqueryruntime.WithKnapsack(k),
-		osqueryruntime.WithRootDirectory(k.RootDirectory()),
 		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
-		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
-		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
-		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
 		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
 			k.Slogger().With(
 				"component", "osquery",
@@ -379,8 +390,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			kolidelog.WithLevel(slog.LevelInfo),
 		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
-		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
 		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
 		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
 		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),

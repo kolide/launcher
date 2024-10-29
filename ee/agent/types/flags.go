@@ -138,13 +138,6 @@ type Flags interface {
 	// overriding Launcher defaults)
 	OsqueryFlags() []string
 
-	// Osquery TLS options
-	OsqueryTlsConfigEndpoint() string
-	OsqueryTlsEnrollEndpoint() string
-	OsqueryTlsLoggerEndpoint() string
-	OsqueryTlsDistributedReadEndpoint() string
-	OsqueryTlsDistributedWriteEndpoint() string
-
 	// Osquery Version is the version of osquery that is being used.
 	SetCurrentRunningOsqueryVersion(version string) error
 	CurrentRunningOsqueryVersion() string
