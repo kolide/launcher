@@ -17,4 +17,5 @@ type Stores interface {
 	StatusLogsStore() KVStore
 	ServerProvidedDataStore() KVStore
 	TokenStore() KVStore
+	LauncherHistoryStore() KVStore
 }
