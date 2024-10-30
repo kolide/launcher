@@ -530,10 +530,6 @@ func (r *DesktopUsersProcessesRunner) writeSharedFile(path string, data []byte) 
 
 // refreshMenu updates the menu file and tells desktop processes to refresh their menus
 func (r *DesktopUsersProcessesRunner) refreshMenu() {
-	if !r.knapsack.DesktopEnabled() {
-		return
-	}
-
 	if err := r.generateMenuFile(); err != nil {
 		if r.knapsack.DebugServerData() {
 			r.slogger.Log(context.TODO(), slog.LevelError,
