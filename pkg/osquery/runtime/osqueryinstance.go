@@ -322,19 +322,13 @@ func (i *OsqueryInstance) launch() error {
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "monitor osquery process",
-		)
-
+	i.addGoroutineToErrgroup(ctx, "monitor_osquery_process", func() error {
 		err := i.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
 			i.slogger.Log(ctx, slog.LevelInfo,
 				"osquery exited successfully",
 			)
-			// TODO: should this return nil?
 			return errors.New("osquery process exited successfully")
 		default:
 			msgPairs := append(
@@ -351,16 +345,7 @@ func (i *OsqueryInstance) launch() error {
 	})
 
 	// Kill osquery process on shutdown
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "kill osquery process on shutdown",
-		)
-
-		<-i.doneCtx.Done()
-		i.slogger.Log(ctx, slog.LevelDebug,
-			"starting osquery shutdown",
-		)
+	i.addShutdownGoroutineToErrgroup(ctx, "kill_osquery_process", func() error {
 		if i.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(i.cmd); err != nil {
@@ -411,12 +396,7 @@ func (i *OsqueryInstance) launch() error {
 	//
 	// TODO: Consider chunking, if we find we can only have so
 	// many tables per extension manager
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "kolide tables extension manager server launch",
-		)
-
+	i.addGoroutineToErrgroup(ctx, "kolide_extension_launch", func() error {
 		plugins := table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
 		plugins = append(plugins, table.LauncherTables(i.knapsack)...)
 
@@ -444,12 +424,7 @@ func (i *OsqueryInstance) launch() error {
 	}
 
 	// Health check on interval
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "health check on interval",
-		)
-
+	i.addGoroutineToErrgroup(ctx, "healthcheck", func() error {
 		if i.knapsack != nil && i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			i.slogger.Log(ctx, slog.LevelDebug,
 				"entering delay before starting osquery healthchecks",
@@ -517,13 +492,7 @@ func (i *OsqueryInstance) launch() error {
 	})
 
 	// Clean up PID file on shutdown
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "cleanup PID file",
-		)
-
-		<-i.doneCtx.Done()
+	i.addShutdownGoroutineToErrgroup(ctx, "remove_pid_file", func() error {
 		// We do a couple retries -- on Windows, the PID file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
@@ -600,11 +569,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	}, func(r any) {})
 
 	// Run extension
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "saas extension execute",
-		)
+	i.addGoroutineToErrgroup(ctx, "saas_extension_execute", func() error {
 		if err := i.saasExtension.Execute(); err != nil {
 			return fmt.Errorf("kolide_grpc extension returned error: %w", err)
 		}
@@ -612,18 +577,50 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	})
 
 	// Register shutdown group for extension
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "saas extension cleanup",
-		)
-		<-i.doneCtx.Done()
-
+	i.addShutdownGoroutineToErrgroup(ctx, "saas_extension_cleanup", func() error {
 		i.saasExtension.Shutdown(i.doneCtx.Err())
-		return nil
+		return i.doneCtx.Err()
 	})
 
 	return nil
+}
+
+// addGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+func (i *OsqueryInstance) addGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+	i.errgroup.Go(func() error {
+		defer i.slogger.Log(ctx, slog.LevelInfo,
+			"exiting goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"starting goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		return goroutine()
+	})
+}
+
+// addShutdownGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+// The goroutine will not execute until the instance has received a signal to exit.
+func (i *OsqueryInstance) addShutdownGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+	i.errgroup.Go(func() error {
+		defer i.slogger.Log(ctx, slog.LevelInfo,
+			"exiting shutdown goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		// Wait for errgroup to exit
+		<-i.doneCtx.Done()
+
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"starting shutdown goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		return goroutine()
+	})
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -773,11 +770,6 @@ func (i *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
 func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin) error {
-	i.slogger.Log(context.TODO(), slog.LevelDebug,
-		"starting startOsqueryExtensionManagerServer",
-		"extension_name", name,
-	)
-
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
 		var newErr error
@@ -789,11 +781,6 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
-		i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"could not create an extension server",
-			"extension_name", name,
-			"err", err,
-		)
 		return fmt.Errorf("could not create an extension server: %w", err)
 	}
 
@@ -805,13 +792,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
 	// Start!
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"exiting errgroup",
-			"errgroup", "run extension manager server",
-			"extension_name", name,
-		)
-
+	i.addGoroutineToErrgroup(context.TODO(), name, func() error {
 		if err := extensionManagerServer.Start(); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"extension manager server startup got error",
@@ -820,24 +801,12 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 			)
 			return fmt.Errorf("running extension server: %w", err)
 		}
+
 		return errors.New("extension manager server exited")
 	})
 
 	// register a shutdown routine
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"exiting errgroup",
-			"errgroup", "shut down extension manager server",
-			"extension_name", name,
-		)
-
-		<-i.doneCtx.Done()
-
-		i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"starting extension shutdown",
-			"extension_name", name,
-		)
-
+	i.addShutdownGoroutineToErrgroup(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"got error while shutting down extension server",
@@ -847,11 +816,6 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		}
 		return i.doneCtx.Err()
 	})
-
-	i.slogger.Log(context.TODO(), slog.LevelDebug,
-		"clean finish startOsqueryExtensionManagerServer",
-		"extension_name", name,
-	)
 
 	return nil
 }
