@@ -36,13 +36,11 @@ import (
 
 const (
 	// KolideSaasExtensionName is the name of the extension that provides the config,
-	// distributed queries, and log destination for the osquery process. This extension
+	// distributed queries, and log destination for the osquery process. It also provides
+	// provides Kolide's additional tables: platform tables and launcher tables. This extension
 	// is required for osquery startup. It is called kolide_grpc for mostly historic reasons;
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
-	// kolideTablesExtensionName is the name of the extension that provides Kolide's additional
-	// tables: platform tables and launcher tables.
-	kolideTablesExtensionName = "kolide"
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -378,6 +376,8 @@ func (i *OsqueryInstance) launch() error {
 		distributed.NewPlugin(KolideSaasExtensionName, i.saasExtension.GetQueries, i.saasExtension.WriteResults),
 		osquerylogger.NewPlugin(KolideSaasExtensionName, i.saasExtension.LogString),
 	}
+	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
+	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack)...)
 
 	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
@@ -388,31 +388,6 @@ func (i *OsqueryInstance) launch() error {
 		return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
 	}
 	span.AddEvent("extension_server_created")
-
-	// Now spawn an extension manager for the tables. We need to
-	// start this one in the background, because the runner.Start
-	// function needs to return promptly enough for osquery to use
-	// it to enroll. Very racy
-	//
-	// TODO: Consider chunking, if we find we can only have so
-	// many tables per extension manager
-	i.addGoroutineToErrgroup(ctx, "kolide_extension_launch", func() error {
-		plugins := table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
-		plugins = append(plugins, table.LauncherTables(i.knapsack)...)
-
-		if len(plugins) == 0 {
-			return nil
-		}
-
-		if err := i.StartOsqueryExtensionManagerServer(kolideTablesExtensionName, paths.extensionSocketPath, i.extensionManagerClient, plugins); err != nil {
-			i.slogger.Log(ctx, slog.LevelWarn,
-				"unable to create Kolide tables extension server, stopping",
-				"err", err,
-			)
-			return fmt.Errorf("could not create Kolide tables extension server: %w", err)
-		}
-		return nil
-	})
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
