@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"testing/quick"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
-	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
@@ -808,18 +808,19 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 
 func TestExtensionWriteLogsLoop(t *testing.T) {
 	var gotStatusLogs, gotResultLogs []string
-	var funcInvokedStatus, funcInvokedResult bool
+	var logLock sync.Mutex
 	var done = make(chan struct{})
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			defer func() { done <- struct{}{} }()
 
+			logLock.Lock()
+			defer logLock.Unlock()
+
 			switch logType {
 			case logger.LogTypeStatus:
-				funcInvokedStatus = true
 				gotStatusLogs = logs
 			case logger.LogTypeString:
-				funcInvokedResult = true
 				gotResultLogs = logs
 			default:
 				t.Error("Unknown log type")
@@ -840,11 +841,9 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
 
-	mockClock := clock.NewMockClock()
-	expectedLoggingInterval := 10 * time.Second
+	expectedLoggingInterval := 5 * time.Second
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
 		MaxBytesPerBatch: 200,
-		Clock:            mockClock,
 		LoggingInterval:  expectedLoggingInterval,
 	})
 	require.Nil(t, err)
@@ -868,45 +867,39 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 		<-done
 		<-done
 	})
-	assert.True(t, funcInvokedStatus)
-	assert.True(t, funcInvokedResult)
-	assert.Nil(t, err)
+	// Examine the logs, then reset them for the next test
+	logLock.Lock()
 	assert.Equal(t, expectedStatusLogs[:10], gotStatusLogs)
 	assert.Equal(t, expectedResultLogs[:10], gotResultLogs)
-
-	funcInvokedStatus = false
-	funcInvokedResult = false
 	gotStatusLogs = nil
 	gotResultLogs = nil
+	logLock.Unlock()
 
 	// Should write last 10 logs
-	mockClock.AddTime(expectedLoggingInterval + 1)
+	time.Sleep(expectedLoggingInterval + 1*time.Second)
 	testutil.FatalAfterFunc(t, 1*time.Second, func() {
 		// PublishLogsFunc runs twice of each run of the loop
 		<-done
 		<-done
 	})
-	assert.True(t, funcInvokedStatus)
-	assert.True(t, funcInvokedResult)
-	assert.Nil(t, err)
+	// Examine the logs, then reset them for the next test
+	logLock.Lock()
 	assert.Equal(t, expectedStatusLogs[10:], gotStatusLogs)
 	assert.Equal(t, expectedResultLogs[10:], gotResultLogs)
-
-	funcInvokedStatus = false
-	funcInvokedResult = false
 	gotStatusLogs = nil
 	gotResultLogs = nil
+	logLock.Unlock()
 
 	// No more logs to write
-	mockClock.AddTime(expectedLoggingInterval + 1)
+	time.Sleep(expectedLoggingInterval + 1*time.Second)
 	// Block to ensure publish function could be called if the logic is
 	// incorrect
 	time.Sleep(1 * time.Millisecond)
-	assert.False(t, funcInvokedStatus)
-	assert.False(t, funcInvokedResult)
-	assert.Nil(t, err)
+	// Confirm logs are nil because nothing got published
+	logLock.Lock()
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
+	logLock.Unlock()
 
 	testutil.FatalAfterFunc(t, 3*time.Second, func() {
 		e.Shutdown(errors.New("test error"))

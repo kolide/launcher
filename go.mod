@@ -18,7 +18,6 @@ require (
 	github.com/kolide/krypto v0.1.1-0.20231229162826-db516b7e0121
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
-	github.com/mixer/clock v0.0.0-20170901150240-b08e6b4da7ea
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/osquery/osquery-go v0.0.0-20231130195733-61ac79279aaa
 	github.com/peterbourgon/ff/v3 v3.1.2
