@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
@@ -81,10 +80,6 @@ type ExtensionOpts struct {
 	// LoggingInterval is the interval at which logs should be flushed to
 	// the server.
 	LoggingInterval time.Duration
-	// Clock is the clock that should be used for time based operations. By
-	// default it will be a normal realtime clock, but a mock clock can be
-	// passed with clock.NewMockClock() for testing purposes.
-	Clock clock.Clock
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
@@ -114,10 +109,6 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 
 	if opts.LoggingInterval == 0 {
 		opts.LoggingInterval = defaultLoggingInterval
-	}
-
-	if opts.Clock == nil {
-		opts.Clock = clock.DefaultClock{}
 	}
 
 	if opts.MaxBufferedLogs == 0 {
@@ -156,7 +147,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 
 func (e *Extension) Execute() error {
 	// Process logs until shutdown
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
+	ticker := time.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {
 		e.writeAndPurgeLogs()
@@ -168,7 +159,7 @@ func (e *Extension) Execute() error {
 				"osquery extension received shutdown request",
 			)
 			return nil
-		case <-ticker.Chan():
+		case <-ticker.C:
 			// Resume loop
 		}
 	}

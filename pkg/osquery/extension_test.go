@@ -25,7 +25,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/service/mock"
-	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
@@ -840,11 +839,9 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
 
-	mockClock := clock.NewMockClock()
 	expectedLoggingInterval := 10 * time.Second
 	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
 		MaxBytesPerBatch: 200,
-		Clock:            mockClock,
 		LoggingInterval:  expectedLoggingInterval,
 	})
 	require.Nil(t, err)
@@ -880,7 +877,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	gotResultLogs = nil
 
 	// Should write last 10 logs
-	mockClock.AddTime(expectedLoggingInterval + 1)
+	time.Sleep(expectedLoggingInterval + 1*time.Second)
 	testutil.FatalAfterFunc(t, 1*time.Second, func() {
 		// PublishLogsFunc runs twice of each run of the loop
 		<-done
@@ -898,7 +895,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	gotResultLogs = nil
 
 	// No more logs to write
-	mockClock.AddTime(expectedLoggingInterval + 1)
+	time.Sleep(expectedLoggingInterval + 1*time.Second)
 	// Block to ensure publish function could be called if the logic is
 	// incorrect
 	time.Sleep(1 * time.Millisecond)
