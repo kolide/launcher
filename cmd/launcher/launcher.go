@@ -61,9 +61,6 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
-	"github.com/osquery/osquery-go/plugin/config"
-	"github.com/osquery/osquery-go/plugin/distributed"
-	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 
 	"go.etcd.io/bbolt"
 )
@@ -362,15 +359,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
 	}
 
-	// create the osquery extension
-	extension, err := createExtensionRuntime(ctx, k, client)
-	if err != nil {
-		return fmt.Errorf("create extension with runtime: %w", err)
-	}
-	runGroup.Add("osqueryExtension", extension.Execute, extension.Shutdown)
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
+		client,
 		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
 			k.Slogger().With(
 				"component", "osquery",
@@ -388,11 +380,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			kolidelog.WithLevel(slog.LevelInfo),
 		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithOsqueryExtensionPlugins(
-			config.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.GenerateConfigs),
-			distributed.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.GetQueries, extension.WriteResults),
-			osquerylogger.NewPlugin(osqueryruntime.KolideSaasExtensionName, extension.LogString),
-		),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
 

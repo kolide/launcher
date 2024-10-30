@@ -9,6 +9,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/service"
 )
 
 const (
@@ -27,22 +28,24 @@ const (
 )
 
 type Runner struct {
-	instance     *OsqueryInstance
-	instanceLock sync.Mutex
-	slogger      *slog.Logger
-	knapsack     types.Knapsack
-	shutdown     chan struct{}
-	interrupted  bool
-	opts         []OsqueryInstanceOption
+	instance      *OsqueryInstance
+	instanceLock  sync.Mutex
+	slogger       *slog.Logger
+	knapsack      types.Knapsack
+	serviceClient service.KolideService
+	shutdown      chan struct{}
+	interrupted   bool
+	opts          []OsqueryInstanceOption
 }
 
-func New(k types.Knapsack, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		instance: newInstance(k, opts...),
-		slogger:  k.Slogger().With("component", "osquery_runner"),
-		knapsack: k,
-		shutdown: make(chan struct{}),
-		opts:     opts,
+		instance:      newInstance(k, serviceClient, opts...),
+		slogger:       k.Slogger().With("component", "osquery_runner"),
+		knapsack:      k,
+		serviceClient: serviceClient,
+		shutdown:      make(chan struct{}),
+		opts:          opts,
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -104,7 +107,7 @@ func (r *Runner) Run() error {
 		}
 
 		r.instanceLock.Lock()
-		r.instance = newInstance(r.knapsack, r.opts...)
+		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
 		if err := r.instance.launch(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"fatal error restarting instance, shutting down",

@@ -27,7 +27,11 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/service"
+	servicemock "github.com/kolide/launcher/pkg/service/mock"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	"github.com/osquery/osquery-go/plugin/logger"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -131,7 +135,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k)
+	i := newInstance(k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -155,7 +159,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k)
+	i := newInstance(k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -191,7 +195,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k)
+	i := newInstance(k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -243,7 +247,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k)
+	i := newInstance(k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -323,9 +327,13 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	assert.Error(t, runner.Run())
 
 	k.AssertExpectations(t)
@@ -350,9 +358,13 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 	waitHealthy(t, runner, &logBytes)
 	waitShutdown(t, runner, &logBytes)
@@ -383,10 +395,14 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
 	// Start the runner
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	// Wait for the instance to start
@@ -513,9 +529,13 @@ func TestSimplePath(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, &logBytes)
@@ -545,9 +565,13 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, &logBytes)
@@ -576,9 +600,13 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, &logBytes)
@@ -607,7 +635,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	runner := New(k)
+	runner := New(k, mockServiceClient())
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -674,9 +702,13 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k)
+	runner = New(k, mockServiceClient())
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -698,5 +730,32 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AutoupdateErrorsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+}
+
+// mockServiceClient returns a mock KolideService that returns the minimum possible response
+// for all methods.
+func mockServiceClient() *servicemock.KolideService {
+	return &servicemock.KolideService{
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
+			return "testnodekey", false, nil
+		},
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
+			return "", false, errors.New("transport")
+		},
+		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+			return "", "", false, nil
+		},
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+			return nil, false, errors.New("transport")
+		},
+		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+			return "", "", false, nil
+		},
+		CheckHealthFunc: func(ctx context.Context) (int32, error) {
+			return 0, nil
+		},
+	}
 }

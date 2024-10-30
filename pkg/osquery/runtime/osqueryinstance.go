@@ -17,11 +17,17 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/backoff"
+	launcherosq "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
+	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
+	"github.com/osquery/osquery-go/plugin/config"
+	"github.com/osquery/osquery-go/plugin/distributed"
+	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -30,13 +36,11 @@ import (
 
 const (
 	// KolideSaasExtensionName is the name of the extension that provides the config,
-	// distributed queries, and log destination for the osquery process. This extension
+	// distributed queries, and log destination for the osquery process. It also provides
+	// provides Kolide's additional tables: platform tables and launcher tables. This extension
 	// is required for osquery startup. It is called kolide_grpc for mostly historic reasons;
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
-	// kolideTablesExtensionName is the name of the extension that provides Kolide's additional
-	// tables: platform tables and launcher tables.
-	kolideTablesExtensionName = "kolide"
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -44,16 +48,6 @@ const (
 // see the following blog post:
 // https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
 type OsqueryInstanceOption func(*OsqueryInstance)
-
-// WithOsqueryExtensionPlugins is a functional option which allows the user to
-// declare a number of osquery plugins (ie: config plugin, logger plugin, tables,
-// etc) which can be loaded when calling LaunchOsqueryInstance. You can load as
-// many plugins as you'd like.
-func WithOsqueryExtensionPlugins(plugins ...osquery.OsqueryPlugin) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.extensionPlugins = append(i.opts.extensionPlugins, plugins...)
-	}
-}
 
 // WithExtensionSocketPath is a functional option which allows the user to
 // define the path of the extension socket path that osqueryd will open to
@@ -93,12 +87,14 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	opts     osqueryOptions
-	knapsack types.Knapsack
-	slogger  *slog.Logger
+	opts          osqueryOptions
+	knapsack      types.Knapsack
+	slogger       *slog.Logger
+	serviceClient service.KolideService
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	errgroup                *errgroup.Group
+	saasExtension           *launcherosq.Extension
 	doneCtx                 context.Context // nolint:containedctx
 	cancel                  context.CancelFunc
 	cmd                     *exec.Cmd
@@ -173,16 +169,16 @@ type osqueryOptions struct {
 	// the following are options which may or may not be set by the functional
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc      func(dir string) error
-	extensionPlugins    []osquery.OsqueryPlugin
 	extensionSocketPath string
 	stderr              io.Writer
 	stdout              io.Writer
 }
 
-func newInstance(knapsack types.Knapsack, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	i := &OsqueryInstance{
-		knapsack: knapsack,
-		slogger:  knapsack.Slogger().With("component", "osquery_instance"),
+		knapsack:      knapsack,
+		slogger:       knapsack.Slogger().With("component", "osquery_instance"),
+		serviceClient: serviceClient,
 	}
 
 	for _, opt := range opts {
@@ -203,6 +199,12 @@ func newInstance(knapsack types.Knapsack, opts ...OsqueryInstanceOption) *Osquer
 func (i *OsqueryInstance) launch() error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
+
+	// Create SaaS extension immediately
+	if err := i.startKolideSaasExtension(ctx); err != nil {
+		traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension: %w", err))
+		return fmt.Errorf("creating Kolide SaaS extension: %w", err)
+	}
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
@@ -318,19 +320,13 @@ func (i *OsqueryInstance) launch() error {
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "monitor osquery process",
-		)
-
+	i.addGoroutineToErrgroup(ctx, "monitor_osquery_process", func() error {
 		err := i.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
 			i.slogger.Log(ctx, slog.LevelInfo,
 				"osquery exited successfully",
 			)
-			// TODO: should this return nil?
 			return errors.New("osquery process exited successfully")
 		default:
 			msgPairs := append(
@@ -347,16 +343,7 @@ func (i *OsqueryInstance) launch() error {
 	})
 
 	// Kill osquery process on shutdown
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "kill osquery process on shutdown",
-		)
-
-		<-i.doneCtx.Done()
-		i.slogger.Log(ctx, slog.LevelDebug,
-			"starting osquery shutdown",
-		)
+	i.addShutdownGoroutineToErrgroup(ctx, "kill_osquery_process", func() error {
 		if i.cmd.Process != nil {
 			// kill osqueryd and children
 			if err := killProcessGroup(i.cmd); err != nil {
@@ -375,19 +362,6 @@ func (i *OsqueryInstance) launch() error {
 		return i.doneCtx.Err()
 	})
 
-	// Here be dragons
-	//
-	// There are two thorny issues. First, we "invert" control of
-	// the osquery process. We don't really know when osquery will
-	// be running, so we need a bunch of retries on these connections
-	//
-	// Second, because launcher supplements the enroll
-	// information, this Start function must return fast enough
-	// that osquery can use the registered tables for
-	// enrollment. *But* there's been a lot of racy behaviors,
-	// likely due to time spent registering tables, and subtle
-	// ordering issues.
-
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc.
 	i.extensionManagerClient, err = i.StartOsqueryClient(paths)
@@ -397,47 +371,23 @@ func (i *OsqueryInstance) launch() error {
 	}
 	span.AddEvent("extension_client_created")
 
-	if len(i.opts.extensionPlugins) > 0 {
-		if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, i.opts.extensionPlugins); err != nil {
-			i.slogger.Log(ctx, slog.LevelInfo,
-				"unable to create Kolide SaaS extension server, stopping",
-				"err", err,
-			)
-			traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension server: %w", err))
-			return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
-		}
-		span.AddEvent("extension_server_created")
+	kolideSaasPlugins := []osquery.OsqueryPlugin{
+		config.NewPlugin(KolideSaasExtensionName, i.saasExtension.GenerateConfigs),
+		distributed.NewPlugin(KolideSaasExtensionName, i.saasExtension.GetQueries, i.saasExtension.WriteResults),
+		osquerylogger.NewPlugin(KolideSaasExtensionName, i.saasExtension.LogString),
 	}
+	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
+	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack)...)
 
-	// Now spawn an extension manager for the tables. We need to
-	// start this one in the background, because the runner.Start
-	// function needs to return promptly enough for osquery to use
-	// it to enroll. Very racy
-	//
-	// TODO: Consider chunking, if we find we can only have so
-	// many tables per extension manager
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "kolide tables extension manager server launch",
+	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"unable to create Kolide SaaS extension server, stopping",
+			"err", err,
 		)
-
-		plugins := table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)
-		plugins = append(plugins, table.LauncherTables(i.knapsack)...)
-
-		if len(plugins) == 0 {
-			return nil
-		}
-
-		if err := i.StartOsqueryExtensionManagerServer(kolideTablesExtensionName, paths.extensionSocketPath, i.extensionManagerClient, plugins); err != nil {
-			i.slogger.Log(ctx, slog.LevelWarn,
-				"unable to create Kolide tables extension server, stopping",
-				"err", err,
-			)
-			return fmt.Errorf("could not create Kolide tables extension server: %w", err)
-		}
-		return nil
-	})
+		traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension server: %w", err))
+		return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
+	}
+	span.AddEvent("extension_server_created")
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
@@ -449,12 +399,7 @@ func (i *OsqueryInstance) launch() error {
 	}
 
 	// Health check on interval
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "health check on interval",
-		)
-
+	i.addGoroutineToErrgroup(ctx, "healthcheck", func() error {
 		if i.knapsack != nil && i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			i.slogger.Log(ctx, slog.LevelDebug,
 				"entering delay before starting osquery healthchecks",
@@ -522,13 +467,7 @@ func (i *OsqueryInstance) launch() error {
 	})
 
 	// Clean up PID file on shutdown
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting errgroup",
-			"errgroup", "cleanup PID file",
-		)
-
-		<-i.doneCtx.Done()
+	i.addShutdownGoroutineToErrgroup(ctx, "remove_pid_file", func() error {
 		// We do a couple retries -- on Windows, the PID file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
@@ -547,6 +486,116 @@ func (i *OsqueryInstance) launch() error {
 	})
 
 	return nil
+}
+
+// startKolideSaasExtension creates the Kolide SaaS extension, which provides configuration,
+// distributed queries, and a log destination for the osquery process.
+func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	// create the osquery extension
+	extOpts := launcherosq.ExtensionOpts{
+		LoggingInterval: i.knapsack.LoggingInterval(),
+	}
+
+	// Setting MaxBytesPerBatch is a tradeoff. If it's too low, we
+	// can never send a large result. But if it's too high, we may
+	// not be able to send the data over a low bandwidth
+	// connection before the connection is timed out.
+	//
+	// The logic for setting this is spread out. The underlying
+	// extension defaults to 3mb, to support GRPC's hardcoded 4MB
+	// limit. But as we're transport aware here. we can set it to
+	// 5MB for others.
+	if i.knapsack.LogMaxBytesPerBatch() != 0 {
+		if i.knapsack.Transport() == "grpc" && i.knapsack.LogMaxBytesPerBatch() > 3 {
+			i.slogger.Log(ctx, slog.LevelInfo,
+				"LogMaxBytesPerBatch is set above the grpc recommended maximum of 3. Expect errors",
+				"log_max_bytes_per_batch", i.knapsack.LogMaxBytesPerBatch(),
+			)
+		}
+		extOpts.MaxBytesPerBatch = i.knapsack.LogMaxBytesPerBatch() << 20
+	} else if i.knapsack.Transport() == "grpc" {
+		extOpts.MaxBytesPerBatch = 3 << 20
+	} else if i.knapsack.Transport() != "grpc" {
+		extOpts.MaxBytesPerBatch = 5 << 20
+	}
+
+	// Create the extension
+	var err error
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.knapsack, extOpts)
+	if err != nil {
+		return fmt.Errorf("creating new extension: %w", err)
+	}
+
+	// Immediately attempt enrollment in the background. We don't want to put this in our errgroup
+	// because we don't need to shut down the whole instance if we can't enroll -- we can always
+	// retry later.
+	gowrapper.Go(ctx, i.slogger, func() {
+		_, nodeInvalid, err := i.saasExtension.Enroll(ctx)
+		if nodeInvalid || err != nil {
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"could not perform initial attempt at enrollment, will retry later",
+				"node_invalid", nodeInvalid,
+				"err", err,
+			)
+		}
+	}, func(r any) {})
+
+	// Run extension
+	i.addGoroutineToErrgroup(ctx, "saas_extension_execute", func() error {
+		if err := i.saasExtension.Execute(); err != nil {
+			return fmt.Errorf("kolide_grpc extension returned error: %w", err)
+		}
+		return nil
+	})
+
+	// Register shutdown group for extension
+	i.addShutdownGoroutineToErrgroup(ctx, "saas_extension_cleanup", func() error {
+		i.saasExtension.Shutdown(i.doneCtx.Err())
+		return i.doneCtx.Err()
+	})
+
+	return nil
+}
+
+// addGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+func (i *OsqueryInstance) addGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+	i.errgroup.Go(func() error {
+		defer i.slogger.Log(ctx, slog.LevelInfo,
+			"exiting goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"starting goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		return goroutine()
+	})
+}
+
+// addShutdownGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+// The goroutine will not execute until the instance has received a signal to exit.
+func (i *OsqueryInstance) addShutdownGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+	i.errgroup.Go(func() error {
+		defer i.slogger.Log(ctx, slog.LevelInfo,
+			"exiting shutdown goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		// Wait for errgroup to exit
+		<-i.doneCtx.Done()
+
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"starting shutdown goroutine in errgroup",
+			"goroutine_name", goroutineName,
+		)
+
+		return goroutine()
+	})
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -696,11 +745,6 @@ func (i *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
 func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin) error {
-	i.slogger.Log(context.TODO(), slog.LevelDebug,
-		"starting startOsqueryExtensionManagerServer",
-		"extension_name", name,
-	)
-
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
 		var newErr error
@@ -712,11 +756,6 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		)
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
-		i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"could not create an extension server",
-			"extension_name", name,
-			"err", err,
-		)
 		return fmt.Errorf("could not create an extension server: %w", err)
 	}
 
@@ -728,13 +767,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
 	// Start!
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"exiting errgroup",
-			"errgroup", "run extension manager server",
-			"extension_name", name,
-		)
-
+	i.addGoroutineToErrgroup(context.TODO(), name, func() error {
 		if err := extensionManagerServer.Start(); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"extension manager server startup got error",
@@ -743,24 +776,12 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 			)
 			return fmt.Errorf("running extension server: %w", err)
 		}
+
 		return errors.New("extension manager server exited")
 	})
 
 	// register a shutdown routine
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"exiting errgroup",
-			"errgroup", "shut down extension manager server",
-			"extension_name", name,
-		)
-
-		<-i.doneCtx.Done()
-
-		i.slogger.Log(context.TODO(), slog.LevelDebug,
-			"starting extension shutdown",
-			"extension_name", name,
-		)
-
+	i.addShutdownGoroutineToErrgroup(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"got error while shutting down extension server",
@@ -770,11 +791,6 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 		}
 		return i.doneCtx.Err()
 	})
-
-	i.slogger.Log(context.TODO(), slog.LevelDebug,
-		"clean finish startOsqueryExtensionManagerServer",
-		"extension_name", name,
-	)
 
 	return nil
 }
