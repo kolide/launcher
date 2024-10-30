@@ -53,10 +53,15 @@ func TestOsquerySlowStart(t *testing.T) {
 	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	k.On("Slogger").Return(slogger.Logger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(
 		k,
+		mockServiceClient(),
 		WithStartFunc(func(cmd *exec.Cmd) error {
 			err := cmd.Start()
 			if err != nil {
@@ -102,11 +107,16 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 	runner := New(
 		k,
+		mockServiceClient(),
 		WithExtensionSocketPath(extensionSocketPath),
 	)
 	go runner.Run()
