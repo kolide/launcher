@@ -16,6 +16,9 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+// Package-level runID variable
+var runID string
+
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
 
@@ -57,6 +60,18 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	}
 
 	return k
+}
+
+// SetRunID sets the run ID in the knapsack
+func (k *knapsack) SetRunID(id string) {
+	runID = id
+	k.slogger.With("run_id", id)
+	k.systemSlogger.With("run_id", id)
+}
+
+// GetRunID retrieves the run ID from the knapsack
+func (k *knapsack) GetRunID() string {
+	return runID
 }
 
 // Logging interface methods

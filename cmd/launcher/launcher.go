@@ -194,6 +194,15 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
+	// Generate a new run ID
+	newRunID := ulid.New()
+	// Set the run ID in knapsack
+	k.SetRunID(newRunID)
+
+	// Apply the run ID to both logger and slogger
+	logger = log.With(logger, "run_id", newRunID)
+	slogger = slogger.With("run_id", newRunID)
+
 	// start counting uptime
 	processStartTime := time.Now().UTC()
 
