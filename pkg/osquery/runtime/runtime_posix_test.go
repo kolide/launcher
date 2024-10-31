@@ -36,7 +36,7 @@ func hasPermissionsToRunTest() bool {
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -84,7 +84,7 @@ func TestOsquerySlowStart(t *testing.T) {
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 

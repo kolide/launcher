@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -93,6 +92,7 @@ type OsqueryInstance struct {
 	serviceClient service.KolideService
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
+	id                      string // string identifier for this instance
 	errgroup                *errgroup.Group
 	saasExtension           *launcherosq.Extension
 	doneCtx                 context.Context // nolint:containedctx
@@ -174,11 +174,12 @@ type osqueryOptions struct {
 	stdout              io.Writer
 }
 
-func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, instanceId string, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	i := &OsqueryInstance{
 		knapsack:      knapsack,
-		slogger:       knapsack.Slogger().With("component", "osquery_instance"),
+		slogger:       knapsack.Slogger().With("component", "osquery_instance", "instance_id", instanceId),
 		serviceClient: serviceClient,
+		id:            instanceId,
 	}
 
 	for _, opt := range opts {
@@ -208,7 +209,7 @@ func (i *OsqueryInstance) launch() error {
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.opts)
+	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.id, i.opts)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
@@ -613,12 +614,12 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDirectory string, opts osqueryOptions) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDirectory string, instanceId string, opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
 	if extensionSocketPath == "" {
-		extensionSocketPath = SocketPath(rootDirectory)
+		extensionSocketPath = SocketPath(rootDirectory, instanceId)
 	}
 
 	extensionAutoloadPath := filepath.Join(rootDirectory, "osquery.autoload")
@@ -626,7 +627,7 @@ func calculateOsqueryPaths(rootDirectory string, opts osqueryOptions) (*osqueryF
 	// We want to use a unique pidfile per launcher run to avoid file locking issues.
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
-		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", ulid.New())),
+		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", instanceId)),
 		databasePath:          filepath.Join(rootDirectory, "osquery.db"),
 		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,

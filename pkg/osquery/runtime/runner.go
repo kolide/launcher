@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
@@ -40,7 +41,7 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		instance:      newInstance(k, serviceClient, opts...),
+		instance:      newInstance(k, serviceClient, ulid.New(), opts...),
 		slogger:       k.Slogger().With("component", "osquery_runner"),
 		knapsack:      k,
 		serviceClient: serviceClient,
@@ -107,7 +108,7 @@ func (r *Runner) Run() error {
 		}
 
 		r.instanceLock.Lock()
-		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
+		r.instance = newInstance(r.knapsack, r.serviceClient, ulid.New(), r.opts...)
 		if err := r.instance.launch(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"fatal error restarting instance, shutting down",

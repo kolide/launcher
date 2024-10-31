@@ -17,6 +17,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -95,7 +96,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	binDir, err := getBinDir()
 	require.NoError(t, err)
 
-	paths, err := calculateOsqueryPaths(binDir, osqueryOptions{})
+	paths, err := calculateOsqueryPaths(binDir, ulid.New(), osqueryOptions{})
 
 	require.NoError(t, err)
 
@@ -136,7 +137,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(k, mockServiceClient(), ulid.New())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -160,7 +161,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(k, mockServiceClient(), ulid.New())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -196,7 +197,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(k, mockServiceClient(), ulid.New())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -248,7 +249,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(k, mockServiceClient(), ulid.New())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -346,7 +347,7 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -374,7 +375,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -509,7 +510,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -541,7 +542,7 @@ func TestSimplePath(t *testing.T) {
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -572,7 +573,7 @@ func TestMultipleShutdowns(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -667,7 +668,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 // sets up an osquery instance with a running extension to be used in tests.
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
-	rootDirectory := t.TempDir()
+	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
@@ -771,4 +772,25 @@ func setUpTestSlogger(rootDirectory string) (*threadsafebuffer.ThreadSafeBuffer,
 	}
 
 	return logBytes, slogger, opts
+}
+
+// testRootDirectory returns a temporary directory suitable for use in these tests.
+// The default t.TempDir is too long of a path, creating too long of an osquery
+// extension socket, on posix systems.
+func testRootDirectory(t *testing.T) string {
+	if runtime.GOOS == "windows" {
+		return t.TempDir()
+	}
+
+	ulid := ulid.New()
+	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
+	require.NoError(t, os.Mkdir(rootDir, 0700))
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(rootDir); err != nil {
+			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+		}
+	})
+
+	return rootDir
 }

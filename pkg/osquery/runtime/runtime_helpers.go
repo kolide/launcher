@@ -22,8 +22,8 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	return nil
 }
 
-func SocketPath(rootDir string) string {
-	return filepath.Join(rootDir, "osquery.sock")
+func SocketPath(rootDir string, instanceId string) string {
+	return filepath.Join(rootDir, fmt.Sprintf("osquery-%s.sock", instanceId))
 }
 
 func platformArgs() []string {
