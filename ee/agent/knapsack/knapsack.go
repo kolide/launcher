@@ -9,12 +9,16 @@ import (
 
 	"log/slog"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
+
+// Package-level runID variable
+var runID string
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
@@ -57,6 +61,16 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	}
 
 	return k
+}
+
+// NewRunID sets the run ID in the knapsack
+func (k *knapsack) GetRunID() string {
+	if runID == "" {
+		runID = ulid.New()
+		k.slogger.Logger = k.slogger.Logger.With("run_id", runID)
+		k.systemSlogger.Logger = k.systemSlogger.Logger.With("run_id", runID)
+	}
+	return runID
 }
 
 // Logging interface methods
