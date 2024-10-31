@@ -196,9 +196,17 @@ func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, o
 	return i
 }
 
+// BeginShutdown cancels the context associated with the errgroup.
+func (i *OsqueryInstance) BeginShutdown() {
+	i.slogger.Log(context.TODO(), slog.LevelInfo,
+		"instance shutdown requested",
+	)
+	i.cancel()
+}
+
 // WaitShutdown waits for the instance's errgroup routines to exit, then returns the
 // initial error. It should be called after either `Exited` has returned, or after
-// the instance has been asked to shut down.
+// the instance has been asked to shut down via call to `BeginShutdown`.
 func (i *OsqueryInstance) WaitShutdown() error {
 	return i.errgroup.Wait()
 }

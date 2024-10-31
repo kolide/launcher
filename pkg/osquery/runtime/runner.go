@@ -156,7 +156,7 @@ func (r *Runner) Shutdown() error {
 	close(r.shutdown)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
-	r.instance.cancel()
+	r.instance.BeginShutdown()
 	if err := r.instance.WaitShutdown(); err != context.Canceled && err != nil {
 		return fmt.Errorf("while shutting down instance: %w", err)
 	}
@@ -205,7 +205,7 @@ func (r *Runner) Restart() error {
 	defer r.instanceLock.Unlock()
 	// Cancelling will cause all of the cleanup routines to execute, and a
 	// new instance will start.
-	r.instance.cancel()
+	r.instance.BeginShutdown()
 	r.instance.WaitShutdown()
 
 	return nil
