@@ -196,6 +196,13 @@ func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, o
 	return i
 }
 
+// WaitShutdown waits for the instance's errgroup routines to exit, then returns the
+// initial error. It should be called after either `Exited` has returned, or after
+// the instance has been asked to shut down.
+func (i *OsqueryInstance) WaitShutdown() error {
+	return i.errgroup.Wait()
+}
+
 // Exited returns a channel to monitor for signal that instance has shut itself down
 func (i *OsqueryInstance) Exited() <-chan struct{} {
 	return i.doneCtx.Done()

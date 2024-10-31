@@ -93,7 +93,7 @@ func (r *Runner) Run() error {
 		}
 
 		// Error case -- osquery instance shut down and needs to be restarted
-		err := r.instance.errgroup.Wait()
+		err := r.instance.WaitShutdown()
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"unexpected restart of instance",
 			"err", err,
@@ -157,7 +157,7 @@ func (r *Runner) Shutdown() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 	r.instance.cancel()
-	if err := r.instance.errgroup.Wait(); err != context.Canceled && err != nil {
+	if err := r.instance.WaitShutdown(); err != context.Canceled && err != nil {
 		return fmt.Errorf("while shutting down instance: %w", err)
 	}
 	return nil
@@ -206,7 +206,7 @@ func (r *Runner) Restart() error {
 	// Cancelling will cause all of the cleanup routines to execute, and a
 	// new instance will start.
 	r.instance.cancel()
-	r.instance.errgroup.Wait()
+	r.instance.WaitShutdown()
 
 	return nil
 }
