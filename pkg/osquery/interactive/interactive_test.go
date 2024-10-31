@@ -35,6 +35,10 @@ func TestMain(m *testing.M) {
 		fmt.Printf("error parsing platform: %s, %s", err, runtime.GOOS)
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	if err := os.MkdirAll(osquerydCacheDir, fsutil.DirMode); err != nil {
 		fmt.Printf("error creating cache dir: %s", err)

@@ -5,7 +5,6 @@ package runtime
 
 import (
 	"fmt"
-	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"syscall"
@@ -13,8 +12,6 @@ import (
 	"time"
 
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -41,7 +38,7 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -50,8 +47,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	k.On("Slogger").Return(slogger.Logger)
+	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
 	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
@@ -59,30 +55,28 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(
-		k,
-		mockServiceClient(),
-		WithStartFunc(func(cmd *exec.Cmd) error {
-			err := cmd.Start()
-			if err != nil {
-				return fmt.Errorf("unexpected error starting command: %w", err)
-			}
-			// suspend the process right away
-			cmd.Process.Signal(syscall.SIGTSTP)
-			go func() {
-				// wait a while before resuming the process
-				time.Sleep(3 * time.Second)
-				cmd.Process.Signal(syscall.SIGCONT)
-			}()
-			return nil
-		}),
-	)
+	opts = append(opts, WithStartFunc(func(cmd *exec.Cmd) error {
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("unexpected error starting command: %w", err)
+		}
+		// suspend the process right away
+		cmd.Process.Signal(syscall.SIGTSTP)
+		go func() {
+			// wait a while before resuming the process
+			time.Sleep(3 * time.Second)
+			cmd.Process.Signal(syscall.SIGCONT)
+		}()
+		return nil
+	}))
+
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	// ensure that we actually had to wait on the socket
 	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	waitShutdown(t, runner, &logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
@@ -92,11 +86,7 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -114,14 +104,12 @@ func TestExtensionSocketPath(t *testing.T) {
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	runner := New(
-		k,
-		mockServiceClient(),
-		WithExtensionSocketPath(extensionSocketPath),
-	)
+	opts = append(opts, WithExtensionSocketPath(extensionSocketPath))
+
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
@@ -135,7 +123,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
 
-	waitShutdown(t, runner, &logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 // TestRestart tests that the launcher can restart the osqueryd process.

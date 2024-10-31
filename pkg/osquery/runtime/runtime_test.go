@@ -23,6 +23,7 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -291,6 +292,10 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
 	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	outputFile := filepath.Join(binDirectory, "osqueryd")
 	if runtime.GOOS == "windows" {
@@ -343,11 +348,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -364,10 +365,10 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
-	waitHealthy(t, runner, &logBytes)
-	waitShutdown(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 func TestFlagsChanged(t *testing.T) {
@@ -375,11 +376,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -402,12 +399,12 @@ func TestFlagsChanged(t *testing.T) {
 	setUpMockStores(t, k)
 
 	// Start the runner
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 
 	// Wait for the instance to start
 	time.Sleep(2 * time.Second)
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
@@ -425,7 +422,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Wait for the instance to restart
 	time.Sleep(2 * time.Second)
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	// Now confirm that the instance is new
 	require.NotEqual(t, startingInstance, runner.instance, "instance not replaced")
@@ -462,7 +459,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	k.AssertExpectations(t)
 
-	waitShutdown(t, runner, &logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
@@ -514,11 +511,7 @@ func TestSimplePath(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -535,26 +528,22 @@ func TestSimplePath(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
 	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
 
-	waitShutdown(t, runner, &logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -571,13 +560,13 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	for i := 0; i < 3; i += 1 {
-		waitShutdown(t, runner, &logBytes)
+		waitShutdown(t, runner, logBytes)
 	}
 }
 
@@ -585,11 +574,7 @@ func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -597,7 +582,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("RootDirectory").Return(rootDirectory)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
 	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
@@ -606,10 +591,10 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 
 	previousStats := runner.instance.stats
 
@@ -619,11 +604,11 @@ func TestOsqueryDies(t *testing.T) {
 	runner.instance.errgroup.Wait()
 	runner.instanceLock.Unlock()
 
-	waitHealthy(t, runner, &logBytes)
+	waitHealthy(t, runner, logBytes)
 	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
 
-	waitShutdown(t, runner, &logBytes)
+	waitShutdown(t, runner, logBytes)
 }
 
 func TestNotStarted(t *testing.T) {
@@ -684,11 +669,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
 	rootDirectory := t.TempDir()
 
-	logBytes = &threadsafebuffer.ThreadSafeBuffer{}
-	slogger := slog.New(slog.NewTextHandler(logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
@@ -708,7 +689,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k, mockServiceClient())
+	runner = New(k, mockServiceClient(), opts...)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -758,4 +739,36 @@ func mockServiceClient() *servicemock.KolideService {
 			return 0, nil
 		},
 	}
+}
+
+// setUpTestSlogger sets up a logger that will log to a buffer.
+func setUpTestSlogger(rootDirectory string) (*threadsafebuffer.ThreadSafeBuffer, *slog.Logger, []OsqueryInstanceOption) {
+	logBytes := &threadsafebuffer.ThreadSafeBuffer{}
+
+	slogger := slog.New(slog.NewTextHandler(logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
+	// Capture osquery logs too
+	opts := []OsqueryInstanceOption{
+		WithStdout(kolidelog.NewOsqueryLogAdapter(
+			slogger.With(
+				"component", "osquery",
+				"osqlevel", "stdout",
+			),
+			rootDirectory,
+			kolidelog.WithLevel(slog.LevelDebug),
+		)),
+		WithStderr(kolidelog.NewOsqueryLogAdapter(
+			slogger.With(
+				"component", "osquery",
+				"osqlevel", "stderr",
+			),
+			rootDirectory,
+			kolidelog.WithLevel(slog.LevelDebug),
+		)),
+	}
+
+	return logBytes, slogger, opts
 }
