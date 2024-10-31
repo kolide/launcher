@@ -73,7 +73,7 @@ func (r *Runner) Run() error {
 	// called), or stops (if Shutdown was called).
 	for {
 		// Wait for async processes to exit
-		<-r.instance.doneCtx.Done()
+		<-r.instance.Exited()
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"osquery instance exited",
 		)

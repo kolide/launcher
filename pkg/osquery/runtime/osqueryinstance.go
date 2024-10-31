@@ -196,6 +196,11 @@ func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, o
 	return i
 }
 
+// Exited returns a channel to monitor for signal that instance has shut itself down
+func (i *OsqueryInstance) Exited() <-chan struct{} {
+	return i.doneCtx.Done()
+}
+
 func (i *OsqueryInstance) launch() error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
