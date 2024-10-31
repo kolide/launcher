@@ -85,7 +85,7 @@ func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOr
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return "", fmt.Errorf("failed download %s, got http status %s", downloadReq.URL.String(), response.Status)
+		return "", fmt.Errorf("failed download, got http status %s", response.Status)
 	}
 
 	// Store it in cache
