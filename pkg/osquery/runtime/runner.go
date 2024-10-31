@@ -81,12 +81,6 @@ func (r *Runner) Run() error {
 		select {
 		case <-r.shutdown:
 			// Intentional shutdown, this loop can exit
-			if err := r.instance.stats.Exited(nil); err != nil {
-				r.slogger.Log(context.TODO(), slog.LevelWarn,
-					"error recording osquery instance exit to history",
-					"err", err,
-				)
-			}
 			return nil
 		default:
 			// Don't block
@@ -98,13 +92,6 @@ func (r *Runner) Run() error {
 			"unexpected restart of instance",
 			"err", err,
 		)
-
-		if err := r.instance.stats.Exited(err); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelWarn,
-				"error recording osquery instance exit to history",
-				"err", err,
-			)
-		}
 
 		r.instanceLock.Lock()
 		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
@@ -203,8 +190,7 @@ func (r *Runner) Restart() error {
 	)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
-	// Cancelling will cause all of the cleanup routines to execute, and a
-	// new instance will start.
+	// Shut down the instance -- `Run` will start a new one.
 	r.instance.BeginShutdown()
 	r.instance.WaitShutdown()
 
