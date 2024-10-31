@@ -216,7 +216,9 @@ func (i *OsqueryInstance) Exited() <-chan struct{} {
 	return i.doneCtx.Done()
 }
 
-func (i *OsqueryInstance) launch() error {
+// Launch starts the osquery instance and its components. It will run until one of its
+// components becomes unhealthy, or until it is asked to shutdown via `BeginShutdown`.
+func (i *OsqueryInstance) Launch() error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
 

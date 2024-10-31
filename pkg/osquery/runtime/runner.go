@@ -58,7 +58,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 func (r *Runner) Run() error {
 	// Ensure we don't try to restart the instance before it's launched
 	r.instanceLock.Lock()
-	if err := r.instance.launch(); err != nil {
+	if err := r.instance.Launch(); err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"failed to launch osquery instance",
 			"err", err,
@@ -108,7 +108,7 @@ func (r *Runner) Run() error {
 
 		r.instanceLock.Lock()
 		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
-		if err := r.instance.launch(); err != nil {
+		if err := r.instance.Launch(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"fatal error restarting instance, shutting down",
 				"err", err,
