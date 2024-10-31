@@ -292,6 +292,10 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
 	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	outputFile := filepath.Join(binDirectory, "osqueryd")
 	if runtime.GOOS == "windows" {
@@ -303,7 +307,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 		cacheDir = os.Getenv("TEMP")
 	}
 
-	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "5.14.1", target)
+	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
 	if err != nil {
 		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
 	}

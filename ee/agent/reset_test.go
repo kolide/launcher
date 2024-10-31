@@ -42,6 +42,10 @@ func TestMain(m *testing.M) {
 		fmt.Printf("error parsing platform %s: %v", runtime.GOOS, err)
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

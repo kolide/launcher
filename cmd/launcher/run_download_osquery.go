@@ -34,6 +34,10 @@ func runDownloadOsquery(_ *multislogger.MultiSlogger, args []string) error {
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
 	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	// We're reusing packaging code, which is based around having a persistent cache directory. It's not quite what
 	// we want but it'll do
