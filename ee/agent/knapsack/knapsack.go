@@ -65,8 +65,8 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 // SetRunID sets the run ID in the knapsack
 func (k *knapsack) SetRunID(id string) {
 	runID = id
-	k.slogger.With("run_id", id)
-	k.systemSlogger.With("run_id", id)
+	k.slogger.Logger = k.slogger.Logger.With("run_id", id)
+	k.systemSlogger.Logger = k.systemSlogger.Logger.With("run_id", id)
 }
 
 // GetRunID retrieves the run ID from the knapsack
