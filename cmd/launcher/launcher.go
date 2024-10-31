@@ -195,9 +195,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
 	// Generate a new run ID
-	newRunID := ulid.New()
-	// Set the run ID in knapsack
-	k.SetRunID(newRunID)
+	newRunID := k.GetRunID()
 
 	// Apply the run ID to both logger and slogger
 	logger = log.With(logger, "run_id", newRunID)

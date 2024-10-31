@@ -9,6 +9,7 @@ import (
 
 	"log/slog"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
@@ -62,15 +63,13 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	return k
 }
 
-// SetRunID sets the run ID in the knapsack
-func (k *knapsack) SetRunID(id string) {
-	runID = id
-	k.slogger.Logger = k.slogger.Logger.With("run_id", id)
-	k.systemSlogger.Logger = k.systemSlogger.Logger.With("run_id", id)
-}
-
-// GetRunID retrieves the run ID from the knapsack
+// NewRunID sets the run ID in the knapsack
 func (k *knapsack) GetRunID() string {
+	if runID == "" {
+		runID = ulid.New()
+		k.slogger.Logger = k.slogger.Logger.With("run_id", runID)
+		k.systemSlogger.Logger = k.systemSlogger.Logger.With("run_id", runID)
+	}
 	return runID
 }
 
