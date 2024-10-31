@@ -40,6 +40,19 @@ const (
 	// is required for osquery startup. It is called kolide_grpc for mostly historic reasons;
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
+
+	// How long to wait before erroring because we cannot open the osquery
+	// extension socket.
+	socketOpenTimeout = 10 * time.Second
+
+	// How often to try to open the osquery extension socket
+	socketOpenInterval = 200 * time.Millisecond
+
+	// How frequently we should healthcheck the client/server
+	healthCheckInterval = 60 * time.Second
+
+	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
+	maxSocketWaitTime = 30 * time.Second
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
