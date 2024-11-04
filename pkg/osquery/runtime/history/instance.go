@@ -6,7 +6,7 @@ import (
 )
 
 type Instance struct {
-	InternalId  string // ID assigned by launcher
+	RunId       string // ID for instance, assigned by launcher
 	StartTime   string
 	ConnectTime string
 	ExitTime    string
