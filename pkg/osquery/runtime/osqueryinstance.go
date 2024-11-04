@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -187,7 +188,8 @@ type osqueryOptions struct {
 	stdout              io.Writer
 }
 
-func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, instanceId string, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
+	instanceId := ulid.New()
 	i := &OsqueryInstance{
 		knapsack:      knapsack,
 		slogger:       knapsack.Slogger().With("component", "osquery_instance", "instance_id", instanceId),
