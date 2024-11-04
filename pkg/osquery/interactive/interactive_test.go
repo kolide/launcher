@@ -62,17 +62,20 @@ func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		osqueryFlags   []string
-		wantProc       bool
-		errContainsStr string
+		name            string
+		useShortRootDir bool
+		osqueryFlags    []string
+		wantProc        bool
+		errContainsStr  string
 	}{
 		{
-			name:     "no flags",
-			wantProc: true,
+			name:            "no flags",
+			useShortRootDir: true,
+			wantProc:        true,
 		},
 		{
-			name: "flags",
+			name:            "flags",
+			useShortRootDir: true,
 			osqueryFlags: []string{
 				"verbose",
 				"force=false",
@@ -80,16 +83,18 @@ func TestProc(t *testing.T) {
 			wantProc: true,
 		},
 		{
-			name: "config path",
+			name:            "config path",
+			useShortRootDir: true,
 			osqueryFlags: []string{
 				fmt.Sprintf("config_path=%s", ulid.New()),
 			},
 			wantProc: true,
 		},
 		{
-			name:           "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
-			wantProc:       false,
-			errContainsStr: "error waiting for osquery to create socket",
+			name:            "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
+			useShortRootDir: false,
+			wantProc:        false,
+			errContainsStr:  "error waiting for osquery to create socket",
 		},
 	}
 	for _, tt := range tests {
@@ -97,7 +102,13 @@ func TestProc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rootDir := testRootDirectory(t)
+			var rootDir string
+			if tt.useShortRootDir {
+				rootDir = testRootDirectory(t)
+			} else {
+				rootDir = t.TempDir()
+			}
+
 			require.NoError(t, downloadOsquery(rootDir))
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -110,7 +121,7 @@ func TestProc(t *testing.T) {
 			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
 			mockSack.On("Slogger").Return(slogger)
-			mockSack.On("RootDirectory").Maybe().Return("whatever_the_root_launcher_dir_is")
+			mockSack.On("RootDirectory").Maybe().Return(rootDir)
 			store, err := storageci.NewStore(t, slogger, storage.KatcConfigStore.String())
 			require.NoError(t, err)
 			mockSack.On("KatcConfigStore").Return(store)
