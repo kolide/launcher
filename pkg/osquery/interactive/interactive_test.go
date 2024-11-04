@@ -97,7 +97,7 @@ func TestProc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rootDir := t.TempDir()
+			rootDir := testRootDirectory(t)
 			require.NoError(t, downloadOsquery(rootDir))
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -175,4 +175,25 @@ func downloadOsquery(dir string) error {
 	}
 
 	return nil
+}
+
+// testRootDirectory returns a temporary directory suitable for use in these tests.
+// The default t.TempDir is too long of a path, creating too long of an osquery
+// extension socket, on posix systems.
+func testRootDirectory(t *testing.T) string {
+	if runtime.GOOS == "windows" {
+		return t.TempDir()
+	}
+
+	ulid := ulid.New()
+	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
+	require.NoError(t, os.Mkdir(rootDir, 0700))
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(rootDir); err != nil {
+			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+		}
+	})
+
+	return rootDir
 }
