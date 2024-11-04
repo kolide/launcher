@@ -3,6 +3,7 @@
 ## Status
 
 2024-10-23: ADR submitted to team.
+2024-11-04: Implementation complete.
 
 ## Context
 
