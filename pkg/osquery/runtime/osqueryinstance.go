@@ -665,12 +665,12 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDirectory string, instanceId string, opts osqueryOptions) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDirectory string, id string, opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
 	if extensionSocketPath == "" {
-		extensionSocketPath = SocketPath(rootDirectory, instanceId)
+		extensionSocketPath = SocketPath(rootDirectory, id)
 	}
 
 	extensionAutoloadPath := filepath.Join(rootDirectory, "osquery.autoload")
@@ -678,7 +678,7 @@ func calculateOsqueryPaths(rootDirectory string, instanceId string, opts osquery
 	// We want to use a unique pidfile per launcher run to avoid file locking issues.
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
-		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", instanceId)),
+		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", id)),
 		databasePath:          filepath.Join(rootDirectory, "osquery.db"),
 		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
