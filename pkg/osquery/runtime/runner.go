@@ -42,7 +42,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 func (r *Runner) Run() error {
 	// Ensure we don't try to restart the instance before it's launched
 	r.instanceLock.Lock()
-	if err := r.instance.launch(); err != nil {
+	if err := r.instance.Launch(); err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"failed to launch osquery instance",
 			"err", err,
@@ -57,7 +57,7 @@ func (r *Runner) Run() error {
 	// called), or stops (if Shutdown was called).
 	for {
 		// Wait for async processes to exit
-		<-r.instance.doneCtx.Done()
+		<-r.instance.Exited()
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"osquery instance exited",
 		)
@@ -65,34 +65,21 @@ func (r *Runner) Run() error {
 		select {
 		case <-r.shutdown:
 			// Intentional shutdown, this loop can exit
-			if err := r.instance.stats.Exited(nil); err != nil {
-				r.slogger.Log(context.TODO(), slog.LevelWarn,
-					"error recording osquery instance exit to history",
-					"err", err,
-				)
-			}
 			return nil
 		default:
 			// Don't block
 		}
 
 		// Error case -- osquery instance shut down and needs to be restarted
-		err := r.instance.errgroup.Wait()
+		err := r.instance.WaitShutdown()
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"unexpected restart of instance",
 			"err", err,
 		)
 
-		if err := r.instance.stats.Exited(err); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelWarn,
-				"error recording osquery instance exit to history",
-				"err", err,
-			)
-		}
-
 		r.instanceLock.Lock()
 		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
-		if err := r.instance.launch(); err != nil {
+		if err := r.instance.Launch(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"fatal error restarting instance, shutting down",
 				"err", err,
@@ -140,8 +127,8 @@ func (r *Runner) Shutdown() error {
 	close(r.shutdown)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
-	r.instance.cancel()
-	if err := r.instance.errgroup.Wait(); err != context.Canceled && err != nil {
+	r.instance.BeginShutdown()
+	if err := r.instance.WaitShutdown(); err != context.Canceled && err != nil {
 		return fmt.Errorf("while shutting down instance: %w", err)
 	}
 	return nil
@@ -187,10 +174,9 @@ func (r *Runner) Restart() error {
 	)
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
-	// Cancelling will cause all of the cleanup routines to execute, and a
-	// new instance will start.
-	r.instance.cancel()
-	r.instance.errgroup.Wait()
+	// Shut down the instance -- `Run` will start a new one.
+	r.instance.BeginShutdown()
+	r.instance.WaitShutdown()
 
 	return nil
 }

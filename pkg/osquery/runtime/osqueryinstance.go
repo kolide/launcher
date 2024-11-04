@@ -212,7 +212,43 @@ func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, o
 	return i
 }
 
-func (i *OsqueryInstance) launch() error {
+// BeginShutdown cancels the context associated with the errgroup.
+func (i *OsqueryInstance) BeginShutdown() {
+	i.slogger.Log(context.TODO(), slog.LevelInfo,
+		"instance shutdown requested",
+	)
+	i.cancel()
+}
+
+// WaitShutdown waits for the instance's errgroup routines to exit, then returns the
+// initial error. It should be called after either `Exited` has returned, or after
+// the instance has been asked to shut down via call to `BeginShutdown`.
+func (i *OsqueryInstance) WaitShutdown() error {
+	// Wait for shutdown to complete
+	exitErr := i.errgroup.Wait()
+
+	// Record shutdown in stats, if initialized
+	if i.stats != nil {
+		if err := i.stats.Exited(exitErr); err != nil {
+			i.slogger.Log(context.TODO(), slog.LevelWarn,
+				"error recording osquery instance exit to history",
+				"exit_err", exitErr,
+				"err", err,
+			)
+		}
+	}
+
+	return exitErr
+}
+
+// Exited returns a channel to monitor for signal that instance has shut itself down
+func (i *OsqueryInstance) Exited() <-chan struct{} {
+	return i.doneCtx.Done()
+}
+
+// Launch starts the osquery instance and its components. It will run until one of its
+// components becomes unhealthy, or until it is asked to shutdown via `BeginShutdown`.
+func (i *OsqueryInstance) Launch() error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
 
