@@ -9,6 +9,7 @@ import (
 
 func TablePlugin() *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("internal_id"),
 		table.TextColumn("start_time"),
 		table.TextColumn("connect_time"),
 		table.TextColumn("exit_time"),
@@ -32,6 +33,7 @@ func generate() table.GenerateFunc {
 		for _, instance := range history {
 
 			results = append(results, map[string]string{
+				"internal_id":  instance.InternalId,
 				"start_time":   instance.StartTime,
 				"connect_time": instance.ConnectTime,
 				"exit_time":    instance.ExitTime,

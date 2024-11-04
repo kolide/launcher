@@ -6,11 +6,12 @@ import (
 )
 
 type Instance struct {
+	InternalId  string // ID assigned by launcher
 	StartTime   string
 	ConnectTime string
 	ExitTime    string
 	Hostname    string
-	InstanceId  string
+	InstanceId  string // ID from osquery
 	Version     string
 	Error       string
 }

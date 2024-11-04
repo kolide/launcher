@@ -189,12 +189,12 @@ type osqueryOptions struct {
 }
 
 func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
-	instanceId := ulid.New()
+	id := ulid.New()
 	i := &OsqueryInstance{
 		knapsack:      knapsack,
-		slogger:       knapsack.Slogger().With("component", "osquery_instance", "instance_id", instanceId),
+		slogger:       knapsack.Slogger().With("component", "osquery_instance", "internal_id", id),
 		serviceClient: serviceClient,
-		id:            instanceId,
+		id:            id,
 	}
 
 	for _, opt := range opts {
@@ -360,7 +360,7 @@ func (i *OsqueryInstance) Launch() error {
 		"osquery socket created",
 	)
 
-	stats, err := history.NewInstance()
+	stats, err := history.NewInstance(i.id)
 	if err != nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"could not create new osquery instance history",
