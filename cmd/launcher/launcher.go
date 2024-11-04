@@ -197,9 +197,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Generate a new run ID
 	newRunID := k.GetRunID()
 
-	// Apply the run ID to both logger and slogger
+	// Apply the run ID to logger which is later used in logshipper
+	// slogger run_id is set in the knapsack GetRunID()
 	logger = log.With(logger, "run_id", newRunID)
-	slogger = slogger.With("run_id", newRunID)
 
 	// start counting uptime
 	processStartTime := time.Now().UTC()
