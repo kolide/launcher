@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
@@ -30,7 +31,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath := osqueryRuntime.SocketPath(interactiveRootDir)
+	socketPath := osqueryRuntime.SocketPath(interactiveRootDir, ulid.New())
 	augeasLensesPath := filepath.Join(interactiveRootDir, "augeas-lenses")
 
 	// only install augeas lenses on non-windows platforms

@@ -5,26 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
-)
-
-const (
-	// How long to wait before erroring because we cannot open the osquery
-	// extension socket.
-	socketOpenTimeout = 10 * time.Second
-
-	// How often to try to open the osquery extension socket
-	socketOpenInterval = 200 * time.Millisecond
-
-	// How frequently we should healthcheck the client/server
-	healthCheckInterval = 60 * time.Second
-
-	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
-	maxSocketWaitTime = 30 * time.Second
 )
 
 type Runner struct {

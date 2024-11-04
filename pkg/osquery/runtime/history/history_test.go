@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -58,7 +59,7 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 
 			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
-			_, err := NewInstance()
+			_, err := NewInstance(ulid.New())
 
 			assert.Equal(t, tt.wantNumInstances, len(currentHistory.instances), "expect history length to reflect new instance")
 

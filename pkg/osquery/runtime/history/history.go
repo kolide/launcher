@@ -88,7 +88,7 @@ func LatestInstanceUptimeMinutes() (int64, error) {
 }
 
 // NewInstance adds a new instance to the osquery instance history and returns it
-func NewInstance() (*Instance, error) {
+func NewInstance(runId string) (*Instance, error) {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
@@ -98,6 +98,7 @@ func NewInstance() (*Instance, error) {
 	}
 
 	newInstance := &Instance{
+		RunId:     runId,
 		StartTime: timeNow(),
 		Hostname:  hostname,
 	}
