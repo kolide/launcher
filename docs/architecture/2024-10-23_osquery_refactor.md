@@ -49,7 +49,7 @@ Therefore, we will want to refactor our current implementation with the followin
 
 To simplify the creation of multiple osquery instances, and to make it possible to increase the number of osquery instances running without performing a full launcher restart, we will move the osquery extension ownership to the osquery instance.
 
-This will also give us the opportunity to make the separation of responsibility between the runner and the instance clearer. The instance will create its own extension, extension server, etc. The runner will be responsible for the instances' state. This means the osquery instance stats should be owned by the runner, since the runner already has the responsibility of updating them.
+This will also give us the opportunity to make the separation of responsibility between the runner and the instance clearer. The instance will create its own extension, extension server, etc. The instance will be responsible for its own stats -- creating them during launch, and updating them during instance shutdown. The runner will be responsible for the instances' state.
 
 ```mermaid
 ---
@@ -63,7 +63,7 @@ erDiagram
     OSQUERYINSTANCE ||--|{ EXTENSIONSERVER : runs
     OSQUERYINSTANCE ||--|| EXTENSIONCLIENT : runs
     EXTENSIONSERVER ||--|| EXTENSION : forwards
-    OSQUERYRUNNER ||--|| STATS: updates
+    OSQUERYINSTANCE ||--|| STATS: updates
 ```
 
 The below diagram shows the desired future state -- it is identical to the above diagram except for the relationship cardinalities (e.g. `OSQUERYRUNNER` runs 0 or more of `OSQUERYINSTANCE`, rather than exactly 1 `OSQUERYINSTANCE`).
@@ -80,7 +80,7 @@ erDiagram
     OSQUERYINSTANCE ||--|{ EXTENSIONSERVER : runs
     OSQUERYINSTANCE ||--|| EXTENSIONCLIENT : runs
     EXTENSIONSERVER ||--|| EXTENSION : forwards
-    OSQUERYRUNNER ||--o{ STATS: updates
+    OSQUERYINSTANCE ||--|| STATS: updates
 ```
 
 ## Consequences
@@ -94,3 +94,4 @@ This decision does preserve a shared JSONRPC client to talk to Kolide SaaS. If w
 ## Changelog
 
 2024-10-23: Initial draft of ADR.
+2024-11-04: Updated ADR so that instance, rather than runner, manages instance stats.
