@@ -181,10 +181,6 @@ func downloadOsquery(dir string) error {
 // The default t.TempDir is too long of a path, creating too long of an osquery
 // extension socket, on posix systems.
 func testRootDirectory(t *testing.T) string {
-	if runtime.GOOS == "windows" {
-		return t.TempDir()
-	}
-
 	ulid := ulid.New()
 	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
 	require.NoError(t, os.Mkdir(rootDir, 0700))
