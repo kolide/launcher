@@ -679,7 +679,7 @@ func calculateOsqueryPaths(rootDirectory string, runId string, opts osqueryOptio
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
 		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", runId)),
-		databasePath:          filepath.Join(rootDirectory, "osquery.db"),
+		databasePath:          filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", runId)),
 		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
