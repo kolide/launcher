@@ -494,7 +494,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Confirm osquery instance setup is complete
 		if runner.instances[defaultRegistrationId] == nil {
-			return errors.New("instance does not exist yet")
+			return errors.New("default instance does not exist yet")
 		}
 		if runner.instances[defaultRegistrationId].stats.ConnectTime == "" {
 			return errors.New("no connect time set yet")
@@ -536,6 +536,49 @@ func TestSimplePath(t *testing.T) {
 
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to instance stats on start up")
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to instance stats on start up")
+
+	waitShutdown(t, runner, logBytes)
+}
+
+func TestMultipleInstances(t *testing.T) {
+	t.Parallel()
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("WatchdogEnabled").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	setUpMockStores(t, k)
+	serviceClient := mockServiceClient()
+
+	runner := New(k, serviceClient, opts...)
+
+	// Add in an extra instance
+	extraRegistrationId := ulid.New()
+	runner.instances[extraRegistrationId] = newInstance(k, serviceClient, opts...)
+
+	// Start the instance
+	go runner.Run()
+	waitHealthy(t, runner, logBytes)
+
+	// Confirm the default instance was started
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+
+	// Confirm the additional instance was started
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 }
