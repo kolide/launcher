@@ -54,6 +54,7 @@ func (r *Runner) Run() error {
 
 	// Start each worker for each instance
 	for registrationId := range r.instances {
+		registrationId := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(registrationId); err != nil {
 				r.slogger.Log(ctx, slog.LevelWarn,
