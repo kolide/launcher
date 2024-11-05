@@ -409,7 +409,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
-	for _, a := range runner.instance.cmd.Args {
+	for _, a := range runner.instances[defaultRegistrationId].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			watchdogDisabled = true
 			break
@@ -417,7 +417,7 @@ func TestFlagsChanged(t *testing.T) {
 	}
 	require.True(t, watchdogDisabled, "instance not set up with watchdog disabled")
 
-	startingInstance := runner.instance
+	startingInstance := runner.instances[defaultRegistrationId]
 
 	runner.FlagsChanged(keys.WatchdogEnabled)
 
@@ -426,13 +426,13 @@ func TestFlagsChanged(t *testing.T) {
 	waitHealthy(t, runner, logBytes)
 
 	// Now confirm that the instance is new
-	require.NotEqual(t, startingInstance, runner.instance, "instance not replaced")
+	require.NotEqual(t, startingInstance, runner.instances[defaultRegistrationId], "instance not replaced")
 
 	// Confirm osquery watchdog is now enabled
 	watchdogMemoryLimitMBFound := false
 	watchdogUtilizationLimitPercentFound := false
 	watchdogDelaySecFound := false
-	for _, a := range runner.instance.cmd.Args {
+	for _, a := range runner.instances[defaultRegistrationId].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			t.Error("disable_watchdog flag set")
 			t.FailNow()
@@ -493,10 +493,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		}
 
 		// Confirm osquery instance setup is complete
-		if runner.instance == nil {
+		if runner.instances[defaultRegistrationId] == nil {
 			return errors.New("instance does not exist yet")
 		}
-		if runner.instance.stats.ConnectTime == "" {
+		if runner.instances[defaultRegistrationId].stats.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 
@@ -534,8 +534,8 @@ func TestSimplePath(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to instance stats on start up")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 }
@@ -597,12 +597,12 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
-	previousStats := runner.instance.stats
+	previousStats := runner.instances[defaultRegistrationId].stats
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
-	require.NoError(t, killProcessGroup(runner.instance.cmd))
-	runner.instance.errgroup.Wait()
+	require.NoError(t, killProcessGroup(runner.instances[defaultRegistrationId].cmd))
+	runner.instances[defaultRegistrationId].errgroup.Wait()
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
@@ -646,10 +646,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[defaultRegistrationId].cmd.Process.Pid)
 
 	// kill the current osquery process but not the extension
-	require.NoError(t, runner.instance.cmd.Process.Kill())
+	require.NoError(t, runner.instances[defaultRegistrationId].cmd.Process.Kill())
 
 	// We need to (a) let the runner restart osquery, and (b) wait for
 	// the extension to die. Both of these may take up to 30s. We'll
@@ -694,7 +694,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
-	requirePgidMatch(t, runner.instance.cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[defaultRegistrationId].cmd.Process.Pid)
 
 	teardown = func() {
 		waitShutdown(t, runner, logBytes)
