@@ -539,6 +539,25 @@ func (i *OsqueryInstance) Launch() error {
 		return i.doneCtx.Err()
 	})
 
+	// Clean up socket file on shutdown
+	i.addShutdownGoroutineToErrgroup(ctx, "remove_socket_file", func() error {
+		// We do a couple retries -- on Windows, the socket file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing socket file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			i.slogger.Log(ctx, slog.LevelInfo,
+				"could not remove socket file, despite retries",
+				"socket_file", paths.extensionSocketPath,
+				"err", err,
+			)
+		}
+		return i.doneCtx.Err()
+	})
+
 	return nil
 }
 
