@@ -28,13 +28,11 @@ const (
 	launcherServiceName         string = `LauncherKolideK2Svc`
 
 	serviceDoesNotExistError string = "The specified service does not exist as an installed service."
-
-	serviceResetPeriodSeconds uint32 = 3 * 60 * 60 // 3 hours in seconds
 )
 
 // WatchdogController is responsible for:
-//  1. adding/enabling and disabling/removing the watchdog service according to the agent flag
-//  2. publishing any watchdog_logs written out by the watchdog service
+//  1. adding/enabling and disabling/removing the watchdog task according to the agent flag
+//  2. publishing any watchdog_logs written out by the watchdog task
 //
 // This controller is intended for use by the main launcher service invocation
 type WatchdogController struct {
@@ -202,10 +200,10 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	defer serviceManager.Disconnect()
 
 	if !enabled {
+		// TODO replace with remove task
 		err := RemoveService(serviceManager)
 		if err != nil {
 			if err.Error() == serviceDoesNotExistError {
-				wc.slogger.Log(ctx, slog.LevelDebug, "watchdog service was not previously installed")
 				return
 			}
 
@@ -222,38 +220,10 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 		return
 	}
 
-	// we're enabling the watchdog - first check if we've already installed the service
-	// there are three potential paths here:
-	// 1. service did not previously exist, proceed with clean installation
-	existingService, err := serviceManager.OpenService(launcherWatchdogServiceName)
-	if err != nil && err.Error() == serviceDoesNotExistError {
-		if err = wc.installService(serviceManager); err != nil {
-			wc.slogger.Log(ctx, slog.LevelError,
-				"encountered error installing watchdog service",
-				"err", err,
-			)
-		}
-
-		return
-	}
-
-	// 2. we are unable to check the current status of the service,
-	// this is the least likely option and there's nothing we can do here so log and return
-	if err != nil {
-		wc.slogger.Log(ctx, slog.LevelWarn,
-			"encountered error checking for watchdog service, unable to proceed with enabling",
-			"err", err,
-		)
-
-		return
-	}
-
-	// 3. The watchdog service already exists on this device. Here we just restart it to ensure it is
-	// running on the latest launcher code
-	defer existingService.Close()
-	if err = wc.restartService(existingService); err != nil {
+	// we're enabling the watchdog task- we can safely always reinstall our latest version here
+	if err = wc.installWatchdogTask(); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError,
-			"failure attempting to restart watchdog service",
+			"encountered error installing watchdog task",
 			"err", err,
 		)
 	}
@@ -271,75 +241,22 @@ func (wc *WatchdogController) getExecutablePath() (string, error) {
 	return defaultLauncherLocation, nil
 }
 
-func (wc *WatchdogController) installService(serviceManager *mgr.Mgr) error {
+func (wc *WatchdogController) installWatchdogTask() error {
 	ctx := context.TODO()
 	installedExePath, err := wc.getExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining watchdog executable path: %w", err)
 	}
 
-	svcMgrConf := mgr.Config{
-		DisplayName:  launcherWatchdogServiceName,
-		Description:  "The Kolide Launcher Watchdog Service",
-		StartType:    mgr.StartAutomatic,
-		ErrorControl: mgr.ErrorNormal,
-		// no reason to rush start for this service, we should wait until after
-		// the main launcher service has attempted to start anyway
-		DelayedAutoStart: true,
-	}
-
 	serviceArgs := []string{"watchdog"}
 	// add any original service arguments from the main launcher service invocation (currently running)
-	// this is likely just a pointer to the launcher.flags file but we want to ensure that the watchdog service
+	// this is likely just a pointer to the launcher.flags file but we want to ensure that the watchdog
 	// has insight into the same options for early service configuration, logging, etc.
 	serviceArgs = append(serviceArgs, os.Args[2:]...)
 
-	restartService, err := serviceManager.CreateService(
-		launcherWatchdogServiceName,
-		installedExePath,
-		svcMgrConf,
-		serviceArgs...,
-	)
+	// TODO add task installation logic
 
-	if err != nil { // no point moving forward if we can't create the service
-		return err
-	}
-
-	defer restartService.Close()
-
-	// set recovery actions - always restart after a 5 second delay
-	recoveryActions := []mgr.RecoveryAction{
-		{
-			Type:  mgr.ServiceRestart,
-			Delay: 5 * time.Second,
-		},
-	}
-
-	if err = restartService.SetRecoveryActions(recoveryActions, serviceResetPeriodSeconds); err != nil {
-		wc.slogger.Log(ctx, slog.LevelWarn,
-			"unable to set recovery actions for service installation, proceeding",
-			"err", err,
-		)
-	}
-
-	// set recovery actions on non crash failures - indicates that we want service manager
-	// to restart this service after terminating without a state of SERVICE_STOPPED, or whenever
-	// the exit code is not 0 (ERROR_SUCCESS)
-	if err = restartService.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
-		wc.slogger.Log(ctx, slog.LevelWarn,
-			"unable to set RecoveryActionsOnNonCrashFailures flag, proceeding",
-			"err", err,
-		)
-	}
-
-	if err = restartService.Start(); err != nil {
-		wc.slogger.Log(ctx, slog.LevelWarn,
-			"unable to start launcher restart service",
-			"err", err,
-		)
-	}
-
-	wc.slogger.Log(ctx, slog.LevelInfo, "completed watchdog service installation")
+	wc.slogger.Log(ctx, slog.LevelInfo, "completed watchdog scheduled task installation")
 
 	return nil
 }
@@ -369,35 +286,4 @@ func RemoveService(serviceManager *mgr.Mgr) error {
 	}
 
 	return nil
-}
-
-func (wc *WatchdogController) restartService(service *mgr.Service) error {
-	status, err := service.Control(svc.Stop)
-	if err != nil {
-		wc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"error stopping service",
-			"err", err,
-		)
-
-		// always attempt to start the service regardless, if the service was already
-		// stopped it will still err on the control (stop) call above
-		return service.Start()
-	}
-
-	if err := backoff.WaitFor(func() error {
-		status, err = service.Query()
-		if err != nil {
-			return fmt.Errorf("could not retrieve service status: %w", err)
-		}
-
-		if status.State != svc.Stopped {
-			return fmt.Errorf("service has not stopped")
-		}
-
-		return nil
-	}, 10*time.Second, 500*time.Millisecond); err != nil {
-		return fmt.Errorf("timed out waiting for %s service to stop: %w", service.Name, err)
-	}
-
-	return service.Start()
 }
