@@ -54,9 +54,9 @@ func (r *Runner) Run() error {
 
 	// Start each worker for each instance
 	for registrationId := range r.instances {
-		registrationId := registrationId
+		id := registrationId
 		wg.Go(func() error {
-			if err := r.runInstance(registrationId); err != nil {
+			if err := r.runInstance(id); err != nil {
 				r.slogger.Log(ctx, slog.LevelWarn,
 					"runner terminated running osquery instance unexpectedly, shutting down runner",
 					"err", err,
@@ -77,7 +77,7 @@ func (r *Runner) Run() error {
 
 	// Wait for all workers to exit
 	if err := wg.Wait(); err != nil {
-		return fmt.Errorf("running instances: %w", err)
+		return fmt.Errorf("running osquery instances: %w", err)
 	}
 
 	return nil
@@ -108,7 +108,6 @@ func (r *Runner) runInstance(registrationId string) error {
 		<-instance.Exited()
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"osquery instance exited",
-			"registration_id", registrationId,
 		)
 
 		select {
@@ -187,12 +186,12 @@ func (r *Runner) triggerShutdownForInstances() error {
 	// Shut down the instances in parallel
 	shutdownWg, _ := errgroup.WithContext(context.Background())
 	for registrationId, instance := range r.instances {
-		registrationId := registrationId
-		instance := instance
+		id := registrationId
+		i := instance
 		shutdownWg.Go(func() error {
-			instance.BeginShutdown()
-			if err := instance.WaitShutdown(); err != context.Canceled && err != nil {
-				return fmt.Errorf("shutting down instance %s: %w", registrationId, err)
+			i.BeginShutdown()
+			if err := i.WaitShutdown(); err != context.Canceled && err != nil {
+				return fmt.Errorf("shutting down instance %s: %w", id, err)
 			}
 			return nil
 		})
