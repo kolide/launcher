@@ -96,7 +96,7 @@ func TestCalculateOsqueryPaths(t *testing.T) {
 	binDir, err := getBinDir()
 	require.NoError(t, err)
 
-	paths, err := calculateOsqueryPaths(binDir, ulid.New(), osqueryOptions{})
+	paths, err := calculateOsqueryPaths(binDir, defaultRegistrationId, ulid.New(), osqueryOptions{})
 
 	require.NoError(t, err)
 
@@ -137,7 +137,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -161,7 +161,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -197,7 +197,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
@@ -249,7 +249,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 
-	i := newInstance(k, mockServiceClient())
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
 	i.opts = *osqOpts
 	i.knapsack = k
 
