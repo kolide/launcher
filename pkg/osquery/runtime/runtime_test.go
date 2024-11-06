@@ -581,6 +581,10 @@ func TestMultipleInstances(t *testing.T) {
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
+
+	// Confirm both instances exited
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
 func TestMultipleShutdowns(t *testing.T) {

@@ -184,16 +184,22 @@ func (r *Runner) triggerShutdownForInstances() error {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 
-	shutdownErrs := make([]error, 0)
+	// Shut down the instances in parallel
+	shutdownWg, _ := errgroup.WithContext(context.Background())
 	for registrationId, instance := range r.instances {
-		instance.BeginShutdown()
-		if err := instance.WaitShutdown(); err != context.Canceled && err != nil {
-			shutdownErrs = append(shutdownErrs, fmt.Errorf("shutting down instance %s: %w", registrationId, err))
-		}
+		registrationId := registrationId
+		instance := instance
+		shutdownWg.Go(func() error {
+			instance.BeginShutdown()
+			if err := instance.WaitShutdown(); err != context.Canceled && err != nil {
+				return fmt.Errorf("shutting down instance %s: %w", registrationId, err)
+			}
+			return nil
+		})
 	}
 
-	if len(shutdownErrs) > 0 {
-		return fmt.Errorf("shutting down all instances: %+v", shutdownErrs)
+	if err := shutdownWg.Wait(); err != nil {
+		return fmt.Errorf("shutting down all instances: %+v", err)
 	}
 
 	return nil
