@@ -194,7 +194,7 @@ func newInstance(registrationId string, knapsack types.Knapsack, serviceClient s
 	i := &OsqueryInstance{
 		registrationId: registrationId,
 		knapsack:       knapsack,
-		slogger:        knapsack.Slogger().With("component", "osquery_instance", "instance_run_id", runId),
+		slogger:        knapsack.Slogger().With("component", "osquery_instance", "registration_id", registrationId, "instance_run_id", runId),
 		serviceClient:  serviceClient,
 		runId:          runId,
 	}
