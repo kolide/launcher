@@ -11,6 +11,10 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 )
 
+const (
+	defaultRegistrationId = "default"
+)
+
 type Runner struct {
 	instance      *OsqueryInstance
 	instanceLock  sync.Mutex
@@ -24,7 +28,7 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		instance:      newInstance(k, serviceClient, opts...),
+		instance:      newInstance(defaultRegistrationId, k, serviceClient, opts...),
 		slogger:       k.Slogger().With("component", "osquery_runner"),
 		knapsack:      k,
 		serviceClient: serviceClient,
@@ -78,7 +82,7 @@ func (r *Runner) Run() error {
 		)
 
 		r.instanceLock.Lock()
-		r.instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
+		r.instance = newInstance(defaultRegistrationId, r.knapsack, r.serviceClient, r.opts...)
 		if err := r.instance.Launch(); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"fatal error restarting instance, shutting down",

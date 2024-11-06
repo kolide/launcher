@@ -100,10 +100,11 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	opts          osqueryOptions
-	knapsack      types.Knapsack
-	slogger       *slog.Logger
-	serviceClient service.KolideService
+	opts           osqueryOptions
+	registrationId string
+	knapsack       types.Knapsack
+	slogger        *slog.Logger
+	serviceClient  service.KolideService
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	runId                   string // string identifier for this instance
@@ -188,13 +189,14 @@ type osqueryOptions struct {
 	stdout              io.Writer
 }
 
-func newInstance(knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
-		knapsack:      knapsack,
-		slogger:       knapsack.Slogger().With("component", "osquery_instance", "instance_run_id", runId),
-		serviceClient: serviceClient,
-		runId:         runId,
+		registrationId: registrationId,
+		knapsack:       knapsack,
+		slogger:        knapsack.Slogger().With("component", "osquery_instance", "instance_run_id", runId),
+		serviceClient:  serviceClient,
+		runId:          runId,
 	}
 
 	for _, opt := range opts {
@@ -260,7 +262,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Based on the root directory, calculate the file names of all of the
 	// required osquery artifact files.
-	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.runId, i.opts)
+	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.registrationId, i.runId, i.opts)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
@@ -665,7 +667,7 @@ type osqueryFilePaths struct {
 // In return, a structure of paths is returned that can be used to launch an
 // osqueryd instance. An error may be returned if the supplied parameters are
 // unacceptable.
-func calculateOsqueryPaths(rootDirectory string, runId string, opts osqueryOptions) (*osqueryFilePaths, error) {
+func calculateOsqueryPaths(rootDirectory string, registrationId string, runId string, opts osqueryOptions) (*osqueryFilePaths, error) {
 
 	// Determine the path to the extension socket
 	extensionSocketPath := opts.extensionSocketPath
@@ -679,10 +681,15 @@ func calculateOsqueryPaths(rootDirectory string, runId string, opts osqueryOptio
 	// See: https://github.com/kolide/launcher/issues/1599
 	osqueryFilePaths := &osqueryFilePaths{
 		pidfilePath:           filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.pid", runId)),
-		databasePath:          filepath.Join(rootDirectory, "osquery.db"),
+		databasePath:          filepath.Join(rootDirectory, fmt.Sprintf("osquery-%s.db", registrationId)),
 		augeasPath:            filepath.Join(rootDirectory, "augeas-lenses"),
 		extensionSocketPath:   extensionSocketPath,
 		extensionAutoloadPath: extensionAutoloadPath,
+	}
+
+	// Keep default database path for default instance
+	if registrationId == defaultRegistrationId {
+		osqueryFilePaths.databasePath = filepath.Join(rootDirectory, "osquery.db")
 	}
 
 	osqueryAutoloadFile, err := os.Create(extensionAutoloadPath)
