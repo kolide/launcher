@@ -32,7 +32,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 	runner := &Runner{
 		instances: map[string]*OsqueryInstance{
 			// For now, we only have one (default) instance and we use it for all queries
-			defaultRegistrationId: newInstance(k, serviceClient, opts...),
+			defaultRegistrationId: newInstance(defaultRegistrationId, k, serviceClient, opts...),
 		},
 		slogger:       k.Slogger().With("component", "osquery_runner"),
 		knapsack:      k,
@@ -128,7 +128,7 @@ func (r *Runner) runInstance(registrationId string) error {
 		)
 
 		r.instanceLock.Lock()
-		instance = newInstance(r.knapsack, r.serviceClient, r.opts...)
+		instance = newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
 		r.instances[registrationId] = instance
 		if err := instance.Launch(); err != nil {
 			r.instanceLock.Unlock()
