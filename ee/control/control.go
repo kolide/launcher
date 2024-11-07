@@ -336,13 +336,12 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(subsystem, data); err != nil {
-		// Although we failed to update, the payload may be bad and there's no
-		// sense in repeatedly attempting to apply a bad update.
-		// A new update will have a new hash, so continue and remember this hash.
+		// Returning the error so we don't store the hash and we can try again next time
 		slogger.Log(context.TODO(), slog.LevelError,
 			"failed to update consumers and subscribers",
 			"err", err,
 		)
+		return err
 	}
 
 	// Remember the hash of the last fetched version of this subsystem's data

@@ -231,10 +231,10 @@ func TestControlServiceUpdateErr(t *testing.T) {
 	// Verify error consumer was called
 	assert.Equal(t, 1, errConsumer.updates)
 
-	// Verify hash was still recorded despite error
+	// Verify hash was not recorded due to error
 	val, err := store.Get([]byte("actions"))
 	require.NoError(t, err)
-	assert.Equal(t, "abc123", string(val))
+	assert.Empty(t, string(val))
 }
 
 func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
@@ -261,7 +261,7 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 	err := cs.RegisterConsumer("actions", errConsumer)
 	require.NoError(t, err)
 
-	// First fetch - should fail but store hash
+	// First fetch - should fail and not store hash
 	err = cs.Fetch()
 	require.NoError(t, err)
 	assert.Equal(t, 1, errConsumer.updates)
