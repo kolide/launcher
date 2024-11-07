@@ -100,6 +100,8 @@ func (aq *ActionQueue) Update(data io.Reader) error {
 		return fmt.Errorf("failed to decode actions data: %w", err)
 	}
 
+	var processError error = nil
+
 	for _, rawAction := range rawActionsToProcess {
 		var action action
 		if err := json.Unmarshal(rawAction, &action); err != nil {
@@ -128,6 +130,7 @@ func (aq *ActionQueue) Update(data io.Reader) error {
 				"failed to do action with action, not marking action complete",
 				"err", err,
 			)
+			processError = fmt.Errorf("actor.Do failed: %w", err)
 			continue
 		}
 
@@ -136,7 +139,7 @@ func (aq *ActionQueue) Update(data io.Reader) error {
 		aq.storeActionRecord(action)
 	}
 
-	return nil
+	return processError
 }
 
 func (aq *ActionQueue) RegisterActor(actorType string, actorToRegister actor) {

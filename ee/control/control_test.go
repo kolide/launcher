@@ -23,7 +23,8 @@ import (
 
 type (
 	mockConsumer struct {
-		updates int
+		updates   int
+		updateErr error
 	}
 	mockSubscriber struct {
 		pings int
@@ -35,7 +36,7 @@ type (
 
 func (mc *mockConsumer) Update(io.Reader) error {
 	mc.updates++
-	return nil
+	return mc.updateErr
 }
 
 func (ms *mockSubscriber) Ping() {
@@ -196,6 +197,44 @@ func TestControlServiceUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestControlServiceUpdateErr(t *testing.T) {
+	t.Parallel()
+
+	// Create mock consumer that returns error on update
+	errConsumer := &mockConsumer{
+		updateErr: errors.New("simulated update failure"),
+	}
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	// Set up test data with known hash
+	subsystems := map[string]string{"actions": "abc123"}
+	hashData := map[string]any{"abc123": "test-data"}
+	data, _ := NewControlTestClient(subsystems, hashData)
+
+	// Create control service and register error-producing consumer
+	store := &mockStore{keyValues: make(map[string]string)}
+	controlOpts := []Option{WithStore(store)}
+	cs := New(mockKnapsack, data, controlOpts...)
+	err := cs.RegisterConsumer("actions", errConsumer)
+	require.NoError(t, err)
+
+	// Trigger fetch which should cause update error
+	err = cs.Fetch()
+	require.NoError(t, err)
+
+	// Verify error consumer was called
+	assert.Equal(t, 1, errConsumer.updates)
+
+	// Verify hash was still recorded despite error
+	val, err := store.Get([]byte("actions"))
+	require.NoError(t, err)
+	assert.Equal(t, "abc123", string(val))
 }
 
 func TestControlServiceFetch(t *testing.T) {
