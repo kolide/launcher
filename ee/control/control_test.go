@@ -237,6 +237,53 @@ func TestControlServiceUpdateErr(t *testing.T) {
 	assert.Equal(t, "abc123", string(val))
 }
 
+func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
+	t.Parallel()
+
+	errConsumer := &mockConsumer{
+		updateErr: errors.New("simulated update failure"),
+	}
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	// First fetch data
+	subsystems := map[string]string{"actions": "abc123"}
+	hashData := map[string]any{"abc123": "test-data-1"}
+	data, _ := NewControlTestClient(subsystems, hashData)
+
+	store := &mockStore{keyValues: make(map[string]string)}
+	controlOpts := []Option{WithStore(store)}
+	cs := New(mockKnapsack, data, controlOpts...)
+
+	err := cs.RegisterConsumer("actions", errConsumer)
+	require.NoError(t, err)
+
+	// First fetch - should fail but store hash
+	err = cs.Fetch()
+	require.NoError(t, err)
+	assert.Equal(t, 1, errConsumer.updates)
+
+	// Create new test client with updated hash
+	subsystems = map[string]string{"actions": "def456"}
+	hashData = map[string]any{"def456": "test-data-2"}
+	newData, _ := NewControlTestClient(subsystems, hashData)
+	cs.fetcher = newData
+
+	// Second fetch with new hash - should succeed
+	errConsumer.updateErr = nil
+	err = cs.Fetch()
+	require.NoError(t, err)
+	assert.Equal(t, 2, errConsumer.updates)
+
+	// Verify final hash was recorded
+	val, err := store.Get([]byte("actions"))
+	require.NoError(t, err)
+	assert.Equal(t, "def456", string(val))
+}
+
 func TestControlServiceFetch(t *testing.T) {
 	t.Parallel()
 
