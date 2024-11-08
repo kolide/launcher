@@ -1,12 +1,14 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kolide/kit/ulid"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -196,4 +198,38 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	require.True(t, disableWatchdogFound, "watchdog disabled not set")
 
 	k.AssertExpectations(t)
+}
+
+func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
+	t.Parallel()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
+
+	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
+}
+
+func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
+	t.Parallel()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
+
+	_, err := i.Query("select * from osquery_info;")
+	require.Error(t, err, "should not be able to query unlaunched instance")
+}
+
+func Test_healthcheckWithRetries(t *testing.T) {
+	t.Parallel()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	i := newInstance(defaultRegistrationId, k, mockServiceClient())
+
+	// No client available, so healthcheck should fail despite retries
+	require.Error(t, i.healthcheckWithRetries(context.TODO(), 5, 100*time.Millisecond))
 }
