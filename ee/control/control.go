@@ -133,6 +133,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 func (cs *ControlService) startupData(ctx context.Context) map[string]string {
 	data := map[string]string{
 		"launcher_version": version.Version().Version,
+		"run_id":           cs.knapsack.GetRunID(),
 	}
 
 	if enrollStatus, err := cs.knapsack.CurrentEnrollmentStatus(); err != nil {
