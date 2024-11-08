@@ -476,7 +476,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 
 	select {
 	case err := <-shutdownErr:
-		require.NoError(t, err, fmt.Sprintf("runner logs: %s", logBytes.String()))
+		require.NoError(t, err, fmt.Sprintf("runner logs:\n\n%s", logBytes.String()))
 	case <-time.After(1 * time.Minute):
 		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
 		t.FailNow()
@@ -502,7 +502,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs: %s", time.Now().String(), logBytes.String()))
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
 
 	// Give the instance just a little bit of buffer before we proceed
 	time.Sleep(2 * time.Second)
@@ -652,6 +652,8 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	previousStats := runner.instances[defaultRegistrationId].stats
 
 	// Simulate the osquery process unexpectedly dying
