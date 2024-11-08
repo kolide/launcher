@@ -50,10 +50,6 @@ func TestCreateOsqueryCommand(t *testing.T) {
 
 	osquerydPath := testOsqueryBinaryDirectory
 
-	osqOpts := &osqueryOptions{
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-	}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -63,9 +59,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(defaultRegistrationId, k, mockServiceClient())
-	i.opts = *osqOpts
-	i.knapsack = k
+	i := newInstance(defaultRegistrationId, k, mockServiceClient(), WithStdout(os.Stdout), WithStderr(os.Stderr))
 
 	cmd, err := i.createOsquerydCommand(osquerydPath, paths)
 	require.NoError(t, err)
@@ -78,7 +72,6 @@ func TestCreateOsqueryCommand(t *testing.T) {
 func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	t.Parallel()
 
-	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -89,8 +82,6 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	i := newInstance(defaultRegistrationId, k, mockServiceClient())
-	i.opts = *osqOpts
-	i.knapsack = k
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinaryDirectory,
@@ -114,7 +105,6 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testing.T) {
 	t.Parallel()
 
-	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -125,8 +115,6 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryFlags").Return([]string{})
 
 	i := newInstance(defaultRegistrationId, k, mockServiceClient())
-	i.opts = *osqOpts
-	i.knapsack = k
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinaryDirectory,
@@ -169,7 +157,6 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testing.T) {
 	t.Parallel()
 
-	osqOpts := &osqueryOptions{}
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(false)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
@@ -177,8 +164,6 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryFlags").Return([]string{})
 
 	i := newInstance(defaultRegistrationId, k, mockServiceClient())
-	i.opts = *osqOpts
-	i.knapsack = k
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinaryDirectory,
