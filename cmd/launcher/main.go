@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -153,11 +154,11 @@ func runMain() int {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if !tuf.IsLauncherReloadNeededErr(err) {
+		if !tuf.IsLauncherReloadNeededErr(err) && !remoterestartconsumer.IsRemoteRestartRequestedErr(err) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}
-		level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
+		level.Debug(logger).Log("msg", "runLauncher exited to reload launcher", "err", err.Error())
 		if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
 			return 1
 		}
