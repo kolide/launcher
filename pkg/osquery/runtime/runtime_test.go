@@ -389,6 +389,56 @@ func TestMultipleInstances(t *testing.T) {
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
+func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
+	t.Parallel()
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("WatchdogEnabled").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	setUpMockStores(t, k)
+	serviceClient := mockServiceClient()
+
+	runner := New(k, serviceClient, opts...)
+
+	// Add in an extra instance
+	extraRegistrationId := ulid.New()
+	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
+
+	// Start the instance
+	go runner.Run()
+
+	// Wait very briefly for the launch routines to begin, then shut it down
+	time.Sleep(100 * time.Millisecond)
+	waitShutdown(t, runner, logBytes)
+
+	// Confirm the default instance was started, and then exited
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+
+	// Confirm the additional instance was started, and then exited
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+}
+
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
