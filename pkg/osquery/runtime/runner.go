@@ -18,15 +18,15 @@ const (
 )
 
 type Runner struct {
-	registrationIds []string
-	instances       map[string]*OsqueryInstance // maps registration ID to instance
-	instanceLock    sync.Mutex
+	registrationIds []string                    // we expect to run one instance per registration ID
+	instances       map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	instanceLock    sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger         *slog.Logger
 	knapsack        types.Knapsack
-	serviceClient   service.KolideService
+	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
+	opts            []OsqueryInstanceOption // global options applying to all osquery instances
 	shutdown        chan struct{}
 	interrupted     bool
-	opts            []OsqueryInstanceOption
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
@@ -35,7 +35,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 			// For now, we only have one (default) instance and we use it for all queries
 			defaultRegistrationId,
 		},
-		instances:     make(map[string]*OsqueryInstance), // maps registration IDs to currently-running instances
+		instances:     make(map[string]*OsqueryInstance),
 		slogger:       k.Slogger().With("component", "osquery_runner"),
 		knapsack:      k,
 		serviceClient: serviceClient,
