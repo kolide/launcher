@@ -454,7 +454,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Health check on interval
 	i.addGoroutineToErrgroup(ctx, "healthcheck", func() error {
-		if i.knapsack != nil && i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
+		if i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			i.slogger.Log(ctx, slog.LevelDebug,
 				"entering delay before starting osquery healthchecks",
 			)
@@ -481,40 +481,8 @@ func (i *OsqueryInstance) Launch() error {
 					break
 				}
 
-				// Health check! Allow a couple
-				// failures before we tear everything
-				// down. This is pretty simple, it
-				// hardcodes the timing. Might be
-				// better for a Limiter
-				maxHealthChecks := 5
-				for idx := 1; idx <= maxHealthChecks; idx++ {
-					err := i.Healthy()
-					if err == nil {
-						// err was nil, clear failed attempts
-						if idx > 1 {
-							i.slogger.Log(ctx, slog.LevelDebug,
-								"healthcheck passed, clearing error",
-								"attempt", idx,
-							)
-						}
-						break
-					}
-
-					if idx == maxHealthChecks {
-						i.slogger.Log(ctx, slog.LevelInfo,
-							"healthcheck failed, giving up",
-							"attempt", idx,
-							"err", err,
-						)
-						return fmt.Errorf("health check failed: %w", err)
-					}
-
-					i.slogger.Log(ctx, slog.LevelDebug,
-						"healthcheck failed, will retry",
-						"attempt", idx,
-						"err", err,
-					)
-					time.Sleep(1 * time.Second)
+				if err := i.healthcheckWithRetries(ctx, 5, 1*time.Second); err != nil {
+					return fmt.Errorf("health check failed: %w", err)
 				}
 			}
 		}
@@ -557,6 +525,39 @@ func (i *OsqueryInstance) Launch() error {
 		}
 		return i.doneCtx.Err()
 	})
+
+	return nil
+}
+
+// healthcheckWithRetries returns an error if it cannot get a non-error response from
+// `Healthy` within `maxHealthChecks` attempts.
+func (i *OsqueryInstance) healthcheckWithRetries(ctx context.Context, maxHealthChecks int, retryInterval time.Duration) error {
+	for idx := 1; idx <= maxHealthChecks; idx++ {
+		err := i.Healthy()
+
+		if err == nil {
+			if idx > 1 {
+				i.slogger.Log(ctx, slog.LevelDebug,
+					"healthcheck passed after previous failures -- clearing error",
+					"attempt", idx,
+				)
+			}
+			break
+		}
+
+		if idx == maxHealthChecks {
+			return fmt.Errorf("health check failed on %d consecutive attempts: %w", maxHealthChecks, err)
+		}
+
+		i.slogger.Log(ctx, slog.LevelDebug,
+			"healthcheck failed, will retry",
+			"attempt", idx,
+			"max_attempts", maxHealthChecks,
+			"err", err,
+		)
+
+		time.Sleep(retryInterval)
+	}
 
 	return nil
 }
