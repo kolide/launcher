@@ -130,7 +130,7 @@ func (aq *ActionQueue) Update(data io.Reader) error {
 				"failed to do action with action, not marking action complete",
 				"err", err,
 			)
-			processError = fmt.Errorf("actor.Do failed: %w", err)
+			processError = fmt.Errorf("actor.Do, action type: %s, failed: %w", action.type, err)
 			continue
 		}
 
