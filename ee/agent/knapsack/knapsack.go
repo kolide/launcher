@@ -63,7 +63,7 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	return k
 }
 
-// NewRunID sets the run ID in the knapsack
+// GetRunID returns the current launcher run ID -- if it's not yet set, it will generate and set it
 func (k *knapsack) GetRunID() string {
 	if runID == "" {
 		runID = ulid.New()
