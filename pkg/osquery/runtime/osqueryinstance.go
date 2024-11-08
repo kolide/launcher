@@ -454,7 +454,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Health check on interval
 	i.addGoroutineToErrgroup(ctx, "healthcheck", func() error {
-		if i.knapsack != nil && i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
+		if i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
 			i.slogger.Log(ctx, slog.LevelDebug,
 				"entering delay before starting osquery healthchecks",
 			)
