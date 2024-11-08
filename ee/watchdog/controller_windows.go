@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/sys/windows"
@@ -31,6 +32,7 @@ const (
 	launcherWatchdogServiceName string = `LauncherKolideWatchdogSvc`
 	launcherServiceName         string = `LauncherKolideK2Svc`
 	taskDateFormat              string = "2006-01-02T15:04:05"
+	watchdogTaskType            string = "watchdog"
 )
 
 // WatchdogController is responsible for:
@@ -39,14 +41,15 @@ const (
 //
 // This controller is intended for use by the main launcher service invocation
 type WatchdogController struct {
-	slogger      *slog.Logger
-	knapsack     types.Knapsack
-	interrupt    chan struct{}
-	interrupted  bool
-	logPublisher types.LogStore
+	slogger        *slog.Logger
+	knapsack       types.Knapsack
+	interrupt      chan struct{}
+	interrupted    bool
+	logPublisher   types.LogStore
+	configFilePath string
 }
 
-func NewController(ctx context.Context, k types.Knapsack) (*WatchdogController, error) {
+func NewController(ctx context.Context, k types.Knapsack, configFilePath string) (*WatchdogController, error) {
 	// set up the log publisher, if watchdog is enabled we will need to pull those logs from sqlite periodically
 	logPublisher, err := agentsqlite.OpenRW(ctx, k.RootDirectory(), agentsqlite.WatchdogLogStore)
 	if err != nil {
@@ -54,10 +57,11 @@ func NewController(ctx context.Context, k types.Knapsack) (*WatchdogController, 
 	}
 
 	return &WatchdogController{
-		slogger:      k.Slogger().With("component", "watchdog_controller"),
-		knapsack:     k,
-		interrupt:    make(chan struct{}, 1),
-		logPublisher: logPublisher,
+		slogger:        k.Slogger().With("component", "watchdog_controller"),
+		knapsack:       k,
+		interrupt:      make(chan struct{}, 1),
+		logPublisher:   logPublisher,
+		configFilePath: configFilePath,
 	}, nil
 }
 
@@ -72,7 +76,7 @@ func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {
 // use all of the existing log publication and cleanup logic while maintaining a single writer
 func (wc *WatchdogController) Run() error {
 	ctx := context.TODO()
-	ticker := time.NewTicker(time.Minute * 5)
+	ticker := time.NewTicker(time.Minute * 30)
 	defer ticker.Stop()
 
 	for {
@@ -91,15 +95,26 @@ func (wc *WatchdogController) Run() error {
 }
 
 func (wc *WatchdogController) publishLogs(ctx context.Context) {
-	// note that there is a small window here where there could be pending logs before watchdog is disabled -
-	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
-	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
-	if !wc.knapsack.LauncherWatchdogEnabled() {
+	// we don't install watchdog for non-prod deployments, so we should also skip log publication
+	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
 		return
 	}
 
-	// we don't install watchdog for non-prod deployments, so we should also skip log publication
-	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
+	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
+	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
+	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
+	watchdogTaskIsInstalled, err := watchdogTaskExists(wc.knapsack.Identifier())
+	if err != nil {
+		wc.slogger.Log(ctx, slog.LevelWarn,
+			"encountered error checking if watchdog task exists",
+			"err", err,
+		)
+
+		return
+	}
+
+	// no need to parse logs if task is not installed
+	if !watchdogTaskIsInstalled {
 		return
 	}
 
@@ -181,11 +196,8 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 		return
 	}
 
-	// TODO generate task name based on identifier
-	taskName := "LauncherKolideK2WakerTask"
-
 	if !enabled {
-		if err := RemoveWatchdogTask(taskName); err != nil {
+		if err := RemoveWatchdogTask(wc.knapsack.Identifier()); err != nil {
 			wc.slogger.Log(ctx, slog.LevelWarn,
 				"encountered error removing watchdog task",
 				"err", err,
@@ -200,7 +212,7 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	}
 
 	// we're enabling the watchdog task- we can safely always reinstall our latest version here
-	if err := InstallWatchdogTask(taskName); err != nil {
+	if err := InstallWatchdogTask(wc.knapsack.Identifier(), wc.configFilePath); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError,
 			"encountered error installing watchdog task",
 			"err", err,
@@ -210,20 +222,28 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	wc.slogger.Log(ctx, slog.LevelInfo, "completed watchdog scheduled task installation")
 }
 
-// TODO make this interpolate identifier in path generation
-func getExecutablePath() (string, error) {
-	defaultBinDir := launcher.DefaultPath(launcher.BinDirectory)
-	defaultLauncherLocation := filepath.Join(defaultBinDir, "launcher.exe")
+func getExecutablePath(identifier string) (string, error) {
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	binDirBase := fmt.Sprintf(`C:\Program Files\Kolide\Launcher-%s\bin`, identifier)
+	launcherBin := filepath.Join(binDirBase, "launcher.exe")
 	// do some basic sanity checking to prevent installation from a bad path
-	_, err := os.Stat(defaultLauncherLocation)
+	_, err := os.Stat(launcherBin)
 	if err != nil {
 		return "", err
 	}
 
-	return defaultLauncherLocation, nil
+	return launcherBin, nil
 }
 
-func InstallWatchdogTask(taskName string) error {
+func InstallWatchdogTask(identifier, configFilePath string) error {
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	taskName := launcher.TaskName(identifier, watchdogTaskType)
 	// Initialize COM
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
@@ -389,7 +409,11 @@ func InstallWatchdogTask(taskName string) error {
 	</Query>
 </QueryList>
 `
-	eventSubscription := fmt.Sprintf(eventSubscriptionTemplate, 507, 107, 1)
+	eventSubscription := fmt.Sprintf(eventSubscriptionTemplate,
+		powereventwatcher.EventIdExitingModernStandby,
+		powereventwatcher.EventIdResumedFromSleep,
+		1, // Microsoft-Windows-Power-Troubleshooter event ID 1 is "resumed from low power state"
+	)
 
 	if _, err = oleutil.PutProperty(eventTrigger, "Subscription", eventSubscription); err != nil {
 		return fmt.Errorf("setting subscription property: %w", err)
@@ -430,7 +454,7 @@ func InstallWatchdogTask(taskName string) error {
 	repetition := repetitionObj.ToIDispatch()
 	defer repetition.Release()
 
-	// set the repetition interval. PT30M=every 30 minutes
+	// set the repetition interval. PT30M=30 minutes
 	if _, err = oleutil.PutProperty(repetition, "Interval", "PT30M"); err != nil {
 		return fmt.Errorf("setting time trigger interval: %w", err)
 	}
@@ -454,23 +478,17 @@ func InstallWatchdogTask(taskName string) error {
 	execAction := execActionTemplate.ToIDispatch()
 	defer execAction.Release()
 
-	installedExePath, err := getExecutablePath()
+	installedExePath, err := getExecutablePath(identifier)
 	if err != nil {
 		return fmt.Errorf("determining watchdog executable path: %w", err)
 	}
 
-	serviceArgs := []string{"watchdog"}
-	// add any original service arguments from the main launcher service invocation (currently running)
-	// this is likely just a pointer to the launcher.flags file but we want to ensure that the watchdog
-	// has insight into the same options for service name determination based on identifier, logging setup, etc.
-	serviceArgs = append(serviceArgs, os.Args[2:]...)
-
-	if _, err = oleutil.PutProperty(execAction, "Path", installedExePath); err != nil {
+	if _, err = oleutil.PutProperty(execAction, "Path", `"`+installedExePath+`"`); err != nil {
 		return fmt.Errorf("setting action path: %w", err)
 	}
 
-	argString := strings.Join(serviceArgs, " ")
-	if _, err = oleutil.PutProperty(execAction, "Arguments", argString); err != nil {
+	taskArgs := fmt.Sprintf(`watchdog -config "%s"`, configFilePath)
+	if _, err = oleutil.PutProperty(execAction, "Arguments", taskArgs); err != nil {
 		return fmt.Errorf("setting action arguments: %w", err)
 	}
 
@@ -492,7 +510,12 @@ func InstallWatchdogTask(taskName string) error {
 	return nil
 }
 
-func RemoveWatchdogTask(taskName string) error {
+func RemoveWatchdogTask(identifier string) error {
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	taskName := launcher.TaskName(identifier, watchdogTaskType)
 	// Initialize COM
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
@@ -560,4 +583,54 @@ func RemoveService(serviceManager *mgr.Mgr) error {
 	}
 
 	return nil
+}
+
+func watchdogTaskExists(identifier string) (bool, error) {
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	taskName := launcher.TaskName(identifier, watchdogTaskType)
+	// Initialize COM
+	ole.CoInitialize(0)
+	defer ole.CoUninitialize()
+
+	// Create a Task Scheduler object
+	schedService, err := oleutil.CreateObject("Schedule.Service")
+	if err != nil {
+		return false, fmt.Errorf("creating schedule service object: %w", err)
+	}
+	defer schedService.Release()
+
+	// Get the Task Scheduler service interface
+	scheduler, err := schedService.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return false, err
+	}
+	defer scheduler.Release()
+
+	// Connect to the local machine
+	_, err = oleutil.CallMethod(scheduler, "Connect")
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to Task Scheduler: %w", err)
+	}
+
+	// Get the root task folder
+	rootFolderVar, err := oleutil.CallMethod(scheduler, "GetFolder", `\`)
+	if err != nil {
+		return false, fmt.Errorf("failed to get root folder: %w", err)
+	}
+
+	rootFolder := rootFolderVar.ToIDispatch()
+	defer rootFolder.Release()
+
+	taskObj, err := oleutil.CallMethod(rootFolder, "GetTask", taskName)
+	// this will fail with a generic "Exception Occurred" message if the task does not exist
+	if err != nil {
+		return false, nil
+	}
+
+	taskObj.ToIDispatch().Release()
+
+	return true, nil
 }
