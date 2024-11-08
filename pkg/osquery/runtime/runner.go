@@ -18,22 +18,24 @@ const (
 )
 
 type Runner struct {
-	instances     map[string]*OsqueryInstance // maps registration ID to instance
-	instanceLock  sync.Mutex
-	slogger       *slog.Logger
-	knapsack      types.Knapsack
-	serviceClient service.KolideService
-	shutdown      chan struct{}
-	interrupted   bool
-	opts          []OsqueryInstanceOption
+	registrationIds []string
+	instances       map[string]*OsqueryInstance // maps registration ID to instance
+	instanceLock    sync.Mutex
+	slogger         *slog.Logger
+	knapsack        types.Knapsack
+	serviceClient   service.KolideService
+	shutdown        chan struct{}
+	interrupted     bool
+	opts            []OsqueryInstanceOption
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		instances: map[string]*OsqueryInstance{
+		registrationIds: []string{
 			// For now, we only have one (default) instance and we use it for all queries
-			defaultRegistrationId: newInstance(defaultRegistrationId, k, serviceClient, opts...),
+			defaultRegistrationId,
 		},
+		instances:     make(map[string]*OsqueryInstance), // maps registration IDs to currently-running instances
 		slogger:       k.Slogger().With("component", "osquery_runner"),
 		knapsack:      k,
 		serviceClient: serviceClient,
@@ -53,7 +55,7 @@ func (r *Runner) Run() error {
 	wg, ctx := errgroup.WithContext(context.Background())
 
 	// Start each worker for each instance
-	for registrationId := range r.instances {
+	for _, registrationId := range r.registrationIds {
 		id := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
@@ -91,15 +93,14 @@ func (r *Runner) runInstance(registrationId string) error {
 
 	// First, launch the instance. Ensure we don't try to restart before launch is complete.
 	r.instanceLock.Lock()
-	instance, ok := r.instances[registrationId]
-	if !ok {
-		r.instanceLock.Unlock()
-		return fmt.Errorf("no instance exists for %s", registrationId)
-	}
+	instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
 	if err := instance.Launch(); err != nil {
 		r.instanceLock.Unlock()
 		return fmt.Errorf("starting instance for %s: %w", registrationId, err)
 	}
+
+	// Now that the instance is running, we can add it to `r.instances` and remove the lock
+	r.instances[registrationId] = instance
 	r.instanceLock.Unlock()
 
 	// This loop restarts the instance as necessary. It exits when `Shutdown` is called,
@@ -258,7 +259,13 @@ func (r *Runner) Healthy() error {
 	defer r.instanceLock.Unlock()
 
 	healthcheckErrs := make([]error, 0)
-	for registrationId, instance := range r.instances {
+	for _, registrationId := range r.registrationIds {
+		instance, ok := r.instances[registrationId]
+		if !ok {
+			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", registrationId))
+			continue
+		}
+
 		if err := instance.Healthy(); err != nil {
 			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("healthcheck error for %s: %w", registrationId, err))
 		}

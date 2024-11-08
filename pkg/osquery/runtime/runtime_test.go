@@ -566,24 +566,32 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
-	runner.instances[extraRegistrationId] = newInstance(ulid.New(), k, serviceClient, opts...)
+	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
 
 	// Start the instance
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm the default instance was started
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
 
 	// Confirm the additional instance was started
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm both instances exited
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
