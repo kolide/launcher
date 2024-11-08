@@ -476,7 +476,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 
 	select {
 	case err := <-shutdownErr:
-		require.NoError(t, err, fmt.Sprintf("runner logs: %s", logBytes.String()))
+		require.NoError(t, err, fmt.Sprintf("runner logs:\n\n%s", logBytes.String()))
 	case <-time.After(1 * time.Minute):
 		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
 		t.FailNow()
@@ -502,7 +502,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs: %s", time.Now().String(), logBytes.String()))
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
 
 	// Give the instance just a little bit of buffer before we proceed
 	time.Sleep(2 * time.Second)
@@ -566,24 +566,32 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
-	runner.instances[extraRegistrationId] = newInstance(ulid.New(), k, serviceClient, opts...)
+	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
 
 	// Start the instance
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm the default instance was started
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
 
 	// Confirm the additional instance was started
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm both instances exited
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
@@ -644,6 +652,8 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
+	require.Contains(t, runner.instances, defaultRegistrationId)
+	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
 	previousStats := runner.instances[defaultRegistrationId].stats
 
 	// Simulate the osquery process unexpectedly dying
