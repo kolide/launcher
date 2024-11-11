@@ -89,6 +89,37 @@ func TestDo_DoesNotSignalRestartWhenRunIDIsEmpty(t *testing.T) {
 	require.Len(t, remoteRestarter.signalRestart, 0, "restarter should not have signaled for a restart, but channel is not empty")
 }
 
+func TestDo_DoesNotRestartIfInterruptedDuringDelay(t *testing.T) {
+	t.Parallel()
+
+	currentRunId := ulid.New()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("GetRunID").Return(currentRunId)
+
+	remoteRestarter := New(mockKnapsack)
+
+	testAction := remoteRestartAction{
+		RunID: currentRunId,
+	}
+	testActionRaw, err := json.Marshal(testAction)
+	require.NoError(t, err)
+
+	// We don't expect an error because the run ID is correct
+	require.NoError(t, remoteRestarter.Do(bytes.NewReader(testActionRaw)), "expected no error processing valid remote restart action")
+
+	// The restarter should delay before sending an error to `signalRestart`
+	require.Len(t, remoteRestarter.signalRestart, 0, "expected restarter to delay before signal for restart but channel is already has item in it")
+
+	// Now, send an interrupt
+	remoteRestarter.Interrupt(errors.New("test error"))
+
+	// Sleep beyond the interrupt delay, and confirm we don't try to do a restart when we're already shutting down
+	time.Sleep(restartDelay + 2*time.Second)
+	require.Len(t, remoteRestarter.signalRestart, 0, "restarter should not have tried to signal for restart when interrupted during restart delay")
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 

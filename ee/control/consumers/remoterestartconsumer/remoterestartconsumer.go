@@ -75,9 +75,20 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			"restart_delay", restartDelay.String(),
 		)
 
-		time.Sleep(restartDelay)
-
-		r.signalRestart <- NewRemoteRestartRequestedErr(restartAction.RunID)
+		select {
+		case <-r.interrupt:
+			r.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received external interrupt before remote restart could be performed",
+			)
+			return
+		case <-time.After(restartDelay):
+			r.signalRestart <- NewRemoteRestartRequestedErr(restartAction.RunID)
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"signaled for restart after delay",
+				"run_id", restartAction.RunID,
+			)
+			return
+		}
 	}()
 
 	return nil
