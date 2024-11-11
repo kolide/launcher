@@ -73,7 +73,7 @@ func RunWatchdogTask(systemSlogger *multislogger.MultiSlogger, args []string) er
 	)
 
 	if *flInstallTask {
-		if err := InstallWatchdogTask(opts.Identifier, opts.ConfigFilePath); err != nil {
+		if err := installWatchdogTask(opts.Identifier, opts.ConfigFilePath); err != nil {
 			localSlogger.Log(ctx, slog.LevelWarn,
 				"encountered error attempting watchdog install from CLI",
 				"err", err,

@@ -21,11 +21,8 @@ import (
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/powereventwatcher"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/mgr"
 )
 
 const (
@@ -212,7 +209,7 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	}
 
 	// we're enabling the watchdog task- we can safely always reinstall our latest version here
-	if err := InstallWatchdogTask(wc.knapsack.Identifier(), wc.configFilePath); err != nil {
+	if err := installWatchdogTask(wc.knapsack.Identifier(), wc.configFilePath); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError,
 			"encountered error installing watchdog task",
 			"err", err,
@@ -238,7 +235,14 @@ func getExecutablePath(identifier string) (string, error) {
 	return launcherBin, nil
 }
 
-func InstallWatchdogTask(identifier, configFilePath string) error {
+// installWatchdogTask registers our watchdog subcommand as a scheduled task.
+// see inline comments for details on various settings, but here is a general overview:
+// Triggers:
+// - 1 minute after any wake event
+// - every 30 minutes as a routine check
+// Actions:
+// - runs launcher.exe watchdog -config <path to config> with a 1 minute timeout
+func installWatchdogTask(identifier, configFilePath string) error {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
 	}
@@ -293,6 +297,7 @@ func InstallWatchdogTask(identifier, configFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("getting registration info property: %w", err)
 	}
+
 	regInfo := regInfoProp.ToIDispatch()
 	defer regInfo.Release()
 
@@ -331,7 +336,6 @@ func InstallWatchdogTask(identifier, configFilePath string) error {
 	settings := settingsProp.ToIDispatch()
 	defer settings.Release()
 
-	// TODO check all of these errors
 	// see all available task settings here https://learn.microsoft.com/en-us/windows/win32/api/taskschd/nn-taskschd-itasksettings
 	// task will be enabled on creation
 	if _, err = oleutil.PutProperty(settings, "Enabled", true); err != nil {
@@ -510,6 +514,8 @@ func InstallWatchdogTask(identifier, configFilePath string) error {
 	return nil
 }
 
+// RemoveWatchdogTask will determine the task name based on the given identifier, and remove
+// the task from the scheduler service. This is exported for use by our remote uninstallation paths
 func RemoveWatchdogTask(identifier string) error {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
@@ -558,33 +564,8 @@ func RemoveWatchdogTask(identifier string) error {
 	return nil
 }
 
-// RemoveService utilizes the passed serviceManager to remove any existing watchdog service if it exists
-func RemoveService(serviceManager *mgr.Mgr) error {
-	existingService, err := serviceManager.OpenService(launcherWatchdogServiceName)
-	if err != nil {
-		return err
-	}
-
-	defer existingService.Close()
-
-	// attempt to stop the service first, we don't care if this fails because we are going to
-	// remove the service next anyway (the removal happens faster if stopped first, but will
-	// happen eventually regardless)
-	existingService.Control(svc.Stop)
-
-	if err := backoff.WaitFor(func() error {
-		if err = existingService.Delete(); err != nil {
-			return err
-		}
-
-		return nil
-	}, 3*time.Second, 500*time.Millisecond); err != nil {
-		return fmt.Errorf("timed out attempting service deletion: %w", err)
-	}
-
-	return nil
-}
-
+// watchdogTaskExists connects with the scheduler service to determine whether
+// a watchdog task for the given identifier is installed on the device
 func watchdogTaskExists(identifier string) (bool, error) {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
