@@ -59,7 +59,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	// Add sleep states using addStreamToZip
 	if err := addStreamToZip(extraZip, "available_sleep_states.txt", time.Now(), bytes.NewReader(availableSleepStatesOutput)); err != nil {
-		return fmt.Errorf("adding sleep states to zip: %w", err)
+		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
 	}
 
 	// Get power events
