@@ -67,7 +67,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 	if restartAction.RunID != r.knapsack.GetRunID() {
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"received remote restart action for incorrect (assuming past) launcher run ID -- discarding",
-			"run_id", restartAction.RunID,
+			"action_run_id", restartAction.RunID,
 		)
 		return nil
 	}
@@ -77,7 +77,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 	go func() {
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"received remote restart action for current launcher run ID -- signaling for restart shortly",
-			"run_id", restartAction.RunID,
+			"action_run_id", restartAction.RunID,
 			"restart_delay", restartDelay.String(),
 		)
 
@@ -91,7 +91,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			r.signalRestart <- NewRemoteRestartRequestedErr(restartAction.RunID)
 			r.slogger.Log(context.TODO(), slog.LevelInfo,
 				"signaled for restart after delay",
-				"run_id", restartAction.RunID,
+				"action_run_id", restartAction.RunID,
 			)
 			return
 		}
