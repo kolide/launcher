@@ -4,6 +4,8 @@ import (
 	"errors"
 )
 
+// ErrRemoteRestartRequested is returned to the main launcher rungroup when
+// a remote restart has been requested.
 type ErrRemoteRestartRequested struct {
 	msg string
 }

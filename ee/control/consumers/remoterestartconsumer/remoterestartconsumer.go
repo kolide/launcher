@@ -12,9 +12,13 @@ import (
 )
 
 const (
-	// Identifier for this consumer.
+	// RemoteRestartActorType identifies this action/actor type, which performs
+	// a launcher restart when requested by the control server. This actor type
+	// belongs to the action subsystem.
 	RemoteRestartActorType = "remote_restart"
 
+	// restartDelay is the delay after receiving action before triggering the restart.
+	// We have a delay to allow the actionqueue.
 	restartDelay = 15 * time.Second
 )
 
@@ -39,6 +43,11 @@ func New(knapsack types.Knapsack) *RemoteRestartConsumer {
 	}
 }
 
+// Do implements the `actionqueue.actor` interface, and allows the actionqueue
+// to pass `remote_restart` type actions to this consumer. The actionqueue validates
+// that this action has not already been performed and that this action is still
+// valid (i.e. not expired). `Do` additionally validates that the `run_id` given in
+// the action matches the current launcher run ID.
 func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 	var restartAction remoteRestartAction
 
@@ -74,8 +83,10 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 	return nil
 }
 
+// Execute allows the remote restart consumer to run in the main launcher rungroup.
+// It waits until it receives a remote restart action from `Do`, or until it receives
+// a `Shutdown` request.
 func (r *RemoteRestartConsumer) Execute() (err error) {
-	// Wait until we receive a remote restart action, or until we receive a Shutdown request
 	select {
 	case <-r.interrupt:
 		return nil
@@ -84,6 +95,8 @@ func (r *RemoteRestartConsumer) Execute() (err error) {
 	}
 }
 
+// Shutdown allows the remote restart consumer to run in the main launcher rungroup
+// and be shut down when the rungroup shuts down.
 func (r *RemoteRestartConsumer) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if r.interrupted {
