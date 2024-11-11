@@ -67,16 +67,13 @@ func TestDo_DoesNotSignalRestartWhenRunIDDoesNotMatch(t *testing.T) {
 func TestDo_DoesNotSignalRestartWhenRunIDIsEmpty(t *testing.T) {
 	t.Parallel()
 
-	currentRunId := ulid.New()
-
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-	mockKnapsack.On("GetRunID").Return(currentRunId)
 
 	remoteRestarter := New(mockKnapsack)
 
 	testAction := remoteRestartAction{
-		RunID: "", // run ID will not match `currentRunId`
+		RunID: "", // run ID is empty
 	}
 	testActionRaw, err := json.Marshal(testAction)
 	require.NoError(t, err)

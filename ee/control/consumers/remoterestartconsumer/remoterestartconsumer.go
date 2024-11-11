@@ -58,6 +58,12 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 	// The action's run ID indicates the current `runLauncher` that should be restarted.
 	// If the action's run ID does not match the current run ID, we assume the restart
 	// has already happened and does not need to happen again.
+	if restartAction.RunID == "" {
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"received remote restart action with blank launcher run ID -- discarding",
+		)
+		return nil
+	}
 	if restartAction.RunID != r.knapsack.GetRunID() {
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"received remote restart action for incorrect (assuming past) launcher run ID -- discarding",
