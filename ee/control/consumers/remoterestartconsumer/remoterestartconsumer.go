@@ -68,7 +68,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 
 		time.Sleep(restartDelay)
 
-		r.signalRestart <- NewRemoteRestartRequested()
+		r.signalRestart <- NewRemoteRestartRequestedErr()
 	}()
 
 	return nil

@@ -4,27 +4,27 @@ import (
 	"errors"
 )
 
-type RemoteRestartRequested struct {
+type ErrRemoteRestartRequested struct {
 	msg string
 }
 
-func NewRemoteRestartRequested() RemoteRestartRequested {
-	return RemoteRestartRequested{
+func NewRemoteRestartRequestedErr() ErrRemoteRestartRequested {
+	return ErrRemoteRestartRequested{
 		msg: "need to reload launcher: remote restart requested",
 	}
 }
 
-func (e RemoteRestartRequested) Error() string {
+func (e ErrRemoteRestartRequested) Error() string {
 	return e.msg
 }
 
-func (e RemoteRestartRequested) Is(target error) bool {
-	if _, ok := target.(RemoteRestartRequested); ok {
+func (e ErrRemoteRestartRequested) Is(target error) bool {
+	if _, ok := target.(ErrRemoteRestartRequested); ok {
 		return true
 	}
 	return false
 }
 
 func IsRemoteRestartRequestedErr(err error) bool {
-	return errors.Is(err, RemoteRestartRequested{})
+	return errors.Is(err, ErrRemoteRestartRequested{})
 }
