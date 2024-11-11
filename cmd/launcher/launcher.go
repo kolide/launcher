@@ -471,7 +471,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		actionsQueue.RegisterActor(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
 		remoteRestartConsumer := remoterestartconsumer.New(k)
-		runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Shutdown)
+		runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
 		actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
 
 		// Set up our tracing instrumentation

@@ -85,7 +85,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 
 // Execute allows the remote restart consumer to run in the main launcher rungroup.
 // It waits until it receives a remote restart action from `Do`, or until it receives
-// a `Shutdown` request.
+// a `Interrupt` request.
 func (r *RemoteRestartConsumer) Execute() (err error) {
 	select {
 	case <-r.interrupt:
@@ -95,9 +95,9 @@ func (r *RemoteRestartConsumer) Execute() (err error) {
 	}
 }
 
-// Shutdown allows the remote restart consumer to run in the main launcher rungroup
+// Interrupt allows the remote restart consumer to run in the main launcher rungroup
 // and be shut down when the rungroup shuts down.
-func (r *RemoteRestartConsumer) Shutdown(_ error) {
+func (r *RemoteRestartConsumer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if r.interrupted {
 		return

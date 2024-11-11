@@ -3,6 +3,7 @@ package remoterestartconsumer
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -86,4 +87,46 @@ func TestDo_DoesNotSignalRestartWhenRunIDIsEmpty(t *testing.T) {
 	// The restarter should not send an error to `signalRestart`
 	time.Sleep(restartDelay + 2*time.Second)
 	require.Len(t, remoteRestarter.signalRestart, 0, "restarter should not have signaled for a restart, but channel is not empty")
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	remoteRestarter := New(mockKnapsack)
+
+	// Let the remote restarter run for a bit
+	go remoteRestarter.Execute()
+	time.Sleep(3 * time.Second)
+	remoteRestarter.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			remoteRestarter.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
