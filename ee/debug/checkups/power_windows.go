@@ -81,6 +81,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	return nil
 }
+
 func (p *powerCheckup) ExtraFileName() string {
 	return "power.zip"
 }
