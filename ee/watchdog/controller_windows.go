@@ -238,7 +238,7 @@ func getExecutablePath(identifier string) (string, error) {
 // Triggers:
 // - 1 minute after any wake event
 // - every 30 minutes as a routine check
-// Actions:
+// Action:
 // - runs launcher.exe watchdog -config <path to config> with a 1 minute timeout
 func installWatchdogTask(identifier, configFilePath string) error {
 	if strings.TrimSpace(identifier) == "" {
@@ -246,31 +246,31 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// Initialize COM
+	// init COM
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
-	// Create a Task Scheduler object
+	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")
 	if err != nil {
 		return fmt.Errorf("creating schedule service object: %w", err)
 	}
 	defer schedService.Release()
 
-	// Get the Task Scheduler service interface
+	// get service interface handle
 	scheduler, err := schedService.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return err
 	}
 	defer scheduler.Release()
 
-	// Connect to the local machine
+	// connect to the scheduler handle on the local machine
 	_, err = oleutil.CallMethod(scheduler, "Connect")
 	if err != nil {
 		return fmt.Errorf("failed to connect to Task Scheduler: %w", err)
 	}
 
-	// Get the root task folder
+	// grab the root task folder
 	rootFolderVar, err := oleutil.CallMethod(scheduler, "GetFolder", `\`)
 	if err != nil {
 		return fmt.Errorf("failed to get root folder: %w", err)
@@ -279,7 +279,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	rootFolder := rootFolderVar.ToIDispatch()
 	defer rootFolder.Release()
 
-	// Create a new task definition
+	// begin definition for a new task
 	taskDefinitionTemplate, err := oleutil.CallMethod(scheduler, "NewTask", 0)
 	if err != nil {
 		return fmt.Errorf("failed to create new task definition: %w", err)
@@ -290,7 +290,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 
 	installationDate := time.Now().Format(taskDateFormat)
 
-	// Get task registration info
+	// get the task registration info props
 	regInfoProp, err := oleutil.GetProperty(taskDefinition, "RegistrationInfo")
 	if err != nil {
 		return fmt.Errorf("getting registration info property: %w", err)
@@ -325,7 +325,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting run level: %w", err)
 	}
 
-	// Get the task settings
+	// get the root task settings property
 	settingsProp, err := oleutil.GetProperty(taskDefinition, "Settings")
 	if err != nil {
 		return fmt.Errorf("getting settings property: %w", err)
@@ -375,7 +375,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting StopOnIdleEnd idlesetting: %w", err)
 	}
 
-	// Define the trigger
+	// begin trigger definitions
 	triggersProp, err := oleutil.GetProperty(taskDefinition, "Triggers")
 	if err != nil {
 		return fmt.Errorf("getting triggers property: %w", err)
@@ -420,6 +420,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	if _, err = oleutil.PutProperty(eventTrigger, "Subscription", eventSubscription); err != nil {
 		return fmt.Errorf("setting subscription property: %w", err)
 	}
+
 	// see details for how this string is created here: https://learn.microsoft.com/en-us/windows/win32/taskschd/eventtrigger-delay
 	// PT1M here means 1 minute
 	if _, err = oleutil.PutProperty(eventTrigger, "Delay", "PT1M"); err != nil {
@@ -461,7 +462,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting time trigger interval: %w", err)
 	}
 
-	// Define the action
+	// begin creation of the task action
 	actionsProp, err := oleutil.GetProperty(taskDefinition, "Actions")
 	if err != nil {
 		return fmt.Errorf("getting actions property: %w", err)
@@ -494,7 +495,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting action arguments: %w", err)
 	}
 
-	// Register the task
+	// now register the task!
 	_, err = oleutil.CallMethod(rootFolder, "RegisterTaskDefinition",
 		taskName,       // Task name
 		taskDefinition, // Task definition
@@ -520,31 +521,31 @@ func RemoveWatchdogTask(identifier string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// Initialize COM
+	// init COM
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
-	// Create a Task Scheduler object
+	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")
 	if err != nil {
 		return fmt.Errorf("creating schedule service object: %w", err)
 	}
 	defer schedService.Release()
 
-	// Get the Task Scheduler service interface
+	// get service interface handle
 	scheduler, err := schedService.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return err
 	}
 	defer scheduler.Release()
 
-	// Connect to the local machine
+	// connect to the scheduler handle on the local machine
 	_, err = oleutil.CallMethod(scheduler, "Connect")
 	if err != nil {
 		return fmt.Errorf("failed to connect to Task Scheduler: %w", err)
 	}
 
-	// Get the root task folder
+	// grab the root task folder
 	rootFolderVar, err := oleutil.CallMethod(scheduler, "GetFolder", `\`)
 	if err != nil {
 		return fmt.Errorf("failed to get root folder: %w", err)
@@ -553,7 +554,7 @@ func RemoveWatchdogTask(identifier string) error {
 	rootFolder := rootFolderVar.ToIDispatch()
 	defer rootFolder.Release()
 
-	// Delete the task
+	// remove the task
 	_, err = oleutil.CallMethod(rootFolder, "DeleteTask", taskName, 0)
 	if err != nil {
 		return fmt.Errorf("failed to delete task %s: %w", taskName, err)
@@ -570,31 +571,31 @@ func watchdogTaskExists(identifier string) (bool, error) {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// Initialize COM
+	// init COM
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
-	// Create a Task Scheduler object
+	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")
 	if err != nil {
 		return false, fmt.Errorf("creating schedule service object: %w", err)
 	}
 	defer schedService.Release()
 
-	// Get the Task Scheduler service interface
+	// get service interface handle
 	scheduler, err := schedService.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
 		return false, err
 	}
 	defer scheduler.Release()
 
-	// Connect to the local machine
+	// connect to the scheduler handle on the local machine
 	_, err = oleutil.CallMethod(scheduler, "Connect")
 	if err != nil {
 		return false, fmt.Errorf("failed to connect to Task Scheduler: %w", err)
 	}
 
-	// Get the root task folder
+	// grab the root task folder
 	rootFolderVar, err := oleutil.CallMethod(scheduler, "GetFolder", `\`)
 	if err != nil {
 		return false, fmt.Errorf("failed to get root folder: %w", err)
