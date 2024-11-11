@@ -26,10 +26,8 @@ import (
 )
 
 const (
-	launcherWatchdogServiceName string = `LauncherKolideWatchdogSvc`
-	launcherServiceName         string = `LauncherKolideK2Svc`
-	taskDateFormat              string = "2006-01-02T15:04:05"
-	watchdogTaskType            string = "watchdog"
+	taskDateFormat   string = "2006-01-02T15:04:05"
+	watchdogTaskType string = "watchdog"
 )
 
 // WatchdogController is responsible for:
