@@ -80,6 +80,7 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	c.summary = "state is running"
 	return nil
 }
+
 func (c *launchdCheckup) ExtraFileName() string {
 	return "launchd.zip"
 }
