@@ -58,7 +58,7 @@ func addFileToZip(z *zip.Writer, location string) error {
 		return fmt.Errorf("creating %s in zip: %w", location+".flaremeta", err)
 	}
 
-	// Get file info first as we do in original
+	// Get file info
 	fi, err := os.Stat(location)
 	if os.IsNotExist(err) || os.IsPermission(err) {
 		fmt.Fprintf(metaout, `{ "error stating file": "%s" }`, err)
@@ -83,7 +83,10 @@ func addFileToZip(z *zip.Writer, location string) error {
 		// Structural error. Abort
 		return fmt.Errorf("indenting json: %w", err)
 	}
-	metaout.Write(buf.Bytes())
+
+	if _, err := metaout.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("writing metadata: %w", err)
+	}
 
 	//
 	// Done with metadata, and we know the file exists, and that we have permission to it.
@@ -136,7 +139,10 @@ func addStreamToZip(z *zip.Writer, name string, modTime time.Time, reader io.Rea
 	if err := json.Indent(&buf, b, "", "  "); err != nil {
 		return fmt.Errorf("indenting json: %w", err)
 	}
-	metaout.Write(buf.Bytes())
+
+	if _, err := metaout.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("writing metadata: %w", err)
+	}
 
 	// Create the main file in zip
 	header := &zip.FileHeader{
