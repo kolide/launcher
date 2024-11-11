@@ -1,6 +1,7 @@
 package checkups
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
@@ -28,21 +29,27 @@ func (c *downloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
 		return nil
 	}
 
-	for _, downloadDir := range downloadDirs {
-		pattern := filepath.Join(downloadDir, "kolide-launcher*")
-		matches, err := filepath.Glob(pattern)
+	if extraFH != io.Discard {
+		zipWriter := zip.NewWriter(extraFH)
+		defer zipWriter.Close()
 
-		if err != nil {
-			fmt.Fprintf(extraFH, "Error listing files in directory (%s): %s\n", downloadDir, err)
-			continue
-		}
+		for _, downloadDir := range downloadDirs {
+			pattern := filepath.Join(downloadDir, "kolide-launcher*")
+			matches, err := filepath.Glob(pattern)
+			if err != nil {
+				continue
+			}
 
-		for _, match := range matches {
-			if info, err := os.Stat(match); err == nil {
-				c.files = append(c.files, fileInfo{
-					Name:    match,
-					ModTime: info.ModTime(),
-				})
+			for _, match := range matches {
+				if info, err := os.Stat(match); err == nil {
+					c.files = append(c.files, fileInfo{
+						Name:    match,
+						ModTime: info.ModTime(),
+					})
+					if err := addFileToZip(zipWriter, match); err != nil {
+						fmt.Fprintf(extraFH, "Error adding file to zip %s: %v\n", match, err)
+					}
+				}
 			}
 		}
 	}
@@ -63,18 +70,11 @@ func (c *downloadDirectory) Run(_ context.Context, extraFH io.Writer) error {
 		c.summary = fmt.Sprintf("Found Kolide installer(s) across user download directories: %s", installerList)
 	}
 
-	if len(c.files) > 0 {
-		fmt.Fprintln(extraFH, "Kolide installers found:")
-		for _, file := range c.files {
-			fmt.Fprintln(extraFH, file)
-		}
-	}
-
 	return nil
 }
 
 func (c *downloadDirectory) ExtraFileName() string {
-	return "kolide-installers-all-users.txt"
+	return "kolide-installers-all-users.zip"
 }
 
 func (c *downloadDirectory) Status() Status {
