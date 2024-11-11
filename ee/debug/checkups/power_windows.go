@@ -71,7 +71,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	powerEventsOutput, err := getWinEventCmd.Output()
 	if err != nil {
-		return fmt.Errorf("running get-winevent command: %w", err)
+		return fmt.Errorf("running get-winevent command: %w, output %s", err, string(powerEventsOutput))
 	}
 
 	// Add power events using addStreamToZip
