@@ -2,8 +2,10 @@ package checkups
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
@@ -15,13 +17,11 @@ func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
 
-	outFile, err := logZip.Create("windows_launcher_events.json")
+	// Capture command output
+	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("creating windows_launcher_events.json: %w", err)
 	}
 
-	cmd.Stderr = outFile
-	cmd.Stdout = outFile
-
-	return cmd.Run()
+	return addStreamToZip(logZip, "windows_launcher_events.json", time.Now(), bytes.NewReader(output))
 }

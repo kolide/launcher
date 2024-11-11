@@ -5,10 +5,12 @@ package checkups
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -35,24 +37,15 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("running powercfg.exe: error %w, output %s", err, string(out))
 	}
 
-	sprHandle, err := os.Open(tmpFilePath)
-	if err != nil {
-		return fmt.Errorf("opening system power report: %w", err)
-	}
-	defer sprHandle.Close()
-
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
 
-	zippedPowerReport, err := extraZip.Create("power.html")
-	if err != nil {
-		return fmt.Errorf("creating power report zip file: %w", err)
+	// Add the power report using addFileToZip
+	if err := addFileToZip(extraZip, tmpFilePath); err != nil {
+		return fmt.Errorf("adding power report to zip: %w", err)
 	}
 
-	if _, err := io.Copy(zippedPowerReport, sprHandle); err != nil {
-		return fmt.Errorf("copying system power report: %w", err)
-	}
-
+	// Get available sleep states
 	powerCfgSleepStatesCmd, err := allowedcmd.Powercfg(ctx, "/availablesleepstates")
 	if err != nil {
 		return fmt.Errorf("creating powercfg sleep states command: %w", err)
@@ -61,36 +54,29 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	hideWindow(powerCfgSleepStatesCmd)
 	availableSleepStatesOutput, err := powerCfgSleepStatesCmd.CombinedOutput()
 	if err != nil {
+		return fmt.Errorf("running powercfg.exe for sleep states: error %w", err)
+	}
+
+	// Add sleep states using addStreamToZip
+	if err := addStreamToZip(extraZip, "available_sleep_states.txt", time.Now(), bytes.NewReader(availableSleepStatesOutput)); err != nil {
 		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
 	}
 
-	zippedSleepStates, err := extraZip.Create("available_sleep_states.txt")
-	if err != nil {
-		return fmt.Errorf("creating available sleep states output file: %w", err)
-	}
-
-	if _, err := zippedSleepStates.Write(availableSleepStatesOutput); err != nil {
-		return fmt.Errorf("writing available sleep states output file: %w", err)
-	}
-
+	// Get power events
 	eventFilter := `Get-Winevent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Power-Troubleshooter','Microsoft-Windows-Kernel-Power'} -MaxEvents 500 | Select-Object @{name='Time'; expression={$_.TimeCreated.ToString("O")}},Id,LogName,ProviderName,Message,TimeCreated | ConvertTo-Json`
 	getWinEventCmd, err := allowedcmd.Powershell(ctx, eventFilter)
 	if err != nil {
 		return fmt.Errorf("creating powershell get-winevent command: %w", err)
 	}
 
-	powerEventFile, err := extraZip.Create("windows_power_events.json")
+	powerEventsOutput, err := getWinEventCmd.Output()
 	if err != nil {
-		return fmt.Errorf("creating windows_power_events.json: %w", err)
+		return fmt.Errorf("running get-winevent command: %w, output %s", err, string(powerEventsOutput))
 	}
 
-	powerEventsOut, err := getWinEventCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("running get-winevent command: %w, output %s", err, string(powerEventsOut))
-	}
-
-	if _, err := powerEventFile.Write(powerEventsOut); err != nil {
-		return fmt.Errorf("writing power events to output file: %w", err)
+	// Add power events using addStreamToZip
+	if err := addStreamToZip(extraZip, "windows_power_events.json", time.Now(), bytes.NewReader(powerEventsOutput)); err != nil {
+		return fmt.Errorf("adding power events to zip: %w", err)
 	}
 
 	return nil
