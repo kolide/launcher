@@ -246,7 +246,8 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM
+	// init COM - we discard the error returned by CoInitialize because it
+	// harmlessly returns S_FALSE if we call it more than once
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
@@ -299,7 +300,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	regInfo := regInfoProp.ToIDispatch()
 	defer regInfo.Release()
 
-	if _, err = oleutil.PutProperty(regInfo, "Description", "Kolide agent waker"); err != nil {
+	if _, err = oleutil.PutProperty(regInfo, "Description", "Kolide agent restarter"); err != nil {
 		return fmt.Errorf("setting reginfo description: %w", err)
 	}
 
@@ -521,7 +522,8 @@ func RemoveWatchdogTask(identifier string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM
+	// init COM - we discard the error returned by CoInitialize because it
+	// harmlessly returns S_FALSE if we call it more than once
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
@@ -571,7 +573,8 @@ func watchdogTaskExists(identifier string) (bool, error) {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM
+	// init COM - we discard the error returned by CoInitialize because it
+	// harmlessly returns S_FALSE if we call it more than once
 	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
