@@ -35,8 +35,8 @@ func disableAutoStart(ctx context.Context, k types.Knapsack) error {
 	}
 
 	// attempt to remove watchdog service in case it is installed to prevent startups later on
-	if err := watchdog.RemoveService(svcMgr); err != nil {
-		return fmt.Errorf("removing watchdog service, error may be expected if not enabled: %w", err)
+	if err := watchdog.RemoveWatchdogTask(k.Identifier()); err != nil {
+		return fmt.Errorf("removing watchdog task, error may be expected if not installed: %w", err)
 	}
 
 	return nil

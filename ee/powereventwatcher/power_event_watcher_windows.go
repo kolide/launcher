@@ -66,9 +66,9 @@ type (
 
 const (
 	eventIdEnteringModernStandby = 506
-	eventIdExitingModernStandby  = 507
+	EventIdExitingModernStandby  = 507
 	eventIdEnteringSleep         = 42
-	eventIdResumedFromSleep      = 107
+	EventIdResumedFromSleep      = 107
 
 	operationSuccessfulMsg = "The operation completed successfully."
 )
@@ -108,7 +108,7 @@ func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
 	switch eventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		ims.inModernStandby = true
-	case eventIdExitingModernStandby, eventIdResumedFromSleep:
+	case EventIdExitingModernStandby, EventIdResumedFromSleep:
 		ims.inModernStandby = false
 	default:
 		ims.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -134,7 +134,7 @@ func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
 				"err", err,
 			)
 		}
-	case eventIdExitingModernStandby, eventIdResumedFromSleep:
+	case EventIdExitingModernStandby, EventIdResumedFromSleep:
 		ks.slogger.Log(context.TODO(), slog.LevelDebug,
 			"system is waking",
 			"event_id", eventID,
@@ -187,9 +187,9 @@ func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*
 
 	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d or EventID=%d)]]",
 		eventIdEnteringModernStandby,
-		eventIdExitingModernStandby,
+		EventIdExitingModernStandby,
 		eventIdEnteringSleep,
-		eventIdResumedFromSleep,
+		EventIdResumedFromSleep,
 	)
 	query, err := syscall.UTF16PtrFromString(queryStr)
 	if err != nil {

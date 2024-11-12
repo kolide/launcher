@@ -47,3 +47,47 @@ func Test_ServiceName(t *testing.T) {
 		})
 	}
 }
+
+func Test_TaskName(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName     string
+		identifier       string
+		taskType         string
+		expectedTaskName string
+	}{
+		{
+			testCaseName:     "empty identifier expecting default task name",
+			identifier:       " ",
+			taskType:         "watchdog",
+			expectedTaskName: "LauncherKolideK2WatchdogTask",
+		},
+		{
+			testCaseName:     "default identifier expecting default task name",
+			identifier:       "kolide-k2",
+			taskType:         "watchdog",
+			expectedTaskName: "LauncherKolideK2WatchdogTask",
+		},
+		{
+			testCaseName:     "preprod identifier expecting preprod task name",
+			identifier:       "kolide-nababe-k2",
+			taskType:         "watchdog",
+			expectedTaskName: "LauncherKolideNababeK2WatchdogTask",
+		},
+		{
+			testCaseName:     "mangled identifier expecting default task name",
+			identifier:       "kolide-!@_k2",
+			taskType:         "watchdog",
+			expectedTaskName: "LauncherKolideK2WatchdogTask",
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			serviceName := TaskName(tt.identifier, tt.taskType)
+			require.Equal(t, tt.expectedTaskName, serviceName, "expected sanitized service name value to match")
+		})
+	}
+}

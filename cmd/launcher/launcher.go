@@ -302,7 +302,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	go checkpointer.Once(ctx)
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
-	watchdogController, err := watchdog.NewController(ctx, k)
+	watchdogController, err := watchdog.NewController(ctx, k, opts.ConfigFilePath)
 	if err != nil { // log any issues here but move on, watchdog is not critical path
 		slogger.Log(ctx, slog.LevelError,
 			"could not init watchdog controller",

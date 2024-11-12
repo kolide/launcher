@@ -191,7 +191,7 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 	case "secure-enclave":
 		run = runSecureEnclave
 	case "watchdog": // note: this is currently only implemented for windows
-		run = watchdog.RunWatchdogService
+		run = watchdog.RunWatchdogTask
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}

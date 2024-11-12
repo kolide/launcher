@@ -21,9 +21,10 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(tempRootDir)
 	mockKnapsack.On("Slogger").Return(testSlogger)
-	mockKnapsack.On("LauncherWatchdogEnabled").Return(false)
+	mockKnapsack.On("Identifier").Return("kolide-k2")
+	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
 
-	controller, _ := NewController(context.TODO(), mockKnapsack)
+	controller, _ := NewController(context.TODO(), mockKnapsack, "")
 
 	// Let the handler run for a bit
 	go controller.Run()

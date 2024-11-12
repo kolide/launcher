@@ -12,7 +12,7 @@ import (
 
 type WatchdogController struct{}
 
-func NewController(_ context.Context, _ types.Knapsack) (*WatchdogController, error) {
+func NewController(_ context.Context, _ types.Knapsack, _ string) (*WatchdogController, error) {
 	return nil, nil
 }
 
