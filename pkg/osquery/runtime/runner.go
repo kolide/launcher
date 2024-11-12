@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -15,6 +16,8 @@ import (
 
 const (
 	defaultRegistrationId = "default"
+
+	launchRetryDelay = 30 * time.Second
 )
 
 type Runner struct {
@@ -91,17 +94,13 @@ func (r *Runner) Run() error {
 func (r *Runner) runInstance(registrationId string) error {
 	slogger := r.slogger.With("registration_id", registrationId)
 
-	// First, launch the instance. Ensure we don't try to restart before launch is complete.
-	r.instanceLock.Lock()
-	instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
-	if err := instance.Launch(); err != nil {
-		r.instanceLock.Unlock()
+	// First, launch the instance.
+	instance, err := r.launchInstanceWithRetries(registrationId)
+	if err != nil {
+		// We only receive an error on launch if the runner has been shut down -- in that case,
+		// return now.
 		return fmt.Errorf("starting instance for %s: %w", registrationId, err)
 	}
-
-	// Now that the instance is running, we can add it to `r.instances` and remove the lock
-	r.instances[registrationId] = instance
-	r.instanceLock.Unlock()
 
 	// This loop restarts the instance as necessary. It exits when `Shutdown` is called,
 	// or if the instance exits and cannot be restarted.
@@ -127,15 +126,54 @@ func (r *Runner) runInstance(registrationId string) error {
 			"err", err,
 		)
 
+		var launchErr error
+		instance, launchErr = r.launchInstanceWithRetries(registrationId)
+		if launchErr != nil {
+			// We only receive an error on launch if the runner has been shut down -- in that case,
+			// return now.
+			return fmt.Errorf("restarting instance for %s after unexpected exit: %w", registrationId, launchErr)
+		}
+	}
+}
+
+// launchInstanceWithRetries repeatedly tries to create and launch a new osquery instance.
+// It will retry until it succeeds, or until the runner is shut down.
+func (r *Runner) launchInstanceWithRetries(registrationId string) (*OsqueryInstance, error) {
+	for {
+		// Lock to ensure we don't try to restart before launch is complete.
 		r.instanceLock.Lock()
-		instance = newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
-		r.instances[registrationId] = instance
-		if err := instance.Launch(); err != nil {
+		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
+		err := instance.Launch()
+
+		// Success!
+		if err == nil {
+			// Now that the instance is running, we can add it to `r.instances` and remove the lock
+			r.instances[registrationId] = instance
 			r.instanceLock.Unlock()
-			return fmt.Errorf("could not restart osquery instance after unexpected exit: %w", err)
+
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"runner successfully launched instance",
+				"registration_id", registrationId,
+			)
+
+			return instance, nil
 		}
 
+		// Launching was not successful. Unlock, log the error, and wait to retry.
 		r.instanceLock.Unlock()
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not launch instance, will retry after delay",
+			"err", err,
+			"registration_id", registrationId,
+		)
+
+		select {
+		case <-r.shutdown:
+			return nil, fmt.Errorf("runner received shutdown, halting before successfully launching instance for %s", registrationId)
+		case <-time.After(launchRetryDelay):
+			// Continue to retry
+			continue
+		}
 	}
 }
 

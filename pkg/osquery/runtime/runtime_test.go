@@ -118,12 +118,14 @@ func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
+	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+
 	k := typesMocks.NewKnapsack(t)
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("LatestOsquerydPath", mock.Anything).Return("")
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return("") // bad binary path
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
@@ -133,8 +135,17 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
-	assert.Error(t, runner.Run())
+	runner := New(k, mockServiceClient(), opts...)
+
+	// The runner will repeatedly try to launch the instance, so `Run`
+	// won't return an error until we shut it down. Kick off `Run`,
+	// wait a while, and confirm we can still shut down.
+	go runner.Run()
+	time.Sleep(2 * time.Second)
+	waitShutdown(t, runner, logBytes)
+
+	// Confirm we tried to launch the instance by examining the logs.
+	require.Contains(t, logBytes.String(), "could not launch instance, will retry after delay")
 
 	k.AssertExpectations(t)
 }
