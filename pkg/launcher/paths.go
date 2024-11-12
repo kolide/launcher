@@ -160,7 +160,9 @@ func nonEmptyFileExists(path string) (bool, error) {
 
 // GetOriginalLauncherExecutablePath is a convenience function to determine and verify the location of
 // the originally installed launcher executable. it uses the identifier to generate the expected path and
-// verifies file presence before returning the path
+// verifies file presence before returning the path. this is currently in use for task installation
+// on windows platforms
+// Note: this will not work for NixOS, we should revisit if we end up with a use case there
 func GetOriginalLauncherExecutablePath(identifier string) (string, error) {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = DefaultLauncherIdentifier
