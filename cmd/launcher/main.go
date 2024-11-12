@@ -154,7 +154,7 @@ func runMain() int {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if !tuf.IsLauncherReloadNeededErr(err) && !remoterestartconsumer.IsRemoteRestartRequestedErr(err) {
+		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}

@@ -3,6 +3,7 @@ package remoterestartconsumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,6 +21,10 @@ const (
 	// restartDelay is the delay after receiving action before triggering the restart.
 	// We have a delay to allow the actionqueue.
 	restartDelay = 15 * time.Second
+)
+
+var (
+	ErrRemoteRestartRequested = errors.New("need to reload launcher: remote restart requested")
 )
 
 type RemoteRestartConsumer struct {
@@ -88,7 +93,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			)
 			return
 		case <-time.After(restartDelay):
-			r.signalRestart <- NewRemoteRestartRequestedErr(restartAction.RunID)
+			r.signalRestart <- ErrRemoteRestartRequested
 			r.slogger.Log(context.TODO(), slog.LevelInfo,
 				"signaled for restart after delay",
 				"action_run_id", restartAction.RunID,
