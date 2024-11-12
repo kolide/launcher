@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -155,4 +156,33 @@ func nonEmptyFileExists(path string) (bool, error) {
 	}
 
 	return fileInfo.Size() > 0, nil
+}
+
+// GetOriginalLauncherExecutablePath is a convenience function to determine and verify the location of
+// the originally installed launcher executable. it uses the identifier to generate the expected path and
+// verifies file presence before returning the path
+func GetOriginalLauncherExecutablePath(identifier string) (string, error) {
+	if strings.TrimSpace(identifier) == "" {
+		identifier = DefaultLauncherIdentifier
+	}
+
+	var binDirBase string
+	var launcherExeName string
+
+	switch runtime.GOOS {
+	case "windows":
+		binDirBase = fmt.Sprintf(`C:\Program Files\Kolide\Launcher-%s\bin`, identifier)
+		launcherExeName = "launcher.exe"
+	default:
+		binDirBase = fmt.Sprintf(`/usr/local/%s/bin`, identifier)
+		launcherExeName = "launcher"
+	}
+
+	launcherBin := filepath.Join(binDirBase, launcherExeName)
+	// do some basic sanity checking to prevent installation from a bad path
+	if exists, err := nonEmptyFileExists(launcherBin); err != nil || !exists {
+		return "", err
+	}
+
+	return launcherBin, nil
 }

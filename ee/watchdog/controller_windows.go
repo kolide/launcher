@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -215,22 +213,6 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 	}
 
 	wc.slogger.Log(ctx, slog.LevelInfo, "completed watchdog scheduled task installation")
-}
-
-func getExecutablePath(identifier string) (string, error) {
-	if strings.TrimSpace(identifier) == "" {
-		identifier = launcher.DefaultLauncherIdentifier
-	}
-
-	binDirBase := fmt.Sprintf(`C:\Program Files\Kolide\Launcher-%s\bin`, identifier)
-	launcherBin := filepath.Join(binDirBase, "launcher.exe")
-	// do some basic sanity checking to prevent installation from a bad path
-	_, err := os.Stat(launcherBin)
-	if err != nil {
-		return "", err
-	}
-
-	return launcherBin, nil
 }
 
 // installWatchdogTask registers our watchdog subcommand as a scheduled task.
@@ -482,7 +464,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	execAction := execActionTemplate.ToIDispatch()
 	defer execAction.Release()
 
-	installedExePath, err := getExecutablePath(identifier)
+	installedExePath, err := launcher.GetOriginalLauncherExecutablePath(identifier)
 	if err != nil {
 		return fmt.Errorf("determining watchdog executable path: %w", err)
 	}
