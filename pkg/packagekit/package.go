@@ -9,6 +9,7 @@ type PackageOptions struct {
 	Root       string // source directory to package
 	Scripts    string // directory of packaging scripts (postinst, prerm, etc)
 	Version    string // package version
+	VersionNum int    // package version in numeric format. used to create comparable windows registry keys
 	FlagFile   string // Path to the flagfile for configuration
 
 	DisableService bool // Whether to install a system service in a disabled state

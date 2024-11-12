@@ -16,6 +16,7 @@ import (
 	"text/template"
 
 	"github.com/google/uuid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"golang.org/x/text/cases"
@@ -50,6 +51,13 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 
 	if err := isDirectory(po.Root); err != nil {
 		return err
+	}
+
+	// populate VersionNum if it isn't already set by the caller. we'll
+	// store this in the registry on install to give a comparable field
+	// for intune to drive upgrade behavior from
+	if po.VersionNum == 0 {
+		po.VersionNum = version.VersionNum()
 	}
 
 	// We include a random nonce as part of the ProductCode
