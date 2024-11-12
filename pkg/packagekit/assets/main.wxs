@@ -57,6 +57,7 @@
 	  <RegistryValue Key="Identifier" Value="{{.Opts.Identifier}}" Type="string" />
 	  <RegistryValue Key="User" Value="[LogonUser]" Type="string" />
 	  <RegistryValue Key="Version" Value="{{.Opts.Version}}" Type="string" />
+	  <RegistryValue Key="InstalledVersionNum" Value="{{.Opts.VersionNum}}" Type="integer" />
 	</RegistryKey>
       </Component>
     </DirectoryRef>
