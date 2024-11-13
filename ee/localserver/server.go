@@ -381,6 +381,9 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
+		// We need this for device trust to work in newer versions of Chrome with experimental features toggled on
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
 		// Some modern chrome and derivatives use Access-Control-Allow-Private-Network
 		// https://developer.chrome.com/blog/private-network-access-preflight/
 		// Though it's unclear if this is still needed, see https://developer.chrome.com/blog/private-network-access-update/
