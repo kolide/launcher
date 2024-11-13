@@ -269,17 +269,17 @@ func recoveryActionsAreSet(curRecoveryActions, recoveryActions []mgr.RecoveryAct
 // maintain consistency with the pattern set by our installer info metadata.
 // for additional details on the difference, see here https://devblogs.microsoft.com/oldnewthing/20080118-00/?p=23773
 func checkCurrentVersionMetadata(logger *slog.Logger, identifier string) {
-	installedVersionRegistryKeyName := fmt.Sprintf(currentVersionRegistryKeyFmt, identifier, currentVersionKeyName)
-	launcherVersionKey, err := registry.OpenKey(registry.LOCAL_MACHINE, installedVersionRegistryKeyName, registry.ALL_ACCESS)
+	versionKeyPath := fmt.Sprintf(currentVersionRegistryKeyFmt, identifier, currentVersionKeyName)
+	launcherVersionKey, err := registry.OpenKey(registry.LOCAL_MACHINE, versionKeyPath, registry.ALL_ACCESS)
 	// create the key if it doesn't already exist
 	if err != nil && err.Error() == notFoundInRegistryError {
-		launcherVersionKey, _, err = registry.CreateKey(registry.LOCAL_MACHINE, installedVersionRegistryKeyName, registry.ALL_ACCESS)
+		launcherVersionKey, _, err = registry.CreateKey(registry.LOCAL_MACHINE, versionKeyPath, registry.ALL_ACCESS)
 	}
 
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"could not create or open new registry key",
-			"key_name", installedVersionRegistryKeyName,
+			"key_path", versionKeyPath,
 			"err", err,
 		)
 
