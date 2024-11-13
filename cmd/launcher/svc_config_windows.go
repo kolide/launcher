@@ -308,6 +308,8 @@ func checkCurrentVersionMetadata(logger *slog.Logger, identifier string) {
 			"encountered error setting current version to registry",
 			"err", err,
 		)
+
+		return
 	}
 
 	logger.Log(context.TODO(), slog.LevelInfo,
