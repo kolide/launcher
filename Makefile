@@ -15,7 +15,7 @@ export GO111MODULE=on
 # If not windows, set the shell to bash explicitly
 ifneq ($(OS), Windows_NT)
 	ifeq ($(shell uname), Darwin)
-		SHELL := /bin/bash
+		SHELL := /bin/sh
 	endif
 endif
 
