@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/launcher"
 
 	"golang.org/x/sys/windows/registry"
@@ -27,6 +28,11 @@ const (
 	dnscacheService     = `Dnscache`
 
 	notFoundInRegistryError = "The system cannot find the file specified."
+
+	// currentVersionRegistryKeyFmt used to determine where the launcher installer info metadata will be,
+	// we add or update the currentVersionKeyName alongside the existing keys from installation
+	currentVersionRegistryKeyFmt = `Software\Kolide\Launcher\%s\%s`
+	currentVersionKeyName        = `CurrentVersionNum`
 )
 
 func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
@@ -95,6 +101,8 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 	checkRestartActions(logger, launcherService)
 
 	checkRecoveryActions(context.TODO(), logger, launcherService)
+
+	checkCurrentVersionMetadata(logger, opts.Identifier)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes
@@ -251,4 +259,60 @@ func recoveryActionsAreSet(curRecoveryActions, recoveryActions []mgr.RecoveryAct
 		}
 	}
 	return true
+}
+
+// checkCurrentVersionMetadata ensures that we've set our currently running version number to
+// the registry alongside the other installation metadata. this looks a little different than
+// our other registry interactions (e.g. checkDelayedAutostart) because there are two different
+// ways to set a value for a key: by setting its default (unnamed) value, or by setting a named
+// value under the key path. we opt to set and get the default value for the full key path to
+// maintain consistency with the pattern set by our installer info metadata.
+// for additional details on the difference, see here https://devblogs.microsoft.com/oldnewthing/20080118-00/?p=23773
+func checkCurrentVersionMetadata(logger *slog.Logger, identifier string) {
+	installedVersionRegistryKeyName := fmt.Sprintf(currentVersionRegistryKeyFmt, identifier, currentVersionKeyName)
+	launcherVersionKey, err := registry.OpenKey(registry.LOCAL_MACHINE, installedVersionRegistryKeyName, registry.ALL_ACCESS)
+	// create the key if it doesn't already exist
+	if err != nil && err.Error() == notFoundInRegistryError {
+		launcherVersionKey, _, err = registry.CreateKey(registry.LOCAL_MACHINE, installedVersionRegistryKeyName, registry.ALL_ACCESS)
+	}
+
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"could not create or open new registry key",
+			"key_name", installedVersionRegistryKeyName,
+			"err", err,
+		)
+
+		return
+	}
+
+	defer launcherVersionKey.Close()
+
+	// passing an empty name here to get the default value set for key
+	currentVersionVal, _, getCurrentVersionErr := launcherVersionKey.GetIntegerValue("")
+	expectedVersion := version.VersionNum()
+
+	// take no action if we can read the current version and it matches expected
+	if getCurrentVersionErr == nil && currentVersionVal == uint64(expectedVersion) {
+		logger.Log(context.TODO(), slog.LevelDebug, "skipping writing current version info to registry",
+			"expected_version", expectedVersion,
+			"current_registry_version", currentVersionVal,
+		)
+
+		return
+	}
+
+	// if we can't read, or the version is out of date, set the expected version as the new value
+	if err := launcherVersionKey.SetDWordValue("", uint32(expectedVersion)); err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"encountered error setting current version to registry",
+			"err", err,
+		)
+	}
+
+	logger.Log(context.TODO(), slog.LevelInfo,
+		"updated registry value for current version info",
+		"updated_version", expectedVersion,
+		"previous_registry_version", currentVersionVal,
+	)
 }
