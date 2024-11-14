@@ -54,12 +54,12 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	hideWindow(powerCfgSleepStatesCmd)
 	availableSleepStatesOutput, err := powerCfgSleepStatesCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("running powercfg.exe for sleep states: error %w", err)
+		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
 	}
 
 	// Add sleep states using addStreamToZip
 	if err := addStreamToZip(extraZip, "available_sleep_states.txt", time.Now(), bytes.NewReader(availableSleepStatesOutput)); err != nil {
-		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
+		return fmt.Errorf("adding sleep states stream to zip: %w", err)
 	}
 
 	// Get power events
