@@ -74,7 +74,7 @@ func gatherInstallerInfo(z *zip.Writer, identifier string) error {
 
 // getDefaultRegistryStringValue queries for the default registry value set at the provided path
 // on the local machine. this is a best effort approach, grabbing whatever info we can. not all
-// devices will have all paths/values present, errors are ignored
+// devices will have all paths/values present, errors are returned as the string value for reporting
 func getDefaultRegistryStringValue(path string) string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
 	if err != nil {
