@@ -233,7 +233,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	warningCheckups := []string{}
 
 	for _, c := range checkupsFor(k, doctorSupported) {
-		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.TODO(), 20*time.Second)
 		defer cancel()
 
 		doctorCheckup(ctx, c, w)
