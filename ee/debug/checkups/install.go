@@ -7,10 +7,11 @@ import (
 	"io"
 	"runtime"
 
-	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type installCheckup struct {
+	k types.Knapsack
 }
 
 func (i *installCheckup) Name() string {
@@ -25,7 +26,7 @@ func (i *installCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("gathering installation logs: %w", err)
 	}
 
-	if err := gatherInstallerInfo(extraZip); err != nil {
+	if err := gatherInstallerInfo(extraZip, i.k.Identifier()); err != nil {
 		return fmt.Errorf("gathering installer info: %w", err)
 	}
 
@@ -55,15 +56,4 @@ func gatherInstallationLogs(z *zip.Writer) error {
 	}
 
 	return addFileToZip(z, "/var/log/install.log")
-}
-
-func gatherInstallerInfo(z *zip.Writer) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-
-	configDir := launcher.DefaultPath(launcher.EtcDirectory)
-	installerInfoPath := fmt.Sprintf("%s/installer-info.json", configDir)
-
-	return addFileToZip(z, installerInfoPath)
 }
