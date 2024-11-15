@@ -26,10 +26,10 @@ const (
 )
 
 type installerInfo struct {
-	// CurrentVersionNum is the numeric representation of our semver version, added at startup
-	CurrentVersionNum uint64 `json:"current_version_num"`
-	// InstalledVersionNum is the numeric representation of our semver version, added at install time
-	InstalledVersionNum uint64 `json:"installed_version_num"`
+	// CurrentVersionNum is the numeric representation of our semver version (cast as string), added at startup
+	CurrentVersionNum string `json:"current_version_num"`
+	// InstalledVersionNum is the numeric representation of our semver version (cast as string), added at install time
+	InstalledVersionNum string `json:"installed_version_num"`
 	// Version is our semver string version representation, added at install time
 	Version string `json:"installed_version"`
 	// DownloadPath is the original location of the MSI used to install launcher
@@ -78,14 +78,14 @@ func gatherInstallerInfo(z *zip.Writer, identifier string) error {
 func getDefaultRegistryStringValue(path string) string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
 	if err != nil {
-		return ""
+		return fmt.Sprintf("error: %s", err.Error())
 	}
 
 	defer key.Close()
 
 	val, _, err := key.GetStringValue("")
 	if err != nil {
-		return ""
+		return fmt.Sprintf("error: %s", err.Error())
 	}
 
 	return val
@@ -93,18 +93,18 @@ func getDefaultRegistryStringValue(path string) string {
 
 // getDefaultRegistryIntValue performs the same function as getDefaultRegistryStringValue but
 // is intended for integer (REG_DWORD) values
-func getDefaultRegistryIntValue(path string) uint64 {
+func getDefaultRegistryIntValue(path string) string {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
 	if err != nil {
-		return 0
+		return fmt.Sprintf("error: %s", err.Error())
 	}
 
 	defer key.Close()
 
 	val, _, err := key.GetIntegerValue("")
 	if err != nil {
-		return 0
+		return fmt.Sprintf("error: %s", err.Error())
 	}
 
-	return val
+	return fmt.Sprintf("%d", val)
 }
