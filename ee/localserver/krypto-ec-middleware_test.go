@@ -244,12 +244,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.Equal(t, runtime.GOOS, responseHeaders[kolideOsHeaderKey][0])
 
 					// check that the presence detection interval is present
-					if runtime.GOOS == "darwin" {
+					if runtime.GOOS != "linux" {
 						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
 						return
 					}
 
-					// not darwin
+					// linux
 					require.Equal(t, presencedetection.DetectionFailedDurationValue.String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
 				})
 			}
