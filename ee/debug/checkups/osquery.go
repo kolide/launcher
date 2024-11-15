@@ -77,7 +77,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	out, err := cmd.CombinedOutput()
 	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
-		return fmt.Errorf("running %s interactive: err %w, output %s", launcherPath, err, string(out))
+		return fmt.Errorf("running %s interactive: err %w, output %s; ctx err: %+v", launcherPath, err, string(out), cmdCtx.Err())
 	}
 
 	return nil
