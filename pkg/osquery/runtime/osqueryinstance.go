@@ -802,6 +802,14 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	// https://github.com/osquery/osquery/pull/6824
 	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
 
+	// On Windows, we want the `SystemDrive` environment variable to be set to ensure paths can be resolved appropriately.
+	// The cmd handles setting `SystemRoot` for us.
+	if runtime.GOOS == "windows" {
+		if systemDrive, found := os.LookupEnv("SystemDrive"); found {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("SystemDrive=%s", systemDrive))
+		}
+	}
+
 	return cmd, nil
 }
 
