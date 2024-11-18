@@ -428,7 +428,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		}
 
 		// presence detection is only supported on macos currently
-		if runtime.GOOS != "darwin" {
+		if runtime.GOOS == "linux" {
 			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
 			next.ServeHTTP(w, r)
 			return
@@ -442,11 +442,17 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 			return
 		}
 
-		// set a default reason, on macos the popup will look like "Kolide is trying to authenticate."
-		reason := "authenticate"
-		reasonHeader := r.Header.Get(kolidePresenceDetectionReasonHeaderKey)
-		if reasonHeader != "" {
-			reason = reasonHeader
+		reason := r.Header.Get(kolidePresenceDetectionReasonMacosHeaderKey)
+		if runtime.GOOS == "windows" {
+			reason = r.Header.Get(kolidePresenceDetectionReasonWindowsHeaderKey)
+		}
+
+		if reason == "" {
+			reason = "authenticate"
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"no reason found for presence detection, using default",
+				"reason", reason,
+			)
 		}
 
 		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
