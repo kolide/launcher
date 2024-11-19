@@ -805,6 +805,19 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	// https://github.com/osquery/osquery/pull/6824
 	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
 
+	// On Windows, we need to ensure the `SystemDrive` environment variable is set to _something_,
+	// so if it isn't already set, we set it to an empty string.
+	systemDriveEnvVarFound := false
+	for _, e := range cmd.Env {
+		if strings.Contains(strings.ToLower(e), "systemdrive") {
+			systemDriveEnvVarFound = true
+			break
+		}
+	}
+	if !systemDriveEnvVarFound {
+		cmd.Env = append(cmd.Env, "SystemDrive=")
+	}
+
 	return cmd, nil
 }
 
