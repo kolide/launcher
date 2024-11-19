@@ -26,6 +26,7 @@ const (
 	// numbers
 	tokenInt32  byte = 0x49 // I
 	tokenUint32 byte = 0x55 // U
+	tokenDouble byte = 0x4e // N
 	// strings
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
@@ -207,6 +208,12 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				return obj, fmt.Errorf("decoding int32 for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
+		case tokenDouble:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return obj, fmt.Errorf("decoding double for `%s`: %w", currentPropertyName, err)
+			}
+			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
 		case tokenBeginSparseArray:
 			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
 			if err != nil {

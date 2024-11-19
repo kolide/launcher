@@ -13,7 +13,7 @@ Loading the page will populate IndexedDB with the desired data. You should also 
 console log message to this effect.
 
 The file will now be available with other IndexedDB files. On macOS, Chrome indexeddb files
-can be found at `/Users/<my-username>/Library/Application Support/Google/Chrome/Default/IndexedDB/file__0.indexeddb.leveldb`.
+can be found at `/Users/<my-username>/Library/Application Support/Google/Chrome/<Profile Name>/IndexedDB/file__0.indexeddb.leveldb`.
 (The name of the indexeddb file will likely be the same, but you can confirm the origin
 matches in Dev Tools in your browser by going to Application => IndexedDB => launchertestdb.)
 On macOS, Firefox sqlite files can be found at a path similar to this one:

@@ -55,7 +55,8 @@
                         }
                     ],
                 noDetails: [], // Empty array
-                email: "test1@example.com"
+                email: "test1@example.com",
+                someTimestamp: 1720034607 // *unint32
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -86,7 +87,8 @@
                         }
                     ],
                 noDetails: [], // Empty array
-                email: "test2@example.com"
+                email: "test2@example.com",
+                someTimestamp: 1726096312 // *unint32
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
