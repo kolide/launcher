@@ -382,11 +382,10 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 	// if there is already a DENY entry set for user's group to avoid recreating every time
 	for i := 0; i < int(existingDACL.AceCount); i++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
-		err = windows.GetAce(existingDACL, uint32(i), &ace)
-		if err != nil {
+		if aceErr := windows.GetAce(existingDACL, uint32(i), &ace); aceErr != nil {
 			logger.Log(context.TODO(), slog.LevelWarn,
 				"encountered error parsing ACE from existing DACL",
-				"err", err,
+				"err", aceErr,
 			)
 
 			return
