@@ -794,6 +794,9 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		fmt.Sprintf("--extensions_require=%s", KolideSaasExtensionName),
 	)
 
+	// We need environment variables to be set to ensure paths can be resolved appropriately.
+	cmd.Env = cmd.Environ()
+
 	// On darwin, run osquery using a magic macOS variable to ensure we
 	// get proper versions strings back. I'm not totally sure why apple
 	// did this, but reading SystemVersion.plist is different when this is set.
@@ -802,12 +805,17 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	// https://github.com/osquery/osquery/pull/6824
 	cmd.Env = append(cmd.Env, "SYSTEM_VERSION_COMPAT=0")
 
-	// On Windows, we want the `SystemDrive` environment variable to be set to ensure paths can be resolved appropriately.
-	// The cmd handles setting `SystemRoot` for us.
-	if runtime.GOOS == "windows" {
-		if systemDrive, found := os.LookupEnv("SystemDrive"); found {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("SystemDrive=%s", systemDrive))
+	// On Windows, we need to ensure the `SystemDrive` environment variable is set to _something_,
+	// so if it isn't already set, we set it to an empty string.
+	systemDriveEnvVarFound := false
+	for _, e := range cmd.Env {
+		if strings.Contains(strings.ToLower(e), "systemdrive") {
+			systemDriveEnvVarFound = true
+			break
 		}
+	}
+	if !systemDriveEnvVarFound {
+		cmd.Env = append(cmd.Env, "SystemDrive=")
 	}
 
 	return cmd, nil
