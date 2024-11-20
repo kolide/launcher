@@ -327,9 +327,9 @@ func checkCurrentVersionMetadata(logger *slog.Logger, identifier string) {
 	)
 }
 
-// checkRootDirACLs verifies that there is an explicit denial for builtin/users write permissions
-// set on the root directory. If none exists, a new one is created and added to the existing
-// security configuration for the directory. errors are logged but not retried, as we will attempt this
+// checkRootDirACLs sets a security policy on the root directory to ensure that
+// SYSTEM, administrators, and the directory owner have full access, but that regular
+// users only have read/execute permission. errors are logged but not retried, as we will attempt this
 // on every launcher startup
 func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 	logger = logger.With("component", "checkRootDirACLs")
@@ -343,24 +343,7 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 		return
 	}
 
-	// Get the current security descriptor for the directory
-	/*
-		sd, err := windows.GetNamedSecurityInfo(
-			rootDirectory,
-			windows.SE_FILE_OBJECT,
-			windows.DACL_SECURITY_INFORMATION,
-		)
-
-		if err != nil {
-			logger.Log(context.TODO(), slog.LevelError,
-				"gathering existing ACL from named sec info",
-				"err", err,
-			)
-
-			return
-		}
-	*/
-
+	// Get all the SIDs we need for our permissions
 	usersSID, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
@@ -370,48 +353,6 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 
 		return
 	}
-
-	/*
-
-		existingDACL, _, err := sd.DACL()
-		if err != nil {
-			logger.Log(context.TODO(), slog.LevelError,
-				"getting DACL from security descriptor",
-				"err", err,
-			)
-
-			return
-		}
-
-			// first iterate the existing ACEs for the directory, we're checking to see
-			// if there is already a DENY entry set for user's group to avoid recreating every time
-			for i := 0; i < int(existingDACL.AceCount); i++ {
-				var ace *windows.ACCESS_ALLOWED_ACE
-				if aceErr := windows.GetAce(existingDACL, uint32(i), &ace); aceErr != nil {
-					logger.Log(context.TODO(), slog.LevelWarn,
-						"encountered error parsing ACE from existing DACL",
-						"err", aceErr,
-					)
-
-					return
-				}
-
-				// do the easy checks first and continue if this isn't the ACE we're looking for
-				if ace.Mask != accessPermissionsAllWrites || ace.Header.AceType != windows.ACCESS_DENIED_ACE_TYPE {
-					continue
-				}
-
-				sid := (*windows.SID)(unsafe.Pointer(uintptr(unsafe.Pointer(ace)) + unsafe.Offsetof(ace.SidStart)))
-				if sid.Equals(usersSID) {
-					logger.Log(context.TODO(), slog.LevelDebug,
-						"root directory already had proper DACL permissions set, skipping",
-					)
-
-					return
-				}
-			}
-
-	*/
 
 	adminsSID, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
 	if err != nil {
@@ -444,7 +385,7 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 	}
 
 	// We want to mirror the permissions set in Program Files:
-	// Admin and creator/owner have full control; users are allowed only read and execute.
+	// SYSTEM, admin, and creator/owner have full control; users are allowed only read and execute.
 	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
 		{
 			AccessPermissions: windows.GENERIC_ALL,
