@@ -35,10 +35,6 @@ const (
 	// we add or update the currentVersionKeyName alongside the existing keys from installation
 	currentVersionRegistryKeyFmt = `Software\Kolide\Launcher\%s\%s`
 	currentVersionKeyName        = `CurrentVersionNum`
-
-	// these are the flag values for the actual "write" ACLs that we see through Get-Acl in powershell. they are not exposed as external constants
-	// github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_DATA|github.com/Microsoft/go-winio/internal/fs.FILE_CREATE_PIPE_INSTANCE|github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_PROPERTIES|github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_ATTRIBUTES (278) = 0x116
-	accessPermissionsAllWrites = 0x116
 )
 
 func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
