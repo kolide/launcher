@@ -433,9 +433,29 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 		return
 	}
 
+	systemSID, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"failed getting SYSTEM SID",
+			"err", err,
+		)
+
+		return
+	}
+
 	// We want to mirror the permissions set in Program Files:
 	// Admin and creator/owner have full control; users are allowed only read and execute.
 	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
+		{
+			AccessPermissions: windows.GENERIC_ALL,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_GROUP,
+				TrusteeValue: windows.TrusteeValueFromSID(systemSID),
+			},
+		},
 		{
 			AccessPermissions: windows.GENERIC_ALL,
 			AccessMode:        windows.SET_ACCESS,
