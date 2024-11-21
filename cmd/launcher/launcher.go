@@ -37,7 +37,6 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
-	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
@@ -470,9 +469,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// register notifications consumer
 		actionsQueue.RegisterActor(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
-		remoteRestartConsumer := remoterestartconsumer.New(k)
-		runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
-		actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
+		// For now, commenting out the remote restart consumer until we can fix up the restart behavior
+		/*
+			remoteRestartConsumer := remoterestartconsumer.New(k)
+				runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
+				actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
+		*/
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())

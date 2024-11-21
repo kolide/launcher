@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -154,7 +153,7 @@ func runMain() int {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) {
+		if !tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}
