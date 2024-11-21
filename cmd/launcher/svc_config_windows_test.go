@@ -4,34 +4,63 @@
 package main
 
 import (
-	"io"
 	"log/slog"
 	"testing"
+	"unsafe"
 
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 )
 
 func Test_checkRootDirACLs(t *testing.T) {
 	t.Parallel()
 
 	rootDir := t.TempDir()
-	var logBytes threadsafebuffer.ThreadSafeBuffer
 
+	// Get info about our starting permissions
+	initialRootDirInfo, err := windows.GetNamedSecurityInfo(rootDir, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting named security info")
+	initialRootDirDacl, _, err := initialRootDirInfo.DACL()
+	require.NoError(t, err, "getting DACL")
+	require.NotNil(t, initialRootDirDacl)
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 
-	// run the check once, expecting that we will correctly work all the way through
-	// and log that we've updated the ACLs for our new directory
+	// Check the root dir ACLs -- expect that we update the permissions
 	checkRootDirACLs(slogger, rootDir)
 	require.Contains(t, logBytes.String(), "updated ACLs for root directory")
 
-	// now clear the log, and rerun. if the previous run did what it was supposed to,
-	// and our check-before-write logic works correctly, we should detect the ACL we
-	// just added and exit early
-	io.Copy(io.Discard, &logBytes)
-	checkRootDirACLs(slogger, rootDir)
-	require.NotContains(t, logBytes.String(), "updated ACLs for root directory")
-	require.Contains(t, logBytes.String(), "root directory already had proper DACL permissions set, skipping")
+	// Get our updated permissions
+	rootDirInfo, err := windows.GetNamedSecurityInfo(rootDir, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting named security info")
+	rootDirDacl, _, err := rootDirInfo.DACL()
+	require.NoError(t, err, "getting DACL")
+	require.NotNil(t, rootDirDacl)
+
+	// Confirm permissions have updated
+	require.NotEqual(t, initialRootDirInfo.String(), rootDirInfo.String(), "permissions did not change")
+
+	// Confirm that users only have access to read+execute
+	usersSID, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
+	require.NoError(t, err, "getting users SID")
+	userAceFound := false
+	for i := 0; i < int(rootDirDacl.AceCount); i++ {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		require.NoError(t, windows.GetAce(rootDirDacl, uint32(i), &ace), "getting ACE")
+
+		if ace.Mask != windows.GENERIC_READ|windows.GENERIC_EXECUTE {
+			continue
+		}
+
+		sid := (*windows.SID)(unsafe.Pointer(uintptr(unsafe.Pointer(ace)) + unsafe.Offsetof(ace.SidStart)))
+		if sid.Equals(usersSID) {
+			userAceFound = true
+			break
+		}
+	}
+	require.True(t, userAceFound, "ACE not found for WinBuiltinUsersSid with permissions GENERIC_READ|GENERIC_EXECUTE")
 }
