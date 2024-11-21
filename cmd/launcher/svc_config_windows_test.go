@@ -74,6 +74,6 @@ func Test_checkRootDirACLs(t *testing.T) {
 	require.NoError(t, err, "getting DACL")
 	require.NotNil(t, rootDirDaclUpdated)
 
-	// Confirm permissions have updated
+	// Confirm permissions have not updated
 	require.Equal(t, rootDirInfo.String(), rootDirInfoUpdated.String(), "permissions should not have changed")
 }
