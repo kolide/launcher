@@ -63,4 +63,17 @@ func Test_checkRootDirACLs(t *testing.T) {
 		}
 	}
 	require.True(t, userAceFound, "ACE not found for WinBuiltinUsersSid with permissions GENERIC_READ|GENERIC_EXECUTE")
+
+	// Run checkRootDirACLs and confirm that the permissions do not change
+	checkRootDirACLs(slogger, rootDir)
+
+	// Get permissions again
+	rootDirInfoUpdated, err := windows.GetNamedSecurityInfo(rootDir, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting named security info")
+	rootDirDaclUpdated, _, err := rootDirInfoUpdated.DACL()
+	require.NoError(t, err, "getting DACL")
+	require.NotNil(t, rootDirDaclUpdated)
+
+	// Confirm permissions have updated
+	require.Equal(t, rootDirInfo.String(), rootDirInfoUpdated.String(), "permissions should not have changed")
 }
