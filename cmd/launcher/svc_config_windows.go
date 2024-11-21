@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -36,10 +35,6 @@ const (
 	// we add or update the currentVersionKeyName alongside the existing keys from installation
 	currentVersionRegistryKeyFmt = `Software\Kolide\Launcher\%s\%s`
 	currentVersionKeyName        = `CurrentVersionNum`
-
-	// these are the flag values for the actual "write" ACLs that we see through Get-Acl in powershell. they are not exposed as external constants
-	// github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_DATA|github.com/Microsoft/go-winio/internal/fs.FILE_CREATE_PIPE_INSTANCE|github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_PROPERTIES|github.com/Microsoft/go-winio/internal/fs.FILE_WRITE_ATTRIBUTES (278) = 0x116
-	accessPermissionsAllWrites = 0x116
 )
 
 func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
@@ -328,11 +323,13 @@ func checkCurrentVersionMetadata(logger *slog.Logger, identifier string) {
 	)
 }
 
-// checkRootDirACLs verifies that there is an explicit denial for builtin/users write permissions
-// set on the root directory. If none exists, a new one is created and added to the existing
-// security configuration for the directory. errors are logged but not retried, as we will attempt this
+// checkRootDirACLs sets a security policy on the root directory to ensure that
+// SYSTEM, administrators, and the directory owner have full access, but that regular
+// users only have read/execute permission. errors are logged but not retried, as we will attempt this
 // on every launcher startup
 func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
+	logger = logger.With("component", "checkRootDirACLs")
+
 	if strings.TrimSpace(rootDirectory) == "" {
 		logger.Log(context.TODO(), slog.LevelError,
 			"unable to check directory permissions without root dir set, skipping",
@@ -342,32 +339,7 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 		return
 	}
 
-	// Get the current security descriptor for the directory
-	sd, err := windows.GetNamedSecurityInfo(
-		rootDirectory,
-		windows.SE_FILE_OBJECT,
-		windows.DACL_SECURITY_INFORMATION,
-	)
-
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"gathering existing ACL from named sec info",
-			"err", err,
-		)
-
-		return
-	}
-
-	existingDACL, _, err := sd.DACL()
-	if err != nil {
-		logger.Log(context.TODO(), slog.LevelError,
-			"getting DACL from security descriptor",
-			"err", err,
-		)
-
-		return
-	}
-
+	// Get all the SIDs we need for our permissions
 	usersSID, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
@@ -378,49 +350,83 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 		return
 	}
 
-	// first iterate the existing ACEs for the directory, we're checking to see
-	// if there is already a DENY entry set for user's group to avoid recreating every time
-	for i := 0; i < int(existingDACL.AceCount); i++ {
-		var ace *windows.ACCESS_ALLOWED_ACE
-		if aceErr := windows.GetAce(existingDACL, uint32(i), &ace); aceErr != nil {
-			logger.Log(context.TODO(), slog.LevelWarn,
-				"encountered error parsing ACE from existing DACL",
-				"err", aceErr,
-			)
+	adminsSID, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"failed getting builtin admins SID",
+			"err", err,
+		)
 
-			return
-		}
-
-		// do the easy checks first and continue if this isn't the ACE we're looking for
-		if ace.Mask != accessPermissionsAllWrites || ace.Header.AceType != windows.ACCESS_DENIED_ACE_TYPE {
-			continue
-		}
-
-		sid := (*windows.SID)(unsafe.Pointer(uintptr(unsafe.Pointer(ace)) + unsafe.Offsetof(ace.SidStart)))
-		if sid.Equals(usersSID) {
-			logger.Log(context.TODO(), slog.LevelDebug,
-				"root directory already had proper DACL permissions set, skipping",
-			)
-
-			return
-		}
+		return
 	}
 
+	creatorOwnerSID, err := windows.CreateWellKnownSid(windows.WinCreatorOwnerSid)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"failed getting creator/owner SID",
+			"err", err,
+		)
+
+		return
+	}
+
+	systemSID, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	if err != nil {
+		logger.Log(context.TODO(), slog.LevelError,
+			"failed getting SYSTEM SID",
+			"err", err,
+		)
+
+		return
+	}
+
+	// We want to mirror the permissions set in Program Files:
+	// SYSTEM, admin, and creator/owner have full control; users are allowed only read and execute.
 	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
 		{
-			AccessPermissions: accessPermissionsAllWrites, // deny writes
-			AccessMode:        windows.DENY_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure denial is inherited by sub folders
+			AccessPermissions: windows.GENERIC_ALL,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_GROUP,
+				TrusteeValue: windows.TrusteeValueFromSID(systemSID),
+			},
+		},
+		{
+			AccessPermissions: windows.GENERIC_ALL,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_GROUP,
+				TrusteeValue: windows.TrusteeValueFromSID(adminsSID),
+			},
+		},
+		{
+			AccessPermissions: windows.GENERIC_READ | windows.GENERIC_EXECUTE,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
 				TrusteeValue: windows.TrusteeValueFromSID(usersSID),
 			},
 		},
+		{
+			AccessPermissions: windows.GENERIC_ALL,
+			AccessMode:        windows.SET_ACCESS,
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Trustee: windows.TRUSTEE{
+				TrusteeForm:  windows.TRUSTEE_IS_SID,
+				TrusteeType:  windows.TRUSTEE_IS_GROUP,
+				TrusteeValue: windows.TrusteeValueFromSID(creatorOwnerSID),
+			},
+		},
 	}
 
-	// merge our existing DACL with our new explicit denial entry
-	newDACL, err := windows.ACLFromEntries(explicitAccessPolicies, existingDACL)
+	// Overwrite the existing DACL
+	newDACL, err := windows.ACLFromEntries(explicitAccessPolicies, nil)
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
 			"generating new DACL from access entries",
@@ -430,7 +436,7 @@ func checkRootDirACLs(logger *slog.Logger, rootDirectory string) {
 		return
 	}
 
-	// apply the merged DACL to the root directory
+	// apply the new DACL to the root directory
 	err = windows.SetNamedSecurityInfo(
 		rootDirectory,
 		windows.SE_FILE_OBJECT,
