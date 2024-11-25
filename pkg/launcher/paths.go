@@ -101,6 +101,11 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL, packageI
 		return optsRootDirectory
 	}
 
+	// assume the default identifier if none is provided
+	if strings.TrimSpace(packageIdentifier) == "" {
+		packageIdentifier = DefaultLauncherIdentifier
+	}
+
 	optsDBLocation := filepath.Join(optsRootDirectory, "launcher.db")
 	dbExists, err := nonEmptyFileExists(optsDBLocation)
 	// If we get an unknown error, back out from making any options changes. This is an
@@ -123,8 +128,8 @@ func DetermineRootDirectoryOverride(optsRootDirectory, kolideServerURL, packageI
 			continue
 		}
 
-		// If the identifier is set, the path MUST contain the identifier
-		if packageIdentifier != "" && !strings.Contains(path, packageIdentifier) {
+		// the fallaback path MUST contain the identifier
+		if !strings.Contains(path, packageIdentifier) {
 			continue
 		}
 
