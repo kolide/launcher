@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type osqueryCheckup struct {
@@ -66,10 +67,15 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 		return fmt.Errorf("getting current running executable: %w", err)
 	}
 
+	flagFilePath := launcher.DefaultPath(launcher.ConfigFile)
+	if o.k != nil && o.k.Identifier() != "" {
+		flagFilePath = strings.ReplaceAll(flagFilePath, launcher.DefaultLauncherIdentifier, o.k.Identifier())
+	}
+
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--osqueryd_path", o.k.LatestOsquerydPath(ctx)) //nolint:forbidigo // It is safe to exec the current running executable
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--config", flagFilePath) //nolint:forbidigo // It is safe to exec the current running executable
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
