@@ -46,23 +46,6 @@ const (
 	Failing       Status = "Failing"       // Checkup is failing
 )
 
-func (s Status) Emoji() string {
-	switch s {
-	case Informational:
-		return " "
-	case Passing:
-		return "✅"
-	case Warning:
-		return "⚠️"
-	case Failing:
-		return "❌"
-	case Erroring:
-		return "❌"
-	default:
-		return "? "
-	}
-}
-
 func writeSummary(w io.Writer, s Status, name, msg string) {
 	fmt.Fprintf(w, "%s\t%s: %s\n", s.Emoji(), name, msg)
 }
