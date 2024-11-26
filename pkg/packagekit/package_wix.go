@@ -57,7 +57,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	// store this in the registry on install to give a comparable field
 	// for intune to drive upgrade behavior from
 	if po.VersionNum == 0 {
-		po.VersionNum = version.VersionNum()
+		po.VersionNum = version.VersionNumFromSemver(po.Version)
 	}
 
 	// We include a random nonce as part of the ProductCode
