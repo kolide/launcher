@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -153,15 +154,40 @@ func runMain() int {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if !tuf.IsLauncherReloadNeededErr(err) {
+		// launcher exited due to error that does not require further handling -- return now so we can exit
+		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}
-		level.Debug(logger).Log("msg", "runLauncher exited to reload launcher", "err", err.Error())
-		if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+
+		// Autoupdate asked for a restart to run the newly-downloaded version of launcher -- run that newer version
+		if tuf.IsLauncherReloadNeededErr(err) {
+			level.Debug(logger).Log("msg", "runLauncher exited to load newer version of launcher after autoupdate", "err", err.Error())
+			if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+				return 1
+			}
+		}
+
+		// A remote restart was requested -- run this version of launcher again.
+		// We need a full exec of our current executable, rather than just calling runLauncher again.
+		// This ensures we don't run into issues where artifacts of our previous runLauncher call
+		// stick around (for example, the signal listener panicking on send to closed channel).
+		currentExecutable, err := os.Executable()
+		if err != nil {
+			level.Debug(logger).Log("msg", "could not get current executable to perform remote restart", "err", err.Error())
+			return 1
+		}
+		if err := execwrapper.Exec(ctx, currentExecutable, os.Args, os.Environ()); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"error execing launcher after remote restart was requested",
+				"binary", currentExecutable,
+				"err", err,
+			)
 			return 1
 		}
 	}
+
+	// launcher exited without error -- nothing to do here
 	return 0
 }
 
