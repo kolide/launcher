@@ -31,7 +31,10 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath := osqueryRuntime.SocketPath(interactiveRootDir, ulid.New())
+	// We need a shorter ulid to avoid running into socket path length issues.
+	socketId := ulid.New()
+	truncatedSocketId := socketId[len(socketId)-4:]
+	socketPath := osqueryRuntime.SocketPath(interactiveRootDir, truncatedSocketId)
 	augeasLensesPath := filepath.Join(interactiveRootDir, "augeas-lenses")
 
 	// only install augeas lenses on non-windows platforms
