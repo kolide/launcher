@@ -80,13 +80,15 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	}
 
 	var templateData = struct {
-		Opts        *PackageOptions
-		UpgradeCode string
-		ProductCode string
+		Opts            *PackageOptions
+		UpgradeCode     string
+		ProductCode     string
+		PermissionsGUID string
 	}{
-		Opts:        po,
-		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
-		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		Opts:            po,
+		UpgradeCode:     generateMicrosoftProductCode("launcher" + po.Identifier),
+		ProductCode:     generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		PermissionsGUID: generateMicrosoftProductCode("launcher_root_dir_permissions"+po.Identifier, extraGuidIdentifiers...),
 	}
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
