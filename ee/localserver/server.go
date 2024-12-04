@@ -52,9 +52,8 @@ type localServer struct {
 	kolideServer string
 	cancel       context.CancelFunc
 
-	myKey                 *rsa.PrivateKey
-	myLocalDbSigner       crypto.Signer
-	myLocalHardwareSigner crypto.Signer
+	myKey           *rsa.PrivateKey
+	myLocalDbSigner crypto.Signer
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
@@ -76,13 +75,12 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	defer span.End()
 
 	ls := &localServer{
-		slogger:               k.Slogger().With("component", "localserver"),
-		knapsack:              k,
-		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer:          k.KolideServerURL(),
-		myLocalDbSigner:       agent.LocalDbKeys(),
-		myLocalHardwareSigner: agent.HardwareKeys(),
-		presenceDetector:      presenceDetector,
+		slogger:          k.Slogger().With("component", "localserver"),
+		knapsack:         k,
+		limiter:          rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer:     k.KolideServerURL(),
+		myLocalDbSigner:  agent.LocalDbKeys(),
+		presenceDetector: presenceDetector,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -98,7 +96,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	}
 	ls.myKey = privateKey
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
+	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())

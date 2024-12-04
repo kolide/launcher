@@ -4,6 +4,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -304,6 +305,20 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 	}
 
 	return lastDurationSinceLastDetection, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
+}
+
+func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return nil, errors.New("no desktop processes running")
+	}
+
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return nil, fmt.Errorf("no desktop process for uid: %s", uid)
+	}
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	return client.CreateSecureEnclaveKey()
 }
 
 // killDesktopProcesses kills any existing desktop processes
