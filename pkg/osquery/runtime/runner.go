@@ -315,3 +315,26 @@ func (r *Runner) Healthy() error {
 
 	return nil
 }
+
+func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
+
+	instanceStatuses := make(map[string]types.InstanceStatus)
+	for _, registrationId := range r.registrationIds {
+		instance, ok := r.instances[registrationId]
+		if !ok {
+			instanceStatuses[registrationId] = types.InstanceStatusNotStarted
+			continue
+		}
+
+		if err := instance.Healthy(); err != nil {
+			instanceStatuses[registrationId] = types.InstanceStatusUnhealthy
+			continue
+		}
+
+		instanceStatuses[registrationId] = types.InstanceStatusHealthy
+	}
+
+	return instanceStatuses
+}

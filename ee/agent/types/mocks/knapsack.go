@@ -672,6 +672,26 @@ func (_m *Knapsack) InsecureTransportTLS() bool {
 	return r0
 }
 
+// InstanceStatuses provides a mock function with given fields:
+func (_m *Knapsack) InstanceStatuses() map[string]types.InstanceStatus {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for InstanceStatuses")
+	}
+
+	var r0 map[string]types.InstanceStatus
+	if rf, ok := ret.Get(0).(func() map[string]types.InstanceStatus); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]types.InstanceStatus)
+		}
+	}
+
+	return r0
+}
+
 // KatcConfigStore provides a mock function with given fields:
 func (_m *Knapsack) KatcConfigStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -1528,6 +1548,11 @@ func (_m *Knapsack) SetInsecureTransportTLS(insecure bool) error {
 	}
 
 	return r0
+}
+
+// SetInstanceQuerier provides a mock function with given fields: q
+func (_m *Knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
+	_m.Called(q)
 }
 
 // SetKolideServerURL provides a mock function with given fields: url

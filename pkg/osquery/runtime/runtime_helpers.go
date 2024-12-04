@@ -30,6 +30,6 @@ func platformArgs() []string {
 	return nil
 }
 
-func isExitOk(err error) bool {
+func isExitOk(_ error) bool {
 	return false
 }

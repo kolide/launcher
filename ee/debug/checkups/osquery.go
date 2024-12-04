@@ -14,10 +14,11 @@ import (
 )
 
 type osqueryCheckup struct {
-	k              types.Knapsack
-	status         Status
-	executionTimes map[string]any // maps command to how long it took to run, in ms
-	summary        string
+	k                types.Knapsack
+	status           Status
+	executionTimes   map[string]any // maps command to how long it took to run, in ms
+	instanceStatuses map[string]types.InstanceStatus
+	summary          string
 }
 
 func (o *osqueryCheckup) Name() string {
@@ -39,6 +40,8 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	if err := o.interactive(ctx); err != nil {
 		return fmt.Errorf("running launcher interactive: %w", err)
 	}
+
+	o.instanceStatuses = o.k.InstanceStatuses()
 
 	return nil
 }
@@ -102,5 +105,8 @@ func (o *osqueryCheckup) Summary() string {
 }
 
 func (o *osqueryCheckup) Data() any {
-	return o.executionTimes
+	return map[string]any{
+		"execution_time":    o.executionTimes,
+		"instance_statuses": o.instanceStatuses,
+	}
 }
