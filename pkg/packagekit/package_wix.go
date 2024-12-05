@@ -85,9 +85,11 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		ProductCode     string
 		PermissionsGUID string
 	}{
-		Opts:            po,
-		UpgradeCode:     generateMicrosoftProductCode("launcher" + po.Identifier),
-		ProductCode:     generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		Opts:        po,
+		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
+		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		// our permissions component does not meet the criteria to have it's GUID automatically generated - but we should
+		// ensure it is unique for each build so we regenerate here alongside the product and upgrade codes
 		PermissionsGUID: generateMicrosoftProductCode("launcher_root_dir_permissions"+po.Identifier, extraGuidIdentifiers...),
 	}
 

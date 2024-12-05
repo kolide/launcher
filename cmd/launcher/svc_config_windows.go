@@ -106,7 +106,7 @@ func checkServiceConfiguration(logger *slog.Logger, opts *launcher.Options) {
 
 	checkCurrentVersionMetadata(logger, opts.Identifier)
 
-	// checkRootDirACLs(logger, opts.RootDirectory)
+	checkRootDirACLs(logger, opts.RootDirectory)
 }
 
 // checkDelayedAutostart checks the current value of `DelayedAutostart` (whether to wait ~2 minutes

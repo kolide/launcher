@@ -27,6 +27,8 @@
 	InstallPrivileges="elevated"
 	Languages="1033" />
 
+    <!-- these allow us to reference the localized user values for e.g. SYSTEM, BUILTIN\Users.
+          see https://wixtoolset.org/docs/v3/customactions/osinfo/ for additional details/options -->
     <PropertyRef Id="WIX_ACCOUNT_LOCALSYSTEM" />
     <PropertyRef Id="WIX_ACCOUNT_ADMINISTRATORS" />
     <PropertyRef Id="WIX_ACCOUNT_USERS" />
