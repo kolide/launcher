@@ -92,6 +92,8 @@ func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
 	k.querier = q
 }
 
+// InstanceStatuses returns the current status of each osquery instance.
+// It performs a healthcheck against each existing instance.
 func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {
 	if k.querier == nil {
 		return nil
