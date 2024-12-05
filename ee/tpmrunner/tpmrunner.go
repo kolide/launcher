@@ -71,10 +71,10 @@ func (tr *tpmRunner) Execute() error {
 	defer retryTicker.Stop()
 
 	for {
-
-		signer, err := tr.fetchCreateKeys(context.TODO())
+		ctx := context.Background()
+		signer, err := tr.loadOrCreateKeys(ctx)
 		if err != nil {
-			tr.slogger.Log(context.TODO(), slog.LevelError,
+			tr.slogger.Log(ctx, slog.LevelError,
 				"creating tpm signer, will retry",
 				"err", err,
 			)
@@ -92,7 +92,7 @@ func (tr *tpmRunner) Execute() error {
 		case <-retryTicker.C:
 			continue
 		case <-tr.interrupt:
-			tr.slogger.Log(context.TODO(), slog.LevelDebug,
+			tr.slogger.Log(ctx, slog.LevelDebug,
 				"interrupt received, exiting secure enclave signer execute loop",
 			)
 			return nil
@@ -183,34 +183,51 @@ func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
 	_ = deleter.Delete([]byte(privateEccData), []byte(publicEccData))
 }
 
-func (tr *tpmRunner) fetchCreateKeys(ctx context.Context) (crypto.Signer, error) {
+func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	priData, pubData, err := fetchKeyData(tr.store)
 	if err != nil {
-		return nil, fmt.Errorf("unabled to access key data store: %w", err)
+		thisErr := fmt.Errorf("fetching key data for data store: %w", err)
+		traces.SetError(span, thisErr)
+		return nil, thisErr
 	}
 
 	if pubData == nil || priData == nil {
 		tr.slogger.Log(ctx, slog.LevelInfo,
-			"generating new keys",
+			"generating new tpm keys",
 		)
 
 		var err error
 		priData, pubData, err = tr.signerCreator.CreateKey()
 		if err != nil {
+			thisErr := fmt.Errorf("creating key: %w", err)
+			traces.SetError(span, thisErr)
+
 			clearKeyData(tr.slogger, tr.store)
-			return nil, fmt.Errorf("creating key: %w", err)
+			return nil, thisErr
 		}
 
 		if err := storeKeyData(tr.store, priData, pubData); err != nil {
+			thisErr := fmt.Errorf("storing key data: %w", err)
+			traces.SetError(span, thisErr)
+
 			clearKeyData(tr.slogger, tr.store)
-			return nil, fmt.Errorf("storing key: %w", err)
+			return nil, thisErr
 		}
+
+		span.AddEvent("generated_new_tpm_keys")
 	}
 
 	k, err := tr.signerCreator.New(priData, pubData)
 	if err != nil {
-		return nil, fmt.Errorf("creating tpm signer: %w", err)
+		thisErr := fmt.Errorf("creating tpm signer: %w", err)
+		traces.SetError(span, thisErr)
+		return nil, thisErr
 	}
+
+	span.AddEvent("created_tpm_signer")
 
 	return k, nil
 }
