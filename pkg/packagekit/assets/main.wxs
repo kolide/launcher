@@ -52,6 +52,7 @@
 	    <Directory Id="DATADIR" Name="Kolide">
             <Component Id="RootDirPermissions" Guid="{{.PermissionsGUID}}">
               <CreateFolder>
+                <!-- see https://wixtoolset.org/docs/v3/xsd/wix/permission/ for additional details -->
                 <Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericAll="yes"/>
                 <Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes"/>
                 <Permission User="[WIX_ACCOUNT_USERS]" GenericRead="yes" GenericExecute="yes"/>
