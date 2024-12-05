@@ -82,7 +82,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		err = store.Set([]byte(publicEccDataKey), serJson)
 		require.NoError(t, err)
 
-		// create new signer with store containting key
+		// create new signer with store containing key
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, nil)
 		require.NoError(t, err)
 

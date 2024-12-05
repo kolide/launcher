@@ -9,7 +9,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type keyInt interface {
@@ -32,10 +31,7 @@ type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error)
 }
 
-func SetupKeys(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) error {
-	ctx, span := traces.StartSpan(ctx)
-	defer span.End()
-
+func SetupKeys(_ context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) error {
 	slogger = slogger.With("component", "agentkeys")
 
 	var err error
