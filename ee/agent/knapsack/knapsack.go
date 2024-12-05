@@ -39,9 +39,9 @@ type knapsack struct {
 
 	slogger, systemSlogger *multislogger.MultiSlogger
 
+	querier types.InstanceQuerier
+
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
-	// Some potential future additions include:
-	// Querier
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
@@ -85,6 +85,20 @@ func (k *knapsack) SystemSlogger() *slog.Logger {
 func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.slogger.AddHandler(handler...)
 	k.systemSlogger.AddHandler(handler...)
+}
+
+// Osquery instance querier
+func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
+	k.querier = q
+}
+
+// InstanceStatuses returns the current status of each osquery instance.
+// It performs a healthcheck against each existing instance.
+func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {
+	if k.querier == nil {
+		return nil
+	}
+	return k.querier.InstanceStatuses()
 }
 
 // BboltDB interface methods

@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -388,6 +389,13 @@ func TestMultipleInstances(t *testing.T) {
 	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
+
+	// Confirm instance statuses are reported correctly
+	instanceStatuses := runner.InstanceStatuses()
+	require.Contains(t, instanceStatuses, defaultRegistrationId)
+	require.Equal(t, instanceStatuses[defaultRegistrationId], types.InstanceStatusHealthy)
+	require.Contains(t, instanceStatuses, extraRegistrationId)
+	require.Equal(t, instanceStatuses[extraRegistrationId], types.InstanceStatusHealthy)
 
 	waitShutdown(t, runner, logBytes)
 
