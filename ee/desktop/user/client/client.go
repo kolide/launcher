@@ -99,7 +99,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 }
 
 func (c *client) CreateSecureEnclaveKey() (*ecdsa.PublicKey, error) {
-	resp, err := c.base.Get("http://unix/secure_enclave_key")
+	resp, err := c.base.Get("http://unix/create_secure_enclave_key")
 	if err != nil {
 		return nil, fmt.Errorf("getting secure enclave key: %w", err)
 	}
