@@ -41,13 +41,14 @@ func Test_secureEnclaveSigner(t *testing.T) {
 		tpmSignerCreatorMock.On("New", fakePrivData, fakePubData).Return(privKey, nil).Once()
 
 		go func() {
-			tpmRunner.Execute()
+			// sleep long enough to get through 2 cycles of execute
+			time.Sleep(3 * time.Second)
+			tpmRunner.Interrupt(errors.New("test"))
 		}()
 
-		// // sleep long enough to get through 2 cycles of exectue
-		time.Sleep(3 * time.Second)
+		require.NoError(t, tpmRunner.Execute())
 		require.NotNil(t, tpmRunner.Public())
-		tpmRunner.Interrupt(errors.New("test"))
+
 	})
 
 	t.Run("loads existing key", func(t *testing.T) {
@@ -68,13 +69,12 @@ func Test_secureEnclaveSigner(t *testing.T) {
 		tpmSignerCreatorMock.On("New", fakePrivData, fakePubData).Return(privKey, nil).Once()
 
 		go func() {
-			tpmRunner.Execute()
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			tpmRunner.Interrupt(errors.New("test"))
 		}()
 
-		// sleep long enough to get through 2 cycles of exectue
-		time.Sleep(3 * time.Second)
+		require.NoError(t, tpmRunner.Execute())
 		require.NotNil(t, tpmRunner.Public())
-		tpmRunner.Interrupt(errors.New("test"))
 	})
-
 }

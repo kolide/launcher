@@ -54,15 +54,15 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 
 		go func() {
-			ser.Execute()
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
 		}()
 
-		// sleep long enough to get through 2 cycles of exectue
-		time.Sleep(3 * time.Second)
-
+		require.NoError(t, ser.Execute())
 		// one cycle of execute should have created key
 		require.NotNil(t, ser.Public())
-		ser.Interrupt(errors.New("test"))
+
 	})
 
 	t.Run("loads existing key", func(t *testing.T) {

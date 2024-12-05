@@ -81,6 +81,7 @@ func (tr *tpmRunner) Execute() error {
 
 			if currentRetryInterval < maxRetryInterval {
 				currentRetryInterval += time.Second
+				retryTicker.Reset(currentRetryInterval)
 			}
 		} else {
 			tr.signer = signer

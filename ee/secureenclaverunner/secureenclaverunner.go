@@ -97,6 +97,7 @@ func (ser *secureEnclaveRunner) Execute() error {
 
 			if currentRetryInterval < maxRetryInterval {
 				currentRetryInterval += time.Second
+				retryTicker.Reset(currentRetryInterval)
 			}
 		} else {
 			retryTicker.Stop()
