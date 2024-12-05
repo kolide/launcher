@@ -13,6 +13,8 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
+// SetHardwareKeysRunner creates a secure enclave runner and sets it as the agent hardware key as it also implements the keyInt/cyrpto.Signer interface.
+// The returned execute and interrupt functions can be used to start and stop the secure enclave runner, generally via a run group.
 func SetHardwareKeysRunner(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, secureEnclaveClient secureEnclaveClient) (execute func() error, interrupt func(error), err error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
