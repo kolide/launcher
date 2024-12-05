@@ -434,7 +434,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
 
-		execute, interrupt, err := agent.SetupHardwareKeys(ctx, k.Slogger(), k.ConfigStore(), runner)
+		execute, interrupt, err := agent.SetHardwareKeysRunner(ctx, k.Slogger(), k.ConfigStore(), runner)
 		if err != nil {
 			return fmt.Errorf("setting up hardware keys: %w", err)
 		}

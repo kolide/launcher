@@ -23,21 +23,29 @@ type tpmRunner struct {
 	interrupted   bool
 }
 
+// tpmSignerCreator is an interface for creating and loading TPM signers
+// useful for mocking in tests
 type tpmSignerCreator interface {
 	CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)
 	New(private, public []byte) (crypto.Signer, error)
 }
 
+// defaultTpmSignerCreator is the default implementation of tpmSignerCreator
+// using the tpm package
 type defaultTpmSignerCreator struct{}
 
+// CreateKey creates a new TPM key
 func (d defaultTpmSignerCreator) CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error) {
 	return tpm.CreateKey()
 }
 
+// New creates a new TPM signer
 func (d defaultTpmSignerCreator) New(private, public []byte) (crypto.Signer, error) {
 	return tpm.New(private, public)
 }
 
+// tpmRunnerOption is a functional option for tpmRunner
+// useful for setting dependencies in tests
 type tpmRunnerOption func(*tpmRunner)
 
 func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, opts ...tpmRunnerOption) (*tpmRunner, error) {

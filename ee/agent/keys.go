@@ -19,6 +19,7 @@ type keyInt interface {
 var hardwareKeys keyInt = keys.Noop
 var localDbKeys keyInt = keys.Noop
 
+// HardwareKeys returns the hardware keys for the agent, it's critical to not cache this value as it may change during runtime.
 func HardwareKeys() keyInt {
 	return hardwareKeys
 }
