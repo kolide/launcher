@@ -32,7 +32,7 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds: k.RegistrationIds(),
+		registrationIds: k.RegistrationIDs(),
 		instances:       make(map[string]*OsqueryInstance),
 		slogger:         k.Slogger().With("component", "osquery_runner"),
 		knapsack:        k,
@@ -177,7 +177,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	defer r.instanceLock.Unlock()
 
 	// For now, grab the default (i.e. only) instance
-	instance, ok := r.instances[types.DefaultRegistrationId]
+	instance, ok := r.instances[types.DefaultRegistrationID]
 	if !ok {
 		return nil, errors.New("no default instance exists, cannot query")
 	}

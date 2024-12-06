@@ -1102,12 +1102,12 @@ func (_m *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, f
 	_m.Called(_ca...)
 }
 
-// RegistrationIds provides a mock function with given fields:
-func (_m *Knapsack) RegistrationIds() []string {
+// RegistrationIDs provides a mock function with given fields:
+func (_m *Knapsack) RegistrationIDs() []string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for RegistrationIds")
+		panic("no return value specified for RegistrationIDs")
 	}
 
 	var r0 []string
