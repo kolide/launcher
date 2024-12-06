@@ -149,7 +149,6 @@ const (
 	publicEccData  = "publicEccData"
 )
 
-// nolint:unused
 func fetchKeyData(store types.Getter) ([]byte, []byte, error) {
 	pri, err := store.Get([]byte(privateEccData))
 	if err != nil {
@@ -164,7 +163,6 @@ func fetchKeyData(store types.Getter) ([]byte, []byte, error) {
 	return pri, pub, nil
 }
 
-// nolint:unused
 func storeKeyData(store types.Setter, pri, pub []byte) error {
 	if pri != nil {
 		if err := store.Set([]byte(privateEccData), pri); err != nil {
