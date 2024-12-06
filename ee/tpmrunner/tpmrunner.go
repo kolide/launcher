@@ -120,8 +120,7 @@ func (tr *tpmRunner) Interrupt(_ error) {
 	tr.interrupt <- struct{}{}
 }
 
-// Public returns the public key of the current console user
-// creating and peristing a new one if needed
+// Public returns the public hardware key
 func (tr *tpmRunner) Public() crypto.PublicKey {
 	if tr.signer == nil {
 		return nil
