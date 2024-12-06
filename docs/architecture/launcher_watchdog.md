@@ -22,7 +22,7 @@ sequenceDiagram
         LauncherKolideK2Svc->>WindowsSchedulerService: remove watchdog task
     end
 
-    loop every 30 minutes, or 1 minute after wake event
+    loop every 30 minutes, immediately after wake event, and 1 minute after wake event
         WindowsSchedulerService->>LauncherKolideK2WatchdogTask: triggers scheduled task
         LauncherKolideK2WatchdogTask->>LauncherKolideK2Svc: performs healthcheck, restarts if stopped
     end
