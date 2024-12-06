@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"slices"
 	"strings"
@@ -370,7 +369,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	// see trigger types here https://learn.microsoft.com/en-us/windows/win32/api/taskschd/ne-taskschd-task_trigger_type2
 	createTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
 	if err != nil {
-		log.Fatalf("encountered error creating trigger: %s", err.Error())
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
 	}
 
 	trigger := createTriggerResp.ToIDispatch()
@@ -416,7 +415,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	// things were too busy during wake
 	noDelayTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
 	if err != nil {
-		log.Fatalf("encountered error creating trigger: %s", err.Error())
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
 	}
 
 	noDelayEventTrigger := noDelayTriggerResp.ToIDispatch()
