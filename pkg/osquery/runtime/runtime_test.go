@@ -122,6 +122,7 @@ func TestBadBinaryPath(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -158,6 +159,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -186,6 +188,7 @@ func TestFlagsChanged(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	// First, it should return false, then on the next call, it should return true
 	k.On("WatchdogEnabled").Return(false).Once()
@@ -215,7 +218,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
-	for _, a := range runner.instances[defaultRegistrationId].cmd.Args {
+	for _, a := range runner.instances[types.DefaultRegistrationId].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			watchdogDisabled = true
 			break
@@ -223,7 +226,7 @@ func TestFlagsChanged(t *testing.T) {
 	}
 	require.True(t, watchdogDisabled, "instance not set up with watchdog disabled")
 
-	startingInstance := runner.instances[defaultRegistrationId]
+	startingInstance := runner.instances[types.DefaultRegistrationId]
 
 	runner.FlagsChanged(keys.WatchdogEnabled)
 
@@ -232,13 +235,13 @@ func TestFlagsChanged(t *testing.T) {
 	waitHealthy(t, runner, logBytes)
 
 	// Now confirm that the instance is new
-	require.NotEqual(t, startingInstance, runner.instances[defaultRegistrationId], "instance not replaced")
+	require.NotEqual(t, startingInstance, runner.instances[types.DefaultRegistrationId], "instance not replaced")
 
 	// Confirm osquery watchdog is now enabled
 	watchdogMemoryLimitMBFound := false
 	watchdogUtilizationLimitPercentFound := false
 	watchdogDelaySecFound := false
-	for _, a := range runner.instances[defaultRegistrationId].cmd.Args {
+	for _, a := range runner.instances[types.DefaultRegistrationId].cmd.Args {
 		if strings.Contains(a, "disable_watchdog") {
 			t.Error("disable_watchdog flag set")
 			t.FailNow()
@@ -299,10 +302,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		}
 
 		// Confirm osquery instance setup is complete
-		if runner.instances[defaultRegistrationId] == nil {
+		if runner.instances[types.DefaultRegistrationId] == nil {
 			return errors.New("default instance does not exist yet")
 		}
-		if runner.instances[defaultRegistrationId].stats == nil || runner.instances[defaultRegistrationId].stats.ConnectTime == "" {
+		if runner.instances[types.DefaultRegistrationId].stats == nil || runner.instances[types.DefaultRegistrationId].stats.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 
@@ -321,6 +324,7 @@ func TestSimplePath(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -340,8 +344,8 @@ func TestSimplePath(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to instance stats on start up")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.StartTime, "start time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.ConnectTime, "connect time should be added to instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 }
@@ -352,7 +356,11 @@ func TestMultipleInstances(t *testing.T) {
 
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
+	// Add in an extra instance
+	extraRegistrationId := ulid.New()
+
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId, extraRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -370,19 +378,15 @@ func TestMultipleInstances(t *testing.T) {
 
 	runner := New(k, serviceClient, opts...)
 
-	// Add in an extra instance
-	extraRegistrationId := ulid.New()
-	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
-
 	// Start the instance
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm the default instance was started
-	require.Contains(t, runner.instances, defaultRegistrationId)
-	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	require.Contains(t, runner.instances, types.DefaultRegistrationId)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
 
 	// Confirm the additional instance was started
 	require.Contains(t, runner.instances, extraRegistrationId)
@@ -392,17 +396,17 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Confirm instance statuses are reported correctly
 	instanceStatuses := runner.InstanceStatuses()
-	require.Contains(t, instanceStatuses, defaultRegistrationId)
-	require.Equal(t, instanceStatuses[defaultRegistrationId], types.InstanceStatusHealthy)
+	require.Contains(t, instanceStatuses, types.DefaultRegistrationId)
+	require.Equal(t, instanceStatuses[types.DefaultRegistrationId], types.InstanceStatusHealthy)
 	require.Contains(t, instanceStatuses, extraRegistrationId)
 	require.Equal(t, instanceStatuses[extraRegistrationId], types.InstanceStatusHealthy)
 
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm both instances exited
-	require.Contains(t, runner.instances, defaultRegistrationId)
-	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.Contains(t, runner.instances, types.DefaultRegistrationId)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
 	require.Contains(t, runner.instances, extraRegistrationId)
 	require.NotNil(t, runner.instances[extraRegistrationId].stats)
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
@@ -415,6 +419,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -444,11 +449,11 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm the default instance was started, and then exited
-	require.Contains(t, runner.instances, defaultRegistrationId)
-	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.Contains(t, runner.instances, types.DefaultRegistrationId)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationId].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
 
 	// Confirm the additional instance was started, and then exited
 	require.Contains(t, runner.instances, extraRegistrationId)
@@ -465,6 +470,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -496,6 +502,7 @@ func TestOsqueryDies(t *testing.T) {
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -515,14 +522,14 @@ func TestOsqueryDies(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
-	require.Contains(t, runner.instances, defaultRegistrationId)
-	require.NotNil(t, runner.instances[defaultRegistrationId].stats)
-	previousStats := runner.instances[defaultRegistrationId].stats
+	require.Contains(t, runner.instances, types.DefaultRegistrationId)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationId].stats)
+	previousStats := runner.instances[types.DefaultRegistrationId].stats
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
-	require.NoError(t, killProcessGroup(runner.instances[defaultRegistrationId].cmd))
-	runner.instances[defaultRegistrationId].errgroup.Wait()
+	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationId].cmd))
+	runner.instances[types.DefaultRegistrationId].errgroup.Wait()
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
@@ -537,6 +544,7 @@ func TestNotStarted(t *testing.T) {
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
@@ -566,10 +574,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	requirePgidMatch(t, runner.instances[defaultRegistrationId].cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[types.DefaultRegistrationId].cmd.Process.Pid)
 
 	// kill the current osquery process but not the extension
-	require.NoError(t, runner.instances[defaultRegistrationId].cmd.Process.Kill())
+	require.NoError(t, runner.instances[types.DefaultRegistrationId].cmd.Process.Kill())
 
 	// We need to (a) let the runner restart osquery, and (b) wait for
 	// the extension to die. Both of these may take up to 30s. We'll
@@ -593,6 +601,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIds").Return([]string{types.DefaultRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -614,7 +623,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
-	requirePgidMatch(t, runner.instances[defaultRegistrationId].cmd.Process.Pid)
+	requirePgidMatch(t, runner.instances[types.DefaultRegistrationId].cmd.Process.Pid)
 
 	teardown = func() {
 		waitShutdown(t, runner, logBytes)

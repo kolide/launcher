@@ -1102,6 +1102,26 @@ func (_m *Knapsack) RegisterChangeObserver(observer types.FlagsChangeObserver, f
 	_m.Called(_ca...)
 }
 
+// RegistrationIds provides a mock function with given fields:
+func (_m *Knapsack) RegistrationIds() []string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegistrationIds")
+	}
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func() []string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	return r0
+}
+
 // ResultLogsStore provides a mock function with given fields:
 func (_m *Knapsack) ResultLogsStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()

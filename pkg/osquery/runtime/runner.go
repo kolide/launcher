@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	defaultRegistrationId = "default"
-
 	launchRetryDelay = 30 * time.Second
 )
 
@@ -34,16 +32,13 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds: []string{
-			// For now, we only have one (default) instance and we use it for all queries
-			defaultRegistrationId,
-		},
-		instances:     make(map[string]*OsqueryInstance),
-		slogger:       k.Slogger().With("component", "osquery_runner"),
-		knapsack:      k,
-		serviceClient: serviceClient,
-		shutdown:      make(chan struct{}),
-		opts:          opts,
+		registrationIds: k.RegistrationIds(),
+		instances:       make(map[string]*OsqueryInstance),
+		slogger:         k.Slogger().With("component", "osquery_runner"),
+		knapsack:        k,
+		serviceClient:   serviceClient,
+		shutdown:        make(chan struct{}),
+		opts:            opts,
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -182,7 +177,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	defer r.instanceLock.Unlock()
 
 	// For now, grab the default (i.e. only) instance
-	instance, ok := r.instances[defaultRegistrationId]
+	instance, ok := r.instances[types.DefaultRegistrationId]
 	if !ok {
 		return nil, errors.New("no default instance exists, cannot query")
 	}

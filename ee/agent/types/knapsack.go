@@ -9,6 +9,7 @@ type Knapsack interface {
 	BboltDB
 	Flags
 	Slogger
+	RegistrationTracker
 	InstanceQuerier
 	SetInstanceQuerier(q InstanceQuerier)
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
