@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"slices"
 	"strings"
@@ -218,7 +217,8 @@ func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
 // installWatchdogTask registers our watchdog subcommand as a scheduled task.
 // see inline comments for details on various settings, but here is a general overview:
 // Triggers:
-// - 1 minute after any wake event
+// - immediately following any wake event
+// - 1 minute after any wake event (to allow for retrying if resource constrained)
 // - every 30 minutes as a routine check
 // Action:
 // - runs launcher.exe watchdog -config <path to config> with a 1 minute timeout
@@ -369,7 +369,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	// see trigger types here https://learn.microsoft.com/en-us/windows/win32/api/taskschd/ne-taskschd-task_trigger_type2
 	createTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
 	if err != nil {
-		log.Fatalf("encountered error creating trigger: %s", err.Error())
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
 	}
 
 	trigger := createTriggerResp.ToIDispatch()
@@ -408,6 +408,31 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	// PT1M here means 1 minute
 	if _, err = oleutil.PutProperty(eventTrigger, "Delay", "PT1M"); err != nil {
 		return fmt.Errorf("setting event trigger delay: %w", err)
+	}
+
+	// add a second trigger using the same event subscription, but without a delay.
+	// this way we will fire immediately upon wake up, and again a minute later in case
+	// things were too busy during wake
+	noDelayTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
+	if err != nil {
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
+	}
+
+	noDelayEventTrigger := noDelayTriggerResp.ToIDispatch()
+	defer noDelayEventTrigger.Release()
+
+	if _, err = oleutil.PutProperty(noDelayEventTrigger, "ExecutionTimeLimit", "PT1M"); err != nil {
+		return fmt.Errorf("setting execution time limit property")
+	}
+
+	secondaryEventTrigger, err := noDelayEventTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+	if err != nil {
+		return fmt.Errorf("getting trigger interface: %w", err)
+	}
+	defer secondaryEventTrigger.Release()
+
+	if _, err = oleutil.PutProperty(secondaryEventTrigger, "Subscription", eventSubscription); err != nil {
+		return fmt.Errorf("setting subscription property: %w", err)
 	}
 
 	// add another trigger, this one time based- repeat every 30 minutes
