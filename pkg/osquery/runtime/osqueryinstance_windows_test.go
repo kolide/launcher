@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(defaultRegistrationId, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
 	cmd, err := i.createOsquerydCommand(osquerydPath, &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",

@@ -92,6 +92,11 @@ func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
 	k.querier = q
 }
 
+// RegistrationTracker interface methods
+func (k *knapsack) RegistrationIDs() []string {
+	return []string{types.DefaultRegistrationID}
+}
+
 // InstanceStatuses returns the current status of each osquery instance.
 // It performs a healthcheck against each existing instance.
 func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {
