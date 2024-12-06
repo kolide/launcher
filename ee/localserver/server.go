@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/krypto"
@@ -59,7 +60,8 @@ type localServer struct {
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
 
-	presenceDetector presenceDetector
+	presenceDetector       presenceDetector
+	presenceDetectionMutex sync.Mutex
 }
 
 const (
@@ -416,6 +418,9 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ensure we only prompt for 1 presence detection at a time
+		ls.presenceDetectionMutex.Lock()
+		defer ls.presenceDetectionMutex.Unlock()
 
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
