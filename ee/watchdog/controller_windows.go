@@ -426,13 +426,13 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting execution time limit property")
 	}
 
-	eventTriggerNoDelay, err := noDelayEventTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+	secondaryEventTrigger, err := noDelayEventTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
 	if err != nil {
 		return fmt.Errorf("getting trigger interface: %w", err)
 	}
-	defer eventTriggerNoDelay.Release()
+	defer secondaryEventTrigger.Release()
 
-	if _, err = oleutil.PutProperty(eventTriggerNoDelay, "Subscription", eventSubscription); err != nil {
+	if _, err = oleutil.PutProperty(secondaryEventTrigger, "Subscription", eventSubscription); err != nil {
 		return fmt.Errorf("setting subscription property: %w", err)
 	}
 
