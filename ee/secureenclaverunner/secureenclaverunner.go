@@ -60,21 +60,23 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 		return nil, fmt.Errorf("getting public ecc data from store: %w", err)
 	}
 
-	if data != nil {
-		if err := json.Unmarshal(data, ser); err != nil {
-			traces.SetError(span, fmt.Errorf("unmarshaling secure enclave signer: %w", err))
+	if data == nil {
+		return ser, nil
+	}
+
+	if err := json.Unmarshal(data, ser); err != nil {
+		traces.SetError(span, fmt.Errorf("unmarshaling secure enclave signer: %w", err))
+		ser.slogger.Log(ctx, slog.LevelError,
+			"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
+			"err", err,
+		)
+
+		if err := store.Delete([]byte(publicEccDataKey)); err != nil {
+			traces.SetError(span, fmt.Errorf("deleting corrupt public ecc data: %w", err))
 			ser.slogger.Log(ctx, slog.LevelError,
 				"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
 				"err", err,
 			)
-
-			if err := store.Delete([]byte(publicEccDataKey)); err != nil {
-				traces.SetError(span, fmt.Errorf("deleting corrupt public ecc data: %w", err))
-				ser.slogger.Log(ctx, slog.LevelError,
-					"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
-					"err", err,
-				)
-			}
 		}
 	}
 
