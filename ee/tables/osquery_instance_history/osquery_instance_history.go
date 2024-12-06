@@ -9,6 +9,7 @@ import (
 
 func TablePlugin() *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("registration_id"),
 		table.TextColumn("instance_run_id"),
 		table.TextColumn("start_time"),
 		table.TextColumn("connect_time"),
@@ -33,6 +34,7 @@ func generate() table.GenerateFunc {
 		for _, instance := range history {
 
 			results = append(results, map[string]string{
+				"registration_id": instance.RegistrationId,
 				"instance_run_id": instance.RunId,
 				"start_time":      instance.StartTime,
 				"connect_time":    instance.ConnectTime,

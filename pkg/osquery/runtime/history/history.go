@@ -61,11 +61,28 @@ func LatestInstance() (Instance, error) {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
-	if currentHistory.instances == nil || len(currentHistory.instances) == 0 {
+	if len(currentHistory.instances) == 0 {
 		return Instance{}, NoInstancesError{}
 	}
 
 	return *currentHistory.instances[len(currentHistory.instances)-1], nil
+}
+
+func LatestInstanceByRegistrationID(registrationId string) (Instance, error) {
+	currentHistory.Lock()
+	defer currentHistory.Unlock()
+
+	if len(currentHistory.instances) == 0 {
+		return Instance{}, NoInstancesError{}
+	}
+
+	for i := len(currentHistory.instances) - 1; i > -1; i -= 1 {
+		if currentHistory.instances[i].RegistrationId == registrationId {
+			return *currentHistory.instances[i], nil
+		}
+	}
+
+	return Instance{}, NoInstancesError{}
 }
 
 func LatestInstanceUptimeMinutes() (int64, error) {
@@ -88,7 +105,7 @@ func LatestInstanceUptimeMinutes() (int64, error) {
 }
 
 // NewInstance adds a new instance to the osquery instance history and returns it
-func NewInstance(runId string) (*Instance, error) {
+func NewInstance(registrationId string, runId string) (*Instance, error) {
 	currentHistory.Lock()
 	defer currentHistory.Unlock()
 
@@ -98,9 +115,10 @@ func NewInstance(runId string) (*Instance, error) {
 	}
 
 	newInstance := &Instance{
-		RunId:     runId,
-		StartTime: timeNow(),
-		Hostname:  hostname,
+		RegistrationId: registrationId,
+		RunId:          runId,
+		StartTime:      timeNow(),
+		Hostname:       hostname,
 	}
 
 	currentHistory.addInstanceToHistory(newInstance)

@@ -59,7 +59,7 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 
 			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
-			_, err := NewInstance(ulid.New())
+			_, err := NewInstance(ulid.New(), ulid.New())
 
 			assert.Equal(t, tt.wantNumInstances, len(currentHistory.instances), "expect history length to reflect new instance")
 
@@ -166,6 +166,82 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
 
 			got, err := LatestInstance()
+
+			if tt.errString != "" {
+				assert.EqualError(t, err, tt.errString)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLatestInstanceForRegistrationID(t *testing.T) { // nolint:paralleltest
+	tests := []struct {
+		name             string
+		registrationID   string
+		initialInstances []*Instance
+		want             Instance
+		errString        string
+	}{
+		{
+			name:           "success",
+			registrationID: "test",
+			initialInstances: []*Instance{
+				{
+					StartTime:      "first_expected_start_time",
+					RegistrationId: "some other",
+				},
+				{
+					StartTime:      "second_expected_start_time",
+					RegistrationId: "test",
+				},
+				{
+					StartTime:      "third_expected_start_time",
+					RegistrationId: "test",
+				},
+				{
+					StartTime:      "fourth_expected_start_time",
+					RegistrationId: "another",
+				},
+			},
+			want: Instance{
+				StartTime:      "third_expected_start_time",
+				RegistrationId: "test",
+			},
+		},
+		{
+			name:           "no_instances_error",
+			registrationID: "test",
+			errString:      NoInstancesError{}.Error(),
+		},
+		{
+			name:           "no matching instances",
+			registrationID: "test3",
+			initialInstances: []*Instance{
+				{
+					StartTime:      "first_expected_start_time",
+					RegistrationId: "test",
+				},
+				{
+					StartTime:      "second_expected_start_time",
+					RegistrationId: "test1",
+				},
+				{
+					StartTime:      "third_expected_start_time",
+					RegistrationId: "test2",
+				},
+			},
+			errString: NoInstancesError{}.Error(),
+		},
+	}
+	for _, tt := range tests { // nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(func() { currentHistory = &History{} })
+
+			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
+
+			got, err := LatestInstanceByRegistrationID(tt.registrationID)
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
