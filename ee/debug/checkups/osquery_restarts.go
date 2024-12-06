@@ -45,12 +45,14 @@ func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 
 	for idx, instance := range restartHistory {
 		results[idx] = map[string]string{
-			"start_time":   instance.StartTime,
-			"connect_time": instance.ConnectTime,
-			"exit_time":    instance.ExitTime,
-			"instance_id":  instance.InstanceId,
-			"version":      instance.Version,
-			"errors":       instance.Error,
+			"registration_id": instance.RegistrationId,
+			"instance_run_id": instance.RunId,
+			"start_time":      instance.StartTime,
+			"connect_time":    instance.ConnectTime,
+			"exit_time":       instance.ExitTime,
+			"instance_id":     instance.InstanceId,
+			"version":         instance.Version,
+			"errors":          instance.Error,
 		}
 	}
 
