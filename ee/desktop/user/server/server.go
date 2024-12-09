@@ -67,7 +67,7 @@ func New(slogger *slog.Logger,
 	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
 	authedMux.HandleFunc("/show", userServer.showDesktop)
 	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
-	authedMux.HandleFunc("/create_secure_enclave_key", userServer.createSecureEnclaveKey)
+	authedMux.HandleFunc("/secure_enclave_key", userServer.createSecureEnclaveKey)
 
 	userServer.server = &http.Server{
 		Handler: userServer.authMiddleware(authedMux),
