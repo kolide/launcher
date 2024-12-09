@@ -362,7 +362,7 @@ func (i *OsqueryInstance) Launch() error {
 		"osquery socket created",
 	)
 
-	stats, err := history.NewInstance(i.runId)
+	stats, err := history.NewInstance(i.registrationId, i.runId)
 	if err != nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"could not create new osquery instance history",

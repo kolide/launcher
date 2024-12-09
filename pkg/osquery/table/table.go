@@ -29,7 +29,7 @@ import (
 // around _launcher_ things thus do not make sense in tables.ext
 func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(k.ConfigStore()),
+		LauncherConfigTable(k.ConfigStore(), k),
 		LauncherDbInfo(k.BboltDB()),
 		LauncherInfoTable(k.ConfigStore(), k.LauncherHistoryStore()),
 		launcher_db.TablePlugin("kolide_server_data", k.ServerProvidedDataStore()),
