@@ -41,10 +41,7 @@ type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error)
 }
 
-func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, secureEnclaveClient secureEnclaveClient) (*secureEnclaveRunner, error) {
-	ctx, span := traces.StartSpan(ctx)
-	defer span.End()
-
+func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, secureEnclaveClient secureEnclaveClient) (*secureEnclaveRunner, error) {
 	return &secureEnclaveRunner{
 		uidPubKeyMap:        make(map[string]*ecdsa.PublicKey),
 		store:               store,
