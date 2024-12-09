@@ -69,6 +69,8 @@ func TestMultiplicativeCounter(t *testing.T) {
 
 // TestMultiplicativeTicker tests the NewMultiplicativeTicker and its behavior.
 func TestMultiplicativeTicker(t *testing.T) {
+	t.Parallel()
+
 	baseTime := 100 * time.Millisecond
 	maxTime := 500 * time.Millisecond
 
