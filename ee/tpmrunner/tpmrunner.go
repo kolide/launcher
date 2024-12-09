@@ -11,6 +11,7 @@ import (
 
 	"github.com/kolide/krypto/pkg/tpm"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -68,8 +69,7 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 // Public returns the public key of the current console user
 // creating and peristing a new one if needed
 func (tr *tpmRunner) Execute() error {
-	currentRetryInterval, maxRetryInterval := 1*time.Second, 1*time.Minute
-	retryTicker := time.NewTicker(currentRetryInterval)
+	retryTicker := backoff.NewMultiplicativeTicker(time.Second, time.Minute)
 	defer retryTicker.Stop()
 
 	for {
@@ -80,11 +80,6 @@ func (tr *tpmRunner) Execute() error {
 				"creating tpm signer, will retry",
 				"err", err,
 			)
-
-			if currentRetryInterval < maxRetryInterval {
-				currentRetryInterval += time.Second
-				retryTicker.Reset(currentRetryInterval)
-			}
 		} else {
 			tr.signer = signer
 			retryTicker.Stop()

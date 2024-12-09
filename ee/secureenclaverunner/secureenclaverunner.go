@@ -20,6 +20,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -76,8 +77,7 @@ func (ser *secureEnclaveRunner) Execute() error {
 		}
 	}
 
-	currentRetryInterval, maxRetryInterval := 1*time.Second, 1*time.Minute
-	retryTicker := time.NewTicker(currentRetryInterval)
+	retryTicker := backoff.NewMultiplicativeTicker(time.Second, time.Minute)
 	defer retryTicker.Stop()
 
 	for {
@@ -87,11 +87,6 @@ func (ser *secureEnclaveRunner) Execute() error {
 				"getting current console user key, will retry",
 				"err", err,
 			)
-
-			if currentRetryInterval < maxRetryInterval {
-				currentRetryInterval += time.Second
-				retryTicker.Reset(currentRetryInterval)
-			}
 		} else {
 			retryTicker.Stop()
 		}
