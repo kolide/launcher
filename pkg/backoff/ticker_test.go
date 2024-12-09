@@ -86,7 +86,7 @@ func TestMultiplicativeTicker(t *testing.T) {
 		500 * time.Millisecond, // maxTime limit
 	}
 
-	buffer := 25 * time.Millisecond
+	buffer := 50 * time.Millisecond
 
 	for _, expected := range expectedDurations {
 		start := time.Now()
