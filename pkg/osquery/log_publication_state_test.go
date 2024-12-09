@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/service/mock"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
@@ -59,7 +60,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
@@ -110,7 +111,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	db, cleanup := makeTempDB(t)
 	defer cleanup()
 	k := makeKnapsack(t, db)
-	e, err := NewExtension(context.TODO(), m, k, ExtensionOpts{
+	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
