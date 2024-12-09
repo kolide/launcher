@@ -598,7 +598,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.knapsack, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.knapsack, i.registrationId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}

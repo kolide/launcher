@@ -36,6 +36,7 @@ import (
 type Extension struct {
 	NodeKey             string
 	Opts                ExtensionOpts
+	registrationId      string
 	knapsack            types.Knapsack
 	serviceClient       service.KolideService
 	enrollMutex         sync.Mutex
@@ -97,11 +98,11 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	slogger := k.Slogger().With("component", "osquery_extension")
+	slogger := k.Slogger().With("component", "osquery_extension", "registration_id", registrationId)
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -137,6 +138,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	return &Extension{
 		slogger:             slogger,
 		serviceClient:       client,
+		registrationId:      registrationId,
 		knapsack:            k,
 		NodeKey:             nodekey,
 		Opts:                opts,
