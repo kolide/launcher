@@ -29,7 +29,6 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
@@ -98,4 +97,45 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		require.NotNil(t, ser.Public())
 	})
 
+	t.Run("multiple interrupts", func(t *testing.T) {
+		t.Parallel()
+
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		require.NoError(t, err)
+
+		go func() {
+			ser.Execute()
+		}()
+
+		// Confirm we can call Interrupt multiple times without blocking
+		interruptComplete := make(chan struct{})
+		expectedInterrupts := 3
+		for i := 0; i < expectedInterrupts; i += 1 {
+			go func() {
+				ser.Interrupt(nil)
+				interruptComplete <- struct{}{}
+			}()
+		}
+
+		receivedInterrupts := 0
+		for {
+			if receivedInterrupts >= expectedInterrupts {
+				break
+			}
+
+			select {
+			case <-interruptComplete:
+				receivedInterrupts += 1
+				continue
+			case <-time.After(5 * time.Second):
+				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+				t.FailNow()
+			}
+		}
+
+		require.Equal(t, expectedInterrupts, receivedInterrupts)
+	})
 }

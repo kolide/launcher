@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"os/user"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -35,7 +36,7 @@ type secureEnclaveRunner struct {
 	slogger             *slog.Logger
 	mux                 *sync.Mutex
 	interrupt           chan struct{}
-	interrupted         bool
+	interrupted         atomic.Bool
 }
 
 type secureEnclaveClient interface {
@@ -105,11 +106,11 @@ func (ser *secureEnclaveRunner) Execute() error {
 
 func (ser *secureEnclaveRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ser.interrupted {
+	if ser.interrupted.Load() {
 		return
 	}
 
-	ser.interrupted = true
+	ser.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
 	ser.interrupt <- struct{}{}

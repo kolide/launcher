@@ -48,7 +48,6 @@ func Test_tpmRunner(t *testing.T) {
 
 		require.NoError(t, tpmRunner.Execute())
 		require.NotNil(t, tpmRunner.Public())
-
 	})
 
 	t.Run("loads existing key", func(t *testing.T) {
@@ -76,5 +75,50 @@ func Test_tpmRunner(t *testing.T) {
 
 		require.NoError(t, tpmRunner.Execute())
 		require.NotNil(t, tpmRunner.Public())
+	})
+
+	t.Run("test multiple interrupts", func(t *testing.T) {
+		t.Parallel()
+
+		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
+		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		require.NoError(t, err)
+
+		require.Nil(t, tpmRunner.Public())
+
+		tpmSignerCreatorMock.On("CreateKey").Return(fakePrivData, fakePubData, nil).Once()
+		tpmSignerCreatorMock.On("New", fakePrivData, fakePubData).Return(privKey, nil).Once()
+
+		go func() {
+			tpmRunner.Execute()
+		}()
+
+		// Confirm we can call Interrupt multiple times without blocking
+		interruptComplete := make(chan struct{})
+		expectedInterrupts := 3
+		for i := 0; i < expectedInterrupts; i += 1 {
+			go func() {
+				tpmRunner.Interrupt(nil)
+				interruptComplete <- struct{}{}
+			}()
+		}
+
+		receivedInterrupts := 0
+		for {
+			if receivedInterrupts >= expectedInterrupts {
+				break
+			}
+
+			select {
+			case <-interruptComplete:
+				receivedInterrupts += 1
+				continue
+			case <-time.After(5 * time.Second):
+				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+				t.FailNow()
+			}
+		}
+
+		require.Equal(t, expectedInterrupts, receivedInterrupts)
 	})
 }

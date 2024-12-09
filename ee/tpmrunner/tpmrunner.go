@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/krypto/pkg/tpm"
@@ -22,7 +23,7 @@ type (
 		store         types.GetterSetterDeleter
 		slogger       *slog.Logger
 		interrupt     chan struct{}
-		interrupted   bool
+		interrupted   atomic.Bool
 	}
 
 	// tpmSignerCreator is an interface for creating and loading TPM signers
@@ -99,11 +100,11 @@ func (tr *tpmRunner) Execute() error {
 
 func (tr *tpmRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if tr.interrupted {
+	if tr.interrupted.Load() {
 		return
 	}
 
-	tr.interrupted = true
+	tr.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
 	tr.interrupt <- struct{}{}
