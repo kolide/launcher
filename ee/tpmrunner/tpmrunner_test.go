@@ -19,7 +19,7 @@ func withTpmSignerCreator(tpmSignerCreator tpmSignerCreator) tpmRunnerOption {
 	}
 }
 
-func Test_secureEnclaveSigner(t *testing.T) {
+func Test_tpmRunner(t *testing.T) {
 	t.Parallel()
 
 	privKey, err := echelper.GenerateEcdsaKey()

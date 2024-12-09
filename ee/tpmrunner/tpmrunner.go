@@ -14,25 +14,31 @@ import (
 	"github.com/kolide/launcher/pkg/traces"
 )
 
-type tpmRunner struct {
-	signer        crypto.Signer
-	signerCreator tpmSignerCreator
-	store         types.GetterSetterDeleter
-	slogger       *slog.Logger
-	interrupt     chan struct{}
-	interrupted   bool
-}
+type (
+	tpmRunner struct {
+		signer        crypto.Signer
+		signerCreator tpmSignerCreator
+		store         types.GetterSetterDeleter
+		slogger       *slog.Logger
+		interrupt     chan struct{}
+		interrupted   bool
+	}
 
-// tpmSignerCreator is an interface for creating and loading TPM signers
-// useful for mocking in tests
-type tpmSignerCreator interface {
-	CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)
-	New(private, public []byte) (crypto.Signer, error)
-}
+	// tpmSignerCreator is an interface for creating and loading TPM signers
+	// useful for mocking in tests
+	tpmSignerCreator interface {
+		CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error)
+		New(private, public []byte) (crypto.Signer, error)
+	}
 
-// defaultTpmSignerCreator is the default implementation of tpmSignerCreator
-// using the tpm package
-type defaultTpmSignerCreator struct{}
+	// defaultTpmSignerCreator is the default implementation of tpmSignerCreator
+	// using the tpm package
+	defaultTpmSignerCreator struct{}
+
+	// tpmRunnerOption is a functional option for tpmRunner
+	// useful for setting dependencies in tests
+	tpmRunnerOption func(*tpmRunner)
+)
 
 // CreateKey creates a new TPM key
 func (d defaultTpmSignerCreator) CreateKey(opts ...tpm.TpmSignerOption) (private []byte, public []byte, err error) {
@@ -44,19 +50,7 @@ func (d defaultTpmSignerCreator) New(private, public []byte) (crypto.Signer, err
 	return tpm.New(private, public)
 }
 
-// tpmRunnerOption is a functional option for tpmRunner
-// useful for setting dependencies in tests
-type tpmRunnerOption func(*tpmRunner)
-
 func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, opts ...tpmRunnerOption) (*tpmRunner, error) {
-	_, span := traces.StartSpan(ctx)
-	defer span.End()
-
-	_, _, err := fetchKeyData(store)
-	if err != nil {
-		return nil, err
-	}
-
 	tpmRunner := &tpmRunner{
 		store:         store,
 		slogger:       slogger.With("component", "tpmrunner"),

@@ -86,6 +86,14 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, nil)
 		require.NoError(t, err)
 
+		go func() {
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, ser.Execute())
+
 		// should be able to fetch the key
 		require.NotNil(t, ser.Public())
 	})

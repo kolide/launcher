@@ -45,54 +45,48 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	ser := &secureEnclaveRunner{
+	return &secureEnclaveRunner{
 		uidPubKeyMap:        make(map[string]*ecdsa.PublicKey),
 		store:               store,
 		secureEnclaveClient: secureEnclaveClient,
 		slogger:             slogger.With("component", "secureenclaverunner"),
 		mux:                 &sync.Mutex{},
 		interrupt:           make(chan struct{}),
-	}
-
-	data, err := store.Get([]byte(publicEccDataKey))
-	if err != nil {
-		traces.SetError(span, fmt.Errorf("getting public ecc data from store: %w", err))
-		return nil, fmt.Errorf("getting public ecc data from store: %w", err)
-	}
-
-	if data == nil {
-		return ser, nil
-	}
-
-	if err := json.Unmarshal(data, ser); err != nil {
-		traces.SetError(span, fmt.Errorf("unmarshaling secure enclave signer: %w", err))
-		ser.slogger.Log(ctx, slog.LevelError,
-			"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
-			"err", err,
-		)
-
-		if err := store.Delete([]byte(publicEccDataKey)); err != nil {
-			traces.SetError(span, fmt.Errorf("deleting corrupt public ecc data: %w", err))
-			ser.slogger.Log(ctx, slog.LevelError,
-				"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
-				"err", err,
-			)
-		}
-	}
-
-	return ser, nil
+	}, nil
 }
 
 // Public returns the public key of the current console user
 // creating and peristing a new one if needed
 func (ser *secureEnclaveRunner) Execute() error {
+	data, err := ser.store.Get([]byte(publicEccDataKey))
+	if err != nil {
+		return fmt.Errorf("getting public ecc data from store: %w", err)
+	}
+
+	if data != nil {
+		if err := json.Unmarshal(data, ser); err != nil {
+			ser.slogger.Log(context.TODO(), slog.LevelError,
+				"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
+				"err", err,
+			)
+
+			if err := ser.store.Delete([]byte(publicEccDataKey)); err != nil {
+				ser.slogger.Log(context.TODO(), slog.LevelError,
+					"unable to unmarshal secure enclave signer, data may be corrupt, wiping",
+					"err", err,
+				)
+			}
+		}
+	}
+
 	currentRetryInterval, maxRetryInterval := 1*time.Second, 1*time.Minute
 	retryTicker := time.NewTicker(currentRetryInterval)
 	defer retryTicker.Stop()
 
 	for {
-		if _, err := ser.currentConsoleUserKey(context.TODO()); err != nil {
-			ser.slogger.Log(context.TODO(), slog.LevelError,
+		ctx := context.Background()
+		if _, err := ser.currentConsoleUserKey(ctx); err != nil {
+			ser.slogger.Log(ctx, slog.LevelError,
 				"getting current console user key, will retry",
 				"err", err,
 			)
@@ -109,7 +103,7 @@ func (ser *secureEnclaveRunner) Execute() error {
 		case <-retryTicker.C:
 			continue
 		case <-ser.interrupt:
-			ser.slogger.Log(context.TODO(), slog.LevelDebug,
+			ser.slogger.Log(ctx, slog.LevelDebug,
 				"interrupt received, exiting secure enclave signer execute loop",
 			)
 			return nil
