@@ -42,7 +42,6 @@ import (
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
-	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
@@ -371,22 +370,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
-		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stdout",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelDebug),
-		)),
-		osqueryruntime.WithStderr(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stderr",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelInfo),
-		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
