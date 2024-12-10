@@ -35,3 +35,18 @@ func KeyByIdentifier(key []byte, identifierType []byte, identifier []byte) []byt
 
 	return newKey
 }
+
+func SplitKey(key []byte) ([]byte, []byte) {
+	if !bytes.Contains(key, []byte{keyDelimiter}) {
+		return key, defaultIdentifier
+	}
+
+	// Key takes the form `<key>:<identifierType>:<identifier>` -- split
+	// on the keyDelimiter.
+	parts := bytes.SplitN(key, []byte{keyDelimiter}, 3)
+	if len(parts) != 3 {
+		return key, defaultIdentifier
+	}
+
+	return parts[0], parts[2]
+}

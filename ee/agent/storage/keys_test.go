@@ -46,3 +46,42 @@ func TestKeyByIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitKey(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName       string
+		key                []byte
+		expectedKey        []byte
+		expectedIdentifier []byte
+	}{
+		{
+			testCaseName:       "default node key",
+			key:                []byte("nodeKey"),
+			expectedKey:        []byte("nodeKey"),
+			expectedIdentifier: []byte("default"),
+		},
+		{
+			testCaseName:       "uuid by registration",
+			key:                []byte("uuid:registration:some-test-registration-id"),
+			expectedKey:        []byte("uuid"),
+			expectedIdentifier: []byte("some-test-registration-id"),
+		},
+		{
+			testCaseName:       "katc table by registration",
+			key:                []byte("katc_some_test_table:registration:another-test-registration-id"),
+			expectedKey:        []byte("katc_some_test_table"),
+			expectedIdentifier: []byte("another-test-registration-id"),
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			splitKey, identifier := SplitKey(tt.key)
+			require.Equal(t, tt.expectedKey, splitKey)
+			require.Equal(t, tt.expectedIdentifier, identifier)
+		})
+	}
+}
