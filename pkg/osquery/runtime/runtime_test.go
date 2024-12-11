@@ -25,7 +25,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -119,7 +118,7 @@ func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
 	rootDirectory := t.TempDir()
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -137,7 +136,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 
 	// The runner will repeatedly try to launch the instance, so `Run`
 	// won't return an error until we shut it down. Kick off `Run`,
@@ -156,7 +155,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -174,7 +173,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
@@ -185,7 +184,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -209,7 +208,7 @@ func TestFlagsChanged(t *testing.T) {
 	setUpMockStores(t, k)
 
 	// Start the runner
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	// Wait for the instance to start
@@ -321,7 +320,7 @@ func TestSimplePath(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -339,7 +338,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -354,7 +353,7 @@ func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
@@ -376,7 +375,7 @@ func TestMultipleInstances(t *testing.T) {
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient()
 
-	runner := New(k, serviceClient, opts...)
+	runner := New(k, serviceClient)
 
 	// Start the instance
 	go runner.Run()
@@ -416,7 +415,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -435,7 +434,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient()
 
-	runner := New(k, serviceClient, opts...)
+	runner := New(k, serviceClient)
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
@@ -467,7 +466,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -485,7 +484,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -499,7 +498,7 @@ func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -517,7 +516,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient())
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -598,7 +597,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
@@ -619,7 +618,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k, mockServiceClient(), opts...)
+	runner = New(k, mockServiceClient())
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -672,7 +671,7 @@ func mockServiceClient() *servicemock.KolideService {
 }
 
 // setUpTestSlogger sets up a logger that will log to a buffer.
-func setUpTestSlogger(rootDirectory string) (*threadsafebuffer.ThreadSafeBuffer, *slog.Logger, []OsqueryInstanceOption) {
+func setUpTestSlogger() (*threadsafebuffer.ThreadSafeBuffer, *slog.Logger) {
 	logBytes := &threadsafebuffer.ThreadSafeBuffer{}
 
 	slogger := slog.New(slog.NewTextHandler(logBytes, &slog.HandlerOptions{
@@ -680,27 +679,7 @@ func setUpTestSlogger(rootDirectory string) (*threadsafebuffer.ThreadSafeBuffer,
 		Level:     slog.LevelDebug,
 	}))
 
-	// Capture osquery logs too
-	opts := []OsqueryInstanceOption{
-		WithStdout(kolidelog.NewOsqueryLogAdapter(
-			slogger.With(
-				"component", "osquery",
-				"osqlevel", "stdout",
-			),
-			rootDirectory,
-			kolidelog.WithLevel(slog.LevelDebug),
-		)),
-		WithStderr(kolidelog.NewOsqueryLogAdapter(
-			slogger.With(
-				"component", "osquery",
-				"osqlevel", "stderr",
-			),
-			rootDirectory,
-			kolidelog.WithLevel(slog.LevelDebug),
-		)),
-	}
-
-	return logBytes, slogger, opts
+	return logBytes, slogger
 }
 
 // testRootDirectory returns a temporary directory suitable for use in these tests.
