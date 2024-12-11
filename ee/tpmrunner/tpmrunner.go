@@ -193,11 +193,11 @@ func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
 }
 
 func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
-	tr.mux.Lock()
-	defer tr.mux.Unlock()
-
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
+
+	tr.mux.Lock()
+	defer tr.mux.Unlock()
 
 	priData, pubData, err := fetchKeyData(tr.store)
 	if err != nil {
