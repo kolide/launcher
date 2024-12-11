@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -61,13 +60,12 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(), WithStdout(os.Stdout), WithStderr(os.Stderr))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
-	cmd, err := i.createOsquerydCommand(osquerydPath, paths)
+	_, err := i.createOsquerydCommand(osquerydPath, paths)
 	require.NoError(t, err)
-	require.Equal(t, os.Stderr, cmd.Stderr)
-	require.Equal(t, os.Stdout, cmd.Stdout)
 
 	k.AssertExpectations(t)
 }
@@ -83,6 +81,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{"verbose=false", "windows_event_channels=foo,bar"})
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("RootDirectory").Return("")
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
@@ -116,6 +115,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
+	k.On("RootDirectory").Return("")
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
@@ -165,6 +165,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
+	k.On("RootDirectory").Return("")
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
