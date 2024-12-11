@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 const (
@@ -79,7 +80,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 
 	// Perform the restart by signaling actor shutdown, but delay slightly to give
 	// the actionqueue a chance to process all actions and store their statuses.
-	go func() {
+	gowrapper.Go(context.TODO(), r.slogger, func() {
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"received remote restart action for current launcher run ID -- signaling for restart shortly",
 			"action_run_id", restartAction.RunID,
@@ -100,7 +101,13 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			)
 			return
 		}
-	}()
+	}, func(err any) {
+		r.slogger.Log(context.TODO(), slog.LevelError,
+			"exiting after remote restart panic",
+			"err", err,
+			"action_run_id", restartAction.RunID,
+		)
+	})
 
 	return nil
 }
