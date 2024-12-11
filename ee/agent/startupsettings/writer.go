@@ -148,7 +148,7 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationI
 func (s *startupSettingsWriter) extractKATCConstructionConfig(registrationId string) (string, error) {
 	kolideCfg := make(map[string]string)
 	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
-		key, identifier := storage.SplitKey(k)
+		key, _, identifier := storage.SplitKey(k)
 		if string(identifier) == registrationId {
 			kolideCfg[string(key)] = string(v)
 		}

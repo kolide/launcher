@@ -108,7 +108,7 @@ func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, err
 	}
 	katcCfg := make(map[string]string)
 	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
-		key, identifier := storage.SplitKey(k)
+		key, _, identifier := storage.SplitKey(k)
 		if string(identifier) == registrationId {
 			katcCfg[string(key)] = string(v)
 		}
