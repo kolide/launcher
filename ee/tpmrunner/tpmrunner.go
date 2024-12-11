@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 type (
 	tpmRunner struct {
 		signer        crypto.Signer
+		mux           sync.Mutex
 		signerCreator tpmSignerCreator
 		store         types.GetterSetterDeleter
 		slogger       *slog.Logger
@@ -74,15 +76,18 @@ func (tr *tpmRunner) Execute() error {
 	defer retryTicker.Stop()
 
 	for {
-		ctx := context.Background()
-		signer, err := tr.loadOrCreateKeys(ctx)
-		if err != nil {
-			tr.slogger.Log(ctx, slog.LevelError,
-				"creating tpm signer, will retry",
-				"err", err,
-			)
-		} else {
-			tr.signer = signer
+		// try to create signer if we don't have one
+		if tr.signer == nil {
+			ctx := context.Background()
+			if err := tr.loadOrCreateKeys(ctx); err != nil {
+				tr.slogger.Log(ctx, slog.LevelError,
+					"loading or creating keys in execute loop",
+					"err", err,
+				)
+			}
+		}
+
+		if tr.signer != nil {
 			retryTicker.Stop()
 		}
 
@@ -90,7 +95,7 @@ func (tr *tpmRunner) Execute() error {
 		case <-retryTicker.C:
 			continue
 		case <-tr.interrupt:
-			tr.slogger.Log(ctx, slog.LevelDebug,
+			tr.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupt received, exiting secure enclave signer execute loop",
 			)
 			return nil
@@ -112,7 +117,16 @@ func (tr *tpmRunner) Interrupt(_ error) {
 
 // Public returns the public hardware key
 func (tr *tpmRunner) Public() crypto.PublicKey {
-	if tr.signer == nil {
+	if tr.signer != nil {
+		return tr.signer.Public()
+	}
+
+	if err := tr.loadOrCreateKeys(context.Background()); err != nil {
+		tr.slogger.Log(context.Background(), slog.LevelError,
+			"loading or creating keys in public call",
+			"err", err,
+		)
+
 		return nil
 	}
 
@@ -178,7 +192,10 @@ func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
 	_ = deleter.Delete([]byte(privateEccData), []byte(publicEccData))
 }
 
-func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error) {
+func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
+	tr.mux.Lock()
+	defer tr.mux.Unlock()
+
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -186,7 +203,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error
 	if err != nil {
 		thisErr := fmt.Errorf("fetching key data for data store: %w", err)
 		traces.SetError(span, thisErr)
-		return nil, thisErr
+		return thisErr
 	}
 
 	if pubData == nil || priData == nil {
@@ -201,7 +218,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error
 			traces.SetError(span, thisErr)
 
 			clearKeyData(tr.slogger, tr.store)
-			return nil, thisErr
+			return thisErr
 		}
 
 		if err := storeKeyData(tr.store, priData, pubData); err != nil {
@@ -209,7 +226,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error
 			traces.SetError(span, thisErr)
 
 			clearKeyData(tr.slogger, tr.store)
-			return nil, thisErr
+			return thisErr
 		}
 
 		span.AddEvent("generated_new_tpm_keys")
@@ -219,10 +236,12 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) (crypto.Signer, error
 	if err != nil {
 		thisErr := fmt.Errorf("creating tpm signer: %w", err)
 		traces.SetError(span, thisErr)
-		return nil, thisErr
+		return thisErr
 	}
+
+	tr.signer = k
 
 	span.AddEvent("created_tpm_signer")
 
-	return k, nil
+	return nil
 }

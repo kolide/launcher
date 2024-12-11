@@ -34,6 +34,7 @@ func Test_tpmRunner(t *testing.T) {
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
+		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, errors.New("not available yet")).Once()
 		require.Nil(t, tpmRunner.Public())
 
 		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, errors.New("not available yet")).Once()
@@ -62,10 +63,10 @@ func Test_tpmRunner(t *testing.T) {
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), store, withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
-		// public will be nil until execute is called and key is loaded form tpm
-		require.Nil(t, tpmRunner.Public())
-
 		tpmSignerCreatorMock.On("New", fakePrivData, fakePubData).Return(privKey, nil).Once()
+
+		// the call to public should load the key from the store and signer creator should not be called any more after
+		require.NotNil(t, tpmRunner.Public())
 
 		go func() {
 			// sleep long enough to get through 2 cycles of exectue
@@ -84,6 +85,7 @@ func Test_tpmRunner(t *testing.T) {
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
+		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, errors.New("not available yet")).Once()
 		require.Nil(t, tpmRunner.Public())
 
 		tpmSignerCreatorMock.On("CreateKey").Return(fakePrivData, fakePubData, nil).Once()
