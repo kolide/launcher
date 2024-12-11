@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/desktop/user/universallink"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/authedclient"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -185,7 +186,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	}, func(err error) {})
 
 	// run run group
-	go func() {
+	gowrapper.Go(context.TODO(), slogger, func() {
 		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
 			slogger.Log(context.TODO(), slog.LevelError,
@@ -193,7 +194,12 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 				"err", err,
 			)
 		}
-	}()
+	}, func(r any) {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"exiting after runGroup panic",
+			"err", r,
+		)
+	})
 
 	// if desktop is not enabled at start up, wait for send on show desktop channel
 	if !*flDesktopEnabled {
