@@ -10,6 +10,7 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/traces"
@@ -70,23 +71,27 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
-	atcConfig, err := s.extractAutoTableConstructionConfig()
-	if err != nil {
-		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-			"extracting auto_table_construction config",
-			"err", err,
-		)
-	} else {
-		updatedFlags["auto_table_construction"] = atcConfig
-	}
+	for _, registrationId := range s.knapsack.RegistrationIDs() {
+		atcConfig, err := s.extractAutoTableConstructionConfig(registrationId)
+		if err != nil {
+			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+				"extracting auto_table_construction config",
+				"err", err,
+			)
+		} else {
+			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			updatedFlags[string(atcConfigKey)] = atcConfig
+		}
 
-	if katcConfig, err := s.extractKATCConstructionConfig(); err != nil {
-		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-			"extracting katc_config",
-			"err", err,
-		)
-	} else {
-		updatedFlags["katc_config"] = katcConfig
+		if katcConfig, err := s.extractKATCConstructionConfig(registrationId); err != nil {
+			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+				"extracting katc_config",
+				"err", err,
+			)
+		} else {
+			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			updatedFlags[string(katcConfigKey)] = katcConfig
+		}
 	}
 
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
@@ -112,8 +117,8 @@ func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
 }
 
-func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get([]byte("config"))
+func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationId string) (string, error) {
+	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}
@@ -140,10 +145,13 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, er
 	return string(atcJson), nil
 }
 
-func (s *startupSettingsWriter) extractKATCConstructionConfig() (string, error) {
+func (s *startupSettingsWriter) extractKATCConstructionConfig(registrationId string) (string, error) {
 	kolideCfg := make(map[string]string)
 	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
-		kolideCfg[string(k)] = string(v)
+		key, _, identifier := storage.SplitKey(k)
+		if string(identifier) == registrationId {
+			kolideCfg[string(key)] = string(v)
+		}
 		return nil
 	}); err != nil {
 		return "", fmt.Errorf("could not get Kolide ATC config from store: %w", err)
