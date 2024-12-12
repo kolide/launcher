@@ -25,7 +25,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 	privKey, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
 
-	t.Run("creates key in new", func(t *testing.T) {
+	t.Run("creates key in public call", func(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
@@ -33,6 +33,12 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 		require.NotNil(t, ser.Public())
+
+		// key should have been created in public call
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &privKey.PublicKey, v)
+		}
 	})
 
 	t.Run("creates key in execute", func(t *testing.T) {
@@ -59,9 +65,12 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		}()
 
 		require.NoError(t, ser.Execute())
-		// one cycle of execute should have created key
-		require.NotNil(t, ser.Public())
 
+		// key should have been created in execute
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &privKey.PublicKey, v)
+		}
 	})
 
 	t.Run("loads existing key", func(t *testing.T) {
@@ -93,8 +102,11 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
-		// should be able to fetch the key
-		require.NotNil(t, ser.Public())
+		// key should have been loaded in execute
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &privKey.PublicKey, v)
+		}
 	})
 
 	t.Run("multiple interrupts", func(t *testing.T) {
@@ -137,5 +149,67 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		}
 
 		require.Equal(t, expectedInterrupts, receivedInterrupts)
+	})
+
+	t.Run("no console users, creates key", func(t *testing.T) {
+		t.Parallel()
+
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		require.NoError(t, err)
+
+		// iniital key should be nil since client wasn't ready
+		require.Nil(t, ser.Public())
+
+		// set delay to 100ms for testing
+		ser.noConsoleUsersDelay = 100 * time.Millisecond
+
+		// give error on first execute loop
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
+
+		// give key on second execute loop
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+
+		go func() {
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, ser.Execute())
+
+		// key should have been loaded in execute
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &privKey.PublicKey, v)
+		}
+	})
+
+	t.Run("no console users, handles interrupt", func(t *testing.T) {
+		t.Parallel()
+
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		require.NoError(t, err)
+
+		// iniital key should be nil since client wasn't ready
+		require.Nil(t, ser.Public())
+
+		// give error on first execute loop
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
+
+		go func() {
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, ser.Execute())
+
+		// no key should be created since loop didn't execute
+		// and public not called
+		require.Len(t, ser.uidPubKeyMap, 0)
 	})
 }

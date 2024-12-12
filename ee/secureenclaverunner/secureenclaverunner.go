@@ -37,6 +37,7 @@ type secureEnclaveRunner struct {
 	mux                 *sync.Mutex
 	interrupt           chan struct{}
 	interrupted         atomic.Bool
+	noConsoleUsersDelay time.Duration
 }
 
 type secureEnclaveClient interface {
@@ -51,6 +52,7 @@ func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDelete
 		slogger:             slogger.With("component", "secureenclaverunner"),
 		mux:                 &sync.Mutex{},
 		interrupt:           make(chan struct{}),
+		noConsoleUsersDelay: 15 * time.Second,
 	}, nil
 }
 
@@ -78,7 +80,8 @@ func (ser *secureEnclaveRunner) Execute() error {
 		}
 	}
 
-	retryTicker := backoff.NewMultiplicativeTicker(time.Second, time.Minute)
+	tickerBaseDuration, tickerMaxDuraiton := time.Second, time.Minute
+	retryTicker := backoff.NewMultiplicativeTicker(tickerBaseDuration, tickerMaxDuraiton)
 	defer retryTicker.Stop()
 
 	for {
@@ -88,6 +91,22 @@ func (ser *secureEnclaveRunner) Execute() error {
 				"getting current console user key, will retry",
 				"err", err,
 			)
+
+			// if we don't have a console user, wait a little longer then reset the ticker
+			// and start trying again
+			if errors.Is(err, noConsoleUsersError{}) {
+				retryTicker.Stop()
+
+				select {
+				case <-time.After(ser.noConsoleUsersDelay):
+					retryTicker = backoff.NewMultiplicativeTicker(tickerBaseDuration, tickerMaxDuraiton)
+				case <-ser.interrupt:
+					ser.slogger.Log(context.TODO(), slog.LevelDebug,
+						"interrupt received, exiting secure enclave signer execute loop",
+					)
+					return nil
+				}
+			}
 		} else {
 			retryTicker.Stop()
 		}
@@ -239,6 +258,12 @@ func (ser *secureEnclaveRunner) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type noConsoleUsersError struct{}
+
+func (noConsoleUsersError) Error() string {
+	return "no console users found"
+}
+
 func firstConsoleUser(ctx context.Context) (*user.User, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
@@ -251,7 +276,7 @@ func firstConsoleUser(ctx context.Context) (*user.User, error) {
 
 	if len(c) == 0 {
 		traces.SetError(span, errors.New("no console users found"))
-		return nil, errors.New("no console users found")
+		return nil, noConsoleUsersError{}
 	}
 
 	return c[0], nil
