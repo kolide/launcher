@@ -228,7 +228,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
 
-					opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
+					opened, err := responseUnmarshalled.Open(privateEncryptionKey)
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
 
@@ -402,7 +402,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
 
-			opened, err := responseUnmarshalled.Open(*privateEncryptionKey)
+			opened, err := responseUnmarshalled.Open(privateEncryptionKey)
 			require.NoError(t, err)
 			require.Equal(t, challengeData, opened.ChallengeData)
 
