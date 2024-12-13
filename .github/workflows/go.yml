@@ -12,7 +12,7 @@ on:
 
 
 jobs:
-  build_and_test:
+  build:
     name: launcher
     runs-on: ${{ matrix.os }}
     strategy:
@@ -103,7 +103,7 @@ jobs:
   version_baseline:
     name: Version Baseline
     runs-on: ubuntu-20.04
-    needs: build_and_test
+    needs: build
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -119,6 +119,33 @@ jobs:
       working-directory: build
       shell: bash
       run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
+
+  launcher_test:
+    name: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+          - macos-13
+          - windows-latest
+    steps:
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: './go.mod'
+        check-latest: true
+        cache: false
+
+    - name: Test
+      run: make test
 
   exec_testing:
     name: Exec Test
@@ -270,6 +297,7 @@ jobs:
     steps:
       - run: true
     needs:
-      - build_and_test
+      - build
+      - launcher_test
       - package_builder_test
       - exec_testing
