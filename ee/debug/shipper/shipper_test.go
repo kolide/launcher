@@ -33,6 +33,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			assertion:            assert.NoError,
@@ -47,6 +48,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			assertion:            assert.NoError,
@@ -63,6 +65,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			expectSignatureHeaders: true,
