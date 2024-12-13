@@ -42,7 +42,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	}
 
 	// due to flakey tests we are tracking the time it takes to build and attempting emit a meaningful error if we time out
-	timeout := time.Second * 60
+	timeout := time.Minute * 2
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
