@@ -86,14 +86,6 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
-    # upload coverage here, because we don't cache it with the build
-    - name: Upload coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-coverage.out
-        path: ./coverage.out
-        if-no-files-found: error
-
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
   # that the version of launcher is the same across all runners.
@@ -151,6 +143,13 @@ jobs:
 
     - name: Test
       run: make test
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-coverage.out
+        path: ./coverage.out
+        if-no-files-found: error
 
   exec_testing:
     name: Exec Test
