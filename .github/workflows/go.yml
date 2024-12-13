@@ -111,6 +111,7 @@ jobs:
 
   launcher_test:
     name: test
+    needs: build # a desktop runner test requires a build to exist
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -132,6 +133,13 @@ jobs:
         go-version-file: './go.mod'
         check-latest: true
         cache: false
+
+    - name: cache restore build output
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
 
     - name: Test
       run: make test
