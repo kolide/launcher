@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -107,11 +109,17 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
 	s.uploadRequestStarted = true
 	s.uploadRequestWg.Add(1)
-	go func() {
+	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
 		defer s.uploadRequestWg.Done()
 		// will close the body in the close function
 		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
-	}()
+	}, func(r any) {
+		s.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
+			"exiting after upload request panic",
+			"err", r,
+		)
+		s.uploadRequestErr = fmt.Errorf("upload request panic: %v", r)
+	})
 
 	return s.writer.Write(p)
 }

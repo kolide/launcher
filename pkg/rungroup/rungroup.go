@@ -113,7 +113,7 @@ func (g *Group) Run() error {
 	interruptWait := semaphore.NewWeighted(numActors)
 	for _, a := range g.actors {
 		interruptWait.Acquire(context.Background(), 1)
-		go func(a rungroupActor) {
+		gowrapper.Go(context.TODO(), g.slogger, func() {
 			defer interruptWait.Release(1)
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupting actor",
@@ -124,7 +124,13 @@ func (g *Group) Run() error {
 				"interrupt complete",
 				"actor", a.name,
 			)
-		}(a)
+		}, func(r any) {
+			g.slogger.Log(context.TODO(), slog.LevelError,
+				"exiting after actor interrupt panic",
+				"err", r,
+				"actor", a.name,
+			)
+		})
 	}
 
 	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), InterruptTimeout)
