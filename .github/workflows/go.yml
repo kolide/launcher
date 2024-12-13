@@ -22,9 +22,6 @@ jobs:
           - ubuntu-20.04
           - macos-13
           - windows-latest
-    outputs:
-      go-build-path: ${{ steps.go-cache-paths.outputs.go-build }}
-      go-mod-path: ${{ steps.go-cache-paths.outputs.go-mod }}
     steps:
     - name: Check out code
       id: checkout
@@ -144,17 +141,23 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
     - name: cache restore - GOCACHE
       uses: actions/cache/restore@v4
       with:
-        path: ${{ needs.build.outputs.go-build-path }}
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
     - name: cache restore - GOMODCACHE
       uses: actions/cache/restore@v4
       with:
-        path: ${{ needs.build.outputs.go-mod-path }}
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
         key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
