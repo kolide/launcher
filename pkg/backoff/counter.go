@@ -10,6 +10,8 @@ type durationCounter struct {
 	calcNext                  func(count int, baseDuration time.Duration) time.Duration
 }
 
+// Next increments the count and returns the base interval multiplied by the count.
+// If the result is greater than the maxDuration, maxDuration is returned.
 func (dc *durationCounter) Next() time.Duration {
 	dc.count++
 	interval := dc.calcNext(dc.count, dc.baseInterval)
@@ -19,10 +21,14 @@ func (dc *durationCounter) Next() time.Duration {
 	return interval
 }
 
+// Reset resets the count to 0.
 func (dc *durationCounter) Reset() {
 	dc.count = 0
 }
 
+// NewMultiplicativeDurationCounter creates a new durationCounter that multiplies the base interval by the count.
+// Count is incremented each time Next() is called and returns the base interval multiplied by the count.
+// If the result is greater than the maxDuration, maxDuration is returned.
 func NewMultiplicativeDurationCounter(baseDuration, maxDuration time.Duration) *durationCounter {
 	return &durationCounter{
 		baseInterval: baseDuration,
