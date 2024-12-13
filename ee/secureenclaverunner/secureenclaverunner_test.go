@@ -151,7 +151,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		require.Equal(t, expectedInterrupts, receivedInterrupts)
 	})
 
-	t.Run("no console users, creates key", func(t *testing.T) {
+	t.Run("no console users then creates key", func(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
@@ -167,6 +167,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		// give error on first execute loop
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
+
+		// give error on first execute loop
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("some other error")).Once()
 
 		// give key on second execute loop
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()

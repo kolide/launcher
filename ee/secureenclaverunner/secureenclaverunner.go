@@ -81,39 +81,39 @@ func (ser *secureEnclaveRunner) Execute() error {
 	}
 
 	durationCounter := backoff.NewMultiplicativeDurationCounter(time.Second, time.Minute)
-	retryTicker := time.NewTicker(durationCounter.Next())
+	retryTicker := time.NewTicker(time.Second)
 	defer retryTicker.Stop()
 
-	noConsoleUserTicker := time.NewTicker(ser.noConsoleUsersDelay)
-	defer noConsoleUserTicker.Stop()
+	inNoConsoleUsersState := false
 
 	for {
 		ctx := context.Background()
-		if _, err := ser.currentConsoleUserKey(ctx); err != nil {
-			ser.slogger.Log(ctx, slog.LevelError,
-				"getting current console user key, will retry",
-				"err", err,
-			)
+		_, err := ser.currentConsoleUserKey(ctx)
 
-			// if we don't have a console user, wait a little longer then reset the ticker
-			// and start trying again
-			if errors.Is(err, noConsoleUsersError{}) {
-				retryTicker.Stop()
-			} else {
-				noConsoleUserTicker.Stop()
-				durationCounter.Reset()
-				retryTicker.Reset(durationCounter.Next())
-			}
-		} else {
+		switch {
+
+		// don't have console user, so wait longer to retry
+		case errors.Is(err, noConsoleUsersError{}):
+			inNoConsoleUsersState = true
+			retryTicker.Reset(ser.noConsoleUsersDelay)
+
+		// now that we have a console user, restart the backoff
+		case err != nil && inNoConsoleUsersState:
+			durationCounter.Reset()
+			retryTicker.Reset(durationCounter.Next())
+			inNoConsoleUsersState = false
+
+		// we have console user, but failed to get key
+		case err != nil:
+			retryTicker.Reset(durationCounter.Next())
+
+		// success
+		default:
 			retryTicker.Stop()
-			noConsoleUserTicker.Stop()
 		}
 
 		select {
 		case <-retryTicker.C:
-			retryTicker.Reset(durationCounter.Next())
-			continue
-		case <-noConsoleUserTicker.C:
 			continue
 		case <-ser.interrupt:
 			ser.slogger.Log(ctx, slog.LevelDebug,
