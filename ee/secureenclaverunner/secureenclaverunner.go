@@ -80,9 +80,12 @@ func (ser *secureEnclaveRunner) Execute() error {
 		}
 	}
 
-	tickerBaseDuration, tickerMaxDuraiton := time.Second, time.Minute
-	retryTicker := backoff.NewMultiplicativeTicker(tickerBaseDuration, tickerMaxDuraiton)
+	durationCounter := backoff.NewMultiplicativeDurationCounter(time.Second, time.Minute)
+	retryTicker := time.NewTicker(durationCounter.Next())
 	defer retryTicker.Stop()
+
+	noConsoleUserTicker := time.NewTicker(ser.noConsoleUsersDelay)
+	defer noConsoleUserTicker.Stop()
 
 	for {
 		ctx := context.Background()
@@ -96,23 +99,21 @@ func (ser *secureEnclaveRunner) Execute() error {
 			// and start trying again
 			if errors.Is(err, noConsoleUsersError{}) {
 				retryTicker.Stop()
-
-				select {
-				case <-time.After(ser.noConsoleUsersDelay):
-					retryTicker = backoff.NewMultiplicativeTicker(tickerBaseDuration, tickerMaxDuraiton)
-				case <-ser.interrupt:
-					ser.slogger.Log(context.TODO(), slog.LevelDebug,
-						"interrupt received, exiting secure enclave signer execute loop",
-					)
-					return nil
-				}
+			} else {
+				noConsoleUserTicker.Stop()
+				durationCounter.Reset()
+				retryTicker.Reset(durationCounter.Next())
 			}
 		} else {
 			retryTicker.Stop()
+			noConsoleUserTicker.Stop()
 		}
 
 		select {
 		case <-retryTicker.C:
+			retryTicker.Reset(durationCounter.Next())
+			continue
+		case <-noConsoleUserTicker.C:
 			continue
 		case <-ser.interrupt:
 			ser.slogger.Log(ctx, slog.LevelDebug,

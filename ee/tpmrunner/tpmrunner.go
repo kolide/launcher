@@ -72,7 +72,8 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 // Public returns the public key of the current console user
 // creating and peristing a new one if needed
 func (tr *tpmRunner) Execute() error {
-	retryTicker := backoff.NewMultiplicativeTicker(time.Second, time.Minute)
+	durationCounter := backoff.NewMultiplicativeDurationCounter(time.Second, time.Minute)
+	retryTicker := time.NewTicker(durationCounter.Next())
 	defer retryTicker.Stop()
 
 	for {
@@ -93,6 +94,7 @@ func (tr *tpmRunner) Execute() error {
 
 		select {
 		case <-retryTicker.C:
+			retryTicker.Reset(durationCounter.Next())
 			continue
 		case <-tr.interrupt:
 			tr.slogger.Log(context.TODO(), slog.LevelDebug,
