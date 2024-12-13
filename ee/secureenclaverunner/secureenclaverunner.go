@@ -112,6 +112,14 @@ func (ser *secureEnclaveRunner) Execute() error {
 			retryTicker.Stop()
 		}
 
+		// log any errors
+		if err != nil {
+			ser.slogger.Log(ctx, slog.LevelDebug,
+				"getting current console user key",
+				"err", err,
+			)
+		}
+
 		select {
 		case <-retryTicker.C:
 			continue
