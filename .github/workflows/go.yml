@@ -122,6 +122,7 @@ jobs:
 
   launcher_test:
     name: test
+    needs: build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -131,6 +132,13 @@ jobs:
           - macos-13
           - windows-latest
     steps:
+    - name: cache restore build output
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
     - name: Check out code
       id: checkout
       uses: actions/checkout@v4
