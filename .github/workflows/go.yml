@@ -137,21 +137,21 @@ jobs:
         check-latest: true
         cache: false
 
-    - name: cache restore - build output
+    - name: cache restore - build
       uses: actions/cache/restore@v4
       with:
         path: ./build
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
-    - name: cache restore - go-build
+    - name: cache restore - GOCACHE
       uses: actions/cache/restore@v4
       with:
         path: ${{ needs.build.outputs.go-build-path }}
         key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
         enableCrossOsArchive: true
 
-    - name: cache restore - go-mod
+    - name: cache restore - GOMODCACHE
       uses: actions/cache/restore@v4
       with:
         path: ${{ needs.build.outputs.go-mod-path }}
