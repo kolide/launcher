@@ -437,13 +437,17 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 
 	atLeastOneSuccess := false
 	errs := make([]error, 0)
-	for _, proc := range r.uidProcs {
+	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"sent notification",
+			"uid", uid,
+		)
 		atLeastOneSuccess = true
 	}
 
