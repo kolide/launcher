@@ -192,12 +192,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 				"err", err,
 			)
 		}
-	}, func(err any) {
-		runner.slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after monitor server panic",
-			"err", err,
-		)
-	})
+	}, func(err any) {})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -318,12 +313,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 	gowrapper.Go(context.TODO(), r.slogger, func() {
 		defer close(wgDone)
 		r.procsWg.Wait()
-	}, func(err any) {
-		r.slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after wait group panic",
-			"err", err,
-		)
-	})
+	}, func(err any) {})
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
@@ -796,7 +786,7 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 // The wait group is needed to prevent races.
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
-	gowrapper.Go(context.TODO(), r.slogger, func() {
+	gowrapper.Go(context.TODO(), r.slogger.With("uid", uid, "pid", proc.Pid), func() {
 		defer r.procsWg.Done()
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
@@ -809,14 +799,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 				"state", state,
 			)
 		}
-	}, func(err any) {
-		r.slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after process wait panic",
-			"err", err,
-			"uid", uid,
-			"pid", proc.Pid,
-		)
-	})
+	}, func(err any) {})
 }
 
 // determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,

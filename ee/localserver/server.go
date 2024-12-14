@@ -279,12 +279,7 @@ func (ls *localServer) Start() error {
 				}
 			}
 		}
-	}, func(r any) {
-		ls.slogger.Log(ctx, slog.LevelError,
-			"exiting after background worker panic",
-			"err", r,
-		)
-	})
+	}, func(r any) {})
 
 	l, err := ls.startListener()
 	if err != nil {

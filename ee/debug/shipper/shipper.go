@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -113,13 +112,7 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 		defer s.uploadRequestWg.Done()
 		// will close the body in the close function
 		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
-	}, func(r any) {
-		s.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
-			"exiting after upload request panic",
-			"err", r,
-		)
-		s.uploadRequestErr = fmt.Errorf("upload request panic: %v", r)
-	})
+	}, func(r any) {})
 
 	return s.writer.Write(p)
 }

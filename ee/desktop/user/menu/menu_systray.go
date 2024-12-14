@@ -2,7 +2,6 @@ package menu
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 
 	"github.com/kolide/launcher/ee/gowrapper"
@@ -134,10 +133,5 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 				return
 			}
 		}
-	}, func(r any) {
-		m.slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after menu action handler panic",
-			"err", r,
-		)
-	})
+	}, func(r any) {})
 }

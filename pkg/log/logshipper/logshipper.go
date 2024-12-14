@@ -117,12 +117,7 @@ func (ls *LogShipper) Ping() {
 	ls.isShippingStarted = true
 	gowrapper.Go(context.TODO(), ls.knapsack.Slogger(), func() {
 		ls.startShippingChan <- struct{}{}
-	}, func(r any) {
-		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
-			"exiting after shipping channel send panic",
-			"err", r,
-		)
-	})
+	}, func(r any) {})
 
 }
 

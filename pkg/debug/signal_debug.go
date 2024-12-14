@@ -47,11 +47,6 @@ func AttachDebugHandler(addrPath string, slogger *slog.Logger) {
 				"shutdown debug server",
 			)
 		}
-	}, func(r any) {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after debug signal handler panic",
-			"err", r,
-		)
-	})
+	}, func(r any) {})
 
 }

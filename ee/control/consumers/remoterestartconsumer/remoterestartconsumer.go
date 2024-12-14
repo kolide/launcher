@@ -101,13 +101,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			)
 			return
 		}
-	}, func(err any) {
-		r.slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after remote restart panic",
-			"err", err,
-			"action_run_id", restartAction.RunID,
-		)
-	})
+	}, func(err any) {})
 
 	return nil
 }

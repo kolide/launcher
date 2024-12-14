@@ -124,13 +124,7 @@ func (g *Group) Run() error {
 				"interrupt complete",
 				"actor", a.name,
 			)
-		}, func(r any) {
-			g.slogger.Log(context.TODO(), slog.LevelError,
-				"exiting after actor interrupt panic",
-				"err", r,
-				"actor", a.name,
-			)
-		})
+		}, func(r any) {})
 	}
 
 	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), InterruptTimeout)

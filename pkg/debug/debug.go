@@ -50,12 +50,7 @@ func startDebugServer(addrPath string, slogger *slog.Logger) (*http.Server, erro
 				"err", err,
 			)
 		}
-	}, func(r any) {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after debug server panic",
-			"err", r,
-		)
-	})
+	}, func(r any) {})
 
 	url := url.URL{
 		Scheme:   "http",
