@@ -436,19 +436,28 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("cannot send notification, no child desktop processes")
 	}
 
+	atLeastOneSuccess := false
 	errs := make([]error, 0)
-	for _, proc := range r.uidProcs {
+	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
+			continue
 		}
+
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"sent notification",
+			"uid", uid,
+		)
+		atLeastOneSuccess = true
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("errors sending notifications: %+v", errs)
+	// We just need to be able to notify one user successfully.
+	if atLeastOneSuccess {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("errors sending notifications: %+v", errs)
 }
 
 // Update handles control server updates for the desktop-menu subsystem
@@ -502,7 +511,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 				"sending refresh command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
-				"path", proc.path,
+				"path", proc.socketPath,
 				"err", err,
 			)
 		}
