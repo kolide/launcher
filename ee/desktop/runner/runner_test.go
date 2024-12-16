@@ -46,17 +46,21 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher") //nolint:forbidigo // Fine to use exec.CommandContext in test
-	buildStartTime := time.Now()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("building launcher binary for desktop testing: %w", err)
+	// We may already have a built binary available -- check for that first
+	if err := symlinkPreexistingBinary(ctx, executablePath); err != nil {
+		// No binary available -- build one instead
+		cmd := exec.CommandContext(ctx, "go", "build", "-o", executablePath, "../../../cmd/launcher") //nolint:forbidigo // Fine to use exec.CommandContext in test
+		buildStartTime := time.Now()
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			err = fmt.Errorf("building launcher binary for desktop testing: %w", err)
 
-		if time.Since(buildStartTime) >= timeout {
-			err = fmt.Errorf("timeout (%v) met: %w", timeout, err)
+			if time.Since(buildStartTime) >= timeout {
+				err = fmt.Errorf("timeout (%v) met: %w", timeout, err)
+			}
 		}
+		require.NoError(t, err, string(out))
 	}
-	require.NoError(t, err, string(out))
 
 	tests := []struct {
 		name          string
@@ -236,6 +240,61 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			require.Equal(t, expectedInterrupts, receivedInterrupts)
 		})
 	}
+}
+
+func symlinkPreexistingBinary(ctx context.Context, executablePath string) error {
+	builtBinaryPath := filepath.Join("..", "..", "..", "build", "launcher")
+	if runtime.GOOS == "windows" {
+		builtBinaryPath += "launcher.exe"
+	}
+	absPath, err := filepath.Abs(builtBinaryPath)
+	if err != nil {
+		return fmt.Errorf("getting absolute path for %s: %w", builtBinaryPath, err)
+	}
+	builtBinaryPath = filepath.Clean(absPath)
+
+	// See if file exists
+	if _, err := os.Stat(builtBinaryPath); os.IsNotExist(err) {
+		return fmt.Errorf("no preexisting binary at %s", builtBinaryPath)
+	}
+
+	// Get our current version
+	gitCmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--always", "--dirty")
+	versionOut, err := gitCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("getting current version: %w", err)
+	}
+	currentVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "v")
+
+	// Binary exists -- see if the version is a match
+	cmd := exec.CommandContext(ctx, builtBinaryPath, "-version") //nolint:forbidigo // Fine to use exec.CommandContext in test
+	cmd.Env = append(cmd.Environ(), "LAUNCHER_SKIP_UPDATES=TRUE")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("checking version: %w", err)
+	}
+
+	lines := strings.Split(string(out), "\n")
+	binaryVersion := ""
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "launcher - version") {
+			continue
+		}
+
+		// We found the version
+		binaryVersion = strings.TrimSpace(strings.TrimPrefix(line, "launcher - version"))
+		break
+	}
+
+	if binaryVersion != currentVersion {
+		return fmt.Errorf("built version %s does not match current version %s", binaryVersion, currentVersion)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(executablePath), 0755); err != nil {
+		return fmt.Errorf("making test dir: %w", err)
+	}
+
+	return os.Symlink(builtBinaryPath, executablePath)
 }
 
 func launcherRootDir(t *testing.T) string {
