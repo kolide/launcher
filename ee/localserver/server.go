@@ -60,8 +60,9 @@ type localServer struct {
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
 
-	presenceDetector       presenceDetector
-	presenceDetectionMutex sync.Mutex
+	presenceDetector             presenceDetector
+	presenceDetectionMutex       sync.Mutex
+	lastPresenceDetectionAttempt time.Time
 }
 
 const (
@@ -422,6 +423,21 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		ls.presenceDetectionMutex.Lock()
 		defer ls.presenceDetectionMutex.Unlock()
 
+		// if the user fails or cancels the presence detection, we want to wait a bit before trying again
+		// so that if there are several queued up requests, we don't prompt the user multiple times in a row
+		// if they keep hitting cancel
+
+		const minTimeBetweenPresenceDetection = 3 * time.Second
+		if time.Since(ls.lastPresenceDetectionAttempt) < minTimeBetweenPresenceDetection {
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"presence detection attempted too soon",
+			)
+
+			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
@@ -461,7 +477,6 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		}
 
 		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
-
 		if err != nil {
 			ls.slogger.Log(r.Context(), slog.LevelInfo,
 				"presence_detection",
@@ -471,6 +486,8 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 				"err", err,
 			)
 		}
+
+		ls.lastPresenceDetectionAttempt = time.Now()
 
 		// if there was an error, we still want to return a 200 status code
 		// and send the request through
