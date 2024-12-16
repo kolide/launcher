@@ -431,6 +431,7 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		if time.Since(ls.lastPresenceDetectionAttempt) < minTimeBetweenPresenceDetection {
 			ls.slogger.Log(r.Context(), slog.LevelInfo,
 				"presence detection attempted too soon",
+				"min_interval", minTimeBetweenPresenceDetection,
 			)
 
 			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
