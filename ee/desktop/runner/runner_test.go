@@ -259,7 +259,7 @@ func symlinkPreexistingBinary(ctx context.Context, executablePath string) error 
 	}
 
 	// Get our current version
-	gitCmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--always", "--dirty")
+	gitCmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--always", "--dirty") //nolint:forbidigo // Fine to use exec.CommandContext in test
 	versionOut, err := gitCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("getting current version: %w", err)
