@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
@@ -253,7 +254,7 @@ func (ls *localServer) Start() error {
 	var ctx context.Context
 	ctx, ls.cancel = context.WithCancel(context.Background())
 
-	go func() {
+	gowrapper.Go(ctx, ls.slogger, func() {
 		var lastRun time.Time
 
 		ticker := time.NewTicker(pollInterval)
@@ -278,14 +279,14 @@ func (ls *localServer) Start() error {
 				}
 			}
 		}
-	}()
+	}, func(r any) {})
 
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
+	if len(ls.tlsCerts) > 0 {
 		ls.slogger.Log(ctx, slog.LevelDebug,
 			"using TLS",
 		)

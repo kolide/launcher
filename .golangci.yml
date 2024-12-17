@@ -39,6 +39,8 @@ linters-settings:
         msg: do not use logutil.Fatal so that launcher can shut down gracefully
       - p: ^panic.*$
         msg: do not use panic so that launcher can shut down gracefully
+      - p: ^go func.*$
+        msg: use gowrapper.Go() instead of raw goroutines for proper panic handling
   sloglint:
     kv-only: true
     context: "all"
