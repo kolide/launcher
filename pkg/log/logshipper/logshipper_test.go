@@ -40,6 +40,7 @@ func TestLogShipper(t *testing.T) {
 			knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 			knapsack.On("LogShippingLevel").Return("info").Times(5)
 			knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
+			knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			tokenStore := testKVStore(t, storage.TokenStore.String())
 			knapsack.On("TokenStore").Return(tokenStore)
