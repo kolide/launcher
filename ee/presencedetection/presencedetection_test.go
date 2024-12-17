@@ -119,9 +119,9 @@ func TestPresenceDetector_AttemptInterval(t *testing.T) {
 		minDetectionAttemptInterval: 500 * time.Millisecond,
 	}
 
+	// first detection, should prompt user for new detection
 	interval, err := pd.DetectPresence("this is a test", 0)
 	assert.NoError(t, err)
-
 	require.Equal(t, time.Duration(0), interval,
 		"interval should be 0 since detection just happened",
 	)
@@ -129,6 +129,8 @@ func TestPresenceDetector_AttemptInterval(t *testing.T) {
 	d = mocks.NewDetectorIface(t)
 	pd.detector = d
 
+	// second detection, should NOT prompt user for new detection
+	// since within min interval
 	interval, err = pd.DetectPresence("this is a test", 0)
 	assert.NoError(t, err)
 	require.Greater(t, interval, time.Duration(0),
@@ -137,4 +139,14 @@ func TestPresenceDetector_AttemptInterval(t *testing.T) {
 
 	// should not have been called since we are within the minDetectionAttemptInterval
 	d.AssertNotCalled(t, "Detect", mock.Anything)
+
+	time.Sleep(1 * time.Second)
+
+	// third detection, should prompt user for new detection since minDetectionAttemptInterval has passed
+	d.On("Detect", mock.AnythingOfType("string")).Return(true, nil).Once()
+	interval, err = pd.DetectPresence("this is a test", 0)
+	assert.NoError(t, err)
+	require.Equal(t, time.Duration(0), interval,
+		"interval should be 0 since detection just happened",
+	)
 }
