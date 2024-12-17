@@ -79,7 +79,7 @@ func TestPresenceDetectionHandler(t *testing.T) {
 			mockPresenceDetector := mocks.NewPresenceDetector(t)
 
 			if tt.expectDetectPresenceCall {
-				mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(tt.durationSinceLastDetection, tt.presenceDetectionError)
+				mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(tt.durationSinceLastDetection, tt.presenceDetectionError).Once()
 			}
 
 			server := &localServer{
@@ -112,6 +112,14 @@ func TestPresenceDetectionHandler(t *testing.T) {
 				require.NotEmpty(t, rr.Header().Get(kolideDurationSinceLastPresenceDetectionHeaderKey))
 			}
 			require.Equal(t, tt.expectedStatusCode, rr.Code)
+
+			// fire the request one more time, it should not call presence detector again
+			// because it's less than the minimum interval
+			mockPresenceDetector = mocks.NewPresenceDetector(t)
+			server.presenceDetector = mockPresenceDetector
+
+			handlerToTest.ServeHTTP(rr, req)
+			mockPresenceDetector.AssertNotCalled(t, "DetectPresence", mock.Anything, mock.Anything)
 		})
 	}
 }
