@@ -249,6 +249,12 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
+	// Make sure no lock files exist that could prevent osquery from starting up
+	if err := i.cleanUpOldDatabaseLock(ctx, paths); err != nil {
+		traces.SetError(span, fmt.Errorf("cleaning up old database lock: %w", err))
+		return fmt.Errorf("cleaning up old database lock: %w", err)
+	}
+
 	// Populate augeas lenses, if requested
 	if i.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
@@ -700,6 +706,37 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	defer osqueryAutoloadFile.Close()
 
 	return osqueryFilePaths, nil
+}
+
+// cleanUpOldDatabaseLock checks for the presence of a lock file in the given database and removes it
+// if it exists. The lock file can hang around if an osquery process isn't properly terminated, and
+// will prevent us from launching a new osquery process.
+func (i *OsqueryInstance) cleanUpOldDatabaseLock(ctx context.Context, paths *osqueryFilePaths) error {
+	lockFilePath := filepath.Join(paths.databasePath, "LOCK")
+
+	lockFileInfo, err := os.Stat(lockFilePath)
+	if os.IsNotExist(err) {
+		// No lock file, nothing to do here
+		return nil
+	}
+
+	if err := os.Remove(lockFilePath); err != nil {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"detected old lock file but could not remove it",
+			"lockfile_path", lockFilePath,
+			"lockfile_modtime", lockFileInfo.ModTime().String(),
+			"err", err,
+		)
+		return fmt.Errorf("removing lock file at %s: %w", lockFilePath, err)
+	}
+
+	i.slogger.Log(ctx, slog.LevelInfo,
+		"detected and removed old osquery db lock file",
+		"lockfile_path", lockFilePath,
+		"lockfile_modtime", lockFileInfo.ModTime().String(),
+	)
+
+	return nil
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
