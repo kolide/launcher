@@ -720,7 +720,15 @@ func (i *OsqueryInstance) cleanUpOldDatabaseLock(ctx context.Context, paths *osq
 		return nil
 	}
 
-	if err := os.Remove(lockFilePath); err != nil {
+	// We do a couple retries here -- Windows complains about removing files in use sometimes.
+	err = backoff.WaitFor(func() error {
+		if err := os.Remove(lockFilePath); err != nil {
+			return fmt.Errorf("removing lock file at %s: %w", lockFilePath, err)
+		}
+		return nil
+	}, 5*time.Second, 500*time.Millisecond)
+
+	if err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"detected old lock file but could not remove it",
 			"lockfile_path", lockFilePath,
