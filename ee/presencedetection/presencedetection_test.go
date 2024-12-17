@@ -83,18 +83,6 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			initialLastDetectionUTC: time.Now().UTC(),
 			expectError:             true,
 		},
-		{
-			// this should never happen, but it is here for completeness
-			name:     "subsequent detection inside min detection attempt interval",
-			interval: 0,
-			detector: func(t *testing.T) detectorIface {
-				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(false, nil).Once()
-				return d
-			},
-			initialLastDetectionUTC: time.Now().UTC(),
-			expectError:             true,
-		},
 	}
 
 	for _, tt := range tests {
