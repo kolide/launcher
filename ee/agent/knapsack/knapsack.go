@@ -39,7 +39,7 @@ type knapsack struct {
 
 	slogger, systemSlogger *multislogger.MultiSlogger
 
-	querier types.InstanceQuerier
+	osqRunner types.OsqRunner
 
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
@@ -87,9 +87,9 @@ func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.systemSlogger.AddHandler(handler...)
 }
 
-// Osquery instance querier
-func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
-	k.querier = q
+// Osquery instance runner
+func (k *knapsack) SetInstanceRunner(r types.OsqRunner) {
+	k.osqRunner = r
 }
 
 // RegistrationTracker interface methods
@@ -97,13 +97,21 @@ func (k *knapsack) RegistrationIDs() []string {
 	return []string{types.DefaultRegistrationID}
 }
 
+func (k *knapsack) SetRegistrationIDs(registrationIDs []string) error {
+	if k.osqRunner == nil {
+		return nil
+	}
+
+	return k.osqRunner.UpdateRegistrationIDs(registrationIDs)
+}
+
 // InstanceStatuses returns the current status of each osquery instance.
 // It performs a healthcheck against each existing instance.
 func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {
-	if k.querier == nil {
+	if k.osqRunner == nil {
 		return nil
 	}
-	return k.querier.InstanceStatuses()
+	return k.osqRunner.InstanceStatuses()
 }
 
 // BboltDB interface methods

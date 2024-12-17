@@ -9,4 +9,5 @@ const (
 // data may be provided by e.g. a control server subsystem.
 type RegistrationTracker interface {
 	RegistrationIDs() []string
+	SetRegistrationIDs(registrationIDs []string) error
 }
