@@ -60,9 +60,8 @@ type localServer struct {
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
 
-	presenceDetector             presenceDetector
-	presenceDetectionMutex       sync.Mutex
-	lastPresenceDetectionAttempt time.Time
+	presenceDetector       presenceDetector
+	presenceDetectionMutex sync.Mutex
 }
 
 const (
@@ -132,7 +131,9 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	// mux.Handle("/id", ls.requestIdHandler())
+	mux.Handle("/id", ls.presenceDetectionHandler(ls.requestIdHandler()))
+
+	mux.Handle("/id2", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
@@ -423,22 +424,6 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 		ls.presenceDetectionMutex.Lock()
 		defer ls.presenceDetectionMutex.Unlock()
 
-		// if the user fails or cancels the presence detection, we want to wait a bit before trying again
-		// so that if there are several queued up requests, we don't prompt the user multiple times in a row
-		// if they keep hitting cancel
-
-		const minTimeBetweenPresenceDetection = 3 * time.Second
-		if time.Since(ls.lastPresenceDetectionAttempt) < minTimeBetweenPresenceDetection {
-			ls.slogger.Log(r.Context(), slog.LevelInfo,
-				"presence detection attempted too soon",
-				"min_interval", minTimeBetweenPresenceDetection,
-			)
-
-			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
@@ -487,8 +472,6 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 				"err", err,
 			)
 		}
-
-		ls.lastPresenceDetectionAttempt = time.Now()
 
 		// if there was an error, we still want to return a 200 status code
 		// and send the request through
