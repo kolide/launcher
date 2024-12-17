@@ -131,7 +131,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	// mux.Handle("/id", ls.presenceDetectionHandler(ls.requestIdHandler()))
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(

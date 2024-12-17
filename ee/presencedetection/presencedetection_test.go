@@ -134,4 +134,7 @@ func TestPresenceDetector_AttemptInterval(t *testing.T) {
 	require.Greater(t, interval, time.Duration(0),
 		"interval should be greater than 0 since some time passed since last detection",
 	)
+
+	// should not have been called since we are within the minDetectionAttemptInterval
+	d.AssertNotCalled(t, "Detect", mock.Anything)
 }
