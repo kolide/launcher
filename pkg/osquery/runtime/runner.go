@@ -333,3 +333,8 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 
 	return instanceStatuses
 }
+
+func (r *Runner) UpdateRegistrationIDs(registrationIDs []string) error {
+	// TODO: detect any difference in reg IDs and shut down/spin up instances accordingly
+	return nil
+}
