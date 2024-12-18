@@ -593,6 +593,157 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	<-timer1.C
 }
 
+func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
+	t.Parallel()
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger := setUpTestSlogger()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("WatchdogEnabled").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	setUpMockStores(t, k)
+	serviceClient := mockServiceClient()
+
+	runner := New(k, serviceClient)
+
+	// Start the instance
+	go runner.Run()
+	waitHealthy(t, runner, logBytes)
+
+	// Confirm the default instance was started
+	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+
+	// confirm only the default instance has started
+	require.Equal(t, 1, len(runner.instances))
+
+	// Confirm instance statuses are reported correctly
+	instanceStatuses := runner.InstanceStatuses()
+	require.Contains(t, instanceStatuses, types.DefaultRegistrationID)
+	require.Equal(t, instanceStatuses[types.DefaultRegistrationID], types.InstanceStatusHealthy)
+
+	// Add in an extra instance
+	extraRegistrationId := ulid.New()
+	runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID, extraRegistrationId})
+	waitHealthy(t, runner, logBytes)
+	updatedInstanceStatuses := runner.InstanceStatuses()
+	// verify that rerunRequired has been reset for any future changes
+	require.False(t, runner.rerunRequired)
+	// now verify both instances are reported
+	require.Equal(t, 2, len(runner.instances))
+	require.Contains(t, updatedInstanceStatuses, types.DefaultRegistrationID)
+	require.Contains(t, updatedInstanceStatuses, extraRegistrationId)
+	// Confirm the additional instance was started and is healthy
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
+	require.Equal(t, updatedInstanceStatuses[extraRegistrationId], types.InstanceStatusHealthy)
+
+	// update registration IDs one more time, this time removing the additional registration
+	originalDefaultInstanceStartTime := runner.instances[extraRegistrationId].stats.StartTime
+	runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID})
+	waitHealthy(t, runner, logBytes)
+
+	// now verify only the default instance remains
+	require.Equal(t, 1, len(runner.instances))
+	// Confirm the default instance was started and is healthy
+	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	// verify that rerunRequired has been reset for any future changes
+	require.False(t, runner.rerunRequired)
+	// verify the default instance was restarted
+	require.NotEqual(t, originalDefaultInstanceStartTime, runner.instances[types.DefaultRegistrationID].stats.StartTime)
+
+	waitShutdown(t, runner, logBytes)
+
+	// Confirm both instances exited
+	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+}
+
+func TestUpdatingRegistrationIDsOnlyRestartsForChanges(t *testing.T) {
+	t.Parallel()
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger := setUpTestSlogger()
+	extraRegistrationId := ulid.New()
+
+	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID, extraRegistrationId})
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("WatchdogEnabled").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	setUpMockStores(t, k)
+	serviceClient := mockServiceClient()
+
+	runner := New(k, serviceClient)
+
+	// Start the instance
+	go runner.Run()
+	waitHealthy(t, runner, logBytes)
+
+	require.Equal(t, 2, len(runner.instances))
+	// Confirm the default instance was started
+	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	// note the original start time
+	defaultInstanceStartTime := runner.instances[types.DefaultRegistrationID].stats.StartTime
+
+	// Confirm the extra instance was started
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to extra instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to extra instance stats on start up")
+	// note the original start time
+	extraInstanceStartTime := runner.instances[extraRegistrationId].stats.StartTime
+
+	// rerun with identical registrationIDs in swapped order and verify that the instances are not restarted
+	runner.UpdateRegistrationIDs([]string{extraRegistrationId, types.DefaultRegistrationID})
+	waitHealthy(t, runner, logBytes)
+
+	require.Equal(t, 2, len(runner.instances))
+	require.Equal(t, extraInstanceStartTime, runner.instances[extraRegistrationId].stats.StartTime)
+	require.Equal(t, defaultInstanceStartTime, runner.instances[types.DefaultRegistrationID].stats.StartTime)
+
+	waitShutdown(t, runner, logBytes)
+
+	// Confirm both instances exited
+	require.Contains(t, runner.instances, types.DefaultRegistrationID)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.Contains(t, runner.instances, extraRegistrationId)
+	require.NotNil(t, runner.instances[extraRegistrationId].stats)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+}
+
 // sets up an osquery instance with a running extension to be used in tests.
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
 	rootDirectory := testRootDirectory(t)
