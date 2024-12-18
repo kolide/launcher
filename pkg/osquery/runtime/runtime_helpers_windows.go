@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/pkg/errors"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 func setpgid() *syscall.SysProcAttr {
@@ -79,4 +80,35 @@ func isExitOk(err error) bool {
 		}
 	}
 	return false
+}
+
+func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process.Process, error) {
+	allProcesses, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting process list: %w", err)
+	}
+
+	processes := make([]*process.Process, 0)
+	for _, p := range allProcesses {
+		openFiles, err := p.OpenFilesWithContext(ctx)
+		if err != nil {
+			continue
+		}
+
+		// Check the process's open files to see if this process is the one using the lockfile
+		for _, f := range openFiles {
+			if f.Path != pathToFile {
+				continue
+			}
+
+			processes = append(processes, p)
+			break
+		}
+	}
+
+	if len(processes) == 0 {
+		return nil, errors.New("no processes found using file")
+	}
+
+	return processes, nil
 }
