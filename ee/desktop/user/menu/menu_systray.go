@@ -1,8 +1,10 @@
 package menu
 
 import (
+	"context"
 	"sync"
 
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/systray"
 )
 
@@ -120,7 +122,7 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 	done := make(chan struct{})
 	doneChans = append(doneChans, done)
 
-	go func() {
+	gowrapper.Go(context.TODO(), m.slogger, func() {
 		for {
 			select {
 			case <-item.ClickedCh:
@@ -131,5 +133,5 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 				return
 			}
 		}
-	}()
+	}, func(r any) {})
 }

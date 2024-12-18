@@ -12,7 +12,7 @@ on:
 
 
 jobs:
-  build_and_test:
+  build:
     name: launcher
     runs-on: ${{ matrix.os }}
     strategy:
@@ -79,9 +79,6 @@ jobs:
       run: make github-launcherapp
       if: ${{ contains(matrix.os, 'macos') }}
 
-    - name: Test
-      run: make test
-
     - name: Cache build output
       uses: actions/cache@v4
       with:
@@ -89,21 +86,13 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
-    # upload coverage here, because we don't cache it with the build
-    - name: Upload coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-coverage.out
-        path: ./coverage.out
-        if-no-files-found: error
-
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
   # that the version of launcher is the same across all runners.
   version_baseline:
     name: Version Baseline
     runs-on: ubuntu-20.04
-    needs: build_and_test
+    needs: build
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -119,6 +108,68 @@ jobs:
       working-directory: build
       shell: bash
       run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
+
+  launcher_test:
+    name: test
+    needs: build # a desktop runner test requires a build to exist
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-20.04
+          - macos-13
+          - windows-latest
+    steps:
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: './go.mod'
+        check-latest: true
+        cache: false
+
+    - name: cache restore - build
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - name: cache restore - GOCACHE
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+        enableCrossOsArchive: true
+
+    - name: cache restore - GOMODCACHE
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        enableCrossOsArchive: true
+
+    - name: Test
+      run: make test
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-coverage.out
+        path: ./coverage.out
+        if-no-files-found: error
 
   exec_testing:
     name: Exec Test
@@ -270,6 +321,7 @@ jobs:
     steps:
       - run: true
     needs:
-      - build_and_test
+      - build
+      - launcher_test
       - package_builder_test
       - exec_testing

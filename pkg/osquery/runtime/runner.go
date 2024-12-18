@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	defaultRegistrationId = "default"
-
 	launchRetryDelay = 30 * time.Second
 )
 
@@ -34,16 +32,13 @@ type Runner struct {
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds: []string{
-			// For now, we only have one (default) instance and we use it for all queries
-			defaultRegistrationId,
-		},
-		instances:     make(map[string]*OsqueryInstance),
-		slogger:       k.Slogger().With("component", "osquery_runner"),
-		knapsack:      k,
-		serviceClient: serviceClient,
-		shutdown:      make(chan struct{}),
-		opts:          opts,
+		registrationIds: k.RegistrationIDs(),
+		instances:       make(map[string]*OsqueryInstance),
+		slogger:         k.Slogger().With("component", "osquery_runner"),
+		knapsack:        k,
+		serviceClient:   serviceClient,
+		shutdown:        make(chan struct{}),
+		opts:            opts,
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -182,7 +177,7 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 	defer r.instanceLock.Unlock()
 
 	// For now, grab the default (i.e. only) instance
-	instance, ok := r.instances[defaultRegistrationId]
+	instance, ok := r.instances[types.DefaultRegistrationID]
 	if !ok {
 		return nil, errors.New("no default instance exists, cannot query")
 	}
@@ -314,4 +309,27 @@ func (r *Runner) Healthy() error {
 	}
 
 	return nil
+}
+
+func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
+	r.instanceLock.Lock()
+	defer r.instanceLock.Unlock()
+
+	instanceStatuses := make(map[string]types.InstanceStatus)
+	for _, registrationId := range r.registrationIds {
+		instance, ok := r.instances[registrationId]
+		if !ok {
+			instanceStatuses[registrationId] = types.InstanceStatusNotStarted
+			continue
+		}
+
+		if err := instance.Healthy(); err != nil {
+			instanceStatuses[registrationId] = types.InstanceStatusUnhealthy
+			continue
+		}
+
+		instanceStatuses[registrationId] = types.InstanceStatusHealthy
+	}
+
+	return instanceStatuses
 }

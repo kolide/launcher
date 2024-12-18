@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
@@ -30,6 +31,7 @@ type (
 
 	status struct {
 		EnrollmentStatus string
+		InstanceStatuses map[string]types.InstanceStatus
 	}
 )
 
@@ -82,6 +84,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		Origin:    r.Header.Get("Origin"),
 		Status: status{
 			EnrollmentStatus: string(enrollmentStatus),
+			InstanceStatuses: ls.knapsack.InstanceStatuses(),
 		},
 	}
 	response.identifiers = ls.identifiers

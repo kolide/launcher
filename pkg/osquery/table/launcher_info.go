@@ -30,6 +30,7 @@ func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore type
 		table.TextColumn("revision"),
 		table.TextColumn("version"),
 		table.TextColumn("version_chain"),
+		table.TextColumn("registration_id"),
 		table.TextColumn("identifier"),
 		table.TextColumn("osquery_instance_id"),
 		table.TextColumn("uptime"),
@@ -52,12 +53,12 @@ func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore type
 
 func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		identifier, err := osquery.IdentifierFromDB(configStore)
+		identifier, err := osquery.IdentifierFromDB(configStore, types.DefaultRegistrationID)
 		if err != nil {
 			return nil, err
 		}
 
-		osqueryInstance, err := history.LatestInstance()
+		osqueryInstance, err := history.LatestInstanceByRegistrationID(types.DefaultRegistrationID)
 		if err != nil {
 			return nil, err
 		}
@@ -91,6 +92,7 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 				"revision":            version.Version().Revision,
 				"version":             version.Version().Version,
 				"version_chain":       os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"),
+				"registration_id":     types.DefaultRegistrationID,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
 				"fingerprint":         fingerprint,

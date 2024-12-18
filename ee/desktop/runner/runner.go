@@ -31,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -186,14 +187,14 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}
 
 	runner.runnerServer = rs
-	go func() {
+	gowrapper.Go(context.TODO(), runner.slogger, func() {
 		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"running monitor server",
 				"err", err,
 			)
 		}
-	}()
+	}, func(err any) {})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -335,10 +336,10 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa
 // killDesktopProcesses kills any existing desktop processes
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
 	wgDone := make(chan struct{})
-	go func() {
+	gowrapper.Go(context.TODO(), r.slogger, func() {
 		defer close(wgDone)
 		r.procsWg.Wait()
-	}()
+	}, func(err any) {})
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
@@ -461,19 +462,28 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("cannot send notification, no child desktop processes")
 	}
 
+	atLeastOneSuccess := false
 	errs := make([]error, 0)
-	for _, proc := range r.uidProcs {
+	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
+			continue
 		}
+
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"sent notification",
+			"uid", uid,
+		)
+		atLeastOneSuccess = true
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("errors sending notifications: %+v", errs)
+	// We just need to be able to notify one user successfully.
+	if atLeastOneSuccess {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("errors sending notifications: %+v", errs)
 }
 
 // Update handles control server updates for the desktop-menu subsystem
@@ -527,7 +537,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 				"sending refresh command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
-				"path", proc.path,
+				"path", proc.socketPath,
 				"err", err,
 			)
 		}
@@ -811,7 +821,7 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 // The wait group is needed to prevent races.
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
-	go func(username string, proc *os.Process) {
+	gowrapper.Go(context.TODO(), r.slogger.With("uid", uid, "pid", proc.Pid), func() {
 		defer r.procsWg.Done()
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
@@ -824,7 +834,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 				"state", state,
 			)
 		}
-	}(uid, proc)
+	}, func(err any) {})
 }
 
 // determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,

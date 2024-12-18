@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/assert"
@@ -38,9 +39,10 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -55,7 +57,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	setUpMockStores(t, k)
 
-	opts = append(opts, WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, mockServiceClient(), WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -69,8 +71,6 @@ func TestOsquerySlowStart(t *testing.T) {
 		}()
 		return nil
 	}))
-
-	runner := New(k, mockServiceClient(), opts...)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -86,9 +86,10 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	rootDirectory := testRootDirectory(t)
 
-	logBytes, slogger, opts := setUpTestSlogger(rootDirectory)
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -104,9 +105,8 @@ func TestExtensionSocketPath(t *testing.T) {
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	opts = append(opts, WithExtensionSocketPath(extensionSocketPath))
 
-	runner := New(k, mockServiceClient(), opts...)
+	runner := New(k, mockServiceClient(), WithExtensionSocketPath(extensionSocketPath))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -134,24 +134,24 @@ func TestRestart(t *testing.T) {
 	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
 
-	previousStats := runner.instances[defaultRegistrationId].stats
+	previousStats := runner.instances[types.DefaultRegistrationID].stats
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be set on latest instance stats after restart")
 
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
 	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
 
-	previousStats = runner.instances[defaultRegistrationId].stats
+	previousStats = runner.instances[types.DefaultRegistrationID].stats
 
 	require.NoError(t, runner.Restart())
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[defaultRegistrationId].stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to latest instance stats after restart")
 
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
 	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")

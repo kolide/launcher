@@ -37,11 +37,11 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/localserver"
-	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
@@ -370,25 +370,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
-		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stdout",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelDebug),
-		)),
-		osqueryruntime.WithStderr(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stderr",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelInfo),
-		)),
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
+	k.SetInstanceQuerier(osqueryRunner)
 
 	versionInfo := version.Version()
 	k.SystemSlogger().Log(ctx, slog.LevelInfo,
@@ -475,12 +460,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// register notifications consumer
 		actionsQueue.RegisterActor(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
-		// For now, commenting out the remote restart consumer until we can fix up the restart behavior
-		/*
-			remoteRestartConsumer := remoterestartconsumer.New(k)
-				runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
-				actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
-		*/
+		remoteRestartConsumer := remoterestartconsumer.New(k)
+		runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
+		actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
 
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())

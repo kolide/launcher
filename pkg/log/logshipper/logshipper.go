@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/sendbuffer"
 	slogmulti "github.com/samber/slog-multi"
 )
@@ -114,9 +115,10 @@ func (ls *LogShipper) Ping() {
 	}
 
 	ls.isShippingStarted = true
-	go func() {
+	gowrapper.Go(context.TODO(), ls.knapsack.Slogger(), func() {
 		ls.startShippingChan <- struct{}{}
-	}()
+	}, func(r any) {})
+
 }
 
 func (ls *LogShipper) Run() error {

@@ -14,12 +14,14 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
@@ -58,7 +60,8 @@ type localServer struct {
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
 
-	presenceDetector presenceDetector
+	presenceDetector       presenceDetector
+	presenceDetectionMutex sync.Mutex
 }
 
 const (
@@ -249,7 +252,7 @@ func (ls *localServer) Start() error {
 	var ctx context.Context
 	ctx, ls.cancel = context.WithCancel(context.Background())
 
-	go func() {
+	gowrapper.Go(ctx, ls.slogger, func() {
 		var lastRun time.Time
 
 		ticker := time.NewTicker(pollInterval)
@@ -274,14 +277,14 @@ func (ls *localServer) Start() error {
 				}
 			}
 		}
-	}()
+	}, func(r any) {})
 
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
+	if len(ls.tlsCerts) > 0 {
 		ls.slogger.Log(ctx, slog.LevelDebug,
 			"using TLS",
 		)
@@ -414,6 +417,9 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ensure we only prompt for 1 presence detection at a time
+		ls.presenceDetectionMutex.Lock()
+		defer ls.presenceDetectionMutex.Unlock()
 
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id

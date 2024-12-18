@@ -6,14 +6,15 @@ import (
 )
 
 type Instance struct {
-	RunId       string // ID for instance, assigned by launcher
-	StartTime   string
-	ConnectTime string
-	ExitTime    string
-	Hostname    string
-	InstanceId  string // ID from osquery
-	Version     string
-	Error       string
+	RegistrationId string // which registration this instance belongs to
+	RunId          string // ID for instance, assigned by launcher
+	StartTime      string
+	ConnectTime    string
+	ExitTime       string
+	Hostname       string
+	InstanceId     string // ID from osquery
+	Version        string
+	Error          string
 }
 
 type Querier interface {

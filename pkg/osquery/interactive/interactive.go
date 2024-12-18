@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/augeas"
 	osqueryRuntime "github.com/kolide/launcher/pkg/osquery/runtime"
@@ -31,7 +32,10 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
 
-	socketPath := osqueryRuntime.SocketPath(interactiveRootDir, ulid.New())
+	// We need a shorter ulid to avoid running into socket path length issues.
+	socketId := ulid.New()
+	truncatedSocketId := socketId[len(socketId)-4:]
+	socketPath := osqueryRuntime.SocketPath(interactiveRootDir, truncatedSocketId)
 	augeasLensesPath := filepath.Join(interactiveRootDir, "augeas-lenses")
 
 	// only install augeas lenses on non-windows platforms
@@ -57,7 +61,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 	}
 
 	// start building list of osq plugins with the kolide tables
-	osqPlugins := table.PlatformTables(knapsack, knapsack.Slogger(), knapsack.OsquerydPath())
+	osqPlugins := table.PlatformTables(knapsack, types.DefaultRegistrationID, knapsack.Slogger(), knapsack.OsquerydPath())
 
 	osqueryFlags := knapsack.OsqueryFlags()
 	// if we were not provided a config path flag, try to add default config
@@ -197,7 +201,9 @@ func generateConfigPlugin(launcherDaemonRootDir string) (*config.Plugin, error) 
 	}
 	defer r.Close()
 
-	atcConfig, err := r.Get("auto_table_construction")
+	// Use the default registration's config
+	atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID))
+	atcConfig, err := r.Get(string(atcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting auto_table_construction from startup settings: %w", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
+	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -68,24 +69,6 @@ type OsqueryInstanceOption func(*OsqueryInstance)
 func WithExtensionSocketPath(path string) OsqueryInstanceOption {
 	return func(i *OsqueryInstance) {
 		i.opts.extensionSocketPath = path
-	}
-}
-
-// WithStdout is a functional option which allows the user to define where the
-// stdout of the osquery process should be directed. By default, the output will
-// be discarded. This should only be configured once.
-func WithStdout(w io.Writer) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.stdout = w
-	}
-}
-
-// WithStderr is a functional option which allows the user to define where the
-// stderr of the osquery process should be directed. By default, the output will
-// be discarded. This should only be configured once.
-func WithStderr(w io.Writer) OsqueryInstanceOption {
-	return func(i *OsqueryInstance) {
-		i.opts.stderr = w
 	}
 }
 
@@ -185,8 +168,6 @@ type osqueryOptions struct {
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc      func(dir string) error
 	extensionSocketPath string
-	stderr              io.Writer
-	stdout              io.Writer
 }
 
 func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
@@ -362,7 +343,7 @@ func (i *OsqueryInstance) Launch() error {
 		"osquery socket created",
 	)
 
-	stats, err := history.NewInstance(i.runId)
+	stats, err := history.NewInstance(i.registrationId, i.runId)
 	if err != nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"could not create new osquery instance history",
@@ -430,7 +411,7 @@ func (i *OsqueryInstance) Launch() error {
 		distributed.NewPlugin(KolideSaasExtensionName, i.saasExtension.GetQueries, i.saasExtension.WriteResults),
 		osquerylogger.NewPlugin(KolideSaasExtensionName, i.saasExtension.LogString),
 	}
-	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
+	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
 	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack)...)
 
 	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
@@ -598,7 +579,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.knapsack, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.knapsack, i.registrationId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}
@@ -708,7 +689,7 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	}
 
 	// Keep default database path for default instance
-	if registrationId == defaultRegistrationId {
+	if registrationId == types.DefaultRegistrationID {
 		osqueryFilePaths.databasePath = filepath.Join(rootDirectory, "osquery.db")
 	}
 
@@ -767,12 +748,26 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	}
 
 	cmd.Args = append(cmd.Args, platformArgs()...)
-	if i.opts.stdout != nil {
-		cmd.Stdout = i.opts.stdout
-	}
-	if i.opts.stderr != nil {
-		cmd.Stderr = i.opts.stderr
-	}
+	cmd.Stdout = kolidelog.NewOsqueryLogAdapter(
+		i.knapsack.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stdout",
+			"registration_id", i.registrationId,
+			"instance_run_id", i.runId,
+		),
+		i.knapsack.RootDirectory(),
+		kolidelog.WithLevel(slog.LevelDebug),
+	)
+	cmd.Stderr = kolidelog.NewOsqueryLogAdapter(
+		i.knapsack.Slogger().With(
+			"component", "osquery",
+			"osqlevel", "stderr",
+			"registration_id", i.registrationId,
+			"instance_run_id", i.runId,
+		),
+		i.knapsack.RootDirectory(),
+		kolidelog.WithLevel(slog.LevelInfo),
+	)
 
 	// Apply user-provided flags last so that they can override other flags set
 	// by Launcher (besides the flags below)
