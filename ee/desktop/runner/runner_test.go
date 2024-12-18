@@ -513,10 +513,10 @@ func TestDesktopUsersProcessesRunner_DetectPresence(t *testing.T) {
 		u, err := user.Current()
 		require.NoError(t, err)
 
-		runner := DesktopUsersProcessesRunner{}
-		runner.uidProcs = make(map[string]processRecord)
-		runner.uidProcs[u.Uid] = processRecord{
-			socketPath: "/tmp/doesntexist",
+		runner := DesktopUsersProcessesRunner{
+			uidProcs: map[string]processRecord{
+				u.Uid: {},
+			},
 		}
 
 		d, err := runner.DetectPresence("whatevs", time.Second)
