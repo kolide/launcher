@@ -4,10 +4,17 @@
 package runtime
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
+
+	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 func setpgid() *syscall.SysProcAttr {
@@ -32,4 +39,28 @@ func platformArgs() []string {
 
 func isExitOk(_ error) bool {
 	return false
+}
+
+func getProcessHoldingFile(ctx context.Context, pathToFile string) (*process.Process, error) {
+	cmd, err := allowedcmd.Lsof(ctx, "-t", pathToFile)
+	if err != nil {
+		return nil, fmt.Errorf("creating lsof command: %w", err)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running lsof: %w", err)
+	}
+
+	pidStr := strings.TrimSpace(string(out))
+	if pidStr == "" {
+		return nil, errors.New("no process found using file via lsof")
+	}
+
+	pid, err := strconv.ParseInt(pidStr, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pid %s: %w", pidStr, err)
+	}
+
+	return process.NewProcess(int32(pid))
 }

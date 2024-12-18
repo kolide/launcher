@@ -725,12 +725,52 @@ func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *os
 		// No lock file, nothing to do here
 		return false, nil
 	}
+	if err != nil {
+		return false, fmt.Errorf("determining whether lock file exists: %w", err)
+	}
 
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"detected stale osquery db lock file",
+	infoToLog := []any{
 		"lockfile_path", lockFilePath,
 		"lockfile_modtime", lockFileInfo.ModTime().String(),
-	)
+	}
+
+	defer func() {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"detected stale osquery db lock file",
+			infoToLog...,
+		)
+	}()
+
+	// Check to see whether the process holding the file still exists
+	p, err := getProcessHoldingFile(ctx, lockFilePath)
+	if err != nil {
+		infoToLog = append(infoToLog, "err", err)
+		return false, fmt.Errorf("getting process holding file: %w", err)
+	}
+
+	// Grab more info to log from the process using the lockfile
+	infoToLog = append(infoToLog, "pid", p.Pid)
+	if name, err := p.NameWithContext(ctx); err == nil {
+		infoToLog = append(infoToLog, "process_name", name)
+	}
+	if cmdline, err := p.CmdlineWithContext(ctx); err == nil {
+		infoToLog = append(infoToLog, "process_cmdline", cmdline)
+	}
+	if status, err := p.StatusWithContext(ctx); err == nil {
+		infoToLog = append(infoToLog, "process_status", status)
+	}
+	if isRunning, err := p.IsRunningWithContext(ctx); err == nil {
+		infoToLog = append(infoToLog, "process_is_running", isRunning)
+	}
+	if parent, err := p.ParentWithContext(ctx); err == nil {
+		infoToLog = append(infoToLog, "process_parent_pid", parent.Pid)
+		if parentCmdline, err := parent.CmdlineWithContext(ctx); err == nil {
+			infoToLog = append(infoToLog, "process_parent_cmdline", parentCmdline)
+		}
+		if parentStatus, err := p.StatusWithContext(ctx); err == nil {
+			infoToLog = append(infoToLog, "process_parent_status", parentStatus)
+		}
+	}
 
 	return true, nil
 }
