@@ -41,7 +41,7 @@ func isExitOk(_ error) bool {
 	return false
 }
 
-func getProcessHoldingFile(ctx context.Context, pathToFile string) (*process.Process, error) {
+func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process.Process, error) {
 	cmd, err := allowedcmd.Lsof(ctx, "-t", pathToFile)
 	if err != nil {
 		return nil, fmt.Errorf("creating lsof command: %w", err)
@@ -57,10 +57,24 @@ func getProcessHoldingFile(ctx context.Context, pathToFile string) (*process.Pro
 		return nil, errors.New("no process found using file via lsof")
 	}
 
-	pid, err := strconv.ParseInt(pidStr, 10, 32)
-	if err != nil {
-		return nil, fmt.Errorf("invalid pid %s: %w", pidStr, err)
+	pidStrs := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(pidStrs) == 0 {
+		return nil, errors.New("no processes found using file via lsof")
 	}
 
-	return process.NewProcess(int32(pid))
+	processes := make([]*process.Process, 0)
+	for _, pidStr := range pidStrs {
+		pid, err := strconv.ParseInt(pidStr, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pid %s: %w", pidStr, err)
+		}
+
+		p, err := process.NewProcess(int32(pid))
+		if err != nil {
+			return nil, fmt.Errorf("getting process for %d: %w", pid, err)
+		}
+		processes = append(processes, p)
+	}
+
+	return processes, nil
 }

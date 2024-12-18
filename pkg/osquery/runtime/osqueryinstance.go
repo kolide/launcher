@@ -29,6 +29,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
+	"github.com/shirou/gopsutil/v3/process"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -731,7 +732,7 @@ func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *os
 
 	infoToLog := []any{
 		"lockfile_path", lockFilePath,
-		"lockfile_modtime", lockFileInfo.ModTime().String(),
+		"lockfile_modtime", lockFileInfo.ModTime().UTC().String(),
 	}
 
 	defer func() {
@@ -742,37 +743,42 @@ func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *os
 	}()
 
 	// Check to see whether the process holding the file still exists
-	p, err := getProcessHoldingFile(ctx, lockFilePath)
+	processes, err := getProcessesHoldingFile(ctx, lockFilePath)
 	if err != nil {
 		infoToLog = append(infoToLog, "err", err)
 		return false, fmt.Errorf("getting process holding file: %w", err)
 	}
 
-	// Grab more info to log from the process using the lockfile
-	infoToLog = append(infoToLog, "pid", p.Pid)
-	if name, err := p.NameWithContext(ctx); err == nil {
-		infoToLog = append(infoToLog, "process_name", name)
+	// Grab more info to log from the processes using the lockfile
+	processStrs := make([]string, len(processes))
+	for i, p := range processes {
+		processStrs[i] = processStr(ctx, p)
 	}
-	if cmdline, err := p.CmdlineWithContext(ctx); err == nil {
-		infoToLog = append(infoToLog, "process_cmdline", cmdline)
-	}
-	if status, err := p.StatusWithContext(ctx); err == nil {
-		infoToLog = append(infoToLog, "process_status", status)
-	}
-	if isRunning, err := p.IsRunningWithContext(ctx); err == nil {
-		infoToLog = append(infoToLog, "process_is_running", isRunning)
-	}
-	if parent, err := p.ParentWithContext(ctx); err == nil {
-		infoToLog = append(infoToLog, "process_parent_pid", parent.Pid)
-		if parentCmdline, err := parent.CmdlineWithContext(ctx); err == nil {
-			infoToLog = append(infoToLog, "process_parent_cmdline", parentCmdline)
-		}
-		if parentStatus, err := p.StatusWithContext(ctx); err == nil {
-			infoToLog = append(infoToLog, "process_parent_status", parentStatus)
-		}
-	}
+	infoToLog = append(infoToLog, "processes", processStrs)
 
 	return true, nil
+}
+
+func processStr(ctx context.Context, p *process.Process) string {
+	name := "unknown"
+	uids := "unknown"
+	status := "unknown"
+	cmdline := "unknown"
+
+	if gotName, err := p.NameWithContext(ctx); err == nil {
+		name = gotName
+	}
+	if gotUids, err := p.UidsWithContext(ctx); err == nil {
+		uids = fmt.Sprintf("%v", gotUids)
+	}
+	if gotStatus, err := p.StatusWithContext(ctx); err == nil {
+		status = strings.Join(gotStatus, " ")
+	}
+	if gotCmdline, err := p.CmdlineWithContext(ctx); err == nil {
+		cmdline = gotCmdline
+	}
+
+	return fmt.Sprintf("process with name `%s` and PID %d belonging to UIDs %s has current status `%s` (%s)", name, p.Pid, uids, status, cmdline)
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd

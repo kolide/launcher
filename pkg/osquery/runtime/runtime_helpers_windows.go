@@ -82,12 +82,13 @@ func isExitOk(err error) bool {
 	return false
 }
 
-func getProcessHoldingFile(ctx context.Context, pathToFile string) (*process.Process, error) {
+func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process.Process, error) {
 	allProcesses, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting process list: %w", err)
 	}
 
+	processes := make([]*process.Process, 0)
 	for _, p := range allProcesses {
 		openFiles, err := p.OpenFilesWithContext(ctx)
 		if err != nil {
@@ -100,9 +101,14 @@ func getProcessHoldingFile(ctx context.Context, pathToFile string) (*process.Pro
 				continue
 			}
 
-			return p, nil
+			processes = append(processes, p)
+			break
 		}
 	}
 
-	return nil, errors.New("no process found using file")
+	if len(processes) == 0 {
+		return nil, errors.New("no processes found using file")
+	}
+
+	return processes, nil
 }
