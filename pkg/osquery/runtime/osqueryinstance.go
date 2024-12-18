@@ -249,10 +249,13 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
-	// Make sure no lock files exist that could prevent osquery from starting up
-	if err := i.cleanUpOldDatabaseLock(ctx, paths); err != nil {
-		traces.SetError(span, fmt.Errorf("cleaning up old database lock: %w", err))
-		return fmt.Errorf("cleaning up old database lock: %w", err)
+	// Check to see whether lock files exist that could prevent osquery from starting up
+	if _, err := i.detectStaleDatabaseLock(ctx, paths); err != nil {
+		// A detection error shouldn't prevent us from creating the process -- log it and move on
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"error detecting stale database lock",
+			"err", err,
+		)
 	}
 
 	// Populate augeas lenses, if requested
@@ -708,43 +711,28 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	return osqueryFilePaths, nil
 }
 
-// cleanUpOldDatabaseLock checks for the presence of a lock file in the given database and removes it
-// if it exists. The lock file can hang around if an osquery process isn't properly terminated, and
-// will prevent us from launching a new osquery process.
-func (i *OsqueryInstance) cleanUpOldDatabaseLock(ctx context.Context, paths *osqueryFilePaths) error {
+// detectStaleDatabaseLock checks for the presence of a lock file in the given database.
+// We have noticed the lock file occasionally hanging around -- we think this can happen
+// when osquery doesn't get adequate time to shut down gracefully. The presence of the lock
+// file will prevent osquery from starting up entirely. For now, we just detect this stale
+// lock file, and log information about it. In the future we will attempt to remediate.
+// See: https://github.com/kolide/launcher/issues/2004.
+func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *osqueryFilePaths) (bool, error) {
 	lockFilePath := filepath.Join(paths.databasePath, "LOCK")
 
 	lockFileInfo, err := os.Stat(lockFilePath)
 	if os.IsNotExist(err) {
 		// No lock file, nothing to do here
-		return nil
-	}
-
-	// We do a couple retries here -- Windows complains about removing files in use sometimes.
-	err = backoff.WaitFor(func() error {
-		if err := os.Remove(lockFilePath); err != nil {
-			return fmt.Errorf("removing lock file at %s: %w", lockFilePath, err)
-		}
-		return nil
-	}, 5*time.Second, 500*time.Millisecond)
-
-	if err != nil {
-		i.slogger.Log(ctx, slog.LevelInfo,
-			"detected old lock file but could not remove it",
-			"lockfile_path", lockFilePath,
-			"lockfile_modtime", lockFileInfo.ModTime().String(),
-			"err", err,
-		)
-		return fmt.Errorf("removing lock file at %s: %w", lockFilePath, err)
+		return false, nil
 	}
 
 	i.slogger.Log(ctx, slog.LevelInfo,
-		"detected and removed old osquery db lock file",
+		"detected stale osquery db lock file",
 		"lockfile_path", lockFilePath,
 		"lockfile_modtime", lockFileInfo.ModTime().String(),
 	)
 
-	return nil
+	return true, nil
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd

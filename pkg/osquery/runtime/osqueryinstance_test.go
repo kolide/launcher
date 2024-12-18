@@ -300,75 +300,37 @@ func TestLaunch(t *testing.T) {
 	k.AssertExpectations(t)
 }
 
-func TestLaunch_WithLockFileCleanup(t *testing.T) {
+func Test_detectStaleDatabaseLock(t *testing.T) {
 	t.Parallel()
 
-	logBytes, slogger := setUpTestSlogger()
+	_, slogger := setUpTestSlogger()
 	rootDirectory := testRootDirectory(t)
 
 	k := typesMocks.NewKnapsack(t)
-	k.On("WatchdogEnabled").Return(true)
-	k.On("WatchdogMemoryLimitMB").Return(150)
-	k.On("WatchdogUtilizationLimitPercent").Return(20)
-	k.On("WatchdogDelaySec").Return(120)
-	k.On("OsqueryFlags").Return([]string{"verbose=true"})
-	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(slogger)
 	k.On("RootDirectory").Return(rootDirectory)
-	k.On("LoggingInterval").Return(1 * time.Second)
-	k.On("LogMaxBytesPerBatch").Return(500)
-	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
-	k.On("ReadEnrollSecret").Return("", nil)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
-	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
-	// Create a lock file that would ordinarily prevent osquery from starting up
+	// Calculate paths
+	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.registrationId, i.runId, i.opts)
+	require.NoError(t, err)
+
+	// Check for stale database lock -- there shouldn't be one
+	detected, err := i.detectStaleDatabaseLock(context.TODO(), paths)
+	require.NoError(t, err)
+	require.False(t, detected)
+
+	// Create a lock file
 	lockFilePath := filepath.Join(rootDirectory, "osquery.db", "LOCK")
 	require.NoError(t, os.MkdirAll(filepath.Dir(lockFilePath), 0700)) // drwx
 	createLockFile(t, lockFilePath)
 
-	// Start the instance
-	instanceStartTime := time.Now()
-	go i.Launch()
-
-	// Wait for the instance to become healthy
-	require.NoError(t, backoff.WaitFor(func() error {
-		// Instance self-reports as healthy
-		if err := i.Healthy(); err != nil {
-			return fmt.Errorf("instance not healthy: %w", err)
-		}
-
-		// Confirm instance setup is complete
-		if i.stats == nil || i.stats.ConnectTime == "" {
-			return errors.New("no connect time set yet")
-		}
-
-		// Good to go
-		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
-
-	// Confirm that the lock file is new -- it should have a modtime after instanceStartTime
-	lockFileInfo, err := os.Stat(lockFilePath)
+	// Check for a stale database lock again -- now, we should find it
+	detectedRetry, err := i.detectStaleDatabaseLock(context.TODO(), paths)
 	require.NoError(t, err)
-	require.True(t, lockFileInfo.ModTime().After(instanceStartTime), logBytes.String())
-
-	// Now wait for full shutdown
-	i.BeginShutdown()
-	shutdownErr := make(chan error)
-	go func() {
-		shutdownErr <- i.WaitShutdown()
-	}()
-
-	select {
-	case err := <-shutdownErr:
-		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("instance logs:\n\n%s", logBytes.String()))
-	case <-time.After(1 * time.Minute):
-		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
-		t.FailNow()
-	}
+	require.True(t, detectedRetry)
 
 	k.AssertExpectations(t)
 }
