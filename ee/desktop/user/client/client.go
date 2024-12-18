@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/presencedetection"
@@ -98,7 +96,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 	return durationSinceLastDetection, detectionErr
 }
 
-func (c *client) CreateSecureEnclaveKey() (*ecdsa.PublicKey, error) {
+func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
 	resp, err := c.base.Post("http://unix/secure_enclave_key", "application/json", http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("getting secure enclave key: %w", err)
@@ -119,12 +117,7 @@ func (c *client) CreateSecureEnclaveKey() (*ecdsa.PublicKey, error) {
 		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
-	key, err := echelper.PublicB64DerToEcdsaKey(body)
-	if err != nil {
-		return nil, fmt.Errorf("converting key: %w", err)
-	}
-
-	return key, nil
+	return body, nil
 }
 
 func (c *client) Notify(n notify.Notification) error {

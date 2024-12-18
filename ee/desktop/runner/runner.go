@@ -22,6 +22,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -318,7 +319,17 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa
 	}
 
 	client := client.New(r.userServerAuthToken, proc.socketPath)
-	return client.CreateSecureEnclaveKey()
+	keyBytes, err := client.CreateSecureEnclaveKey()
+	if err != nil {
+		return nil, fmt.Errorf("creating secure enclave key: %w", err)
+	}
+
+	key, err := echelper.PublicB64DerToEcdsaKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("converting key bytes to ecdsa key: %w", err)
+	}
+
+	return key, nil
 }
 
 // killDesktopProcesses kills any existing desktop processes

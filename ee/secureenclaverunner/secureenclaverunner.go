@@ -31,10 +31,10 @@ const (
 
 type secureEnclaveRunner struct {
 	uidPubKeyMap        map[string]*ecdsa.PublicKey
+	uidPubKeyMapMux     *sync.Mutex
 	secureEnclaveClient secureEnclaveClient
 	store               types.GetterSetterDeleter
 	slogger             *slog.Logger
-	mux                 *sync.Mutex
 	interrupt           chan struct{}
 	interrupted         atomic.Bool
 	noConsoleUsersDelay time.Duration
@@ -50,7 +50,7 @@ func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDelete
 		store:               store,
 		secureEnclaveClient: secureEnclaveClient,
 		slogger:             slogger.With("component", "secureenclaverunner"),
-		mux:                 &sync.Mutex{},
+		uidPubKeyMapMux:     &sync.Mutex{},
 		interrupt:           make(chan struct{}),
 		noConsoleUsersDelay: 15 * time.Second,
 	}, nil
@@ -181,8 +181,8 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	ser.mux.Lock()
-	defer ser.mux.Unlock()
+	ser.uidPubKeyMapMux.Lock()
+	defer ser.uidPubKeyMapMux.Unlock()
 
 	cu, err := firstConsoleUser(ctx)
 	if err != nil {

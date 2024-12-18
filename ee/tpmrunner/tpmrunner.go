@@ -186,7 +186,6 @@ func storeKeyData(store types.Setter, pri, pub []byte) error {
 
 // clearKeyData is used to clear the keys as part of error handling around new keys. It is not intended to be called
 // regularly, and since the path that calls it is around DB errors, it has no error handling.
-// nolint:unused
 func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
 	slogger.Log(context.TODO(), slog.LevelInfo,
 		"clearing keys",
