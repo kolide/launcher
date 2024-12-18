@@ -84,7 +84,6 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		Origin:    r.Header.Get("Origin"),
 		Status: status{
 			EnrollmentStatus: string(enrollmentStatus),
-			InstanceStatuses: ls.knapsack.InstanceStatuses(),
 		},
 	}
 	response.identifiers = ls.identifiers

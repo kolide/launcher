@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -492,4 +493,34 @@ func countFilesWithPrefix(folderPath, prefix string) (int, error) {
 	}
 
 	return count, nil
+}
+
+func TestDesktopUsersProcessesRunner_DetectPresence(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no user procs", func(t *testing.T) {
+		t.Parallel()
+
+		runner := DesktopUsersProcessesRunner{}
+		d, err := runner.DetectPresence("whatevs", time.Second)
+		require.Error(t, err)
+		require.Equal(t, presencedetection.DetectionFailedDurationValue, d)
+	})
+
+	t.Run("cant connect to user server", func(t *testing.T) {
+		t.Parallel()
+
+		u, err := user.Current()
+		require.NoError(t, err)
+
+		runner := DesktopUsersProcessesRunner{
+			uidProcs: map[string]processRecord{
+				u.Uid: {},
+			},
+		}
+
+		d, err := runner.DetectPresence("whatevs", time.Second)
+		require.Error(t, err)
+		require.Equal(t, presencedetection.DetectionFailedDurationValue, d)
+	})
 }
