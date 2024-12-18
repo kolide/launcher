@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ type Runner struct {
 	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
 	shutdown        chan struct{}
+	rerunRequired   bool
 	interrupted     bool
 }
 
@@ -38,6 +40,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 		knapsack:        k,
 		serviceClient:   serviceClient,
 		shutdown:        make(chan struct{}),
+		rerunRequired:   false,
 		opts:            opts,
 	}
 
@@ -49,6 +52,31 @@ func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryI
 }
 
 func (r *Runner) Run() error {
+	for {
+		// if our instances ever exit unexpectedly, return immediately
+		if err := r.runRegisteredInstances(); err != nil {
+			return err
+		}
+
+		// if we're in a state that required re-running all registered instances,
+		// reset the field and do that
+		if r.rerunRequired {
+			r.rerunRequired = false
+			continue
+		}
+
+		// otherwise, exit cleanly
+		return nil
+	}
+}
+
+func (r *Runner) runRegisteredInstances() error {
+	// clear the internal instances to add back in fresh as we runInstance,
+	// this prevents old instances from sticking around if a registrationID is ever removed
+	r.instanceLock.Lock()
+	r.instances = make(map[string]*OsqueryInstance)
+	r.instanceLock.Unlock()
+
 	// Create a group to track the workers running each instance
 	wg, ctx := errgroup.WithContext(context.Background())
 
@@ -334,7 +362,43 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	return instanceStatuses
 }
 
-func (r *Runner) UpdateRegistrationIDs(registrationIDs []string) error {
-	// TODO: detect any difference in reg IDs and shut down/spin up instances accordingly
+func (r *Runner) UpdateRegistrationIDs(newRegistrationIDs []string) error {
+	slices.Sort(newRegistrationIDs)
+	existingRegistrationIDs := r.registrationIds
+	slices.Sort(existingRegistrationIDs)
+
+	if slices.Equal(newRegistrationIDs, existingRegistrationIDs) {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"skipping runner restarts for updated registration IDs, no changes detected",
+		)
+
+		return nil
+	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"detected changes to registrationIDs, will restart runner instances",
+		"previous_registration_ids", existingRegistrationIDs,
+		"new_registration_ids", newRegistrationIDs,
+	)
+
+	// we know there are changes, safe to update the internal registrationIDs now
+	r.registrationIds = newRegistrationIDs
+	// mark rerun as required so that we can safely shutdown all workers and have the changes
+	// picked back up from within the main Run function
+	r.rerunRequired = true
+
+	if err := r.Shutdown(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not shut down runner instances for restart after registration changes",
+			"err", err,
+		)
+
+		return err
+	}
+
+	// reset the shutdown channel and interrupted state
+	r.shutdown = make(chan struct{})
+	r.interrupted = false
+
 	return nil
 }
