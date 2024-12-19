@@ -42,8 +42,9 @@ func (sdc *serverDataCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 	}
 
 	if store == nil {
-		sdc.status = Warning
-		sdc.summary = "no server_data store in knapsack"
+		// We are probably running standalone instead of in situ
+		sdc.status = Informational
+		sdc.summary = "server_data not available"
 		return nil
 	}
 
