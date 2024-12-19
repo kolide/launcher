@@ -638,11 +638,12 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
-	runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID, extraRegistrationId})
+	updateErr := runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID, extraRegistrationId})
+	require.NoError(t, updateErr)
 	waitHealthy(t, runner, logBytes)
 	updatedInstanceStatuses := runner.InstanceStatuses()
 	// verify that rerunRequired has been reset for any future changes
-	require.False(t, runner.rerunRequired)
+	require.False(t, runner.rerunRequired.Load())
 	// now verify both instances are reported
 	require.Equal(t, 2, len(runner.instances))
 	require.Contains(t, updatedInstanceStatuses, types.DefaultRegistrationID)
@@ -655,7 +656,8 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 
 	// update registration IDs one more time, this time removing the additional registration
 	originalDefaultInstanceStartTime := runner.instances[extraRegistrationId].stats.StartTime
-	runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID})
+	updateErr = runner.UpdateRegistrationIDs([]string{types.DefaultRegistrationID})
+	require.NoError(t, updateErr)
 	waitHealthy(t, runner, logBytes)
 
 	// now verify only the default instance remains
@@ -666,7 +668,7 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
 	// verify that rerunRequired has been reset for any future changes
-	require.False(t, runner.rerunRequired)
+	require.False(t, runner.rerunRequired.Load())
 	// verify the default instance was restarted
 	require.NotEqual(t, originalDefaultInstanceStartTime, runner.instances[types.DefaultRegistrationID].stats.StartTime)
 
@@ -726,7 +728,8 @@ func TestUpdatingRegistrationIDsOnlyRestartsForChanges(t *testing.T) {
 	extraInstanceStartTime := runner.instances[extraRegistrationId].stats.StartTime
 
 	// rerun with identical registrationIDs in swapped order and verify that the instances are not restarted
-	runner.UpdateRegistrationIDs([]string{extraRegistrationId, types.DefaultRegistrationID})
+	updateErr := runner.UpdateRegistrationIDs([]string{extraRegistrationId, types.DefaultRegistrationID})
+	require.NoError(t, updateErr)
 	waitHealthy(t, runner, logBytes)
 
 	require.Equal(t, 2, len(runner.instances))
