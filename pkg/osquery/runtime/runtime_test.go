@@ -674,7 +674,7 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 
 	waitShutdown(t, runner, logBytes)
 
-	// Confirm both instances exited
+	// Confirm instance exited
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")

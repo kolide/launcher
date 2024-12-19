@@ -369,6 +369,8 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	return instanceStatuses
 }
 
+// UpdateRegistrationIDs detects any changes between the new and stored registration IDs,
+// and resets the runner instances for the new registrationIDs if required
 func (r *Runner) UpdateRegistrationIDs(newRegistrationIDs []string) error {
 	slices.Sort(newRegistrationIDs)
 	existingRegistrationIDs := r.registrationIds
