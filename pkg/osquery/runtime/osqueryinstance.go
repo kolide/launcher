@@ -761,15 +761,15 @@ func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *os
 
 func processStr(ctx context.Context, p *process.Process) string {
 	name := "unknown"
-	uids := "unknown"
+	username := "unknown"
 	runningStatus := "unknown"
 	cmdline := "unknown"
 
 	if gotName, err := p.NameWithContext(ctx); err == nil {
 		name = gotName
 	}
-	if gotUids, err := p.UidsWithContext(ctx); err == nil {
-		uids = fmt.Sprintf("%v", gotUids)
+	if gotUsername, err := p.UsernameWithContext(ctx); err == nil {
+		username = gotUsername
 	}
 	if gotIsRunning, err := p.IsRunningWithContext(ctx); err == nil {
 		if gotIsRunning {
@@ -782,7 +782,7 @@ func processStr(ctx context.Context, p *process.Process) string {
 		cmdline = gotCmdline
 	}
 
-	return fmt.Sprintf("process with name `%s` and PID %d belonging to UIDs %s has current status `%s` (%s)", name, p.Pid, uids, runningStatus, cmdline)
+	return fmt.Sprintf("process with name `%s` and PID %d belonging to user `%s` has current status `%s` (%s)", name, p.Pid, username, runningStatus, cmdline)
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
