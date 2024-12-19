@@ -214,8 +214,6 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runDownloadOsquery
 	case "uninstall":
 		run = runUninstall
-	case "secure-enclave":
-		run = runSecureEnclave
 	case "watchdog": // note: this is currently only implemented for windows
 		run = watchdog.RunWatchdogTask
 	default:

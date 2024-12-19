@@ -19,6 +19,7 @@ import (
 
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -69,17 +70,16 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 }
 
 type kryptoEcMiddleware struct {
-	localDbSigner, hardwareSigner crypto.Signer
-	counterParty                  ecdsa.PublicKey
-	slogger                       *slog.Logger
+	localDbSigner crypto.Signer
+	counterParty  ecdsa.PublicKey
+	slogger       *slog.Logger
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner, hardwareSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		localDbSigner:  localDbSigner,
-		hardwareSigner: hardwareSigner,
-		counterParty:   counterParty,
-		slogger:        slogger.With("keytype", "ec"),
+		localDbSigner: localDbSigner,
+		counterParty:  counterParty,
+		slogger:       slogger.With("keytype", "ec"),
 	}
 }
 
@@ -356,8 +356,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 		// pass nil to krypto
 		// hardware signing is not implemented for darwin
-		if runtime.GOOS != "darwin" && e.hardwareSigner != nil && e.hardwareSigner.Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, e.hardwareSigner, responseBytes)
+		if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
+			response, err = challengeBox.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
 		} else {
 			response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
 		}

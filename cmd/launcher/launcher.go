@@ -357,7 +357,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	if err := osquery.SetupLauncherKeys(k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up initial launcher keys: %w", err)
 	}
-	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore(), false); err != nil {
+	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
 	}
 
@@ -418,6 +418,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
+
+		execute, interrupt, err := agent.SetHardwareKeysRunner(ctx, k.Slogger(), k.ConfigStore(), runner)
+		if err != nil {
+			return fmt.Errorf("setting up hardware keys: %w", err)
+		}
+		runGroup.Add("hardwareKeys", execute, interrupt)
 
 		runGroup.Add("desktopRunner", runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)

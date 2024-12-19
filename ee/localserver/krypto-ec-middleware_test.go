@@ -189,7 +189,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					})).Logger
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, tt.hardwareKey, counterpartyKey.PublicKey)
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, counterpartyKey.PublicKey)
 					require.NoError(t, err)
 
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
@@ -369,7 +369,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			})).Logger
 
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, ecdsaKey(t), nil, counterpartyKey.PublicKey)
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, ecdsaKey(t), counterpartyKey.PublicKey)
 			require.NoError(t, err)
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
