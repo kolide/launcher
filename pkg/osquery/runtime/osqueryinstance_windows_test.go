@@ -4,7 +4,6 @@
 package runtime
 
 import (
-	"os"
 	"strings"
 	"syscall"
 	"testing"
@@ -90,11 +89,4 @@ func createLockFile(t *testing.T, fileToLock string) {
 		uintptr(unsafe.Pointer(overlapped)),
 	)
 	require.False(t, r1 == 0, error(e1))
-
-	fh, err := os.Open(fileToLock)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		fh.Close()
-	})
 }

@@ -303,6 +303,10 @@ func TestLaunch(t *testing.T) {
 func Test_detectStaleDatabaseLock(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" && os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping test on GitHub Actions -- test only works locally on Windows")
+	}
+
 	_, slogger := setUpTestSlogger()
 	rootDirectory := testRootDirectory(t)
 
