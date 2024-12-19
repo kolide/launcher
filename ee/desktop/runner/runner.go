@@ -290,21 +290,20 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 	}
 
 	var lastErr error
-	var lastDurationSinceLastDetection time.Duration
 
 	for _, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
-		lastDurationSinceLastDetection, err := client.DetectPresence(reason, interval)
 
+		durationSinceLastDetection, err := client.DetectPresence(reason, interval)
 		if err != nil {
 			lastErr = err
 			continue
 		}
 
-		return lastDurationSinceLastDetection, nil
+		return durationSinceLastDetection, nil
 	}
 
-	return lastDurationSinceLastDetection, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
+	return presencedetection.DetectionFailedDurationValue, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
 }
 
 // killDesktopProcesses kills any existing desktop processes
