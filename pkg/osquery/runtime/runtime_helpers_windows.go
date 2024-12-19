@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -97,7 +98,9 @@ func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process
 
 		// Check the process's open files to see if this process is the one using the lockfile
 		for _, f := range openFiles {
-			if f.Path != pathToFile {
+			// We check for strings.Contains rather than equals because the open file's path contains
+			// a `\\?\` prefix.
+			if !strings.Contains(f.Path, pathToFile) {
 				continue
 			}
 
