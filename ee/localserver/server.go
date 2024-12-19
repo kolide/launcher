@@ -54,9 +54,8 @@ type localServer struct {
 	kolideServer string
 	cancel       context.CancelFunc
 
-	myKey                 *rsa.PrivateKey
-	myLocalDbSigner       crypto.Signer
-	myLocalHardwareSigner crypto.Signer
+	myKey           *rsa.PrivateKey
+	myLocalDbSigner crypto.Signer
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
@@ -79,13 +78,12 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	defer span.End()
 
 	ls := &localServer{
-		slogger:               k.Slogger().With("component", "localserver"),
-		knapsack:              k,
-		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer:          k.KolideServerURL(),
-		myLocalDbSigner:       agent.LocalDbKeys(),
-		myLocalHardwareSigner: agent.HardwareKeys(),
-		presenceDetector:      presenceDetector,
+		slogger:          k.Slogger().With("component", "localserver"),
+		knapsack:         k,
+		limiter:          rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer:     k.KolideServerURL(),
+		myLocalDbSigner:  agent.LocalDbKeys(),
+		presenceDetector: presenceDetector,
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -101,7 +99,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	}
 	ls.myKey = privateKey
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
+	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
@@ -419,10 +417,6 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// ensure we only prompt for 1 presence detection at a time
-		ls.presenceDetectionMutex.Lock()
-		defer ls.presenceDetectionMutex.Unlock()
-
 		// can test this by adding an unauthed endpoint to the mux and running, for example:
 		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
 		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
@@ -460,6 +454,12 @@ func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler 
 				"reason", reason,
 			)
 		}
+
+		if !ls.presenceDetectionMutex.TryLock() {
+			http.Error(w, "presence detection already in progress", http.StatusTooManyRequests)
+			return
+		}
+		defer ls.presenceDetectionMutex.Unlock()
 
 		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -93,6 +94,30 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 	}
 
 	return durationSinceLastDetection, detectionErr
+}
+
+func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
+	resp, err := c.base.Post("http://unix/secure_enclave_key", "application/json", http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("getting secure enclave key: %w", err)
+	}
+
+	if resp.Body == nil {
+		return nil, errors.New("response body is nil")
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	return body, nil
 }
 
 func (c *client) Notify(n notify.Notification) error {
