@@ -3,7 +3,6 @@ package checkups
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,7 +26,8 @@ func (c *bboltdbCheckup) Name() string {
 func (c *bboltdbCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	db := c.k.BboltDB()
 	if db == nil {
-		return errors.New("no DB available")
+		// Not an error -- we are probably running standalone instead of in situ
+		return nil
 	}
 
 	stats, err := agent.GetStats(db)
