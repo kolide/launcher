@@ -88,6 +88,9 @@ func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process
 	if err != nil {
 		return nil, fmt.Errorf("getting process list: %w", err)
 	}
+	if len(allProcesses) == 0 {
+		return nil, errors.New("could not get any processes")
+	}
 
 	processes := make([]*process.Process, 0)
 	for _, p := range allProcesses {
@@ -110,7 +113,7 @@ func getProcessesHoldingFile(ctx context.Context, pathToFile string) ([]*process
 	}
 
 	if len(processes) == 0 {
-		return nil, errors.New("no processes found using file")
+		return nil, fmt.Errorf("no processes found using file %s", pathToFile)
 	}
 
 	return processes, nil
