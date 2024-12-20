@@ -114,8 +114,7 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	return nil
 }
 
-func TestBadBinaryPath(t *testing.T) {
-	t.Parallel()
+func TestBadBinaryPath(t *testing.T) { //nolint:paralleltest
 	rootDirectory := t.TempDir()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -151,8 +150,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.AssertExpectations(t)
 }
 
-func TestWithOsqueryFlags(t *testing.T) {
-	t.Parallel()
+func TestWithOsqueryFlags(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -179,9 +177,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
-func TestFlagsChanged(t *testing.T) {
-	t.Parallel()
-
+func TestFlagsChanged(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -316,8 +312,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	time.Sleep(2 * time.Second)
 }
 
-func TestSimplePath(t *testing.T) {
-	t.Parallel()
+func TestSimplePath(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -349,8 +344,7 @@ func TestSimplePath(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
-func TestMultipleInstances(t *testing.T) {
-	t.Parallel()
+func TestMultipleInstances(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -411,8 +405,7 @@ func TestMultipleInstances(t *testing.T) {
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
-func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
-	t.Parallel()
+func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -462,8 +455,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
-func TestMultipleShutdowns(t *testing.T) {
-	t.Parallel()
+func TestMultipleShutdowns(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -494,8 +486,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	}
 }
 
-func TestOsqueryDies(t *testing.T) {
-	t.Parallel()
+func TestOsqueryDies(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -538,8 +529,7 @@ func TestOsqueryDies(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
-func TestNotStarted(t *testing.T) {
-	t.Parallel()
+func TestNotStarted(t *testing.T) { //nolint:paralleltest
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
@@ -566,9 +556,8 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 // TestExtensionIsCleanedUp tests that the osquery extension cleans
 // itself up. Unfortunately, this test has proved very flakey on
 // circle-ci, but just fine on laptops.
-func TestExtensionIsCleanedUp(t *testing.T) {
+func TestExtensionIsCleanedUp(t *testing.T) { //nolint:paralleltest
 	t.Skip("https://github.com/kolide/launcher/issues/478")
-	t.Parallel()
 
 	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
 	defer teardown()
@@ -593,8 +582,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	<-timer1.C
 }
 
-func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
-	t.Parallel()
+func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -680,8 +668,7 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
 }
 
-func TestUpdatingRegistrationIDsOnlyRestartsForChanges(t *testing.T) {
-	t.Parallel()
+func TestUpdatingRegistrationIDsOnlyRestartsForChanges(t *testing.T) { //nolint:paralleltest
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
