@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,7 +43,7 @@ type Extension struct {
 	serviceClient       service.KolideService
 	enrollMutex         sync.Mutex
 	done                chan struct{}
-	interrupted         bool
+	interrupted         atomic.Bool
 	slogger             *slog.Logger
 	logPublicationState *logPublicationState
 }
@@ -172,10 +173,10 @@ func (e *Extension) Execute() error {
 // with this extension.
 func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if e.interrupted {
+	if e.interrupted.Load() {
 		return
 	}
-	e.interrupted = true
+	e.interrupted.Store(true)
 
 	close(e.done)
 }

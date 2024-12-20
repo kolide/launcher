@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -28,7 +29,7 @@ import (
 type universalLinkHandler struct {
 	urlInput    chan string
 	slogger     *slog.Logger
-	interrupted bool
+	interrupted atomic.Bool
 	interrupt   chan struct{}
 }
 
@@ -73,10 +74,10 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 	)
 
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if u.interrupted {
+	if u.interrupted.Load() {
 		return
 	}
-	u.interrupted = true
+	u.interrupted.Store(true)
 
 	u.interrupt <- struct{}{}
 	close(u.urlInput)

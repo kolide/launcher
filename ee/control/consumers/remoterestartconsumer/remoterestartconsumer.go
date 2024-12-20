@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -33,7 +34,7 @@ type RemoteRestartConsumer struct {
 	slogger       *slog.Logger
 	signalRestart chan error
 	interrupt     chan struct{}
-	interrupted   bool
+	interrupted   atomic.Bool
 }
 
 type remoteRestartAction struct {
@@ -122,10 +123,10 @@ func (r *RemoteRestartConsumer) Execute() (err error) {
 // and be shut down when the rungroup shuts down.
 func (r *RemoteRestartConsumer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if r.interrupted {
+	if r.interrupted.Load() {
 		return
 	}
-	r.interrupted = true
+	r.interrupted.Store(true)
 
 	r.interrupt <- struct{}{}
 }

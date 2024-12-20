@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -57,7 +58,7 @@ type TraceExporter struct {
 	batchTimeout              time.Duration
 	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
-	interrupted               bool
+	interrupted               atomic.Bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -318,11 +319,11 @@ func (t *TraceExporter) Execute() error {
 
 func (t *TraceExporter) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if t.interrupted {
+	if t.interrupted.Load() {
 		return
 	}
 
-	t.interrupted = true
+	t.interrupted.Store(true)
 
 	if t.provider != nil {
 		t.provider.Shutdown(t.ctx)

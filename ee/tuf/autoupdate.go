@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -95,7 +96,7 @@ type TufAutoupdater struct {
 	initialDelayEnd        time.Time
 	updateLock             *sync.Mutex
 	interrupt              chan struct{}
-	interrupted            bool
+	interrupted            atomic.Bool
 	signalRestart          chan error
 	slogger                *slog.Logger
 	restartFuncs           map[autoupdatableBinary]func() error
@@ -273,10 +274,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ta.interrupted {
+	if ta.interrupted.Load() {
 		return
 	}
-	ta.interrupted = true
+	ta.interrupted.Store(true)
 
 	ta.interrupt <- struct{}{}
 }
