@@ -5,12 +5,13 @@ package universallink
 
 import (
 	"log/slog"
+	"sync/atomic"
 )
 
 // On other OSes, universal link handling is a no-op.
 type noopUniversalLinkHandler struct {
 	unusedInput chan string
-	interrupted bool
+	interrupted atomic.Bool
 	interrupt   chan struct{}
 }
 
@@ -29,10 +30,10 @@ func (n *noopUniversalLinkHandler) Execute() error {
 
 func (n *noopUniversalLinkHandler) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if n.interrupted {
+	if n.interrupted.Load() {
 		return
 	}
-	n.interrupted = true
+	n.interrupted.Store(true)
 
 	n.interrupt <- struct{}{}
 	close(n.unusedInput)

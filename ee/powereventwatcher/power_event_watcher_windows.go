@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
@@ -35,7 +36,7 @@ type (
 		unsubscribeProcedure    *syscall.LazyProc
 		renderEventLogProcedure *syscall.LazyProc
 		interrupt               chan struct{}
-		interrupted             bool
+		interrupted             atomic.Bool
 	}
 
 	// powerEventSubscriber is an interface to be implemented by anything utilizing the power event updates.
@@ -234,11 +235,11 @@ func (p *powerEventWatcher) Execute() error {
 
 func (p *powerEventWatcher) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if p.interrupted {
+	if p.interrupted.Load() {
 		return
 	}
 
-	p.interrupted = true
+	p.interrupted.Store(true)
 
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)

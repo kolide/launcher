@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -21,6 +22,7 @@ type dbusNotifier struct {
 	conn                *dbus.Conn
 	signal              chan *dbus.Signal
 	interrupt           chan struct{}
+	interrupted         atomic.Bool
 	sentNotificationIds map[uint32]bool
 	lock                sync.RWMutex
 }
@@ -129,6 +131,11 @@ func (d *dbusNotifier) Execute() error {
 }
 
 func (d *dbusNotifier) Interrupt(err error) {
+	if d.interrupted.Load() {
+		return
+	}
+	d.interrupted.Store(true)
+
 	d.interrupt <- struct{}{}
 
 	d.conn.RemoveSignal(d.signal)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -23,7 +24,7 @@ type databaseBackupSaver struct {
 	knapsack    types.Knapsack
 	slogger     *slog.Logger
 	interrupt   chan struct{}
-	interrupted bool
+	interrupted atomic.Bool
 }
 
 func NewDatabaseBackupSaver(k types.Knapsack) *databaseBackupSaver {
@@ -71,10 +72,10 @@ func (d *databaseBackupSaver) Execute() error {
 
 func (d *databaseBackupSaver) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if d.interrupted {
+	if d.interrupted.Load() {
 		return
 	}
-	d.interrupted = true
+	d.interrupted.Store(true)
 
 	d.interrupt <- struct{}{}
 }
