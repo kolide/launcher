@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -27,7 +28,7 @@ type Runner struct {
 	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
 	shutdown        chan struct{}
-	interrupted     bool
+	interrupted     atomic.Bool
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *Runner {
@@ -197,12 +198,12 @@ func (r *Runner) Interrupt(_ error) {
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
 func (r *Runner) Shutdown() error {
-	if r.interrupted {
+	if r.interrupted.Load() {
 		// Already shut down, nothing else to do
 		return nil
 	}
 
-	r.interrupted = true
+	r.interrupted.Store(true)
 	close(r.shutdown)
 
 	if err := r.triggerShutdownForInstances(); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
@@ -14,7 +15,7 @@ type (
 		slogger     *slog.Logger
 		knapsack    types.Knapsack
 		interrupt   chan struct{}
-		interrupted bool
+		interrupted atomic.Bool
 	}
 )
 
@@ -49,11 +50,11 @@ func (c *logCheckPointer) Run() error {
 
 func (c *logCheckPointer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if c.interrupted {
+	if c.interrupted.Load() {
 		return
 	}
 
-	c.interrupted = true
+	c.interrupted.Store(true)
 
 	c.interrupt <- struct{}{}
 }

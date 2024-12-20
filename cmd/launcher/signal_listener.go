@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -13,7 +14,7 @@ type signalListener struct {
 	sigChannel  chan os.Signal
 	cancel      context.CancelFunc
 	slogger     *slog.Logger
-	interrupted bool
+	interrupted atomic.Bool
 }
 
 func newSignalListener(sigChannel chan os.Signal, cancel context.CancelFunc, slogger *slog.Logger) *signalListener {
@@ -36,10 +37,11 @@ func (s *signalListener) Execute() error {
 
 func (s *signalListener) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if s.interrupted {
+	if s.interrupted.Load() {
 		return
 	}
-	s.interrupted = true
+
+	s.interrupted.Store(true)
 	s.cancel()
 	close(s.sigChannel)
 }
