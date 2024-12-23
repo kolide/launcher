@@ -50,7 +50,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		extensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	osquerydPath := testOsqueryBinaryPath
+	osquerydPath := testOsqueryBinary
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
@@ -86,7 +86,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
 	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinaryPath,
+		testOsqueryBinary,
 		&osqueryFilePaths{},
 	)
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
 	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinaryPath,
+		testOsqueryBinary,
 		&osqueryFilePaths{},
 	)
 	require.NoError(t, err)
@@ -170,7 +170,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 
 	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinaryPath,
+		testOsqueryBinary,
 		&osqueryFilePaths{},
 	)
 	require.NoError(t, err)

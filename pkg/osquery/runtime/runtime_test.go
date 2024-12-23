@@ -40,7 +40,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testOsqueryBinaryPath string
+var testOsqueryBinary string
 
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
@@ -67,9 +67,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)              //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
-	testOsqueryBinaryPath = filepath.Join(binDirectory, "osqueryd")
+	testOsqueryBinary = filepath.Join(binDirectory, "osqueryd")
 	if runtime.GOOS == "windows" {
-		testOsqueryBinaryPath += ".exe"
+		testOsqueryBinary += ".exe"
 	}
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
@@ -170,7 +170,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
@@ -204,7 +204,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{"verbose=false"})
 	k.On("OsqueryVerbose").Return(false)
@@ -335,7 +335,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
@@ -371,7 +371,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
@@ -430,7 +430,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
@@ -481,7 +481,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
@@ -513,7 +513,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("OsqueryVerbose").Return(true)
@@ -615,7 +615,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("WatchdogDelaySec").Return(120)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(slogger)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryPath)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
