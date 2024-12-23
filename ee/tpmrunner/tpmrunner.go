@@ -98,7 +98,7 @@ func (tr *tpmRunner) Execute() error {
 			continue
 		case <-tr.interrupt:
 			tr.slogger.Log(context.TODO(), slog.LevelDebug,
-				"interrupt received, exiting secure enclave signer execute loop",
+				"interrupt received, exiting tpm signer execute loop",
 			)
 			return nil
 		}
@@ -208,10 +208,6 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 	}
 
 	if pubData == nil || priData == nil {
-		tr.slogger.Log(ctx, slog.LevelInfo,
-			"generating new tpm keys",
-		)
-
 		var err error
 		priData, pubData, err = tr.signerCreator.CreateKey()
 		if err != nil {
@@ -230,6 +226,9 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 			return thisErr
 		}
 
+		tr.slogger.Log(ctx, slog.LevelInfo,
+			"new tpm keys generated",
+		)
 		span.AddEvent("generated_new_tpm_keys")
 	}
 
@@ -242,6 +241,9 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 
 	tr.signer = k
 
+	tr.slogger.Log(ctx, slog.LevelDebug,
+		"tpm signer created",
+	)
 	span.AddEvent("created_tpm_signer")
 
 	return nil

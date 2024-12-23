@@ -197,6 +197,10 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	key, ok := ser.uidPubKeyMap[cu.Uid]
 	if ok {
+		ser.slogger.Log(ctx, slog.LevelDebug,
+			"found existing key for console user",
+			"uid", cu.Uid,
+		)
 		span.AddEvent("found_existing_key_for_console_user")
 		return key, nil
 	}
@@ -207,6 +211,10 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 		return nil, fmt.Errorf("creating key: %w", err)
 	}
 
+	ser.slogger.Log(ctx, slog.LevelInfo,
+		"created new key for console user",
+		"uid", cu.Uid,
+	)
 	span.AddEvent("created_new_key_for_console_user")
 
 	ser.uidPubKeyMap[cu.Uid] = key
