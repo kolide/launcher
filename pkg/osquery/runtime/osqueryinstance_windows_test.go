@@ -16,7 +16,7 @@ import (
 func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	t.Parallel()
 
-	osquerydPath := testOsqueryBinaryDirectory
+	osquerydPath := testOsqueryBinaryPath
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
