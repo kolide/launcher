@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-ole/go-ole"
@@ -36,7 +37,7 @@ type WatchdogController struct {
 	slogger        *slog.Logger
 	knapsack       types.Knapsack
 	interrupt      chan struct{}
-	interrupted    bool
+	interrupted    atomic.Bool
 	logPublisher   types.LogStore
 	configFilePath string
 }
@@ -156,12 +157,12 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 
 func (wc *WatchdogController) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if wc.interrupted {
+	if wc.interrupted.Load() {
 		return
 	}
 
 	wc.logPublisher.Close()
-	wc.interrupted = true
+	wc.interrupted.Store(true)
 	wc.interrupt <- struct{}{}
 }
 
