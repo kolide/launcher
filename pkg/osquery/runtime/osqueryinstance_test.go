@@ -260,7 +260,7 @@ func TestLaunch(t *testing.T) {
 	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
 	k.On("ReadEnrollSecret").Return("", nil)
-	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinaryDirectory)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
