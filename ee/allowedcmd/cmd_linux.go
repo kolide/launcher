@@ -160,7 +160,16 @@ func Systemctl(ctx context.Context, arg ...string) (*exec.Cmd, error) {
 }
 
 func Ws1HubUtil(ctx context.Context, arg ...string) (*exec.Cmd, error) {
-	return validatedCommand(ctx, "/opt/vmware/ws1-hub/bin/ws1HubUtil", arg...)
+	for _, p := range []string{"/usr/bin/ws1HubUtil", "/opt/vmware/ws1-hub/bin/ws1HubUtil"} {
+		validatedCmd, err := validatedCommand(ctx, p, arg...)
+		if err != nil {
+			continue
+		}
+
+		return validatedCmd, nil
+	}
+
+	return nil, errors.New("ws1HubUtil not found")
 }
 
 func XdgOpen(ctx context.Context, arg ...string) (*exec.Cmd, error) {
