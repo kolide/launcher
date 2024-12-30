@@ -35,12 +35,12 @@ func TestMain(m *testing.M) {
 		fmt.Printf("failed to make temp dir for test osquery binary: %v", err)
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
-	defer os.RemoveAll(downloadDir)
 
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		fmt.Printf("error parsing platform %s: %v", runtime.GOOS, err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
 	if runtime.GOOS == "darwin" {
@@ -48,12 +48,13 @@ func TestMain(m *testing.M) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	dlPath, err := packaging.FetchBinary(ctx, downloadDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "nightly", target)
 	if err != nil {
 		fmt.Printf("error fetching binary osqueryd binary: %v", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
+		cancel()                  // explicit cancel as defer will not run when os.Exit is called
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
 	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
@@ -63,12 +64,17 @@ func TestMain(m *testing.M) {
 
 	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
 		fmt.Printf("error copying osqueryd binary: %v", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
+		cancel()                  // explicit cancel as defer will not run when os.Exit is called
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
 	// Run the tests
 	retCode := m.Run()
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit inside tests
+
+	cancel()                  // explicit cancel as defer will not run when os.Exit is called
+	os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+	os.Exit(retCode)          //nolint:forbidigo // Fine to use os.Exit inside tests
 }
 
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
