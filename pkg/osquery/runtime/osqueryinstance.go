@@ -384,18 +384,22 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Kill osquery process on shutdown
 	i.errgroup.AddShutdownGoroutineToErrgroup(ctx, "kill_osquery_process", func() error {
-		if i.cmd.Process != nil {
-			// kill osqueryd and children
-			if err := killProcessGroup(i.cmd); err != nil {
-				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-					i.slogger.Log(ctx, slog.LevelDebug,
-						"tried to stop osquery, but process already gone",
-					)
-				} else {
-					return fmt.Errorf("killing osquery process: %w", err)
-				}
-			}
+		if i.cmd.Process == nil {
+			return nil
 		}
+
+		// kill osqueryd and children
+		if err := killProcessGroup(i.cmd); err != nil {
+			if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
+				i.slogger.Log(ctx, slog.LevelDebug,
+					"tried to stop osquery, but process already gone",
+				)
+				return nil
+			}
+
+			return fmt.Errorf("killing osquery process: %w", err)
+		}
+
 		return nil
 	})
 
