@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/process"
@@ -17,9 +18,10 @@ import (
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
 // to the osquery stdout/stderr
 type OsqueryLogAdapter struct {
-	slogger       slog.Logger
-	level         slog.Level
-	rootDirectory string
+	slogger             slog.Logger
+	level               slog.Level
+	rootDirectory       string
+	lastLockfileLogTime time.Time
 }
 
 type Option func(*OsqueryLogAdapter)
@@ -30,9 +32,11 @@ func WithLevel(level slog.Level) Option {
 	}
 }
 
-var callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
-
-var pidRegex = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+var (
+	callerRegexp  = regexp.MustCompile(`[\w.]+:\d+]`)
+	pidRegex      = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	lockfileRegex = regexp.MustCompile(`lock file: ([a-zA-Z0-9_\.\s\\\/\-:]*LOCK):`)
+)
 
 func extractOsqueryCaller(msg string) string {
 	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
@@ -76,6 +80,22 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 			"detected non-osqueryd process using pidfile, logging info about process",
 		)
 		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+	}
+
+	// We have noticed the lock file occasionally locked when it shouldn't be -- we think this can happen
+	// when osquery doesn't get adequate time to shut down gracefully. The held lockfile will prevent
+	// osquery from starting up entirely.
+	// See: https://github.com/kolide/launcher/issues/2004.
+	if bytes.Contains(p, []byte("Rocksdb open failed")) {
+		// We can get spammed with this log, but we don't want to do all the work to look up info about the process
+		// using the lockfile each time we see this log -- make sure we only log once every 10 minutes at most.
+		if time.Since(l.lastLockfileLogTime) > 10*time.Minute {
+			l.lastLockfileLogTime = time.Now()
+			l.slogger.Log(context.TODO(), slog.LevelError,
+				"detected stale lockfile, logging info about file",
+			)
+			go l.logInfoAboutProcessHoldingLockfile(context.TODO(), p)
+		}
 	}
 
 	msg := strings.TrimSpace(string(p))
@@ -201,4 +221,69 @@ func getSliceStat(getFunc func() ([]int32, error)) string {
 		return fmt.Sprintf("could not get stat: %v", err)
 	}
 	return fmt.Sprintf("%+v", stat)
+}
+
+// logInfoAboutProcessHoldingLockfile logs information about the osquery database's lock file.
+func (l *OsqueryLogAdapter) logInfoAboutProcessHoldingLockfile(ctx context.Context, p []byte) {
+	matches := lockfileRegex.FindAllStringSubmatch(string(p), -1)
+	if len(matches) < 1 || len(matches[0]) < 2 {
+		l.slogger.Log(context.TODO(), slog.LevelError,
+			"could not extract lockfile path from log line",
+			"log_line", string(p),
+		)
+
+		return
+	}
+
+	lockFilePath := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
+	infoToLog := []any{
+		"lockfile_path", lockFilePath,
+	}
+
+	defer func() {
+		l.slogger.Log(ctx, slog.LevelInfo,
+			"detected stale osquery db lock file",
+			infoToLog...,
+		)
+	}()
+
+	// Check to see whether the process holding the file still exists
+	processes, err := getProcessesHoldingFile(ctx, lockFilePath)
+	if err != nil {
+		infoToLog = append(infoToLog, "err", err)
+		return
+	}
+
+	// Grab more info to log from the processes using the lockfile
+	processStrs := make([]string, len(processes))
+	for i, p := range processes {
+		processStrs[i] = processStr(ctx, p)
+	}
+	infoToLog = append(infoToLog, "processes", processStrs)
+}
+
+func processStr(ctx context.Context, p *process.Process) string {
+	name := "unknown"
+	processOwner := "unknown"
+	runningStatus := "unknown"
+	cmdline := "unknown"
+
+	if gotName, err := p.NameWithContext(ctx); err == nil {
+		name = gotName
+	}
+	if gotUsername, err := p.UsernameWithContext(ctx); err == nil {
+		processOwner = gotUsername
+	}
+	if gotIsRunning, err := p.IsRunningWithContext(ctx); err == nil {
+		if gotIsRunning {
+			runningStatus = "running"
+		} else {
+			runningStatus = "not running"
+		}
+	}
+	if gotCmdline, err := p.CmdlineWithContext(ctx); err == nil {
+		cmdline = gotCmdline
+	}
+
+	return fmt.Sprintf("process with name `%s` and PID %d belonging to user `%s` has current status `%s` (%s)", name, p.Pid, processOwner, runningStatus, cmdline)
 }
