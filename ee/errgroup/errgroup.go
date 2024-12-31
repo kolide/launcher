@@ -39,14 +39,11 @@ func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName strin
 			"goroutine_name", goroutineName,
 		)
 
-		goroutineStart := time.Now()
 		err := goroutine()
-		elapsedTime := time.Since(goroutineStart)
 
 		l.slogger.Log(ctx, slog.LevelInfo,
 			"exiting goroutine in errgroup",
 			"goroutine_name", goroutineName,
-			"goroutine_run_time", elapsedTime.String(),
 			"goroutine_err", err,
 		)
 
@@ -85,20 +82,15 @@ func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineNa
 			select {
 			case <-l.doneCtx.Done():
 				l.slogger.Log(ctx, slog.LevelInfo,
-					"exiting repeated goroutine in errgroup",
+					"exiting repeated goroutine in errgroup due to shutdown",
 					"goroutine_name", goroutineName,
 				)
 				return nil
 			case <-ticker.C:
-				goroutineStart := time.Now()
-				err := goroutine()
-				elapsedTime := time.Since(goroutineStart)
-
-				if err != nil {
+				if err := goroutine(); err != nil {
 					l.slogger.Log(ctx, slog.LevelInfo,
-						"exiting repeated goroutine in errgroup",
+						"exiting repeated goroutine in errgroup due to error",
 						"goroutine_name", goroutineName,
-						"goroutine_run_time", elapsedTime.String(),
 						"goroutine_err", err,
 					)
 					return err
