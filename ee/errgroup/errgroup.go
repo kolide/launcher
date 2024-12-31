@@ -31,8 +31,8 @@ func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgrou
 	}
 }
 
-// AddGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
-func (l *LoggedErrgroup) AddGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+// StartGoroutine starts the given goroutine in the errgroup, ensuring that we log its start and exit.
+func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
 	l.errgroup.Go(func() error {
 		l.slogger.Log(ctx, slog.LevelInfo,
 			"starting goroutine in errgroup",
@@ -54,10 +54,10 @@ func (l *LoggedErrgroup) AddGoroutineToErrgroup(ctx context.Context, goroutineNa
 	})
 }
 
-// AddRepeatedGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+// StartRepeatedGoroutine starts the given goroutine in the errgroup, ensuring that we log its start and exit.
 // If the delay is non-zero, the goroutine will not start until after the delay interval has elapsed. The goroutine
 // will run on the given interval, and will continue to run until it returns an error or the errgroup shuts down.
-func (l *LoggedErrgroup) AddRepeatedGoroutineToErrgroup(ctx context.Context, goroutineName string, interval time.Duration, delay time.Duration, goroutine func() error) {
+func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineName string, interval time.Duration, delay time.Duration, goroutine func() error) {
 	l.errgroup.Go(func() error {
 		l.slogger.Log(ctx, slog.LevelInfo,
 			"starting repeated goroutine in errgroup",
@@ -108,9 +108,9 @@ func (l *LoggedErrgroup) AddRepeatedGoroutineToErrgroup(ctx context.Context, gor
 	})
 }
 
-// AddShutdownGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
+// AddShutdownGoroutine adds the given goroutine to the errgroup, ensuring that we log its start and exit.
 // The goroutine will not execute until the errgroup has received a signal to exit.
-func (l *LoggedErrgroup) AddShutdownGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
+func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
 	l.errgroup.Go(func() error {
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()

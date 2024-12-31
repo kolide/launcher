@@ -360,7 +360,7 @@ func (i *OsqueryInstance) Launch() error {
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
-	i.errgroup.AddGoroutineToErrgroup(ctx, "monitor_osquery_process", func() error {
+	i.errgroup.StartGoroutine(ctx, "monitor_osquery_process", func() error {
 		err := i.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
@@ -383,7 +383,7 @@ func (i *OsqueryInstance) Launch() error {
 	})
 
 	// Kill osquery process on shutdown
-	i.errgroup.AddShutdownGoroutineToErrgroup(ctx, "kill_osquery_process", func() error {
+	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
 		if i.cmd.Process == nil {
 			return nil
 		}
@@ -440,7 +440,7 @@ func (i *OsqueryInstance) Launch() error {
 	}
 
 	// Health check on interval
-	i.errgroup.AddRepeatedGoroutineToErrgroup(ctx, "healthcheck", healthCheckInterval, i.knapsack.OsqueryHealthcheckStartupDelay(), func() error {
+	i.errgroup.StartRepeatedGoroutine(ctx, "healthcheck", healthCheckInterval, i.knapsack.OsqueryHealthcheckStartupDelay(), func() error {
 		// If device is sleeping, we do not want to perform unnecessary healthchecks that
 		// may force an unnecessary restart.
 		if i.knapsack != nil && i.knapsack.InModernStandby() {
@@ -455,7 +455,7 @@ func (i *OsqueryInstance) Launch() error {
 	})
 
 	// Clean up PID file on shutdown
-	i.errgroup.AddShutdownGoroutineToErrgroup(ctx, "remove_pid_file", func() error {
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_pid_file", func() error {
 		// We do a couple retries -- on Windows, the PID file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
@@ -470,7 +470,7 @@ func (i *OsqueryInstance) Launch() error {
 	})
 
 	// Clean up socket file on shutdown
-	i.errgroup.AddShutdownGoroutineToErrgroup(ctx, "remove_socket_file", func() error {
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_socket_file", func() error {
 		// We do a couple retries -- on Windows, the socket file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
@@ -576,7 +576,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	}, func(r any) {})
 
 	// Run extension
-	i.errgroup.AddGoroutineToErrgroup(ctx, "saas_extension_execute", func() error {
+	i.errgroup.StartGoroutine(ctx, "saas_extension_execute", func() error {
 		if err := i.saasExtension.Execute(); err != nil {
 			return fmt.Errorf("kolide_grpc extension returned error: %w", err)
 		}
@@ -584,7 +584,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	})
 
 	// Register shutdown group for extension
-	i.errgroup.AddShutdownGoroutineToErrgroup(ctx, "saas_extension_cleanup", func() error {
+	i.errgroup.AddShutdownGoroutine(ctx, "saas_extension_cleanup", func() error {
 		i.saasExtension.Shutdown(nil)
 		return nil
 	})
@@ -869,7 +869,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
 	// Start!
-	i.errgroup.AddGoroutineToErrgroup(context.TODO(), name, func() error {
+	i.errgroup.StartGoroutine(context.TODO(), name, func() error {
 		if err := extensionManagerServer.Start(); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"extension manager server startup got error",
@@ -883,7 +883,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	})
 
 	// register a shutdown routine
-	i.errgroup.AddShutdownGoroutineToErrgroup(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
+	i.errgroup.AddShutdownGoroutine(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
 			// Log error, but no need to bubble it up further
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
