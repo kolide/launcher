@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -296,45 +295,6 @@ func TestLaunch(t *testing.T) {
 		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
 		t.FailNow()
 	}
-
-	k.AssertExpectations(t)
-}
-
-func Test_detectStaleDatabaseLock(t *testing.T) {
-	t.Parallel()
-
-	if runtime.GOOS == "windows" && os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("Skipping test on GitHub Actions -- test only works locally on Windows")
-	}
-
-	_, slogger := setUpTestSlogger()
-	rootDirectory := testRootDirectory(t)
-
-	k := typesMocks.NewKnapsack(t)
-	k.On("Slogger").Return(slogger)
-	k.On("RootDirectory").Return(rootDirectory)
-	setUpMockStores(t, k)
-
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
-
-	// Calculate paths
-	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.registrationId, i.runId, i.opts)
-	require.NoError(t, err)
-
-	// Check for stale database lock -- there shouldn't be one
-	detected, err := i.detectStaleDatabaseLock(context.TODO(), paths)
-	require.NoError(t, err)
-	require.False(t, detected)
-
-	// Create a lock file
-	lockFilePath := filepath.Join(rootDirectory, "osquery.db", "LOCK")
-	require.NoError(t, os.MkdirAll(filepath.Dir(lockFilePath), 0700)) // drwx
-	createLockFile(t, lockFilePath)
-
-	// Check for a stale database lock again -- now, we should find it
-	detectedRetry, err := i.detectStaleDatabaseLock(context.TODO(), paths)
-	require.NoError(t, err)
-	require.True(t, detectedRetry)
 
 	k.AssertExpectations(t)
 }

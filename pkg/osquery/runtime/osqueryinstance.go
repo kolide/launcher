@@ -30,7 +30,6 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
-	"github.com/shirou/gopsutil/v3/process"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -243,15 +242,6 @@ func (i *OsqueryInstance) Launch() error {
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
-	}
-
-	// Check to see whether lock files exist that could prevent osquery from starting up
-	if _, err := i.detectStaleDatabaseLock(ctx, paths); err != nil {
-		// A detection error shouldn't prevent us from creating the process -- log it and move on
-		i.slogger.Log(ctx, slog.LevelInfo,
-			"error detecting stale database lock",
-			"err", err,
-		)
 	}
 
 	// Populate augeas lenses, if requested
@@ -573,7 +563,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 				"err", err,
 			)
 		}
-	}, func(r any) {})
+	})
 
 	// Run extension
 	i.errgroup.StartGoroutine(ctx, "saas_extension_execute", func() error {
@@ -639,79 +629,6 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 	defer osqueryAutoloadFile.Close()
 
 	return osqueryFilePaths, nil
-}
-
-// detectStaleDatabaseLock checks for the presence of a lock file in the given database.
-// We have noticed the lock file occasionally hanging around -- we think this can happen
-// when osquery doesn't get adequate time to shut down gracefully. The presence of the lock
-// file will prevent osquery from starting up entirely. For now, we just detect this stale
-// lock file, and log information about it. In the future we will attempt to remediate.
-// See: https://github.com/kolide/launcher/issues/2004.
-func (i *OsqueryInstance) detectStaleDatabaseLock(ctx context.Context, paths *osqueryFilePaths) (bool, error) {
-	lockFilePath := filepath.Join(paths.databasePath, "LOCK")
-
-	lockFileInfo, err := os.Stat(lockFilePath)
-	if os.IsNotExist(err) {
-		// No lock file, nothing to do here
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("determining whether lock file exists: %w", err)
-	}
-
-	infoToLog := []any{
-		"lockfile_path", lockFilePath,
-		"lockfile_modtime", lockFileInfo.ModTime().UTC().String(),
-	}
-
-	defer func() {
-		i.slogger.Log(ctx, slog.LevelInfo,
-			"detected stale osquery db lock file",
-			infoToLog...,
-		)
-	}()
-
-	// Check to see whether the process holding the file still exists
-	processes, err := getProcessesHoldingFile(ctx, lockFilePath)
-	if err != nil {
-		infoToLog = append(infoToLog, "err", err)
-		return false, fmt.Errorf("getting process holding file: %w", err)
-	}
-
-	// Grab more info to log from the processes using the lockfile
-	processStrs := make([]string, len(processes))
-	for i, p := range processes {
-		processStrs[i] = processStr(ctx, p)
-	}
-	infoToLog = append(infoToLog, "processes", processStrs)
-
-	return true, nil
-}
-
-func processStr(ctx context.Context, p *process.Process) string {
-	name := "unknown"
-	processOwner := "unknown"
-	runningStatus := "unknown"
-	cmdline := "unknown"
-
-	if gotName, err := p.NameWithContext(ctx); err == nil {
-		name = gotName
-	}
-	if gotUsername, err := p.UsernameWithContext(ctx); err == nil {
-		processOwner = gotUsername
-	}
-	if gotIsRunning, err := p.IsRunningWithContext(ctx); err == nil {
-		if gotIsRunning {
-			runningStatus = "running"
-		} else {
-			runningStatus = "not running"
-		}
-	}
-	if gotCmdline, err := p.CmdlineWithContext(ctx); err == nil {
-		cmdline = gotCmdline
-	}
-
-	return fmt.Sprintf("process with name `%s` and PID %d belonging to user `%s` has current status `%s` (%s)", name, p.Pid, processOwner, runningStatus, cmdline)
 }
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
