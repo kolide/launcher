@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -41,7 +42,8 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 			return fmt.Errorf("received non 200 http status code: %d, error reading body response body %w", resp.StatusCode, err)
 		}
 
-		return fmt.Errorf("received non 200 http status code: %d, response body: %s", resp.StatusCode, bodyData)
+		escapedBodyData := strings.ReplaceAll(strings.ReplaceAll(string(bodyData), "\n", ""), "\r", "") // remove any newlines
+		return fmt.Errorf("received non 200 http status code: %d, response body: %s", resp.StatusCode, escapedBodyData)
 	}
 	return nil
 }
