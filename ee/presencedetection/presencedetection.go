@@ -1,6 +1,7 @@
 package presencedetection
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ const (
 
 type PresenceDetector struct {
 	lastDetection time.Time
-	mutext        sync.Mutex
+	mutex         sync.Mutex
 	// detector is an interface to allow for mocking in tests
 	detector detectorIface
 }
@@ -32,8 +33,13 @@ func (d *detector) Detect(reason string) (bool, error) {
 // DetectPresence checks if the user is present by detecting the presence of a user.
 // It returns the duration since the last detection.
 func (pd *PresenceDetector) DetectPresence(reason string, detectionInterval time.Duration) (time.Duration, error) {
-	pd.mutext.Lock()
-	defer pd.mutext.Unlock()
+	// using try lock here because we don't don't want presence detections to queue up,
+	// in the event that the users presses cancel, if the request were queued up, it would
+	// request the presence detection again
+	if !pd.mutex.TryLock() {
+		return DetectionFailedDurationValue, errors.New("detection already in progress")
+	}
+	defer pd.mutex.Unlock()
 
 	if pd.detector == nil {
 		pd.detector = &detector{}
