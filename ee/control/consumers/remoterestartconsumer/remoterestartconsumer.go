@@ -102,7 +102,7 @@ func (r *RemoteRestartConsumer) Do(data io.Reader) error {
 			)
 			return
 		}
-	}, func(err any) {})
+	})
 
 	return nil
 }

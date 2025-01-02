@@ -194,11 +194,6 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 				"err", err,
 			)
 		}
-	}, func(r any) {
-		slogger.Log(context.TODO(), slog.LevelError,
-			"exiting after runGroup panic",
-			"err", r,
-		)
 	})
 
 	// if desktop is not enabled at start up, wait for send on show desktop channel

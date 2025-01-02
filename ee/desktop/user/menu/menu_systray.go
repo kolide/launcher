@@ -133,5 +133,5 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 				return
 			}
 		}
-	}, func(r any) {})
+	})
 }

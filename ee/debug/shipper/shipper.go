@@ -112,7 +112,7 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 		defer s.uploadRequestWg.Done()
 		// will close the body in the close function
 		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
-	}, func(r any) {})
+	})
 
 	return s.writer.Write(p)
 }
