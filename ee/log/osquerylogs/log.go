@@ -225,6 +225,11 @@ func getSliceStat(getFunc func() ([]int32, error)) string {
 
 // logInfoAboutProcessHoldingLockfile logs information about the osquery database's lock file.
 func (l *OsqueryLogAdapter) logInfoAboutProcessHoldingLockfile(ctx context.Context, p []byte) {
+	executable, err := os.Executable()
+	if err == nil && strings.Contains(executable, "__debug_bin") {
+		return
+	}
+
 	matches := lockfileRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
 		l.slogger.Log(context.TODO(), slog.LevelError,
