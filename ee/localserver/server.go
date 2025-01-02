@@ -277,7 +277,7 @@ func (ls *localServer) Start() error {
 				}
 			}
 		}
-	}, func(r any) {})
+	})
 
 	l, err := ls.startListener()
 	if err != nil {

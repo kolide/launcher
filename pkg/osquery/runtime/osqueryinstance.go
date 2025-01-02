@@ -596,7 +596,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 				"err", err,
 			)
 		}
-	}, func(r any) {})
+	})
 
 	// Run extension
 	i.addGoroutineToErrgroup(ctx, "saas_extension_execute", func() error {

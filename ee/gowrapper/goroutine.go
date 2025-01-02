@@ -9,9 +9,15 @@ import (
 )
 
 // Go is a thin wrapper around `go func()` that ensures we log panics
-// and then handle them appropriately. `onPanic` defines the behavior
-// that should happen after recovering from a panic.
-func Go(ctx context.Context, slogger *slog.Logger, goroutine func(), onPanic func(r any)) {
+func Go(ctx context.Context, slogger *slog.Logger, goroutine func()) {
+	GoWithRecoveryAction(ctx, slogger, goroutine, func(r any) {
+		// Panic is already logged in GoWithRecoveryAction
+	})
+}
+
+// GoWithRecoveryAction wraps `go func()` with panic recovery and custom handling
+// onPanic defines the behavior that should happen after recovering from a panic
+func GoWithRecoveryAction(ctx context.Context, slogger *slog.Logger, goroutine func(), onPanic func(r any)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
