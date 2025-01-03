@@ -200,6 +200,11 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 	tr.mux.Lock()
 	defer tr.mux.Unlock()
 
+	// tpm signer was already created
+	if tr.signer != nil {
+		return nil
+	}
+
 	priData, pubData, err := fetchKeyData(tr.store)
 	if err != nil {
 		thisErr := fmt.Errorf("fetching key data for data store: %w", err)
