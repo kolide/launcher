@@ -15,10 +15,10 @@ func Test_getEnrollDetails_binaryNotExist(t *testing.T) {
 
 	var details service.EnrollmentDetails
 
-	err1 := getOsqEnrollDetails(context.TODO(), filepath.Join("some", "fake", "path", "to", "osqueryd"), &details)
+	err1 := GetOsqEnrollDetails(context.TODO(), filepath.Join("some", "fake", "path", "to", "osqueryd"), &details)
 	require.Error(t, err1, "expected error when path does not exist")
 
-	err2 := getOsqEnrollDetails(context.TODO(), t.TempDir(), &details)
+	err2 := GetOsqEnrollDetails(context.TODO(), t.TempDir(), &details)
 	require.Error(t, err2, "expected error when path is directory")
 }
 
@@ -31,6 +31,6 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 	require.NoError(t, err, "could not get current executable for test")
 
 	// We expect getEnrollDetails to fail when called against an executable that is not osquery
-	err = getOsqEnrollDetails(context.TODO(), currentExecutable, &details)
+	err = GetOsqEnrollDetails(context.TODO(), currentExecutable, &details)
 	require.Error(t, err, "should not have been able to get enroll details with non-osqueryd executable")
 }

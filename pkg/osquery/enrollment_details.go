@@ -21,7 +21,7 @@ import (
 
 // getEnrollDetails returns an EnrollmentDetails struct with populated with details it can fetch without osquery.
 // To get the rest of the details, pass the struct to getOsqEnrollDetails.
-func getRuntimeEnrollDetails() service.EnrollmentDetails {
+func GetRuntimeEnrollDetails() service.EnrollmentDetails {
 	details := service.EnrollmentDetails{
 		OSPlatform:      runtime.GOOS,
 		OSPlatformLike:  runtime.GOOS,
@@ -51,7 +51,7 @@ func getRuntimeEnrollDetails() service.EnrollmentDetails {
 
 // getOsqEnrollDetails queries osquery for enrollment details and populates the EnrollmentDetails struct.
 // It's expected that the caller has initially populated the struct with runtimeEnrollDetails by calling getRuntimeEnrollDetails.
-func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *service.EnrollmentDetails) error {
+func GetOsqEnrollDetails(ctx context.Context, osquerydPath string, details *service.EnrollmentDetails) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 

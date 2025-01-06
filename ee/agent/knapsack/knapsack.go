@@ -14,11 +14,16 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+
 	"go.etcd.io/bbolt"
 )
 
 // Package-level runID variable
 var runID string
+
+// Package-level enrollmentDetails variable
+
+var enrollmentDetails types.EnrollmentDetails
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
@@ -238,4 +243,16 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	}
 
 	return types.Enrolled, nil
+}
+
+func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
+	// Only update if there are actual changes
+	if details != enrollmentDetails {
+		k.slogger.Logger.Debug("updating enrollment details")
+		enrollmentDetails = details
+	}
+}
+
+func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
+	return enrollmentDetails
 }

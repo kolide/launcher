@@ -400,7 +400,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// We used to see the enrollment details fail, but now that we're running as an exec,
 	// it seems less likely. Try a couple times, but backoff fast.
-	enrollDetails := getRuntimeEnrollDetails()
+	enrollDetails := GetRuntimeEnrollDetails()
 	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
 		e.slogger.Log(ctx, slog.LevelInfo,
 			"skipping enrollment osquery details, no osqueryd path, this is probably CI",
@@ -408,7 +408,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		span.AddEvent("skipping_enrollment_details")
 	} else {
 		if err := backoff.WaitFor(func() error {
-			err = getOsqEnrollDetails(ctx, osqPath, &enrollDetails)
+			err = GetOsqEnrollDetails(ctx, osqPath, &enrollDetails)
 			if err != nil {
 				e.slogger.Log(ctx, slog.LevelDebug,
 					"getOsqEnrollDetails failed in backoff",

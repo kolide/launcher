@@ -194,6 +194,16 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
+	// Getting enrollment details
+	details := osquery.GetRuntimeEnrollDetails()
+	if err := osquery.GetOsqEnrollDetails(ctx, k.LatestOsquerydPath(ctx), &details); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"getting initial osquery enrollment details",
+			"err", err,
+		)
+	}
+	k.SetEnrollmentDetails(details)
+
 	// Generate a new run ID
 	newRunID := k.GetRunID()
 
