@@ -93,6 +93,13 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		return
 	}
 
+	// don't bother processing further unless watchdog is enabled.
+	// note that this means if you manually install watchdog via CLI, logs
+	// will not be published unless you have the corresponding feature flag enabled
+	if !wc.knapsack.LauncherWatchdogEnabled() {
+		return
+	}
+
 	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
 	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
 	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
