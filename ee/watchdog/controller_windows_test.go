@@ -23,6 +23,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(testSlogger)
 	mockKnapsack.On("Identifier").Return("kolide-k2")
 	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
+	mockKnapsack.On("LauncherWatchdogEnabled").Return(false).Maybe()
 
 	controller, _ := NewController(context.TODO(), mockKnapsack, "")
 
