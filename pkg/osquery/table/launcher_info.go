@@ -53,7 +53,7 @@ func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore type
 
 func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		identifier, err := osquery.IdentifierFromDB(configStore, types.DefaultRegistrationID)
+		identifier, err := osquery.IdentifierFromDB(configStore)
 		if err != nil {
 			return nil, err
 		}

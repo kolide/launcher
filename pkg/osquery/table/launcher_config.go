@@ -20,7 +20,7 @@ func generateLauncherConfig(store types.Getter, registrationTracker types.Regist
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		results := make([]map[string]string, 0)
 		for _, registrationId := range registrationTracker.RegistrationIDs() {
-			config, err := osquery.Config(store, registrationId)
+			config, err := osquery.Config(store)
 			if err != nil {
 				return nil, err
 			}

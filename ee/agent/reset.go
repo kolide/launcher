@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/traces"
@@ -289,20 +287,10 @@ func currentMunemo(k types.Knapsack) (string, error) {
 // as a record of the current state of this database before reset. It appends this record
 // to previous records if they exist, and returns the collection ready for storage.
 func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetReason string) ([]byte, error) { // nolint:unused
-	nodeKeys := make([]string, 0)
-	for _, registrationId := range k.RegistrationIDs() {
-		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeRegistration, []byte(registrationId)))
-		if err != nil {
-			k.Slogger().Log(ctx, slog.LevelWarn,
-				"could not get node key from store",
-				"registration_id", registrationId,
-				"err", err,
-			)
-			continue
-		}
-		nodeKeys = append(nodeKeys, string(nodeKey))
+	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
+	if err != nil {
+		k.Slogger().Log(ctx, slog.LevelWarn, "could not get node key from store", "err", err)
 	}
-	nodeKey := strings.Join(nodeKeys, ",")
 
 	localPubKey, err := getLocalPubKey(k)
 	if err != nil {
@@ -340,7 +328,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 	}
 
 	dataToStore := dbResetRecord{
-		NodeKey:        nodeKey,
+		NodeKey:        string(nodeKey),
 		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
 		HardwareUUID:   string(hardwareUuid),

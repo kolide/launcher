@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/katc"
@@ -44,7 +43,7 @@ func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
 }
 
 // PlatformTables returns all tables for the launcher build platform.
-func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
+func PlatformTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
 		ChromeLoginDataEmails(slogger),
@@ -73,23 +72,23 @@ func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logge
 	tables = append(tables, platformSpecificTables(slogger, currentOsquerydBinaryPath)...)
 
 	// Add in the Kolide custom ATC tables
-	tables = append(tables, kolideCustomAtcTables(k, registrationId, slogger)...)
+	tables = append(tables, kolideCustomAtcTables(k, slogger)...)
 
 	return tables
 }
 
 // kolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s),
 // then constructs the tables.
-func kolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
+func kolideCustomAtcTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	// Fetch tables from KVStore or from startup settings
-	config, err := katcFromDb(k, registrationId)
+	config, err := katcFromDb(k)
 	if err != nil {
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"could not retrieve KATC config from store, may not have access -- falling back to startup settings",
 			"err", err,
 		)
 
-		config, err = katcFromStartupSettings(k, registrationId)
+		config, err = katcFromStartupSettings(k)
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not retrieve KATC config from startup settings",
@@ -102,17 +101,13 @@ func kolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slo
 	return katc.ConstructKATCTables(config, slogger)
 }
 
-func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, error) {
+func katcFromDb(k types.Knapsack) (map[string]string, error) {
 	if k == nil || k.KatcConfigStore() == nil {
 		return nil, errors.New("stores in knapsack not available")
 	}
 	katcCfg := make(map[string]string)
 	if err := k.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
-		key, _, identifier := storage.SplitKey(k)
-		if string(identifier) == registrationId {
-			katcCfg[string(key)] = string(v)
-		}
-
+		katcCfg[string(k)] = string(v)
 		return nil
 	}); err != nil {
 		return nil, fmt.Errorf("retrieving contents of Kolide ATC config store: %w", err)
@@ -121,15 +116,14 @@ func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, err
 	return katcCfg, nil
 }
 
-func katcFromStartupSettings(k types.Knapsack, registrationId string) (map[string]string, error) {
+func katcFromStartupSettings(k types.Knapsack) (map[string]string, error) {
 	r, err := startupsettings.OpenReader(context.TODO(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
 	defer r.Close()
 
-	katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
-	katcConfig, err := r.Get(string(katcConfigKey))
+	katcConfig, err := r.Get("katc_config")
 	if err != nil {
 		return nil, fmt.Errorf("error getting katc_config from startup settings: %w", err)
 	}
