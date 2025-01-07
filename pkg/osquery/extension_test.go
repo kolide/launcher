@@ -171,7 +171,7 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 
-	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -220,7 +220,7 @@ func TestExtensionEnroll(t *testing.T) {
 	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
 
-	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	key, invalid, err := e.Enroll(context.Background())
@@ -239,7 +239,7 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
+	e, err = NewExtension(context.TODO(), m, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
 	key, invalid, err = e.Enroll(context.Background())
@@ -273,7 +273,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	defer cleanup()
 	k := makeKnapsack(t, db)
 	k.ConfigStore().Set([]byte(nodeKeyKey), []byte("some_node_key"))
-	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), m, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	configs, err := e.GenerateConfigs(context.Background())
