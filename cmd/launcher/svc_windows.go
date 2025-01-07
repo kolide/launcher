@@ -175,7 +175,9 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	// Confirm that service configuration is up-to-date
-	go checkServiceConfiguration(w.slogger.Logger, w.opts)
+	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
+		checkServiceConfiguration(w.slogger.Logger, w.opts)
+	})
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 	runLauncherResults := make(chan struct{})
