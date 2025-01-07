@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -119,7 +120,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 
 	configStore := k.ConfigStore()
 
-	nodekey, err := NodeKey(configStore)
+	nodekey, err := NodeKey(configStore, registrationId)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
@@ -184,7 +185,7 @@ func (e *Extension) Shutdown(_ error) {
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.knapsack.ConfigStore())
+	return IdentifierFromDB(e.knapsack.ConfigStore(), e.registrationId)
 }
 
 // SetupLauncherKeys configures the various keys used for communication.
@@ -277,9 +278,9 @@ func PublicRSAKeyFromDB(configStore types.Getter) (string, string, error) {
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
-func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
+func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
 	var identifier string
-	uuidBytes, _ := configStore.Get([]byte(uuidKey))
+	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	gotID, err := uuid.ParseBytes(uuidBytes)
 
 	// Use existing UUID
@@ -296,7 +297,7 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 	identifier = gotID.String()
 
 	// Save new UUID
-	err = configStore.Set([]byte(uuidKey), []byte(identifier))
+	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(identifier))
 	if err != nil {
 		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
@@ -305,8 +306,8 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 }
 
 // NodeKey returns the device node key from the storage layer
-func NodeKey(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(nodeKeyKey))
+func NodeKey(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -318,8 +319,8 @@ func NodeKey(getter types.Getter) (string, error) {
 }
 
 // Config returns the device config from the storage layer
-func Config(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(configKey))
+func Config(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -367,7 +368,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.knapsack.ConfigStore())
+	key, err := NodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
@@ -460,7 +461,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
+	err = e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -486,7 +487,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
+	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -502,7 +503,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -514,7 +515,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		config = string(confBytes)
 	} else {
 		// Store good config
-		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
+		e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config))
 
 		// open the start up settings writer just to trigger a write of the config,
 		// then we can immediately close it
