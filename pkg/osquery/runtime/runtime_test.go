@@ -600,6 +600,35 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	<-timer1.C
 }
 
+// TestRestart tests that the launcher can restart the osqueryd process.
+func TestRestart(t *testing.T) {
+	t.Parallel()
+	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
+	defer teardown()
+
+	previousStats := runner.instances[types.DefaultRegistrationID].stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner, logBytes)
+
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	previousStats = runner.instances[types.DefaultRegistrationID].stats
+
+	require.NoError(t, runner.Restart())
+	waitHealthy(t, runner, logBytes)
+
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+}
+
 // sets up an osquery instance with a running extension to be used in tests.
 func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
 	rootDirectory := testRootDirectory(t)
