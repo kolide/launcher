@@ -598,6 +598,8 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 	// Ensure we've waited at least 32s
 	<-timer1.C
+
+	waitShutdown(t, runner, logBytes)
 }
 
 // TestRestart tests that the launcher can restart the osqueryd process.
@@ -627,6 +629,8 @@ func TestRestart(t *testing.T) {
 
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
 	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	waitShutdown(t, runner, logBytes)
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
