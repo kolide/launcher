@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
@@ -118,7 +119,9 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 func (t *TraceExporter) SetOsqueryClient(client querier) {
 	t.osqueryClient = client
 
-	go t.addAttributesFromOsquery()
+	gowrapper.Go(context.TODO(), t.slogger, func() {
+		t.addAttributesFromOsquery()
+	})
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
