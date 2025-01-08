@@ -3,6 +3,7 @@ package errgroup
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -91,6 +92,33 @@ func TestShutdown(t *testing.T) {
 	require.Nil(t, eg.Wait(), "should not have returned error on shutdown")
 
 	// We expect that the errgroup shuts down
+	canceled := false
+	select {
+	case <-eg.Exited():
+		canceled = true
+	default:
+	}
+
+	require.True(t, canceled, "errgroup did not exit")
+}
+
+func Test_HandlesPanic(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
+
+	eg.StartGoroutine(ctx, "test_goroutine", func() error {
+		testArr := make([]int, 0)
+		fmt.Println(testArr[2]) // cause out-of-bounds panic
+		return nil
+	})
+
+	// We expect that the errgroup shuts down -- the test should not panic
+	eg.Shutdown()
+	eg.Wait()
 	canceled := false
 	select {
 	case <-eg.Exited():

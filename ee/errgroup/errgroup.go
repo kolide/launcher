@@ -2,9 +2,11 @@ package errgroup
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -34,6 +36,22 @@ func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgrou
 // StartGoroutine starts the given goroutine in the errgroup, ensuring that we log its start and exit.
 func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
 	l.errgroup.Go(func() error {
+		// Catch any panicking goroutines and log them
+		defer func() {
+			if r := recover(); r != nil {
+				l.slogger.Log(ctx, slog.LevelError,
+					"panic occurred in goroutine",
+					"err", r,
+				)
+				if err, ok := r.(error); ok {
+					l.slogger.Log(ctx, slog.LevelError,
+						"panic stack trace",
+						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+					)
+				}
+			}
+		}()
+
 		l.slogger.Log(ctx, slog.LevelInfo,
 			"starting goroutine in errgroup",
 			"goroutine_name", goroutineName,
@@ -55,14 +73,7 @@ func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName strin
 // If the delay is non-zero, the goroutine will not start until after the delay interval has elapsed. The goroutine
 // will run on the given interval, and will continue to run until it returns an error or the errgroup shuts down.
 func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineName string, interval time.Duration, delay time.Duration, goroutine func() error) {
-	l.errgroup.Go(func() error {
-		l.slogger.Log(ctx, slog.LevelInfo,
-			"starting repeated goroutine in errgroup",
-			"goroutine_name", goroutineName,
-			"goroutine_interval", interval.String(),
-			"goroutine_start_delay", delay.String(),
-		)
-
+	l.StartGoroutine(ctx, goroutineName, func() error {
 		if delay != 0*time.Second {
 			select {
 			case <-time.After(delay):
@@ -103,30 +114,29 @@ func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineNa
 // AddShutdownGoroutine adds the given goroutine to the errgroup, ensuring that we log its start and exit.
 // The goroutine will not execute until the errgroup has received a signal to exit.
 func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
-	l.errgroup.Go(func() error {
+	l.StartGoroutine(ctx, goroutineName, func() error {
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()
-
-		l.slogger.Log(ctx, slog.LevelInfo,
-			"starting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
-		)
 
 		goroutineStart := time.Now()
 		err := goroutine()
 		elapsedTime := time.Since(goroutineStart)
 
-		logLevel := slog.LevelInfo
-		if elapsedTime > maxShutdownGoroutineDuration {
-			logLevel = slog.LevelWarn
+		// Log anything amiss about the shutdown goroutine -- did it return an error? Did it take too long?
+		if err != nil {
+			l.slogger.Log(ctx, slog.LevelWarn,
+				"shutdown routine returned err",
+				"goroutine_name", goroutineName,
+				"goroutine_run_time", elapsedTime.String(),
+				"goroutine_err", err,
+			)
+		} else if elapsedTime > maxShutdownGoroutineDuration {
+			l.slogger.Log(ctx, slog.LevelWarn,
+				"noticed slow shutdown routine",
+				"goroutine_name", goroutineName,
+				"goroutine_run_time", elapsedTime.String(),
+			)
 		}
-
-		l.slogger.Log(ctx, logLevel,
-			"exiting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
-			"goroutine_run_time", elapsedTime.String(),
-			"goroutine_err", err,
-		)
 
 		// We don't want to actually return the error here, to avoid causing an otherwise successful call
 		// to `Shutdown` => `Wait` to return an error. Shutdown routine errors don't matter for the success
