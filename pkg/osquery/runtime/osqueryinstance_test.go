@@ -261,6 +261,7 @@ func TestLaunch(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
 	go i.Launch()

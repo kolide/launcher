@@ -245,14 +245,16 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	return types.Enrolled, nil
 }
 
-func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
+func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
 	// Only update if there are actual changes
 	if details != enrollmentDetails {
 		k.slogger.Logger.Debug("updating enrollment details")
 		enrollmentDetails = details
+		return nil
 	}
+	return nil
 }
 
-func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
-	return enrollmentDetails
+func (k *knapsack) GetEnrollmentDetails() (types.EnrollmentDetails, error) {
+	return enrollmentDetails, nil
 }

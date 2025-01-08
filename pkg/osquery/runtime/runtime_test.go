@@ -141,6 +141,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient())
@@ -178,6 +179,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient())
@@ -212,6 +214,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	// Start the runner
@@ -343,6 +346,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient())
@@ -379,6 +383,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient()
 
@@ -438,6 +443,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient()
 
@@ -489,6 +495,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient())
@@ -521,6 +528,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient())
@@ -623,6 +631,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner = New(k, mockServiceClient())

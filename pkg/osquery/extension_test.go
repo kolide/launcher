@@ -60,6 +60,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	m.On("RootDirectory").Maybe().Return("whatever")
+	m.On("GetEnrollmentDetails").Maybe().Return(types.EnrollmentDetails{}, nil)
 	return m
 }
 
@@ -70,6 +71,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+	m.On("GetEnrollmentDetails").Maybe().Return(types.EnrollmentDetails{}, nil)
 
 	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, m, ulid.New(), ExtensionOpts{})
@@ -219,6 +221,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil)
 
 	e, err := NewExtension(context.TODO(), m, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -642,6 +645,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1034,6 +1038,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil)
 
 	e, err := NewExtension(context.TODO(), m, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)

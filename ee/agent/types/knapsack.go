@@ -21,5 +21,5 @@ type Knapsack interface {
 	// GetRunID returns the current launcher run ID
 	GetRunID() string
 	// GetEnrollmentDetails returns the enrollment details for the launcher installation
-	GetEnrollmentDetails() EnrollmentDetails
+	GetEnrollmentDetails() (EnrollmentDetails, error)
 }

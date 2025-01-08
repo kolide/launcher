@@ -202,7 +202,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	}
-	k.SetEnrollmentDetails(details)
+
+	if err := k.SetEnrollmentDetails(details); err != nil {
+		slogger.Log(ctx, slog.LevelError,
+			"setting enrollment details",
+			"err", err,
+		)
+	}
 
 	// Generate a new run ID
 	newRunID := k.GetRunID()
