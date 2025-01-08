@@ -223,18 +223,15 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 				continue
 			}
 
-			// Log queries that took more than 5 seconds
-			if r.QueryStats.WallTimeMs < 5000 {
-				continue
-			}
-			mw.knapsack.Slogger().Log(ctx, slog.LevelWarn,
-				"noticed long-running query",
+			mw.knapsack.Slogger().Log(ctx, slog.LevelInfo,
+				"received distributed query stats",
 				"query_name", r.QueryName,
 				"query_status", r.Status,
 				"wall_time_ms", r.QueryStats.WallTimeMs,
 				"user_time", r.QueryStats.UserTime,
 				"system_time", r.QueryStats.SystemTime,
 				"memory", r.QueryStats.Memory,
+				"long_running", r.QueryStats.WallTimeMs > 5000,
 			)
 		}
 	}(time.Now())
