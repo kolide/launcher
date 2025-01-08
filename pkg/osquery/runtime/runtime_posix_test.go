@@ -55,6 +55,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(), WithStartFunc(func(cmd *exec.Cmd) error {
@@ -102,6 +103,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
