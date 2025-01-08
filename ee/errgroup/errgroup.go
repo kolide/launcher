@@ -91,6 +91,16 @@ func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineNa
 		defer ticker.Stop()
 
 		for {
+			// Run goroutine immediately
+			if err := goroutine(); err != nil {
+				slogger.Log(ctx, slog.LevelInfo,
+					"exiting repeated goroutine in errgroup due to error",
+					"goroutine_err", err,
+				)
+				return err
+			}
+
+			// Wait for next interval or for errgroup shutdown
 			select {
 			case <-l.doneCtx.Done():
 				slogger.Log(ctx, slog.LevelInfo,
@@ -98,13 +108,7 @@ func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineNa
 				)
 				return nil
 			case <-ticker.C:
-				if err := goroutine(); err != nil {
-					slogger.Log(ctx, slog.LevelInfo,
-						"exiting repeated goroutine in errgroup due to error",
-						"goroutine_err", err,
-					)
-					return err
-				}
+				continue
 			}
 		}
 	})
