@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/process"
 )
@@ -18,7 +19,7 @@ import (
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
 // to the osquery stdout/stderr
 type OsqueryLogAdapter struct {
-	slogger             slog.Logger
+	slogger             *slog.Logger
 	level               slog.Level
 	rootDirectory       string
 	lastLockfileLogTime time.Time
@@ -44,7 +45,7 @@ func extractOsqueryCaller(msg string) string {
 
 func NewOsqueryLogAdapter(slogger *slog.Logger, rootDirectory string, opts ...Option) *OsqueryLogAdapter {
 	l := &OsqueryLogAdapter{
-		slogger:       *slogger,
+		slogger:       slogger,
 		level:         slog.LevelInfo,
 		rootDirectory: rootDirectory,
 	}
@@ -79,7 +80,9 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		l.slogger.Log(context.TODO(), slog.LevelError,
 			"detected non-osqueryd process using pidfile, logging info about process",
 		)
-		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		gowrapper.Go(context.TODO(), l.slogger, func() {
+			l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		})
 	}
 
 	// We have noticed the lock file occasionally locked when it shouldn't be -- we think this can happen
@@ -94,7 +97,9 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 			l.slogger.Log(context.TODO(), slog.LevelError,
 				"detected stale lockfile, logging info about file",
 			)
-			go l.logInfoAboutProcessHoldingLockfile(context.TODO(), p)
+			gowrapper.Go(context.TODO(), l.slogger, func() {
+				l.logInfoAboutProcessHoldingLockfile(context.TODO(), p)
+			})
 		}
 	}
 
@@ -225,6 +230,11 @@ func getSliceStat(getFunc func() ([]int32, error)) string {
 
 // logInfoAboutProcessHoldingLockfile logs information about the osquery database's lock file.
 func (l *OsqueryLogAdapter) logInfoAboutProcessHoldingLockfile(ctx context.Context, p []byte) {
+	executable, err := os.Executable()
+	if err == nil && strings.Contains(executable, "__debug_bin") {
+		return
+	}
+
 	matches := lockfileRegex.FindAllStringSubmatch(string(p), -1)
 	if len(matches) < 1 || len(matches[0]) < 2 {
 		l.slogger.Log(context.TODO(), slog.LevelError,

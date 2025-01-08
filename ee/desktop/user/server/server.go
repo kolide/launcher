@@ -230,8 +230,8 @@ func (s *UserServer) detectPresence(w http.ResponseWriter, req *http.Request) {
 
 	// write response
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseBytes)
 	w.WriteHeader(http.StatusOK)
+	w.Write(responseBytes)
 }
 
 func (s *UserServer) refreshHandler(w http.ResponseWriter, req *http.Request) {

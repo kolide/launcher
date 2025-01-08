@@ -999,7 +999,9 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go r.processLogs(uid, stdErr, stdOut)
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		r.processLogs(uid, stdErr, stdOut)
+	})
 
 	return cmd, nil
 }
