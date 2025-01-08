@@ -35,21 +35,23 @@ func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgrou
 
 // StartGoroutine starts the given goroutine in the errgroup, ensuring that we log its start and exit.
 func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
-	l.errgroup.Go(func() error {
+	l.errgroup.Go(func() (err error) {
 		slogger := l.slogger.With("goroutine_name", goroutineName)
 
-		// Catch any panicking goroutines and log them
+		// Catch any panicking goroutines and log them. We also want to make sure
+		// we return an error from this goroutine overall if it panics.
 		defer func() {
 			if r := recover(); r != nil {
 				slogger.Log(ctx, slog.LevelError,
 					"panic occurred in goroutine",
 					"err", r,
 				)
-				if err, ok := r.(error); ok {
+				if recoveredErr, ok := r.(error); ok {
 					slogger.Log(ctx, slog.LevelError,
 						"panic stack trace",
-						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(recoveredErr)),
 					)
+					err = recoveredErr
 				}
 			}
 		}()
@@ -58,7 +60,7 @@ func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName strin
 			"starting goroutine in errgroup",
 		)
 
-		err := goroutine()
+		err = goroutine()
 
 		slogger.Log(ctx, slog.LevelInfo,
 			"exiting goroutine in errgroup",

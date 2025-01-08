@@ -118,7 +118,7 @@ func Test_HandlesPanic(t *testing.T) {
 
 	// We expect that the errgroup shuts down -- the test should not panic
 	eg.Shutdown()
-	eg.Wait()
+	require.Error(t, eg.Wait(), "should have returned error from panicking goroutine")
 	canceled := false
 	select {
 	case <-eg.Exited():
