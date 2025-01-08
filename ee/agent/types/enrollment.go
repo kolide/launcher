@@ -11,21 +11,21 @@ const (
 
 // Move EnrollmentDetails from service package to types
 type EnrollmentDetails struct {
-	OSVersion                 string
-	OSBuildID                 string
-	OSPlatform                string
-	Hostname                  string
-	HardwareVendor            string
-	HardwareModel             string
-	HardwareSerial            string
-	OsqueryVersion            string
-	LauncherHardwareKey       string
-	LauncherHardwareKeySource string
-	LauncherLocalKey          string
-	LauncherVersion           string
-	OSName                    string
-	OSPlatformLike            string
-	GOOS                      string
-	GOARCH                    string
-	HardwareUUID              string
+	OSVersion                 string `json:"os_version"`
+	OSBuildID                 string `json:"os_build_id"`
+	OSPlatform                string `json:"os_platform"`
+	Hostname                  string `json:"hostname"`
+	HardwareVendor            string `json:"hardware_vendor"`
+	HardwareModel             string `json:"hardware_model"`
+	HardwareSerial            string `json:"hardware_serial"`
+	OsqueryVersion            string `json:"osquery_version"`
+	LauncherHardwareKey       string `json:"launcher_hardware_key"`
+	LauncherHardwareKeySource string `json:"launcher_hardware_key_source"`
+	LauncherLocalKey          string `json:"launcher_local_key"`
+	LauncherVersion           string `json:"launcher_version"`
+	OSName                    string `json:"os_name"`
+	OSPlatformLike            string `json:"os_platform_like"`
+	GOOS                      string `json:"goos"`
+	GOARCH                    string `json:"goarch"`
+	HardwareUUID              string `json:"hardware_uuid"`
 }

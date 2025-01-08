@@ -194,13 +194,40 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	// Getting enrollment details
+	// First get runtime enrollment details
 	details := osquery.GetRuntimeEnrollDetails()
-	if err := osquery.GetOsqEnrollDetails(ctx, k.LatestOsquerydPath(ctx), &details); err != nil {
-		slogger.Log(ctx, slog.LevelError,
-			"getting initial osquery enrollment details",
-			"err", err,
+
+	// Check if we have an osquery path
+	if osqPath := k.LatestOsquerydPath(ctx); osqPath == "" {
+		slogger.Log(ctx, slog.LevelInfo,
+			"skipping enrollment osquery details, no osqueryd path, this is probably CI",
 		)
+		startupSpan.AddEvent("skipping_enrollment_details")
+	} else {
+		// Add retry mechanism with backoff
+		if err := backoff.WaitFor(func() error {
+			err := osquery.GetOsqEnrollDetails(ctx, osqPath, &details)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelDebug,
+					"getOsqEnrollDetails failed in backoff",
+					"err", err,
+				)
+			}
+			return err
+		}, 30*time.Second, 5*time.Second); err != nil {
+			// Check if details are required via env var
+			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
+				return fmt.Errorf("query osq enrollment details: %w", err)
+			}
+
+			slogger.Log(ctx, slog.LevelError,
+				"failed to get osq enrollment details with retries, moving on",
+				"err", err,
+			)
+			traces.SetError(startupSpan, fmt.Errorf("query osq enrollment details: %w", err))
+		} else {
+			startupSpan.AddEvent("got_enrollment_details")
+		}
 	}
 
 	if err := k.SetEnrollmentDetails(details); err != nil {
