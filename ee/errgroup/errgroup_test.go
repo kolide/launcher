@@ -102,7 +102,7 @@ func TestShutdown(t *testing.T) {
 	require.True(t, canceled, "errgroup did not exit")
 }
 
-func Test_HandlesPanic(t *testing.T) {
+func TestStartGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.TODO())
@@ -116,9 +116,67 @@ func Test_HandlesPanic(t *testing.T) {
 		return nil
 	})
 
-	// We expect that the errgroup shuts down -- the test should not panic
-	eg.Shutdown()
+	// We expect that the errgroup shuts itself down -- the test should not panic
 	require.Error(t, eg.Wait(), "should have returned error from panicking goroutine")
+	canceled := false
+	select {
+	case <-eg.Exited():
+		canceled = true
+	default:
+	}
+
+	require.True(t, canceled, "errgroup did not exit")
+}
+
+func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
+
+	eg.StartRepeatedGoroutine(ctx, "test_goroutine", 100*time.Millisecond, 50*time.Millisecond, func() error {
+		testArr := make([]int, 0)
+		fmt.Println(testArr[2]) // cause out-of-bounds panic
+		return nil
+	})
+
+	// Wait for long enough that the repeated goroutine executes at least once
+	time.Sleep(500 * time.Millisecond)
+
+	// We expect that the errgroup shuts itself down -- the test should not panic
+	require.Error(t, eg.Wait(), "should have returned error from panicking goroutine")
+	canceled := false
+	select {
+	case <-eg.Exited():
+		canceled = true
+	default:
+	}
+
+	require.True(t, canceled, "errgroup did not exit")
+}
+
+func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
+
+	eg.AddShutdownGoroutine(ctx, "test_goroutine", func() error {
+		testArr := make([]int, 0)
+		fmt.Println(testArr[2]) // cause out-of-bounds panic
+		return nil
+	})
+
+	// Call shutdown so the shutdown goroutine runs and the errgroup returns.
+	eg.Shutdown()
+
+	// We expect that the errgroup shuts itself down -- the test should not panic.
+	// Since we called `Shutdown`, `Wait` should not return an error.
+	require.Nil(t, eg.Wait(), "should not returned error after call to Shutdown")
 	canceled := false
 	select {
 	case <-eg.Exited():

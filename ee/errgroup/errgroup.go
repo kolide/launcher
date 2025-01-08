@@ -119,29 +119,48 @@ func (l *LoggedErrgroup) StartRepeatedGoroutine(ctx context.Context, goroutineNa
 // AddShutdownGoroutine adds the given goroutine to the errgroup, ensuring that we log its start and exit.
 // The goroutine will not execute until the errgroup has received a signal to exit.
 func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName string, goroutine func() error) {
-	l.StartGoroutine(ctx, goroutineName, func() error {
+	l.errgroup.Go(func() error {
 		slogger := l.slogger.With("goroutine_name", goroutineName)
+
+		// Catch any panicking goroutines and log them. We do not want to return
+		// the error from this routine, as we do for StartGoroutine and StartRepeatedGoroutine --
+		// shutdown goroutines should not return an error besides the errgroup's initial error.
+		defer func() {
+			if r := recover(); r != nil {
+				slogger.Log(ctx, slog.LevelError,
+					"panic occurred in shutdown goroutine",
+					"err", r,
+				)
+				if err, ok := r.(error); ok {
+					slogger.Log(ctx, slog.LevelError,
+						"panic stack trace",
+						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
+					)
+				}
+			}
+		}()
 
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()
+
+		slogger.Log(ctx, slog.LevelInfo,
+			"starting shutdown goroutine in errgroup",
+		)
 
 		goroutineStart := time.Now()
 		err := goroutine()
 		elapsedTime := time.Since(goroutineStart)
 
-		// Log anything amiss about the shutdown goroutine -- did it return an error? Did it take too long?
-		if err != nil {
-			slogger.Log(ctx, slog.LevelWarn,
-				"shutdown routine returned err",
-				"goroutine_run_time", elapsedTime.String(),
-				"goroutine_err", err,
-			)
-		} else if elapsedTime > maxShutdownGoroutineDuration {
-			slogger.Log(ctx, slog.LevelWarn,
-				"noticed slow shutdown routine",
-				"goroutine_run_time", elapsedTime.String(),
-			)
+		logLevel := slog.LevelInfo
+		if elapsedTime > maxShutdownGoroutineDuration || err != nil {
+			logLevel = slog.LevelWarn
 		}
+		slogger.Log(ctx, logLevel,
+			"exiting shutdown goroutine in errgroup",
+			"goroutine_name", goroutineName,
+			"goroutine_run_time", elapsedTime.String(),
+			"goroutine_err", err,
+		)
 
 		// We don't want to actually return the error here, to avoid causing an otherwise successful call
 		// to `Shutdown` => `Wait` to return an error. Shutdown routine errors don't matter for the success
