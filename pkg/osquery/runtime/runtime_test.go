@@ -254,7 +254,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
-	// Now, WatchdogEnabled should return false
+	// Now, WatchdogEnabled should return true
 	k.On("WatchdogEnabled").Return(true).Once()
 	runner.FlagsChanged(keys.WatchdogEnabled)
 
