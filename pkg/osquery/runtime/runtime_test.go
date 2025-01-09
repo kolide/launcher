@@ -221,7 +221,6 @@ func TestFlagsChanged(t *testing.T) {
 	go runner.Run()
 
 	// Wait for the instance to start
-	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm watchdog is disabled
