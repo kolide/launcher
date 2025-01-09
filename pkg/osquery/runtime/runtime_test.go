@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +36,7 @@ import (
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -141,9 +144,15 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 
 	// The runner will repeatedly try to launch the instance, so `Run`
 	// won't return an error until we shut it down. Kick off `Run`,
@@ -179,9 +188,15 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
@@ -197,9 +212,7 @@ func TestFlagsChanged(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	// First, it should return false, then on the next call, it should return true
-	k.On("WatchdogEnabled").Return(false).Once()
-	k.On("WatchdogEnabled").Return(true).Once()
+	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -214,14 +227,19 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
 	// Start the runner
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	// Wait for the instance to start
-	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm watchdog is disabled
@@ -236,9 +254,11 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
+	// Now, WatchdogEnabled should return true
+	k.On("WatchdogEnabled").Return(true).Once()
 	runner.FlagsChanged(keys.WatchdogEnabled)
 
-	// Wait for the instance to restart
+	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
@@ -303,7 +323,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test.
 func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	require.NoError(t, backoff.WaitFor(func() error {
+	err := backoff.WaitFor(func() error {
 		// Instance self-reports as healthy
 		if err := runner.Healthy(); err != nil {
 			return fmt.Errorf("instance not healthy: %w", err)
@@ -319,10 +339,30 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
+	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second)
 
-	// Give the instance just a little bit of buffer before we proceed
-	time.Sleep(2 * time.Second)
+	// Instance is healthy -- return
+	if err == nil {
+		time.Sleep(2 * time.Second)
+		return
+	}
+
+	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
+
+	// Instance is not healthy -- gather info about osquery proc, then fail
+	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
+
+	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
+
+	if isRunning {
+		t.Error("instance not healthy before timeout, though osquery process is running", debugInfo)
+		t.FailNow()
+	} else {
+		t.Error("instance not healthy before timeout, osquery process is not running", debugInfo)
+		t.FailNow()
+	}
 }
 
 func TestSimplePath(t *testing.T) {
@@ -346,9 +386,15 @@ func TestSimplePath(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -383,8 +429,14 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
 
@@ -443,8 +495,14 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
 
@@ -495,9 +553,15 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("UpdateChannel").Return("stable")
+	k.On("PinnedLauncherVersion").Return("")
+	k.On("PinnedOsquerydVersion").Return("")
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -528,9 +592,15 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -562,7 +632,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -664,9 +734,15 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k, mockServiceClient())
+	runner = New(k, mockServiceClient(t))
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -695,25 +771,40 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 
 // mockServiceClient returns a mock KolideService that returns the minimum possible response
 // for all methods.
-func mockServiceClient() *servicemock.KolideService {
+func mockServiceClient(t *testing.T) *servicemock.KolideService {
+	testOptions := map[string]any{
+		"distributed_interval": 30,
+		"verbose":              true,
+		"schedule_epoch":       strconv.Itoa(int(time.Now().Unix())),
+	}
+	testConfig := map[string]any{
+		"options": testOptions,
+	}
+	testConfigBytes, err := json.Marshal(testConfig)
+	require.NoError(t, err)
+
 	return &servicemock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "testnodekey", false, nil
 		},
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
-			return "", false, errors.New("transport")
+			return string(testConfigBytes), false, nil
 		},
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
-			return nil, false, errors.New("transport")
+			return &distributed.GetQueriesResult{
+				Queries: map[string]string{
+					"test-distributed-query": "SELECT * FROM system_info",
+				},
+			}, false, nil
 		},
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		CheckHealthFunc: func(ctx context.Context) (int32, error) {
-			return 0, nil
+			return 1, nil
 		},
 	}
 }
@@ -743,7 +834,11 @@ func testRootDirectory(t *testing.T) string {
 	require.NoError(t, os.Mkdir(rootDir, 0700))
 
 	t.Cleanup(func() {
-		if err := os.RemoveAll(rootDir); err != nil {
+		// Do a couple retries in case the directory is still in use --
+		// Windows is a little slow on this sometimes
+		if err := backoff.WaitFor(func() error {
+			return os.RemoveAll(rootDir)
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
 			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
 		}
 	})

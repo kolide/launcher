@@ -28,7 +28,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	cmd, err := i.createOsquerydCommand(osquerydPath, &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",
