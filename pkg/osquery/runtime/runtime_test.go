@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,9 +143,15 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 
 	// The runner will repeatedly try to launch the instance, so `Run`
 	// won't return an error until we shut it down. Kick off `Run`,
@@ -179,9 +187,15 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
@@ -212,10 +226,16 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
 	// Start the runner
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	// Wait for the instance to start
@@ -345,9 +365,15 @@ func TestSimplePath(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -382,8 +408,14 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
 
@@ -442,8 +474,14 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
 
@@ -494,9 +532,15 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
+	k.On("UpdateChannel").Return("stable")
+	k.On("PinnedLauncherVersion").Return("")
+	k.On("PinnedOsquerydVersion").Return("")
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -527,9 +571,15 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -561,7 +611,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -663,9 +713,15 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k, mockServiceClient())
+	runner = New(k, mockServiceClient(t))
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -694,25 +750,40 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 
 // mockServiceClient returns a mock KolideService that returns the minimum possible response
 // for all methods.
-func mockServiceClient() *servicemock.KolideService {
+func mockServiceClient(t *testing.T) *servicemock.KolideService {
+	testOptions := map[string]any{
+		"distributed_interval": 30,
+		"verbose":              true,
+		"schedule_epoch":       strconv.Itoa(int(time.Now().Unix())),
+	}
+	testConfig := map[string]any{
+		"options": testOptions,
+	}
+	testConfigBytes, err := json.Marshal(testConfig)
+	require.NoError(t, err)
+
 	return &servicemock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "testnodekey", false, nil
 		},
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
-			return "", false, errors.New("transport")
+			return string(testConfigBytes), false, nil
 		},
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
-			return nil, false, errors.New("transport")
+			return &distributed.GetQueriesResult{
+				Queries: map[string]string{
+					"test-distributed-query": "SELECT * FROM system_info",
+				},
+			}, false, nil
 		},
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		CheckHealthFunc: func(ctx context.Context) (int32, error) {
-			return 0, nil
+			return 1, nil
 		},
 	}
 }
