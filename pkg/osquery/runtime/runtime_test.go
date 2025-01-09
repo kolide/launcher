@@ -36,6 +36,7 @@ import (
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -322,7 +323,7 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test.
 func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	require.NoError(t, backoff.WaitFor(func() error {
+	err := backoff.WaitFor(func() error {
 		// Instance self-reports as healthy
 		if err := runner.Healthy(); err != nil {
 			return fmt.Errorf("instance not healthy: %w", err)
@@ -338,10 +339,30 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
+	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second)
 
-	// Give the instance just a little bit of buffer before we proceed
-	time.Sleep(2 * time.Second)
+	// Instance is healthy -- return
+	if err == nil {
+		time.Sleep(2 * time.Second)
+		return
+	}
+
+	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
+
+	// Instance is not healthy -- gather info about osquery proc, then fail
+	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
+
+	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
+
+	if isRunning {
+		t.Error("instance not healthy before timeout, though osquery process is running", debugInfo)
+		t.FailNow()
+	} else {
+		t.Error("instance not healthy before timeout, osquery process is not running", debugInfo)
+		t.FailNow()
+	}
 }
 
 func TestSimplePath(t *testing.T) {
