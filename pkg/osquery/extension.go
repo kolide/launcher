@@ -548,7 +548,12 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
-	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
@@ -796,7 +801,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
 		uninstall.Uninstall(ctx, e.knapsack, true)
