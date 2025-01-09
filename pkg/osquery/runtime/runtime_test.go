@@ -743,7 +743,11 @@ func testRootDirectory(t *testing.T) string {
 	require.NoError(t, os.Mkdir(rootDir, 0700))
 
 	t.Cleanup(func() {
-		if err := os.RemoveAll(rootDir); err != nil {
+		// Do a couple retries in case the directory is still in use --
+		// Windows is a little slow on this sometimes
+		if err := backoff.WaitFor(func() error {
+			return os.RemoveAll(rootDir)
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
 			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
 		}
 	})
