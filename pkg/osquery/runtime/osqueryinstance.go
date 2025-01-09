@@ -30,6 +30,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
+	"github.com/shirou/gopsutil/v3/process"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -404,7 +405,13 @@ func (i *OsqueryInstance) Launch() error {
 	i.extensionManagerClient, err = i.StartOsqueryClient(paths)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
-		return fmt.Errorf("could not create an extension client: %w", err)
+
+		isRunning, checkProcErr := i.isOsqueryProcessRunning(ctx)
+		if checkProcErr != nil {
+			return fmt.Errorf("could not create an extension client: %w; could not check if process is running: %v", err, checkProcErr)
+		}
+
+		return fmt.Errorf("could not create an extension client: %w; process is running: %v", err, isRunning)
 	}
 	span.AddEvent("extension_client_created")
 
@@ -481,6 +488,20 @@ func (i *OsqueryInstance) Launch() error {
 	})
 
 	return nil
+}
+
+func (i *OsqueryInstance) isOsqueryProcessRunning(ctx context.Context) (bool, error) {
+	osqueryProc, err := process.NewProcessWithContext(ctx, int32(i.cmd.Process.Pid))
+	if err != nil {
+		return false, fmt.Errorf("getting process: %w", err)
+	}
+
+	isRunning, err := osqueryProc.IsRunningWithContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("checking if osquery process is running: %w", err)
+	}
+
+	return isRunning, nil
 }
 
 // healthcheckWithRetries returns an error if it cannot get a non-error response from
