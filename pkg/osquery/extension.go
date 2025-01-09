@@ -477,7 +477,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 }
 
 func (e *Extension) enrolled() bool {
-	return e.NodeKey != ""
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	return nodeKey != ""
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the
@@ -922,8 +927,13 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
-	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
+	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -981,7 +991,12 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
