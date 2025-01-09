@@ -197,9 +197,7 @@ func TestFlagsChanged(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	// First, it should return false, then on the next call, it should return true
-	k.On("WatchdogEnabled").Return(false).Once()
-	k.On("WatchdogEnabled").Return(true).Once()
+	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -235,9 +233,11 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
+	// Now, WatchdogEnabled should return false
+	k.On("WatchdogEnabled").Return(true).Once()
 	runner.FlagsChanged(keys.WatchdogEnabled)
 
-	// Wait for the instance to restart
+	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
