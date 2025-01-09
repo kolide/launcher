@@ -42,6 +42,12 @@ const (
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
 
+	// How long to wait before erroring because the osquery process has not started up successfully
+	osqueryStartupTimeout = 1 * time.Minute
+
+	// How often to check whether the osquery process has started up successfully
+	osqueryStartupRecheckInterval = 1 * time.Second
+
 	// How long to wait before erroring because we cannot open the osquery
 	// extension socket.
 	socketOpenTimeout = 10 * time.Second
@@ -328,7 +334,7 @@ func (i *OsqueryInstance) Launch() error {
 			)
 		}
 		return err
-	}, 1*time.Minute, 1*time.Second); err != nil {
+	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
 		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
 		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
 	}
