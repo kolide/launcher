@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -65,7 +66,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	_, err := i.createOsquerydCommand(osquerydPath, paths)
 	require.NoError(t, err)
@@ -86,7 +87,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinary,
@@ -120,7 +121,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinary,
@@ -170,7 +171,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	cmd, err := i.createOsquerydCommand(
 		testOsqueryBinary,
@@ -211,7 +212,7 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
 }
@@ -222,7 +223,7 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	_, err := i.Query("select * from osquery_info;")
 	require.Error(t, err, "should not be able to query unlaunched instance")
@@ -233,7 +234,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 
 	// No client available, so healthcheck should fail despite retries
 	require.Error(t, i.healthcheckWithRetries(context.TODO(), 5, 100*time.Millisecond))
@@ -261,8 +262,15 @@ func TestLaunch(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient())
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 	go i.Launch()
 
 	// Wait for the instance to become healthy
