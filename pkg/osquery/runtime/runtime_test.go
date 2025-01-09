@@ -319,7 +319,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
+	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
 
 	// Give the instance just a little bit of buffer before we proceed
 	time.Sleep(2 * time.Second)
