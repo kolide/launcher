@@ -350,6 +350,8 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
 
 	// Instance is not healthy -- gather info about osquery proc, then fail
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
 	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
 	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
 
@@ -553,12 +555,12 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel)
-	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion)
-	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion)
-	k.On("UpdateChannel").Return("stable")
-	k.On("PinnedLauncherVersion").Return("")
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
