@@ -236,6 +236,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	}
+	startupSpan.AddEvent("enrollment_details_set")
 
 	// Generate a new run ID
 	newRunID := k.GetRunID()
