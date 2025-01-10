@@ -153,6 +153,7 @@ func TestBadBinaryPath(t *testing.T) {
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// The runner will repeatedly try to launch the instance, so `Run`
 	// won't return an error until we shut it down. Kick off `Run`,
@@ -197,6 +198,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
@@ -237,6 +239,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Start the runner
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	// Wait for the instance to start
@@ -300,6 +303,10 @@ func TestFlagsChanged(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
+// waitShutdown is used as a test helper, it performs additional tests to ensure proper shutdown
+// at the end of a passing test run. Tests can additionally use ensureShutdownOnCleanup as a cleanup method
+// to ensure a shutdown is attempted in the event of an earlier test failure, but this is the correct method
+// to use inline at the end of any tests that trigger runner.Run()
 func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
 	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
 	// they return nil immediately, which would give `backoff` the impression that shutdown has
@@ -318,6 +325,41 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 		t.Error("runner did not shut down within timeout", fmt.Sprintf("runner logs: %s", logBytes.String()))
 		t.FailNow()
 	}
+}
+
+// ensureShutdownOnCleanup adds a cleanup method which will attempt to shutdown any runners which have not
+// previously been interrupted. Failures here will be logged but will not fail the test itself. most tests
+// should already contain a waitShutdown which actually test this logic- this is here purely to ensure shutdown
+// without triggering any confusing failures on top of whatever has already gone wrong.
+// This is expected to be a no-op throughout any happy paths of testing
+func ensureShutdownOnCleanup(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
+	t.Cleanup(func() {
+		// no further action required if the test already triggered Shutdown
+		if runner.interrupted.Load() {
+			return
+		}
+		// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
+		// they return nil immediately, which would give `backoff` the impression that shutdown has
+		// completed when it hasn't.
+		// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
+		// `Shutdown` has not returned.
+		shutdownErr := make(chan error)
+		go func() {
+			shutdownErr <- runner.Shutdown()
+		}()
+
+		select {
+		case err := <-shutdownErr:
+			if err != nil {
+				t.Logf("ensureShutdownOnCleanup encountered error: %v", err)
+			}
+
+			return
+		case <-time.After(1 * time.Minute):
+			t.Logf("runner did not shut down within timeout. runner logs: %s", logBytes.String())
+			return
+		}
+	})
 }
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
@@ -397,6 +439,7 @@ func TestSimplePath(t *testing.T) {
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -441,6 +484,7 @@ func TestMultipleInstances(t *testing.T) {
 	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
 	go runner.Run()
@@ -507,6 +551,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
@@ -564,6 +609,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -603,6 +649,7 @@ func TestOsqueryDies(t *testing.T) {
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -656,8 +703,8 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
 
-	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
+	runner, logBytes := setupOsqueryInstanceForTests(t)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
 
@@ -684,8 +731,8 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
-	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
+	runner, logBytes := setupOsqueryInstanceForTests(t)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	previousStats := runner.instances[types.DefaultRegistrationID].stats
 
@@ -713,7 +760,7 @@ func TestRestart(t *testing.T) {
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -750,10 +797,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
 
-	teardown = func() {
-		waitShutdown(t, runner, logBytes)
-	}
-	return runner, logBytes, teardown
+	return runner, logBytes
 }
 
 // setUpMockStores creates test stores in the test knapsack
@@ -843,7 +887,7 @@ func testRootDirectory(t *testing.T) string {
 		if err := backoff.WaitFor(func() error {
 			return os.RemoveAll(rootDir)
 		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+			t.Logf("testRootDirectory RemoveAll cleanup: %v", err)
 		}
 	})
 

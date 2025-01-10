@@ -79,6 +79,7 @@ func TestOsquerySlowStart(t *testing.T) {
 		}()
 		return nil
 	}))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -122,6 +123,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 
 	runner := New(k, mockServiceClient(t), WithExtensionSocketPath(extensionSocketPath))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
