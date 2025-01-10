@@ -827,13 +827,15 @@ func setUpTestSlogger() (*threadsafebuffer.ThreadSafeBuffer, *slog.Logger) {
 // The default t.TempDir is too long of a path, creating too long of an osquery
 // extension socket, on posix systems.
 func testRootDirectory(t *testing.T) string {
-	if runtime.GOOS == "windows" {
-		return t.TempDir()
-	}
+	var rootDir string
 
-	ulid := ulid.New()
-	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
-	require.NoError(t, os.Mkdir(rootDir, 0700))
+	if runtime.GOOS == "windows" {
+		rootDir = t.TempDir()
+	} else {
+		ulid := ulid.New()
+		rootDir = filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
+		require.NoError(t, os.Mkdir(rootDir, 0700))
+	}
 
 	t.Cleanup(func() {
 		// Do a couple retries in case the directory is still in use --
