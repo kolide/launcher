@@ -136,17 +136,16 @@ func (r *Runner) runInstance(registrationId string) error {
 // It will retry until it succeeds, or until the runner is shut down.
 func (r *Runner) launchInstanceWithRetries(registrationId string) (*OsqueryInstance, error) {
 	for {
-		// Lock to ensure we don't try to restart before launch is complete.
+		// Add the instance to our instances map right away, so that if we receive a shutdown
+		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
 		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.opts...)
+		r.instances[registrationId] = instance
+		r.instanceLock.Unlock()
 		err := instance.Launch()
 
 		// Success!
 		if err == nil {
-			// Now that the instance is running, we can add it to `r.instances` and remove the lock
-			r.instances[registrationId] = instance
-			r.instanceLock.Unlock()
-
 			r.slogger.Log(context.TODO(), slog.LevelInfo,
 				"runner successfully launched instance",
 				"registration_id", registrationId,
@@ -155,7 +154,7 @@ func (r *Runner) launchInstanceWithRetries(registrationId string) (*OsqueryInsta
 			return instance, nil
 		}
 
-		// Launching was not successful. Shut down the instance, unlock, log the error, and wait to retry.
+		// Launching was not successful. Shut down the instance, log the error, and wait to retry.
 		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not launch instance, will retry after delay",
 			"err", err,
@@ -169,7 +168,6 @@ func (r *Runner) launchInstanceWithRetries(registrationId string) (*OsqueryInsta
 				"registration_id", registrationId,
 			)
 		}
-		r.instanceLock.Unlock()
 
 		select {
 		case <-r.shutdown:
