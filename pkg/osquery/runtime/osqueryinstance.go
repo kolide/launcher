@@ -43,7 +43,7 @@ const (
 	KolideSaasExtensionName = "kolide_grpc"
 
 	// How long to wait before erroring because the osquery process has not started up successfully
-	osqueryStartupTimeout = 1 * time.Minute
+	osqueryStartupTimeout = 20 * time.Second
 
 	// How often to check whether the osquery process has started up successfully
 	osqueryStartupRecheckInterval = 1 * time.Second
