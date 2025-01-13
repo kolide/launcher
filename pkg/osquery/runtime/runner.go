@@ -155,13 +155,21 @@ func (r *Runner) launchInstanceWithRetries(registrationId string) (*OsqueryInsta
 			return instance, nil
 		}
 
-		// Launching was not successful. Unlock, log the error, and wait to retry.
-		r.instanceLock.Unlock()
+		// Launching was not successful. Shut down the instance, unlock, log the error, and wait to retry.
 		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not launch instance, will retry after delay",
 			"err", err,
 			"registration_id", registrationId,
 		)
+		instance.BeginShutdown()
+		if err := instance.WaitShutdown(); err != context.Canceled && err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelWarn,
+				"error shutting down instance that failed to launch",
+				"err", err,
+				"registration_id", registrationId,
+			)
+		}
+		r.instanceLock.Unlock()
 
 		select {
 		case <-r.shutdown:
