@@ -250,6 +250,57 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 
+	// Register as many of our shutdown functions ahead of time as we can, so that we can make sure
+	// we fully clean up after any partially-launched erroring instances.
+	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
+		if i.cmd.Process == nil {
+			return nil
+		}
+
+		// kill osqueryd and children
+		if err := killProcessGroup(i.cmd); err != nil {
+			if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
+				i.slogger.Log(ctx, slog.LevelDebug,
+					"tried to stop osquery, but process already gone",
+				)
+				return nil
+			}
+
+			return fmt.Errorf("killing osquery process: %w", err)
+		}
+
+		return nil
+	})
+	// Clean up PID file on shutdown
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_pid_file", func() error {
+		// We do a couple retries -- on Windows, the PID file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing PID file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			return fmt.Errorf("removing PID file %s failed with retries: %w", paths.pidfilePath, err)
+		}
+		return nil
+	})
+
+	// Clean up socket file on shutdown
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_socket_file", func() error {
+		// We do a couple retries -- on Windows, the socket file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing socket file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			return fmt.Errorf("removing socket file %s failed with retries: %w", paths.extensionSocketPath, err)
+		}
+		return nil
+	})
+
 	// Populate augeas lenses, if requested
 	if i.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
@@ -329,27 +380,6 @@ func (i *OsqueryInstance) Launch() error {
 		}
 	})
 
-	// Kill osquery process on shutdown
-	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
-		if i.cmd.Process == nil {
-			return nil
-		}
-
-		// kill osqueryd and children
-		if err := killProcessGroup(i.cmd); err != nil {
-			if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-				i.slogger.Log(ctx, slog.LevelDebug,
-					"tried to stop osquery, but process already gone",
-				)
-				return nil
-			}
-
-			return fmt.Errorf("killing osquery process: %w", err)
-		}
-
-		return nil
-	})
-
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc.
 	i.extensionManagerClient, err = i.StartOsqueryClient(paths)
@@ -398,36 +428,6 @@ func (i *OsqueryInstance) Launch() error {
 			return fmt.Errorf("health check failed: %w", err)
 		}
 
-		return nil
-	})
-
-	// Clean up PID file on shutdown
-	i.errgroup.AddShutdownGoroutine(ctx, "remove_pid_file", func() error {
-		// We do a couple retries -- on Windows, the PID file may still be in use
-		// and therefore unable to be removed.
-		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("removing PID file: %w", err)
-			}
-			return nil
-		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			return fmt.Errorf("removing PID file %s failed with retries: %w", paths.pidfilePath, err)
-		}
-		return nil
-	})
-
-	// Clean up socket file on shutdown
-	i.errgroup.AddShutdownGoroutine(ctx, "remove_socket_file", func() error {
-		// We do a couple retries -- on Windows, the socket file may still be in use
-		// and therefore unable to be removed.
-		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("removing socket file: %w", err)
-			}
-			return nil
-		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			return fmt.Errorf("removing socket file %s failed with retries: %w", paths.extensionSocketPath, err)
-		}
 		return nil
 	})
 

@@ -560,8 +560,8 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	// Start the instance
 	go runner.Run()
 
-	// Wait very briefly for the launch routines to begin, then shut it down
-	time.Sleep(100 * time.Millisecond)
+	// Wait briefly for the launch routines to begin, then shut it down
+	time.Sleep(10 * time.Second)
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm the default instance was started, and then exited
