@@ -79,7 +79,7 @@ func ThreadAs(fn func() error, timeout time.Duration, uid uint32, gid uint32) er
 	// sequence starting the child and our listener.
 	errChan := make(chan error, 1)
 
-	gowrapper.Go(context.TODO(), slog.Default(), func() {
+	gowrapper.GoWithRecoveryAction(context.TODO(), slog.Default(), func() {
 		// Calling LockOSThread, without a subsequent Unlock,
 		// will cause the thread to terminate when the
 		// goroutine does. This seems simpler than resetting

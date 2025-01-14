@@ -17,6 +17,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/errgroup"
 	"github.com/kolide/launcher/ee/gowrapper"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -31,8 +32,6 @@ import (
 	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -42,6 +41,16 @@ const (
 	// is required for osquery startup. It is called kolide_grpc for mostly historic reasons;
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
+
+	// How long to wait before erroring because the osquery process has not started up successfully.
+	// This is a generous timeout -- the average osquery startup takes just over a second, and the
+	// 95th percentile startup takes just over two seconds. We rounded up to 20 seconds to give
+	// extra time for our outliers.
+	// See writeup in https://github.com/kolide/launcher/pull/2041 for data and details.
+	osqueryStartupTimeout = 20 * time.Second
+
+	// How often to check whether the osquery process has started up successfully
+	osqueryStartupRecheckInterval = 1 * time.Second
 
 	// How long to wait before erroring because we cannot open the osquery
 	// extension socket.
@@ -91,10 +100,8 @@ type OsqueryInstance struct {
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	runId                   string // string identifier for this instance
-	errgroup                *errgroup.Group
+	errgroup                *errgroup.LoggedErrgroup
 	saasExtension           *launcherosq.Extension
-	doneCtx                 context.Context // nolint:containedctx
-	cancel                  context.CancelFunc
 	cmd                     *exec.Cmd
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers []*osquery.ExtensionManagerServer
@@ -184,9 +191,7 @@ func newInstance(registrationId string, knapsack types.Knapsack, serviceClient s
 		opt(i)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	i.cancel = cancel
-	i.errgroup, i.doneCtx = errgroup.WithContext(ctx)
+	i.errgroup = errgroup.NewLoggedErrgroup(context.Background(), i.slogger)
 
 	i.startFunc = func(cmd *exec.Cmd) error {
 		return cmd.Start()
@@ -200,7 +205,7 @@ func (i *OsqueryInstance) BeginShutdown() {
 	i.slogger.Log(context.TODO(), slog.LevelInfo,
 		"instance shutdown requested",
 	)
-	i.cancel()
+	i.errgroup.Shutdown()
 }
 
 // WaitShutdown waits for the instance's errgroup routines to exit, then returns the
@@ -226,7 +231,7 @@ func (i *OsqueryInstance) WaitShutdown() error {
 
 // Exited returns a channel to monitor for signal that instance has shut itself down
 func (i *OsqueryInstance) Exited() <-chan struct{} {
-	return i.doneCtx.Done()
+	return i.errgroup.Exited()
 }
 
 // Launch starts the osquery instance and its components. It will run until one of its
@@ -248,6 +253,57 @@ func (i *OsqueryInstance) Launch() error {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
+
+	// Register as many of our shutdown functions ahead of time as we can, so that we can make sure
+	// we fully clean up after any partially-launched erroring instances.
+	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
+		if i.cmd.Process == nil {
+			return nil
+		}
+
+		// kill osqueryd and children
+		if err := killProcessGroup(i.cmd); err != nil {
+			if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
+				i.slogger.Log(ctx, slog.LevelDebug,
+					"tried to stop osquery, but process already gone",
+				)
+				return nil
+			}
+
+			return fmt.Errorf("killing osquery process: %w", err)
+		}
+
+		return nil
+	})
+	// Clean up PID file on shutdown
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_pid_file", func() error {
+		// We do a couple retries -- on Windows, the PID file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing PID file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			return fmt.Errorf("removing PID file %s failed with retries: %w", paths.pidfilePath, err)
+		}
+		return nil
+	})
+
+	// Clean up socket file on shutdown
+	i.errgroup.AddShutdownGoroutine(ctx, "remove_socket_file", func() error {
+		// We do a couple retries -- on Windows, the socket file may still be in use
+		// and therefore unable to be removed.
+		if err := backoff.WaitFor(func() error {
+			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing socket file: %w", err)
+			}
+			return nil
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			return fmt.Errorf("removing socket file %s failed with retries: %w", paths.extensionSocketPath, err)
+		}
+		return nil
+	})
 
 	// Populate augeas lenses, if requested
 	if i.opts.augeasLensFunc != nil {
@@ -279,12 +335,6 @@ func (i *OsqueryInstance) Launch() error {
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	i.cmd.SysProcAttr = setpgid()
 
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"launching osqueryd",
-		"path", i.cmd.Path,
-		"args", strings.Join(i.cmd.Args, " "),
-	)
-
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
 	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
@@ -296,52 +346,9 @@ func (i *OsqueryInstance) Launch() error {
 	}
 
 	// Launch osquery process (async)
-	err = i.startFunc(i.cmd)
-	if err != nil {
-		// Failure here is indicative of a failure to exec. A missing
-		// binary? Bad permissions? TODO: Consider catching errors in the
-		// update system and falling back to an earlier version.
-		msgPairs := append(
-			getOsqueryInfoForLog(i.cmd.Path),
-			"err", err,
-		)
-
-		i.slogger.Log(ctx, slog.LevelWarn,
-			"fatal error starting osquery -- could not exec.",
-			msgPairs...,
-		)
-		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
-		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	if err := i.startOsquerydProcess(ctx, paths); err != nil {
+		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
-
-	span.AddEvent("launched_osqueryd")
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"launched osquery process",
-		"osqueryd_pid", i.cmd.Process.Pid,
-	)
-
-	// wait for osquery to create the socket before moving on,
-	// this is intended to serve as a kind of health check
-	// for osquery, if it's started successfully it will create
-	// a socket
-	if err := backoff.WaitFor(func() error {
-		_, err := os.Stat(paths.extensionSocketPath)
-		if err != nil {
-			i.slogger.Log(ctx, slog.LevelDebug,
-				"osquery extension socket not created yet ... will retry",
-				"path", paths.extensionSocketPath,
-			)
-		}
-		return err
-	}, 1*time.Minute, 1*time.Second); err != nil {
-		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
-		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
-	}
-
-	span.AddEvent("socket_created")
-	i.slogger.Log(ctx, slog.LevelDebug,
-		"osquery socket created",
-	)
 
 	stats, err := history.NewInstance(i.registrationId, i.runId)
 	if err != nil {
@@ -355,7 +362,7 @@ func (i *OsqueryInstance) Launch() error {
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
 	// code. eg: this runs if we could exec. Failure to exec is above.)
-	i.addGoroutineToErrgroup(ctx, "monitor_osquery_process", func() error {
+	i.errgroup.StartGoroutine(ctx, "monitor_osquery_process", func() error {
 		err := i.cmd.Wait()
 		switch {
 		case err == nil, isExitOk(err):
@@ -375,26 +382,6 @@ func (i *OsqueryInstance) Launch() error {
 			)
 			return fmt.Errorf("running osqueryd command: %w", err)
 		}
-	})
-
-	// Kill osquery process on shutdown
-	i.addShutdownGoroutineToErrgroup(ctx, "kill_osquery_process", func() error {
-		if i.cmd.Process != nil {
-			// kill osqueryd and children
-			if err := killProcessGroup(i.cmd); err != nil {
-				if strings.Contains(err.Error(), "process already finished") || strings.Contains(err.Error(), "no such process") {
-					i.slogger.Log(ctx, slog.LevelDebug,
-						"tried to stop osquery, but process already gone",
-					)
-				} else {
-					i.slogger.Log(ctx, slog.LevelWarn,
-						"error killing osquery process",
-						"err", err,
-					)
-				}
-			}
-		}
-		return i.doneCtx.Err()
 	})
 
 	// Start an extension manager for the extensions that osquery
@@ -434,78 +421,80 @@ func (i *OsqueryInstance) Launch() error {
 	}
 
 	// Health check on interval
-	i.addGoroutineToErrgroup(ctx, "healthcheck", func() error {
-		if i.knapsack.OsqueryHealthcheckStartupDelay() != 0*time.Second {
+	i.errgroup.StartRepeatedGoroutine(ctx, "healthcheck", healthCheckInterval, i.knapsack.OsqueryHealthcheckStartupDelay(), func() error {
+		// If device is sleeping, we do not want to perform unnecessary healthchecks that
+		// may force an unnecessary restart.
+		if i.knapsack != nil && i.knapsack.InModernStandby() {
+			return nil
+		}
+
+		if err := i.healthcheckWithRetries(ctx, 5, 1*time.Second); err != nil {
+			return fmt.Errorf("health check failed: %w", err)
+		}
+
+		return nil
+	})
+
+	return nil
+}
+
+// startOsquerydProcess starts the osquery instance's `cmd` and waits for the osqueryd process
+// to create a socket file, indicating it's started up successfully.
+func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, paths *osqueryFilePaths) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	i.slogger.Log(ctx, slog.LevelInfo,
+		"launching osqueryd",
+		"path", i.cmd.Path,
+		"args", strings.Join(i.cmd.Args, " "),
+	)
+
+	if err := i.startFunc(i.cmd); err != nil {
+		// Failure here is indicative of a failure to exec. A missing
+		// binary? Bad permissions? TODO: Consider catching errors in the
+		// update system and falling back to an earlier version.
+		msgPairs := append(
+			getOsqueryInfoForLog(i.cmd.Path),
+			"err", err,
+		)
+
+		i.slogger.Log(ctx, slog.LevelWarn,
+			"fatal error starting osquery -- could not exec.",
+			msgPairs...,
+		)
+		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
+		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	}
+
+	span.AddEvent("launched_osqueryd")
+	i.slogger.Log(ctx, slog.LevelInfo,
+		"launched osquery process",
+		"osqueryd_pid", i.cmd.Process.Pid,
+	)
+
+	// wait for osquery to create the socket before moving on,
+	// this is intended to serve as a kind of health check
+	// for osquery, if it's started successfully it will create
+	// a socket
+	if err := backoff.WaitFor(func() error {
+		_, err := os.Stat(paths.extensionSocketPath)
+		if err != nil {
 			i.slogger.Log(ctx, slog.LevelDebug,
-				"entering delay before starting osquery healthchecks",
-			)
-			select {
-			case <-time.After(i.knapsack.OsqueryHealthcheckStartupDelay()):
-				i.slogger.Log(ctx, slog.LevelDebug,
-					"exiting delay before starting osquery healthchecks",
-				)
-			case <-i.doneCtx.Done():
-				return i.doneCtx.Err()
-			}
-		}
-
-		ticker := time.NewTicker(healthCheckInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-i.doneCtx.Done():
-				return i.doneCtx.Err()
-			case <-ticker.C:
-				// If device is sleeping, we do not want to perform unnecessary healthchecks that
-				// may force an unnecessary restart.
-				if i.knapsack != nil && i.knapsack.InModernStandby() {
-					break
-				}
-
-				if err := i.healthcheckWithRetries(ctx, 5, 1*time.Second); err != nil {
-					return fmt.Errorf("health check failed: %w", err)
-				}
-			}
-		}
-	})
-
-	// Clean up PID file on shutdown
-	i.addShutdownGoroutineToErrgroup(ctx, "remove_pid_file", func() error {
-		// We do a couple retries -- on Windows, the PID file may still be in use
-		// and therefore unable to be removed.
-		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("removing PID file: %w", err)
-			}
-			return nil
-		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			i.slogger.Log(ctx, slog.LevelInfo,
-				"could not remove PID file, despite retries",
-				"pid_file", paths.pidfilePath,
-				"err", err,
+				"osquery extension socket not created yet ... will retry",
+				"path", paths.extensionSocketPath,
 			)
 		}
-		return i.doneCtx.Err()
-	})
+		return err
+	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
+		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
+	}
 
-	// Clean up socket file on shutdown
-	i.addShutdownGoroutineToErrgroup(ctx, "remove_socket_file", func() error {
-		// We do a couple retries -- on Windows, the socket file may still be in use
-		// and therefore unable to be removed.
-		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("removing socket file: %w", err)
-			}
-			return nil
-		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			i.slogger.Log(ctx, slog.LevelInfo,
-				"could not remove socket file, despite retries",
-				"socket_file", paths.extensionSocketPath,
-				"err", err,
-			)
-		}
-		return i.doneCtx.Err()
-	})
+	span.AddEvent("socket_created")
+	i.slogger.Log(ctx, slog.LevelDebug,
+		"osquery socket created",
+	)
 
 	return nil
 }
@@ -596,10 +585,10 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 				"err", err,
 			)
 		}
-	}, func(r any) {})
+	})
 
 	// Run extension
-	i.addGoroutineToErrgroup(ctx, "saas_extension_execute", func() error {
+	i.errgroup.StartGoroutine(ctx, "saas_extension_execute", func() error {
 		if err := i.saasExtension.Execute(); err != nil {
 			return fmt.Errorf("kolide_grpc extension returned error: %w", err)
 		}
@@ -607,50 +596,12 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 	})
 
 	// Register shutdown group for extension
-	i.addShutdownGoroutineToErrgroup(ctx, "saas_extension_cleanup", func() error {
-		i.saasExtension.Shutdown(i.doneCtx.Err())
-		return i.doneCtx.Err()
+	i.errgroup.AddShutdownGoroutine(ctx, "saas_extension_cleanup", func() error {
+		i.saasExtension.Shutdown(nil)
+		return nil
 	})
 
 	return nil
-}
-
-// addGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
-func (i *OsqueryInstance) addGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting goroutine in errgroup",
-			"goroutine_name", goroutineName,
-		)
-
-		i.slogger.Log(ctx, slog.LevelInfo,
-			"starting goroutine in errgroup",
-			"goroutine_name", goroutineName,
-		)
-
-		return goroutine()
-	})
-}
-
-// addShutdownGoroutineToErrgroup adds the given goroutine to the errgroup, ensuring that we log its start and exit.
-// The goroutine will not execute until the instance has received a signal to exit.
-func (i *OsqueryInstance) addShutdownGoroutineToErrgroup(ctx context.Context, goroutineName string, goroutine func() error) {
-	i.errgroup.Go(func() error {
-		defer i.slogger.Log(ctx, slog.LevelInfo,
-			"exiting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
-		)
-
-		// Wait for errgroup to exit
-		<-i.doneCtx.Done()
-
-		i.slogger.Log(ctx, slog.LevelInfo,
-			"starting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
-		)
-
-		return goroutine()
-	})
 }
 
 // osqueryFilePaths is a struct which contains the relevant file paths needed to
@@ -857,7 +808,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
 	// Start!
-	i.addGoroutineToErrgroup(context.TODO(), name, func() error {
+	i.errgroup.StartGoroutine(context.TODO(), name, func() error {
 		if err := extensionManagerServer.Start(); err != nil {
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"extension manager server startup got error",
@@ -871,15 +822,16 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	})
 
 	// register a shutdown routine
-	i.addShutdownGoroutineToErrgroup(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
+	i.errgroup.AddShutdownGoroutine(context.TODO(), fmt.Sprintf("%s_cleanup", name), func() error {
 		if err := extensionManagerServer.Shutdown(context.TODO()); err != nil {
+			// Log error, but no need to bubble it up further
 			i.slogger.Log(context.TODO(), slog.LevelInfo,
 				"got error while shutting down extension server",
 				"err", err,
 				"extension_name", name,
 			)
 		}
-		return i.doneCtx.Err()
+		return nil
 	})
 
 	return nil

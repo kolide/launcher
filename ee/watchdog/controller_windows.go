@@ -93,6 +93,13 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		return
 	}
 
+	// don't bother processing further unless watchdog is enabled.
+	// note that this means if you manually install watchdog via CLI, logs
+	// will not be published unless you have the corresponding feature flag enabled
+	if !wc.knapsack.LauncherWatchdogEnabled() {
+		return
+	}
+
 	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
 	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
 	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
@@ -229,9 +236,9 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object
@@ -530,9 +537,9 @@ func RemoveWatchdogTask(identifier string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object
@@ -581,9 +588,9 @@ func watchdogTaskExists(identifier string) (bool, error) {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object

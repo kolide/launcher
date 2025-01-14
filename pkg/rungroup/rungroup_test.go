@@ -22,6 +22,12 @@ func TestRun_MultipleActors(t *testing.T) {
 	t.Parallel()
 
 	testRunGroup := NewRunGroup()
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+	testRunGroup.SetSlogger(slogger)
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -36,9 +42,10 @@ func TestRun_MultipleActors(t *testing.T) {
 	})
 
 	// Second actor returns error on `execute`, and then alerts groupReceivedInterrupts when it's interrupted
+	expectedRuntimeForRungroup := 1 * time.Second
 	expectedError := errors.New("test error from interruptingActor")
 	testRunGroup.Add("interruptingActor", func() error {
-		time.Sleep(1 * time.Second)
+		time.Sleep(expectedRuntimeForRungroup)
 		return expectedError
 	}, func(error) {
 		groupReceivedInterrupts <- struct{}{}
@@ -58,11 +65,11 @@ func TestRun_MultipleActors(t *testing.T) {
 	go func() {
 		err := testRunGroup.Run()
 		runCompleted <- struct{}{}
-		require.Error(t, err)
+		require.Error(t, err, "run group expected to return interruptingActor's error, but did not")
 	}()
 
-	// 1 second before interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
-	runDuration := 1*time.Second + InterruptTimeout + executeReturnTimeout + 1*time.Second
+	// Running until interrupt, waiting for interrupt, and waiting for execute return, plus a little buffer
+	runDuration := expectedRuntimeForRungroup + InterruptTimeout + executeReturnTimeout + 1*time.Second
 	interruptCheckTimer := time.NewTicker(runDuration)
 	defer interruptCheckTimer.Stop()
 
@@ -86,13 +93,19 @@ func TestRun_MultipleActors(t *testing.T) {
 
 	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
 
-	require.Equal(t, 3, receivedInterrupts)
+	require.Equal(t, 3, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
 }
 
 func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	t.Parallel()
 
 	testRunGroup := NewRunGroup()
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+	testRunGroup.SetSlogger(slogger)
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 
@@ -159,13 +172,19 @@ func TestRun_MultipleActors_InterruptTimeout(t *testing.T) {
 	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
 
 	// We only want two interrupts -- we should not be waiting on the blocking actor
-	require.Equal(t, 2, receivedInterrupts)
+	require.Equal(t, 2, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
 }
 
 func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	t.Parallel()
 
 	testRunGroup := NewRunGroup()
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+	testRunGroup.SetSlogger(slogger)
 
 	groupReceivedInterrupts := make(chan struct{}, 3)
 	// Keep track of when `execute`s return so we give testRunGroup.Run enough time to do its thing
@@ -237,7 +256,7 @@ func TestRun_MultipleActors_ExecuteReturnTimeout(t *testing.T) {
 	}
 
 	require.True(t, gotRunCompleted, "rungroup.Run did not terminate within time limit")
-	require.Equal(t, 3, receivedInterrupts)
+	require.Equal(t, 3, receivedInterrupts, "unexpected number of interrupts: logs:", logBytes.String())
 	require.Equal(t, 2, receivedExecuteReturns)
 }
 

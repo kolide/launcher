@@ -195,7 +195,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 				"err", err,
 			)
 		}
-	}, func(err any) {})
+	})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -339,7 +339,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 	gowrapper.Go(context.TODO(), r.slogger, func() {
 		defer close(wgDone)
 		r.procsWg.Wait()
-	}, func(err any) {})
+	})
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
@@ -834,7 +834,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 				"state", state,
 			)
 		}
-	}, func(err any) {})
+	})
 }
 
 // determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,
@@ -999,7 +999,9 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go r.processLogs(uid, stdErr, stdOut)
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		r.processLogs(uid, stdErr, stdOut)
+	})
 
 	return cmd, nil
 }
