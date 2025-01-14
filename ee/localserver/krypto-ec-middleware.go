@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -222,7 +223,9 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 						context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
 					)
 				}
-				go e.sendCallback(callbackReq, callbackData)
+				gowrapper.Go(r.Context(), e.slogger, func() {
+					e.sendCallback(callbackReq, callbackData)
+				})
 			}()
 		}
 

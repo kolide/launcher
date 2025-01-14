@@ -857,7 +857,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	require.NoError(t, autoupdater.Do(data), "should not have received error when performing request during initial delay")
 
 	// Give autoupdater a chance to run
-	time.Sleep(initialDelay + interval)
+	time.Sleep(2*initialDelay + 2*interval)
 
 	// Assert expectation that we did not add the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
