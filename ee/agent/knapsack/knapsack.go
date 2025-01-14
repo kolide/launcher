@@ -248,7 +248,7 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
 	// Only update if there are actual changes
 	if details != enrollmentDetails {
-		k.slogger.Logger.Debug("updating enrollment details")
+		k.slogger.Logger.DebugContext(context.Background(), "updating enrollment details")
 		enrollmentDetails = details
 		return nil
 	}
