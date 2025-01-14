@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/krypto"
@@ -71,16 +72,19 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 }
 
 type kryptoEcMiddleware struct {
-	localDbSigner crypto.Signer
-	counterParty  ecdsa.PublicKey
-	slogger       *slog.Logger
+	localDbSigner         crypto.Signer
+	counterParty          ecdsa.PublicKey
+	slogger               *slog.Logger
+	presenceDetector      presenceDetector
+	presenceDetectionLock sync.Mutex
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		localDbSigner: localDbSigner,
-		counterParty:  counterParty,
-		slogger:       slogger.With("keytype", "ec"),
+		localDbSigner:    localDbSigner,
+		counterParty:     counterParty,
+		slogger:          slogger.With("keytype", "ec"),
+		presenceDetector: presenceDetector,
 	}
 }
 
@@ -222,6 +226,14 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 						// so just add the session id manually
 						context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
 					)
+
+					// here we want to create an additional callback for presence detection, but it's only going to be valid if we have the session (saml) id
+					presenceDetectionCallbackReq := callbackReq.Clone(context.WithoutCancel(callbackReq.Context()))
+
+					gowrapper.Go(presenceDetectionCallbackReq.Context(), e.slogger, func() {
+						e.presenceDetectionCallback(presenceDetectionCallbackReq, cmdReq, challengeBox, kolideSessionId)
+					})
+
 				}
 				gowrapper.Go(r.Context(), e.slogger, func() {
 					e.sendCallback(callbackReq, callbackData)
@@ -321,6 +333,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
+
+		if len(kolideSessionId) > 0 {
+			bhr.Header().Add(kolideSessionIdHeaderKey, kolideSessionId[0])
+		}
 
 		bhr.Header().Add(kolideOsHeaderKey, runtime.GOOS)
 		bhr.Header().Add(kolideArchHeaderKey, runtime.GOARCH)
@@ -458,4 +474,103 @@ func (bhr *bufferedHttpResponse) WriteHeader(code int) {
 
 func (bhr *bufferedHttpResponse) Bytes() []byte {
 	return bhr.buf.Bytes()
+}
+
+func (e *kryptoEcMiddleware) presenceDetectionCallback(callbackReq *http.Request, cmdReq v2CmdRequestType, challengeBox *challenge.OuterChallenge, kolideSessionId []string) {
+	if callbackReq == nil {
+		return
+	}
+
+	// can test this by adding an unauthed endpoint to the mux and running, for example:
+	// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
+	//detectionIntervalStr := cmdReq.CallbackHeaders.Get(kolidePresenceDetectionIntervalHeaderKey)
+	detectionIntervalStr, ok := cmdReq.Headers[kolidePresenceDetectionIntervalHeaderKey]
+	if !ok || len(detectionIntervalStr) == 0 {
+		return
+	}
+
+	// no presence detection requested
+	if len(detectionIntervalStr) == 0 || detectionIntervalStr[0] == "" {
+		return
+	}
+
+	// presence detection is only supported on macos currently
+	if runtime.GOOS == "linux" {
+		return
+	}
+
+	detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr[0])
+	if err != nil {
+		return
+	}
+
+	reasonKey := kolidePresenceDetectionReasonMacosHeaderKey
+	if runtime.GOOS == "windows" {
+		reasonKey = kolidePresenceDetectionReasonWindowsHeaderKey
+	}
+
+	reason := "authenticate"
+	if reasonStr, ok := cmdReq.CallbackHeaders[reasonKey]; ok && len(reasonStr) > 0 && len(reasonStr[0]) > 0 {
+		reason = reasonStr[0]
+	}
+
+	if !e.presenceDetectionLock.TryLock() {
+		e.slogger.Log(callbackReq.Context(), slog.LevelInfo,
+			"dropping presence detection callback, already in progress",
+		)
+		return
+	}
+	defer e.presenceDetectionLock.Unlock()
+
+	durationSinceLastDetection, err := e.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
+	if err != nil {
+		e.slogger.Log(callbackReq.Context(), slog.LevelInfo,
+			"presence_detection",
+			"reason", reason,
+			"interval", detectionIntervalDuration,
+			"duration_since_last_detection", durationSinceLastDetection,
+			"err", err,
+		)
+	}
+
+	data := map[string]any{
+		"headers": map[string][]string{
+			kolideSessionIdHeaderKey:                          kolideSessionId,
+			kolideDurationSinceLastPresenceDetectionHeaderKey: {durationSinceLastDetection.String()},
+			kolideArchHeaderKey:                               {runtime.GOARCH},
+			kolideOsHeaderKey:                                 {runtime.GOOS},
+		},
+	}
+
+	responseBytes, err := json.Marshal(data)
+	if err != nil {
+		e.slogger.Log(callbackReq.Context(), slog.LevelError,
+			"unable to marshal callback data",
+			"err", err,
+		)
+	}
+
+	var response []byte
+	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
+	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
+	// pass nil to krypto
+	// hardware signing is not implemented for darwin
+	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
+		response, err = challengeBox.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
+	} else {
+		response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
+	}
+
+	callbackReq.Body = io.NopCloser(bytes.NewReader([]byte(base64.StdEncoding.EncodeToString(response))))
+
+	callbackData := &callbackDataStruct{
+		Time:     time.Now().Unix(),
+		Response: base64.StdEncoding.EncodeToString(response),
+	}
+
+	e.sendCallback(callbackReq, callbackData)
+
+	e.slogger.Log(callbackReq.Context(), slog.LevelDebug,
+		"finished presence detection callback",
+	)
 }
