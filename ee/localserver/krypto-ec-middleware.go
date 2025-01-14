@@ -561,6 +561,14 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(callbackReq *http.Request
 		response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
 	}
 
+	if err != nil {
+		e.slogger.Log(callbackReq.Context(), slog.LevelError,
+			"responding to challenge with presence detection data",
+			"err", err,
+		)
+		return
+	}
+
 	callbackReq.Body = io.NopCloser(bytes.NewReader([]byte(base64.StdEncoding.EncodeToString(response))))
 
 	callbackData := &callbackDataStruct{
