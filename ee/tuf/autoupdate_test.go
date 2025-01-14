@@ -50,7 +50,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 
-	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
+	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -122,7 +122,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsquerierBackoff(1*time.Second, 1*time.Second))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -222,7 +222,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -305,7 +305,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -395,7 +395,7 @@ func TestExecute_withInitialDelay(t *testing.T) {
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
-		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+		mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Expect that we interrupt
@@ -458,7 +458,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
-		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+		mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set up library manager: we should expect to tidy the library on startup, but NOT add anything to it
@@ -519,7 +519,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
-		mockQuerier, WithOsqueryRestart(func() error { return nil }))
+		mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Set up normal library and querier interactions
@@ -655,7 +655,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil).Maybe()
 
 			// Set up autoupdater
-			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 			// Update the metadata client with our test root JSON
@@ -731,7 +731,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -816,7 +816,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -900,7 +900,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "beta", autoupdater.updateChannel)
 
@@ -967,7 +967,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "", autoupdater.pinnedVersions[binaryOsqueryd])
 
@@ -1026,7 +1026,7 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, pinnedLauncherVersion, autoupdater.pinnedVersions[binaryLauncher])
 
@@ -1157,7 +1157,7 @@ func Test_storeError(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
 	mockQuerier := newMockQuerier(t)
 
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	mockLibraryManager := NewMocklibrarian(t)
@@ -1237,6 +1237,81 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	require.NoError(t, err, "could not iterate over keys")
 
 	require.Equal(t, 1, keyCount, "cleanup routine did not clean up correct number of old errors")
+}
+
+func TestCollectAndSetEnrollmentDetails(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		osquerydPath  string
+		queryResponse []map[string]string
+		queryError    error
+		expectError   bool
+	}{
+		{
+			name:         "successful collection",
+			osquerydPath: "/test/osqueryd",
+			queryResponse: []map[string]string{{
+				"osquery_version": "1.1.1",
+				"os_build":        "test",
+				"os_name":         "test",
+				"os_version":      "test",
+				"hardware_model":  "test",
+				"hardware_serial": "test",
+				"hardware_vendor": "test",
+				"hostname":        "test",
+				"hardware_uuid":   "test",
+			}},
+			expectError: false,
+		},
+		{
+			name:         "no osqueryd path",
+			osquerydPath: "",
+			expectError:  false,
+		},
+		{
+			name:         "query fails",
+			osquerydPath: "/test/osqueryd",
+			queryError:   errors.New("test error"),
+			expectError:  false, // We don't return error unless env var is set
+		},
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(tt.osquerydPath)
+			mockKnapsack.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Maybe()
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+			mockQuerier := newMockQuerier(t)
+			if tt.osquerydPath != "" {
+				mockQuerier.On("Query", mock.Anything).Return(tt.queryResponse, tt.queryError).Maybe()
+			}
+
+			autoupdater := &TufAutoupdater{
+				knapsack:                mockKnapsack,
+				osquerier:               mockQuerier,
+				slogger:                 mockKnapsack.Slogger(),
+				osquerierBackoffTimeout: 100 * time.Millisecond,
+				osquerierRetryInterval:  20 * time.Millisecond,
+			}
+
+			err := autoupdater.collectAndSetEnrollmentDetails(context.Background())
+			if tt.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			mockKnapsack.AssertExpectations(t)
+			mockQuerier.AssertExpectations(t)
+		})
+	}
 }
 
 func setupStorage(t *testing.T) types.KVStore {

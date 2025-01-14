@@ -86,22 +86,24 @@ type querier interface {
 }
 
 type TufAutoupdater struct {
-	metadataClient         *client.Client
-	libraryManager         librarian
-	osquerier              querier // used to query for current running osquery version
-	osquerierRetryInterval time.Duration
-	knapsack               types.Knapsack
-	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
-	updateChannel          string
-	pinnedVersions         map[autoupdatableBinary]string        // maps the binaries to their pinned versions
-	pinnedVersionGetters   map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
-	initialDelayEnd        time.Time
-	updateLock             *sync.Mutex
-	interrupt              chan struct{}
-	interrupted            atomic.Bool
-	signalRestart          chan error
-	slogger                *slog.Logger
-	restartFuncs           map[autoupdatableBinary]func() error
+	metadataClient           *client.Client
+	libraryManager           librarian
+	osquerier                querier // used to query for current running osquery version
+	osquerierRetryInterval   time.Duration
+	knapsack                 types.Knapsack
+	store                    types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
+	updateChannel            string
+	pinnedVersions           map[autoupdatableBinary]string        // maps the binaries to their pinned versions
+	pinnedVersionGetters     map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
+	initialDelayEnd          time.Time
+	updateLock               *sync.Mutex
+	interrupt                chan struct{}
+	interrupted              atomic.Bool
+	signalRestart            chan error
+	slogger                  *slog.Logger
+	restartFuncs             map[autoupdatableBinary]func() error
+	osquerierBackoffTimeout  time.Duration
+	osquerierBackoffInterval time.Duration
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -112,6 +114,13 @@ func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
 			ta.restartFuncs = make(map[autoupdatableBinary]func() error)
 		}
 		ta.restartFuncs[binaryOsqueryd] = restart
+	}
+}
+
+func WithOsquerierBackoff(timeout, interval time.Duration) TufAutoupdaterOption {
+	return func(ta *TufAutoupdater) {
+		ta.osquerierBackoffTimeout = timeout
+		ta.osquerierBackoffInterval = interval
 	}
 }
 
@@ -134,12 +143,14 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
-		initialDelayEnd:        time.Now().Add(k.AutoupdateInitialDelay()),
-		updateLock:             &sync.Mutex{},
-		osquerier:              osquerier,
-		osquerierRetryInterval: 30 * time.Second,
-		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
-		restartFuncs:           make(map[autoupdatableBinary]func() error),
+		initialDelayEnd:          time.Now().Add(k.AutoupdateInitialDelay()),
+		updateLock:               &sync.Mutex{},
+		osquerier:                osquerier,
+		osquerierRetryInterval:   30 * time.Second,
+		slogger:                  k.Slogger().With("component", "tuf_autoupdater"),
+		restartFuncs:             make(map[autoupdatableBinary]func() error),
+		osquerierBackoffTimeout:  30 * time.Second, // Default production value
+		osquerierBackoffInterval: 5 * time.Second,  // Default production value
 	}
 
 	for _, opt := range opts {
@@ -784,7 +795,7 @@ func (ta *TufAutoupdater) collectAndSetEnrollmentDetails(ctx context.Context) er
 				)
 			}
 			return err
-		}, 30*time.Second, 5*time.Second); err != nil {
+		}, ta.osquerierBackoffTimeout, ta.osquerierBackoffInterval); err != nil {
 			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
 				return fmt.Errorf("query osq enrollment details: %w", err)
 			}
