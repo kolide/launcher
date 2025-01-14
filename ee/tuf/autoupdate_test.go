@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -25,6 +26,7 @@ import (
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -72,13 +74,29 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
+
+	// Download real osqueryd binary
+	target := packaging.Target{}
+	require.NoError(t, target.PlatformFromString(runtime.GOOS))
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
+
+	osquerydPath := filepath.Join(testRootDir, target.PlatformBinaryName("osqueryd"))
+
+	// Fetch and copy osqueryd
+	downloadPath, err := packaging.FetchBinary(context.TODO(), testRootDir, "osqueryd",
+		target.PlatformBinaryName("osqueryd"), "stable", target)
+	require.NoError(t, err)
+	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
+
+	// Make binary executable
+	require.NoError(t, os.Chmod(osquerydPath, 0755))
+
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
-	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
-	_, err := os.Create(fakeOsqBinaryPath)
-	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
@@ -93,8 +111,9 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
+	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -633,6 +652,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath).Maybe()
+			mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil).Maybe()
 
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -708,6 +728,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }))
@@ -872,6 +893,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
 	// Start out on beta channel, then swap to nightly
 	mockKnapsack.On("UpdateChannel").Return("beta").Once()
