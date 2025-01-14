@@ -102,6 +102,44 @@ func TestShutdown(t *testing.T) {
 	require.True(t, canceled, "errgroup did not exit")
 }
 
+func TestShutdown_ReturnsOnTimeout(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
+
+	// Create a goroutine that will not return before the shutdown timeout
+	eg.StartGoroutine(ctx, "test_goroutine", func() error {
+		time.Sleep(10 * maxErrgroupShutdownDuration)
+		return nil
+	})
+
+	// Shutdown should return by `maxErrgroupShutdownDuration`
+	eg.Shutdown()
+	waitChan := make(chan error)
+	go func() {
+		waitChan <- eg.Wait()
+	}()
+	select {
+	case err := <-waitChan:
+		require.NotNil(t, err, "should have received timeout error")
+	case <-time.After(maxErrgroupShutdownDuration + 1*time.Second):
+		t.Errorf("instance did not complete shutdown before timeout plus small grace period")
+	}
+
+	// We expect that the errgroup shuts down
+	canceled := false
+	select {
+	case <-eg.Exited():
+		canceled = true
+	default:
+	}
+
+	require.True(t, canceled, "errgroup did not exit")
+}
+
 func TestStartGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
