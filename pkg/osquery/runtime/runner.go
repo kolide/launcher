@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	launchRetryDelay = 30 * time.Second
+	launchRetryDelay = 10 * time.Second
 )
 
 type Runner struct {

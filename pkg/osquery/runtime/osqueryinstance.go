@@ -42,8 +42,12 @@ const (
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
 
-	// How long to wait before erroring because the osquery process has not started up successfully
-	osqueryStartupTimeout = 1 * time.Minute
+	// How long to wait before erroring because the osquery process has not started up successfully.
+	// This is a generous timeout -- the average osquery startup takes just over a second, and the
+	// 95th percentile startup takes just over two seconds. We rounded up to 20 seconds to give
+	// extra time for our outliers.
+	// See writeup in https://github.com/kolide/launcher/pull/2041 for data and details.
+	osqueryStartupTimeout = 20 * time.Second
 
 	// How often to check whether the osquery process has started up successfully
 	osqueryStartupRecheckInterval = 1 * time.Second
@@ -331,12 +335,6 @@ func (i *OsqueryInstance) Launch() error {
 	// Assign a PGID that matches the PID. This lets us kill the entire process group later.
 	i.cmd.SysProcAttr = setpgid()
 
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"launching osqueryd",
-		"path", i.cmd.Path,
-		"args", strings.Join(i.cmd.Args, " "),
-	)
-
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
 	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
@@ -348,52 +346,9 @@ func (i *OsqueryInstance) Launch() error {
 	}
 
 	// Launch osquery process (async)
-	err = i.startFunc(i.cmd)
-	if err != nil {
-		// Failure here is indicative of a failure to exec. A missing
-		// binary? Bad permissions? TODO: Consider catching errors in the
-		// update system and falling back to an earlier version.
-		msgPairs := append(
-			getOsqueryInfoForLog(i.cmd.Path),
-			"err", err,
-		)
-
-		i.slogger.Log(ctx, slog.LevelWarn,
-			"fatal error starting osquery -- could not exec.",
-			msgPairs...,
-		)
-		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
-		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	if err := i.startOsquerydProcess(ctx, paths); err != nil {
+		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
-
-	span.AddEvent("launched_osqueryd")
-	i.slogger.Log(ctx, slog.LevelInfo,
-		"launched osquery process",
-		"osqueryd_pid", i.cmd.Process.Pid,
-	)
-
-	// wait for osquery to create the socket before moving on,
-	// this is intended to serve as a kind of health check
-	// for osquery, if it's started successfully it will create
-	// a socket
-	if err := backoff.WaitFor(func() error {
-		_, err := os.Stat(paths.extensionSocketPath)
-		if err != nil {
-			i.slogger.Log(ctx, slog.LevelDebug,
-				"osquery extension socket not created yet ... will retry",
-				"path", paths.extensionSocketPath,
-			)
-		}
-		return err
-	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
-		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
-		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
-	}
-
-	span.AddEvent("socket_created")
-	i.slogger.Log(ctx, slog.LevelDebug,
-		"osquery socket created",
-	)
 
 	stats, err := history.NewInstance(i.registrationId, i.runId)
 	if err != nil {
@@ -479,6 +434,67 @@ func (i *OsqueryInstance) Launch() error {
 
 		return nil
 	})
+
+	return nil
+}
+
+// startOsquerydProcess starts the osquery instance's `cmd` and waits for the osqueryd process
+// to create a socket file, indicating it's started up successfully.
+func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, paths *osqueryFilePaths) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	i.slogger.Log(ctx, slog.LevelInfo,
+		"launching osqueryd",
+		"path", i.cmd.Path,
+		"args", strings.Join(i.cmd.Args, " "),
+	)
+
+	if err := i.startFunc(i.cmd); err != nil {
+		// Failure here is indicative of a failure to exec. A missing
+		// binary? Bad permissions? TODO: Consider catching errors in the
+		// update system and falling back to an earlier version.
+		msgPairs := append(
+			getOsqueryInfoForLog(i.cmd.Path),
+			"err", err,
+		)
+
+		i.slogger.Log(ctx, slog.LevelWarn,
+			"fatal error starting osquery -- could not exec.",
+			msgPairs...,
+		)
+		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
+		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
+	}
+
+	span.AddEvent("launched_osqueryd")
+	i.slogger.Log(ctx, slog.LevelInfo,
+		"launched osquery process",
+		"osqueryd_pid", i.cmd.Process.Pid,
+	)
+
+	// wait for osquery to create the socket before moving on,
+	// this is intended to serve as a kind of health check
+	// for osquery, if it's started successfully it will create
+	// a socket
+	if err := backoff.WaitFor(func() error {
+		_, err := os.Stat(paths.extensionSocketPath)
+		if err != nil {
+			i.slogger.Log(ctx, slog.LevelDebug,
+				"osquery extension socket not created yet ... will retry",
+				"path", paths.extensionSocketPath,
+			)
+		}
+		return err
+	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
+		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
+	}
+
+	span.AddEvent("socket_created")
+	i.slogger.Log(ctx, slog.LevelDebug,
+		"osquery socket created",
+	)
 
 	return nil
 }
