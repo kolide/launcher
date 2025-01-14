@@ -42,7 +42,11 @@ const (
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
 
-	// How long to wait before erroring because the osquery process has not started up successfully
+	// How long to wait before erroring because the osquery process has not started up successfully.
+	// This is a generous timeout -- the average osquery startup takes just over a second, and the
+	// 95th percentile startup takes just over two seconds. We rounded up to 20 seconds to give
+	// extra time for our outliers.
+	// See writeup in https://github.com/kolide/launcher/pull/2041 for data and details.
 	osqueryStartupTimeout = 20 * time.Second
 
 	// How often to check whether the osquery process has started up successfully
