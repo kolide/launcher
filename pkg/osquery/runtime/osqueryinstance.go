@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/errgroup"
@@ -176,12 +175,6 @@ type osqueryOptions struct {
 	// options included by the caller of LaunchOsqueryInstance
 	augeasLensFunc      func(dir string) error
 	extensionSocketPath string
-}
-
-func init() {
-	// Override the default shutdown behavior for our extension server, so that it does not
-	// take too long to shut down.
-	thrift.ServerStopTimeout = 3 * time.Second
 }
 
 func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, opts ...OsqueryInstanceOption) *OsqueryInstance {
