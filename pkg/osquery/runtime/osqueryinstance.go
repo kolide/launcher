@@ -831,6 +831,9 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 				"extension_name", name,
 			)
 		}
+		if client != nil {
+			client.Close()
+		}
 		return nil
 	})
 
