@@ -778,10 +778,18 @@ func TestMultipleInstancesWithUpdatedRegistrationIDs(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
 	go runner.Run()
@@ -866,10 +874,18 @@ func TestUpdatingRegistrationIDsOnlyRestartsForChanges(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
 	runner := New(k, serviceClient)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
 	go runner.Run()
