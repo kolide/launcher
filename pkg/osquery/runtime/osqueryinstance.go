@@ -35,6 +35,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+func init() {
+	// Make sure we will stop the extension manager server during shutdown.
+	// We set this during `init` to avoid data races.
+	thrift.ServerStopTimeout = 1 * time.Second
+}
+
 const (
 	// KolideSaasExtensionName is the name of the extension that provides the config,
 	// distributed queries, and log destination for the osquery process. It also provides
@@ -805,9 +811,6 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	i.emsLock.Lock()
 	defer i.emsLock.Unlock()
-
-	// Make sure we will stop the server during shutdown
-	thrift.ServerStopTimeout = 1 * time.Second
 
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
