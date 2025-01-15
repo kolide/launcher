@@ -22,7 +22,6 @@ import (
 var runID string
 
 // Package-level enrollmentDetails variable
-
 var enrollmentDetails types.EnrollmentDetails
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
