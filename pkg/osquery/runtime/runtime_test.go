@@ -665,8 +665,8 @@ func TestOsqueryDies(t *testing.T) {
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
-	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
+	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown occurs")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown occurs")
 
 	waitShutdown(t, runner, logBytes)
 }
