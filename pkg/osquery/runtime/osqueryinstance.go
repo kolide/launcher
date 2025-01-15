@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/errgroup"
@@ -804,6 +805,9 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 
 	i.emsLock.Lock()
 	defer i.emsLock.Unlock()
+
+	// Make sure we will stop the server during shutdown
+	thrift.ServerStopTimeout = 1 * time.Second
 
 	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
 
