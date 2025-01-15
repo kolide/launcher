@@ -87,7 +87,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			callbackWaitGroup.Add(2)
 
 			// assume that if we have presence detection headers, we should have a presence detection callback
-			if tt.expectedPresenceDetectionCallbackHeaders != nil {
+			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
 				callbackWaitGroup.Add(2)
 			}
 
