@@ -19,7 +19,7 @@ type LoggedErrgroup struct {
 
 const (
 	maxShutdownGoroutineDuration = 3 * time.Second
-	maxErrgroupShutdownDuration  = 8 * time.Second // shutdown timeout should be shorter than rungroup.InterruptTimeout
+	maxErrgroupShutdownDuration  = 30 * time.Second // shutdown timeout should be shorter than rungroup.InterruptTimeout
 )
 
 func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgroup {
