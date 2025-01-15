@@ -185,7 +185,11 @@ func (l *LoggedErrgroup) Wait() error {
 	case err := <-errChan:
 		return err
 	case <-time.After(maxErrgroupShutdownDuration):
-		return fmt.Errorf("instance did not complete shutdown within %s", maxErrgroupShutdownDuration.String())
+		l.slogger.Log(context.TODO(), slog.LevelWarn,
+			"errgroup did not complete shutdown within timeout",
+			"timeout", maxErrgroupShutdownDuration.String(),
+		)
+		return nil
 	}
 }
 
