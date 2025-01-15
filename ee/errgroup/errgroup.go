@@ -158,7 +158,6 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		}
 		slogger.Log(ctx, logLevel,
 			"exiting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
 			"goroutine_run_time", elapsedTime.String(),
 			"goroutine_err", err,
 		)
