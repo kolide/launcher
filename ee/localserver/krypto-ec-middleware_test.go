@@ -141,7 +141,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			for _, req := range []*http.Request{mustMakeGetRequest(t, challengeKryptoBoxB64), mustMakePostRequest(t, challengeKryptoBoxB64)} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
-					// t.Parallel()
+					t.Parallel()
 
 					var logBytes bytes.Buffer
 					slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -188,11 +188,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					responseHeaders := mustExtractJsonProperty[map[string][]string](t, opened.ResponseData, "headers")
 					require.Equal(t, tt.expectedResponseHeaders, responseHeaders)
+
+					// wait for the callbacks to finish so callback server can run tests
+					callbackWaitGroup.Wait()
 				})
 			}
-
-			// wait for the callbacks to finish so callback server can run tests
-			callbackWaitGroup.Wait()
 		})
 	}
 }
