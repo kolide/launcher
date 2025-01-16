@@ -43,28 +43,3 @@ func TestTable(t *testing.T) {
 		})
 	}
 }
-
-func BenchmarkUpdatesTable(b *testing.B) {
-	for range b.N {
-		table := Table{
-			slogger:   multislogger.NewNopLogger(),
-			queryFunc: queryUpdates,
-		}
-
-		_, err := table.generate(context.TODO(), tablehelpers.MockQueryContext(nil))
-		require.NoError(b, err, "expected no error generating rows")
-	}
-
-	/*
-		goos: windows
-		goarch: amd64
-		pkg: github.com/kolide/launcher/ee/tables/windowsupdatetable
-		cpu: 12th Gen Intel(R) Core(TM) i5-1235U
-		BenchmarkUpdatesTable-12               1        11490456300 ns/op
-		BenchmarkUpdatesTable-12               1        10991756100 ns/op
-		BenchmarkUpdatesTable-12               1        11363828700 ns/op
-		BenchmarkUpdatesTable-12               1        29924337500 ns/op
-		BenchmarkUpdatesTable-12               1        9703925900 ns/op
-		BenchmarkUpdatesTable-12               1        11219771500 ns/op
-	*/
-}
