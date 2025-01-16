@@ -19,6 +19,7 @@ type LoggedErrgroup struct {
 
 const (
 	maxShutdownGoroutineDuration = 3 * time.Second
+	maxErrgroupShutdownDuration  = 30 * time.Second
 )
 
 func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgroup {
@@ -157,7 +158,6 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		}
 		slogger.Log(ctx, logLevel,
 			"exiting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
 			"goroutine_run_time", elapsedTime.String(),
 			"goroutine_err", err,
 		)
@@ -174,7 +174,22 @@ func (l *LoggedErrgroup) Shutdown() {
 }
 
 func (l *LoggedErrgroup) Wait() error {
-	return l.errgroup.Wait()
+	errChan := make(chan error)
+	go func() {
+		errChan <- l.errgroup.Wait()
+	}()
+
+	// Wait to receive an error from l.errgroup.Wait(), but only until our shutdown timeout.
+	select {
+	case err := <-errChan:
+		return err
+	case <-time.After(maxErrgroupShutdownDuration):
+		l.slogger.Log(context.TODO(), slog.LevelWarn,
+			"errgroup did not complete shutdown within timeout",
+			"timeout", maxErrgroupShutdownDuration.String(),
+		)
+		return nil
+	}
 }
 
 func (l *LoggedErrgroup) Exited() <-chan struct{} {

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/osquery/osquery-go"
@@ -56,9 +57,15 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(), WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, mockServiceClient(t), WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -72,6 +79,7 @@ func TestOsquerySlowStart(t *testing.T) {
 		}()
 		return nil
 	}))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
@@ -104,11 +112,18 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 
-	runner := New(k, mockServiceClient(), WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, mockServiceClient(t), WithExtensionSocketPath(extensionSocketPath))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
