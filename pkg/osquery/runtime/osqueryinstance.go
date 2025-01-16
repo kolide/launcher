@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/errgroup"
@@ -33,6 +34,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+func init() {
+	// Make sure we will stop the extension manager server during shutdown.
+	// We set this during `init` to avoid data races.
+	thrift.ServerStopTimeout = 1 * time.Second
+}
 
 const (
 	// KolideSaasExtensionName is the name of the extension that provides the config,
@@ -830,6 +837,9 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 				"err", err,
 				"extension_name", name,
 			)
+		}
+		if client != nil {
+			client.Close()
 		}
 		return nil
 	})
