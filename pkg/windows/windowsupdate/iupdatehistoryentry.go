@@ -1,11 +1,13 @@
 package windowsupdate
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -29,7 +31,10 @@ type IUpdateHistoryEntry struct {
 	UpdateIdentity      *IUpdateIdentity
 }
 
-func toIUpdateHistoryEntries(updateHistoryEntriesDisp *ole.IDispatch) ([]*IUpdateHistoryEntry, error) {
+func toIUpdateHistoryEntries(ctx context.Context, updateHistoryEntriesDisp *ole.IDispatch) ([]*IUpdateHistoryEntry, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntriesDisp, "Count"))
 	if err != nil {
 		return nil, fmt.Errorf("Count: %w", err)
@@ -42,7 +47,7 @@ func toIUpdateHistoryEntries(updateHistoryEntriesDisp *ole.IDispatch) ([]*IUpdat
 			return nil, fmt.Errorf("item %d: %w", i, err)
 		}
 
-		updateHistoryEntry, err := toIUpdateHistoryEntry(updateHistoryEntryDisp)
+		updateHistoryEntry, err := toIUpdateHistoryEntry(ctx, updateHistoryEntryDisp)
 		if err != nil {
 			return nil, fmt.Errorf("toIUpdateHistoryEntry: %w", err)
 		}
@@ -52,7 +57,10 @@ func toIUpdateHistoryEntries(updateHistoryEntriesDisp *ole.IDispatch) ([]*IUpdat
 	return updateHistoryEntries, nil
 }
 
-func toIUpdateHistoryEntry(updateHistoryEntryDisp *ole.IDispatch) (*IUpdateHistoryEntry, error) {
+func toIUpdateHistoryEntry(ctx context.Context, updateHistoryEntryDisp *ole.IDispatch) (*IUpdateHistoryEntry, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 	iUpdateHistoryEntry := &IUpdateHistoryEntry{
 		disp: updateHistoryEntryDisp,
@@ -115,7 +123,7 @@ func toIUpdateHistoryEntry(updateHistoryEntryDisp *ole.IDispatch) (*IUpdateHisto
 		return nil, fmt.Errorf("UpdateIdentity: %w", err)
 	}
 	if updateIdentityDisp != nil {
-		if iUpdateHistoryEntry.UpdateIdentity, err = toIUpdateIdentity(updateIdentityDisp); err != nil {
+		if iUpdateHistoryEntry.UpdateIdentity, err = toIUpdateIdentity(ctx, updateIdentityDisp); err != nil {
 			return nil, fmt.Errorf("toIUpdateIdentity: %w", err)
 		}
 	}

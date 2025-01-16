@@ -1,7 +1,10 @@
 package windowsupdate
 
 import (
+	"context"
+
 	"github.com/go-ole/go-ole"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // IImageInformation contains information about a localized image that is associated with an update or a category.
@@ -14,7 +17,10 @@ type IImageInformation struct {
 	Width   int64
 }
 
-func toIImageInformation(imageInformationDisp *ole.IDispatch) (*IImageInformation, error) {
+func toIImageInformation(ctx context.Context, imageInformationDisp *ole.IDispatch) (*IImageInformation, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// TODO
 	return nil, nil
 }

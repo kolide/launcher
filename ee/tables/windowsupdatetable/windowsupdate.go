@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/scjalliance/comshim"
@@ -55,17 +56,26 @@ func TablePlugin(mode tableMode, slogger *slog.Logger) *table.Plugin {
 	return table.NewPlugin(t.name, columns, t.generate)
 }
 
-func queryUpdates(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
-	return searcher.Search("Type='Software'")
+func queryUpdates(ctx context.Context, searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	return searcher.Search(ctx, "Type='Software'")
 }
 
-func queryHistory(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
-	return searcher.QueryHistoryAll()
+func queryHistory(ctx context.Context, searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	return searcher.QueryHistoryAll(ctx)
 }
 
-type queryFuncType func(*windowsupdate.IUpdateSearcher) (interface{}, error)
+type queryFuncType func(context.Context, *windowsupdate.IUpdateSearcher) (interface{}, error)
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
@@ -87,23 +97,26 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "locale", locale)
+	defer span.End()
+
 	comshim.Add(1)
 	defer comshim.Done()
 
 	var results []map[string]string
 
-	searcher, setLocale, isDefaultLocale, err := getSearcher(locale)
+	searcher, setLocale, isDefaultLocale, err := getSearcher(ctx, locale)
 	if err != nil {
 		return nil, fmt.Errorf("new searcher: %w", err)
 	}
 
-	searchResults, err := t.queryFunc(searcher)
+	searchResults, err := t.queryFunc(ctx, searcher)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-		flatData, err := t.flattenOutput(dataQuery, searchResults)
+		flatData, err := t.flattenOutput(ctx, dataQuery, searchResults)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"flatten failed",
@@ -123,7 +136,10 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 	return results, nil
 }
 
-func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
+func (t *Table) flattenOutput(ctx context.Context, dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
@@ -139,10 +155,13 @@ func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]da
 	return dataflatten.Json(jsonBytes, flattenOpts...)
 }
 
-func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, error) {
+func getSearcher(ctx context.Context, locale string) (*windowsupdate.IUpdateSearcher, string, int, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	isDefaultLocale := 0
 
-	session, err := windowsupdate.NewUpdateSession()
+	session, err := windowsupdate.NewUpdateSession(ctx)
 	if err != nil {
 		return nil, locale, isDefaultLocale, fmt.Errorf("NewUpdateSession: %w", err)
 	}
@@ -155,7 +174,7 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 		if err != nil {
 			return nil, locale, isDefaultLocale, fmt.Errorf("Parse locale %s: %w", locale, err)
 		}
-		if err := session.SetLocal(uint32(requestedLocale)); err != nil {
+		if err := session.SetLocal(ctx, uint32(requestedLocale)); err != nil {
 			return nil, locale, isDefaultLocale, fmt.Errorf("setting local to %d: %w", uint32(requestedLocale), err)
 		}
 	}
@@ -163,7 +182,7 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 	// What local is this data for? If it doesn't match the
 	// requested one, throw an error, since sqlite is going to
 	// block it.
-	getLocale, err := session.GetLocal()
+	getLocale, err := session.GetLocal(ctx)
 	if err != nil {
 		return nil, locale, isDefaultLocale, fmt.Errorf("getlocale: %w", err)
 	}
@@ -173,7 +192,7 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 		locale = strconv.FormatUint(uint64(getLocale), 10)
 	}
 
-	searcher, err := session.CreateUpdateSearcher()
+	searcher, err := session.CreateUpdateSearcher(ctx)
 	if err != nil {
 		return nil, locale, isDefaultLocale, fmt.Errorf("new searcher: %w", err)
 	}

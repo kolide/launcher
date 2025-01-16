@@ -1,8 +1,11 @@
 package windowsupdate
 
 import (
+	"context"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -21,7 +24,10 @@ type ICategory struct {
 	Updates     []*IUpdate
 }
 
-func toICategories(categoriesDisp *ole.IDispatch) ([]*ICategory, error) {
+func toICategories(ctx context.Context, categoriesDisp *ole.IDispatch) ([]*ICategory, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(categoriesDisp, "Count"))
 	if err != nil {
 		return nil, err
@@ -34,7 +40,7 @@ func toICategories(categoriesDisp *ole.IDispatch) ([]*ICategory, error) {
 			return nil, err
 		}
 
-		category, err := toICategory(categoryDisp)
+		category, err := toICategory(ctx, categoryDisp)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +50,10 @@ func toICategories(categoriesDisp *ole.IDispatch) ([]*ICategory, error) {
 	return categories, nil
 }
 
-func toICategory(categoryDisp *ole.IDispatch) (*ICategory, error) {
+func toICategory(ctx context.Context, categoryDisp *ole.IDispatch) (*ICategory, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 	iCategory := &ICategory{
 		disp: categoryDisp,
@@ -59,7 +68,7 @@ func toICategory(categoryDisp *ole.IDispatch) (*ICategory, error) {
 		return nil, err
 	}
 	if childrenDisp != nil {
-		if iCategory.Children, err = toICategories(childrenDisp); err != nil {
+		if iCategory.Children, err = toICategories(ctx, childrenDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -73,7 +82,7 @@ func toICategory(categoryDisp *ole.IDispatch) (*ICategory, error) {
 		return nil, err
 	}
 	if imageDisp != nil {
-		if iCategory.Image, err = toIImageInformation(imageDisp); err != nil {
+		if iCategory.Image, err = toIImageInformation(ctx, imageDisp); err != nil {
 			return nil, err
 		}
 	}

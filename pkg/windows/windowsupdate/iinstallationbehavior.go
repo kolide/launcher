@@ -1,7 +1,10 @@
 package windowsupdate
 
 import (
+	"context"
+
 	"github.com/go-ole/go-ole"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // IInstallationBehavior represents the installation and uninstallation options of an update.
@@ -14,7 +17,10 @@ type IInstallationBehavior struct {
 	RequiresNetworkConnectivity bool
 }
 
-func toIInstallationBehavior(installationBehaviorDisp *ole.IDispatch) (*IInstallationBehavior, error) {
+func toIInstallationBehavior(ctx context.Context, installationBehaviorDisp *ole.IDispatch) (*IInstallationBehavior, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// TODO
 	return nil, nil
 }

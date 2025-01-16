@@ -1,10 +1,12 @@
 package windowsupdate
 
 import (
+	"context"
 	"time"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -63,7 +65,10 @@ type IUpdate struct {
 }
 
 // toIUpdates takes a IUpdateCollection and returns a []*IUpdate
-func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
+func toIUpdates(ctx context.Context, updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
 	if err != nil {
 		return nil, err
@@ -76,7 +81,7 @@ func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 			return nil, err
 		}
 
-		update, err := toIUpdate(updateDisp)
+		update, err := toIUpdate(ctx, updateDisp)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +93,10 @@ func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 
 // toIUpdates takes a IUpdateCollection and returns the a
 // []*IUpdateIdentity of the contained IUpdates. This is *not* recursive, though possible is should be
-func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error) {
+func toIUpdatesIdentities(ctx context.Context, updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if updatesDisp == nil {
 		return nil, nil
 	}
@@ -110,7 +118,7 @@ func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error
 			return nil, err
 		}
 		if identityDisp != nil {
-			if identities[i], err = toIUpdateIdentity(identityDisp); err != nil {
+			if identities[i], err = toIUpdateIdentity(ctx, identityDisp); err != nil {
 				return nil, err
 			}
 		}
@@ -118,7 +126,10 @@ func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error
 	return identities, nil
 }
 
-func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
+func toIUpdate(ctx context.Context, updateDisp *ole.IDispatch) (*IUpdate, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 	iUpdate := &IUpdate{
 		disp: updateDisp,
@@ -139,7 +150,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 	if arrDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "BundledUpdates")); err != nil {
 		return nil, err
 	} else {
-		if iUpdate.BundledUpdates, err = toIUpdatesIdentities(arrDisp); err != nil {
+		if iUpdate.BundledUpdates, err = toIUpdatesIdentities(ctx, arrDisp); err != nil {
 			return nil, err
 
 		}
@@ -156,7 +167,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 	if categoriesDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Categories")); err != nil {
 		return nil, err
 	} else if categoriesDisp != nil {
-		if iUpdate.Categories, err = toICategories(categoriesDisp); err != nil {
+		if iUpdate.Categories, err = toICategories(ctx, categoriesDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -190,7 +201,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 	if downloadContentsDisp != nil {
-		if iUpdate.DownloadContents, err = toIUpdateDownloadContents(downloadContentsDisp); err != nil {
+		if iUpdate.DownloadContents, err = toIUpdateDownloadContents(ctx, downloadContentsDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -216,7 +227,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 	if identityDisp != nil {
-		if iUpdate.Identity, err = toIUpdateIdentity(identityDisp); err != nil {
+		if iUpdate.Identity, err = toIUpdateIdentity(ctx, identityDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -226,7 +237,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 	if imageDisp != nil {
-		if iUpdate.Image, err = toIImageInformation(imageDisp); err != nil {
+		if iUpdate.Image, err = toIImageInformation(ctx, imageDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -236,7 +247,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 	if installationBehaviorDisp != nil {
-		if iUpdate.InstallationBehavior, err = toIInstallationBehavior(installationBehaviorDisp); err != nil {
+		if iUpdate.InstallationBehavior, err = toIInstallationBehavior(ctx, installationBehaviorDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -342,7 +353,7 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 		return nil, err
 	}
 	if uninstallationBehaviorDisp != nil {
-		if iUpdate.UninstallationBehavior, err = toIInstallationBehavior(uninstallationBehaviorDisp); err != nil {
+		if iUpdate.UninstallationBehavior, err = toIInstallationBehavior(ctx, uninstallationBehaviorDisp); err != nil {
 			return nil, err
 		}
 	}
@@ -359,7 +370,10 @@ func toIUpdate(updateDisp *ole.IDispatch) (*IUpdate, error) {
 }
 
 //nolint:unused
-func toIUpdateCollection(updates []*IUpdate) (*ole.IDispatch, error) {
+func toIUpdateCollection(ctx context.Context, updates []*IUpdate) (*ole.IDispatch, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	unknown, err := oleutil.CreateObject("Microsoft.Update.UpdateColl")
 	if err != nil {
 		return nil, err
