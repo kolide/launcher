@@ -72,19 +72,21 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 }
 
 type kryptoEcMiddleware struct {
-	localDbSigner         crypto.Signer
-	counterParty          ecdsa.PublicKey
-	slogger               *slog.Logger
-	presenceDetector      presenceDetector
-	presenceDetectionLock sync.Mutex
+	localDbSigner          crypto.Signer
+	counterParty           ecdsa.PublicKey
+	slogger                *slog.Logger
+	presenceDetector       presenceDetector
+	presenceDetectionLock  sync.Mutex
+	timestampValidityRange int64
 }
 
 func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		localDbSigner:    localDbSigner,
-		counterParty:     counterParty,
-		slogger:          slogger.With("keytype", "ec"),
-		presenceDetector: presenceDetector,
+		localDbSigner:          localDbSigner,
+		counterParty:           counterParty,
+		slogger:                slogger.With("keytype", "ec"),
+		presenceDetector:       presenceDetector,
+		timestampValidityRange: timestampValidityRange,
 	}
 }
 
@@ -284,7 +286,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
-		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
+		if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 			traces.SetError(span, errors.New("timestamp is out of range"))
 			e.slogger.Log(r.Context(), slog.LevelError,
@@ -494,7 +496,7 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(callbackReq *http.Request
 		return
 	}
 
-	// presence detection is only supported on macos currently
+	// presence detection is not yet available on linux
 	if runtime.GOOS == "linux" {
 		return
 	}

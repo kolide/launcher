@@ -87,6 +87,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			callbackWaitGroup.Add(2)
 
 			// assume that if we have presence detection headers, we should have a presence detection callback
+			// presence detection is not yet available on linux
 			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
 				callbackWaitGroup.Add(2)
 			}
@@ -101,7 +102,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				body, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
 
-				opened := mustOpenKryptoResponse(t, mustExtractJsonProperty[string](t, body, "Response"), challengePrivateKey)
+				outerResponse := mustUnmarshallOuterResponse(t, mustExtractJsonProperty[string](t, body, "Response"))
+				require.Equal(t, challengeId, outerResponse.ChallengeId)
+
+				opened, err := outerResponse.Open(challengePrivateKey)
+				require.NoError(t, err)
+				require.Equal(t, challengeData, opened.ChallengeData)
 
 				headers := mustExtractJsonProperty[map[string][]string](t, opened.ResponseData, "headers")
 
@@ -167,7 +173,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
 
-					opened := mustOpenKryptoResponse(t, rr.Body.String(), challengePrivateKey)
+					outerResponse := mustUnmarshallOuterResponse(t, string(rr.Body.Bytes()))
+					require.Equal(t, challengeId, outerResponse.ChallengeId)
+
+					opened, err := outerResponse.Open(challengePrivateKey)
+					require.NoError(t, err)
+					require.Equal(t, challengeData, opened.ChallengeData)
 
 					require.Equal(t, mustExtractJsonProperty[string](t, responseBody, "body"), mustExtractJsonProperty[string](t, opened.ResponseData, "body"),
 						"returned response body should match the expected response body",
@@ -194,9 +205,10 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 	localServerPrivateKey := mustGenEcdsaKey(t)
 
 	var tests = []struct {
-		name      string
-		loggedErr string
-		challenge func() string
+		name          string
+		loggedErr     string
+		challenge     func() string
+		middlewareOpt func(*kryptoEcMiddleware)
 	}{
 		{
 			name:      "no command",
@@ -222,6 +234,17 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 			},
 			loggedErr: "unable to verify signature",
 		},
+		{
+			name: "timestamp invalid",
+			challenge: func() string {
+				challenge, _ := mustGenerateChallenge(t, remoteServerPrivateKey, []byte(ulid.New()), []byte(ulid.New()), mustMarshal(t, v2CmdRequestType{}))
+				return challenge
+			},
+			loggedErr: "timestamp is out of range",
+			middlewareOpt: func(k *kryptoEcMiddleware) {
+				k.timestampValidityRange = -1
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -234,7 +257,7 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 			for _, req := range []*http.Request{getRequest /* makePostRequest(t, encodedChallenge) */} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
-					// t.Parallel()
+					t.Parallel()
 
 					var logBytes bytes.Buffer
 					slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -246,6 +269,9 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					if tt.middlewareOpt != nil {
+						tt.middlewareOpt(kryptoEcMiddleware)
+					}
 
 					rr := httptest.NewRecorder()
 
@@ -257,7 +283,7 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					require.Contains(t, logBytes.String(), tt.loggedErr)
 
 					require.NotEqual(t, http.StatusOK, rr.Code,
-						"should have no 200 code on failure",
+						"should not have 200 status code on failure",
 					)
 				})
 			}
@@ -398,7 +424,9 @@ func Test_AllowedOrigin(t *testing.T) {
 				return
 			}
 
-			mustOpenKryptoResponse(t, rr.Body.String(), privateEncryptionKey)
+			outerRespnse := mustUnmarshallOuterResponse(t, rr.Body.String())
+			_, err := outerRespnse.Open(privateEncryptionKey)
+			require.NoError(t, err)
 		})
 	}
 
@@ -433,18 +461,13 @@ func mustGenerateChallenge(t *testing.T, key *ecdsa.PrivateKey, challengeId, cha
 	return base64.StdEncoding.EncodeToString(challenge), priv
 }
 
-func mustOpenKryptoResponse(t *testing.T, responseB64 string, privateEncryptionKey *[32]byte) *challenge.InnerResponse {
+func mustUnmarshallOuterResponse(t *testing.T, responseB64 string) *challenge.OuterResponse {
 	returnedResponseBytes, err := base64.StdEncoding.DecodeString(responseB64)
 	require.NoError(t, err)
 
 	responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
 	require.NoError(t, err)
-	// require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
-
-	opened, err := responseUnmarshalled.Open(privateEncryptionKey)
-	require.NoError(t, err)
-	return opened
-	// require.Equal(t, challengeData, opened.ChallengeData)
+	return responseUnmarshalled
 }
 
 func mustMakeGetRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Request {
