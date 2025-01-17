@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/localserver/mocks"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -143,7 +144,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
 
-					var logBytes bytes.Buffer
+					var logBytes threadsafebuffer.ThreadSafeBuffer
 					slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 						Level: slog.LevelDebug,
 					})).Logger
