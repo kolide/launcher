@@ -71,6 +71,9 @@ const (
 
 	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
 	maxSocketWaitTime = 30 * time.Second
+
+	// How long to wait for a single osqueryinstance healthcheck before forcibly returning error
+	healtcheckTimeout = 10 * time.Second
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -129,31 +132,40 @@ func (i *OsqueryInstance) Healthy() error {
 		return errors.New("instance not started")
 	}
 
-	for _, srv := range i.extensionManagerServers {
-		serverStatus, err := srv.Ping(context.TODO())
+	resultsChan := make(chan error)
+	gowrapper.Go(context.TODO(), i.slogger, func() {
+		for _, srv := range i.extensionManagerServers {
+			serverStatus, err := srv.Ping(context.TODO())
+			if err != nil {
+				resultsChan <- fmt.Errorf("could not ping extension server: %w", err)
+				return
+			}
+			if serverStatus.Code != 0 {
+				resultsChan <- fmt.Errorf("ping extension server returned %d: %s", serverStatus.Code, serverStatus.Message)
+				return
+			}
+		}
+
+		clientStatus, err := i.extensionManagerClient.Ping()
 		if err != nil {
-			return fmt.Errorf("could not ping extension server: %w", err)
+			resultsChan <- fmt.Errorf("could not ping osquery extension client: %w", err)
+			return
 		}
-		if serverStatus.Code != 0 {
-			return fmt.Errorf("ping extension server returned %d: %s",
-				serverStatus.Code,
-				serverStatus.Message)
-
+		if clientStatus.Code != 0 {
+			resultsChan <- fmt.Errorf("ping extension client returned %d: %s", clientStatus.Code, clientStatus.Message)
+			return
 		}
-	}
 
-	clientStatus, err := i.extensionManagerClient.Ping()
-	if err != nil {
-		return fmt.Errorf("could not ping osquery extension client: %w", err)
-	}
-	if clientStatus.Code != 0 {
-		return fmt.Errorf("ping extension client returned %d: %s",
-			clientStatus.Code,
-			clientStatus.Message)
+		resultsChan <- nil
+	})
 
+	// Wait until we either receive an error or nil result from the healthcheck goroutine, or exceed our timeout threshold
+	select {
+	case maybeErr := <-resultsChan:
+		return maybeErr
+	case <-time.After(healtcheckTimeout):
+		return fmt.Errorf("osqueryinstance healthcheck exceeded timeout of %s", healtcheckTimeout.String())
 	}
-
-	return nil
 }
 
 func (i *OsqueryInstance) Query(query string) ([]map[string]string, error) {
