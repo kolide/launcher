@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -26,7 +25,6 @@ import (
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -74,29 +72,13 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-
-	// Download real osqueryd binary
-	target := packaging.Target{}
-	require.NoError(t, target.PlatformFromString(runtime.GOOS))
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	osquerydPath := filepath.Join(testRootDir, target.PlatformBinaryName("osqueryd"))
-
-	// Fetch and copy osqueryd
-	downloadPath, err := packaging.FetchBinary(context.TODO(), testRootDir, "osqueryd",
-		target.PlatformBinaryName("osqueryd"), "stable", target)
-	require.NoError(t, err)
-	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
-
-	// Make binary executable
-	require.NoError(t, os.Chmod(osquerydPath, 0755))
-
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
 	s := setupStorage(t)
+	// setup fake osqueryd binary to mock file existence for currentRunningVersion
+	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
+	_, err := os.Create(fakeOsqBinaryPath)
+	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
@@ -111,9 +93,8 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
-	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -122,7 +103,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsquerierBackoff(1*time.Second, 1*time.Second))
+	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -652,7 +633,6 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath).Maybe()
-			mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil).Maybe()
 
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
@@ -728,7 +708,6 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func() error { return nil }), WithOsquerierBackoff(100*time.Millisecond, 20*time.Millisecond))
@@ -893,7 +872,6 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
 	// Start out on beta channel, then swap to nightly
 	mockKnapsack.On("UpdateChannel").Return("beta").Once()
@@ -1237,81 +1215,6 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	require.NoError(t, err, "could not iterate over keys")
 
 	require.Equal(t, 1, keyCount, "cleanup routine did not clean up correct number of old errors")
-}
-
-func TestCollectAndSetEnrollmentDetails(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		osquerydPath  string
-		queryResponse []map[string]string
-		queryError    error
-		expectError   bool
-	}{
-		{
-			name:         "successful collection",
-			osquerydPath: "/test/osqueryd",
-			queryResponse: []map[string]string{{
-				"osquery_version": "1.1.1",
-				"os_build":        "test",
-				"os_name":         "test",
-				"os_version":      "test",
-				"hardware_model":  "test",
-				"hardware_serial": "test",
-				"hardware_vendor": "test",
-				"hostname":        "test",
-				"hardware_uuid":   "test",
-			}},
-			expectError: false,
-		},
-		{
-			name:         "no osqueryd path",
-			osquerydPath: "",
-			expectError:  false,
-		},
-		{
-			name:         "query fails",
-			osquerydPath: "/test/osqueryd",
-			queryError:   errors.New("test error"),
-			expectError:  false, // We don't return error unless env var is set
-		},
-	}
-
-	for _, tt := range testCases {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockKnapsack := typesmocks.NewKnapsack(t)
-			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(tt.osquerydPath)
-			mockKnapsack.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Maybe()
-			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-
-			mockQuerier := newMockQuerier(t)
-			if tt.osquerydPath != "" {
-				mockQuerier.On("Query", mock.Anything).Return(tt.queryResponse, tt.queryError).Maybe()
-			}
-
-			autoupdater := &TufAutoupdater{
-				knapsack:                mockKnapsack,
-				osquerier:               mockQuerier,
-				slogger:                 mockKnapsack.Slogger(),
-				osquerierBackoffTimeout: 100 * time.Millisecond,
-				osquerierRetryInterval:  20 * time.Millisecond,
-			}
-
-			err := autoupdater.collectAndSetEnrollmentDetails(context.Background())
-			if tt.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-
-			mockKnapsack.AssertExpectations(t)
-			mockQuerier.AssertExpectations(t)
-		})
-	}
 }
 
 func setupStorage(t *testing.T) types.KVStore {

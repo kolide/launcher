@@ -9,7 +9,8 @@ const (
 	Unknown         EnrollmentStatus = "unknown"
 )
 
-// Move EnrollmentDetails from service package to types
+// EnrollmentDetails is the set of details that are collected from osqueryd
+// that are sent to the Kolide server during enrollment.
 type EnrollmentDetails struct {
 	OSVersion                 string `json:"os_version"`
 	OSBuildID                 string `json:"os_build_id"`

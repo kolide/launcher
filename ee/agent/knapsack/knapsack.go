@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 
 	"log/slog"
 
@@ -22,7 +23,7 @@ import (
 var runID string
 
 // Package-level enrollmentDetails variable
-var enrollmentDetails types.EnrollmentDetails
+var enrollmentDetails *types.EnrollmentDetails
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
@@ -245,15 +246,45 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 }
 
 func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
-	// Only update if there are actual changes
-	if details != enrollmentDetails {
-		k.slogger.Logger.DebugContext(context.Background(), "updating enrollment details")
-		enrollmentDetails = details
+	if enrollmentDetails == nil {
+		newDetails := details
+		enrollmentDetails = &newDetails
+		k.Slogger().Log(context.Background(), slog.LevelDebug,
+			"initializing enrollment details",
+			"details", fmt.Sprintf("%+v", enrollmentDetails),
+		)
 		return nil
 	}
+
+	// If the enrollment details are nil, we should not update the enrollment details
+	// because it would overwrite the existing enrollment details with nil values.
+	current := *enrollmentDetails
+	changed := false
+	v := reflect.ValueOf(&details).Elem()
+	currentV := reflect.ValueOf(&current).Elem()
+
+	for i := 0; i < v.NumField(); i++ {
+		if !v.Field(i).IsZero() && v.Field(i).Interface() != currentV.Field(i).Interface() {
+			currentV.Field(i).Set(v.Field(i))
+			changed = true
+		}
+	}
+
+	if changed {
+		k.Slogger().Log(context.Background(), slog.LevelDebug,
+			"updating enrollment details",
+			"old_details", fmt.Sprintf("%+v", enrollmentDetails),
+			"new_details", fmt.Sprintf("%+v", current),
+		)
+		enrollmentDetails = &current
+	}
+
 	return nil
 }
 
 func (k *knapsack) GetEnrollmentDetails() (types.EnrollmentDetails, error) {
-	return enrollmentDetails, nil
+	if enrollmentDetails == nil {
+		return types.EnrollmentDetails{}, nil
+	}
+	return *enrollmentDetails, nil
 }

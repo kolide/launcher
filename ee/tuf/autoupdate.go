@@ -25,7 +25,6 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	client "github.com/theupdateframework/go-tuf/client"
@@ -543,7 +542,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 		if ta.knapsack.LocalDevelopmentPath() == "" {
 			ctx := context.Background()
 			// Collect enrollment details before restart
-			if err := ta.collectAndSetEnrollmentDetails(ctx); err != nil {
+			if err := osquery.CollectAndSetEnrollmentDetails(ctx, ta.knapsack, ta.osquerierBackoffTimeout, ta.osquerierBackoffInterval); err != nil {
 				ta.slogger.Log(ctx, slog.LevelError,
 					"collecting enrollment details before restart",
 					"err", err,
@@ -770,41 +769,4 @@ func (ta *TufAutoupdater) cleanUpOldErrors() {
 			"err", err,
 		)
 	}
-}
-
-// collectAndSetEnrollmentDetails collects the runtime enrollment details for the
-// osquery process and sets them in the knapsack. If no osqueryd path is available,
-// it skips collecting the details. If there is an error collecting the details,
-// it logs the error and returns nil, unless the LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED
-// environment variable is set to "true", in which case it returns the error.
-func (ta *TufAutoupdater) collectAndSetEnrollmentDetails(ctx context.Context) error {
-	details := osquery.GetRuntimeEnrollDetails()
-
-	if osqPath := ta.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		ta.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment osquery details, no osqueryd path",
-		)
-		return nil
-	} else {
-		if err := backoff.WaitFor(func() error {
-			err := osquery.GetOsqEnrollDetails(ctx, osqPath, &details)
-			if err != nil {
-				ta.slogger.Log(ctx, slog.LevelDebug,
-					"getOsqEnrollDetails failed in backoff",
-					"err", err,
-				)
-			}
-			return err
-		}, ta.osquerierBackoffTimeout, ta.osquerierBackoffInterval); err != nil {
-			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return fmt.Errorf("query osq enrollment details: %w", err)
-			}
-			ta.slogger.Log(ctx, slog.LevelError,
-				"failed to get osq enrollment details with retries, moving on",
-				"err", err,
-			)
-		}
-	}
-
-	return ta.knapsack.SetEnrollmentDetails(details)
 }
