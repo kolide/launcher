@@ -228,17 +228,17 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 						// so just add the session id manually
 						context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
 					)
-
-					// here we want to create an additional callback for presence detection, but it's only going to be valid if we have the session (saml) id
-					presenceDetectionCallbackReq := callbackReq.Clone(context.WithoutCancel(callbackReq.Context()))
-
-					gowrapper.Go(presenceDetectionCallbackReq.Context(), e.slogger, func() {
-						e.presenceDetectionCallback(presenceDetectionCallbackReq, cmdReq, challengeBox, kolideSessionId)
-					})
-
 				}
+
+				// here we want to create an additional callback for presence detection, but it's only going to be valid if we have the session (saml) id
+				presenceDetectionCallbackReq := callbackReq.Clone(context.WithoutCancel(callbackReq.Context()))
+
 				gowrapper.Go(r.Context(), e.slogger, func() {
 					e.sendCallback(callbackReq, callbackData)
+				})
+
+				gowrapper.Go(presenceDetectionCallbackReq.Context(), e.slogger, func() {
+					e.presenceDetectionCallback(presenceDetectionCallbackReq, cmdReq, challengeBox, kolideSessionId)
 				})
 			}()
 		}
@@ -483,9 +483,6 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(callbackReq *http.Request
 		return
 	}
 
-	// can test this by adding an unauthed endpoint to the mux and running, for example:
-	// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
-	//detectionIntervalStr := cmdReq.CallbackHeaders.Get(kolidePresenceDetectionIntervalHeaderKey)
 	detectionIntervalStr, ok := cmdReq.Headers[kolidePresenceDetectionIntervalHeaderKey]
 	if !ok || len(detectionIntervalStr) == 0 {
 		return
@@ -535,13 +532,16 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(callbackReq *http.Request
 		)
 	}
 
-	data := map[string]any{
-		"headers": map[string][]string{
-			kolideSessionIdHeaderKey:                          kolideSessionId,
+	data := map[string]map[string][]string{
+		"headers": {
 			kolideDurationSinceLastPresenceDetectionHeaderKey: {durationSinceLastDetection.String()},
-			kolideArchHeaderKey:                               {runtime.GOARCH},
-			kolideOsHeaderKey:                                 {runtime.GOOS},
+			kolideArchHeaderKey: {runtime.GOARCH},
+			kolideOsHeaderKey:   {runtime.GOOS},
 		},
+	}
+
+	if kolideSessionId != nil && len(kolideSessionId) > 0 {
+		data["headers"][kolideSessionIdHeaderKey] = kolideSessionId
 	}
 
 	responseBytes, err := json.Marshal(data)

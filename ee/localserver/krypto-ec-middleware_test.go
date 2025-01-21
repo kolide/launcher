@@ -69,6 +69,26 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				kolideDurationSinceLastPresenceDetectionHeaderKey: {"0s"},
 			},
 		},
+		{
+			name: "without session id",
+			cmdReqHeaders: map[string][]string{
+				kolidePresenceDetectionIntervalHeaderKey: {"0s"},
+			},
+			cmdReqCallbackHeaders: map[string][]string{},
+			expectedResponseHeaders: map[string][]string{
+				kolideOsHeaderKey:   {runtime.GOOS},
+				kolideArchHeaderKey: {runtime.GOARCH},
+			},
+			expectedCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey: {runtime.GOARCH},
+				kolideOsHeaderKey:   {runtime.GOOS},
+			},
+			expectedPresenceDetectionCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey: {runtime.GOARCH},
+				kolideOsHeaderKey:   {runtime.GOOS},
+				kolideDurationSinceLastPresenceDetectionHeaderKey: {"0s"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,12 +186,21 @@ func TestKryptoEcMiddleware(t *testing.T) {
 						w.Write(responseBody)
 					})).ServeHTTP(rr, req)
 
-					require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey.String())
-					require.Contains(t, logBytes.String(), koldieSessionId)
+					expecteKolideSessionId := false
+					for _, headerMap := range []map[string][]string{tt.cmdReqHeaders, tt.cmdReqCallbackHeaders} {
+						_, expecteKolideSessionId = headerMap[kolideSessionIdHeaderKey]
+						if expecteKolideSessionId {
+							break
+						}
+					}
+
+					if expecteKolideSessionId {
+						require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey.String())
+						require.Contains(t, logBytes.String(), koldieSessionId)
+					}
+
 					require.Contains(t, logBytes.String(), multislogger.SpanIdKey.String())
-
 					require.Equal(t, http.StatusOK, rr.Code)
-
 					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
 
 					outerResponse := mustUnmarshallOuterResponse(t, string(rr.Body.Bytes()))
