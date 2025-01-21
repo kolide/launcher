@@ -12,22 +12,24 @@ package presencedetection
 import "C"
 import (
 	"fmt"
+	"time"
 	"unsafe"
 )
 
-func Detect(reason string) (bool, error) {
+func Detect(reason string, timeout time.Duration) (bool, error) {
 	reasonStr := C.CString(reason)
 	defer C.free(unsafe.Pointer(reasonStr))
 
-	result := C.Authenticate(reasonStr)
+	// Convert timeout to nanoseconds
+	timeoutNs := C.int64_t(timeout.Nanoseconds())
 
-	// Convert C error message to Go string
+	result := C.Authenticate(reasonStr, timeoutNs)
+
 	if result.error_msg != nil {
 		defer C.free(unsafe.Pointer(result.error_msg))
 	}
 	errorMessage := C.GoString(result.error_msg)
 
-	// Return success or failure, with an error if applicable
 	if result.success {
 		return true, nil
 	}

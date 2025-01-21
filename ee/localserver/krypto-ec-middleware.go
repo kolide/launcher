@@ -230,7 +230,6 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 					)
 				}
 
-				// here we want to create an additional callback for presence detection, but it's only going to be valid if we have the session (saml) id
 				presenceDetectionCallbackReq := callbackReq.Clone(context.WithoutCancel(callbackReq.Context()))
 
 				gowrapper.Go(r.Context(), e.slogger, func() {

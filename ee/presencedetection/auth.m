@@ -1,11 +1,8 @@
-//go:build darwin
-// +build darwin
-
-// auth.m
 #import <LocalAuthentication/LocalAuthentication.h>
+#include <stdint.h>
 #include "auth.h"
 
-struct AuthResult Authenticate(char const* reason) {
+struct AuthResult Authenticate(char const* reason, int64_t timeout_ns) {
     struct AuthResult authResult;
     LAContext *myContext = [[LAContext alloc] init];
     NSError *authError = nil;
@@ -26,24 +23,6 @@ struct AuthResult Authenticate(char const* reason) {
                     success = false;
                     errorCode = (int)[error code];
                     errorMessage = [error localizedDescription];
-                    if (error.code == LAErrorUserFallback || error.code == LAErrorAuthenticationFailed) {
-                        // Prompting for password
-                        [myContext evaluatePolicy:LAPolicyDeviceOwnerAuthentication
-                            localizedReason:nsReason
-                            reply:^(BOOL pwdSuccess, NSError *error) {
-                                if (pwdSuccess) {
-                                    success = true;
-                                } else {
-                                    success = false;
-                                    errorCode = (int)[error code];
-                                    errorMessage = [error localizedDescription];
-                                }
-                                dispatch_semaphore_signal(sema);
-                            }];
-                    } else {
-                        errorCode = (int)[error code];
-                        errorMessage = [error localizedDescription];
-                    }
                 }
                 dispatch_semaphore_signal(sema);
             }];
@@ -53,7 +32,17 @@ struct AuthResult Authenticate(char const* reason) {
         errorMessage = [authError localizedDescription];
     }
 
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+    // wait for the authentication to complete or timeout
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, timeout_ns);
+    long result = dispatch_semaphore_wait(sema, timeout);
+
+    if (result != 0) {  // timed out
+        [myContext invalidate]; // dismiss presence detection dialog
+        success = false;
+        errorCode = -1;
+        errorMessage = @"presence detection timed out";
+    }
+
     dispatch_release(sema);
 
     authResult.success = success;

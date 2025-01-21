@@ -30,7 +30,15 @@ type client struct {
 	base http.Client
 }
 
-func New(authToken, socketPath string) client {
+type clientOption func(*client)
+
+func WithTimeout(timeout time.Duration) clientOption {
+	return func(c *client) {
+		c.base.Timeout = timeout
+	}
+}
+
+func New(authToken, socketPath string, opts ...clientOption) client {
 	transport := &transport{
 		authToken: authToken,
 		base: http.Transport{
@@ -43,6 +51,10 @@ func New(authToken, socketPath string) client {
 			Transport: transport,
 			Timeout:   30 * time.Second,
 		},
+	}
+
+	for _, opt := range opts {
+		opt(&client)
 	}
 
 	return client

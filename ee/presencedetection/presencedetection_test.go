@@ -26,7 +26,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			interval: 0,
 			detector: func(t *testing.T) detectorIface {
 				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(true, nil)
+				d.On("Detect", mock.AnythingOfType("string"), DetectionTimeout).Return(true, nil)
 				return d
 			},
 		},
@@ -35,7 +35,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			interval: time.Minute,
 			detector: func(t *testing.T) detectorIface {
 				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(true, nil)
+				d.On("Detect", mock.AnythingOfType("string"), DetectionTimeout).Return(true, nil)
 				return d
 			},
 			initialLastDetectionUTC: time.Now().UTC().Add(-time.Minute),
@@ -54,7 +54,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			interval: 0,
 			detector: func(t *testing.T) detectorIface {
 				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(true, errors.New("error"))
+				d.On("Detect", mock.AnythingOfType("string"), DetectionTimeout).Return(true, errors.New("error"))
 				return d
 			},
 			expectError: true,
@@ -64,7 +64,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			interval: 0,
 			detector: func(t *testing.T) detectorIface {
 				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(true, errors.New("error"))
+				d.On("Detect", mock.AnythingOfType("string"), DetectionTimeout).Return(true, errors.New("error"))
 				return d
 			},
 			initialLastDetectionUTC: time.Now().UTC(),
@@ -76,7 +76,7 @@ func TestPresenceDetector_DetectPresence(t *testing.T) {
 			interval: 0,
 			detector: func(t *testing.T) detectorIface {
 				d := mocks.NewDetectorIface(t)
-				d.On("Detect", mock.AnythingOfType("string")).Return(false, nil)
+				d.On("Detect", mock.AnythingOfType("string"), DetectionTimeout).Return(false, nil)
 				return d
 			},
 			initialLastDetectionUTC: time.Now().UTC(),
