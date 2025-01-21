@@ -162,7 +162,11 @@ func (i *OsqueryInstance) Healthy() error {
 	// Wait until we either receive an error or nil result from the healthcheck goroutine, or exceed our timeout threshold
 	select {
 	case maybeErr := <-resultsChan:
-		return maybeErr
+		if maybeErr != nil {
+			return fmt.Errorf("encountered error during healthcheck: %w", maybeErr)
+		}
+
+		return nil
 	case <-time.After(healtcheckTimeout):
 		return fmt.Errorf("osqueryinstance healthcheck exceeded timeout of %s", healtcheckTimeout.String())
 	}
