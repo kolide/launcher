@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 #import <LocalAuthentication/LocalAuthentication.h>
 #include <stdint.h>
 #include "auth.h"
