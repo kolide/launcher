@@ -73,7 +73,7 @@ const (
 	maxSocketWaitTime = 30 * time.Second
 
 	// How long to wait for a single osqueryinstance healthcheck before forcibly returning error
-	healtcheckTimeout = 10 * time.Second
+	healthcheckTimeout = 10 * time.Second
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -167,8 +167,8 @@ func (i *OsqueryInstance) Healthy() error {
 		}
 
 		return nil
-	case <-time.After(healtcheckTimeout):
-		return fmt.Errorf("osqueryinstance healthcheck exceeded timeout of %s", healtcheckTimeout.String())
+	case <-time.After(healthcheckTimeout):
+		return fmt.Errorf("osqueryinstance healthcheck exceeded timeout of %s", healthcheckTimeout.String())
 	}
 }
 
