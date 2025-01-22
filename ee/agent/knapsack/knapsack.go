@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 
 	"log/slog"
 
@@ -256,28 +255,14 @@ func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
 		return nil
 	}
 
-	// If the enrollment details are nil, we should not update the enrollment details
-	// because it would overwrite the existing enrollment details with nil values.
 	current := *enrollmentDetails
-	changed := false
-	v := reflect.ValueOf(&details).Elem()
-	currentV := reflect.ValueOf(&current).Elem()
 
-	for i := 0; i < v.NumField(); i++ {
-		if !v.Field(i).IsZero() && v.Field(i).Interface() != currentV.Field(i).Interface() {
-			currentV.Field(i).Set(v.Field(i))
-			changed = true
-		}
-	}
-
-	if changed {
-		k.Slogger().Log(context.Background(), slog.LevelDebug,
-			"updating enrollment details",
-			"old_details", fmt.Sprintf("%+v", enrollmentDetails),
-			"new_details", fmt.Sprintf("%+v", current),
-		)
-		enrollmentDetails = &current
-	}
+	k.Slogger().Log(context.Background(), slog.LevelDebug,
+		"updating enrollment details",
+		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
+		"new_details", fmt.Sprintf("%+v", current),
+	)
+	enrollmentDetails = &current
 
 	return nil
 }
