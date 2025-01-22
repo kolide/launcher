@@ -661,7 +661,7 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait()
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
