@@ -136,7 +136,7 @@ func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.
 }
 
 func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, duration time.Duration, value any) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx, "key", key.String())
 	defer span.End()
 
 	// Always notify observers when overrides start, so they know to refresh.
@@ -163,7 +163,7 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 	}
 
 	overrideExpired := func(key keys.FlagKey) {
-		ctx, span := traces.StartSpan(ctx)
+		ctx, span := traces.StartSpan(context.TODO(), "key", key.String())
 		defer span.End()
 
 		// Always notify observers when overrides expire, so they know to refresh.
