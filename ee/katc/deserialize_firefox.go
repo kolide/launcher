@@ -22,6 +22,7 @@ const (
 	tagBoolean       uint32 = 0xffff0002
 	tagInt32         uint32 = 0xffff0003
 	tagString        uint32 = 0xffff0004
+	tagDateObject    uint32 = 0xffff0005
 	tagArrayObject   uint32 = 0xffff0007
 	tagObjectObject  uint32 = 0xffff0008
 	tagBooleanObject uint32 = 0xffff000a
@@ -137,6 +138,17 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 			} else {
 				resultObj[nextKeyStr] = []byte("false")
 			}
+		case tagDateObject:
+			// Date objects are stored as follows:
+			// * first, a tagDateObject with valData `0`
+			// * next, a double
+			// So, we want to ignore our current `valData`, and read the next pair as a double.
+			nextTag, nextData, err := nextPair(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading next pair as date object for key `%s`: %w", nextKeyStr, err)
+			}
+			d := uint64(nextData) | uint64(nextTag)<<32
+			resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
 		case tagObjectObject:
 			obj, err := deserializeNestedObject(srcReader)
 			if err != nil {
