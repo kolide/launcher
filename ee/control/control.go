@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/exp/slices"
 )
 
@@ -198,13 +199,19 @@ func (cs *ControlService) Stop() {
 	}
 }
 
-func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
-		cs.requestIntervalChanged(cs.knapsack.ControlRequestInterval())
+		cs.requestIntervalChanged(ctx, cs.knapsack.ControlRequestInterval())
 	}
 }
 
-func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
+func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterval time.Duration) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	currentRequestInterval := cs.readRequestInterval()
 	if newInterval == currentRequestInterval {
 		return
@@ -215,20 +222,20 @@ func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
 	// instead of by a control server change.
 	if err := cs.Fetch(); err != nil {
 		// if we got an error, log it and move on
-		cs.slogger.Log(context.TODO(), slog.LevelWarn,
+		cs.slogger.Log(ctx, slog.LevelWarn,
 			"failed to fetch data from control server. Not fatal, moving on",
 			"err", err,
 		)
 	}
 
 	if newInterval < currentRequestInterval {
-		cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		cs.slogger.Log(ctx, slog.LevelDebug,
 			"accelerating control service request interval",
 			"new_interval", newInterval.String(),
 			"old_interval", currentRequestInterval.String(),
 		)
 	} else {
-		cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		cs.slogger.Log(ctx, slog.LevelDebug,
 			"resetting control service request interval after acceleration",
 			"new_interval", newInterval.String(),
 			"old_interval", currentRequestInterval.String(),

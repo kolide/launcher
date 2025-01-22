@@ -900,7 +900,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockLibraryManager.On("AddToLibrary", binaryLauncher, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Notify that flags changed
-	autoupdater.FlagsChanged(keys.UpdateChannel)
+	autoupdater.FlagsChanged(context.TODO(), keys.UpdateChannel)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -965,7 +965,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Notify that flags changed
-	autoupdater.FlagsChanged(keys.PinnedOsquerydVersion)
+	autoupdater.FlagsChanged(context.TODO(), keys.PinnedOsquerydVersion)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -1011,7 +1011,7 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	// Start the autoupdater, then notify flag change right away, during the initial delay
 	go autoupdater.Execute()
 	time.Sleep(100 * time.Millisecond)
-	autoupdater.FlagsChanged(keys.PinnedLauncherVersion)
+	autoupdater.FlagsChanged(context.TODO(), keys.PinnedLauncherVersion)
 
 	// Stop the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))

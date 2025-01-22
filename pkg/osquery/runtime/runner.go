@@ -259,14 +259,17 @@ func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb,
 // and watchdog_utilization_limit_percent.
-func (r *Runner) FlagsChanged(flagKeys ...keys.FlagKey) {
-	r.slogger.Log(context.TODO(), slog.LevelDebug,
+func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	r.slogger.Log(ctx, slog.LevelDebug,
 		"control server flags changed, restarting instance to apply",
 		"flags", fmt.Sprintf("%+v", flagKeys),
 	)
 
 	if err := r.Restart(); err != nil {
-		r.slogger.Log(context.TODO(), slog.LevelError,
+		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after flag change",
 			"err", err,
 		)

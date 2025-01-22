@@ -394,7 +394,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				cancel:                    cancel,
 			}
 
-			traceExporter.FlagsChanged(keys.ExportTraces)
+			traceExporter.FlagsChanged(ctx, keys.ExportTraces)
 
 			require.Equal(t, tt.newEnableValue, traceExporter.enabled, "enabled value not updated")
 
@@ -468,7 +468,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				cancel:                    cancel,
 			}
 
-			traceExporter.FlagsChanged(keys.TraceSamplingRate)
+			traceExporter.FlagsChanged(ctx, keys.TraceSamplingRate)
 
 			require.Equal(t, tt.newTraceSamplingRate, traceExporter.traceSamplingRate, "trace sampling rate value not updated")
 
@@ -538,7 +538,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				cancel:                    cancel,
 			}
 
-			traceExporter.FlagsChanged(keys.TraceIngestServerURL)
+			traceExporter.FlagsChanged(ctx, keys.TraceIngestServerURL)
 
 			require.Equal(t, tt.newObservabilityIngestServerURL, traceExporter.ingestUrl, "ingest url value not updated")
 
@@ -613,7 +613,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				cancel:                    cancel,
 			}
 
-			traceExporter.FlagsChanged(keys.DisableTraceIngestTLS)
+			traceExporter.FlagsChanged(ctx, keys.DisableTraceIngestTLS)
 
 			require.Equal(t, tt.newDisableTraceIngestTLS, traceExporter.disableIngestTLS, "ingest TLS value not updated")
 			require.Equal(t, tt.newDisableTraceIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
@@ -689,7 +689,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				cancel:                    cancel,
 			}
 
-			traceExporter.FlagsChanged(keys.TraceBatchTimeout)
+			traceExporter.FlagsChanged(ctx, keys.TraceBatchTimeout)
 
 			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 

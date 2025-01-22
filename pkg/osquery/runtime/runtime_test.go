@@ -259,7 +259,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Now, WatchdogEnabled should return true
 	k.On("WatchdogEnabled").Return(true).Once()
-	runner.FlagsChanged(keys.WatchdogEnabled)
+	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)

@@ -350,12 +350,15 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 
 // FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
 // to respond to changes to autoupdate-related settings.
-func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
 
 	// Check to see if update channel has changed
 	if ta.updateChannel != ta.knapsack.UpdateChannel() {
-		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		ta.slogger.Log(ctx, slog.LevelInfo,
 			"control server sent down new update channel value",
 			"new_channel", ta.knapsack.UpdateChannel(),
 			"old_channel", ta.updateChannel,
@@ -368,7 +371,7 @@ func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
 	for binary, currentPinnedVersion := range ta.pinnedVersions {
 		newPinnedVersion := ta.pinnedVersionGetters[binary]()
 		if currentPinnedVersion != newPinnedVersion {
-			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			ta.slogger.Log(ctx, slog.LevelInfo,
 				"control server sent down new pinned version for binary",
 				"binary", binary,
 				"new_pinned_version", newPinnedVersion,
@@ -389,7 +392,7 @@ func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
 	// At least one binary requires a recheck -- perform that now
 	if err := ta.checkForUpdate(binariesToCheckForUpdate); err != nil {
 		ta.storeError(err)
-		ta.slogger.Log(context.TODO(), slog.LevelError,
+		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
 			"update_channel", ta.updateChannel,
 			"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
