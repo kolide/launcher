@@ -268,7 +268,7 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 		"flags", fmt.Sprintf("%+v", flagKeys),
 	)
 
-	if err := r.Restart(); err != nil {
+	if err := r.Restart(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after flag change",
 			"err", err,
@@ -279,12 +279,15 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 // Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
 // the katc_config subsystem.
 func (r *Runner) Ping() {
-	r.slogger.Log(context.TODO(), slog.LevelDebug,
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	r.slogger.Log(ctx, slog.LevelDebug,
 		"KATC configuration changed, restarting instance to apply",
 	)
 
-	if err := r.Restart(); err != nil {
-		r.slogger.Log(context.TODO(), slog.LevelError,
+	if err := r.Restart(ctx); err != nil {
+		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after KATC configuration changed",
 			"err", err,
 		)
@@ -293,8 +296,8 @@ func (r *Runner) Ping() {
 
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
-func (r *Runner) Restart() error {
-	ctx, span := traces.StartSpan(context.TODO())
+func (r *Runner) Restart(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	r.slogger.Log(ctx, slog.LevelDebug,

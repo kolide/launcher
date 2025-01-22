@@ -736,7 +736,7 @@ func TestRestart(t *testing.T) {
 
 	previousStats := runner.instances[types.DefaultRegistrationID].stats
 
-	require.NoError(t, runner.Restart())
+	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
@@ -747,7 +747,7 @@ func TestRestart(t *testing.T) {
 
 	previousStats = runner.instances[types.DefaultRegistrationID].stats
 
-	require.NoError(t, runner.Restart())
+	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")
