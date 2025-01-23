@@ -13,18 +13,18 @@ func TestEcho(t *testing.T) {
 	t.Parallel()
 
 	// echo is the only one available on all platforms and likely to be available in CI
-	cmd, err := Echo(context.TODO(), "hello")
+	tracedCmd, err := Echo(context.TODO(), "hello")
 	require.NoError(t, err)
-	require.Contains(t, cmd.Path, "echo")
-	require.Contains(t, cmd.Args, "hello")
+	require.Contains(t, tracedCmd.Path, "echo")
+	require.Contains(t, tracedCmd.Args, "hello")
 }
 
 func Test_newCmd(t *testing.T) {
 	t.Parallel()
 
 	cmdPath := filepath.Join("some", "path", "to", "a", "command")
-	cmd := newCmd(context.TODO(), cmdPath)
-	require.Equal(t, cmdPath, cmd.Path)
+	tracedCmd := newCmd(context.TODO(), cmdPath)
+	require.Equal(t, cmdPath, tracedCmd.Path)
 }
 
 func Test_validatedCommand(t *testing.T) {
@@ -38,10 +38,10 @@ func Test_validatedCommand(t *testing.T) {
 		cmdPath = `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
 	}
 
-	cmd, err := validatedCommand(context.TODO(), cmdPath)
+	tracedCmd, err := validatedCommand(context.TODO(), cmdPath)
 
 	require.NoError(t, err)
-	require.Equal(t, cmdPath, cmd.Path)
+	require.Equal(t, cmdPath, tracedCmd.Path)
 }
 
 func Test_validatedCommand_doesNotSearchPathOnNonNixOS(t *testing.T) {

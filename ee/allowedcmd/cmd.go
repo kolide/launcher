@@ -13,17 +13,55 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/kolide/launcher/pkg/traces"
 )
 
-type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
+type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
 
-func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
+type TracedCmd struct {
+	*exec.Cmd
+}
+
+// Start overrides the Start method to add tracing before executing the command.
+func (t *TracedCmd) Start() error {
+	_, span := traces.StartSpan(context.Background(), "path", t.Cmd.Path)
+	defer span.End()
+
+	return t.Cmd.Start()
+}
+
+// Run overrides the Run method to add tracing before running the command.
+func (t *TracedCmd) Run() error {
+	_, span := traces.StartSpan(context.Background(), "path", t.Cmd.Path)
+	defer span.End()
+
+	return t.Cmd.Run()
+}
+
+// Output overrides the Output method to add tracing before capturing output.
+func (t *TracedCmd) Output() ([]byte, error) {
+	_, span := traces.StartSpan(context.Background(), "path", t.Cmd.Path)
+	defer span.End()
+
+	return t.Cmd.Output()
+}
+
+// CombinedOutput overrides the CombinedOutput method to add tracing before capturing combined output.
+func (t *TracedCmd) CombinedOutput() ([]byte, error) {
+	_, span := traces.StartSpan(context.Background(), "path", t.Cmd.Path)
+	defer span.End()
+
+	return t.Cmd.CombinedOutput()
+}
+
+func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+	return &TracedCmd{exec.CommandContext(ctx, fullPathToCmd, arg...)} //nolint:forbidigo // This is our approved usage of exec.CommandContext
 }
 
 var ErrCommandNotFound = errors.New("command not found")
 
-func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*exec.Cmd, error) {
+func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*TracedCmd, error) {
 	knownPath = filepath.Clean(knownPath)
 
 	if _, err := os.Stat(knownPath); err == nil {
