@@ -57,6 +57,12 @@ func (t *TracedCmd) CombinedOutput() ([]byte, error) {
 }
 
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+	tc := &TracedCmd{
+		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...), //nolint:forbidigo // This is our approved usage of exec.CommandContext
+	}
+
+	tc.Cmd.Run()
+
 	return &TracedCmd{
 		ctx: ctx,
 		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...), //nolint:forbidigo // This is our approved usage of exec.CommandContext
