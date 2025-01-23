@@ -274,7 +274,11 @@ func (cs *ControlService) Fetch(ctx context.Context) error {
 	if !cs.fetchMutex.TryLock() {
 		return errors.New("fetch is currently executing elsewhere")
 	}
-	defer cs.fetchMutex.Unlock()
+	span.AddEvent("fetch_lock_acquired")
+	defer func() {
+		cs.fetchMutex.Unlock()
+		span.AddEvent("fetch_lock_released")
+	}()
 
 	// Empty hash means get the map of subsystems & hashes
 	data, err := cs.fetcher.GetConfig(ctx)
@@ -293,11 +297,13 @@ func (cs *ControlService) Fetch(ctx context.Context) error {
 
 	fetchFull := false
 	cs.fetchFullMutex.Lock()
+	span.AddEvent("fetch_full_lock_acquired")
 	if cs.fetchFull {
 		fetchFull = true     // fetch all subsystems during this Fetch
 		cs.fetchFull = false // reset for next Fetch
 	}
 	cs.fetchFullMutex.Unlock()
+	span.AddEvent("fetch_full_lock_released")
 
 	for subsystem, hash := range subsystems {
 		if !cs.knownSubsystem(subsystem) {
@@ -432,15 +438,23 @@ func (cs *ControlService) update(ctx context.Context, subsystem string, reader i
 
 // Do handles the force_full_control_data_fetch action.
 func (cs *ControlService) Do(data io.Reader) error {
-	cs.slogger.Log(context.TODO(), slog.LevelDebug,
+	ctx, span := traces.StartSpan(context.TODO(), "action", ForceFullControlDataFetchAction)
+	defer span.End()
+
+	cs.slogger.Log(ctx, slog.LevelDebug,
 		"received request to perform full fetch of all subsystems",
 	)
 
 	// We receive this request in the middle of a `Fetch`, so we can't call
 	// `Fetch` again immediately. Instead, set `fetchFull` so that the next
 	// call to `Fetch` will fetch all subsystems.
+	span.AddEvent("fetch_full_lock_acquired")
 	cs.fetchFullMutex.Lock()
-	defer cs.fetchFullMutex.Unlock()
+
+	defer func() {
+		cs.fetchFullMutex.Unlock()
+		span.AddEvent("fetch_full_lock_released")
+	}()
 	cs.fetchFull = true
 
 	// Treat this action as best-effort: try to do it once, no need to retry.
