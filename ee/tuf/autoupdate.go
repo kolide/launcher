@@ -469,7 +469,7 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
 func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
 	defer span.End()
 
 	ta.updateLock.Lock()
