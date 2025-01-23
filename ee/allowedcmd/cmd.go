@@ -29,7 +29,7 @@ func (t *TracedCmd) Start() error {
 	_, span := traces.StartSpan(t.ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
-	return t.Cmd.Start()
+	return t.Cmd.Start() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
 }
 
 // Run overrides the Run method to add tracing before running the command.
@@ -37,7 +37,7 @@ func (t *TracedCmd) Run() error {
 	_, span := traces.StartSpan(t.ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
-	return t.Cmd.Run()
+	return t.Cmd.Run() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
 }
 
 // Output overrides the Output method to add tracing before capturing output.
@@ -45,7 +45,7 @@ func (t *TracedCmd) Output() ([]byte, error) {
 	_, span := traces.StartSpan(t.ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
-	return t.Cmd.Output()
+	return t.Cmd.Output() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
 }
 
 // CombinedOutput overrides the CombinedOutput method to add tracing before capturing combined output.
@@ -53,7 +53,7 @@ func (t *TracedCmd) CombinedOutput() ([]byte, error) {
 	_, span := traces.StartSpan(t.ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
-	return t.Cmd.CombinedOutput()
+	return t.Cmd.CombinedOutput() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
 }
 
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
