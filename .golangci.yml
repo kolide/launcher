@@ -41,7 +41,7 @@ linters-settings:
         msg: do not use panic so that launcher can shut down gracefully
       - p: ^go func.*$
         msg: use gowrapper.Go() instead of raw goroutines for proper panic handling
-      - p: ^\.Cmd\.(Run|Start|Output|CombinedOutput)*$
+      - p: \.Cmd\.(Run|Start|Output|CombinedOutput)
         msg: "Do not call embedded exec.Cmd methods directly on TracedCmd; call TracedCmd.Run(), TracedCmd.Start(), etc. instead"
   sloglint:
     kv-only: true
