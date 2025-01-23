@@ -20,7 +20,7 @@ import (
 type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
 
 type TracedCmd struct {
-	ctx context.Context
+	ctx context.Context // nolint:structcheck // This is an approved usage of context for short lived cmd
 	*exec.Cmd
 }
 
@@ -59,8 +59,8 @@ func (t *TracedCmd) CombinedOutput() ([]byte, error) {
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
 	return &TracedCmd{
 		ctx: ctx,
-		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...),
-	} //nolint:forbidigo // This is our approved usage of exec.CommandContext
+		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...), //nolint:forbidigo // This is our approved usage of exec.CommandContext
+	}
 }
 
 var ErrCommandNotFound = errors.New("command not found")

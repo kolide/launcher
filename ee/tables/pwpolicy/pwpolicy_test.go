@@ -75,7 +75,7 @@ func TestQueries(t *testing.T) {
 func execFaker(filename string) func(context.Context, ...string) (*allowedcmd.TracedCmd, error) {
 	return func(ctx context.Context, _ ...string) (*allowedcmd.TracedCmd, error) {
 		return &allowedcmd.TracedCmd{
-			Cmd: exec.CommandContext(ctx, "/bin/cat", filename),
+			Cmd: exec.CommandContext(ctx, "/bin/cat", filename), //nolint:forbidigo // Fine to use exec.CommandContext in test
 		}, nil
 	}
 }
