@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -144,6 +145,9 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()
 
+		ctx, span := traces.StartSpan(ctx, "goroutine_name", goroutineName)
+		defer span.End()
+
 		slogger.Log(ctx, slog.LevelInfo,
 			"starting shutdown goroutine in errgroup",
 		)
@@ -173,7 +177,10 @@ func (l *LoggedErrgroup) Shutdown() {
 	l.cancel()
 }
 
-func (l *LoggedErrgroup) Wait() error {
+func (l *LoggedErrgroup) Wait(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	errChan := make(chan error)
 	go func() {
 		errChan <- l.errgroup.Wait()
@@ -184,7 +191,7 @@ func (l *LoggedErrgroup) Wait() error {
 	case err := <-errChan:
 		return err
 	case <-time.After(maxErrgroupShutdownDuration):
-		l.slogger.Log(context.TODO(), slog.LevelWarn,
+		l.slogger.Log(ctx, slog.LevelWarn,
 			"errgroup did not complete shutdown within timeout",
 			"timeout", maxErrgroupShutdownDuration.String(),
 		)
