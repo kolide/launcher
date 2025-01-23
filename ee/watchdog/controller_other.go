@@ -16,7 +16,7 @@ func NewController(_ context.Context, _ types.Knapsack, _ string) (*WatchdogCont
 	return nil, nil
 }
 
-func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {}
+func (wc *WatchdogController) FlagsChanged(_ context.Context, flagKeys ...keys.FlagKey) {}
 
 func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {}
 

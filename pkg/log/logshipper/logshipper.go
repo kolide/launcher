@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/sendbuffer"
+	"github.com/kolide/launcher/pkg/traces"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -75,7 +76,10 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	return ls
 }
 
-func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (ls *LogShipper) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// TODO: only make updates that are relevant to flag key changes
 	// calling ping does more work than needed
 	ls.Ping()

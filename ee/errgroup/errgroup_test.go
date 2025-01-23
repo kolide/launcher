@@ -62,7 +62,7 @@ func TestWait(t *testing.T) {
 			}
 
 			// We should get the expected error when we wait for the routines to exit
-			require.Equal(t, tt.expectedErr, eg.Wait(), "incorrect error returned by errgroup")
+			require.Equal(t, tt.expectedErr, eg.Wait(ctx), "incorrect error returned by errgroup")
 
 			// We expect that the errgroup shuts down
 			canceled := false
@@ -91,7 +91,7 @@ func TestShutdown(t *testing.T) {
 
 	// We should get the expected error when we wait for the routines to exit
 	eg.Shutdown()
-	require.Nil(t, eg.Wait(), "should not have returned error on shutdown")
+	require.Nil(t, eg.Wait(ctx), "should not have returned error on shutdown")
 
 	// We expect that the errgroup shuts down
 	canceled := false
@@ -128,7 +128,7 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	eg.Shutdown()
 	waitChan := make(chan error)
 	go func() {
-		waitChan <- eg.Wait()
+		waitChan <- eg.Wait(ctx)
 	}()
 	select {
 	case err := <-waitChan:
@@ -164,7 +164,7 @@ func TestStartGoroutine_HandlesPanic(t *testing.T) {
 	})
 
 	// We expect that the errgroup shuts itself down -- the test should not panic
-	require.Error(t, eg.Wait(), "should have returned error from panicking goroutine")
+	require.Error(t, eg.Wait(ctx), "should have returned error from panicking goroutine")
 	canceled := false
 	select {
 	case <-eg.Exited():
@@ -193,7 +193,7 @@ func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// We expect that the errgroup shuts itself down -- the test should not panic
-	require.Error(t, eg.Wait(), "should have returned error from panicking goroutine")
+	require.Error(t, eg.Wait(ctx), "should have returned error from panicking goroutine")
 	canceled := false
 	select {
 	case <-eg.Exited():
@@ -223,7 +223,7 @@ func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
 
 	// We expect that the errgroup shuts itself down -- the test should not panic.
 	// Since we called `Shutdown`, `Wait` should not return an error.
-	require.Nil(t, eg.Wait(), "should not returned error after call to Shutdown")
+	require.Nil(t, eg.Wait(ctx), "should not returned error after call to Shutdown")
 	canceled := false
 	select {
 	case <-eg.Exited():

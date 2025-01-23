@@ -188,7 +188,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return(newPinnedOsquerydVersion).Once()
 
 	// Call FlagsChanged and expect that all flag values are updated
-	s.FlagsChanged(keys.UpdateChannel)
+	s.FlagsChanged(context.TODO(), keys.UpdateChannel)
 	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, newFlagValue, string(v1), "incorrect flag value")

@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ func NewControlTestClient(subsystemMap map[string]string, hashData map[string]an
 	return c, nil
 }
 
-func (c *TestClient) GetConfig() (data io.Reader, err error) {
+func (c *TestClient) GetConfig(_ context.Context) (data io.Reader, err error) {
 	bodyBytes, err := json.Marshal(c.subsystemMap)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling json: %w", err)
@@ -32,7 +33,7 @@ func (c *TestClient) GetConfig() (data io.Reader, err error) {
 	return bytes.NewReader(bodyBytes), nil
 }
 
-func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
+func (c *TestClient) GetSubsystemData(_ context.Context, hash string) (data io.Reader, err error) {
 	if _, ok := c.hashRequestCounts[hash]; !ok {
 		c.hashRequestCounts[hash] = 1
 	} else {
@@ -47,6 +48,6 @@ func (c *TestClient) GetSubsystemData(hash string) (data io.Reader, err error) {
 	return bytes.NewReader(bodyBytes), nil
 }
 
-func (c *TestClient) SendMessage(method string, params interface{}) error {
+func (c *TestClient) SendMessage(_ context.Context, method string, params interface{}) error {
 	return nil
 }
