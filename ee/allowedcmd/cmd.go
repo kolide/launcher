@@ -20,7 +20,7 @@ import (
 type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
 
 type TracedCmd struct {
-	ctx context.Context // nolint:structcheck // This is an approved usage of context for short lived cmd
+	ctx context.Context // nolint:containedctx // This is an approved usage of context for short lived cmd
 	*exec.Cmd
 }
 
