@@ -122,9 +122,11 @@ func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.
 	defer span.End()
 
 	fc.observersMutex.RLock()
-	defer fc.observersMutex.RUnlock()
-
-	span.AddEvent("observers_mutex_acquired")
+	span.AddEvent("observers_lock_acquired")
+	defer func() {
+		fc.observersMutex.RUnlock()
+		span.AddEvent("observers_lock_released")
+	}()
 
 	for observer, observedKeys := range fc.observers {
 		changedKeys := keys.Intersection(observedKeys, flagKeys)
@@ -144,9 +146,12 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 	defer fc.notifyObservers(ctx, key)
 
 	fc.overrideMutex.Lock()
-	defer fc.overrideMutex.Unlock()
+	span.AddEvent("override_lock_acquired")
 
-	span.AddEvent("override_mutex_acquired")
+	defer func() {
+		fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_released")
+	}()
 
 	fc.slogger.Log(ctx, slog.LevelInfo,
 		"overriding flag",
@@ -171,9 +176,12 @@ func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, du
 		defer fc.notifyObservers(ctx, key)
 
 		fc.overrideMutex.Lock()
-		defer fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_acquired")
 
-		span.AddEvent("override_mutex_acquired")
+		defer func() {
+			fc.overrideMutex.Unlock()
+			span.AddEvent("override_lock_released")
+		}()
 
 		// Deleting the override implictly allows the next value to take precedence
 		delete(fc.overrides, key)
