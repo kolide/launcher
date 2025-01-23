@@ -85,7 +85,7 @@ func TestCollectAndSetEnrollmentDetails(t *testing.T) {
 		mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 		mockKnapsack.On("SetEnrollmentDetails", mock.Anything).Return(nil)
 
-		err := CollectAndSetEnrollmentDetails(ctx, mockKnapsack, 100*time.Millisecond, 100*time.Millisecond)
+		err := CollectAndSetEnrollmentDetails(ctx, mockKnapsack, 1*time.Second, 100*time.Millisecond)
 		require.NoError(t, err)
 		mockKnapsack.AssertExpectations(t)
 	})
