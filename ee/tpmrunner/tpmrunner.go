@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-tpm/tpmutil/tbs"
 	"github.com/kolide/krypto/pkg/tpm"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -229,7 +228,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 		priData, pubData, err = tr.signerCreator.CreateKey()
 		if err != nil {
 
-			if errors.Is(err, tbs.ErrTPMNotFound) {
+			if isTPMNotFoundErr(err) {
 				tr.machineHasTpm.Store(false)
 
 				tr.slogger.Log(ctx, slog.LevelInfo,
