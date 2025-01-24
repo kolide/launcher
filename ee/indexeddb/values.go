@@ -30,6 +30,8 @@ const (
 	// strings
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
+	// dates
+	tokenDate byte = 0x44 // D
 	// types: object
 	tokenObjectBegin byte = 0x6f // o
 	tokenObjectEnd   byte = 0x7b // {
@@ -212,6 +214,12 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return obj, fmt.Errorf("decoding double for `%s`: %w", currentPropertyName, err)
+			}
+			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
+		case tokenDate:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return obj, fmt.Errorf("decoding double as date for `%s`: %w", currentPropertyName, err)
 			}
 			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
 		case tokenBeginSparseArray:

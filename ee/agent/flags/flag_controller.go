@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/exp/maps"
 )
 
@@ -65,13 +66,16 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 
 // setControlServerValue stores a control-server-provided value in the agent flags store.
 func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) error {
+	ctx, span := traces.StartSpan(context.TODO(), "key", key.String())
+	defer span.End()
+
 	if fc == nil || fc.agentFlagsStore == nil {
 		return errors.New("agentFlagsStore is nil")
 	}
 
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {
-		fc.slogger.Log(context.TODO(), slog.LevelDebug,
+		fc.slogger.Log(ctx, slog.LevelDebug,
 			"failed to set control server key",
 			"key", key,
 			"err", err,
@@ -79,7 +83,7 @@ func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) 
 		return err
 	}
 
-	fc.notifyObservers(key)
+	fc.notifyObservers(ctx, key)
 
 	return nil
 }
@@ -87,6 +91,9 @@ func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) 
 // Update bulk replaces agent flags and stores them.
 // Observers will be notified of changed flags and deleted flags.
 func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	// Attempt to bulk replace the store with the key-values
 	deletedKeys, err := fc.agentFlagsStore.Update(kvPairs)
 
@@ -97,7 +104,7 @@ func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 	changedKeys := append(updatedKeys, deletedKeys...)
 
 	// Now observers can be notified these keys have possibly changed
-	fc.notifyObservers(keys.ToFlagKeys(changedKeys)...)
+	fc.notifyObservers(ctx, keys.ToFlagKeys(changedKeys)...)
 
 	return changedKeys, err
 }
@@ -110,28 +117,43 @@ func (fc *FlagController) RegisterChangeObserver(observer types.FlagsChangeObser
 }
 
 // notifyObservers informs all observers of the keys that they have changed.
-func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
+func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	fc.observersMutex.RLock()
-	defer fc.observersMutex.RUnlock()
+	span.AddEvent("observers_lock_acquired")
+	defer func() {
+		fc.observersMutex.RUnlock()
+		span.AddEvent("observers_lock_released")
+	}()
 
 	for observer, observedKeys := range fc.observers {
 		changedKeys := keys.Intersection(observedKeys, flagKeys)
 
 		if len(changedKeys) > 0 {
-			observer.FlagsChanged(changedKeys...)
+			observer.FlagsChanged(ctx, changedKeys...)
 		}
 	}
 }
 
-func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration, value any) {
+func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, duration time.Duration, value any) {
+	ctx, span := traces.StartSpan(ctx, "key", key.String())
+	defer span.End()
+
 	// Always notify observers when overrides start, so they know to refresh.
 	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-	defer fc.notifyObservers(key)
+	defer fc.notifyObservers(ctx, key)
 
 	fc.overrideMutex.Lock()
-	defer fc.overrideMutex.Unlock()
+	span.AddEvent("override_lock_acquired")
 
-	fc.slogger.Log(context.TODO(), slog.LevelInfo,
+	defer func() {
+		fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_released")
+	}()
+
+	fc.slogger.Log(ctx, slog.LevelInfo,
 		"overriding flag",
 		"key", key,
 		"value", value,
@@ -146,12 +168,20 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 	}
 
 	overrideExpired := func(key keys.FlagKey) {
+		ctx, span := traces.StartSpan(context.TODO(), "key", key.String())
+		defer span.End()
+
 		// Always notify observers when overrides expire, so they know to refresh.
 		// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-		defer fc.notifyObservers(key)
+		defer fc.notifyObservers(ctx, key)
 
 		fc.overrideMutex.Lock()
-		defer fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_acquired")
+
+		defer func() {
+			fc.overrideMutex.Unlock()
+			span.AddEvent("override_lock_released")
+		}()
 
 		// Deleting the override implictly allows the next value to take precedence
 		delete(fc.overrides, key)
@@ -294,7 +324,10 @@ func (fc *FlagController) SetControlRequestInterval(interval time.Duration) erro
 	return fc.setControlServerValue(keys.ControlRequestInterval, durationToBytes(interval))
 }
 func (fc *FlagController) SetControlRequestIntervalOverride(value time.Duration, duration time.Duration) {
-	fc.overrideFlag(keys.ControlRequestInterval, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.ControlRequestInterval, duration, value)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
 	fc.overrideMutex.RLock()
@@ -514,7 +547,10 @@ func (fc *FlagController) SetExportTraces(enabled bool) error {
 	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
 }
 func (fc *FlagController) SetExportTracesOverride(value bool, duration time.Duration) {
-	fc.overrideFlag(keys.ExportTraces, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.ExportTraces, duration, value)
 }
 func (fc *FlagController) ExportTraces() bool {
 	return NewBoolFlagValue(
@@ -547,7 +583,10 @@ func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
 	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
 }
 func (fc *FlagController) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
-	fc.overrideFlag(keys.TraceSamplingRate, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.TraceSamplingRate, duration, value)
 }
 func (fc *FlagController) TraceSamplingRate() float64 {
 	return NewFloat64FlagValue(fc.slogger, keys.LoggingInterval,
@@ -583,7 +622,10 @@ func (fc *FlagController) SetLogShippingLevel(level string) error {
 	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
 }
 func (fc *FlagController) SetLogShippingLevelOverride(value string, duration time.Duration) {
-	fc.overrideFlag(keys.LogShippingLevel, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.LogShippingLevel, duration, value)
 }
 func (fc *FlagController) LogShippingLevel() string {
 	fc.overrideMutex.RLock()

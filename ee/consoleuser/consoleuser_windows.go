@@ -8,10 +8,14 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	explorerProcs, err := explorerProcesses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer processes: %w", err)
@@ -44,6 +48,9 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
+	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	defer span.End()
+
 	explorerProcs, err := explorerProcesses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting explorer processes: %w", err)
@@ -66,6 +73,9 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 // explorerProcesses returns a list of explorer processes whose
 // filepath base is "explorer.exe".
 func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var explorerProcs []*process.Process
 
 	procs, err := process.ProcessesWithContext(ctx)
@@ -88,6 +98,9 @@ func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
 }
 
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	username, err := proc.UsernameWithContext(ctx)
 	if err != nil {
 		return "", fmt.Errorf("getting process username (for pid %d): %w", proc.Pid, err)

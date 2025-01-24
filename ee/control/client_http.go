@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // HTTPClient handles retrieving control data via HTTP
@@ -58,21 +61,26 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 		opt(c)
 	}
 
+	c.client.Transport = otelhttp.NewTransport(c.client.Transport)
+
 	return c, nil
 }
 
-func (c *HTTPClient) GetConfig() (io.Reader, error) {
-	challengeReq, err := http.NewRequest(http.MethodGet, c.url("/api/agent/config").String(), nil)
+func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	challengeReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(challengeReq)
+	challenge, err := c.do(ctx, challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
 
-	configReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/config").String(), nil)
+	configReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create config request: %w", err)
 	}
@@ -113,7 +121,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
-	configAndAuthKeyRaw, err := c.do(configReq)
+	configAndAuthKeyRaw, err := c.do(ctx, configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
 	}
@@ -130,12 +138,15 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 	return reader, nil
 }
 
-func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
+func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if c.token == "" {
 		return nil, errors.New("token is nil, cannot request subsystem data")
 	}
 
-	dataReq, err := http.NewRequest(http.MethodGet, c.url(fmt.Sprintf("/api/agent/object/%s", hash)).String(), nil)
+	dataReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url(fmt.Sprintf("/api/agent/object/%s", hash)).String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create subsystem data request: %w", err)
 	}
@@ -144,7 +155,7 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 	dataReq.Header.Set("Content-Type", "application/json")
 	dataReq.Header.Set("Accept", "application/json")
 
-	dataRaw, err := c.do(dataReq)
+	dataRaw, err := c.do(ctx, dataReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make subsystem data request: %w", err)
 	}
@@ -154,7 +165,10 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 }
 
 // SendMessage sends a message to the server using JSON-RPC format
-func (c *HTTPClient) SendMessage(method string, params interface{}) error {
+func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
 	}
@@ -179,7 +193,7 @@ func (c *HTTPClient) SendMessage(method string, params interface{}) error {
 		return fmt.Errorf("message size %d exceeds maximum size %d", len(body), maxMessageSize)
 	}
 
-	dataReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
+	dataReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("could not create server message: %w", err)
 	}
@@ -190,12 +204,15 @@ func (c *HTTPClient) SendMessage(method string, params interface{}) error {
 
 	// we don't care about the response here, just want to know
 	// if there was an error sending our request
-	_, err = c.do(dataReq)
+	_, err = c.do(ctx, dataReq)
 	return err
 }
 
 // TODO: this should probably just return a io.Reader
-func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
+func (c *HTTPClient) do(ctx context.Context, req *http.Request) ([]byte, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
 

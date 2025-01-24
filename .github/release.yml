@@ -15,6 +15,9 @@ changelog:
     - title: Bug Fixes
       labels:
         - "bug-fixes"
+    - title: Tests, Docs, and Other No-op Changes
+      labels:
+        - "tests-docs"
     - title: General # Non-code changes like tests, CI, documentation
       labels:
         - "*"

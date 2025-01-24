@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/sys/windows"
 )
 
@@ -58,7 +59,10 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 	}, nil
 }
 
-func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if slices.Contains(flagKeys, keys.LauncherWatchdogEnabled) {
 		wc.ServiceEnabledChanged(wc.knapsack.LauncherWatchdogEnabled())
 	}

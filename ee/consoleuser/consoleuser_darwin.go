@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // example scutil output
@@ -91,6 +92,9 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	cmd, err := allowedcmd.Scutil(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating scutil command: %w", err)

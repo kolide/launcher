@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/errgroup"
@@ -33,6 +34,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+func init() {
+	// Make sure we will stop the extension manager server during shutdown.
+	// We set this during `init` to avoid data races.
+	thrift.ServerStopTimeout = 1 * time.Second
+}
 
 const (
 	// KolideSaasExtensionName is the name of the extension that provides the config,
@@ -64,6 +71,9 @@ const (
 
 	// The maximum amount of time to wait for the osquery socket to be available -- overrides context deadline
 	maxSocketWaitTime = 30 * time.Second
+
+	// How long to wait for a single osqueryinstance healthcheck before forcibly returning error
+	healthcheckTimeout = 10 * time.Second
 )
 
 // OsqueryInstanceOption is a functional option pattern for defining how an
@@ -122,31 +132,44 @@ func (i *OsqueryInstance) Healthy() error {
 		return errors.New("instance not started")
 	}
 
-	for _, srv := range i.extensionManagerServers {
-		serverStatus, err := srv.Ping(context.TODO())
+	resultsChan := make(chan error)
+	gowrapper.Go(context.TODO(), i.slogger, func() {
+		for _, srv := range i.extensionManagerServers {
+			serverStatus, err := srv.Ping(context.TODO())
+			if err != nil {
+				resultsChan <- fmt.Errorf("could not ping extension server: %w", err)
+				return
+			}
+			if serverStatus.Code != 0 {
+				resultsChan <- fmt.Errorf("ping extension server returned %d: %s", serverStatus.Code, serverStatus.Message)
+				return
+			}
+		}
+
+		clientStatus, err := i.extensionManagerClient.Ping()
 		if err != nil {
-			return fmt.Errorf("could not ping extension server: %w", err)
+			resultsChan <- fmt.Errorf("could not ping osquery extension client: %w", err)
+			return
 		}
-		if serverStatus.Code != 0 {
-			return fmt.Errorf("ping extension server returned %d: %s",
-				serverStatus.Code,
-				serverStatus.Message)
-
+		if clientStatus.Code != 0 {
+			resultsChan <- fmt.Errorf("ping extension client returned %d: %s", clientStatus.Code, clientStatus.Message)
+			return
 		}
-	}
 
-	clientStatus, err := i.extensionManagerClient.Ping()
-	if err != nil {
-		return fmt.Errorf("could not ping osquery extension client: %w", err)
-	}
-	if clientStatus.Code != 0 {
-		return fmt.Errorf("ping extension client returned %d: %s",
-			clientStatus.Code,
-			clientStatus.Message)
+		resultsChan <- nil
+	})
 
-	}
+	// Wait until we either receive an error or nil result from the healthcheck goroutine, or exceed our timeout threshold
+	select {
+	case maybeErr := <-resultsChan:
+		if maybeErr != nil {
+			return fmt.Errorf("encountered error during healthcheck: %w", maybeErr)
+		}
 
-	return nil
+		return nil
+	case <-time.After(healthcheckTimeout):
+		return fmt.Errorf("osqueryinstance healthcheck exceeded timeout of %s", healthcheckTimeout.String())
+	}
 }
 
 func (i *OsqueryInstance) Query(query string) ([]map[string]string, error) {
@@ -211,14 +234,14 @@ func (i *OsqueryInstance) BeginShutdown() {
 // WaitShutdown waits for the instance's errgroup routines to exit, then returns the
 // initial error. It should be called after either `Exited` has returned, or after
 // the instance has been asked to shut down via call to `BeginShutdown`.
-func (i *OsqueryInstance) WaitShutdown() error {
+func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
 	// Wait for shutdown to complete
-	exitErr := i.errgroup.Wait()
+	exitErr := i.errgroup.Wait(ctx)
 
 	// Record shutdown in stats, if initialized
 	if i.stats != nil {
 		if err := i.stats.Exited(exitErr); err != nil {
-			i.slogger.Log(context.TODO(), slog.LevelWarn,
+			i.slogger.Log(ctx, slog.LevelWarn,
 				"error recording osquery instance exit to history",
 				"exit_err", exitErr,
 				"err", err,
@@ -830,6 +853,9 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 				"err", err,
 				"extension_name", name,
 			)
+		}
+		if client != nil {
+			client.Close()
 		}
 		return nil
 	})

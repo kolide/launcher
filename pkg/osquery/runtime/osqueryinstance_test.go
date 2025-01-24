@@ -293,12 +293,12 @@ func TestLaunch(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown()
+		shutdownErr <- i.WaitShutdown(context.TODO())
 	}()
 
 	select {
 	case err := <-shutdownErr:
-		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("instance logs:\n\n%s", logBytes.String()))
+		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("unexpected err at %s: %v; instance logs:\n\n%s", time.Now().String(), err, logBytes.String()))
 	case <-time.After(1 * time.Minute):
 		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
 		t.FailNow()

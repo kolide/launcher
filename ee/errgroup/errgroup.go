@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -19,6 +20,7 @@ type LoggedErrgroup struct {
 
 const (
 	maxShutdownGoroutineDuration = 3 * time.Second
+	maxErrgroupShutdownDuration  = 30 * time.Second
 )
 
 func NewLoggedErrgroup(ctx context.Context, slogger *slog.Logger) *LoggedErrgroup {
@@ -143,6 +145,9 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()
 
+		ctx, span := traces.StartSpan(ctx, "goroutine_name", goroutineName)
+		defer span.End()
+
 		slogger.Log(ctx, slog.LevelInfo,
 			"starting shutdown goroutine in errgroup",
 		)
@@ -157,7 +162,6 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		}
 		slogger.Log(ctx, logLevel,
 			"exiting shutdown goroutine in errgroup",
-			"goroutine_name", goroutineName,
 			"goroutine_run_time", elapsedTime.String(),
 			"goroutine_err", err,
 		)
@@ -173,8 +177,26 @@ func (l *LoggedErrgroup) Shutdown() {
 	l.cancel()
 }
 
-func (l *LoggedErrgroup) Wait() error {
-	return l.errgroup.Wait()
+func (l *LoggedErrgroup) Wait(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	errChan := make(chan error)
+	go func() {
+		errChan <- l.errgroup.Wait()
+	}()
+
+	// Wait to receive an error from l.errgroup.Wait(), but only until our shutdown timeout.
+	select {
+	case err := <-errChan:
+		return err
+	case <-time.After(maxErrgroupShutdownDuration):
+		l.slogger.Log(ctx, slog.LevelWarn,
+			"errgroup did not complete shutdown within timeout",
+			"timeout", maxErrgroupShutdownDuration.String(),
+		)
+		return nil
+	}
 }
 
 func (l *LoggedErrgroup) Exited() <-chan struct{} {
