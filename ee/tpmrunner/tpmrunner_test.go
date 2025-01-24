@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-tpm/tpmutil/tbs"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/tpmrunner/mocks"
@@ -123,4 +124,50 @@ func Test_tpmRunner(t *testing.T) {
 
 		require.Equal(t, expectedInterrupts, receivedInterrupts)
 	})
+
+	t.Run("handles no tpm in exectue", func(t *testing.T) {
+		t.Parallel()
+
+		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
+		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		require.NoError(t, err)
+
+		// we should never try again after getting TPMNotFound err
+		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, tbs.ErrTPMNotFound).Once()
+
+		go func() {
+			// sleep long enough to get through 2 cycles of execute
+
+			// "CreateKey" should only be called once
+			time.Sleep(3 * time.Second)
+			tpmRunner.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, tpmRunner.Execute())
+		require.Nil(t, tpmRunner.Public())
+	})
+
+	t.Run("handles no tpm in Public() call", func(t *testing.T) {
+		t.Parallel()
+
+		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
+		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		require.NoError(t, err)
+
+		// we should never try again after getting TPMNotFound err
+		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, tbs.ErrTPMNotFound).Once()
+
+		// this is the only time "CreateKey" should be called
+		require.Nil(t, tpmRunner.Public())
+
+		go func() {
+			// sleep long enough to get through 2 cycles of execute
+			time.Sleep(3 * time.Second)
+			tpmRunner.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, tpmRunner.Execute())
+		require.Nil(t, tpmRunner.Public())
+	})
+
 }
