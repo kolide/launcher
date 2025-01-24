@@ -73,6 +73,28 @@ const (
 	// Default maximum number of logs to buffer before purging oldest logs
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
+
+	// How frequently osquery should check for distributed queries to run during
+	// osquery instance startup -- an accelerated interval, where the unit is seconds.
+	// This shorter interval should hopefully help launcher begin to process stale,
+	// slow-running queries as quickly as possible after device startup.
+	startupDistributedInterval = 5
+)
+
+var (
+	// Osquery configuration options that we set during the osquery instance's startup period.
+	// These are the override, non-standard values.
+	startupOsqueryConfigOptions = map[string]any{
+		"verbose":              true,                       // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": startupDistributedInterval, // request distributed queries more frequently, so stale checks run ASAP
+	}
+
+	// Osquery configuration options that we set after the osquery instance has been up and running
+	// for at least 10 minutes. These are the "normal" values. We don't set the distributed interval
+	// here so that the cloud can set it instead.
+	postStartupOsqueryConfigOptions = map[string]any{
+		"verbose": false,
+	}
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -599,24 +621,26 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
-	osqueryVerbose := true
+	configOptsToSet := startupOsqueryConfigOptions
 	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
 		// Only log the state change once -- RequestConfig happens every 5 mins
 		if uptimeMins <= 15 {
 			e.slogger.Log(ctx, slog.LevelDebug,
-				"osquery has been up for more than 10 minutes, turning off verbose logging",
+				"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
 				"uptime_mins", uptimeMins,
 			)
 		}
-		osqueryVerbose = false
+		configOptsToSet = postStartupOsqueryConfigOptions
 	}
-	config = e.setVerbose(config, osqueryVerbose)
+	config = e.setOsqueryOptions(config, configOptsToSet)
 
 	return config, nil
 }
 
-// setVerbose modifies the given config to add the `verbose` option.
-func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
+// setOsqueryOptions modifies the given config to add the given options in `optsToSet`.
+// The values in `optsToSet` will override any existing and conflicting option values
+// within `config`.
+func (e *Extension) setOsqueryOptions(config string, optsToSet map[string]any) string {
 	var cfg map[string]any
 
 	if config != "" {
@@ -644,7 +668,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 		opts = make(map[string]any)
 	}
 
-	opts["verbose"] = osqueryVerbose
+	for k, v := range optsToSet {
+		opts[k] = v
+	}
+
 	cfg["options"] = opts
 
 	cfgBytes, err := json.Marshal(cfg)
