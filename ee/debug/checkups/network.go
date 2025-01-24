@@ -55,7 +55,7 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		if err != nil {
 			continue
 		}
-		_ = runCmdMarkdownLogged(cmd, commandOutput)
+		_ = runCmdMarkdownLogged(cmd.Cmd, commandOutput)
 	}
 
 	for _, fileLocation := range listFiles() {

@@ -32,7 +32,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("creating powercfg command: %w", err)
 	}
-	hideWindow(powerCfgCmd)
+	hideWindow(powerCfgCmd.Cmd)
 	if out, err := powerCfgCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("running powercfg.exe: error %w, output %s", err, string(out))
 	}
@@ -51,7 +51,7 @@ func (p *powerCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		return fmt.Errorf("creating powercfg sleep states command: %w", err)
 	}
 
-	hideWindow(powerCfgSleepStatesCmd)
+	hideWindow(powerCfgSleepStatesCmd.Cmd)
 	availableSleepStatesOutput, err := powerCfgSleepStatesCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("running powercfg.exe for sleep states: error %w, output %s", err, string(availableSleepStatesOutput))
