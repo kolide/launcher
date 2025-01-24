@@ -253,7 +253,7 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
-	hideWindow(cmd)
+	hideWindow(cmd.Cmd)
 	cmd.Stdout = out
 	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
@@ -284,7 +284,7 @@ func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
 	if err != nil {
 		return fmt.Errorf("creating powershell command: %w", err)
 	}
-	hideWindow(getEventLogCmd)
+	hideWindow(getEventLogCmd.Cmd)
 	getEventLogCmd.Stdout = eventLogOut
 	getEventLogCmd.Stderr = eventLogOut
 	if err := getEventLogCmd.Run(); err != nil {
