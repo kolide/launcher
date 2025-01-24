@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"go.etcd.io/bbolt"
 )
 
@@ -34,7 +35,10 @@ type bboltKeyValueStore struct {
 	bucketName string
 }
 
-func NewStore(slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+func NewStore(ctx context.Context, slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+	_, span := traces.StartSpan(ctx, "bucket_name", bucketName)
+	defer span.End()
+
 	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
