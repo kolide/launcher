@@ -285,7 +285,7 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 
 func TestExtensionGenerateConfigsCaching(t *testing.T) {
 
-	configVal := `{"foo":"bar","options":{"verbose":true}}`
+	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -378,7 +378,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 
 func TestExtensionGenerateConfigs(t *testing.T) {
 
-	configVal := `{"foo":"bar","options":{"verbose":true}}`
+	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
@@ -1169,131 +1169,186 @@ func TestSetupLauncherKeys(t *testing.T) {
 	require.Equal(t, &key.PublicKey, pubkey)
 }
 
-func Test_setVerbose(t *testing.T) {
+func Test_setOsqueryOptions(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
 		name           string
 		initialConfig  map[string]any
-		osqueryVerbose bool
+		overrideOpts   map[string]any
 		expectedConfig map[string]any
 	}
 
-	testCases := make([]testCase, 0)
-	for _, osqVerbose := range []bool{true, false} {
-		testCases = append(testCases,
-			testCase{
-				name:           fmt.Sprintf("empty config, osquery verbose %v", osqVerbose),
-				initialConfig:  make(map[string]any),
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
+	testCases := []testCase{
+		{
+			name:          "empty config, startup override opts",
+			initialConfig: make(map[string]any),
+			overrideOpts:  startupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose":              true,
+					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+				},
+			},
+		},
+		{
+			name:          "empty config, post-startup override opts",
+			initialConfig: make(map[string]any),
+			overrideOpts:  postStartupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose": false,
+				},
+			},
+		},
+		{
+			name: "config with verbose already set, startup override opts",
+			initialConfig: map[string]any{
+				"options": map[string]any{
+					"verbose": false,
+				},
+			},
+			overrideOpts: startupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose":              true,
+					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+				},
+			},
+		},
+		{
+			name: "config with verbose already set, post-startup override opts",
+			initialConfig: map[string]any{
+				"options": map[string]any{
+					"verbose": true,
+				},
+			},
+			overrideOpts: postStartupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose": false,
+				},
+			},
+		},
+		{
+			name: "config with distributed_interval already set, startup override opts",
+			initialConfig: map[string]any{
+				"options": map[string]any{
+					"distributed_interval": 30,
+				},
+			},
+			overrideOpts: startupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose":              true,
+					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+				},
+			},
+		},
+		{
+			name: "config with distributed_interval already set, post-startup override opts",
+			initialConfig: map[string]any{
+				"options": map[string]any{
+					"distributed_interval": 25,
+				},
+			},
+			overrideOpts: postStartupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose":              false,
+					"distributed_interval": float64(25), // has to be a float64 due to json unmarshal nonsense
+				},
+			},
+		},
+		{
+			name: "config with other options, startup override opts",
+			initialConfig: map[string]any{
+				"options": map[string]any{
+					"audit_allow_config": false,
+				},
+			},
+			overrideOpts: startupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"audit_allow_config":   false,
+					"verbose":              true,
+					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+				},
+			},
+		},
+		{
+			name: "config with decorators, post-startup override opts",
+			initialConfig: map[string]any{
+				"decorators": map[string]any{
+					"load": []any{
+						"SELECT version FROM osquery_info;",
+						"SELECT uuid AS host_uuid FROM system_info;",
+					},
+					"always": []any{
+						"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
+					},
+					"interval": map[string]any{
+						"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
 					},
 				},
 			},
-			testCase{
-				name: fmt.Sprintf("config with verbose already set, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": !osqVerbose,
-					},
+			overrideOpts: postStartupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose": false,
 				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
+				"decorators": map[string]any{
+					"load": []any{
+						"SELECT version FROM osquery_info;",
+						"SELECT uuid AS host_uuid FROM system_info;",
 					},
-				},
-			},
-			testCase{
-				name: fmt.Sprintf("config with other options, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"options": map[string]any{
-						"audit_allow_config": false,
+					"always": []any{
+						"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
 					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"audit_allow_config": false,
-						"verbose":            osqVerbose,
+					"interval": map[string]any{
+						"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
 					},
 				},
 			},
-			testCase{
-				name: fmt.Sprintf("config with decorators, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"decorators": map[string]any{
-						"load": []any{
-							"SELECT version FROM osquery_info;",
-							"SELECT uuid AS host_uuid FROM system_info;",
+		},
+		{
+			name: "config with auto table construction, startup override opts",
+			initialConfig: map[string]any{
+				"auto_table_construction": map[string]any{
+					"tcc_system_entries": map[string]any{
+						"query": "SELECT service, client, auth_value, last_modified FROM access;",
+						"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
+						"columns": []any{
+							"service",
+							"client",
+							"auth_value",
+							"last_modified",
 						},
-						"always": []any{
-							"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
-						},
-						"interval": map[string]any{
-							"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
-						},
-					},
-				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-					"decorators": map[string]any{
-						"load": []any{
-							"SELECT version FROM osquery_info;",
-							"SELECT uuid AS host_uuid FROM system_info;",
-						},
-						"always": []any{
-							"SELECT user AS username FROM logged_in_users WHERE user <> '' ORDER BY time LIMIT 1;",
-						},
-						"interval": map[string]any{
-							"3600": []any{"SELECT total_seconds AS uptime FROM uptime;"},
-						},
+						"platform": "darwin",
 					},
 				},
 			},
-			testCase{
-				name: fmt.Sprintf("config with auto table construction, osquery verbose %v", osqVerbose),
-				initialConfig: map[string]any{
-					"auto_table_construction": map[string]any{
-						"tcc_system_entries": map[string]any{
-							"query": "SELECT service, client, auth_value, last_modified FROM access;",
-							"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
-							"columns": []any{
-								"service",
-								"client",
-								"auth_value",
-								"last_modified",
-							},
-							"platform": "darwin",
-						},
-					},
+			overrideOpts: startupOsqueryConfigOptions,
+			expectedConfig: map[string]any{
+				"options": map[string]any{
+					"verbose":              true,
+					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
-				osqueryVerbose: osqVerbose,
-				expectedConfig: map[string]any{
-					"options": map[string]any{
-						"verbose": osqVerbose,
-					},
-					"auto_table_construction": map[string]any{
-						"tcc_system_entries": map[string]any{
-							"query": "SELECT service, client, auth_value, last_modified FROM access;",
-							"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
-							"columns": []any{
-								"service",
-								"client",
-								"auth_value",
-								"last_modified",
-							},
-							"platform": "darwin",
+				"auto_table_construction": map[string]any{
+					"tcc_system_entries": map[string]any{
+						"query": "SELECT service, client, auth_value, last_modified FROM access;",
+						"path":  "/Library/Application Support/com.apple.TCC/TCC.db",
+						"columns": []any{
+							"service",
+							"client",
+							"auth_value",
+							"last_modified",
 						},
+						"platform": "darwin",
 					},
 				},
 			},
-		)
+		},
 	}
 
 	for _, tt := range testCases {
@@ -1308,7 +1363,7 @@ func Test_setVerbose(t *testing.T) {
 			cfgBytes, err := json.Marshal(tt.initialConfig)
 			require.NoError(t, err)
 
-			modifiedCfgStr := e.setVerbose(string(cfgBytes), tt.osqueryVerbose)
+			modifiedCfgStr := e.setOsqueryOptions(string(cfgBytes), tt.overrideOpts)
 
 			var modifiedCfg map[string]any
 			require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
@@ -1318,7 +1373,7 @@ func Test_setVerbose(t *testing.T) {
 	}
 }
 
-func Test_setVerbose_EmptyConfig(t *testing.T) {
+func Test_setOsqueryOptions_EmptyConfig(t *testing.T) {
 	t.Parallel()
 
 	e := &Extension{
@@ -1327,11 +1382,12 @@ func Test_setVerbose_EmptyConfig(t *testing.T) {
 
 	expectedCfg := map[string]any{
 		"options": map[string]any{
-			"verbose": true,
+			"verbose":              true,
+			"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 		},
 	}
 
-	modifiedCfgStr := e.setVerbose("", true)
+	modifiedCfgStr := e.setOsqueryOptions("", startupOsqueryConfigOptions)
 
 	var modifiedCfg map[string]any
 	require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
@@ -1351,7 +1407,7 @@ func Test_setVerbose_MalformedConfig(t *testing.T) {
 	}
 	cfgBytes, err := json.Marshal(malformedCfg)
 	require.NoError(t, err)
-	modifiedCfgStr := e.setVerbose(string(cfgBytes), true)
+	modifiedCfgStr := e.setOsqueryOptions(string(cfgBytes), postStartupOsqueryConfigOptions)
 
 	var modifiedCfg map[string]any
 	require.NoError(t, json.Unmarshal([]byte(modifiedCfgStr), &modifiedCfg))
