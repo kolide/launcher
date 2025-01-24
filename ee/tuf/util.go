@@ -16,10 +16,10 @@ import (
 // CheckExecutable tests whether something is an executable. It
 // examines permissions, mode, and tries to exec it directly.
 func CheckExecutable(ctx context.Context, potentialBinary string, args ...string) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx, "binary_path", potentialBinary)
 	defer span.End()
 
-	if err := checkExecutablePermissions(potentialBinary); err != nil {
+	if err := checkExecutablePermissions(ctx, potentialBinary); err != nil {
 		return err
 	}
 
@@ -36,34 +36,46 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 	// in that circumstance.
 	// See: https://github.com/golang/go/issues/22315
 	for i := 0; i < 3; i += 1 {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-
-		cmd := exec.CommandContext(ctx, potentialBinary, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct location so we don't need allowedcmd
-
-		// Set env, this should prevent launcher for fork-bombing
-		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
-
-		out, execErr := cmd.CombinedOutput()
+		out, execErr := runExecutableCheck(ctx, potentialBinary, args...)
 		if execErr != nil && errors.Is(execErr, syscall.ETXTBSY) {
 			continue
 		}
 
-		if ctx.Err() != nil {
-			return fmt.Errorf("timeout when checking executable: %w", ctx.Err())
-		}
-
-		return supressRoutineErrors(execErr, out)
+		return supressRoutineErrors(ctx, execErr, out)
 	}
 
 	return fmt.Errorf("could not exec %s despite retries due to text file busy", potentialBinary)
+}
+
+// runExecutableCheck runs a single exec against the given binary and returns the result.
+func runExecutableCheck(ctx context.Context, potentialBinary string, args ...string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, potentialBinary, args...) //nolint:forbidigo // We trust the autoupdate library to find the correct location so we don't need allowedcmd
+
+	// Set env, this should prevent launcher for fork-bombing
+	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("timeout when checking executable: %w", ctx.Err())
+	}
+
+	return out, err
 }
 
 // supressRoutineErrors attempts to tell whether the error was a
 // program that has executed, and then exited, vs one that's execution
 // was entirely unsuccessful. This differentiation allows us to
 // detect, and recover, from corrupt updates vs something in-app.
-func supressRoutineErrors(err error, combinedOutput []byte) error {
+func supressRoutineErrors(ctx context.Context, err error, combinedOutput []byte) error {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if err == nil {
 		return nil
 	}
