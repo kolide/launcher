@@ -27,7 +27,7 @@ func Brew(ctx context.Context, arg ...string) (*TracedCmd, error) {
 			continue
 		}
 
-		validatedCmd.Env = append(validatedCmd.Env, "HOMEBREW_NO_AUTO_UPDATE=1")
+		validatedCmd.Env = append(validatedCmd.Environ(), "HOMEBREW_NO_AUTO_UPDATE=1")
 
 		return validatedCmd, nil
 	}
