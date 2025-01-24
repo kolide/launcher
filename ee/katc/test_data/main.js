@@ -56,7 +56,8 @@
                     ],
                 noDetails: [], // Empty array
                 email: "test1@example.com",
-                someTimestamp: 1720034607 // *unint32
+                someTimestamp: 1720034607, // *unint32
+                someDate: new Date() // Date object, empty
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -88,7 +89,8 @@
                     ],
                 noDetails: [], // Empty array
                 email: "test2@example.com",
-                someTimestamp: 1726096312 // *unint32
+                someTimestamp: 1726096312, // *unint32
+                someDate: new Date("December 17, 1995 03:24:00") // Date object, not empty
             },
         ];
         objectStore.transaction.oncomplete = (event) => {

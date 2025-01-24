@@ -64,7 +64,7 @@ func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd 
 	}
 
 	for _, opt := range opts {
-		if err := opt(cmd); err != nil {
+		if err := opt(cmd.Cmd); err != nil {
 			return fmt.Errorf("applying option: %w", err)
 		}
 	}

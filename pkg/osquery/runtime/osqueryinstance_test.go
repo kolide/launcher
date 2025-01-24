@@ -293,7 +293,7 @@ func TestLaunch(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown()
+		shutdownErr <- i.WaitShutdown(context.TODO())
 	}()
 
 	select {

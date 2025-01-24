@@ -104,9 +104,12 @@ func (s *startupSettingsWriter) WriteSettings() error {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface. When a flag
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
-func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (s *startupSettingsWriter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if err := s.WriteSettings(); err != nil {
-		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
+		s.knapsack.Slogger().Log(ctx, slog.LevelError,
 			"writing startup settings after flag change",
 			"err", err,
 		)

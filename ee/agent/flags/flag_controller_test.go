@@ -262,7 +262,7 @@ func TestControllerNotify(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", []keys.FlagKey{keys.ControlRequestInterval})
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 
@@ -300,9 +300,10 @@ func TestControllerUpdate(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", mock.MatchedBy(func(k []keys.FlagKey) bool {
-				return assert.ElementsMatch(t, k, keys.ToFlagKeys(tt.changedKeys))
-			}))
+			matchKey := mock.MatchedBy(func(k keys.FlagKey) bool {
+				return assert.Contains(t, keys.ToFlagKeys(tt.changedKeys), k)
+			})
+			mockObserver.On("FlagsChanged", mock.Anything, matchKey, matchKey)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ToFlagKeys(tt.changedKeys)...)
 
@@ -341,7 +342,7 @@ func TestControllerOverride(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", []keys.FlagKey{keys.ControlRequestInterval})
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 

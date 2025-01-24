@@ -259,7 +259,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Now, WatchdogEnabled should return true
 	k.On("WatchdogEnabled").Return(true).Once()
-	runner.FlagsChanged(keys.WatchdogEnabled)
+	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
@@ -661,7 +661,7 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait()
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
@@ -736,7 +736,7 @@ func TestRestart(t *testing.T) {
 
 	previousStats := runner.instances[types.DefaultRegistrationID].stats
 
-	require.NoError(t, runner.Restart())
+	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
@@ -747,7 +747,7 @@ func TestRestart(t *testing.T) {
 
 	previousStats = runner.instances[types.DefaultRegistrationID].stats
 
-	require.NoError(t, runner.Restart())
+	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
 	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")

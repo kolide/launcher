@@ -234,14 +234,14 @@ func (i *OsqueryInstance) BeginShutdown() {
 // WaitShutdown waits for the instance's errgroup routines to exit, then returns the
 // initial error. It should be called after either `Exited` has returned, or after
 // the instance has been asked to shut down via call to `BeginShutdown`.
-func (i *OsqueryInstance) WaitShutdown() error {
+func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
 	// Wait for shutdown to complete
-	exitErr := i.errgroup.Wait()
+	exitErr := i.errgroup.Wait(ctx)
 
 	// Record shutdown in stats, if initialized
 	if i.stats != nil {
 		if err := i.stats.Exited(exitErr); err != nil {
-			i.slogger.Log(context.TODO(), slog.LevelWarn,
+			i.slogger.Log(ctx, slog.LevelWarn,
 				"error recording osquery instance exit to history",
 				"exit_err", exitErr,
 				"err", err,
