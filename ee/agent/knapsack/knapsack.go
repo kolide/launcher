@@ -274,5 +274,10 @@ func (k *knapsack) GetEnrollmentDetails() (types.EnrollmentDetails, error) {
 	if enrollmentDetails == nil {
 		return types.EnrollmentDetails{}, nil
 	}
+
+	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
+	osquery_version := k.CurrentRunningOsqueryVersion()
+	enrollmentDetails.OsqueryVersion = osquery_version
+
 	return *enrollmentDetails, nil
 }

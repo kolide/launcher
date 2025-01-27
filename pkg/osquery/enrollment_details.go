@@ -166,7 +166,6 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 	}
 
 	// Set the osquery version and save everything to knapsack before attempting to get osquery enrollment details
-	details.OsqueryVersion = k.CurrentRunningOsqueryVersion()
 	k.SetEnrollmentDetails(details)
 
 	// Launch collection in background
