@@ -420,10 +420,10 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	var enrollDetails types.EnrollmentDetails
 	// Poll for complete enrollment details
-	pollTimeout := time.NewTimer(30 * time.Second)
+	pollTimeout := time.NewTimer(60 * time.Second)
 	defer pollTimeout.Stop()
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	pollLoop := true
