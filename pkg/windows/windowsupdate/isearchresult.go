@@ -1,10 +1,12 @@
 package windowsupdate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -18,7 +20,10 @@ type ISearchResult struct {
 	Warnings       []*IUpdateException
 }
 
-func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
+func toISearchResult(ctx context.Context, searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 	iSearchResult := &ISearchResult{
 		disp: searchResultDisp,
@@ -33,7 +38,7 @@ func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
 		return nil, fmt.Errorf("RootCategories: %w", err)
 	}
 	if rootCategoriesDisp != nil {
-		if iSearchResult.RootCategories, err = toICategories(rootCategoriesDisp); err != nil {
+		if iSearchResult.RootCategories, err = toICategories(ctx, rootCategoriesDisp); err != nil {
 			return nil, fmt.Errorf("toICategories: %w", err)
 		}
 	}
@@ -44,7 +49,7 @@ func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
 		return nil, fmt.Errorf("Updates: %w", err)
 	}
 	if updatesDisp != nil {
-		if iSearchResult.Updates, err = toIUpdates(updatesDisp); err != nil {
+		if iSearchResult.Updates, err = toIUpdates(ctx, updatesDisp); err != nil {
 			return nil, fmt.Errorf("toIUpdates: %w", err)
 		}
 	}
@@ -54,7 +59,7 @@ func toISearchResult(searchResultDisp *ole.IDispatch) (*ISearchResult, error) {
 		return nil, fmt.Errorf("Warnings: %w", err)
 	}
 	if warningsDisp != nil {
-		if iSearchResult.Warnings, err = toIUpdateExceptions(warningsDisp); err != nil {
+		if iSearchResult.Warnings, err = toIUpdateExceptions(ctx, warningsDisp); err != nil {
 			return nil, fmt.Errorf("toIUpdateExceptions: %w", err)
 		}
 	}

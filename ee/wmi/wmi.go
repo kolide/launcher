@@ -39,6 +39,7 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/scjalliance/comshim"
 )
 
@@ -111,6 +112,9 @@ func WithWhere(whereClause string) Option {
 }
 
 func Query(ctx context.Context, slogger *slog.Logger, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	handler := NewOleHandler(ctx, slogger, properties)
 
 	// settings

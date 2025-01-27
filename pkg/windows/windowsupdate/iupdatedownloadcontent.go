@@ -1,7 +1,10 @@
 package windowsupdate
 
 import (
+	"context"
+
 	"github.com/go-ole/go-ole"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // IUpdateDownloadContent represents the download content of an update.
@@ -11,7 +14,10 @@ type IUpdateDownloadContent struct {
 	DownloadUrl string
 }
 
-func toIUpdateDownloadContents(updateDownloadContentsDisp *ole.IDispatch) ([]*IUpdateDownloadContent, error) {
+func toIUpdateDownloadContents(ctx context.Context, updateDownloadContentsDisp *ole.IDispatch) ([]*IUpdateDownloadContent, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// TODO
 	return nil, nil
 }

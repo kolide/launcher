@@ -42,5 +42,4 @@ func TestTable(t *testing.T) {
 			require.NoError(t, err, "generate")
 		})
 	}
-
 }

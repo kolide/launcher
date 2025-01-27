@@ -1,10 +1,12 @@
 package windowsupdate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -20,7 +22,10 @@ type IUpdateSession struct {
 }
 
 // NewUpdateSession creates a new Microsoft.Update.Session object
-func NewUpdateSession() (*IUpdateSession, error) {
+func NewUpdateSession(ctx context.Context) (*IUpdateSession, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	unknown, err := oleutil.CreateObject("Microsoft.Update.Session")
 	if err != nil {
 		return nil, fmt.Errorf("create Microsoft.Update.Session: %w", err)
@@ -29,10 +34,13 @@ func NewUpdateSession() (*IUpdateSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("IID_IDispatch: %w", err)
 	}
-	return toIUpdateSession(disp)
+	return toIUpdateSession(ctx, disp)
 }
 
-func toIUpdateSession(updateSessionDisp *ole.IDispatch) (*IUpdateSession, error) {
+func toIUpdateSession(ctx context.Context, updateSessionDisp *ole.IDispatch) (*IUpdateSession, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 
 	iUpdateSession := &IUpdateSession{
@@ -50,11 +58,17 @@ func toIUpdateSession(updateSessionDisp *ole.IDispatch) (*IUpdateSession, error)
 	return iUpdateSession, nil
 }
 
-func (iUpdateSession *IUpdateSession) GetLocal() (uint32, error) {
+func (iUpdateSession *IUpdateSession) GetLocal(ctx context.Context) (uint32, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	return oleconv.ToUint32Err(oleutil.GetProperty(iUpdateSession.disp, "UserLocale"))
 }
 
-func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
+func (iUpdateSession *IUpdateSession) SetLocal(ctx context.Context, locale uint32) error {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if _, err := oleconv.ToUint32Err(oleutil.PutProperty(iUpdateSession.disp, "UserLocale", locale)); err != nil {
 		return fmt.Errorf("putproperty userlocale: %w", err)
 	}
@@ -63,11 +77,14 @@ func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
 
 // CreateUpdateSearcher returns an IUpdateSearcher interface for this session.
 // https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
-func (iUpdateSession *IUpdateSession) CreateUpdateSearcher() (*IUpdateSearcher, error) {
+func (iUpdateSession *IUpdateSession) CreateUpdateSearcher(ctx context.Context) (*IUpdateSearcher, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	updateSearcherDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(iUpdateSession.disp, "CreateUpdateSearcher"))
 	if err != nil {
 		return nil, err
 	}
 
-	return toIUpdateSearcher(updateSearcherDisp)
+	return toIUpdateSearcher(ctx, updateSearcherDisp)
 }

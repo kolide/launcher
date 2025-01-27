@@ -1,10 +1,12 @@
 package windowsupdate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
 )
 
@@ -16,7 +18,10 @@ type IUpdateIdentity struct {
 	UpdateID       string
 }
 
-func toIUpdateIdentity(updateIdentityDisp *ole.IDispatch) (*IUpdateIdentity, error) {
+func toIUpdateIdentity(ctx context.Context, updateIdentityDisp *ole.IDispatch) (*IUpdateIdentity, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var err error
 	iUpdateIdentity := &IUpdateIdentity{
 		disp: updateIdentityDisp,
