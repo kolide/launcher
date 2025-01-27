@@ -327,8 +327,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// For now, remediation is not performed -- we only log the hardware change.
-	agent.DetectAndRemediateHardwareChange(ctx, k)
+	// For now, remediation is not performed -- we only log the hardware change. So we can
+	// perform this operation in the background to avoid slowing down launcher startup.
+	go agent.DetectAndRemediateHardwareChange(ctx, k)
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
@@ -377,6 +378,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
+		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
