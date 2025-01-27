@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
@@ -31,6 +30,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// settingsStoreWriter writes to our startup settings store
+type settingsStoreWriter interface {
+	WriteSettings() error
+}
+
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
@@ -41,6 +45,7 @@ type Extension struct {
 	registrationId      string
 	knapsack            types.Knapsack
 	serviceClient       service.KolideService
+	settingsWriter      settingsStoreWriter
 	enrollMutex         sync.Mutex
 	done                chan struct{}
 	interrupted         atomic.Bool
@@ -122,7 +127,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -162,6 +167,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	return &Extension{
 		slogger:             slogger,
 		serviceClient:       client,
+		settingsWriter:      settingsWriter,
 		registrationId:      registrationId,
 		knapsack:            k,
 		NodeKey:             nodekey,
@@ -541,30 +547,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		}
 		config = string(confBytes)
 	} else {
-		// Store good config
-		e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config))
-
-		// open the start up settings writer just to trigger a write of the config,
-		// then we can immediately close it
-		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
-		if err != nil {
+		// Store good config in both the knapsack and our settings store
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config)); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
-				"could not get startup settings writer",
+				"writing config to config store",
 				"err", err,
 			)
-		} else {
-			defer startupSettingsWriter.Close()
-
-			if err := startupSettingsWriter.WriteSettings(); err != nil {
-				e.slogger.Log(ctx, slog.LevelError,
-					"writing startup settings",
-					"err", err,
-				)
-			}
 		}
-		// TODO log or record metrics when caching config fails? We
-		// would probably like to return the config and not an error in
-		// this case.
+		if err := e.settingsWriter.WriteSettings(); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"writing config to startup settings",
+				"err", err,
+			)
+		}
 	}
 
 	return map[string]string{"config": config}, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +29,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
 	cmd, err := i.createOsquerydCommand(osquerydPath, &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",
