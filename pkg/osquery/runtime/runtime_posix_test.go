@@ -64,6 +64,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -122,6 +123,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)

@@ -151,6 +151,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -196,6 +197,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -239,6 +241,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -443,6 +446,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -490,6 +494,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient(t)
 
@@ -560,6 +565,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient(t)
 
@@ -622,6 +628,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -665,6 +672,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -811,6 +819,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
