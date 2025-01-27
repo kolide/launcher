@@ -13,7 +13,7 @@ import (
 
 // MakeStores creates all the KVStores used by launcher
 func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
-	_, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	stores := make(map[storage.Store]types.KVStore)
@@ -37,7 +37,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 	}
 
 	for _, storeName := range storeNames {
-		store, err := NewStore(slogger, db, storeName.String())
+		store, err := NewStore(ctx, slogger, db, storeName.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create '%s' KVStore: %w", storeName, err)
 		}
