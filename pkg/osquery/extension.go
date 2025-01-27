@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -426,28 +427,25 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	pollLoop := true
-	for pollLoop {
-		select {
-		case <-ctx.Done():
-			return "", true, ctx.Err()
-		case <-pollTimeout.C:
-			// Timeout reached, proceed with whatever details we have
-			span.AddEvent("enrollment_details_timeout")
-			pollLoop = false
-		case <-ticker.C:
-			details, err := e.knapsack.GetEnrollmentDetails()
-			if err != nil {
-				traces.SetError(span, fmt.Errorf("error getting enrollment details: %w", err))
-				continue
-			}
-			if details.OSVersion != "" && details.Hostname != "" {
-				span.AddEvent("got_complete_enrollment_details")
-				enrollDetails = details
-				pollLoop = false
-			}
-			// Continue polling
+	// Replace the manual polling loop with backoff.WaitFor
+	err = backoff.WaitFor(func() error {
+		details, err := e.knapsack.GetEnrollmentDetails()
+		if err != nil {
+			traces.SetError(span, fmt.Errorf("error getting enrollment details: %w", err))
+			return err
 		}
+		if details.OSVersion == "" || details.Hostname == "" {
+			return fmt.Errorf("incomplete enrollment details")
+		}
+		enrollDetails = details
+		span.AddEvent("got_complete_enrollment_details")
+		return nil
+	}, 60*time.Second, 5*time.Second)
+
+	if err != nil {
+		span.AddEvent("enrollment_details_timeout")
+		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
+		enrollDetails, _ = e.knapsack.GetEnrollmentDetails()
 	}
 
 	// If no cached node key, enroll for new node key
