@@ -63,7 +63,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t), WithStartFunc(func(cmd *exec.Cmd) error {
@@ -119,7 +119,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")

@@ -269,7 +269,7 @@ func TestLaunch(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
-	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t))
 	go i.Launch()
