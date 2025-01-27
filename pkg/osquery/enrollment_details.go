@@ -7,12 +7,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -142,6 +146,48 @@ func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *serv
 	if val, ok := resp[0]["hardware_uuid"]; ok {
 		details.HardwareUUID = val
 	}
+
+	return nil
+}
+
+// CollectAndSetEnrollmentDetails collects enrollment details from osquery and sets them in the knapsack.
+func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k types.Knapsack, collectTimeout time.Duration, collectRetryInterval time.Duration) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	// Get the runtime details
+	details := getRuntimeEnrollDetails()
+
+	latestOsquerydPath := k.LatestOsquerydPath(ctx)
+
+	if latestOsquerydPath == "" {
+		span.AddEvent("no osqueryd path, skipping enrollment osquery details")
+		return errors.New("no osqueryd path, skipping enrollment osquery details, no osqueryd path, this is probably CI")
+	}
+
+	// Set the osquery version and save everything to knapsack before attempting to get osquery enrollment details
+	details.OsqueryVersion = k.CurrentRunningOsqueryVersion()
+	k.SetEnrollmentDetails(details)
+
+	// Launch collection in background
+	collectCtx, cancel := context.WithCancel(ctx)
+	// Get the osquery details
+	gowrapper.Go(collectCtx, slogger, func() {
+		defer span.End()
+		defer cancel()
+
+		if err := backoff.WaitFor(func() error {
+			err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
+			if err != nil {
+				span.AddEvent("failed to get enrollment details")
+			}
+			return err
+		}, collectTimeout, collectRetryInterval); err != nil {
+			span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
+			return
+		}
+		k.SetEnrollmentDetails(details) // Overwrite the runtime details with runtime + osquery details
+	})
 
 	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -420,38 +418,38 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
-	// We used to see the enrollment details fail, but now that we're running as an exec,
-	// it seems less likely. Try a couple times, but backoff fast.
-	enrollDetails := getRuntimeEnrollDetails()
-	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		e.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment osquery details, no osqueryd path, this is probably CI",
-		)
-		span.AddEvent("skipping_enrollment_details")
-	} else {
-		if err := backoff.WaitFor(func() error {
-			err = getOsqEnrollDetails(ctx, osqPath, &enrollDetails)
-			if err != nil {
-				e.slogger.Log(ctx, slog.LevelDebug,
-					"getOsqEnrollDetails failed in backoff",
-					"err", err,
-				)
-			}
-			return err
-		}, 30*time.Second, 5*time.Second); err != nil {
-			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return "", true, fmt.Errorf("query osq enrollment details: %w", err)
-			}
+	var enrollDetails types.EnrollmentDetails
+	// Poll for complete enrollment details
+	pollTimeout := time.NewTimer(30 * time.Second)
+	defer pollTimeout.Stop()
 
-			e.slogger.Log(ctx, slog.LevelError,
-				"failed to get osq enrollment details with retries, moving on",
-				"err", err,
-			)
-			traces.SetError(span, fmt.Errorf("query osq enrollment details: %w", err))
-		} else {
-			span.AddEvent("got_enrollment_details")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	pollLoop := true
+	for pollLoop {
+		select {
+		case <-ctx.Done():
+			return "", true, ctx.Err()
+		case <-pollTimeout.C:
+			// Timeout reached, proceed with whatever details we have
+			span.AddEvent("enrollment_details_timeout")
+			pollLoop = false
+		case <-ticker.C:
+			details, err := e.knapsack.GetEnrollmentDetails()
+			if err != nil {
+				traces.SetError(span, fmt.Errorf("error getting enrollment details: %w", err))
+				continue
+			}
+			if details.OSVersion != "" && details.Hostname != "" {
+				span.AddEvent("got_complete_enrollment_details")
+				enrollDetails = details
+				pollLoop = false
+			}
+			// Continue polling
 		}
 	}
+
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
