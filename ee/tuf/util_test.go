@@ -196,13 +196,13 @@ func windowsAddExe(in string) string {
 func Test_checkExecutablePermissions(t *testing.T) {
 	t.Parallel()
 
-	require.Error(t, checkExecutablePermissions(""), "passing empty string")
-	require.Error(t, checkExecutablePermissions("/random/path/should/not/exist"), "passing non-existent file path")
+	require.Error(t, checkExecutablePermissions(context.TODO(), ""), "passing empty string")
+	require.Error(t, checkExecutablePermissions(context.TODO(), "/random/path/should/not/exist"), "passing non-existent file path")
 
 	// Setup the tests
 	tmpDir := t.TempDir()
 
-	require.Error(t, checkExecutablePermissions(tmpDir), "directory should not be executable")
+	require.Error(t, checkExecutablePermissions(context.TODO(), tmpDir), "directory should not be executable")
 
 	dotExe := ""
 	if runtime.GOOS == "windows" {
@@ -222,17 +222,17 @@ func Test_checkExecutablePermissions(t *testing.T) {
 
 	// windows doesn't have an executable bit
 	if runtime.GOOS == "windows" {
-		require.NoError(t, checkExecutablePermissions(fileName), "plain file")
-		require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
-		require.NoError(t, checkExecutablePermissions(symLink), "symlink")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
 	} else {
-		require.Error(t, checkExecutablePermissions(fileName), "plain file")
-		require.Error(t, checkExecutablePermissions(hardLink), "hard link")
-		require.Error(t, checkExecutablePermissions(symLink), "symlink")
+		require.Error(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
+		require.Error(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
+		require.Error(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
 
 		require.NoError(t, os.Chmod(fileName, 0755))
-		require.NoError(t, checkExecutablePermissions(fileName), "plain file")
-		require.NoError(t, checkExecutablePermissions(hardLink), "hard link")
-		require.NoError(t, checkExecutablePermissions(symLink), "symlink")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
 	}
 }

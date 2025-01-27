@@ -1,6 +1,7 @@
 package storageci
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -16,7 +17,7 @@ import (
 
 func getStores(t *testing.T) []types.KVStore {
 	db := SetupDB(t)
-	bboltStore, err := agentbbolt.NewStore(multislogger.NewNopLogger(), db, "test_bucket")
+	bboltStore, err := agentbbolt.NewStore(context.TODO(), multislogger.NewNopLogger(), db, "test_bucket")
 	require.NoError(t, err)
 
 	stores := []types.KVStore{
