@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/stretchr/testify/require"
@@ -66,6 +67,33 @@ func TestOpenRW_DatabaseIsCorrupt(t *testing.T) {
 	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected database to be deleted and re-created successfully when corrupt")
 	require.NoError(t, s.Close(), "closing test store")
+}
+
+func TestOpenRW_DatabaseIsDirty(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+
+	// Create the database
+	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error creating test store")
+
+	// Mark the migration as dirty
+	_, err = s.conn.Exec(fmt.Sprintf(`UPDATE %s SET dirty = 1;`, sqlite.DefaultMigrationsTable))
+	require.NoError(t, err, "marking migration as dirty")
+
+	// Close the connection
+	require.NoError(t, s.Close(), "expected no error closing test store")
+
+	// Open a new connection and expect that it succeeds, forcing the dirty migration
+	s2, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error opening test store with dirty migration")
+	require.NoError(t, s2.Close(), "expected no error closing test store")
+
+	// Open and close again successfully just to be sure
+	s3, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error opening test store with dirty migration")
+	require.NoError(t, s3.Close(), "expected no error closing test store")
 }
 
 func TestOpenRW_InvalidTable(t *testing.T) {

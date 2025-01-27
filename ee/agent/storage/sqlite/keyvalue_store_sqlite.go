@@ -187,7 +187,21 @@ func (s *sqliteStore) migrate() error {
 
 	// don't prevent DB access for a missing migration, this is the result of a downgrade after previously
 	// running a migration
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) && !isMissingMigrationError(err) {
+	if err := m.Up(); err != nil {
+		// Not actually errors for us -- we're in a successful state
+		if errors.Is(err, migrate.ErrNoChange) || isMissingMigrationError(err) {
+			return nil
+		}
+
+		// If we need to force, do that
+		if errDirty, ok := err.(migrate.ErrDirty); ok {
+			if err := m.Force(errDirty.Version); err != nil {
+				return fmt.Errorf("forcing migration version %d: %w", errDirty.Version, err)
+			}
+			return nil
+		}
+
+		// Some other error -- return it
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
