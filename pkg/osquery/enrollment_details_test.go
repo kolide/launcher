@@ -58,6 +58,8 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	t.Parallel()
 	slogger := multislogger.NewNopLogger()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
 
 	testRootDir := t.TempDir()
 
@@ -65,14 +67,11 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	target := packaging.Target{}
 	require.NoError(t, target.PlatformFromString(runtime.GOOS))
 	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
 
 	osquerydPath := filepath.Join(testRootDir, target.PlatformBinaryName("osqueryd"))
 
 	// Fetch and copy osqueryd
-	downloadPath, err := packaging.FetchBinary(context.TODO(), testRootDir, "osqueryd",
+	downloadPath, err := packaging.FetchBinary(ctx, testRootDir, "osqueryd",
 		target.PlatformBinaryName("osqueryd"), "stable", target)
 	require.NoError(t, err)
 	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
@@ -81,7 +80,6 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	require.NoError(t, os.Chmod(osquerydPath, 0755))
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	ctx := context.Background()
 
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 
