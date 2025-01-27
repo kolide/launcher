@@ -43,6 +43,7 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 }
 
 func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
+	t.Parallel()
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	ctx := context.Background()
 	slogger := multislogger.NewNopLogger()
@@ -55,7 +56,7 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 }
 
 func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
-
+	t.Parallel()
 	slogger := multislogger.NewNopLogger()
 
 	testRootDir := t.TempDir()
