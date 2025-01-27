@@ -150,6 +150,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
@@ -195,6 +196,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
@@ -235,6 +237,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	// Start the runner
@@ -436,6 +439,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
@@ -480,6 +484,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient(t)
 
@@ -547,6 +552,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 	serviceClient := mockServiceClient(t)
 
@@ -606,6 +612,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
@@ -646,6 +653,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner := New(k, mockServiceClient(t))
@@ -789,6 +797,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{}, nil).Maybe()
 	setUpMockStores(t, k)
 
 	runner = New(k, mockServiceClient(t))
