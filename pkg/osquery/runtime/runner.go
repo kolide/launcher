@@ -36,7 +36,7 @@ type Runner struct {
 	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
 	settingsWriter  settingsStoreWriter     // writes to startup settings store
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown        chan struct{}           // buffered shutdown channel for to enable shutting down to restart or exit
+	shutdown        chan struct{}           // buffered shutdown channel to enable shutting down to restart or exit
 	rerunRequired   atomic.Bool
 	interrupted     atomic.Bool
 }
