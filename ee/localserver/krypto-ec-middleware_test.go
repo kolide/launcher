@@ -104,13 +104,34 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			challengeId := []byte(ulid.New())
 			challengeData := []byte(ulid.New())
 
+			// this is the interval between callbacks for testing
+			presenceDetectionCallbackInterval := 750 * time.Millisecond
+
+			// this is how long it will take the "user" to complete presence detection for texting
+			presenceDetectionCompletionTime := 1 * time.Second
+
 			callbackWaitGroup := sync.WaitGroup{}
+
+			// 2 for the standard post / get call back
 			callbackWaitGroup.Add(2)
 
 			// assume that if we have presence detection headers, we should have a presence detection callback
 			// presence detection is not yet available on linux
 			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
-				callbackWaitGroup.Add(2)
+
+				// we fire off one call back immedatly when presence detection is starts
+				callbackWaitGroup.Add(1)
+
+				// calc the number of "waiting on user" callbacks
+				expectedPresenceDetectionCallbacks := int(presenceDetectionCompletionTime / presenceDetectionCallbackInterval)
+
+				// we expect one call back when the detection is complete
+				expectedPresenceDetectionCallbacks += 1
+
+				// we go test this using a post and a get so double that
+				expectedPresenceDetectionCallbacks *= 2
+
+				callbackWaitGroup.Add(expectedPresenceDetectionCallbacks)
 			}
 
 			// this is the key we can use to open the response
@@ -140,9 +161,12 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					return
 				}
 
+				// otherwise it's the regular call back or a "waiting on user callback"
 				require.Equal(t, tt.expectedCallbackHeaders, headers,
 					"callback headers should match expected",
 				)
+
+				w.WriteHeader(http.StatusOK)
 			}))
 
 			cmdReq := v2CmdRequestType{
@@ -170,10 +194,14 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					})).Logger
 
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
-					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
+					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).
+						After(presenceDetectionCompletionTime).
+						Return(0*time.Second, nil).
+						Once()
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					kryptoEcMiddleware.presenceDetectionCallbackInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
 					// give our middleware with the test handler to the determiner

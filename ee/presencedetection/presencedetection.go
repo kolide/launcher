@@ -8,7 +8,7 @@ import (
 
 const (
 	DetectionFailedDurationValue = -1 * time.Second
-	DetectionTimeout             = 1 * time.Minute
+	DetectionTimeout             = 5 * time.Minute
 )
 
 type PresenceDetector struct {
