@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -53,6 +54,9 @@ type chromeProfileInfo struct {
 }
 
 func (c *chromeUserProfilesTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", fileInfo.path)
+	defer span.End()
+
 	var results []map[string]string
 	data, err := os.ReadFile(fileInfo.path)
 	if err != nil {
@@ -76,6 +80,9 @@ func (c *chromeUserProfilesTable) generateForPath(ctx context.Context, fileInfo 
 }
 
 func (c *chromeUserProfilesTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_chrome_user_profiles")
+	defer span.End()
+
 	osChromeLocalStateDirs, ok := chromeLocalStateDirs[runtime.GOOS]
 	if !ok {
 		osChromeLocalStateDirs = chromeLocalStateDirDefault

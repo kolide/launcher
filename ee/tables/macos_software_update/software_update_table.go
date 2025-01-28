@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/sys/unix"
 )
@@ -45,6 +46,9 @@ type osUpdateTable struct {
 }
 
 func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_macos_software_update")
+	defer span.End()
+
 	if table.macOSBuildVersionPrefix == 0 {
 		buildPrefix, err := macOSBuildVersionPrefix()
 		if err != nil {

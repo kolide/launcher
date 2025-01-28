@@ -15,10 +15,14 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
 func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	targetUser, err := user.Lookup(username)
 	if err != nil {
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
@@ -57,6 +61,9 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 }
 
 func ExecOsqueryLaunchctlParsed(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	outBytes, err := ExecOsqueryLaunchctl(ctx, timeoutSeconds, username, osqueryPath, query)
 	if err != nil {
 		return nil, err

@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -49,6 +50,9 @@ type onePasswordAccountsTable struct {
 // generate the onepassword account info results given the path to a
 // onepassword sqlite DB
 func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", fileInfo.path)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_onepassword_accounts")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_onepassword_accounts tmp dir: %w", err)
@@ -92,6 +96,9 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 }
 
 func (o *onePasswordAccountsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_onepassword_accounts")
+	defer span.End()
+
 	var results []map[string]string
 	osDataFiles, ok := onepasswordDataFiles[runtime.GOOS]
 	if !ok {

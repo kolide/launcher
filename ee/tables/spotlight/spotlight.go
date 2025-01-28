@@ -15,6 +15,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -44,6 +45,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_spotlight")
+	defer span.End()
+
 	q, ok := queryContext.Constraints["query"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The spotlight table requires that you specify a constraint WHERE query =")

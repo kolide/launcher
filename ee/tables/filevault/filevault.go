@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -33,6 +34,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_filevault")
+	defer span.End()
+
 	output, err := tablehelpers.RunSimple(ctx, t.slogger, 10, allowedcmd.Fdesetup, []string{"status"})
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,

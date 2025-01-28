@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -39,9 +40,12 @@ func AvailableProducts(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generateAvailableProducts(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_macos_available_products")
+	defer span.End()
+
 	var results []map[string]string
 
-	data := getProducts()
+	data := getProducts(ctx)
 
 	for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 		flattened, err := dataflatten.Flatten(data, dataflatten.WithSlogger(t.slogger), dataflatten.WithQuery(strings.Split(dataQuery, "/")))
@@ -93,7 +97,10 @@ func productNestedKeyValueFound(index C.uint, parent, key, value *C.char) {
 	}
 }
 
-func getProducts() map[string]interface{} {
+func getProducts(ctx context.Context) map[string]interface{} {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	results := make(map[string]interface{})
 
 	// Calling getAvailableProducts is an expensive operation and could cause performance

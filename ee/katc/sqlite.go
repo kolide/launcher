@@ -8,12 +8,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
 
 // sqliteData is the dataFunc for sqlite KATC tables
 func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Pull out path constraints from the query against the KATC table, to avoid querying more sqlite dbs than we need to.
 	pathConstraintsFromQuery := getPathConstraint(queryContext)
 
@@ -60,6 +64,9 @@ func sourcePatternToGlobbablePattern(sourcePattern string) string {
 
 // querySqliteDb queries the database at the given path, returning rows of results
 func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query string) ([]map[string][]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	dsn := fmt.Sprintf("file:%s?mode=ro&immutable=1", path)
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {

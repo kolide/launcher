@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -45,6 +46,9 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	execBytes, err := tablehelpers.RunSimple(ctx, t.slogger, 50, t.cmdGen, t.execArgs)

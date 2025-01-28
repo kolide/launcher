@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,6 +25,9 @@ func TablePlugin() *table.Plugin {
 
 func generate() table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
+		defer span.End()
+
 		results := []map[string]string{}
 
 		history, err := history.GetHistory()

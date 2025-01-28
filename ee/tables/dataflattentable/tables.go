@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -129,6 +130,9 @@ func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.Os
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	requestedPaths := tablehelpers.GetConstraints(queryContext, "path")
@@ -204,6 +208,9 @@ func (t *Table) generateRawData(ctx context.Context, rawdata string, dataQuery s
 }
 
 func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "path", filePath)
+	defer span.End()
+
 	data, err := t.flattenFileFunc(filePath, flattenOpts...)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,

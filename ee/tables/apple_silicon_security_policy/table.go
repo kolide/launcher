@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -35,6 +36,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_apple_silicon_security_policy")
+	defer span.End()
+
 	var results []map[string]string
 
 	output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs})
