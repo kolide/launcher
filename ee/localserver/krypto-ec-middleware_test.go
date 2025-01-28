@@ -194,10 +194,13 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					})).Logger
 
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
-					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).
-						After(presenceDetectionCompletionTime).
-						Return(0*time.Second, nil).
-						Once()
+
+					if runtime.GOOS != "linux" { // only doing persence detection on windows and macos for now
+						mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).
+							After(presenceDetectionCompletionTime).
+							Return(0*time.Second, nil).
+							Once()
+					}
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
