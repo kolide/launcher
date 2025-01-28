@@ -29,6 +29,11 @@ linters-settings:
     exclude-functions: github.com/go-kit/kit/log:Log
   gofmt:
     simplify: false
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
   forbidigo:
     forbid:
       - p: ^exec\.Command.*$
