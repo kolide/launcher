@@ -88,7 +88,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to fetch binary: %v\nLogs:\n%s", err, logBytes.String())
 	}
-	slogger.InfoContext(ctx, "downloaded osqueryd", "downloadPath", downloadPath)
+	slogger.InfoContext(ctx, "downloaded osqueryd", "download_path", downloadPath)
 	require.NoError(t, err)
 	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
 
@@ -144,7 +144,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 				t.Error("timeout waiting for enrollment details")
 				return
 			case <-time.After(5 * time.Second):
-				slogger.Debug("waiting for details", "current_count", atomic.LoadInt32(&detailsCount))
+				slogger.DebugContext(ctx, "waiting for details", "current_count", atomic.LoadInt32(&detailsCount))
 				continue
 			}
 		}
