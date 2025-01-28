@@ -3,9 +3,12 @@
 
 package presencedetection
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
-func Detect(reason string) (bool, error) {
+func Detect(reason string, timeout time.Duration) (bool, error) {
 	// Implement detection logic for non-Darwin platforms
 	return false, errors.New("detection not implemented for this platform")
 }

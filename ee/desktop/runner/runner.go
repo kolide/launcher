@@ -295,7 +295,7 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 	var lastErr error
 
 	for _, proc := range r.uidProcs {
-		client := client.New(r.userServerAuthToken, proc.socketPath)
+		client := client.New(r.userServerAuthToken, proc.socketPath, client.WithTimeout(presencedetection.DetectionTimeout))
 
 		durationSinceLastDetection, err := client.DetectPresence(reason, interval)
 		if err != nil {

@@ -71,10 +71,10 @@ var roInitialize = sync.OnceFunc(func() {
 })
 
 // Detect prompts the user via Hello.
-func Detect(reason string) (bool, error) {
+func Detect(reason string, timeout time.Duration) (bool, error) {
 	roInitialize()
 
-	if err := requestVerification(reason); err != nil {
+	if err := requestVerification(reason, timeout); err != nil {
 		return false, fmt.Errorf("requesting verification: %w", err)
 	}
 
@@ -83,7 +83,7 @@ func Detect(reason string) (bool, error) {
 
 // requestVerification calls Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync via the interop interface.
 // See: https://learn.microsoft.com/en-us/windows/win32/api/userconsentverifierinterop/nf-userconsentverifierinterop-iuserconsentverifierinterop-requestverificationforwindowasync
-func requestVerification(reason string) error {
+func requestVerification(reason string, timeout time.Duration) error {
 	// Get access to UserConsentVerifier via factory
 	factory, err := ole.RoGetActivationFactory("Windows.Security.Credentials.UI.UserConsentVerifier", iUserConsentVerifierStaticsGuid)
 	if err != nil {
@@ -155,7 +155,7 @@ func requestVerification(reason string) error {
 		if operationStatus != foundation.AsyncStatusCompleted {
 			return fmt.Errorf("RequestVerificationForWindowAsync operation did not complete: status %d", operationStatus)
 		}
-	case <-time.After(DetectionTimeout):
+	case <-time.After(timeout):
 		return errors.New("timed out waiting for RequestVerificationForWindowAsync operation to complete")
 	}
 

@@ -15,12 +15,14 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
@@ -71,16 +73,23 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 }
 
 type kryptoEcMiddleware struct {
-	localDbSigner crypto.Signer
-	counterParty  ecdsa.PublicKey
-	slogger       *slog.Logger
+	localDbSigner                     crypto.Signer
+	counterParty                      ecdsa.PublicKey
+	slogger                           *slog.Logger
+	presenceDetector                  presenceDetector
+	presenceDetectionLock             sync.Mutex
+	presenceDetectionCallbackInterval time.Duration
+	timestampValidityRange            int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		localDbSigner: localDbSigner,
-		counterParty:  counterParty,
-		slogger:       slogger.With("keytype", "ec"),
+		localDbSigner:                     localDbSigner,
+		counterParty:                      counterParty,
+		slogger:                           slogger.With("keytype", "ec"),
+		presenceDetector:                  presenceDetector,
+		timestampValidityRange:            timestampValidityRange,
+		presenceDetectionCallbackInterval: 30 * time.Second,
 	}
 }
 
@@ -108,14 +117,14 @@ type callbackDataStruct struct {
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
 //
 // Note that because this is a network call, it should be called in a goroutine.
-func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataStruct) {
+func sendCallback(slogger *slog.Logger, req *http.Request, data *callbackDataStruct) {
 	if req == nil {
 		return
 	}
 
 	b, err := json.Marshal(data)
 	if err != nil {
-		e.slogger.Log(req.Context(), slog.LevelError,
+		slogger.Log(req.Context(), slog.LevelError,
 			"unable to marshal callback data",
 			"err", err,
 		)
@@ -130,7 +139,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	resp, err := client.Do(req)
 	if err != nil {
-		e.slogger.Log(req.Context(), slog.LevelError,
+		slogger.Log(req.Context(), slog.LevelError,
 			"got error in callback",
 			"err", err,
 		)
@@ -141,7 +150,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 		resp.Body.Close()
 	}
 
-	e.slogger.Log(req.Context(), slog.LevelDebug,
+	slogger.Log(req.Context(), slog.LevelDebug,
 		"finished callback",
 		"response_status", resp.Status,
 	)
@@ -223,8 +232,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 						context.WithValue(callbackReq.Context(), multislogger.KolideSessionIdKey, kolideSessionId[0]),
 					)
 				}
+
 				gowrapper.Go(r.Context(), e.slogger, func() {
-					e.sendCallback(callbackReq, callbackData)
+					sendCallback(e.slogger, callbackReq, callbackData)
+				})
+
+				gowrapper.Go(r.Context(), e.slogger, func() {
+					e.presenceDetectionCallback(challengeBox)
 				})
 			}()
 		}
@@ -272,7 +286,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// Check the timestamp, this prevents people from saving a challenge and then
 		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
 		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
-		if timestampDelta > timestampValidityRange || timestampDelta < -timestampValidityRange {
+		if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
 			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 			traces.SetError(span, errors.New("timestamp is out of range"))
 			e.slogger.Log(r.Context(), slog.LevelError,
@@ -321,6 +335,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// bhr contains the data returned by the request defined above
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
+
+		if len(kolideSessionId) > 0 {
+			bhr.Header().Add(kolideSessionIdHeaderKey, kolideSessionId[0])
+		}
 
 		bhr.Header().Add(kolideOsHeaderKey, runtime.GOOS)
 		bhr.Header().Add(kolideArchHeaderKey, runtime.GOARCH)
@@ -458,4 +476,198 @@ func (bhr *bufferedHttpResponse) WriteHeader(code int) {
 
 func (bhr *bufferedHttpResponse) Bytes() []byte {
 	return bhr.buf.Bytes()
+}
+
+func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.OuterChallenge) {
+	// extract cmd req from challenge box
+	ctx, cancel := context.WithTimeout(context.Background(), presencedetection.DetectionTimeout)
+	defer cancel()
+
+	var cmdReq v2CmdRequestType
+	if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
+		e.slogger.ErrorContext(ctx,
+			"error unmarshaling cmd request",
+			"err", err,
+		)
+		return
+	}
+
+	// figure out if we need to do presence detection
+	detectionIntervalStr, ok := cmdReq.Headers[kolidePresenceDetectionIntervalHeaderKey]
+	if !ok || len(detectionIntervalStr) == 0 {
+		return
+	}
+
+	// no presence detection requested
+	if len(detectionIntervalStr) == 0 || detectionIntervalStr[0] == "" {
+		return
+	}
+
+	// presence detection is not yet available on linux
+	if runtime.GOOS == "linux" {
+		return
+	}
+
+	detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr[0])
+	if err != nil {
+		return
+	}
+
+	reasonKey := kolidePresenceDetectionReasonMacosHeaderKey
+	if runtime.GOOS == "windows" {
+		reasonKey = kolidePresenceDetectionReasonWindowsHeaderKey
+	}
+
+	reason := "authenticate"
+	if reasonStr, ok := cmdReq.CallbackHeaders[reasonKey]; ok && len(reasonStr) > 0 && len(reasonStr[0]) > 0 {
+		reason = reasonStr[0]
+	}
+
+	if !e.presenceDetectionLock.TryLock() {
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"dropping presence detection callback, already in progress",
+		)
+		return
+	}
+	defer e.presenceDetectionLock.Unlock()
+
+	type detectionResult struct {
+		durtionSinceLastDetection time.Duration
+		err                       error
+	}
+
+	detectionDoneChan := make(chan *detectionResult)
+
+	// kick of presence detection
+	gowrapper.Go(ctx, e.slogger, func() {
+		durationSinceLastDetection, err := e.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
+		if err != nil {
+			e.slogger.Log(ctx, slog.LevelInfo,
+				"presence_detection",
+				"reason", reason,
+				"interval", detectionIntervalDuration,
+				"duration_since_last_detection", durationSinceLastDetection,
+				"err", err,
+			)
+		}
+
+		detectionDoneChan <- &detectionResult{
+			durtionSinceLastDetection: durationSinceLastDetection,
+			err:                       err,
+		}
+	})
+
+	callbackTicker := time.NewTicker(e.presenceDetectionCallbackInterval)
+	defer callbackTicker.Stop()
+
+	presenceDetectionStartTime := time.Now()
+
+	var returnedDetectionResult *detectionResult
+
+	headers := map[string][]string{
+		kolideArchHeaderKey: {runtime.GOARCH},
+		kolideOsHeaderKey:   {runtime.GOOS},
+	}
+
+	kolideSessionId, ok := cmdReq.CallbackHeaders[kolideSessionIdHeaderKey]
+	if ok {
+		headers[kolideSessionIdHeaderKey] = kolideSessionId
+	}
+
+	for {
+		var callbackBody map[string]string
+
+		if returnedDetectionResult != nil {
+			// presence detection complete
+			callbackBody = map[string]string{
+				"msg":          "presence detection completed",
+				"elapsed_time": time.Since(presenceDetectionStartTime).String(),
+				kolideDurationSinceLastPresenceDetectionHeaderKey: returnedDetectionResult.durtionSinceLastDetection.String(),
+			}
+
+			if returnedDetectionResult.err != nil {
+				e.slogger.DebugContext(ctx,
+					"presence detection error",
+					"err", returnedDetectionResult.err,
+				)
+				callbackBody["err"] = returnedDetectionResult.err.Error()
+			}
+
+			headers[kolideDurationSinceLastPresenceDetectionHeaderKey] = []string{returnedDetectionResult.durtionSinceLastDetection.String()}
+		} else {
+			// still waiting on presence detection
+			callbackBody = map[string]string{
+				"msg":          "waiting for user to complete presence detection",
+				"elapsed_time": time.Since(presenceDetectionStartTime).String(),
+			}
+		}
+
+		callBackData, err := e.presenceDetectionCallbackKryptoResponse(challengeBox, headers, callbackBody)
+		if err != nil {
+			e.slogger.ErrorContext(ctx,
+				"error creating presence detection callback response",
+				"err", err,
+			)
+			return
+		}
+
+		req, err := cmdReq.CallbackReq()
+		if err != nil {
+			e.slogger.ErrorContext(ctx,
+				"error creating presence detection callback request",
+				"err", err,
+			)
+			return
+		}
+
+		sendCallback(e.slogger, req, callBackData)
+
+		if returnedDetectionResult != nil {
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			e.slogger.InfoContext(ctx,
+				"presence detection timed out",
+			)
+			return
+		case returnedDetectionResult = <-detectionDoneChan:
+			continue
+		case <-callbackTicker.C:
+			continue
+		}
+	}
+}
+
+func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBox *challenge.OuterChallenge, headers map[string][]string, body map[string]string) (*callbackDataStruct, error) {
+	data := map[string]any{
+		"headers": headers,
+		"body":    body,
+	}
+
+	responseBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling response: %w", err)
+	}
+
+	var response []byte
+	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
+	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
+	// pass nil to krypto
+	// hardware signing is not implemented for darwin
+	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
+		response, err = challengeBox.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
+	} else {
+		response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating krypto response: %w", err)
+	}
+
+	return &callbackDataStruct{
+		Time:     time.Now().Unix(),
+		Response: base64.StdEncoding.EncodeToString(response),
+	}, nil
 }
