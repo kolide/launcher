@@ -290,19 +290,27 @@ func runMake(args []string) error {
 	}
 
 	for _, target := range targets {
-		outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
-		outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
-		if err != nil {
-			return fmt.Errorf("failed to make package output file: %w", err)
-		}
-		defer outputFile.Close()
-
-		if err := packageOptions.Build(ctx, outputFile, target); err != nil {
-			return fmt.Errorf("could not generate packages: %w", err)
+		if err := makeTarget(ctx, target, packageOptions, outputDir); err != nil {
+			return fmt.Errorf("making target %s: %w", target.String(), err)
 		}
 	}
 
 	fmt.Printf("Built packages in %s\n", outputDir)
+	return nil
+}
+
+func makeTarget(ctx context.Context, target packaging.Target, packageOptions packaging.PackageOptions, outputDir string) error {
+	outputFileName := fmt.Sprintf("launcher.%s.%s", target.String(), target.PkgExtension())
+	outputFile, err := os.Create(filepath.Join(outputDir, outputFileName))
+	if err != nil {
+		return fmt.Errorf("failed to make package output file: %w", err)
+	}
+	defer outputFile.Close()
+
+	if err := packageOptions.Build(ctx, outputFile, target); err != nil {
+		return fmt.Errorf("could not generate packages: %w", err)
+	}
+
 	return nil
 }
 

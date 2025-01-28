@@ -76,6 +76,8 @@ linters-settings:
         disabled: false
       - name: confusing-naming
         disabled: false
+      - name: defer
+        disabled: false
   staticcheck:
     checks: ["all"]
 

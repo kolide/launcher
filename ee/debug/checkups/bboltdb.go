@@ -71,18 +71,9 @@ func (c *bboltdbCheckup) backupStats() (map[string]map[string]any, error) {
 
 		backupStatsMap[backupDbLocation] = make(map[string]any)
 
-		// Open a connection to the backup, since we don't have one available yet
-		boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-		backupDb, err := bbolt.Open(backupDbLocation, 0600, boltOptions)
+		backupStats, err := backupStatsFromDb(backupDbLocation)
 		if err != nil {
-			return nil, fmt.Errorf("could not open backup db at %s: %w", backupDbLocation, err)
-		}
-		defer backupDb.Close()
-
-		// Gather stats
-		backupStats, err := agent.GetStats(backupDb)
-		if err != nil {
-			return nil, fmt.Errorf("could not get backup db stats: %w", err)
+			return nil, fmt.Errorf("could not get backup db stats from %s: %w", backupDbLocation, err)
 		}
 
 		for k, v := range backupStats.Buckets {
@@ -91,6 +82,24 @@ func (c *bboltdbCheckup) backupStats() (map[string]map[string]any, error) {
 	}
 
 	return backupStatsMap, nil
+}
+
+func backupStatsFromDb(backupDbLocation string) (*agent.Stats, error) {
+	// Open a connection to the backup, since we don't have one available yet
+	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+	backupDb, err := bbolt.Open(backupDbLocation, 0600, boltOptions)
+	if err != nil {
+		return nil, fmt.Errorf("could not open backup db at %s: %w", backupDbLocation, err)
+	}
+	defer backupDb.Close()
+
+	// Gather stats
+	backupStats, err := agent.GetStats(backupDb)
+	if err != nil {
+		return nil, fmt.Errorf("could not get backup db stats: %w", err)
+	}
+
+	return backupStats, nil
 }
 
 func (c *bboltdbCheckup) ExtraFileName() string {
