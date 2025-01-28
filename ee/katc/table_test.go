@@ -61,23 +61,7 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			require.NoError(t, err, "opening reader to zip file")
 			defer zipReader.Close()
 			for _, fileInZip := range zipReader.File {
-				fileInZipReader, err := fileInZip.Open()
-				require.NoError(t, err, "opening file in zip")
-				defer fileInZipReader.Close()
-
-				idbFilePath := filepath.Join(tempDir, fileInZip.Name)
-
-				if fileInZip.FileInfo().IsDir() {
-					require.NoError(t, os.MkdirAll(idbFilePath, fileInZip.Mode()), "creating dir")
-					continue
-				}
-
-				outFile, err := os.OpenFile(idbFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
-				require.NoError(t, err, "opening output file")
-				defer outFile.Close()
-
-				_, err = io.Copy(outFile, fileInZipReader)
-				require.NoError(t, err, "copying from zip to temp dir")
+				unzipFile(t, fileInZip, tempDir)
 			}
 
 			// Construct table
@@ -148,6 +132,26 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 	}
 }
 
+func unzipFile(t *testing.T, fileInZip *zip.File, tempDir string) {
+	fileInZipReader, err := fileInZip.Open()
+	require.NoError(t, err, "opening file in zip")
+	defer fileInZipReader.Close()
+
+	idbFilePath := filepath.Join(tempDir, fileInZip.Name)
+
+	if fileInZip.FileInfo().IsDir() {
+		require.NoError(t, os.MkdirAll(idbFilePath, fileInZip.Mode()), "creating dir")
+		return
+	}
+
+	outFile, err := os.OpenFile(idbFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
+	require.NoError(t, err, "opening output file")
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, fileInZipReader)
+	require.NoError(t, err, "copying from zip to temp dir")
+}
+
 func TestQueryChromeIndexedDB(t *testing.T) {
 	t.Parallel()
 
@@ -206,23 +210,7 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			require.NoError(t, err, "opening reader to zip file")
 			defer zipReader.Close()
 			for _, fileInZip := range zipReader.File {
-				fileInZipReader, err := fileInZip.Open()
-				require.NoError(t, err, "opening file in zip")
-				defer fileInZipReader.Close()
-
-				idbFilePath := filepath.Join(tempDir, fileInZip.Name)
-
-				if fileInZip.FileInfo().IsDir() {
-					require.NoError(t, os.MkdirAll(idbFilePath, fileInZip.Mode()), "creating dir")
-					continue
-				}
-
-				outFile, err := os.OpenFile(idbFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileInZip.Mode())
-				require.NoError(t, err, "opening output file")
-				defer outFile.Close()
-
-				_, err = io.Copy(outFile, fileInZipReader)
-				require.NoError(t, err, "copying from zip to temp dir")
+				unzipFile(t, fileInZip, tempDir)
 			}
 
 			// Construct table

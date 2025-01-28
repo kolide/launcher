@@ -208,7 +208,7 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 	result := make(map[string]interface{})
 
 	for _, p := range oh.properties {
-		val, err := oleutil.GetProperty(item, p)
+		prop, err := getProperty(item, p)
 		if err != nil {
 			oh.slogger.Log(context.TODO(), slog.LevelDebug,
 				"got error looking for property",
@@ -217,24 +217,7 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 			)
 			continue
 		}
-		defer val.Clear()
-
-		// Not sure if we need to special case the nil, or if Value() handles it.
-		if val.VT == 0x1 { //VT_NULL
-			result[p] = nil
-			continue
-		}
-
-		// Attempt to handle arrays
-		safeArray := val.ToArray()
-		if safeArray != nil {
-			// I would have expected to need
-			// `defersafeArray.Release()` here, if I add
-			// that, this routine stops working.
-			result[p] = safeArray.ToValueArray()
-		} else {
-			result[p] = val.Value()
-		}
+		result[p] = prop
 
 	}
 	if len(result) > 0 {
@@ -242,4 +225,28 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 	}
 
 	return nil
+}
+
+func getProperty(item *ole.IDispatch, property string) (any, error) {
+	val, err := oleutil.GetProperty(item, property)
+	if err != nil {
+		return nil, fmt.Errorf("looking for property %s: %w", property, err)
+	}
+	defer val.Clear()
+
+	// Not sure if we need to special case the nil, or if Value() handles it.
+	if val.VT == 0x1 { //VT_NULL
+		return nil, nil
+	}
+
+	// Attempt to handle arrays
+	safeArray := val.ToArray()
+	if safeArray != nil {
+		// I would have expected to need
+		// `defersafeArray.Release()` here, if I add
+		// that, this routine stops working.
+		return safeArray.ToValueArray(), nil
+	}
+
+	return val.Value(), nil
 }
