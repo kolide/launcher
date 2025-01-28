@@ -101,33 +101,32 @@ func (d *dbusNotifier) Execute() error {
 			actionUri := signal.Body[1].(string)
 
 			for _, browserLauncher := range browserLaunchers {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-				cmd, err := browserLauncher(ctx, actionUri)
-				if err != nil {
-					d.slogger.Log(context.TODO(), slog.LevelWarn,
-						"couldn't create command to start process",
+				if err := startBrowserLauncherCmd(browserLauncher, actionUri); err != nil {
+					d.slogger.Log(context.TODO(), slog.LevelError,
+						"couldn't start process",
 						"err", err,
 						"browser_launcher", browserLauncher,
 					)
 					continue
 				}
-
-				err = cmd.Start()
-				if err == nil {
-					break
-				}
-				d.slogger.Log(context.TODO(), slog.LevelError,
-					"couldn't start process",
-					"err", err,
-					"browser_launcher", browserLauncher,
-				)
+				break
 			}
 
 		case <-d.interrupt:
 			return nil
 		}
 	}
+}
+
+func startBrowserLauncherCmd(browserLauncher allowedcmd.AllowedCommand, actionUri string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	cmd, err := browserLauncher(ctx, actionUri)
+	if err != nil {
+		return fmt.Errorf("creating command: %w", err)
+	}
+
+	return cmd.Start()
 }
 
 func (d *dbusNotifier) Interrupt(err error) {

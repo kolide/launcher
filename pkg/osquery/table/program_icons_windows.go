@@ -54,25 +54,15 @@ func generateUninstallerProgramIcons() []map[string]string {
 
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.READ)
+			iconPath, name, version, err := getRegistryKeyData(key, path)
 			if err != nil {
 				continue
 			}
-			defer key.Close()
 
-			iconPath, _, err := key.GetStringValue("DisplayIcon")
-			if err != nil {
-				continue
-			}
 			icon, err := parseIcoFile(iconPath)
 			if err != nil {
 				continue
 			}
-			name, _, err := key.GetStringValue("DisplayName")
-			if err != nil {
-				continue
-			}
-			version, _, _ := key.GetStringValue("DisplayVersion")
 
 			uninstallerIcons = append(uninstallerIcons, map[string]string{
 				"icon":    icon.base64,
@@ -83,6 +73,31 @@ func generateUninstallerProgramIcons() []map[string]string {
 		}
 	}
 	return uninstallerIcons
+}
+
+func getRegistryKeyData(key registry.Key, path string) (string, string, string, error) {
+	key, err := registry.OpenKey(key, path, registry.READ)
+	if err != nil {
+		return "", "", "", fmt.Errorf("opening key: %w", err)
+	}
+	defer key.Close()
+
+	iconPath, _, err := key.GetStringValue("DisplayIcon")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayIcon: %w", err)
+	}
+
+	name, _, err := key.GetStringValue("DisplayName")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayName: %w", err)
+	}
+
+	version, _, err := key.GetStringValue("DisplayVersion")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayVersion: %w", err)
+	}
+
+	return iconPath, name, version, nil
 }
 
 func generateInstallersProgramIcons() []map[string]string {
