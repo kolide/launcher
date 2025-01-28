@@ -191,7 +191,7 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 			"err", err,
 		)
 
-		traces.SetError(span, fmt.Errorf("getting first console user: %w", err))
+		span.AddEvent("no_console_user_found")
 		return nil, nil
 	}
 
