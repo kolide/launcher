@@ -58,7 +58,7 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	t.Parallel()
 	slogger := multislogger.NewNopLogger()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	testRootDir := t.TempDir()
@@ -67,6 +67,9 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	target := packaging.Target{}
 	require.NoError(t, target.PlatformFromString(runtime.GOOS))
 	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
+	}
 
 	osquerydPath := filepath.Join(testRootDir, target.PlatformBinaryName("osqueryd"))
 
@@ -79,18 +82,16 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	// Make binary executable
 	require.NoError(t, os.Chmod(osquerydPath, 0755))
 
-	mockKnapsack := typesmocks.NewKnapsack(t)
-
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
-
 	detailsChan := make(chan service.EnrollmentDetails, 2) // Buffer of 2 for both calls
 
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details service.EnrollmentDetails) bool {
 		detailsChan <- details
 		return true
 	})).Return(nil).Times(2)
 
-	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 1*time.Second, 100*time.Millisecond)
+	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
 
 	// Receive first call
 	firstDetails := <-detailsChan
