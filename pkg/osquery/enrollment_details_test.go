@@ -70,7 +70,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	defer cancel()
 
 	testRootDir := t.TempDir()
-	slogger.Info("created test directory", "path", testRootDir)
+	slogger.InfoContext(ctx, "created test directory", "path", testRootDir)
 
 	// Download real osqueryd binary
 	target := packaging.Target{}
@@ -88,7 +88,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to fetch binary: %v\nLogs:\n%s", err, logBytes.String())
 	}
-	slogger.Info("downloaded osqueryd", "downloadPath", downloadPath)
+	slogger.InfoContext(ctx, "downloaded osqueryd", "downloadPath", downloadPath)
 	require.NoError(t, err)
 	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
 
@@ -96,7 +96,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	if err := os.Chmod(osquerydPath, 0755); err != nil {
 		t.Fatalf("failed to chmod binary: %v\nLogs:\n%s", err, logBytes.String())
 	}
-	slogger.Info("made binary executable")
+	slogger.InfoContext(ctx, "made binary executable")
 
 	detailsChan := make(chan types.EnrollmentDetails, 2)
 	var detailsCount int32
@@ -110,7 +110,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 		return details.LauncherVersion != "" && details.OsqueryVersion == ""
 	})).Run(func(args mock.Arguments) {
 		details := args.Get(0).(types.EnrollmentDetails)
-		slogger.Info("first SetEnrollmentDetails match attempt", "details", details)
+		slogger.InfoContext(ctx, "first SetEnrollmentDetails match attempt", "details", details)
 		detailsChan <- details
 		atomic.AddInt32(&detailsCount, 1)
 	}).Return(nil).Once()
@@ -120,7 +120,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 		return details.LauncherVersion != "" && details.OsqueryVersion != ""
 	})).Run(func(args mock.Arguments) {
 		details := args.Get(0).(types.EnrollmentDetails)
-		slogger.Info("second SetEnrollmentDetails match attempt", "details", details)
+		slogger.InfoContext(ctx, "second SetEnrollmentDetails match attempt", "details", details)
 		detailsChan <- details
 		atomic.AddInt32(&detailsCount, 1)
 	}).Return(nil).Once()
@@ -129,10 +129,10 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	go func() {
 		defer close(testDone)
 
-		slogger.Info("starting CollectAndSetEnrollmentDetails")
+		slogger.InfoContext(ctx, "starting CollectAndSetEnrollmentDetails")
 		err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
 		if err != nil {
-			slogger.Error("CollectAndSetEnrollmentDetails failed", "error", err)
+			slogger.ErrorContext(ctx, "CollectAndSetEnrollmentDetails failed", "error", err)
 			return
 		}
 
@@ -159,10 +159,10 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 
 	// Get and verify the details
 	firstDetails := <-detailsChan
-	slogger.Info("received first details", "details", firstDetails)
+	slogger.InfoContext(ctx, "received first details", "details", firstDetails)
 
 	finalDetails := <-detailsChan
-	slogger.Info("received final details", "details", finalDetails)
+	slogger.InfoContext(ctx, "received final details", "details", finalDetails)
 
 	t.Logf("Final Details: %+v", finalDetails)
 
