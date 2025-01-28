@@ -48,6 +48,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -101,6 +102,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_system_profiler")
+	defer span.End()
+
 	var results []map[string]string
 
 	requestedDatatypes := tablehelpers.GetConstraints(queryContext, "datatype",
@@ -152,6 +156,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
@@ -194,6 +201,9 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	timeoutSeconds := 45
 	if detailLevel == "full" {
 		timeoutSeconds = 5 * 60

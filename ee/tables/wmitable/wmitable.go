@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/wmi"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -41,6 +42,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_wmi")
+	defer span.End()
+
 	var results []map[string]string
 
 	classes := tablehelpers.GetConstraints(queryContext, "class", tablehelpers.WithAllowedCharacters(allowedCharacters))
@@ -110,6 +114,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) runQuery(ctx context.Context, class string, properties []string, ns string, whereClause string) ([]map[string]interface{}, error) {
+	ctx, span := traces.StartSpan(ctx, "class", class)
+	defer span.End()
+
 	// Set a timeout in case wmi hangs
 	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
@@ -118,6 +125,9 @@ func (t *Table) runQuery(ctx context.Context, class string, properties []string,
 }
 
 func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),

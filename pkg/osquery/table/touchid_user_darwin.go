@@ -9,6 +9,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -33,6 +34,9 @@ type touchIDUserConfigTable struct {
 }
 
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_touchid_user_config")
+	defer span.End()
+
 	q := queryContext.Constraints["uid"]
 	if len(q.Constraints) == 0 {
 		t.slogger.Log(ctx, slog.LevelDebug,

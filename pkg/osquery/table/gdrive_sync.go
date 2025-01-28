@@ -10,6 +10,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -30,6 +31,9 @@ type gdrive struct {
 }
 
 func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", path)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_gdrive_sync_config")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_gdrive_sync_config tmp dir: %w", err)
@@ -88,6 +92,9 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 }
 
 func (g *gdrive) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_gdrive_sync_config")
+	defer span.End()
+
 	files, err := findFileInUserDirs("/Library/Application Support/Google/Drive/user_default/sync_config.db", g.slogger)
 	if err != nil {
 		return nil, fmt.Errorf("find gdrive sync config sqlite DBs: %w", err)

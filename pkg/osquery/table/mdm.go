@@ -12,6 +12,7 @@ import (
 
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -34,6 +35,9 @@ func MDMInfo() *table.Plugin {
 }
 
 func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_mdm_info")
+	defer span.End()
+
 	profiles, err := getMDMProfile(ctx)
 	if err != nil {
 		return nil, err
@@ -88,6 +92,9 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 }
 
 func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -134,6 +141,9 @@ type payloadContent struct {
 }
 
 func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

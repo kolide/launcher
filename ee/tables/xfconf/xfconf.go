@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/exp/maps"
 )
@@ -39,6 +40,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_xfconf")
+	defer span.End()
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username")
