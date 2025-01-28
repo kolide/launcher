@@ -195,7 +195,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 				"err", err,
 			)
 		}
-	}, func(err any) {})
+	})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -335,11 +335,14 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa
 
 // killDesktopProcesses kills any existing desktop processes
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	wgDone := make(chan struct{})
 	gowrapper.Go(context.TODO(), r.slogger, func() {
 		defer close(wgDone)
 		r.procsWg.Wait()
-	}, func(err any) {})
+	})
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
@@ -511,12 +514,15 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
 		return
 	}
 
-	r.slogger.Log(context.TODO(), slog.LevelDebug,
+	r.slogger.Log(ctx, slog.LevelDebug,
 		"desktop enabled set by control server",
 		"desktop_enabled", r.knapsack.DesktopEnabled(),
 	)
@@ -524,7 +530,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 	if !r.knapsack.DesktopEnabled() {
 		// there is no way to "hide" the menu, so we will just kill any existing processes
 		// they will respawn in "silent" mode
-		r.killDesktopProcesses(context.TODO())
+		r.killDesktopProcesses(ctx)
 		return
 	}
 
@@ -533,7 +539,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.ShowDesktop(); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
+			r.slogger.Log(ctx, slog.LevelError,
 				"sending refresh command to user desktop process",
 				"uid", uid,
 				"pid", proc.Process.Pid,
@@ -834,7 +840,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 				"state", state,
 			)
 		}
-	}, func(err any) {})
+	})
 }
 
 // determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,
@@ -999,7 +1005,9 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go r.processLogs(uid, stdErr, stdOut)
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		r.processLogs(uid, stdErr, stdOut)
+	})
 
 	return cmd, nil
 }

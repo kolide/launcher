@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/sys/windows"
 )
 
@@ -58,7 +59,10 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 	}, nil
 }
 
-func (wc *WatchdogController) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if slices.Contains(flagKeys, keys.LauncherWatchdogEnabled) {
 		wc.ServiceEnabledChanged(wc.knapsack.LauncherWatchdogEnabled())
 	}
@@ -90,6 +94,13 @@ func (wc *WatchdogController) Run() error {
 func (wc *WatchdogController) publishLogs(ctx context.Context) {
 	// we don't install watchdog for non-prod deployments, so we should also skip log publication
 	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
+		return
+	}
+
+	// don't bother processing further unless watchdog is enabled.
+	// note that this means if you manually install watchdog via CLI, logs
+	// will not be published unless you have the corresponding feature flag enabled
+	if !wc.knapsack.LauncherWatchdogEnabled() {
 		return
 	}
 
@@ -229,9 +240,9 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object
@@ -530,9 +541,9 @@ func RemoveWatchdogTask(identifier string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object
@@ -581,9 +592,9 @@ func watchdogTaskExists(identifier string) (bool, error) {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitializeEx because it
+	// init COM - we discard the error returned by CoInitialize because it
 	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
+	ole.CoInitialize(0)
 	defer ole.CoUninitialize()
 
 	// create our scheduler object

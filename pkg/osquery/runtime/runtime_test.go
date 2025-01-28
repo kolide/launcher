@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +29,7 @@ import (
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/service"
@@ -34,6 +37,7 @@ import (
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
+	"github.com/shirou/gopsutil/v3/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -141,9 +145,16 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// The runner will repeatedly try to launch the instance, so `Run`
 	// won't return an error until we shut it down. Kick off `Run`,
@@ -178,9 +189,20 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 	waitShutdown(t, runner, logBytes)
@@ -196,9 +218,7 @@ func TestFlagsChanged(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
-	// First, it should return false, then on the next call, it should return true
-	k.On("WatchdogEnabled").Return(false).Once()
-	k.On("WatchdogEnabled").Return(true).Once()
+	k.On("WatchdogEnabled").Return(false).Once() // WatchdogEnabled should initially return false
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
@@ -212,14 +232,24 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
 	// Start the runner
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	// Wait for the instance to start
-	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
 	// Confirm watchdog is disabled
@@ -234,9 +264,11 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
-	runner.FlagsChanged(keys.WatchdogEnabled)
+	// Now, WatchdogEnabled should return true
+	k.On("WatchdogEnabled").Return(true).Once()
+	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled)
 
-	// Wait for the instance to restart
+	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
 	waitHealthy(t, runner, logBytes)
 
@@ -278,6 +310,10 @@ func TestFlagsChanged(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
+// waitShutdown is used as a test helper, it performs additional tests to ensure proper shutdown
+// at the end of a passing test run. Tests can additionally use ensureShutdownOnCleanup as a cleanup method
+// to ensure a shutdown is attempted in the event of an earlier test failure, but this is the correct method
+// to use inline at the end of any tests that trigger runner.Run()
 func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
 	// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
 	// they return nil immediately, which would give `backoff` the impression that shutdown has
@@ -298,10 +334,45 @@ func waitShutdown(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Threa
 	}
 }
 
+// ensureShutdownOnCleanup adds a cleanup method which will attempt to shutdown any runners which have not
+// previously been interrupted. Failures here will be logged but will not fail the test itself. most tests
+// should already contain a waitShutdown which actually test this logic- this is here purely to ensure shutdown
+// without triggering any confusing failures on top of whatever has already gone wrong.
+// This is expected to be a no-op throughout any happy paths of testing
+func ensureShutdownOnCleanup(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
+	t.Cleanup(func() {
+		// no further action required if the test already triggered Shutdown
+		if runner.interrupted.Load() {
+			return
+		}
+		// We don't want to retry shutdowns because subsequent shutdown calls don't do anything --
+		// they return nil immediately, which would give `backoff` the impression that shutdown has
+		// completed when it hasn't.
+		// Instead, call `Shutdown` once, wait for our timeout (1 minute), and report failure if
+		// `Shutdown` has not returned.
+		shutdownErr := make(chan error)
+		go func() {
+			shutdownErr <- runner.Shutdown()
+		}()
+
+		select {
+		case err := <-shutdownErr:
+			if err != nil {
+				t.Logf("ensureShutdownOnCleanup encountered error: %v", err)
+			}
+
+			return
+		case <-time.After(1 * time.Minute):
+			t.Logf("runner did not shut down within timeout. runner logs: %s", logBytes.String())
+			return
+		}
+	})
+}
+
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test.
 func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
-	require.NoError(t, backoff.WaitFor(func() error {
+	err := backoff.WaitFor(func() error {
 		// Instance self-reports as healthy
 		if err := runner.Healthy(); err != nil {
 			return fmt.Errorf("instance not healthy: %w", err)
@@ -317,10 +388,32 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 		// Good to go
 		return nil
-	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String()))
+	}, osqueryStartupTimeout+socketOpenTimeout, 1*time.Second)
 
-	// Give the instance just a little bit of buffer before we proceed
-	time.Sleep(2 * time.Second)
+	// Instance is healthy -- return
+	if err == nil {
+		time.Sleep(2 * time.Second)
+		return
+	}
+
+	debugInfo := fmt.Sprintf("instance not healthy by %s: runner logs:\n\n%s", time.Now().String(), logBytes.String())
+
+	// Instance is not healthy -- gather info about osquery proc, then fail
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
+	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
+
+	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
+
+	if isRunning {
+		t.Error("instance not healthy before timeout, though osquery process is running", debugInfo)
+		t.FailNow()
+	} else {
+		t.Error("instance not healthy before timeout, osquery process is not running", debugInfo)
+		t.FailNow()
+	}
 }
 
 func TestSimplePath(t *testing.T) {
@@ -343,9 +436,20 @@ func TestSimplePath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -379,10 +483,21 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
-	runner := New(k, serviceClient)
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, serviceClient, s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
 	go runner.Run()
@@ -438,10 +553,21 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
-	serviceClient := mockServiceClient()
+	serviceClient := mockServiceClient(t)
 
-	runner := New(k, serviceClient)
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, serviceClient, s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
@@ -450,8 +576,8 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	// Start the instance
 	go runner.Run()
 
-	// Wait very briefly for the launch routines to begin, then shut it down
-	time.Sleep(100 * time.Millisecond)
+	// Wait briefly for the launch routines to begin, then shut it down
+	time.Sleep(10 * time.Second)
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm the default instance was started, and then exited
@@ -489,9 +615,20 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -521,9 +658,20 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient())
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
 	waitHealthy(t, runner, logBytes)
@@ -535,12 +683,12 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait()
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes)
-	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown")
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown")
+	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown occurs")
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown occurs")
 
 	waitShutdown(t, runner, logBytes)
 }
@@ -555,7 +703,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	runner := New(k, mockServiceClient())
+	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -577,8 +725,8 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
 
-	runner, logBytes, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
+	runner, logBytes := setupOsqueryInstanceForTests(t)
+	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
 
@@ -598,10 +746,43 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 
 	// Ensure we've waited at least 32s
 	<-timer1.C
+
+	waitShutdown(t, runner, logBytes)
+}
+
+// TestRestart tests that the launcher can restart the osqueryd process.
+func TestRestart(t *testing.T) {
+	t.Parallel()
+	runner, logBytes := setupOsqueryInstanceForTests(t)
+	ensureShutdownOnCleanup(t, runner, logBytes)
+
+	previousStats := runner.instances[types.DefaultRegistrationID].stats
+
+	require.NoError(t, runner.Restart(context.TODO()))
+	waitHealthy(t, runner, logBytes)
+
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	previousStats = runner.instances[types.DefaultRegistrationID].stats
+
+	require.NoError(t, runner.Restart(context.TODO()))
+	waitHealthy(t, runner, logBytes)
+
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+
+	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
+	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+
+	waitShutdown(t, runner, logBytes)
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, teardown func()) {
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -623,18 +804,25 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	setUpMockStores(t, k)
 
-	runner = New(k, mockServiceClient())
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner = New(k, mockServiceClient(t), s)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes)
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
 
-	teardown = func() {
-		waitShutdown(t, runner, logBytes)
-	}
-	return runner, logBytes, teardown
+	return runner, logBytes
 }
 
 // setUpMockStores creates test stores in the test knapsack
@@ -654,25 +842,40 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 
 // mockServiceClient returns a mock KolideService that returns the minimum possible response
 // for all methods.
-func mockServiceClient() *servicemock.KolideService {
+func mockServiceClient(t *testing.T) *servicemock.KolideService {
+	testOptions := map[string]any{
+		"distributed_interval": 30,
+		"verbose":              true,
+		"schedule_epoch":       strconv.Itoa(int(time.Now().Unix())),
+	}
+	testConfig := map[string]any{
+		"options": testOptions,
+	}
+	testConfigBytes, err := json.Marshal(testConfig)
+	require.NoError(t, err)
+
 	return &servicemock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "testnodekey", false, nil
 		},
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
-			return "", false, errors.New("transport")
+			return string(testConfigBytes), false, nil
 		},
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
-			return nil, false, errors.New("transport")
+			return &distributed.GetQueriesResult{
+				Queries: map[string]string{
+					"test-distributed-query": "SELECT * FROM system_info",
+				},
+			}, false, nil
 		},
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, nil
 		},
 		CheckHealthFunc: func(ctx context.Context) (int32, error) {
-			return 0, nil
+			return 1, nil
 		},
 	}
 }
@@ -693,17 +896,23 @@ func setUpTestSlogger() (*threadsafebuffer.ThreadSafeBuffer, *slog.Logger) {
 // The default t.TempDir is too long of a path, creating too long of an osquery
 // extension socket, on posix systems.
 func testRootDirectory(t *testing.T) string {
+	var rootDir string
+
 	if runtime.GOOS == "windows" {
-		return t.TempDir()
+		rootDir = t.TempDir()
+	} else {
+		ulid := ulid.New()
+		rootDir = filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
+		require.NoError(t, os.Mkdir(rootDir, 0700))
 	}
 
-	ulid := ulid.New()
-	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
-	require.NoError(t, os.Mkdir(rootDir, 0700))
-
 	t.Cleanup(func() {
-		if err := os.RemoveAll(rootDir); err != nil {
-			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+		// Do a couple retries in case the directory is still in use --
+		// Windows is a little slow on this sometimes
+		if err := backoff.WaitFor(func() error {
+			return os.RemoveAll(rootDir)
+		}, 5*time.Second, 500*time.Millisecond); err != nil {
+			t.Logf("testRootDirectory RemoveAll cleanup: %v", err)
 		}
 	})
 

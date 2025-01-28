@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
@@ -118,7 +119,9 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 func (t *TraceExporter) SetOsqueryClient(client querier) {
 	t.osqueryClient = client
 
-	go t.addAttributesFromOsquery()
+	gowrapper.Go(context.TODO(), t.slogger, func() {
+		t.addAttributesFromOsquery()
+	})
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -352,7 +355,10 @@ func (t *TraceExporter) Ping() {
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which are ingest_url and export_traces.
-func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (t *TraceExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	needsNewProvider := false
 
 	// Handle export_traces toggle
@@ -364,7 +370,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.addAttributesFromOsquery()
 			t.enabled = true
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"enabling trace export",
 			)
 		} else if t.enabled && !t.knapsack.ExportTraces() {
@@ -373,7 +379,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 				t.provider.Shutdown(t.ctx)
 			}
 			t.enabled = false
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"disabling trace export",
 			)
 		}
@@ -384,7 +390,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.traceSamplingRate != t.knapsack.TraceSamplingRate() {
 			t.traceSamplingRate = t.knapsack.TraceSamplingRate()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating trace sampling rate",
 				"new_sampling_rate", t.traceSamplingRate,
 			)
@@ -396,7 +402,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
 			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating ingest server url",
 				"new_ingest_url", t.ingestUrl,
 			)
@@ -409,7 +415,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableTraceIngestTLS())
 			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating ingest server config",
 				"new_disable_trace_ingest_tls", t.disableIngestTLS,
 			)
@@ -421,7 +427,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.batchTimeout != t.knapsack.TraceBatchTimeout() {
 			t.batchTimeout = t.knapsack.TraceBatchTimeout()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating trace batch timeout",
 				"new_batch_timeout", t.batchTimeout,
 			)

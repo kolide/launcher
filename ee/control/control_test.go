@@ -54,15 +54,15 @@ func (ms *mockStore) Set(key, value []byte) error {
 
 type nopDataProvider struct{}
 
-func (dp nopDataProvider) GetConfig() (io.Reader, error) {
+func (dp nopDataProvider) GetConfig(_ context.Context) (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
+func (dp nopDataProvider) GetSubsystemData(_ context.Context, hash string) (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) SendMessage(method string, params interface{}) error {
+func (dp nopDataProvider) SendMessage(_ context.Context, method string, params interface{}) error {
 	return nil
 }
 
@@ -185,7 +185,7 @@ func TestControlServiceUpdate(t *testing.T) {
 				cs.RegisterSubscriber(tt.subsystem, ss)
 			}
 
-			err = cs.update(tt.subsystem, nil)
+			err = cs.update(context.TODO(), tt.subsystem, nil)
 			require.NoError(t, err)
 
 			// Expect consumer to have gotten exactly one update
@@ -225,7 +225,7 @@ func TestControlServiceUpdateErr(t *testing.T) {
 	require.NoError(t, err)
 
 	// Trigger fetch which should cause update error
-	err = cs.Fetch()
+	err = cs.Fetch(context.TODO())
 	require.NoError(t, err)
 
 	// Verify error consumer was called
@@ -262,7 +262,7 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 	require.NoError(t, err)
 
 	// First fetch - should fail and not store hash
-	err = cs.Fetch()
+	err = cs.Fetch(context.TODO())
 	require.NoError(t, err)
 	assert.Equal(t, 1, errConsumer.updates)
 
@@ -274,7 +274,7 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 
 	// Second fetch with new hash - should succeed
 	errConsumer.updateErr = nil
-	err = cs.Fetch()
+	err = cs.Fetch(context.TODO())
 	require.NoError(t, err)
 	assert.Equal(t, 2, errConsumer.updates)
 
@@ -333,7 +333,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			// Repeat fetches to verify no changes
 			for i := 0; i < tt.fetches; i++ {
-				err = cs.Fetch()
+				err = cs.Fetch(context.TODO())
 				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
@@ -375,7 +375,7 @@ func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
 	cs.RegisterSubscriber("desktop", desktopSubscriber)
 
 	// Run fetch for the first time
-	require.NoError(t, cs.Fetch())
+	require.NoError(t, cs.Fetch(context.TODO()))
 
 	// Expect desktop consumer to have gotten exactly one update
 	assert.Equal(t, 1, desktopConsumer.updates)
@@ -387,7 +387,7 @@ func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
 	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
 
 	// Run fetch again. This time, data should be cached, so there should be no updates or pings.
-	require.NoError(t, cs.Fetch())
+	require.NoError(t, cs.Fetch(context.TODO()))
 	assert.Equal(t, 1, desktopConsumer.updates)
 	assert.Equal(t, 1, desktopSubscriber.pings)
 
@@ -486,7 +486,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
-				err = cs.Fetch()
+				err = cs.Fetch(context.TODO())
 				require.NoError(t, err)
 			}
 

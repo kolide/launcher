@@ -47,6 +47,6 @@ func AttachDebugHandler(addrPath string, slogger *slog.Logger) {
 				"shutdown debug server",
 			)
 		}
-	}, func(r any) {})
+	})
 
 }

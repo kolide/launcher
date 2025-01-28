@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
@@ -31,6 +30,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// settingsStoreWriter writes to our startup settings store
+type settingsStoreWriter interface {
+	WriteSettings() error
+}
+
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
@@ -41,6 +45,7 @@ type Extension struct {
 	registrationId      string
 	knapsack            types.Knapsack
 	serviceClient       service.KolideService
+	settingsWriter      settingsStoreWriter
 	enrollMutex         sync.Mutex
 	done                chan struct{}
 	interrupted         atomic.Bool
@@ -73,6 +78,28 @@ const (
 	// Default maximum number of logs to buffer before purging oldest logs
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
+
+	// How frequently osquery should check for distributed queries to run during
+	// osquery instance startup -- an accelerated interval, where the unit is seconds.
+	// This shorter interval should hopefully help launcher begin to process stale,
+	// slow-running queries as quickly as possible after device startup.
+	startupDistributedInterval = 5
+)
+
+var (
+	// Osquery configuration options that we set during the osquery instance's startup period.
+	// These are the override, non-standard values.
+	startupOsqueryConfigOptions = map[string]any{
+		"verbose":              true,                       // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": startupDistributedInterval, // request distributed queries more frequently, so stale checks run ASAP
+	}
+
+	// Osquery configuration options that we set after the osquery instance has been up and running
+	// for at least 10 minutes. These are the "normal" values. We don't set the distributed interval
+	// here so that the cloud can set it instead.
+	postStartupOsqueryConfigOptions = map[string]any{
+		"verbose": false,
+	}
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -100,7 +127,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -140,6 +167,7 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 	return &Extension{
 		slogger:             slogger,
 		serviceClient:       client,
+		settingsWriter:      settingsWriter,
 		registrationId:      registrationId,
 		knapsack:            k,
 		NodeKey:             nodekey,
@@ -477,7 +505,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 }
 
 func (e *Extension) enrolled() bool {
-	return e.NodeKey != ""
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	return nodeKey != ""
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the
@@ -514,30 +547,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		}
 		config = string(confBytes)
 	} else {
-		// Store good config
-		e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config))
-
-		// open the start up settings writer just to trigger a write of the config,
-		// then we can immediately close it
-		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
-		if err != nil {
+		// Store good config in both the knapsack and our settings store
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config)); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
-				"could not get startup settings writer",
+				"writing config to config store",
 				"err", err,
 			)
-		} else {
-			defer startupSettingsWriter.Close()
-
-			if err := startupSettingsWriter.WriteSettings(); err != nil {
-				e.slogger.Log(ctx, slog.LevelError,
-					"writing startup settings",
-					"err", err,
-				)
-			}
 		}
-		// TODO log or record metrics when caching config fails? We
-		// would probably like to return the config and not an error in
-		// this case.
+		if err := e.settingsWriter.WriteSettings(); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"writing config to startup settings",
+				"err", err,
+			)
+		}
 	}
 
 	return map[string]string{"config": config}, nil
@@ -548,7 +570,12 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
-	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)
@@ -589,24 +616,26 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
-	osqueryVerbose := true
+	configOptsToSet := startupOsqueryConfigOptions
 	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
 		// Only log the state change once -- RequestConfig happens every 5 mins
 		if uptimeMins <= 15 {
 			e.slogger.Log(ctx, slog.LevelDebug,
-				"osquery has been up for more than 10 minutes, turning off verbose logging",
+				"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
 				"uptime_mins", uptimeMins,
 			)
 		}
-		osqueryVerbose = false
+		configOptsToSet = postStartupOsqueryConfigOptions
 	}
-	config = e.setVerbose(config, osqueryVerbose)
+	config = e.setOsqueryOptions(config, configOptsToSet)
 
 	return config, nil
 }
 
-// setVerbose modifies the given config to add the `verbose` option.
-func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
+// setOsqueryOptions modifies the given config to add the given options in `optsToSet`.
+// The values in `optsToSet` will override any existing and conflicting option values
+// within `config`.
+func (e *Extension) setOsqueryOptions(config string, optsToSet map[string]any) string {
 	var cfg map[string]any
 
 	if config != "" {
@@ -634,7 +663,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 		opts = make(map[string]any)
 	}
 
-	opts["verbose"] = osqueryVerbose
+	for k, v := range optsToSet {
+		opts[k] = v
+	}
+
 	cfg["options"] = opts
 
 	cfgBytes, err := json.Marshal(cfg)
@@ -796,7 +828,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
 		uninstall.Uninstall(ctx, e.knapsack, true)
@@ -912,8 +949,13 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
-	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
+	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -971,7 +1013,12 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
 		uninstall.Uninstall(ctx, e.knapsack, true)

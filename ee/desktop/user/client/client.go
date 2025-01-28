@@ -14,6 +14,8 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/presencedetection"
+	"github.com/kolide/launcher/pkg/traces"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 type transport struct {
@@ -40,7 +42,7 @@ func New(authToken, socketPath string) client {
 
 	client := client{
 		base: http.Client{
-			Transport: transport,
+			Transport: otelhttp.NewTransport(transport),
 			Timeout:   30 * time.Second,
 		},
 	}
@@ -49,19 +51,31 @@ func New(authToken, socketPath string) client {
 }
 
 func (c *client) Shutdown(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	return c.getWithContext(ctx, "shutdown")
 }
 
 func (c *client) Ping() error {
-	return c.get("ping")
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	return c.getWithContext(ctx, "ping")
 }
 
 func (c *client) Refresh() error {
-	return c.get("refresh")
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	return c.getWithContext(ctx, "refresh")
 }
 
 func (c *client) ShowDesktop() error {
-	return c.get("show")
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	return c.getWithContext(ctx, "show")
 }
 
 func (c *client) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
@@ -163,6 +177,9 @@ func (c *client) get(path string) error {
 }
 
 func (c *client) getWithContext(ctx context.Context, path string) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://unix/%s", path), nil)
 	if err != nil {
 		return fmt.Errorf("creating request with context: %w", err)

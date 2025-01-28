@@ -9,6 +9,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
@@ -71,8 +72,11 @@ func TestQueries(t *testing.T) {
 
 }
 
-func execFaker(filename string) func(context.Context, ...string) (*exec.Cmd, error) {
-	return func(ctx context.Context, _ ...string) (*exec.Cmd, error) {
-		return exec.CommandContext(ctx, "/bin/cat", filename), nil //nolint:forbidigo // Fine to use exec.CommandContext in test
+func execFaker(filename string) func(context.Context, ...string) (*allowedcmd.TracedCmd, error) {
+	return func(ctx context.Context, _ ...string) (*allowedcmd.TracedCmd, error) {
+		return &allowedcmd.TracedCmd{
+			Ctx: ctx,
+			Cmd: exec.CommandContext(ctx, "/bin/cat", filename), //nolint:forbidigo // Fine to use exec.CommandContext in test
+		}, nil
 	}
 }

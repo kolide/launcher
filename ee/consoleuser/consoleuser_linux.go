@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 type listSessionsResult []struct {
@@ -20,6 +21,9 @@ type listSessionsResult []struct {
 }
 
 func CurrentUids(ctx context.Context) ([]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	sessions, err := listSessions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing sessions: %w", err)
@@ -68,6 +72,9 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 // Depending on the systemd version, we have to use different flags to output the results as JSON.
 // We may want to attempt parsing the output regardless in the future -- see launcher #1522.
 func listSessions(ctx context.Context) (listSessionsResult, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var sessions listSessionsResult
 
 	// Try with `--output=json` first, to support the more widely-used older versions of systemd

@@ -41,6 +41,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
@@ -206,8 +207,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
 
-	go runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
-	go timemachine.AddExclusions(ctx, k)
+	gowrapper.Go(ctx, slogger, func() {
+		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
+	})
+	gowrapper.Go(ctx, slogger, func() {
+		timemachine.AddExclusions(ctx, k)
+	})
 
 	if k.Debug() && runtime.GOOS != "windows" {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
@@ -299,7 +304,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
-	go checkpointer.Once(ctx)
+	gowrapper.Go(ctx, slogger, func() {
+		checkpointer.Once(ctx)
+	})
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 
 	watchdogController, err := watchdog.NewController(ctx, k, opts.ConfigFilePath)
@@ -320,8 +327,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// For now, remediation is not performed -- we only log the hardware change.
-	agent.DetectAndRemediateHardwareChange(ctx, k)
+	// For now, remediation is not performed -- we only log the hardware change. So we can
+	// perform this operation in the background to avoid slowing down launcher startup.
+	go agent.DetectAndRemediateHardwareChange(ctx, k)
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
@@ -370,6 +378,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
+		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
