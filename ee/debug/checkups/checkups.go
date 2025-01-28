@@ -216,12 +216,7 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	warningCheckups := []string{}
 
 	for _, c := range checkupsFor(k, doctorSupported) {
-		ctx, cancel := context.WithTimeout(context.TODO(), 20*time.Second)
-		defer cancel()
-
-		doctorCheckup(ctx, c, w)
-
-		switch c.Status() {
+		switch runDoctorCheckup(ctx, c, w) {
 		case Warning:
 			warningCheckups = append(warningCheckups, c.Name())
 		case Failing, Erroring:
@@ -246,6 +241,15 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 		}
 		fmt.Fprintf(w, "\n")
 	}
+}
+
+func runDoctorCheckup(ctx context.Context, c checkupInt, w io.Writer) Status {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	doctorCheckup(ctx, c, w)
+
+	return c.Status()
 }
 
 type runtimeEnvironmentType string

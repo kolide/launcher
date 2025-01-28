@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 package tpmrunner
 
 import (
@@ -26,6 +29,7 @@ type (
 		slogger       *slog.Logger
 		interrupt     chan struct{}
 		interrupted   atomic.Bool
+		machineHasTpm atomic.Bool
 	}
 
 	// tpmSignerCreator is an interface for creating and loading TPM signers
@@ -62,6 +66,9 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 		signerCreator: defaultTpmSignerCreator{},
 	}
 
+	// assume we have a tpm until we know otherwise
+	tpmRunner.machineHasTpm.Store(true)
+
 	for _, opt := range opts {
 		opt(tpmRunner)
 	}
@@ -78,17 +85,17 @@ func (tr *tpmRunner) Execute() error {
 
 	for {
 		// try to create signer if we don't have one
-		if tr.signer == nil {
+		if tr.signer == nil && tr.machineHasTpm.Load() {
 			ctx := context.Background()
 			if err := tr.loadOrCreateKeys(ctx); err != nil {
-				tr.slogger.Log(ctx, slog.LevelError,
+				tr.slogger.Log(ctx, slog.LevelInfo,
 					"loading or creating keys in execute loop",
 					"err", err,
 				)
 			}
 		}
 
-		if tr.signer != nil {
+		if tr.signer != nil || !tr.machineHasTpm.Load() {
 			retryTicker.Stop()
 		}
 
@@ -119,12 +126,16 @@ func (tr *tpmRunner) Interrupt(_ error) {
 
 // Public returns the public hardware key
 func (tr *tpmRunner) Public() crypto.PublicKey {
+	if !tr.machineHasTpm.Load() {
+		return nil
+	}
+
 	if tr.signer != nil {
 		return tr.signer.Public()
 	}
 
 	if err := tr.loadOrCreateKeys(context.Background()); err != nil {
-		tr.slogger.Log(context.Background(), slog.LevelError,
+		tr.slogger.Log(context.Background(), slog.LevelInfo,
 			"loading or creating keys in public call",
 			"err", err,
 		)
@@ -216,6 +227,19 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 		var err error
 		priData, pubData, err = tr.signerCreator.CreateKey()
 		if err != nil {
+
+			if isTPMNotFoundErr(err) {
+				tr.machineHasTpm.Store(false)
+
+				tr.slogger.Log(ctx, slog.LevelInfo,
+					"tpm not found",
+					"err", err,
+				)
+
+				span.AddEvent("tpm_not_found")
+				return err
+			}
+
 			thisErr := fmt.Errorf("creating key: %w", err)
 			traces.SetError(span, thisErr)
 

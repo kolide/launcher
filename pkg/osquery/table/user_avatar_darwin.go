@@ -96,11 +96,8 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 			continue
 		}
 
-		var base64Buf bytes.Buffer
-		encoder := base64.NewEncoder(base64.StdEncoding, &base64Buf)
-		defer encoder.Close()
-		thumbnail := resize.Thumbnail(150, 150, image, resize.Lanczos3)
-		if err := png.Encode(encoder, thumbnail); err != nil {
+		base64Buf, err := encodeThumbnail(image)
+		if err != nil {
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"error encoding resized user avatar to png",
 				"err", err,
@@ -139,4 +136,17 @@ func getUserAvatar(username string) (image.Image, uint64, error) {
 	}
 	hash := crc64.Checksum(goBytes, crcTable)
 	return image, hash, nil
+}
+
+func encodeThumbnail(image image.Image) (*bytes.Buffer, error) {
+	var base64Buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &base64Buf)
+	defer encoder.Close()
+
+	thumbnail := resize.Thumbnail(150, 150, image, resize.Lanczos3)
+	if err := png.Encode(encoder, thumbnail); err != nil {
+		return nil, fmt.Errorf("encoding png: %w", err)
+	}
+
+	return &base64Buf, nil
 }
