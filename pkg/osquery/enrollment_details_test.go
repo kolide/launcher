@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
@@ -82,21 +84,58 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	// Make binary executable
 	require.NoError(t, os.Chmod(osquerydPath, 0755))
 
-	detailsChan := make(chan service.EnrollmentDetails, 2) // Buffer of 2 for both calls
+	detailsChan := make(chan types.EnrollmentDetails, 2)
+	var detailsCount int32
+	expectedDetails := 2
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
-	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details service.EnrollmentDetails) bool {
+
+	// First call expectation - Runtime details
+	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
+		return details.LauncherVersion != "" && details.OsqueryVersion == ""
+	})).Run(func(args mock.Arguments) {
+		details := args.Get(0).(types.EnrollmentDetails)
 		detailsChan <- details
-		return true
-	})).Return(nil).Times(2)
+		atomic.AddInt32(&detailsCount, 1)
+	}).Return(nil).Once()
 
-	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
+	// Second call expectation - Full details with osquery data
+	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
+		return details.LauncherVersion != "" && details.OsqueryVersion != ""
+	})).Run(func(args mock.Arguments) {
+		details := args.Get(0).(types.EnrollmentDetails)
+		detailsChan <- details
+		atomic.AddInt32(&detailsCount, 1)
+	}).Return(nil).Once()
 
-	// Receive first call
+	testDone := make(chan struct{})
+	go func() {
+		defer close(testDone)
+		err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
+
+		// Wait for all details to be processed with timeout
+		deadline := time.After(30 * time.Second)
+		for atomic.LoadInt32(&detailsCount) < int32(expectedDetails) {
+			select {
+			case <-deadline:
+				t.Error("timeout waiting for enrollment details")
+				return
+			case <-time.After(100 * time.Millisecond):
+				continue
+			}
+		}
+	}()
+
+	select {
+	case <-testDone:
+		require.Equal(t, int32(expectedDetails), atomic.LoadInt32(&detailsCount))
+	case <-time.After(45 * time.Second):
+		t.Fatal("test timed out")
+	}
+
+	// Get and verify the details
 	firstDetails := <-detailsChan
-
-	// Receive second call (the one with complete details)
 	finalDetails := <-detailsChan
 
 	t.Logf("Final Details: %+v", finalDetails)
