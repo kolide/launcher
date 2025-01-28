@@ -104,39 +104,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			challengeId := []byte(ulid.New())
 			challengeData := []byte(ulid.New())
 
-			// this is the interval between callbacks for testing
-			presenceDetectionCallbackInterval := 750 * time.Millisecond
-
-			// this is how long it will take the "user" to complete presence detection for texting
-			presenceDetectionCompletionTime := 1 * time.Second
-
-			callbackWaitGroup := sync.WaitGroup{}
-
-			// 2 for the standard post / get call back
-			callbackWaitGroup.Add(2)
-
-			// assume that if we have presence detection headers, we should have a presence detection callback
-			// presence detection is not yet available on linux
-			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
-
-				// we fire off one call back immedatly when presence detection is starts
-				callbackWaitGroup.Add(1)
-
-				// calc the number of "waiting on user" callbacks
-				expectedPresenceDetectionCallbacks := int(presenceDetectionCompletionTime / presenceDetectionCallbackInterval)
-
-				// we expect one call back when the detection is complete
-				expectedPresenceDetectionCallbacks += 1
-
-				// we go test this using a post and a get so double that
-				expectedPresenceDetectionCallbacks *= 2
-
-				callbackWaitGroup.Add(expectedPresenceDetectionCallbacks)
-			}
-
 			// this is the key we can use to open the response
 			// it gets set later
 			var challengePrivateKey *[32]byte
+
+			callbackWaitGroup := sync.WaitGroup{}
 
 			callbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer callbackWaitGroup.Done()
@@ -183,7 +155,36 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				"body": ulid.New(),
 			})
 
-			for _, req := range []*http.Request{mustMakeGetRequest(t, challengeKryptoBoxB64), mustMakePostRequest(t, challengeKryptoBoxB64)} {
+			requests := []*http.Request{mustMakeGetRequest(t, challengeKryptoBoxB64), mustMakePostRequest(t, challengeKryptoBoxB64)}
+
+			// calculate how many total callbacks we expect
+
+			// by default, even without presence detection, we expect a call back for each request
+			expectedCallbacks := len(requests)
+
+			// this is the interval between callbacks for testing
+			presenceDetectionCallbackInterval := 750 * time.Millisecond
+
+			// this is how long it will take the "user" to complete presence detection for testing
+			simulatedPresenceDetectionCompletionTime := 1 * time.Second
+
+			// assume that if we have presence detection headers, we should have a presence detection callback
+			// presence detection is not yet available on linux
+			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
+
+				// we fire off one call back per request immediately when presence detection is starts
+				expectedCallbacks += len(requests)
+
+				// calc the number of "waiting on user" callbacks, on an interval well send a call back letting the server know we're still waiting
+				expectedCallbacks += int(simulatedPresenceDetectionCompletionTime/presenceDetectionCallbackInterval) * len(requests)
+
+				// we expect one call back per request when the detection is complete
+				expectedCallbacks += len(requests)
+			}
+
+			callbackWaitGroup.Add(expectedCallbacks)
+
+			for _, req := range requests {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
@@ -197,7 +198,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					if runtime.GOOS != "linux" { // only doing persence detection on windows and macos for now
 						mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).
-							After(presenceDetectionCompletionTime).
+							After(simulatedPresenceDetectionCompletionTime).
 							Return(0*time.Second, nil).
 							Once()
 					}
