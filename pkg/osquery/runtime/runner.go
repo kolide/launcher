@@ -63,16 +63,14 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 
 // String method is only added to runner because it is often used in our runtime tests as an argument
 // passed to mocked knapsack calls. when we AssertExpectations, the runner struct is traversed by the
-// Diff logic inside testify. This causes data races to be incorrectly reported for structs containing mutexes
-// (the second read is coming from testify). Implementing the stringer interface with locks acquired prevents these
-// races. see (one of) the issues here for additional context https://github.com/stretchr/testify/issues/1597
+// Diff logic inside testify. This causes data races to be incorrectly reported for structs containing mutexes-
+// the second read is coming from testify.
+// see (one of) the issues here for additional context https://github.com/stretchr/testify/issues/1597
+// If we really needed to expose more here, we could acquire all locks and return fmt.Sprintf("%#v", r). but given
+// that we do not, it seems safer to avoid introducing any additional lock contention in case our Stringer call
+// is invoked someday in a production flow
 func (r *Runner) String() string {
-	r.instanceLock.Lock()
-	defer r.instanceLock.Unlock()
-	r.regIDLock.Lock()
-	defer r.regIDLock.Unlock()
-
-	return fmt.Sprintf("%#v", r)
+	return "runtime.Runner{}"
 }
 
 func (r *Runner) Run() error {
