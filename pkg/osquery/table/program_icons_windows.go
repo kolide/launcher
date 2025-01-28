@@ -54,7 +54,7 @@ func generateUninstallerProgramIcons() []map[string]string {
 
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
-			iconPath, name, version, err := getRegistryKeyData(key, path)
+			iconPath, name, version, err := getRegistryKeyDisplayData(key, path)
 			if err != nil {
 				continue
 			}
@@ -75,7 +75,7 @@ func generateUninstallerProgramIcons() []map[string]string {
 	return uninstallerIcons
 }
 
-func getRegistryKeyData(key registry.Key, path string) (string, string, string, error) {
+func getRegistryKeyDisplayData(key registry.Key, path string) (string, string, string, error) {
 	key, err := registry.OpenKey(key, path, registry.READ)
 	if err != nil {
 		return "", "", "", fmt.Errorf("opening key: %w", err)
@@ -110,21 +110,12 @@ func generateInstallersProgramIcons() []map[string]string {
 
 	for key, paths := range productRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.READ)
+			iconPath, name, err := getRegistryKeyProductData(key, path)
 			if err != nil {
 				continue
 			}
-			defer key.Close()
 
-			iconPath, _, err := key.GetStringValue("ProductIcon")
-			if err != nil {
-				continue
-			}
 			icon, err := parseIcoFile(iconPath)
-			if err != nil {
-				continue
-			}
-			name, _, _ := key.GetStringValue("ProductName")
 			if err != nil {
 				continue
 			}
@@ -138,6 +129,26 @@ func generateInstallersProgramIcons() []map[string]string {
 	}
 
 	return installerIcons
+}
+
+func getRegistryKeyProductData(key registry.Key, path string) (string, string, error) {
+	key, err := registry.OpenKey(key, path, registry.READ)
+	if err != nil {
+		return "", "", fmt.Errorf("opening key: %w", err)
+	}
+	defer key.Close()
+
+	iconPath, _, err := key.GetStringValue("ProductIcon")
+	if err != nil {
+		return "", "", fmt.Errorf("getting ProductIcon: %w", err)
+	}
+
+	name, _, err := key.GetStringValue("ProductName")
+	if err != nil {
+		return "", "", fmt.Errorf("getting ProductName: %w", err)
+	}
+
+	return iconPath, name, nil
 }
 
 // parseIcoFile returns a base64 encoded version and a hash of the ico.
