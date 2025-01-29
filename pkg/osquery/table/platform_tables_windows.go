@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/dsim_default_associations"
 	"github.com/kolide/launcher/ee/tables/execparsers/dsregcmd"
+	"github.com/kolide/launcher/ee/tables/ntfs_ads_zone_id"
 	"github.com/kolide/launcher/ee/tables/secedit"
 	"github.com/kolide/launcher/ee/tables/wifi_networks"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
@@ -21,6 +22,7 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 	return []osquery.OsqueryPlugin{
 		ProgramIcons(),
 		dsim_default_associations.TablePlugin(slogger),
+		ntfs_ads_zone_id.TablePlugin(slogger),
 		secedit.TablePlugin(slogger),
 		wifi_networks.TablePlugin(slogger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, slogger),
