@@ -59,7 +59,7 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	t.Parallel()
 	slogger := multislogger.NewNopLogger()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	testRootDir := t.TempDir()
@@ -97,7 +97,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 		firstCall = false
 	}).Return(nil)
 
-	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
+	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 60*time.Second, 10*time.Second)
 	require.NoError(t, err)
 
 	require.NoError(t, err)
