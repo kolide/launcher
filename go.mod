@@ -19,7 +19,7 @@ require (
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/osquery/osquery-go v0.0.0-20231130195733-61ac79279aaa
+	github.com/osquery/osquery-go v0.0.0-20250129172556-8293fdf5f1ce
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
@@ -96,7 +96,7 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/go-tpm v0.3.3 // indirect
+	github.com/google/go-tpm v0.3.3
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
