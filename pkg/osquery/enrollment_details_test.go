@@ -83,22 +83,19 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	// Make binary executable
 	require.NoError(t, os.Chmod(osquerydPath, 0755))
 
-	var firstDetails, finalDetails types.EnrollmentDetails
+	var details types.EnrollmentDetails
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 
-	// Single mock call that captures both states
-	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
-		if details.OsqueryVersion == "" {
-			// First call - capture runtime details
-			firstDetails = details
-		} else {
-			// Second call - capture complete details
-			finalDetails = details
+	firstCall := true
+	mockKnapsack.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Run(func(args mock.Arguments) {
+		if !firstCall {
+			// Capture details from second call
+			details = args.Get(0).(types.EnrollmentDetails)
 		}
-		return true
-	})).Return(nil)
+		firstCall = false
+	}).Return(nil)
 
 	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
 	require.NoError(t, err)
@@ -107,20 +104,20 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 
 	// Runtime details
-	require.NotEmpty(t, firstDetails.OSPlatform)
-	require.NotEmpty(t, firstDetails.OSPlatformLike)
-	require.NotEmpty(t, firstDetails.LauncherVersion)
-	require.NotEmpty(t, firstDetails.GOARCH)
-	require.NotEmpty(t, firstDetails.GOOS)
+	require.NotEmpty(t, details.OSPlatform)
+	require.NotEmpty(t, details.OSPlatformLike)
+	require.NotEmpty(t, details.LauncherVersion)
+	require.NotEmpty(t, details.GOARCH)
+	require.NotEmpty(t, details.GOOS)
 
 	// Core system details
-	require.NotEmpty(t, finalDetails.OSPlatform)
-	require.NotEmpty(t, finalDetails.OSName)
-	require.NotEmpty(t, finalDetails.Hostname)
-	require.NotEmpty(t, finalDetails.HardwareUUID)
+	require.NotEmpty(t, details.OSPlatform)
+	require.NotEmpty(t, details.OSName)
+	require.NotEmpty(t, details.Hostname)
+	require.NotEmpty(t, details.HardwareUUID)
 
 	// Version information
-	require.NotEmpty(t, finalDetails.OsqueryVersion)
-	require.NotEmpty(t, finalDetails.GOOS)
-	require.NotEmpty(t, finalDetails.GOARCH)
+	require.NotEmpty(t, details.OsqueryVersion)
+	require.NotEmpty(t, details.GOOS)
+	require.NotEmpty(t, details.GOARCH)
 }
