@@ -88,22 +88,16 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 
-	// First call expectation - Runtime details
+	// Single mock call that captures both states
 	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
-		if details.LauncherVersion != "" && details.OsqueryVersion == "" {
+		if details.OsqueryVersion == "" {
+			// First call - capture runtime details
 			firstDetails = details
-			return true
-		}
-		return false
-	})).Return(nil)
-
-	// Second call expectation - Full details with osquery data
-	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
-		if details.LauncherVersion != "" && details.OsqueryVersion != "" {
+		} else {
+			// Second call - capture complete details
 			finalDetails = details
-			return true
 		}
-		return false
+		return true
 	})).Return(nil)
 
 	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
