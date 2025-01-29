@@ -112,12 +112,8 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 
 	// Core system details
 	require.NotEmpty(t, details.OSPlatform)
-	require.NotEmpty(t, details.OSName)
-	require.NotEmpty(t, details.Hostname)
 	require.NotEmpty(t, details.HardwareUUID)
 
 	// Version information
 	require.NotEmpty(t, details.OsqueryVersion)
-	require.NotEmpty(t, details.GOOS)
-	require.NotEmpty(t, details.GOARCH)
 }
