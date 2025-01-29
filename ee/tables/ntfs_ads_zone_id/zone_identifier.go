@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -42,11 +42,11 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		return nil, fmt.Errorf("kolide_ntfs_ads_zone_id requires at least one path to be specified")
 	}
 
-	for _, p := range paths {
+	for _, path := range paths {
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			var output bytes.Buffer
-			if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Powershell, []string{"Get-Content", "-Path", path.Clean(p), "-Stream", "Zone.Identifier"}, &output, &output); err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo, "failure running powershell get-content command", "err", err, "path", p)
+			if err := tablehelpers.Run(ctx, t.slogger, 30, allowedcmd.Powershell, []string{"Get-Content", "-Path", filepath.Clean(path), "-Stream", "Zone.Identifier", "-ErrorAction", "Ignore"}, &output, &output); err != nil {
+				t.slogger.Log(ctx, slog.LevelInfo, "failure running powershell get-content command", "err", err, "path", path)
 				continue
 			}
 
@@ -62,7 +62,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			}
 
 			rowData := map[string]string{
-				"path": p,
+				"path": path,
 			}
 
 			results = append(results, dataflattentable.ToMap(flattened, dataQuery, rowData)...)
