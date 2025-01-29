@@ -95,7 +95,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 			return true
 		}
 		return false
-	})).Return(nil).Once()
+	})).Return(nil)
 
 	// Second call expectation - Full details with osquery data
 	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
@@ -104,7 +104,7 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 			return true
 		}
 		return false
-	})).Return(nil).Once()
+	})).Return(nil)
 
 	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
 	require.NoError(t, err)
