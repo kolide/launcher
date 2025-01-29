@@ -15,7 +15,6 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
@@ -168,25 +167,15 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 	// Set the osquery version and save everything to knapsack before attempting to get osquery enrollment details
 	k.SetEnrollmentDetails(details)
 
-	// Launch collection in background
-	collectCtx, cancel := context.WithCancel(ctx)
-	// Get the osquery details
-	gowrapper.Go(collectCtx, slogger, func() {
-		defer span.End()
-		defer cancel()
-
-		if err := backoff.WaitFor(func() error {
-			err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
-			if err != nil {
-				span.AddEvent("failed to get enrollment details")
-			}
-			return err
-		}, collectTimeout, collectRetryInterval); err != nil {
-			span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
-			return
+	if err := backoff.WaitFor(func() error {
+		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
+		if err != nil {
+			span.AddEvent("failed to get enrollment details")
 		}
-		k.SetEnrollmentDetails(details) // Overwrite the runtime details with runtime + osquery details
-	})
+		return err
+	}, collectTimeout, collectRetryInterval); err != nil {
+		span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
+	}
 
-	return nil
+	return k.SetEnrollmentDetails(details) // Overwrite the runtime details with runtime + osquery details
 }

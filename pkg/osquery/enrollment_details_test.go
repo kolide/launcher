@@ -2,11 +2,9 @@ package osquery
 
 import (
 	"context"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,7 +14,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -61,16 +58,11 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 
 func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	t.Parallel()
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	}))
+	slogger := multislogger.NewNopLogger()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	testRootDir := t.TempDir()
-	slogger.InfoContext(ctx, "created test directory", "path", testRootDir)
 
 	// Download real osqueryd binary
 	target := packaging.Target{}
@@ -85,90 +77,37 @@ func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
 	// Fetch and copy osqueryd
 	downloadPath, err := packaging.FetchBinary(ctx, testRootDir, "osqueryd",
 		target.PlatformBinaryName("osqueryd"), "stable", target)
-	if err != nil {
-		t.Fatalf("failed to fetch binary: %v\nLogs:\n%s", err, logBytes.String())
-	}
-	slogger.InfoContext(ctx, "downloaded osqueryd", "download_path", downloadPath)
 	require.NoError(t, err)
 	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
 
 	// Make binary executable
-	if err := os.Chmod(osquerydPath, 0755); err != nil {
-		t.Fatalf("failed to chmod binary: %v\nLogs:\n%s", err, logBytes.String())
-	}
-	slogger.InfoContext(ctx, "made binary executable")
+	require.NoError(t, os.Chmod(osquerydPath, 0755))
 
-	detailsChan := make(chan types.EnrollmentDetails, 2)
-	var detailsCount int32
-	expectedDetails := 2
+	var firstDetails, finalDetails types.EnrollmentDetails
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
 
 	// First call expectation - Runtime details
 	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
-		return details.LauncherVersion != "" && details.OsqueryVersion == ""
-	})).Run(func(args mock.Arguments) {
-		details := args.Get(0).(types.EnrollmentDetails)
-		slogger.InfoContext(ctx, "first SetEnrollmentDetails match attempt", "details", details)
-		detailsChan <- details
-		atomic.AddInt32(&detailsCount, 1)
-	}).Return(nil).Once()
+		if details.LauncherVersion != "" && details.OsqueryVersion == "" {
+			firstDetails = details
+			return true
+		}
+		return false
+	})).Return(nil).Once()
 
 	// Second call expectation - Full details with osquery data
 	mockKnapsack.On("SetEnrollmentDetails", mock.MatchedBy(func(details types.EnrollmentDetails) bool {
-		return details.LauncherVersion != "" && details.OsqueryVersion != ""
-	})).Run(func(args mock.Arguments) {
-		details := args.Get(0).(types.EnrollmentDetails)
-		slogger.InfoContext(ctx, "second SetEnrollmentDetails match attempt", "details", details)
-		detailsChan <- details
-		atomic.AddInt32(&detailsCount, 1)
-	}).Return(nil).Once()
-
-	testDone := make(chan struct{})
-	go func() {
-		defer close(testDone)
-
-		slogger.InfoContext(ctx, "starting CollectAndSetEnrollmentDetails")
-		err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
-		if err != nil {
-			slogger.ErrorContext(ctx, "CollectAndSetEnrollmentDetails failed", "error", err)
-			return
+		if details.LauncherVersion != "" && details.OsqueryVersion != "" {
+			finalDetails = details
+			return true
 		}
+		return false
+	})).Return(nil).Once()
 
-		// Wait for all details to be processed with timeout
-		deadline := time.After(30 * time.Second)
-		for atomic.LoadInt32(&detailsCount) < int32(expectedDetails) {
-			select {
-			case <-deadline:
-				t.Error("timeout waiting for enrollment details")
-				return
-			case <-time.After(5 * time.Second):
-				slogger.DebugContext(ctx, "waiting for details", "current_count", atomic.LoadInt32(&detailsCount))
-				continue
-			}
-		}
-	}()
-
-	select {
-	case <-testDone:
-		require.Equal(t, int32(expectedDetails), atomic.LoadInt32(&detailsCount))
-	case <-time.After(45 * time.Second):
-		t.Fatalf("test timed out\nLogs:\n%s", logBytes.String())
-	}
-
-	// Get and verify the details
-	firstDetails := <-detailsChan
-	slogger.InfoContext(ctx, "received first details", "details", firstDetails)
-
-	finalDetails := <-detailsChan
-	slogger.InfoContext(ctx, "received final details", "details", finalDetails)
-
-	t.Logf("Final Details: %+v", finalDetails)
-
-	if err != nil {
-		t.Fatalf("test failed with error: %v\nLogs:\n%s", err, logBytes.String())
-	}
+	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 30*time.Second, 5*time.Second)
+	require.NoError(t, err)
 
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
