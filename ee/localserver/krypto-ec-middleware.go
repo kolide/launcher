@@ -488,10 +488,6 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 
 		switch {
 
-		// timeout
-		case hasPresenceDetectionTimedout:
-			callbackBody["msg"] = string(presenceDetectionTimedOut)
-
 		// completed with error
 		case finalPresenceDetectionResult != nil && finalPresenceDetectionResult.err != nil:
 			e.slogger.DebugContext(ctx,
@@ -506,6 +502,10 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 		case finalPresenceDetectionResult != nil:
 			callbackBody["msg"] = string(presenceDetectionCompleted)
 			callbackBody[kolideDurationSinceLastPresenceDetectionHeaderKey] = finalPresenceDetectionResult.durationSinceLastDetection.String()
+
+		// timeout
+		case hasPresenceDetectionTimedout:
+			callbackBody["msg"] = string(presenceDetectionTimedOut)
 
 		// still waiting on user
 		default:
@@ -554,6 +554,8 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 	}
 }
 
+// presenceDetectionCallbackKryptoResponse takes a challenge box, headers, and body objects. Creates an encrypted response and returns in
+// the callbackDataStruct expected for callbacks
 func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBox *challenge.OuterChallenge, headers map[string][]string, body map[string]string) (*callbackDataStruct, error) {
 	data := map[string]any{
 		"headers": headers,
@@ -576,6 +578,8 @@ func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBo
 	}, nil
 }
 
+// bufferedHttpResponseToResponseData takes a bufferedHttpResponse returns a json blob in the format
+// expected (body & headers)
 func bufferedHttpResponseToResponseData(bhr *bufferedHttpResponse) ([]byte, error) {
 	// add headers to the response map
 	// this assumes that the response to `bhr` was a json encoded blob.
@@ -595,6 +599,7 @@ func bufferedHttpResponseToResponseData(bhr *bufferedHttpResponse) ([]byte, erro
 	return json.Marshal(responseMap)
 }
 
+// bufferedHttpResponseToKryptoResponse takes a bufferedHttpResponse and a challenge and returns a krypto response
 func (e *kryptoEcMiddleware) bufferedHttpResponseToKryptoResponse(box *challenge.OuterChallenge, bhr *bufferedHttpResponse) ([]byte, error) {
 	responseBytes, err := bufferedHttpResponseToResponseData(bhr)
 	if err != nil {
@@ -604,7 +609,8 @@ func (e *kryptoEcMiddleware) bufferedHttpResponseToKryptoResponse(box *challenge
 	return e.kryptoResponse(box, responseBytes)
 }
 
-func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, bytes []byte) ([]byte, error) {
+// kryptoResponse uses provided challenge and data to create a krypto response
+func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, data []byte) ([]byte, error) {
 	var response []byte
 	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
@@ -612,9 +618,9 @@ func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, bytes
 	// hardware signing is not implemented for darwin
 	var err error
 	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
-		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), bytes)
+		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), data)
 	} else {
-		response, err = box.Respond(e.localDbSigner, nil, bytes)
+		response, err = box.Respond(e.localDbSigner, nil, data)
 	}
 
 	if err != nil {
@@ -624,6 +630,8 @@ func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, bytes
 	return response, nil
 }
 
+// checkOrigin checks the origin of the request against a list of allowed origins.
+// If no allowlist is provided, all origins are allowed.
 func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []string) error {
 	r, span := traces.StartHttpRequestSpan(r)
 	defer span.End()
@@ -634,41 +642,40 @@ func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []strin
 	if origin == "" {
 		origin = strings.TrimSuffix(r.Header.Get("Referer"), "/")
 	}
-	if len(allowedOrigins) > 0 {
-		allowed := false
-		for _, ao := range allowedOrigins {
-			if strings.EqualFold(ao, origin) {
-				allowed = true
-				break
-			}
-		}
 
-		if !allowed {
-			span.SetAttributes(attribute.String("origin", origin))
-			traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
-			e.slogger.Log(r.Context(), slog.LevelError,
-				"origin is not allowed",
-				"allowlist", allowedOrigins,
-				"origin", origin,
-			)
-
-			return errors.New(string(originDisallowedErr))
-		}
-
-		e.slogger.Log(r.Context(), slog.LevelDebug,
-			"origin matches allowlist",
-			"origin", origin,
-		)
-	} else {
+	if allowedOrigins == nil || len(allowedOrigins) == 0 {
 		e.slogger.Log(r.Context(), slog.LevelDebug,
 			"origin is allowed by default, no allowlist",
 			"origin", origin,
 		)
+		return nil
 	}
 
-	return nil
+	for _, ao := range allowedOrigins {
+		if strings.EqualFold(ao, origin) {
+			e.slogger.Log(r.Context(), slog.LevelDebug,
+				"origin matches allowlist",
+				"origin", origin,
+			)
+
+			return nil
+		}
+	}
+
+	span.SetAttributes(attribute.String("origin", origin))
+	traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
+	e.slogger.Log(r.Context(), slog.LevelError,
+		"origin is not allowed",
+		"allowlist", allowedOrigins,
+		"origin", origin,
+	)
+
+	return errors.New(string(originDisallowedErr))
 }
 
+// checkTimestamp checks the timestamp of the challenge is within a defined interval.
+// This prevents people from saving a challenge and then reusing it a bunch.
+// However, it will fail if the clocks are too far out of sync.
 func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *challenge.OuterChallenge) error {
 	r, span := traces.StartHttpRequestSpan(r)
 	defer span.End()
@@ -690,6 +697,8 @@ func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *chall
 	return nil
 }
 
+// cmdReqToHttpReq takes the original request and the cmd request and returns a new http.Request
+// suitable for passing to standard http handlers
 func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *http.Request {
 	newReq := &http.Request{
 		Method: http.MethodPost,
