@@ -243,91 +243,19 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			}()
 		}
 
-		// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
-		origin := r.Header.Get("Origin")
-		// When loading images, the origin may not be set, but the referer will. We can accept that instead.
-		if origin == "" {
-			origin = strings.TrimSuffix(r.Header.Get("Referer"), "/")
-		}
-		if len(cmdReq.AllowedOrigins) > 0 {
-			allowed := false
-			for _, ao := range cmdReq.AllowedOrigins {
-				if strings.EqualFold(ao, origin) {
-					allowed = true
-					break
-				}
-			}
-
-			if !allowed {
-				span.SetAttributes(attribute.String("origin", origin))
-				traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
-				e.slogger.Log(r.Context(), slog.LevelError,
-					"origin is not allowed",
-					"allowlist", cmdReq.AllowedOrigins,
-					"origin", origin,
-				)
-
-				w.WriteHeader(http.StatusUnauthorized)
-				callbackData.Error = originDisallowedErr
-				return
-			}
-
-			e.slogger.Log(r.Context(), slog.LevelDebug,
-				"origin matches allowlist",
-				"origin", origin,
-			)
-		} else {
-			e.slogger.Log(r.Context(), slog.LevelDebug,
-				"origin is allowed by default, no allowlist",
-				"origin", origin,
-			)
-		}
-
-		// Check the timestamp, this prevents people from saving a challenge and then
-		// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
-		timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
-		if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
-			span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
-			traces.SetError(span, errors.New("timestamp is out of range"))
-			e.slogger.Log(r.Context(), slog.LevelError,
-				"timestamp is out of range",
-				"delta", timestampDelta,
-			)
-
+		if err := e.checkOrigin(r, cmdReq.AllowedOrigins); err != nil {
+			callbackData.Error = callbackErrors(err.Error())
 			w.WriteHeader(http.StatusUnauthorized)
-			callbackData.Error = timeOutOfRangeErr
 			return
 		}
 
-		newReq := &http.Request{
-			Method: http.MethodPost,
-			Header: make(http.Header),
-			URL: &url.URL{
-				Scheme: r.URL.Scheme,
-				Host:   r.Host,
-				Path:   cmdReq.Path,
-			},
+		if err := e.checkTimestamp(r, challengeBox); err != nil {
+			callbackData.Error = callbackErrors(err.Error())
+			w.WriteHeader(http.StatusUnauthorized)
+			return
 		}
 
-		for h, vals := range cmdReq.Headers {
-			for _, v := range vals {
-				newReq.Header.Add(h, v)
-			}
-		}
-
-		newReq.Header.Set("Origin", r.Header.Get("Origin"))
-		newReq.Header.Set("Referer", r.Header.Get("Referer"))
-
-		// setting the newReq context to the current request context
-		// allows the trace to continue to the inner request,
-		// maintains the same lifetime as the original request,
-		// allows same ctx values such as session id to be passed to the inner request
-		newReq = newReq.WithContext(r.Context())
-
-		// the body of the cmdReq become the body of the next http request
-		if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
-			newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
-		}
+		newReq := cmdReqToHttpReq(r, cmdReq)
 
 		e.slogger.Log(r.Context(), slog.LevelDebug, "successful challenge, proxying")
 		span.AddEvent("challenge_success")
@@ -343,55 +271,13 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr.Header().Add(kolideOsHeaderKey, runtime.GOOS)
 		bhr.Header().Add(kolideArchHeaderKey, runtime.GOARCH)
 
-		// add headers to the response map
-		// this assumes that the response to `bhr` was a json encoded blob.
-		var responseMap map[string]interface{}
-		bhrBytes := bhr.Bytes()
-		if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
-			traces.SetError(span, err)
-			e.slogger.Log(r.Context(), slog.LevelError,
-				"unable to unmarshal response",
-				"err", err,
-			)
-			responseMap = map[string]any{
-				"headers": bhr.Header(),
-
-				// the request body was not in json format, just pass it through as "body"
-				"body": string(bhrBytes),
-			}
-		} else {
-			responseMap["headers"] = bhr.Header()
-		}
-
-		responseBytes, err := json.Marshal(responseMap)
+		response, err := e.bufferedHttpResponseToKryptoResponse(challengeBox, bhr)
 		if err != nil {
 			traces.SetError(span, err)
 			e.slogger.Log(r.Context(), slog.LevelError,
-				"unable to marshal response",
+				"error creating krypto response",
 				"err", err,
 			)
-		}
-
-		var response []byte
-		// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
-		// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
-		// pass nil to krypto
-		// hardware signing is not implemented for darwin
-		if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
-			response, err = challengeBox.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
-		} else {
-			response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
-		}
-
-		if err != nil {
-			traces.SetError(span, err)
-			e.slogger.Log(r.Context(), slog.LevelError,
-				"failed to respond",
-				"err", err,
-			)
-			w.WriteHeader(http.StatusUnauthorized)
-			callbackData.Error = responseFailureErr
-			return
 		}
 
 		// because the response is a []byte, we need a copy to prevent simultaneous accessing. Conviniently we can cast
@@ -670,4 +556,147 @@ func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBo
 		Time:     time.Now().Unix(),
 		Response: base64.StdEncoding.EncodeToString(response),
 	}, nil
+}
+
+func bufferedHttpResponseToResponseData(bhr *bufferedHttpResponse) ([]byte, error) {
+	// add headers to the response map
+	// this assumes that the response to `bhr` was a json encoded blob.
+	var responseMap map[string]interface{}
+	bhrBytes := bhr.Bytes()
+	if err := json.Unmarshal(bhrBytes, &responseMap); err != nil {
+		responseMap = map[string]any{
+			"headers": bhr.Header(),
+
+			// the request body was not in json format, just pass it through as "body"
+			"body": string(bhrBytes),
+		}
+	} else {
+		responseMap["headers"] = bhr.Header()
+	}
+
+	return json.Marshal(responseMap)
+}
+
+func (e *kryptoEcMiddleware) bufferedHttpResponseToKryptoResponse(box *challenge.OuterChallenge, bhr *bufferedHttpResponse) ([]byte, error) {
+	responseBytes, err := bufferedHttpResponseToResponseData(bhr)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []byte
+	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
+	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
+	// pass nil to krypto
+	// hardware signing is not implemented for darwin
+	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
+		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
+	} else {
+		response, err = box.Respond(e.localDbSigner, nil, responseBytes)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []string) error {
+	r, span := traces.StartHttpRequestSpan(r)
+	defer span.End()
+
+	// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
+	origin := r.Header.Get("Origin")
+	// When loading images, the origin may not be set, but the referer will. We can accept that instead.
+	if origin == "" {
+		origin = strings.TrimSuffix(r.Header.Get("Referer"), "/")
+	}
+	if len(allowedOrigins) > 0 {
+		allowed := false
+		for _, ao := range allowedOrigins {
+			if strings.EqualFold(ao, origin) {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			span.SetAttributes(attribute.String("origin", origin))
+			traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
+			e.slogger.Log(r.Context(), slog.LevelError,
+				"origin is not allowed",
+				"allowlist", allowedOrigins,
+				"origin", origin,
+			)
+
+			return errors.New(string(originDisallowedErr))
+		}
+
+		e.slogger.Log(r.Context(), slog.LevelDebug,
+			"origin matches allowlist",
+			"origin", origin,
+		)
+	} else {
+		e.slogger.Log(r.Context(), slog.LevelDebug,
+			"origin is allowed by default, no allowlist",
+			"origin", origin,
+		)
+	}
+
+	return nil
+}
+
+func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *challenge.OuterChallenge) error {
+	r, span := traces.StartHttpRequestSpan(r)
+	defer span.End()
+
+	// Check the timestamp, this prevents people from saving a challenge and then
+	// reusing it a bunch. However, it will fail if the clocks are too far out of sync.
+	timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
+	if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
+		span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
+		traces.SetError(span, errors.New("timestamp is out of range"))
+		e.slogger.Log(r.Context(), slog.LevelError,
+			"timestamp is out of range",
+			"delta", timestampDelta,
+		)
+
+		return errors.New(string(timeOutOfRangeErr))
+	}
+
+	return nil
+}
+
+func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *http.Request {
+	newReq := &http.Request{
+		Method: http.MethodPost,
+		Header: make(http.Header),
+		URL: &url.URL{
+			Scheme: originalRequest.URL.Scheme,
+			Host:   originalRequest.Host,
+			Path:   cmdReq.Path,
+		},
+	}
+
+	for h, vals := range cmdReq.Headers {
+		for _, v := range vals {
+			newReq.Header.Add(h, v)
+		}
+	}
+
+	newReq.Header.Set("Origin", originalRequest.Header.Get("Origin"))
+	newReq.Header.Set("Referer", originalRequest.Header.Get("Referer"))
+
+	// setting the newReq context to the current request context
+	// allows the trace to continue to the inner request,
+	// maintains the same lifetime as the original request,
+	// allows same ctx values such as session id to be passed to the inner request
+	newReq = newReq.WithContext(originalRequest.Context())
+
+	// the body of the cmdReq become the body of the next http request
+	if cmdReq.Body != nil && len(cmdReq.Body) > 0 {
+		newReq.Body = io.NopCloser(bytes.NewBuffer(cmdReq.Body))
+	}
+
+	return newReq
 }
