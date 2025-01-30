@@ -54,7 +54,7 @@ func New(slogger *slog.Logger, name string, columns []table.ColumnDefinition, ge
 // generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
 // than `wt.genTimeout`.
 func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", wt.name)
+	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "generate_timeout", wt.genTimeout.String())
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, wt.genTimeout)
