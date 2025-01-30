@@ -205,7 +205,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
-					kryptoEcMiddleware.presenceDetectionCallbackInterval = presenceDetectionCallbackInterval
+					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
 					// give our middleware with the test handler to the determiner

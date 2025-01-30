@@ -73,23 +73,26 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 }
 
 type kryptoEcMiddleware struct {
-	localDbSigner                     crypto.Signer
-	counterParty                      ecdsa.PublicKey
-	slogger                           *slog.Logger
-	presenceDetector                  presenceDetector
-	presenceDetectionLock             sync.Mutex
-	presenceDetectionCallbackInterval time.Duration
-	timestampValidityRange            int64
+	localDbSigner         crypto.Signer
+	counterParty          ecdsa.PublicKey
+	slogger               *slog.Logger
+	presenceDetector      presenceDetector
+	presenceDetectionLock sync.Mutex
+
+	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
+	// callback is sent while waiting on user to complete presence detection
+	presenceDetectionStatusUpdateInterval time.Duration
+	timestampValidityRange                int64
 }
 
 func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
-		localDbSigner:                     localDbSigner,
-		counterParty:                      counterParty,
-		slogger:                           slogger.With("keytype", "ec"),
-		presenceDetector:                  presenceDetector,
-		timestampValidityRange:            timestampValidityRange,
-		presenceDetectionCallbackInterval: 30 * time.Second,
+		localDbSigner:                         localDbSigner,
+		counterParty:                          counterParty,
+		slogger:                               slogger.With("keytype", "ec"),
+		presenceDetector:                      presenceDetector,
+		timestampValidityRange:                timestampValidityRange,
+		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 	}
 }
 
@@ -238,7 +241,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				})
 
 				gowrapper.Go(r.Context(), e.slogger, func() {
-					e.presenceDetectionCallback(challengeBox)
+					e.detectPresence(challengeBox)
 				})
 			}()
 		}
@@ -364,14 +367,16 @@ func (bhr *bufferedHttpResponse) Bytes() []byte {
 	return bhr.buf.Bytes()
 }
 
-func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.OuterChallenge) {
+// detectPresence prompts the user for presence detection and sends periodic status updates to
+// k2 (waiting , complete, error, timeout)
+func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallenge) {
 	// extract cmd req from challenge box
 	ctx, cancel := context.WithTimeout(context.Background(), presencedetection.DetectionTimeout)
 	defer cancel()
 
 	var cmdReq v2CmdRequestType
 	if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
-		e.slogger.ErrorContext(ctx,
+		e.slogger.Log(ctx, slog.LevelError,
 			"error unmarshaling cmd request",
 			"err", err,
 		)
@@ -380,12 +385,7 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 
 	// figure out if we need to do presence detection
 	detectionIntervalStr, ok := cmdReq.Headers[kolidePresenceDetectionIntervalHeaderKey]
-	if !ok || len(detectionIntervalStr) == 0 {
-		return
-	}
-
-	// no presence detection requested
-	if len(detectionIntervalStr) == 0 || detectionIntervalStr[0] == "" {
+	if !ok || len(detectionIntervalStr) == 0 || detectionIntervalStr[0] == "" {
 		return
 	}
 
@@ -396,15 +396,23 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 
 	detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr[0])
 	if err != nil {
+		e.slogger.Log(ctx, slog.LevelError,
+			"error parsing presence detection interval",
+			"err", err,
+		)
 		return
 	}
 
+	// On MacOS presence detection appears as "Kolide is trying to {reason}."
+	reason := "authenticate"
+
 	reasonKey := kolidePresenceDetectionReasonMacosHeaderKey
 	if runtime.GOOS == "windows" {
+		// On windows presence detection text is expected to be a full sentence
+		reason = "Kolide is requesting authentication"
 		reasonKey = kolidePresenceDetectionReasonWindowsHeaderKey
 	}
 
-	reason := "authenticate"
 	if reasonStr, ok := cmdReq.CallbackHeaders[reasonKey]; ok && len(reasonStr) > 0 && len(reasonStr[0]) > 0 {
 		reason = reasonStr[0]
 	}
@@ -418,9 +426,11 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 	defer e.presenceDetectionLock.Unlock()
 
 	type detectionResult struct {
-		durtionSinceLastDetection time.Duration
-		err                       error
+		durationSinceLastDetection time.Duration
+		err                        error
 	}
+
+	presenceDetectionStartTime := time.Now()
 
 	detectionDoneChan := make(chan *detectionResult)
 
@@ -438,17 +448,13 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 		}
 
 		detectionDoneChan <- &detectionResult{
-			durtionSinceLastDetection: durationSinceLastDetection,
-			err:                       err,
+			durationSinceLastDetection: durationSinceLastDetection,
+			err:                        err,
 		}
 	})
 
-	callbackTicker := time.NewTicker(e.presenceDetectionCallbackInterval)
-	defer callbackTicker.Stop()
-
-	presenceDetectionStartTime := time.Now()
-
-	var returnedDetectionResult *detectionResult
+	statusUpdateTicker := time.NewTicker(e.presenceDetectionStatusUpdateInterval)
+	defer statusUpdateTicker.Stop()
 
 	headers := map[string][]string{
 		kolideArchHeaderKey: {runtime.GOARCH},
@@ -460,37 +466,55 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 		headers[kolideSessionIdHeaderKey] = kolideSessionId
 	}
 
+	type presenceDetectionMessages string
+
+	const (
+		presenceDetectionCompleted presenceDetectionMessages = "presence_detection_complete"
+		presenceDetectionTimedOut  presenceDetectionMessages = "presence_detection_timed_out"
+		presenceDetectionWaiting   presenceDetectionMessages = "presence_detection_waiting"
+		presenceDetectionError     presenceDetectionMessages = "presence_detection_error"
+	)
+
+	var finalPresenceDetectionResult *detectionResult
+	hasPresenceDetectionTimedout := false
+
+	// send status updates to k2 on an interval until presence detection completes
 	for {
-		var callbackBody map[string]string
 
-		if returnedDetectionResult != nil {
-			// presence detection complete
-			callbackBody = map[string]string{
-				"msg":          "presence detection completed",
-				"elapsed_time": time.Since(presenceDetectionStartTime).String(),
-				kolideDurationSinceLastPresenceDetectionHeaderKey: returnedDetectionResult.durtionSinceLastDetection.String(),
-			}
+		// Build status update for k2
+		callbackBody := map[string]string{
+			"elapsed_time": time.Since(presenceDetectionStartTime).String(),
+		}
 
-			if returnedDetectionResult.err != nil {
-				e.slogger.DebugContext(ctx,
-					"presence detection error",
-					"err", returnedDetectionResult.err,
-				)
-				callbackBody["err"] = returnedDetectionResult.err.Error()
-			}
+		switch {
 
-			headers[kolideDurationSinceLastPresenceDetectionHeaderKey] = []string{returnedDetectionResult.durtionSinceLastDetection.String()}
-		} else {
-			// still waiting on presence detection
-			callbackBody = map[string]string{
-				"msg":          "waiting for user to complete presence detection",
-				"elapsed_time": time.Since(presenceDetectionStartTime).String(),
-			}
+		// timeout
+		case hasPresenceDetectionTimedout:
+			callbackBody["msg"] = string(presenceDetectionTimedOut)
+
+		// completed with error
+		case finalPresenceDetectionResult != nil && finalPresenceDetectionResult.err != nil:
+			e.slogger.DebugContext(ctx,
+				"presence detection error",
+				"err", finalPresenceDetectionResult.err,
+			)
+
+			callbackBody["msg"] = string(presenceDetectionError)
+			callbackBody[kolideDurationSinceLastPresenceDetectionHeaderKey] = finalPresenceDetectionResult.durationSinceLastDetection.String()
+
+		// completed without error
+		case finalPresenceDetectionResult != nil:
+			callbackBody["msg"] = string(presenceDetectionCompleted)
+			callbackBody[kolideDurationSinceLastPresenceDetectionHeaderKey] = finalPresenceDetectionResult.durationSinceLastDetection.String()
+
+		// still waiting on user
+		default:
+			callbackBody["msg"] = string(presenceDetectionWaiting)
 		}
 
 		callBackData, err := e.presenceDetectionCallbackKryptoResponse(challengeBox, headers, callbackBody)
 		if err != nil {
-			e.slogger.ErrorContext(ctx,
+			e.slogger.Log(ctx, slog.LevelError,
 				"error creating presence detection callback response",
 				"err", err,
 			)
@@ -499,7 +523,7 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 
 		req, err := cmdReq.CallbackReq()
 		if err != nil {
-			e.slogger.ErrorContext(ctx,
+			e.slogger.Log(ctx, slog.LevelError,
 				"error creating presence detection callback request",
 				"err", err,
 			)
@@ -508,19 +532,23 @@ func (e *kryptoEcMiddleware) presenceDetectionCallback(challengeBox *challenge.O
 
 		sendCallback(e.slogger, req, callBackData)
 
-		if returnedDetectionResult != nil {
+		if finalPresenceDetectionResult != nil || hasPresenceDetectionTimedout {
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			e.slogger.InfoContext(ctx,
+			hasPresenceDetectionTimedout = true
+			e.slogger.Log(ctx, slog.LevelInfo,
 				"presence detection timed out",
+				"elapsed_time", time.Since(presenceDetectionStartTime),
+				"timeout", presencedetection.DetectionTimeout,
 			)
-			return
-		case returnedDetectionResult = <-detectionDoneChan:
 			continue
-		case <-callbackTicker.C:
+		case finalPresenceDetectionResult = <-detectionDoneChan:
+			headers[kolideDurationSinceLastPresenceDetectionHeaderKey] = []string{finalPresenceDetectionResult.durationSinceLastDetection.String()}
+			continue
+		case <-statusUpdateTicker.C:
 			continue
 		}
 	}
@@ -537,17 +565,7 @@ func (e *kryptoEcMiddleware) presenceDetectionCallbackKryptoResponse(challengeBo
 		return nil, fmt.Errorf("error marshaling response: %w", err)
 	}
 
-	var response []byte
-	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
-	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
-	// pass nil to krypto
-	// hardware signing is not implemented for darwin
-	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
-		response, err = challengeBox.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
-	} else {
-		response, err = challengeBox.Respond(e.localDbSigner, nil, responseBytes)
-	}
-
+	response, err := e.kryptoResponse(challengeBox, responseBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error creating krypto response: %w", err)
 	}
@@ -583,15 +601,20 @@ func (e *kryptoEcMiddleware) bufferedHttpResponseToKryptoResponse(box *challenge
 		return nil, err
 	}
 
+	return e.kryptoResponse(box, responseBytes)
+}
+
+func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, bytes []byte) ([]byte, error) {
 	var response []byte
 	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 	// pass nil to krypto
 	// hardware signing is not implemented for darwin
+	var err error
 	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
-		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), responseBytes)
+		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), bytes)
 	} else {
-		response, err = box.Respond(e.localDbSigner, nil, responseBytes)
+		response, err = box.Respond(e.localDbSigner, nil, bytes)
 	}
 
 	if err != nil {
