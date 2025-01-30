@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -40,7 +41,7 @@ func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return table.NewPlugin("kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(slogger, "kolide_onepassword_accounts", columns, o.generate)
 }
 
 type onePasswordAccountsTable struct {

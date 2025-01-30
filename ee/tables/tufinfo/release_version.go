@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,13 +14,14 @@ import (
 	"github.com/theupdateframework/go-tuf/data"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/traces"
 )
 
 const tufReleaseVersionTableName = "kolide_tuf_release_version"
 
-func TufReleaseVersionTable(flags types.Flags) *table.Plugin {
+func TufReleaseVersionTable(slogger *slog.Logger, flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("binary"),
 		table.TextColumn("operating_system"),
@@ -28,7 +30,7 @@ func TufReleaseVersionTable(flags types.Flags) *table.Plugin {
 		table.TextColumn("target"),
 	}
 
-	return table.NewPlugin(tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
+	return tablewrapper.New(slogger, tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
 }
 
 func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {

@@ -19,7 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/softwareupdate"
 	"github.com/kolide/launcher/ee/tables/filevault"
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
-	"github.com/kolide/launcher/ee/tables/homebrew"
+	brew_upgradeable "github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/ioreg"
 	"github.com/kolide/launcher/ee/tables/macos_software_update"
 	"github.com/kolide/launcher/ee/tables/mdmclient"
@@ -82,17 +82,17 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 	return []osquery.OsqueryPlugin{
 		keychainAclsTable,
 		keychainItemsTable,
-		appicons.AppIcons(),
+		appicons.AppIcons(slogger),
 		brew_upgradeable.TablePlugin(slogger),
 		ChromeLoginKeychainInfo(slogger),
 		firmwarepasswd.TablePlugin(slogger),
 		GDriveSyncConfig(slogger),
 		GDriveSyncHistoryInfo(slogger),
-		MDMInfo(),
-		macos_software_update.MacOSUpdate(),
+		MDMInfo(slogger),
+		macos_software_update.MacOSUpdate(slogger),
 		macos_software_update.RecommendedUpdates(slogger),
 		macos_software_update.AvailableProducts(slogger),
-		MachoInfo(),
+		MachoInfo(slogger),
 		spotlight.TablePlugin(slogger),
 		TouchIDUserConfig(slogger),
 		TouchIDSystemConfig(slogger),
@@ -120,8 +120,8 @@ func platformSpecificTables(slogger *slog.Logger, currentOsquerydBinaryPath stri
 		screenlockTable,
 		pwpolicy.TablePlugin(slogger),
 		systemprofiler.TablePlugin(slogger),
-		munki.ManagedInstalls(),
-		munki.MunkiReport(),
+		munki.ManagedInstalls(slogger),
+		munki.MunkiReport(slogger),
 		dataflattentable.TablePluginExec(slogger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
 		dataflattentable.NewExecAndParseTable(slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode", "--getloggingmode", "--getloggingopt"}, dataflattentable.WithIncludeStderr()),

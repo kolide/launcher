@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/indexeddb"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -144,7 +145,7 @@ func ConstructKATCTables(config map[string]string, slogger *slog.Logger) []osque
 		}
 
 		t, columns := newKatcTable(tableName, cfg, slogger)
-		plugins = append(plugins, table.NewPlugin(tableName, columns, t.generate))
+		plugins = append(plugins, tablewrapper.New(slogger, tableName, columns, t.generate))
 	}
 
 	return plugins

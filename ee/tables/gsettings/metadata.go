@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -43,7 +44,7 @@ func Metadata(slogger *slog.Logger) *table.Plugin {
 		cmdRunner: execGsettingsCommand,
 	}
 
-	return table.NewPlugin("kolide_gsettings_metadata", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_gsettings_metadata", columns, t.generate)
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

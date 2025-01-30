@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"hash/crc64"
 	"image/png"
+	"log/slog"
 	"os"
 
 	"strings"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
@@ -25,14 +27,14 @@ type icon struct {
 	hash   uint64
 }
 
-func ProgramIcons() *table.Plugin {
+func ProgramIcons(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("version"),
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return table.NewPlugin("kolide_program_icons", columns, generateProgramIcons)
+	return tablewrapper.New(slogger, "kolide_program_icons", columns, generateProgramIcons)
 }
 
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

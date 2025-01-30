@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -34,7 +35,7 @@ func ChromeUserProfiles(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("ephemeral"),
 	}
 
-	return table.NewPlugin("kolide_chrome_user_profiles", columns, c.generate)
+	return tablewrapper.New(slogger, "kolide_chrome_user_profiles", columns, c.generate)
 }
 
 type chromeUserProfilesTable struct {
