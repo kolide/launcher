@@ -48,7 +48,7 @@ func New(slogger *slog.Logger, name string, columns []table.ColumnDefinition, ge
 		opt(wt)
 	}
 
-	return table.NewPlugin(name, columns, wt.generate)
+	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
 }
 
 // generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
