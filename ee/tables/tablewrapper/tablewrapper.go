@@ -11,7 +11,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const DefaultTableTimeout = 2 * time.Minute
+const DefaultTableTimeout = 4 * time.Minute
 
 type generateResult struct {
 	rows []map[string]string
