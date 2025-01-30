@@ -8,6 +8,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -40,6 +41,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_dev_table_tooling")
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, name := range tablehelpers.GetConstraints(queryContext, "name", tablehelpers.WithDefaults("")) {

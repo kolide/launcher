@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/groob/plist"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -51,6 +52,9 @@ func (m *MunkiInfo) ManagedInstalls() *table.Plugin {
 }
 
 func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_munki_installs")
+	defer span.End()
+
 	if err := m.loadReport(); err != nil {
 		return nil, err
 	}
@@ -74,6 +78,9 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 }
 
 func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_munki_report")
+	defer span.End()
+
 	if err := m.loadReport(); err != nil {
 		return nil, err
 	}

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -101,9 +100,7 @@ func (d *dbusNotifier) Execute() error {
 			actionUri := signal.Body[1].(string)
 
 			for _, browserLauncher := range browserLaunchers {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-				cmd, err := browserLauncher(ctx, actionUri)
+				cmd, err := browserLauncher(context.TODO(), actionUri)
 				if err != nil {
 					d.slogger.Log(context.TODO(), slog.LevelWarn,
 						"couldn't create command to start process",

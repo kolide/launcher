@@ -34,6 +34,7 @@ import (
 	"image/png"
 	"unsafe"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
 
@@ -52,6 +53,9 @@ func AppIcons() *table.Plugin {
 }
 
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_app_icons")
+	defer span.End()
+
 	q, ok := queryContext.Constraints["path"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The kolide_app_icons table requires that you specify a constraint WHERE path =")

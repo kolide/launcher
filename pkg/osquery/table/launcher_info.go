@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -53,6 +54,9 @@ func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore type
 
 func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_info")
+		defer span.End()
+
 		identifier, err := osquery.IdentifierFromDB(configStore, types.DefaultRegistrationID)
 		if err != nil {
 			return nil, err

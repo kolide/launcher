@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -38,6 +39,9 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", file)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)
@@ -84,6 +88,9 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 }
 
 func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_chrome_login_data_emails")
+	defer span.End()
+
 	var results []map[string]string
 	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {

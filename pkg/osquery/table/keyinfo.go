@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -45,6 +46,9 @@ func KeyInfo(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_keyinfo")
+	defer span.End()
+
 	var results []map[string]string
 
 	q, ok := queryContext.Constraints["path"]

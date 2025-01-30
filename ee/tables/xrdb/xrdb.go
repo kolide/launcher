@@ -19,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -49,6 +50,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_xrdb")
+	defer span.End()
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedUsernameCharacters))
@@ -84,6 +88,9 @@ func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryCon
 // execXRDB writes the output of running 'xrdb' command into the
 // supplied bytes buffer
 func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffer) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	u, err := user.Lookup(username)
 	if err != nil {
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
@@ -115,6 +122,9 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 }
 
 func (t *XRDBSettings) parse(ctx context.Context, display, username string, input io.Reader) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)

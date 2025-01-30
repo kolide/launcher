@@ -6,11 +6,15 @@ import (
 	"log/slog"
 
 	"github.com/golang/snappy"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // snappyDecode is a dataProcessingStep that decodes data compressed with snappy.
 // We use this to decode data retrieved from Firefox IndexedDB sqlite-backed databases.
 func snappyDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	decodedRow := make(map[string][]byte)
 
 	for k, v := range row {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 const tufReleaseVersionTableName = "kolide_tuf_release_version"
@@ -32,6 +33,9 @@ func TufReleaseVersionTable(flags types.Flags) *table.Plugin {
 
 func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		_, span := traces.StartSpan(ctx, "table_name", tufReleaseVersionTableName)
+		defer span.End()
+
 		results := []map[string]string{}
 
 		for _, binary := range []string{"launcher", "osqueryd"} {

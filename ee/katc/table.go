@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -17,6 +18,7 @@ const pathColumnName = "path"
 // katcTable is a Kolide ATC table. It queries the source and transforms the response data
 // per the configuration in its `cfg`.
 type katcTable struct {
+	tableName         string
 	sourceType        katcSourceType
 	sourcePaths       []string
 	sourceQuery       string
@@ -45,6 +47,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 	}
 
 	k := katcTable{
+		tableName:    tableName,
 		columnLookup: columnLookup,
 		slogger:      slogger,
 	}
@@ -104,6 +107,9 @@ func filtersMatch(filters map[string]string) bool {
 
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", k.tableName)
+	defer span.End()
+
 	if k.sourceType.dataFunc == nil {
 		return nil, errors.New("table source type not set")
 	}

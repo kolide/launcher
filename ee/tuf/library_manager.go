@@ -103,7 +103,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 		}
 		dirToRemove := filepath.Dir(stagedUpdatePath)
 		if err := backoff.WaitFor(func() error {
-			return os.RemoveAll(dirToRemove)
+			return os.RemoveAll(dirToRemove) //revive:disable-line -- incorrectly flags `defer: return in a defer function has no effect`
 		}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
 			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not remove temp staging directory",
@@ -198,7 +198,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		// In case of error, clean up the staged version and its directory
 		if _, err := os.Stat(stagedVersionedDirectory); err == nil || !os.IsNotExist(err) {
 			if err := backoff.WaitFor(func() error {
-				return os.RemoveAll(stagedVersionedDirectory)
+				return os.RemoveAll(stagedVersionedDirectory) //revive:disable-line -- incorrectly flags `defer: return in a defer function has no effect`
 			}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
 				ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 					"could not remove staged update",

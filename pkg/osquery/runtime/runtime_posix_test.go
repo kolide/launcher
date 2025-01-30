@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -66,7 +67,10 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
-	runner := New(k, mockServiceClient(t), WithStartFunc(func(cmd *exec.Cmd) error {
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s, WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -122,9 +126,12 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 
-	runner := New(k, mockServiceClient(t), WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, mockServiceClient(t), s, WithExtensionSocketPath(extensionSocketPath))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 

@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -59,6 +60,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, command := range tablehelpers.GetConstraints(queryContext, "command", tablehelpers.WithAllowedValues(allowedCommands), tablehelpers.WithDefaults("show")) {
@@ -66,82 +70,103 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			for _, user := range tablehelpers.GetConstraints(queryContext, "user", tablehelpers.WithAllowedCharacters(userAllowedCharacters), tablehelpers.WithDefaults("_all")) {
 				for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 
-					// apple documents `-output stdout-xml` as sending the
-					// output to stdout, in xml. This, however, does not work
-					// for some subset of the profiles command. I've reported it
-					// to apple (feedback FB8962811), and while it may someday
-					// be fixed, we need to support it where it is.
-					dir, err := agent.MkdirTemp("kolide_profiles")
+					rowData, err := t.generateProfile(ctx, command, profileType, user, dataQuery)
 					if err != nil {
-						return nil, fmt.Errorf("creating kolide_profiles tmp dir: %w", err)
-					}
-					defer os.RemoveAll(dir)
-
-					outputFile := filepath.Join(dir, "output.xml")
-
-					profileArgs := []string{command, "-output", outputFile}
-
-					if profileType != "" {
-						profileArgs = append(profileArgs, "-type", profileType)
-					}
-
-					// setup the command line. This table overloads the `user`
-					// column so one can select either:
-					//   * All profiles merged, using the special value `_all` (this is the default)
-					//   * The device profiles, using the special value `_device`
-					//   * a user specific one, using the username
-					switch {
-					case user == "" || user == "_all":
-						profileArgs = append(profileArgs, "-all")
-					case user == "_device":
-						break
-					case user != "":
-						profileArgs = append(profileArgs, "-user", user)
-					default:
-						return nil, fmt.Errorf("Unknown user argument: %s", user)
-					}
-
-					output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Profiles, profileArgs)
-					if err != nil {
-						t.slogger.Log(ctx, slog.LevelInfo,
-							"ioreg exec failed",
+						t.slogger.Log(ctx, slog.LevelWarn,
+							"generating profile",
+							"command", command,
+							"profile_type", profileType,
+							"user", user,
+							"data_query", dataQuery,
 							"err", err,
 						)
 						continue
 					}
 
-					if bytes.Contains(output, []byte("requires root privileges")) {
-						t.slogger.Log(ctx, slog.LevelInfo,
-							"ioreg requires root privileges",
-						)
-						continue
+					if len(rowData) > 0 {
+						results = append(results, rowData...)
 					}
-
-					flattenOpts := []dataflatten.FlattenOpts{
-						dataflatten.WithSlogger(t.slogger),
-						dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-					}
-
-					flatData, err := dataflatten.PlistFile(outputFile, flattenOpts...)
-					if err != nil {
-						t.slogger.Log(ctx, slog.LevelInfo,
-							"flatten failed",
-							"err", err,
-						)
-						continue
-					}
-
-					rowData := map[string]string{
-						"command": command,
-						"type":    profileType,
-						"user":    user,
-					}
-
-					results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
-
 				}
 			}
 		}
 	}
 	return results, nil
+}
+
+func (t *Table) generateProfile(ctx context.Context, command string, profileType string, user string, dataQuery string) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	// apple documents `-output stdout-xml` as sending the
+	// output to stdout, in xml. This, however, does not work
+	// for some subset of the profiles command. I've reported it
+	// to apple (feedback FB8962811), and while it may someday
+	// be fixed, we need to support it where it is.
+	dir, err := agent.MkdirTemp("kolide_profiles")
+	if err != nil {
+		return nil, fmt.Errorf("creating kolide_profiles tmp dir: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	outputFile := filepath.Join(dir, "output.xml")
+
+	profileArgs := []string{command, "-output", outputFile}
+
+	if profileType != "" {
+		profileArgs = append(profileArgs, "-type", profileType)
+	}
+
+	// setup the command line. This table overloads the `user`
+	// column so one can select either:
+	//   * All profiles merged, using the special value `_all` (this is the default)
+	//   * The device profiles, using the special value `_device`
+	//   * a user specific one, using the username
+	switch {
+	case user == "" || user == "_all":
+		profileArgs = append(profileArgs, "-all")
+	case user == "_device":
+		break
+	case user != "":
+		profileArgs = append(profileArgs, "-user", user)
+	default:
+		return nil, fmt.Errorf("Unknown user argument: %s", user)
+	}
+
+	output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Profiles, profileArgs)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"ioreg exec failed",
+			"err", err,
+		)
+		return nil, nil
+	}
+
+	if bytes.Contains(output, []byte("requires root privileges")) {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"ioreg requires root privileges",
+		)
+		return nil, nil
+	}
+
+	flattenOpts := []dataflatten.FlattenOpts{
+		dataflatten.WithSlogger(t.slogger),
+		dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+	}
+
+	flatData, err := dataflatten.PlistFile(outputFile, flattenOpts...)
+	if err != nil {
+		t.slogger.Log(ctx, slog.LevelInfo,
+			"flatten failed",
+			"err", err,
+		)
+		return nil, nil
+	}
+
+	rowData := map[string]string{
+		"command": command,
+		"type":    profileType,
+		"user":    user,
+	}
+
+	return dataflattentable.ToMap(flatData, dataQuery, rowData), nil
 }

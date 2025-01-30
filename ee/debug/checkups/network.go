@@ -48,14 +48,7 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 
 	for _, c := range listCommands() {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-
-		cmd, err := c.cmd(ctx, c.args...)
-		if err != nil {
-			continue
-		}
-		_ = runCmdMarkdownLogged(cmd.Cmd, commandOutput)
+		runCommand(ctx, c, commandOutput)
 	}
 
 	for _, fileLocation := range listFiles() {
@@ -63,6 +56,17 @@ func (n *networkCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	}
 
 	return nil
+}
+
+func runCommand(ctx context.Context, c networkCommand, commandOutput io.Writer) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd, err := c.cmd(ctx, c.args...)
+	if err != nil {
+		return
+	}
+	_ = runCmdMarkdownLogged(cmd.Cmd, commandOutput)
 }
 
 func (n *networkCheckup) ExtraFileName() string {
