@@ -9,15 +9,20 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
+	"golang.org/x/sync/semaphore"
 )
 
-const DefaultTableTimeout = 4 * time.Minute
+const (
+	DefaultTableTimeout = 4 * time.Minute
+	numWorkers          = 5
+)
 
 type wrappedTable struct {
 	slogger    *slog.Logger
 	name       string
 	gen        table.GenerateFunc
 	genTimeout time.Duration
+	workers    *semaphore.Weighted
 }
 
 type tablePluginOption func(*wrappedTable)
@@ -42,6 +47,7 @@ func New(slogger *slog.Logger, name string, columns []table.ColumnDefinition, ge
 		name:       name,
 		gen:        gen,
 		genTimeout: DefaultTableTimeout,
+		workers:    semaphore.NewWeighted(numWorkers),
 	}
 
 	for _, opt := range opts {
@@ -60,10 +66,18 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	ctx, cancel := context.WithTimeout(ctx, wt.genTimeout)
 	defer cancel()
 
+	// A worker must be available for us to try to run the generate function --
+	// we don't want too many calls to the same table piling up.
+	if !wt.workers.TryAcquire(1) {
+		span.AddEvent("no_workers_available")
+		return nil, fmt.Errorf("no workers available (limit %d)", numWorkers)
+	}
+
 	// Kick off running the query
 	resultChan := make(chan *generateResult)
 	gowrapper.Go(ctx, wt.slogger, func() {
 		rows, err := wt.gen(ctx, queryContext)
+		wt.workers.Release(1)
 		span.AddEvent("generate_returned")
 		resultChan <- &generateResult{
 			rows: rows,
