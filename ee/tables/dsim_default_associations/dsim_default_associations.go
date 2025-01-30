@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -36,6 +37,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_dsim_default_associations")
+	defer span.End()
+
 	var results []map[string]string
 
 	dismResults, err := t.execDism(ctx)
@@ -69,6 +73,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) execDism(ctx context.Context) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// dism.exe outputs xml, but with weird intermingled status. So
 	// instead, we dump it to a temp file.
 	dir, err := agent.MkdirTemp("kolide_dism")

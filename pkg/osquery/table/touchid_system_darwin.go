@@ -8,6 +8,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -31,6 +32,9 @@ type touchIDSystemConfigTable struct {
 
 // TouchIDSystemConfigGenerate will be called whenever the table is queried.
 func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_touchid_system_config")
+	defer span.End()
+
 	var results []map[string]string
 	var touchIDCompatible, secureEnclaveCPU, touchIDEnabled, touchIDUnlock string
 

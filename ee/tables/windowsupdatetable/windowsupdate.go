@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/scjalliance/comshim"
@@ -66,6 +67,9 @@ func queryHistory(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) 
 type queryFuncType func(*windowsupdate.IUpdateSearcher) (interface{}, error)
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
@@ -87,6 +91,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	comshim.Add(1)
 	defer comshim.Done()
 

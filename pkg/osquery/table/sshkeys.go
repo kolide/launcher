@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -56,6 +57,9 @@ func SshKeys(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_ssh_keys")
+	defer span.End()
+
 	var results []map[string]string
 
 	// Find the dirs we're going to search

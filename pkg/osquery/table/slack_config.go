@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -59,6 +60,9 @@ type slackTeamsFile map[string]struct {
 }
 
 func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", file.path)
+	defer span.End()
+
 	var results []map[string]string
 	data, err := os.ReadFile(file.path)
 	if err != nil {
@@ -83,6 +87,9 @@ func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInf
 }
 
 func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_slack_config")
+	defer span.End()
+
 	var results []map[string]string
 	// Prevent this table from being used to easily enumerate a user's slack teams
 	q, ok := queryContext.Constraints["team_id"]

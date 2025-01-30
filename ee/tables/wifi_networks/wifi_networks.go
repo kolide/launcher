@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -53,6 +54,9 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_wifi_networks")
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var results []map[string]string
@@ -71,6 +75,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
+		ctx, span := traces.StartSpan(ctx)
+		defer span.End()
+
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
 		// powershell.exe

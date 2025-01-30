@@ -41,6 +41,9 @@ func WithAppendEnv(key, value string) ExecOps {
 // This is not suitable for high performance work -- it allocates new buffers each time
 // Use Run() for more control over the stdout and stderr streams.
 func RunSimple(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, cmd allowedcmd.AllowedCommand, args []string, opts ...ExecOps) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var stdout bytes.Buffer
 	if err := Run(ctx, slogger, timeoutSeconds, cmd, args, &stdout, io.Discard, opts...); err != nil {
 		return nil, err

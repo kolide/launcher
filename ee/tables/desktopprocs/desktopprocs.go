@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -20,6 +21,9 @@ func TablePlugin() *table.Plugin {
 
 func generate() table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		_, span := traces.StartSpan(ctx, "table_name", "kolide_desktop_procs")
+		defer span.End()
+
 		results := []map[string]string{}
 
 		for k, v := range runner.InstanceDesktopProcessRecords() {
