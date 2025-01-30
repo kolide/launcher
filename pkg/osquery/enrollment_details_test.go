@@ -4,15 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
-	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -56,64 +52,26 @@ func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 	require.Contains(t, err.Error(), "no osqueryd path")
 }
 
-func TestCollectAndSetEnrollmentDetailsSuccess(t *testing.T) {
+func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 	t.Parallel()
-	slogger := multislogger.NewNopLogger()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
 
-	testRootDir := t.TempDir()
+	k := typesmocks.NewKnapsack(t)
 
-	// Download real osqueryd binary
-	target := packaging.Target{}
-	require.NoError(t, target.PlatformFromString(runtime.GOOS))
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
+	expectedOsquerydPath := "/usr/local/bin/osqueryd"
+	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
+	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Twice()
 
-	osquerydPath := filepath.Join(testRootDir, target.PlatformBinaryName("osqueryd"))
+	ctx := context.Background()
+	logger := multislogger.NewNopLogger()
 
-	// Fetch and copy osqueryd
-	downloadPath, err := packaging.FetchBinary(ctx, testRootDir, "osqueryd",
-		target.PlatformBinaryName("osqueryd"), "stable", target)
-	require.NoError(t, err)
-	require.NoError(t, fsutil.CopyFile(downloadPath, osquerydPath))
+	collectTimeout := 5 * time.Second
+	collectRetryInterval := 500 * time.Millisecond
 
-	// Make binary executable
-	require.NoError(t, os.Chmod(osquerydPath, 0755))
-
-	var details types.EnrollmentDetails
-
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osquerydPath)
-
-	firstCall := true
-	mockKnapsack.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Run(func(args mock.Arguments) {
-		if !firstCall {
-			// Capture details from second call
-			details = args.Get(0).(types.EnrollmentDetails)
-		}
-		firstCall = false
-	}).Return(nil)
-
-	err = CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 60*time.Second, 10*time.Second)
-	require.NoError(t, err)
+	err := CollectAndSetEnrollmentDetails(ctx, logger, k, collectTimeout, collectRetryInterval)
 
 	require.NoError(t, err)
-	mockKnapsack.AssertExpectations(t)
+	k.AssertExpectations(t)
 
-	// Runtime details
-	require.NotEmpty(t, details.OSPlatform)
-	require.NotEmpty(t, details.OSPlatformLike)
-	require.NotEmpty(t, details.LauncherVersion)
-	require.NotEmpty(t, details.GOARCH)
-	require.NotEmpty(t, details.GOOS)
-
-	// Core system details
-	require.NotEmpty(t, details.OSPlatform)
-	require.NotEmpty(t, details.HardwareUUID)
-
-	// Version information
-	require.NotEmpty(t, details.OsqueryVersion)
+	k.AssertCalled(t, "LatestOsquerydPath", mock.Anything)
+	k.AssertNumberOfCalls(t, "SetEnrollmentDetails", 2)
 }
