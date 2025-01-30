@@ -23,6 +23,7 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -51,7 +52,7 @@ func TablePlugin(
 		tablename: tablename,
 	}
 
-	return table.NewPlugin(t.tablename, columns, t.generate)
+	return tablewrapper.New(slogger, t.tablename, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

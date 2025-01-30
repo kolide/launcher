@@ -8,6 +8,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -23,7 +24,7 @@ func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return table.NewPlugin("kolide_touchid_system_config", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_touchid_system_config", columns, t.generate)
 }
 
 type touchIDSystemConfigTable struct {

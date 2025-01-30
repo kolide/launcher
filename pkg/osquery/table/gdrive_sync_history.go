@@ -10,6 +10,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -24,7 +25,7 @@ func GDriveSyncHistoryInfo(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("mtime"),
 		table.TextColumn("size"),
 	}
-	return table.NewPlugin("kolide_gdrive_sync_history", columns, g.generate)
+	return tablewrapper.New(slogger, "kolide_gdrive_sync_history", columns, g.generate)
 }
 
 type GDriveSyncHistory struct {

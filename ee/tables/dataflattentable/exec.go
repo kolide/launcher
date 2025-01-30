@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -42,7 +43,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 
 	t.flattenBytesFunc = dataSourceType.FlattenBytesFunc(t.keyValueSeparator)
 
-	return table.NewPlugin(t.tableName, columns, t.generateExec)
+	return tablewrapper.New(slogger, t.tableName, columns, t.generateExec)
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

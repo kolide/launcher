@@ -27,6 +27,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 
 	"fmt"
 	"hash/crc64"
@@ -34,6 +35,7 @@ import (
 	"image/png"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -43,13 +45,13 @@ import (
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
 
-func AppIcons() *table.Plugin {
+func AppIcons(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return table.NewPlugin("kolide_app_icons", columns, generateAppIcons)
+	return tablewrapper.New(slogger, "kolide_app_icons", columns, generateAppIcons)
 }
 
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

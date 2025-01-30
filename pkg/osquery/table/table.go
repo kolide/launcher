@@ -28,18 +28,18 @@ import (
 
 // LauncherTables returns launcher-specific tables. They're based
 // around _launcher_ things thus do not make sense in tables.ext
-func LauncherTables(k types.Knapsack) []osquery.OsqueryPlugin {
+func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(k.ConfigStore(), k),
-		LauncherDbInfo(k.BboltDB()),
-		LauncherInfoTable(k.ConfigStore(), k.LauncherHistoryStore()),
-		launcher_db.TablePlugin("kolide_server_data", k.ServerProvidedDataStore()),
-		launcher_db.TablePlugin("kolide_control_flags", k.AgentFlagsStore()),
-		LauncherAutoupdateConfigTable(k),
-		osquery_instance_history.TablePlugin(),
-		tufinfo.TufReleaseVersionTable(k),
-		launcher_db.TablePlugin("kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
-		desktopprocs.TablePlugin(),
+		LauncherConfigTable(slogger, k.ConfigStore(), k),
+		LauncherDbInfo(slogger, k.BboltDB()),
+		LauncherInfoTable(slogger, k.ConfigStore(), k.LauncherHistoryStore()),
+		launcher_db.TablePlugin(slogger, "kolide_server_data", k.ServerProvidedDataStore()),
+		launcher_db.TablePlugin(slogger, "kolide_control_flags", k.AgentFlagsStore()),
+		LauncherAutoupdateConfigTable(slogger, k),
+		osquery_instance_history.TablePlugin(slogger),
+		tufinfo.TufReleaseVersionTable(slogger, k),
+		launcher_db.TablePlugin(slogger, "kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
+		desktopprocs.TablePlugin(slogger),
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -53,7 +54,7 @@ func SshKeys(slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return table.NewPlugin("kolide_ssh_keys", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_ssh_keys", columns, t.generate)
 }
 
 func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
