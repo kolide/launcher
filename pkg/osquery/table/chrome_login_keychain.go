@@ -10,6 +10,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -24,7 +25,7 @@ func ChromeLoginKeychainInfo(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
 	}
-	return table.NewPlugin("kolide_chrome_login_keychain", columns, c.generate)
+	return tablewrapper.New(slogger, "kolide_chrome_login_keychain", columns, c.generate)
 }
 
 type ChromeLoginKeychain struct {

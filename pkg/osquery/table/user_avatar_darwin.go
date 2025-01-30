@@ -48,6 +48,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -63,7 +64,7 @@ func UserAvatar(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("hash"),
 	}
 	t := &userAvatarTable{slogger: slogger.With("table", "kolide_user_avatars")}
-	return table.NewPlugin("kolide_user_avatars", columns, t.generateAvatars)
+	return tablewrapper.New(slogger, "kolide_user_avatars", columns, t.generateAvatars)
 }
 
 type userAvatarTable struct {

@@ -424,7 +424,7 @@ func (i *OsqueryInstance) Launch() error {
 		osquerylogger.NewPlugin(KolideSaasExtensionName, i.saasExtension.LogString),
 	}
 	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
-	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack)...)
+	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack, i.knapsack.Slogger().With("component", "launcher_tables"))...)
 
 	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,

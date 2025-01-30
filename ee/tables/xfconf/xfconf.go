@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/exp/maps"
@@ -36,7 +37,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_xfconf"),
 	}
 
-	return table.NewPlugin("kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
+	return tablewrapper.New(slogger, "kolide_xfconf", dataflattentable.Columns(table.TextColumn("username"), table.TextColumn("path")), t.generate)
 }
 
 func (t *xfconfTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

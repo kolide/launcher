@@ -14,6 +14,7 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
@@ -43,7 +44,7 @@ func ZfsPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_zfs_properties",
 	}
 
-	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
+	return tablewrapper.New(slogger, "kolide_zfs_properties", columns(), t.generate)
 }
 
 func ZpoolPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
@@ -53,7 +54,7 @@ func ZpoolPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_zpool_properties",
 	}
 
-	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)
+	return tablewrapper.New(slogger, "kolide_zpool_properties", columns(), t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -7,16 +7,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func MDMInfo() *table.Plugin {
+func MDMInfo(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("enrolled"),
 		table.TextColumn("server_url"),
@@ -31,7 +33,7 @@ func MDMInfo() *table.Plugin {
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
 	}
-	return table.NewPlugin("kolide_mdm_info", columns, generateMDMInfo)
+	return tablewrapper.New(slogger, "kolide_mdm_info", columns, generateMDMInfo)
 }
 
 func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"time"
@@ -14,13 +15,14 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
+func LauncherInfoTable(slogger *slog.Logger, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -49,7 +51,7 @@ func LauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore type
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return table.NewPlugin("kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
+	return tablewrapper.New(slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
 }
 
 func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {

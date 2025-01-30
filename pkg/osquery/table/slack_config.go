@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -43,7 +44,7 @@ func SlackConfig(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_slack_config"),
 	}
 
-	return table.NewPlugin("kolide_slack_config", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_slack_config", columns, t.generate)
 }
 
 type SlackConfigTable struct {
