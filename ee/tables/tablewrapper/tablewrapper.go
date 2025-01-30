@@ -13,55 +13,76 @@ import (
 
 const DefaultTableTimeout = 4 * time.Minute
 
+type wrappedTable struct {
+	slogger    *slog.Logger
+	name       string
+	gen        table.GenerateFunc
+	genTimeout time.Duration
+}
+
+type tablePluginOption func(*wrappedTable)
+
+// WithGenerateTimeout overrides the default table timeout of four minutes
+func WithGenerateTimeout(genTimeout time.Duration) tablePluginOption {
+	return func(w *wrappedTable) {
+		w.genTimeout = genTimeout
+	}
+}
+
 type generateResult struct {
 	rows []map[string]string
 	err  error
 }
 
-// NewTablePluginWithTimeout returns a table plugin using the default table timeout.
-// Most tables should use this function unless they have a specific need for a
-// custom timeout.
-func NewTablePluginWithTimeout(slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc) *table.Plugin {
-	return NewTablePluginWithCustomTimeout(slogger, name, columns, gen, DefaultTableTimeout)
-}
-
-// NewTablePluginWithCustomTimeout returns a table plugin that will attempt to execute a query
-// up until the given timeout, at which point it will instead return no rows and a timeout error.
-func NewTablePluginWithCustomTimeout(slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, genTimeout time.Duration) *table.Plugin {
-	wrappedGen := func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		ctx, span := traces.StartSpan(ctx, "table_name", name)
-		defer span.End()
-
-		ctx, cancel := context.WithTimeout(ctx, genTimeout)
-		defer cancel()
-
-		// Kick off running the query
-		resultChan := make(chan *generateResult)
-		gowrapper.Go(ctx, slogger, func() {
-			rows, err := gen(ctx, queryContext)
-			span.AddEvent("generate_returned")
-			resultChan <- &generateResult{
-				rows: rows,
-				err:  err,
-			}
-		})
-
-		// Wait for results up until the timeout
-		select {
-		case result := <-resultChan:
-			return result.rows, result.err
-		case <-ctx.Done():
-			queriedColumns := columnsFromConstraints(queryContext)
-			slogger.Log(ctx, slog.LevelWarn,
-				"query timed out",
-				"table_name", name,
-				"queried_columns", fmt.Sprintf("%+v", queriedColumns),
-			)
-			return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", name, genTimeout.String(), queriedColumns)
-		}
+// New returns a table plugin that will attempt to execute a query up until the given timeout,
+// at which point it will instead return no rows and a timeout error.
+func New(slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
+	wt := &wrappedTable{
+		slogger:    slogger.With("table_name", name),
+		name:       name,
+		gen:        gen,
+		genTimeout: DefaultTableTimeout,
 	}
 
-	return table.NewPlugin(name, columns, wrappedGen)
+	for _, opt := range opts {
+		opt(wt)
+	}
+
+	return table.NewPlugin(name, columns, wt.generate)
+}
+
+// generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
+// than `wt.genTimeout`.
+func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", wt.name)
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, wt.genTimeout)
+	defer cancel()
+
+	// Kick off running the query
+	resultChan := make(chan *generateResult)
+	gowrapper.Go(ctx, wt.slogger, func() {
+		rows, err := wt.gen(ctx, queryContext)
+		span.AddEvent("generate_returned")
+		resultChan <- &generateResult{
+			rows: rows,
+			err:  err,
+		}
+	})
+
+	// Wait for results up until the timeout
+	select {
+	case result := <-resultChan:
+		return result.rows, result.err
+	case <-ctx.Done():
+		queriedColumns := columnsFromConstraints(queryContext)
+		wt.slogger.Log(ctx, slog.LevelWarn,
+			"query timed out",
+			"queried_columns", fmt.Sprintf("%+v", queriedColumns),
+		)
+		return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, wt.genTimeout.String(), queriedColumns)
+	}
 }
 
 // columnsFromConstraints extracts the column names from the query for logging purposes

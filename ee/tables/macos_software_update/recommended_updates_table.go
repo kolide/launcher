@@ -39,7 +39,7 @@ func RecommendedUpdates(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.NewTablePluginWithTimeout(slogger, tableName, columns, t.generate)
+	return tablewrapper.New(slogger, tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
