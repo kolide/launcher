@@ -51,7 +51,13 @@ func NewTablePluginWithCustomTimeout(slogger *slog.Logger, name string, columns 
 		case result := <-resultChan:
 			return result.rows, result.err
 		case <-ctx.Done():
-			return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", name, genTimeout.String(), columnsFromConstraints(queryContext))
+			queriedColumns := columnsFromConstraints(queryContext)
+			slogger.Log(ctx, slog.LevelWarn,
+				"query timed out",
+				"table_name", name,
+				"queried_columns", fmt.Sprintf("%+v", queriedColumns),
+			)
+			return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", name, genTimeout.String(), queriedColumns)
 		}
 	}
 
