@@ -490,7 +490,7 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 
 		// completed with error
 		case finalPresenceDetectionResult != nil && finalPresenceDetectionResult.err != nil:
-			e.slogger.DebugContext(ctx,
+			e.slogger.Log(ctx, slog.LevelWarn,
 				"presence detection error",
 				"err", finalPresenceDetectionResult.err,
 			)
