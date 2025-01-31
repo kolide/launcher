@@ -19,7 +19,7 @@ require (
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/osquery/osquery-go v0.0.0-20250129172556-8293fdf5f1ce
+	github.com/osquery/osquery-go v0.0.0-20250131154556-629f995b6947
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
