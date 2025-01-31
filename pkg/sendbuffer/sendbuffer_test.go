@@ -121,7 +121,7 @@ func TestBufferFullPurgeWaitsForSendAndPurge(t *testing.T) {
 	)
 
 	// kind of an ugly test, but it was the simplest way to reproduce the issue
-	// if the issue is present, we'll get a panic: runtime error: index out of range [0] with length 0
+	// if the issue is present, we'll get a panic: runtime error: index out of range [x] with length x
 
 	go func() {
 		for {
