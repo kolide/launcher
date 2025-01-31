@@ -742,7 +742,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 			"instance_run_id", i.runId,
 		),
 		i.knapsack.RootDirectory(),
-		kolidelog.WithLevel(slog.LevelInfo),
+		kolidelog.WithLevel(slog.LevelDebug),
 	)
 
 	// Apply user-provided flags last so that they can override other flags set
