@@ -284,7 +284,7 @@ func (sb *SendBuffer) sendAndPurge() error {
 	// There is a small possibility that the buffer gets full while were in the middle of sending
 	// and gets deleted. However, we don't want to block writes while were waiting on a network call
 	// to send the logs. To live with this, we just have the deleteLogs func make sure that the buffer
-	// is not empty (ie: got purged while waiting on network call).
+	// is not empty (ie: did not get purged while waiting on network call).
 
 	// testing on a new enrollment in debug mode, log size hit 130K bytes
 	// before enrollment completed and was able to ship logs
