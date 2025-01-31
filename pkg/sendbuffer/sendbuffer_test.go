@@ -115,8 +115,9 @@ func TestBufferFullPurgeWaitsForSendAndPurge(t *testing.T) {
 
 	sb := New(
 		&testSender{lastReceived: &bytes.Buffer{}, t: t},
-		WithMaxStorageSizeBytes(1),
-		WithMaxSendSizeBytes(1),
+		WithMaxStorageSizeBytes(11),
+		WithMaxSendSizeBytes(5),
+		WithSendInterval(100*time.Millisecond),
 	)
 
 	// kind of an ugly test, but it was the simplest way to reproduce the issue
@@ -130,6 +131,7 @@ func TestBufferFullPurgeWaitsForSendAndPurge(t *testing.T) {
 
 	go func() {
 		for {
+			time.Sleep(50 * time.Millisecond)
 			sb.sendAndPurge()
 		}
 	}()
