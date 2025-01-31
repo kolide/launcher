@@ -280,6 +280,12 @@ func (sb *SendBuffer) sendAndPurge() error {
 		sb.logger.Log("msg", "failed to send, will retry", "err", err)
 		return nil
 	}
+
+	// There is a small possibility that the buffer gets full while were in the middle of sending
+	// and gets deleted. However, we don't want to block writes while were waiting on a network call
+	// to send the logs. To live with this, we just have the deleteLogs func make sure that the buffer
+	// is not empty (ie) got purged while waiting on network call.
+
 	// testing on a new enrollment in debug mode, log size hit 130K bytes
 	// before enrollment completed and was able to ship logs
 	// 2023-11-16
@@ -316,7 +322,13 @@ func (sb *SendBuffer) copyLogs(w io.Writer, maxSizeBytes int) (int, error) {
 	return lastLogIndex, nil
 }
 
+// deleteLogs deletes the logs up to the provided index
+// it's up to the caller to lock the write mutex
 func (sb *SendBuffer) deleteLogs(toIndex int) {
+	if len(sb.logs) == 0 {
+		return
+	}
+
 	sizeDeleted := 0
 	for i := 0; i < toIndex; i++ {
 		sizeDeleted += len(sb.logs[i])

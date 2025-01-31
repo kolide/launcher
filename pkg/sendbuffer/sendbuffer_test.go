@@ -107,6 +107,36 @@ func TestSendBuffer(t *testing.T) {
 	}
 }
 
+// TestBufferFullPurgeWaitsForSendAndPurge resulted from a panic found in production where
+// if the buffer was full while sendAndPurge was running, the buffer get wiped and then
+// sendAndPurge would try to delete the portion of the buffer it just sent, causing a panic
+func TestBufferFullPurgeWaitsForSendAndPurge(t *testing.T) {
+	t.Parallel()
+
+	sb := New(
+		&testSender{lastReceived: &bytes.Buffer{}, t: t},
+		WithMaxStorageSizeBytes(1),
+		WithMaxSendSizeBytes(1),
+	)
+
+	// kind of an ugly test, but it was the simplest way to reproduce the issue
+	// if the issue is present, we'll get a panic: runtime error: index out of range [0] with length 0
+
+	go func() {
+		for {
+			sb.Write([]byte("1"))
+		}
+	}()
+
+	go func() {
+		for {
+			sb.sendAndPurge()
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
+}
+
 func testStringArray(size int) []string {
 	arr := make([]string, size)
 
