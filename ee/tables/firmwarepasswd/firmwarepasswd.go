@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -36,7 +37,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
-	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_firmwarepasswd", columns, t.generate)
 
 }
 

@@ -3,6 +3,7 @@ package fscrypt_info
 import (
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -29,5 +30,5 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger: slogger.With("table", tableName),
 	}
-	return table.NewPlugin(tableName, columns, t.generate)
+	return tablewrapper.New(slogger, tableName, columns, t.generate)
 }

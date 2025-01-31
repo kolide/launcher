@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -46,7 +47,7 @@ func Settings(slogger *slog.Logger) *table.Plugin {
 		getBytes: execGsettings,
 	}
 
-	return table.NewPlugin("kolide_gsettings", columns, t.generate)
+	return tablewrapper.New(slogger, "kolide_gsettings", columns, t.generate)
 }
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

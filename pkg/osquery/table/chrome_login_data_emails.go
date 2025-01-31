@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -31,7 +32,7 @@ func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("email"),
 		table.BigIntColumn("count"),
 	}
-	return table.NewPlugin("kolide_chrome_login_data_emails", columns, c.generate)
+	return tablewrapper.New(slogger, "kolide_chrome_login_data_emails", columns, c.generate)
 }
 
 type ChromeLoginDataEmailsTable struct {

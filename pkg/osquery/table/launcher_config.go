@@ -2,19 +2,21 @@ package table
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherConfigTable(store types.Getter, registrationTracker types.RegistrationTracker) *table.Plugin {
+func LauncherConfigTable(slogger *slog.Logger, store types.Getter, registrationTracker types.RegistrationTracker) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("config"),
 		table.TextColumn("registration_id"),
 	}
-	return table.NewPlugin("kolide_launcher_config", columns, generateLauncherConfig(store, registrationTracker))
+	return tablewrapper.New(slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, registrationTracker))
 }
 
 func generateLauncherConfig(store types.Getter, registrationTracker types.RegistrationTracker) table.GenerateFunc {

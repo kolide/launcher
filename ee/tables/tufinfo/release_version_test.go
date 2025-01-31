@@ -11,6 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/tuf"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/gen/osquery"
 
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,7 @@ func TestTufReleaseVersionTable(t *testing.T) {
 	mockFlags.On("RootDirectory").Return(testRootDir)
 
 	// Call table generate func and validate that our data matches what exists in the filesystem
-	testTable := TufReleaseVersionTable(mockFlags)
+	testTable := TufReleaseVersionTable(multislogger.NewNopLogger(), mockFlags)
 	resp := testTable.Call(context.Background(), osquery.ExtensionPluginRequest{
 		"action":  "generate",
 		"context": "{}",

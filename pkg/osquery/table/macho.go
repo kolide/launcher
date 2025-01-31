@@ -4,20 +4,22 @@ import (
 	"context"
 	"debug/macho"
 	"errors"
+	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func MachoInfo() *table.Plugin {
+func MachoInfo(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("name"),
 		table.TextColumn("cpu"),
 	}
 
-	return table.NewPlugin("kolide_macho_info", columns, generateMacho)
+	return tablewrapper.New(slogger, "kolide_macho_info", columns, generateMacho)
 }
 
 func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

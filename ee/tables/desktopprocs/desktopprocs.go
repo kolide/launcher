@@ -3,20 +3,22 @@ package desktopprocs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TablePlugin() *table.Plugin {
+func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("uid"),
 		table.TextColumn("pid"),
 		table.TextColumn("start_time"),
 		table.TextColumn("last_health_check"),
 	}
-	return table.NewPlugin("kolide_desktop_procs", columns, generate())
+	return tablewrapper.New(slogger, "kolide_desktop_procs", columns, generate())
 }
 
 func generate() table.GenerateFunc {

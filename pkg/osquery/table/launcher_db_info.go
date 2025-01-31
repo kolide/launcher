@@ -4,20 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
 
-func LauncherDbInfo(db *bbolt.DB) *table.Plugin {
+func LauncherDbInfo(slogger *slog.Logger, db *bbolt.DB) *table.Plugin {
 	columns := dataflattentable.Columns()
-	return table.NewPlugin("kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
+	return tablewrapper.New(slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
 }
 
 func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {

@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -125,7 +126,7 @@ func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.Os
 
 	t.slogger = slogger.With("table", t.tableName)
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return tablewrapper.New(slogger, t.tableName, columns, t.generate)
 
 }
 
