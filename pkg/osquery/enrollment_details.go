@@ -150,32 +150,29 @@ func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *serv
 }
 
 // CollectAndSetEnrollmentDetails collects enrollment details from osquery and sets them in the knapsack.
-func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k types.Knapsack, collectTimeout time.Duration, collectRetryInterval time.Duration) error {
+func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k types.Knapsack, collectTimeout time.Duration, collectRetryInterval time.Duration) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	// Get the runtime details
 	details := getRuntimeEnrollDetails()
 
-	latestOsquerydPath := k.LatestOsquerydPath(ctx)
-
-	if latestOsquerydPath == "" {
-		span.AddEvent("no osqueryd path, skipping enrollment osquery details")
-		return errors.New("no osqueryd path, skipping enrollment osquery details, no osqueryd path, this is probably CI")
-	}
-
 	// Set the osquery version and save everything to knapsack before attempting to get osquery enrollment details
 	k.SetEnrollmentDetails(details)
 
-	if err := backoff.WaitFor(func() error {
-		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
-		if err != nil {
-			span.AddEvent("failed to get enrollment details")
-		}
-		return err
-	}, collectTimeout, collectRetryInterval); err != nil {
-		span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
-	}
+	latestOsquerydPath := k.LatestOsquerydPath(ctx)
 
-	return k.SetEnrollmentDetails(details) // Overwrite the runtime details with runtime + osquery details
+	if latestOsquerydPath != "" {
+		if err := backoff.WaitFor(func() error {
+			err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
+			if err != nil {
+				span.AddEvent("failed to get enrollment details")
+			}
+			return err
+		}, collectTimeout, collectRetryInterval); err != nil {
+			span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
+		}
+
+		k.SetEnrollmentDetails(details)
+	}
 }

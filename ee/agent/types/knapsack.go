@@ -23,5 +23,5 @@ type Knapsack interface {
 	// GetEnrollmentDetails returns the enrollment details for the launcher installation
 	GetEnrollmentDetails() (EnrollmentDetails, error)
 	// SetEnrollmentDetails sets the enrollment details for the launcher installation
-	SetEnrollmentDetails(details EnrollmentDetails) error
+	SetEnrollmentDetails(details EnrollmentDetails)
 }

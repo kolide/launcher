@@ -426,12 +426,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	var enrollDetails types.EnrollmentDetails
-	// Poll for complete enrollment details
-	pollTimeout := time.NewTimer(60 * time.Second)
-	defer pollTimeout.Stop()
-
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
 
 	// Replace the manual polling loop with backoff.WaitFor
 	err = backoff.WaitFor(func() error {
@@ -441,7 +435,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			return err
 		}
 		if details.OSVersion == "" || details.Hostname == "" {
-			return fmt.Errorf("incomplete enrollment details")
+			return errors.New("incomplete enrollment details")
 		}
 		enrollDetails = details
 		span.AddEvent("got_complete_enrollment_details")

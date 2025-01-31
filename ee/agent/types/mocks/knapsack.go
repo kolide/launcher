@@ -1486,21 +1486,8 @@ func (_m *Knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 }
 
 // SetEnrollmentDetails provides a mock function with given fields: details
-func (_m *Knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
-	ret := _m.Called(details)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetEnrollmentDetails")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(types.EnrollmentDetails) error); ok {
-		r0 = rf(details)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *Knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
+	_m.Called(details)
 }
 
 // SetExportTraces provides a mock function with given fields: enabled

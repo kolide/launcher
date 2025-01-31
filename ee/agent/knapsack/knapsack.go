@@ -243,11 +243,7 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	return types.Enrolled, nil
 }
 
-//Todo change where the enrollment details call is made
-// consider goroutine to unblock the startup of launcher
-// we can use the latest osquery version stored in the knapsack to add to the enrollment details when doing autoupdate
-
-func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
+func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
 	if enrollmentDetails == nil {
 		newDetails := details
 		enrollmentDetails = &newDetails
@@ -255,7 +251,7 @@ func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
 			"initializing enrollment details",
 			"details", fmt.Sprintf("%+v", enrollmentDetails),
 		)
-		return nil
+
 	}
 
 	current := *enrollmentDetails
@@ -266,8 +262,6 @@ func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) error {
 		"new_details", fmt.Sprintf("%+v", current),
 	)
 	enrollmentDetails = &current
-
-	return nil
 }
 
 func (k *knapsack) GetEnrollmentDetails() (types.EnrollmentDetails, error) {
@@ -276,8 +270,8 @@ func (k *knapsack) GetEnrollmentDetails() (types.EnrollmentDetails, error) {
 	}
 
 	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
-	osquery_version := k.CurrentRunningOsqueryVersion()
-	enrollmentDetails.OsqueryVersion = osquery_version
+	osqueryVersion := k.CurrentRunningOsqueryVersion()
+	enrollmentDetails.OsqueryVersion = osqueryVersion
 
 	return *enrollmentDetails, nil
 }

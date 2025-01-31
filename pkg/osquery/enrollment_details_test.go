@@ -41,15 +41,16 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 
 func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 	t.Parallel()
-	mockKnapsack := typesmocks.NewKnapsack(t)
+	k := typesmocks.NewKnapsack(t)
 	ctx := context.Background()
 	slogger := multislogger.NewNopLogger()
 
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return("")
+	k.On("LatestOsquerydPath", mock.Anything).Return("")
+	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Once()
 
-	err := CollectAndSetEnrollmentDetails(ctx, slogger, mockKnapsack, 1*time.Second, 100*time.Millisecond)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no osqueryd path")
+	CollectAndSetEnrollmentDetails(ctx, slogger, k, 1*time.Second, 100*time.Millisecond)
+
+	k.AssertNumberOfCalls(t, "SetEnrollmentDetails", 1)
 }
 
 func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
@@ -59,7 +60,7 @@ func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 
 	expectedOsquerydPath := "/usr/local/bin/osqueryd"
 	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
-	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Twice()
+	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Twice()
 
 	ctx := context.Background()
 	logger := multislogger.NewNopLogger()
@@ -67,9 +68,8 @@ func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 	collectTimeout := 5 * time.Second
 	collectRetryInterval := 500 * time.Millisecond
 
-	err := CollectAndSetEnrollmentDetails(ctx, logger, k, collectTimeout, collectRetryInterval)
+	CollectAndSetEnrollmentDetails(ctx, logger, k, collectTimeout, collectRetryInterval)
 
-	require.NoError(t, err)
 	k.AssertExpectations(t)
 
 	k.AssertCalled(t, "LatestOsquerydPath", mock.Anything)
