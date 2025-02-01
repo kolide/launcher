@@ -107,10 +107,10 @@ func TestSendBuffer(t *testing.T) {
 	}
 }
 
-// TestBufferFullPurgeWaitsForSendAndPurge resulted from a panic found in production where
+// TestSendAndPurgeHandlesLogBufferFullPurge resulted from a panic found in production where
 // if the buffer was full while sendAndPurge was running, the buffer get wiped and then
 // sendAndPurge would try to delete the portion of the buffer it just sent, causing a panic
-func TestBufferFullPurgeWaitsForSendAndPurge(t *testing.T) {
+func TestSendAndPurgeHandlesLogBufferFullPurge(t *testing.T) {
 	t.Parallel()
 
 	sb := New(

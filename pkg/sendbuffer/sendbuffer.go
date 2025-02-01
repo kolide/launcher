@@ -336,7 +336,6 @@ func (sb *SendBuffer) copyLogs(w io.Writer, maxSizeBytes int) (int, error) {
 // deleteLogs deletes the logs up to the provided index
 // it's up to the caller to lock the write mutex
 func (sb *SendBuffer) deleteLogs(toIndex int) {
-
 	sizeDeleted := 0
 	for i := 0; i < toIndex; i++ {
 		sizeDeleted += len(sb.logs[i])
