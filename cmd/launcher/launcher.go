@@ -329,7 +329,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	// For now, remediation is not performed -- we only log the hardware change. So we can
 	// perform this operation in the background to avoid slowing down launcher startup.
-	go agent.DetectAndRemediateHardwareChange(ctx, k)
+	gowrapper.Go(ctx, slogger, func() {
+		agent.DetectAndRemediateHardwareChange(ctx, k)
+	})
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
