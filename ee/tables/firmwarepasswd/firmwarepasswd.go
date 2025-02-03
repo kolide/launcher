@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -28,7 +29,7 @@ type Table struct {
 	parser  *OutputParser
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("option_roms_allowed"),
 		table.IntegerColumn("password_enabled"),
@@ -37,7 +38,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
-	return tablewrapper.New(slogger, "kolide_firmwarepasswd", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_firmwarepasswd", columns, t.generate)
 
 }
 

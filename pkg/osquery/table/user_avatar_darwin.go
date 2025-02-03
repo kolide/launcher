@@ -48,6 +48,7 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
@@ -57,14 +58,14 @@ import (
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
 
-func UserAvatar(slogger *slog.Logger) *table.Plugin {
+func UserAvatar(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("thumbnail"),
 		table.TextColumn("hash"),
 	}
 	t := &userAvatarTable{slogger: slogger.With("table", "kolide_user_avatars")}
-	return tablewrapper.New(slogger, "kolide_user_avatars", columns, t.generateAvatars)
+	return tablewrapper.New(flags, slogger, "kolide_user_avatars", columns, t.generateAvatars)
 }
 
 type userAvatarTable struct {

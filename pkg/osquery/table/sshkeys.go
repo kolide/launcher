@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/keyidentifier"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
@@ -28,7 +29,7 @@ type SshKeysTable struct {
 }
 
 // New returns a new table extension
-func SshKeys(slogger *slog.Logger) *table.Plugin {
+func SshKeys(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("user"),
 		table.TextColumn("path"),
@@ -54,7 +55,7 @@ func SshKeys(slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return tablewrapper.New(slogger, "kolide_ssh_keys", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_ssh_keys", columns, t.generate)
 }
 
 func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

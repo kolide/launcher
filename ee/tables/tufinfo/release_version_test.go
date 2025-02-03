@@ -6,14 +6,17 @@ import (
 	"math/rand"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/tuf"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/gen/osquery"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,6 +34,8 @@ func TestTufReleaseVersionTable(t *testing.T) {
 
 	mockFlags := mocks.NewFlags(t)
 	mockFlags.On("RootDirectory").Return(testRootDir)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
 
 	// Call table generate func and validate that our data matches what exists in the filesystem
 	testTable := TufReleaseVersionTable(multislogger.NewNopLogger(), mockFlags)

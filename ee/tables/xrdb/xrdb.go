@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -34,7 +35,7 @@ type XRDBSettings struct {
 	getBytes execer
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
@@ -47,7 +48,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		getBytes: execXRDB,
 	}
 
-	return tablewrapper.New(slogger, "kolide_xrdb", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate)
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

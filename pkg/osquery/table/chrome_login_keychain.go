@@ -10,13 +10,14 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 // DEPRECATED use kolide_chrome_login_data_emails
-func ChromeLoginKeychainInfo(slogger *slog.Logger) *table.Plugin {
+func ChromeLoginKeychainInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginKeychain{
 		slogger: slogger.With("table", "kolide_chrome_login_keychain"),
 	}
@@ -25,7 +26,7 @@ func ChromeLoginKeychainInfo(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("action_url"),
 		table.TextColumn("username_value"),
 	}
-	return tablewrapper.New(slogger, "kolide_chrome_login_keychain", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_keychain", columns, c.generate)
 }
 
 type ChromeLoginKeychain struct {

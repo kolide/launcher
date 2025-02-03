@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/gen/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +26,11 @@ func TestCall(t *testing.T) {
 		expectedRow,
 	}
 
-	w := New(multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return expectedRows, nil
 	}, WithGenerateTimeout(overrideTimeout))
 
@@ -35,6 +42,8 @@ func TestCall(t *testing.T) {
 	require.Equal(t, int32(0), resp.Status.Code) // success
 	require.Equal(t, 1, len(resp.Response))
 	require.Equal(t, expectedRow, resp.Response[0])
+
+	mockFlags.AssertExpectations(t)
 }
 
 func TestCall_handlesTimeout(t *testing.T) {
@@ -43,7 +52,11 @@ func TestCall_handlesTimeout(t *testing.T) {
 	expectedName := "test_table"
 	overrideTimeout := 3 * time.Second
 
-	w := New(multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		// The generate function must take longer than the timeout
 		time.Sleep(3 * overrideTimeout)
 		return []map[string]string{
@@ -71,6 +84,8 @@ func TestCall_handlesTimeout(t *testing.T) {
 		t.Error("generate did not return within timeout")
 		t.FailNow()
 	}
+
+	mockFlags.AssertExpectations(t)
 }
 
 func TestCall_allowsConcurrentRequests(t *testing.T) {
@@ -85,7 +100,11 @@ func TestCall_allowsConcurrentRequests(t *testing.T) {
 		expectedRow,
 	}
 
-	w := New(multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		time.Sleep(100 * time.Millisecond) // very short wait -- generate will not time out
 		return expectedRows, nil
 	}, WithGenerateTimeout(overrideTimeout))
@@ -113,6 +132,8 @@ func TestCall_allowsConcurrentRequests(t *testing.T) {
 			t.FailNow()
 		}
 	}
+
+	mockFlags.AssertExpectations(t)
 }
 
 func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
@@ -127,7 +148,11 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 		expectedRow,
 	}
 
-	w := New(multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+
+	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		time.Sleep(overrideTimeout + 1*time.Second) // generate should always time out
 		return expectedRows, nil
 	}, WithGenerateTimeout(overrideTimeout))
@@ -183,4 +208,6 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 	resp := w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
 	require.Equal(t, int32(1), resp.Status.Code)                // failure
 	require.Contains(t, resp.Status.Message, "timed out after") // matches `querying %s timed out after %s (queried columns: %v)`
+
+	mockFlags.AssertExpectations(t)
 }

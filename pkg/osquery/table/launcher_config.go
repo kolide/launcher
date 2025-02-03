@@ -11,12 +11,12 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherConfigTable(slogger *slog.Logger, store types.Getter, registrationTracker types.RegistrationTracker) *table.Plugin {
+func LauncherConfigTable(flags types.Flags, slogger *slog.Logger, store types.Getter, registrationTracker types.RegistrationTracker) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("config"),
 		table.TextColumn("registration_id"),
 	}
-	return tablewrapper.New(slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, registrationTracker))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_config", columns, generateLauncherConfig(store, registrationTracker))
 }
 
 func generateLauncherConfig(store types.Getter, registrationTracker types.RegistrationTracker) table.GenerateFunc {

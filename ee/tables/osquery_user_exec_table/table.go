@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
@@ -40,7 +41,7 @@ type Table struct {
 }
 
 func TablePlugin(
-	slogger *slog.Logger, tablename string, osqueryd string,
+	flags types.Flags, slogger *slog.Logger, tablename string, osqueryd string,
 	osqueryQuery string, columns []table.ColumnDefinition,
 ) *table.Plugin {
 	columns = append(columns, table.TextColumn("user"))
@@ -52,7 +53,7 @@ func TablePlugin(
 		tablename: tablename,
 	}
 
-	return tablewrapper.New(slogger, t.tablename, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tablename, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

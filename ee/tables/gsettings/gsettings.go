@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -34,7 +35,7 @@ type GsettingsValues struct {
 
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
-func Settings(slogger *slog.Logger) *table.Plugin {
+func Settings(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
@@ -47,7 +48,7 @@ func Settings(slogger *slog.Logger) *table.Plugin {
 		getBytes: execGsettings,
 	}
 
-	return tablewrapper.New(slogger, "kolide_gsettings", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate)
 }
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

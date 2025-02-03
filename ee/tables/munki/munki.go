@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/groob/plist"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -29,7 +30,7 @@ func New() *MunkiInfo {
 	}
 }
 
-func (m *MunkiInfo) MunkiReport(slogger *slog.Logger) *table.Plugin {
+func (m *MunkiInfo) MunkiReport(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("version"),
 		table.TextColumn("start_time"),
@@ -40,17 +41,17 @@ func (m *MunkiInfo) MunkiReport(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("console_user"),
 		table.TextColumn("manifest_name"),
 	}
-	return tablewrapper.New(slogger, "kolide_munki_report", columns, m.generateMunkiReport)
+	return tablewrapper.New(flags, slogger, "kolide_munki_report", columns, m.generateMunkiReport)
 }
 
-func (m *MunkiInfo) ManagedInstalls(slogger *slog.Logger) *table.Plugin {
+func (m *MunkiInfo) ManagedInstalls(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("installed_version"),
 		table.TextColumn("installed"),
 		table.TextColumn("name"),
 		table.TextColumn("end_time"),
 	}
-	return tablewrapper.New(slogger, "kolide_munki_installs", columns, m.generateMunkiInstalls)
+	return tablewrapper.New(flags, slogger, "kolide_munki_installs", columns, m.generateMunkiInstalls)
 }
 
 func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
