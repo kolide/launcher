@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -23,7 +24,7 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
+func ChromeLoginDataEmails(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
 		slogger: slogger.With("table", "kolide_chrome_login_data_emails"),
 	}
@@ -32,7 +33,7 @@ func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("email"),
 		table.BigIntColumn("count"),
 	}
-	return tablewrapper.New(slogger, "kolide_chrome_login_data_emails", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_data_emails", columns, c.generate)
 }
 
 type ChromeLoginDataEmailsTable struct {

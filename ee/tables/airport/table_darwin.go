@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -32,7 +33,7 @@ type Table struct {
 
 const tableName = "kolide_airport_util"
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("option"),
 	)
@@ -42,7 +43,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("name", tableName),
 	}
 
-	return tablewrapper.New(slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
 }
 
 type airportExecutor struct {

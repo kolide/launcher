@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -32,7 +33,7 @@ Example Query:
 	AS f JOIN kolide_spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
 */
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
@@ -42,7 +43,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_spotlight", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate)
 }
 
 func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

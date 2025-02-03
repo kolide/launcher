@@ -22,7 +22,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherInfoTable(slogger *slog.Logger, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
+func LauncherInfoTable(flags types.Flags, slogger *slog.Logger, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -51,7 +51,7 @@ func LauncherInfoTable(slogger *slog.Logger, configStore types.GetterSetter, Lau
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return tablewrapper.New(slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
 }
 
 func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {

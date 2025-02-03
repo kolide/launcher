@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -13,7 +14,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
+func TouchIDSystemConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &touchIDSystemConfigTable{
 		slogger: slogger.With("table", "kolide_touchid_system_config"),
 	}
@@ -24,7 +25,7 @@ func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_touchid_system_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate)
 }
 
 type touchIDSystemConfigTable struct {

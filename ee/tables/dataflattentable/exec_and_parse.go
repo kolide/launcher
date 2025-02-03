@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -53,7 +54,7 @@ func WithIncludeStderr() execTableV2Opt {
 	}
 }
 
-func NewExecAndParseTable(slogger *slog.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
+func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
 		slogger:        slogger.With("table", tableName),
 		tableName:      tableName,
@@ -67,7 +68,7 @@ func NewExecAndParseTable(slogger *slog.Logger, tableName string, p parser, cmd 
 		opt(t)
 	}
 
-	return tablewrapper.New(slogger, t.tableName, Columns(), t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, Columns(), t.generate)
 }
 
 func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

@@ -21,7 +21,7 @@ func LauncherAutoupdateConfigTable(slogger *slog.Logger, flags types.Flags) *tab
 		table.TextColumn("update_channel"),
 	}
 
-	return tablewrapper.New(slogger, launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
+	return tablewrapper.New(flags, slogger, launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
 }
 
 func boolToString(in bool) string {

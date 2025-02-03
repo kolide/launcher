@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -25,7 +26,7 @@ type Table struct {
 	name    string
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("name"),
 	)
@@ -35,7 +36,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		name:    "kolide_cryptsetup_status",
 	}
 
-	return tablewrapper.New(slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

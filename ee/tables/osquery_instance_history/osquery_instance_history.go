@@ -4,13 +4,14 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("registration_id"),
 		table.TextColumn("instance_run_id"),
@@ -22,7 +23,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("errors"),
 	}
-	return tablewrapper.New(slogger, "kolide_launcher_osquery_instance_history", columns, generate())
+	return tablewrapper.New(flags, slogger, "kolide_launcher_osquery_instance_history", columns, generate())
 }
 
 func generate() table.GenerateFunc {

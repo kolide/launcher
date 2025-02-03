@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -37,24 +38,24 @@ func columns() []table.ColumnDefinition {
 	}
 }
 
-func ZfsPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
+func ZfsPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_zfs_properties"),
 		cmd:       allowedcmd.Zfs,
 		tableName: "kolide_zfs_properties",
 	}
 
-	return tablewrapper.New(slogger, "kolide_zfs_properties", columns(), t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_zfs_properties", columns(), t.generate)
 }
 
-func ZpoolPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
+func ZpoolPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger:   slogger.With("table", "kolide_zpool_properties"),
 		cmd:       allowedcmd.Zpool,
 		tableName: "kolide_zpool_properties",
 	}
 
-	return tablewrapper.New(slogger, "kolide_zpool_properties", columns(), t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_zpool_properties", columns(), t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

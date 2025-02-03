@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -26,7 +27,7 @@ var onepasswordDataFiles = map[string][]string{
 	},
 }
 
-func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
+func OnePasswordAccounts(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
@@ -41,7 +42,7 @@ func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate)
 }
 
 type onePasswordAccountsTable struct {

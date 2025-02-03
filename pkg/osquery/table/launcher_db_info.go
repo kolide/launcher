@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -17,9 +18,9 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func LauncherDbInfo(slogger *slog.Logger, db *bbolt.DB) *table.Plugin {
+func LauncherDbInfo(flags types.Flags, slogger *slog.Logger, db *bbolt.DB) *table.Plugin {
 	columns := dataflattentable.Columns()
-	return tablewrapper.New(slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
+	return tablewrapper.New(flags, slogger, "kolide_launcher_db_info", columns, generateLauncherDbInfo(db))
 }
 
 func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {

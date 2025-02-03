@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -25,14 +26,14 @@ type gcTable struct {
 	stats   debug.GCStats
 }
 
-func LauncherGcInfo(slogger *slog.Logger) *table.Plugin {
+func LauncherGcInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &gcTable{
 		slogger: slogger.With("table", gcTableName),
 	}
 
-	return tablewrapper.New(slogger, gcTableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, gcTableName, columns, t.generate)
 }
 
 func (t *gcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

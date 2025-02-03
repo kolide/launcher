@@ -703,3 +703,14 @@ func (fc *FlagController) Identifier() string {
 
 	return identifier
 }
+
+func (fc *FlagController) SetTableGenerateTimeout(interval time.Duration) error {
+	return fc.setControlServerValue(keys.TableGenerateTimeout, durationToBytes(interval))
+}
+func (fc *FlagController) TableGenerateTimeout() time.Duration {
+	return NewDurationFlagValue(fc.slogger, keys.TableGenerateTimeout,
+		WithDefault(4*time.Minute),
+		WithMin(30*time.Second),
+		WithMax(10*time.Minute),
+	).get(fc.getControlServerValue(keys.TableGenerateTimeout))
+}
