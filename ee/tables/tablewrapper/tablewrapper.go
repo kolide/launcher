@@ -49,6 +49,13 @@ type generateResult struct {
 // New returns a table plugin that will attempt to execute a query up until the given timeout,
 // at which point it will instead return no rows and a timeout error.
 func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
+	wt := newWrappedTable(flags, slogger, name, gen, opts...)
+	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
+}
+
+// newWrappedTable returns a new `wrappedTable`. We split the constructor out for ease of testing
+// specific wrappedTable functionality around flag changes.
+func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen table.GenerateFunc, opts ...tablePluginOption) *wrappedTable {
 	wt := &wrappedTable{
 		flagsController: flags,
 		slogger:         slogger.With("table_name", name),
@@ -65,7 +72,7 @@ func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.C
 
 	flags.RegisterChangeObserver(wt, keys.GenerateTimeout)
 
-	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
+	return wt
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags

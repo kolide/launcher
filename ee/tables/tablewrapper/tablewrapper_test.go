@@ -211,3 +211,42 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 
 	mockFlags.AssertExpectations(t)
 }
+
+func TestFlagsChanged(t *testing.T) {
+	t.Parallel()
+
+	expectedName := "test_table"
+	overrideTimeout := 3 * time.Second
+	expectedRow := map[string]string{
+		"somekey": "somevalue",
+	}
+	expectedRows := []map[string]string{
+		expectedRow,
+	}
+
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("GenerateTimeout").Return(4 * time.Minute).Once()
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+
+	w := newWrappedTable(mockFlags, multislogger.NewNopLogger(), expectedName, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		return expectedRows, nil
+	}, WithGenerateTimeout(overrideTimeout))
+
+	// The table name must be set correctly
+	require.Equal(t, expectedName, w.name)
+
+	// The timeout must be set to the override to start
+	w.genTimeoutLock.Lock()
+	require.Equal(t, overrideTimeout, w.genTimeout)
+	w.genTimeoutLock.Unlock()
+
+	// Simulate GenerateTimeout changing via control server
+	controlServerOverrideTimeout := 30 * time.Second
+	mockFlags.On("GenerateTimeout").Return(controlServerOverrideTimeout).Once()
+	w.FlagsChanged(context.TODO(), keys.GenerateTimeout)
+
+	// The timeout should have been updated
+	w.genTimeoutLock.Lock()
+	require.Equal(t, controlServerOverrideTimeout, w.genTimeout)
+	w.genTimeoutLock.Unlock()
+}
