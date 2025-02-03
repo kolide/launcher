@@ -330,6 +330,5 @@ func (ls *LogShipper) updateLogShippingLevel() {
 		)
 	}
 
-
 	ls.sendBuffer.SetSendInterval(sendInterval)
 }
