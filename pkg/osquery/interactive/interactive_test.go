@@ -127,8 +127,8 @@ func TestProc(t *testing.T) {
 			store, err := storageci.NewStore(t, slogger, storage.KatcConfigStore.String())
 			require.NoError(t, err)
 			mockSack.On("KatcConfigStore").Return(store)
-			mockSack.On("GenerateTimeout").Return(4 * time.Minute).Maybe()
-			mockSack.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return().Maybe()
+			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process

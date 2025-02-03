@@ -378,12 +378,12 @@ func (_m *Flags) ForceControlSubsystems() bool {
 	return r0
 }
 
-// GenerateTimeout provides a mock function with given fields:
-func (_m *Flags) GenerateTimeout() time.Duration {
+// TableGenerateTimeout provides a mock function with given fields:
+func (_m *Flags) TableGenerateTimeout() time.Duration {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTimeout")
+		panic("no return value specified for TableGenerateTimeout")
 	}
 
 	var r0 time.Duration
@@ -1104,12 +1104,12 @@ func (_m *Flags) SetForceControlSubsystems(force bool) error {
 	return r0
 }
 
-// SetGenerateTimeout provides a mock function with given fields: interval
-func (_m *Flags) SetGenerateTimeout(interval time.Duration) error {
+// SetTableGenerateTimeout provides a mock function with given fields: interval
+func (_m *Flags) SetTableGenerateTimeout(interval time.Duration) error {
 	ret := _m.Called(interval)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetGenerateTimeout")
+		panic("no return value specified for SetTableGenerateTimeout")
 	}
 
 	var r0 error

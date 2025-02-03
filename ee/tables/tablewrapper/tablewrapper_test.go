@@ -27,12 +27,12 @@ func TestCall(t *testing.T) {
 	}
 
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return expectedRows, nil
-	}, WithGenerateTimeout(overrideTimeout))
+	}, WithTableGenerateTimeout(overrideTimeout))
 
 	// The table name must be set correctly
 	require.Equal(t, expectedName, w.Name())
@@ -53,8 +53,8 @@ func TestCall_handlesTimeout(t *testing.T) {
 	overrideTimeout := 3 * time.Second
 
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		// The generate function must take longer than the timeout
@@ -64,7 +64,7 @@ func TestCall_handlesTimeout(t *testing.T) {
 				"somekey": "1",
 			},
 		}, nil
-	}, WithGenerateTimeout(overrideTimeout))
+	}, WithTableGenerateTimeout(overrideTimeout))
 
 	// The table name must be set correctly
 	require.Equal(t, expectedName, w.Name())
@@ -101,13 +101,13 @@ func TestCall_allowsConcurrentRequests(t *testing.T) {
 	}
 
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		time.Sleep(100 * time.Millisecond) // very short wait -- generate will not time out
 		return expectedRows, nil
-	}, WithGenerateTimeout(overrideTimeout))
+	}, WithTableGenerateTimeout(overrideTimeout))
 
 	// The table name must be set correctly
 	require.Equal(t, expectedName, w.Name())
@@ -149,13 +149,13 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 	}
 
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	w := New(mockFlags, multislogger.NewNopLogger(), expectedName, nil, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		time.Sleep(overrideTimeout + 1*time.Second) // generate should always time out
 		return expectedRows, nil
-	}, WithGenerateTimeout(overrideTimeout))
+	}, WithTableGenerateTimeout(overrideTimeout))
 
 	// The table name must be set correctly
 	require.Equal(t, expectedName, w.Name())
@@ -225,12 +225,12 @@ func TestFlagsChanged(t *testing.T) {
 	}
 
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute).Once()
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute).Once()
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	w := newWrappedTable(mockFlags, multislogger.NewNopLogger(), expectedName, func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		return expectedRows, nil
-	}, WithGenerateTimeout(overrideTimeout))
+	}, WithTableGenerateTimeout(overrideTimeout))
 
 	// The table name must be set correctly
 	require.Equal(t, expectedName, w.name)
@@ -240,10 +240,10 @@ func TestFlagsChanged(t *testing.T) {
 	require.Equal(t, overrideTimeout, w.genTimeout)
 	w.genTimeoutLock.Unlock()
 
-	// Simulate GenerateTimeout changing via control server
+	// Simulate TableGenerateTimeout changing via control server
 	controlServerOverrideTimeout := 30 * time.Second
-	mockFlags.On("GenerateTimeout").Return(controlServerOverrideTimeout).Once()
-	w.FlagsChanged(context.TODO(), keys.GenerateTimeout)
+	mockFlags.On("TableGenerateTimeout").Return(controlServerOverrideTimeout).Once()
+	w.FlagsChanged(context.TODO(), keys.TableGenerateTimeout)
 
 	// The timeout should have been updated
 	w.genTimeoutLock.Lock()

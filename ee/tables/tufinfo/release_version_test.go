@@ -34,8 +34,8 @@ func TestTufReleaseVersionTable(t *testing.T) {
 
 	mockFlags := mocks.NewFlags(t)
 	mockFlags.On("RootDirectory").Return(testRootDir)
-	mockFlags.On("GenerateTimeout").Return(4 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return()
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return()
 
 	// Call table generate func and validate that our data matches what exists in the filesystem
 	testTable := TufReleaseVersionTable(multislogger.NewNopLogger(), mockFlags)

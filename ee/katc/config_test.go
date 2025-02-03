@@ -154,8 +154,8 @@ func TestConstructKATCTables(t *testing.T) {
 			t.Parallel()
 
 			mockFlags := typesmocks.NewFlags(t)
-			mockFlags.On("GenerateTimeout").Return(4 * time.Minute).Maybe()
-			mockFlags.On("RegisterChangeObserver", mock.Anything, keys.GenerateTimeout).Return().Maybe()
+			mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+			mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 
 			plugins := ConstructKATCTables(tt.katcConfig, mockFlags, multislogger.NewNopLogger())
 			require.Equal(t, tt.expectedPluginCount, len(plugins), "unexpected number of plugins")

@@ -526,12 +526,12 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
-// GenerateTimeout provides a mock function with given fields:
-func (_m *Knapsack) GenerateTimeout() time.Duration {
+// TableGenerateTimeout provides a mock function with given fields:
+func (_m *Knapsack) TableGenerateTimeout() time.Duration {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateTimeout")
+		panic("no return value specified for TableGenerateTimeout")
 	}
 
 	var r0 time.Duration
@@ -1516,12 +1516,12 @@ func (_m *Knapsack) SetForceControlSubsystems(force bool) error {
 	return r0
 }
 
-// SetGenerateTimeout provides a mock function with given fields: interval
-func (_m *Knapsack) SetGenerateTimeout(interval time.Duration) error {
+// SetTableGenerateTimeout provides a mock function with given fields: interval
+func (_m *Knapsack) SetTableGenerateTimeout(interval time.Duration) error {
 	ret := _m.Called(interval)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetGenerateTimeout")
+		panic("no return value specified for SetTableGenerateTimeout")
 	}
 
 	var r0 error

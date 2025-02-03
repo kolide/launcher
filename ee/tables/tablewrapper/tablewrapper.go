@@ -33,9 +33,9 @@ type wrappedTable struct {
 
 type tablePluginOption func(*wrappedTable)
 
-// WithGenerateTimeout overrides the default table timeout of four minutes.
+// WithTableGenerateTimeout overrides the default table timeout of four minutes.
 // The control server may override this value.
-func WithGenerateTimeout(genTimeout time.Duration) tablePluginOption {
+func WithTableGenerateTimeout(genTimeout time.Duration) tablePluginOption {
 	return func(w *wrappedTable) {
 		w.genTimeout = genTimeout
 	}
@@ -61,7 +61,7 @@ func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen t
 		slogger:         slogger.With("table_name", name),
 		name:            name,
 		gen:             gen,
-		genTimeout:      flags.GenerateTimeout(),
+		genTimeout:      flags.TableGenerateTimeout(),
 		genTimeoutLock:  &sync.Mutex{},
 		workers:         semaphore.NewWeighted(numWorkers),
 	}
@@ -70,28 +70,28 @@ func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen t
 		opt(wt)
 	}
 
-	flags.RegisterChangeObserver(wt, keys.GenerateTimeout)
+	flags.RegisterChangeObserver(wt, keys.TableGenerateTimeout)
 
 	return wt
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
-// that we care about, which is just `GenerateTimeout`
+// that we care about, which is just `TableGenerateTimeout`
 func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	if !slices.Contains(flagKeys, keys.GenerateTimeout) {
+	if !slices.Contains(flagKeys, keys.TableGenerateTimeout) {
 		return
 	}
 
 	wt.genTimeoutLock.Lock()
 	defer wt.genTimeoutLock.Unlock()
 
-	newGenTimeout := wt.flagsController.GenerateTimeout()
+	newGenTimeout := wt.flagsController.TableGenerateTimeout()
 
 	wt.slogger.Log(ctx, slog.LevelInfo,
-		"received changed value for generate_timeout",
+		"received changed value for table_generate_timeout",
 		"old_timeout", wt.genTimeout.String(),
 		"new_timeout", newGenTimeout.String(),
 	)
@@ -102,7 +102,7 @@ func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagK
 // generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
 // than `wt.genTimeout`.
 func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "generate_timeout", wt.genTimeout.String())
+	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "table_generate_timeout", wt.genTimeout.String())
 	defer span.End()
 
 	// Get the current timeout value -- this value can change per the control server
