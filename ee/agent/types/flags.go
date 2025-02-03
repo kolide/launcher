@@ -230,4 +230,8 @@ type Flags interface {
 
 	// Identifier is the package build identifier used to namespace our paths and service names
 	Identifier() string
+
+	// GenerateTimeout is the maximum time a Kolide extension table is permitted to take
+	SetGenerateTimeout(interval time.Duration) error
+	GenerateTimeout() time.Duration
 }

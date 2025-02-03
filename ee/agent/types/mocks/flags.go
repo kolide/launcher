@@ -378,6 +378,24 @@ func (_m *Flags) ForceControlSubsystems() bool {
 	return r0
 }
 
+// GenerateTimeout provides a mock function with given fields:
+func (_m *Flags) GenerateTimeout() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateTimeout")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // IAmBreakingEELicense provides a mock function with given fields:
 func (_m *Flags) IAmBreakingEELicense() bool {
 	ret := _m.Called()
@@ -1079,6 +1097,24 @@ func (_m *Flags) SetForceControlSubsystems(force bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(force)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetGenerateTimeout provides a mock function with given fields: interval
+func (_m *Flags) SetGenerateTimeout(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetGenerateTimeout")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
 	} else {
 		r0 = ret.Error(0)
 	}
