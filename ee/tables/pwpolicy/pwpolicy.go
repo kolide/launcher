@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -33,7 +34,7 @@ type Table struct {
 	execCC    allowedcmd.AllowedCommand
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("username"),
@@ -45,7 +46,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		execCC:    allowedcmd.Pwpolicy,
 	}
 
-	return tablewrapper.New(slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

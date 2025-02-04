@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -28,7 +29,7 @@ import (
 var productsData []map[string]interface{}
 var cachedTime time.Time
 
-func AvailableProducts(slogger *slog.Logger) *table.Plugin {
+func AvailableProducts(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_macos_available_products"
@@ -37,7 +38,7 @@ func AvailableProducts(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(slogger, tableName, columns, t.generateAvailableProducts)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generateAvailableProducts)
 }
 
 func (t *Table) generateAvailableProducts(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

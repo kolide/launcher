@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"runtime"
 	"testing"
+	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -149,7 +153,11 @@ func TestConstructKATCTables(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			plugins := ConstructKATCTables(tt.katcConfig, multislogger.NewNopLogger())
+			mockFlags := typesmocks.NewFlags(t)
+			mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+			mockFlags.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+
+			plugins := ConstructKATCTables(tt.katcConfig, mockFlags, multislogger.NewNopLogger())
 			require.Equal(t, tt.expectedPluginCount, len(plugins), "unexpected number of plugins")
 		})
 	}

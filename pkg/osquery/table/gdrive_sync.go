@@ -10,12 +10,13 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncConfig(slogger *slog.Logger) *table.Plugin {
+func GDriveSyncConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	g := &gdrive{
 		slogger: slogger.With("table", "kolide_gdrive_sync_config"),
 	}
@@ -24,7 +25,7 @@ func GDriveSyncConfig(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("user_email"),
 		table.TextColumn("local_sync_root_path"),
 	}
-	return tablewrapper.New(slogger, "kolide_gdrive_sync_config", columns, g.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_config", columns, g.generate)
 }
 
 type gdrive struct {

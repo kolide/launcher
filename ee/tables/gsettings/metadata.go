@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -30,7 +31,7 @@ type GsettingsMetadata struct {
 
 // Metadata returns a table plugin for querying metadata about specific keys in
 // specific schemas
-func Metadata(slogger *slog.Logger) *table.Plugin {
+func Metadata(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
 		table.TextColumn("schema"),
@@ -44,7 +45,7 @@ func Metadata(slogger *slog.Logger) *table.Plugin {
 		cmdRunner: execGsettingsCommand,
 	}
 
-	return tablewrapper.New(slogger, "kolide_gsettings_metadata", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings_metadata", columns, t.generate)
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

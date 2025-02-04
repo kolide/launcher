@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -26,7 +27,7 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(flags types.Flags, slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
@@ -43,7 +44,7 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 
 	t.flattenBytesFunc = dataSourceType.FlattenBytesFunc(t.keyValueSeparator)
 
-	return tablewrapper.New(slogger, t.tableName, columns, t.generateExec)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateExec)
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

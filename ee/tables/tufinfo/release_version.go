@@ -30,7 +30,7 @@ func TufReleaseVersionTable(slogger *slog.Logger, flags types.Flags) *table.Plug
 		table.TextColumn("target"),
 	}
 
-	return tablewrapper.New(slogger, tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
+	return tablewrapper.New(flags, slogger, tufReleaseVersionTableName, columns, generateTufReleaseVersionTable(flags))
 }
 
 func generateTufReleaseVersionTable(flags types.Flags) table.GenerateFunc {

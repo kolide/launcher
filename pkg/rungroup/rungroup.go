@@ -88,7 +88,7 @@ func (g *Group) Run() error {
 			// add it now.
 			actorErrors <- actorError{
 				errorSourceName: a.name,
-				err:             fmt.Errorf("execute panicked: %+v", r),
+				err:             fmt.Errorf("executing rungroup actor %s panicked: %+v", a.name, r),
 			}
 		})
 	}

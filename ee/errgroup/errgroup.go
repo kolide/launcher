@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -182,9 +183,9 @@ func (l *LoggedErrgroup) Wait(ctx context.Context) error {
 	defer span.End()
 
 	errChan := make(chan error)
-	go func() {
+	gowrapper.Go(ctx, l.slogger, func() {
 		errChan <- l.errgroup.Wait()
-	}()
+	})
 
 	// Wait to receive an error from l.errgroup.Wait(), but only until our shutdown timeout.
 	select {

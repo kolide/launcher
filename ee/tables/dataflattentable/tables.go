@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -105,17 +106,17 @@ type Table struct {
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.
-func AllTablePlugins(slogger *slog.Logger) []osquery.OsqueryPlugin {
+func AllTablePlugins(flags types.Flags, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		TablePlugin(slogger, JsonType),
-		TablePlugin(slogger, XmlType),
-		TablePlugin(slogger, IniType),
-		TablePlugin(slogger, PlistType),
-		TablePlugin(slogger, JsonlType),
+		TablePlugin(flags, slogger, JsonType),
+		TablePlugin(flags, slogger, XmlType),
+		TablePlugin(flags, slogger, IniType),
+		TablePlugin(flags, slogger, PlistType),
+		TablePlugin(flags, slogger, JsonlType),
 	}
 }
 
-func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger, dataSourceType DataSourceType) osquery.OsqueryPlugin {
 	columns := Columns(table.TextColumn("path"), table.TextColumn("raw_data"))
 
 	t := &Table{
@@ -126,7 +127,7 @@ func TablePlugin(slogger *slog.Logger, dataSourceType DataSourceType) osquery.Os
 
 	t.slogger = slogger.With("table", t.tableName)
 
-	return tablewrapper.New(slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 
 }
 

@@ -270,6 +270,8 @@ func TestLaunch(t *testing.T) {
 	k.On("PinnedLauncherVersion").Return("").Maybe()
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)

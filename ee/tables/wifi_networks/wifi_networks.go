@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -43,7 +44,7 @@ type Table struct {
 	getBytes execer
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
@@ -51,7 +52,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		getBytes: execPwsh(slogger),
 	}
 
-	return tablewrapper.New(slogger, "kolide_wifi_networks", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

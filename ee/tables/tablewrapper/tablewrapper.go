@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
+	"sync"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -18,17 +22,20 @@ const (
 )
 
 type wrappedTable struct {
-	slogger    *slog.Logger
-	name       string
-	gen        table.GenerateFunc
-	genTimeout time.Duration
-	workers    *semaphore.Weighted
+	flagsController types.Flags
+	slogger         *slog.Logger
+	name            string
+	gen             table.GenerateFunc
+	genTimeout      time.Duration
+	genTimeoutLock  *sync.Mutex
+	workers         *semaphore.Weighted
 }
 
 type tablePluginOption func(*wrappedTable)
 
-// WithGenerateTimeout overrides the default table timeout of four minutes
-func WithGenerateTimeout(genTimeout time.Duration) tablePluginOption {
+// WithTableGenerateTimeout overrides the default table timeout of four minutes.
+// The control server may override this value.
+func WithTableGenerateTimeout(genTimeout time.Duration) tablePluginOption {
 	return func(w *wrappedTable) {
 		w.genTimeout = genTimeout
 	}
@@ -41,29 +48,69 @@ type generateResult struct {
 
 // New returns a table plugin that will attempt to execute a query up until the given timeout,
 // at which point it will instead return no rows and a timeout error.
-func New(slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
+func New(flags types.Flags, slogger *slog.Logger, name string, columns []table.ColumnDefinition, gen table.GenerateFunc, opts ...tablePluginOption) *table.Plugin {
+	wt := newWrappedTable(flags, slogger, name, gen, opts...)
+	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
+}
+
+// newWrappedTable returns a new `wrappedTable`. We split the constructor out for ease of testing
+// specific wrappedTable functionality around flag changes.
+func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen table.GenerateFunc, opts ...tablePluginOption) *wrappedTable {
 	wt := &wrappedTable{
-		slogger:    slogger.With("table_name", name),
-		name:       name,
-		gen:        gen,
-		genTimeout: DefaultTableTimeout,
-		workers:    semaphore.NewWeighted(numWorkers),
+		flagsController: flags,
+		slogger:         slogger.With("table_name", name),
+		name:            name,
+		gen:             gen,
+		genTimeout:      flags.TableGenerateTimeout(),
+		genTimeoutLock:  &sync.Mutex{},
+		workers:         semaphore.NewWeighted(numWorkers),
 	}
 
 	for _, opt := range opts {
 		opt(wt)
 	}
 
-	return table.NewPlugin(name, columns, wt.generate) //nolint:forbidigo // This is our one allowed usage of table.NewPlugin
+	flags.RegisterChangeObserver(wt, keys.TableGenerateTimeout)
+
+	return wt
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which is just `TableGenerateTimeout`
+func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	if !slices.Contains(flagKeys, keys.TableGenerateTimeout) {
+		return
+	}
+
+	wt.genTimeoutLock.Lock()
+	defer wt.genTimeoutLock.Unlock()
+
+	newGenTimeout := wt.flagsController.TableGenerateTimeout()
+
+	wt.slogger.Log(ctx, slog.LevelInfo,
+		"received changed value for table_generate_timeout",
+		"old_timeout", wt.genTimeout.String(),
+		"new_timeout", newGenTimeout.String(),
+	)
+
+	wt.genTimeout = newGenTimeout
 }
 
 // generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
 // than `wt.genTimeout`.
 func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "generate_timeout", wt.genTimeout.String())
+	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "table_generate_timeout", wt.genTimeout.String())
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(ctx, wt.genTimeout)
+	// Get the current timeout value -- this value can change per the control server
+	wt.genTimeoutLock.Lock()
+	genTimeout := wt.genTimeout
+	wt.genTimeoutLock.Unlock()
+
+	ctx, cancel := context.WithTimeout(ctx, genTimeout)
 	defer cancel()
 
 	// A worker must be available for us to try to run the generate function --
@@ -95,7 +142,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 			"query timed out",
 			"queried_columns", fmt.Sprintf("%+v", queriedColumns),
 		)
-		return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, wt.genTimeout.String(), queriedColumns)
+		return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, genTimeout.String(), queriedColumns)
 	}
 }
 
