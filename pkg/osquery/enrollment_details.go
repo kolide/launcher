@@ -162,17 +162,18 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 
 	latestOsquerydPath := k.LatestOsquerydPath(ctx)
 
-	if latestOsquerydPath != "" {
-		if err := backoff.WaitFor(func() error {
-			err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
-			if err != nil {
-				span.AddEvent("failed to get enrollment details")
-			}
-			return err
-		}, collectTimeout, collectRetryInterval); err != nil {
-			span.AddEvent(fmt.Sprintf("enrollment details collection failed: %v", err))
-		}
-
-		k.SetEnrollmentDetails(details)
+	if latestOsquerydPath == "" {
+		return
 	}
+	if err := backoff.WaitFor(func() error {
+		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
+		if err != nil {
+			span.AddEvent("failed to get enrollment details")
+		}
+		return err
+	}, collectTimeout, collectRetryInterval); err != nil {
+		traces.SetError(span, fmt.Errorf("enrollment details collection failed: %w", err))
+	}
+
+	k.SetEnrollmentDetails(details)
 }

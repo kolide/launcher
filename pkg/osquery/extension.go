@@ -427,7 +427,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	var enrollDetails types.EnrollmentDetails
 
-	// Replace the manual polling loop with backoff.WaitFor
 	err = backoff.WaitFor(func() error {
 		details, err := e.knapsack.GetEnrollmentDetails()
 		if err != nil {

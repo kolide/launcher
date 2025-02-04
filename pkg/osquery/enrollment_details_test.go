@@ -58,7 +58,7 @@ func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 
 	k := typesmocks.NewKnapsack(t)
 
-	expectedOsquerydPath := "/usr/local/bin/osqueryd"
+	expectedOsquerydPath := "/some/fake/path/to/osquerd"
 	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
 	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Twice()
 
