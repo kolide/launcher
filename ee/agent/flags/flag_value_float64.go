@@ -89,12 +89,12 @@ func (f *float64FlagValue) get(controlServerValue []byte) float64 {
 }
 
 // clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampFloat64Value(value float64, min, max float64) float64 {
+func clampFloat64Value(value float64, minimum, maximum float64) float64 {
 	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
+	case value < minimum:
+		return minimum
+	case value > maximum:
+		return maximum
 	default:
 		return value
 	}

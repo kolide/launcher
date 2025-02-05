@@ -89,12 +89,12 @@ func (i *intFlagValue) get(controlServerValue []byte) int {
 }
 
 // clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampIntValue(value int, min, max int) int {
+func clampIntValue(value int, minimum, maximum int) int {
 	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
+	case value < minimum:
+		return minimum
+	case value > maximum:
+		return maximum
 	default:
 		return value
 	}
