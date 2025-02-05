@@ -200,7 +200,7 @@ func TestUpdate(t *testing.T) {
 				require.NoError(t, err, "expected no error on update")
 			}
 
-			rows, err := s.conn.Query(`SELECT name, value FROM startup_settings;`)
+			rows, err := s.conn.Query(`SELECT name, value FROM startup_settings;`) //nolint:rowserrcheck // Can't defer rows.Close() AND check rows.Err() in a way that's meaningful in a test
 			require.NoError(t, err, "querying kv pairs")
 			defer rows.Close()
 
