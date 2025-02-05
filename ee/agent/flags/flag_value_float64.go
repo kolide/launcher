@@ -23,15 +23,15 @@ func WithFloat64ValueDefault(defaultVal float64) float64Option {
 	}
 }
 
-func WithFloat64ValueMin(min float64) float64Option {
+func WithFloat64ValueMin(minimum float64) float64Option {
 	return func(f *float64FlagValue) {
-		f.min = min
+		f.min = minimum
 	}
 }
 
-func WithFloat64ValueMax(max float64) float64Option {
+func WithFloat64ValueMax(maximum float64) float64Option {
 	return func(f *float64FlagValue) {
-		f.max = max
+		f.max = maximum
 	}
 }
 

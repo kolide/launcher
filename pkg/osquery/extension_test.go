@@ -971,9 +971,9 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("ResultLogsStore").Return(resultLogsStore)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
-	max := 10
+	maximum := 10
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
-		MaxBufferedLogs: max,
+		MaxBufferedLogs: maximum,
 	})
 	require.Nil(t, err)
 
@@ -991,12 +991,12 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 
 		e.writeAndPurgeLogs()
 
-		if i < max {
+		if i < maximum {
 			assert.Equal(t, expectedStatusLogs, gotStatusLogs)
 			assert.Equal(t, expectedResultLogs, gotResultLogs)
 		} else {
-			assert.Equal(t, expectedStatusLogs[i-max:], gotStatusLogs)
-			assert.Equal(t, expectedResultLogs[i-max:], gotResultLogs)
+			assert.Equal(t, expectedStatusLogs[i-maximum:], gotStatusLogs)
+			assert.Equal(t, expectedResultLogs[i-maximum:], gotResultLogs)
 		}
 	}
 }

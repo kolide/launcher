@@ -23,15 +23,15 @@ func WithIntValueDefault(defaultVal int) intOption {
 	}
 }
 
-func WithIntValueMin(min int) intOption {
+func WithIntValueMin(minimum int) intOption {
 	return func(i *intFlagValue) {
-		i.min = min
+		i.min = minimum
 	}
 }
 
-func WithIntValueMax(max int) intOption {
+func WithIntValueMax(maximum int) intOption {
 	return func(i *intFlagValue) {
-		i.max = max
+		i.max = maximum
 	}
 }
 
