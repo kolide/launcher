@@ -61,7 +61,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 	}
 
 	// Get update channel from startup settings
-	pinnedVersion, updateChannel, err := getUpdateSettingsFromStartupSettings(ctx, binary, cfg.rootDirectory)
+	pinnedVersion, updateChannel, err := getUpdateSettingsFromStartupSettings(ctx, slogger, binary, cfg.rootDirectory)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelWarn,
 			"could not get startup settings",
@@ -79,11 +79,11 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 // getUpdateSettingsFromStartupSettings queries the startup settings database to fetch the
 // pinned version and update channel. This accounts for e.g. the control server sending down
 // a particular value for the update channel, overriding the config file.
-func getUpdateSettingsFromStartupSettings(ctx context.Context, binary autoupdatableBinary, rootDirectory string) (string, string, error) {
+func getUpdateSettingsFromStartupSettings(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, rootDirectory string) (string, string, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	r, err := startupsettings.OpenReader(ctx, rootDirectory)
+	r, err := startupsettings.OpenReader(ctx, slogger, rootDirectory)
 	if err != nil {
 		return "", "", fmt.Errorf("opening startupsettings reader: %w", err)
 	}

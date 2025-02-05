@@ -29,7 +29,7 @@ func Test_getUpdateSettingsFromStartupSettings(t *testing.T) {
 	require.NoError(t, store.Set([]byte(keys.PinnedOsquerydVersion.String()), []byte("5.5.5")), "setting key")
 	require.NoError(t, store.Close(), "closing test db")
 
-	actualVersion, actualChannel, err := getUpdateSettingsFromStartupSettings(context.TODO(), "launcher", rootDir)
+	actualVersion, actualChannel, err := getUpdateSettingsFromStartupSettings(context.TODO(), multislogger.NewNopLogger(), "launcher", rootDir)
 	require.NoError(t, err, "did not expect error getting update settings from startup settings")
 	require.Equal(t, expectedPinnedVersion, actualVersion, "did not get expected version")
 	require.Equal(t, expectedChannel, actualChannel, "did not get expected channel")
