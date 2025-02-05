@@ -92,6 +92,12 @@ func querySqliteDb(ctx context.Context, slogger *slog.Logger, path string, query
 				"err", err,
 			)
 		}
+		if err := rows.Err(); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
 	}()
 
 	results := make([]map[string][]byte, 0)

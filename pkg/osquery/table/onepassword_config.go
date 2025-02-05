@@ -76,7 +76,20 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	if err != nil {
 		return nil, fmt.Errorf("query rows from onepassword account configuration db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 	for rows.Next() {

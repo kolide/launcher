@@ -67,7 +67,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 	// if we were not provided a config path flag, try to add default config
 	if !haveConfigPathOsqFlag {
 		// check to see if we can actually get a config plugin
-		configPlugin, err := generateConfigPlugin(knapsack.RootDirectory())
+		configPlugin, err := generateConfigPlugin(knapsack.Slogger(), knapsack.RootDirectory())
 		if err != nil {
 			knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
 				"error creating config plugin",
@@ -194,8 +194,8 @@ func waitForFile(path string, interval, timeout time.Duration) error {
 	}
 }
 
-func generateConfigPlugin(launcherDaemonRootDir string) (*config.Plugin, error) {
-	r, err := startupsettings.OpenReader(context.TODO(), launcherDaemonRootDir)
+func generateConfigPlugin(slogger *slog.Logger, launcherDaemonRootDir string) (*config.Plugin, error) {
+	r, err := startupsettings.OpenReader(context.TODO(), slogger, launcherDaemonRootDir)
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
