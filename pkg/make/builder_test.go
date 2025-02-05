@@ -140,8 +140,7 @@ func TestExecOut(t *testing.T) {
 
 }
 
-func TestGetVersion(t *testing.T) {
-	t.Parallel()
+func TestGetVersion(t *testing.T) { //nolint:paralleltest
 	var tests = []struct {
 		in  string
 		out string
@@ -190,9 +189,7 @@ func TestGetVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.in, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.in, func(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

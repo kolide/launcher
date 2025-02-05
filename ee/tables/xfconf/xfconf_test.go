@@ -17,9 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_getUserConfig(t *testing.T) {
-	t.Parallel()
-
+func Test_getUserConfig(t *testing.T) { //nolint:paralleltest
 	tmpDefaultDir, tmpUserDir := setUpConfigFiles(t)
 
 	xfconf := xfconfTable{
