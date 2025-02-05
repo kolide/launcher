@@ -51,7 +51,7 @@ func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) 
 }
 
 func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
-	_, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	var uninstallerIcons []map[string]string
@@ -64,12 +64,12 @@ func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
 
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
-			iconPath, name, version, err := getRegistryKeyDisplayData(key, path)
+			iconPath, name, version, err := getRegistryKeyDisplayData(ctx, key, path)
 			if err != nil {
 				continue
 			}
 
-			icon, err := parseIcoFile(iconPath)
+			icon, err := parseIcoFile(ctx, iconPath)
 			if err != nil {
 				continue
 			}
@@ -85,7 +85,10 @@ func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
 	return uninstallerIcons
 }
 
-func getRegistryKeyDisplayData(key registry.Key, path string) (string, string, string, error) {
+func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path string) (string, string, string, error) {
+	_, span := traces.StartSpan(ctx, "display_data_path", path)
+	defer span.End()
+
 	key, err := registry.OpenKey(key, path, registry.READ)
 	if err != nil {
 		return "", "", "", fmt.Errorf("opening key: %w", err)
@@ -111,7 +114,7 @@ func getRegistryKeyDisplayData(key registry.Key, path string) (string, string, s
 }
 
 func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
-	_, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	var installerIcons []map[string]string
@@ -123,12 +126,12 @@ func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
 
 	for key, paths := range productRegPaths {
 		for _, path := range paths {
-			iconPath, name, err := getRegistryKeyProductData(key, path)
+			iconPath, name, err := getRegistryKeyProductData(ctx, key, path)
 			if err != nil {
 				continue
 			}
 
-			icon, err := parseIcoFile(iconPath)
+			icon, err := parseIcoFile(ctx, iconPath)
 			if err != nil {
 				continue
 			}
@@ -144,7 +147,10 @@ func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
 	return installerIcons
 }
 
-func getRegistryKeyProductData(key registry.Key, path string) (string, string, error) {
+func getRegistryKeyProductData(ctx context.Context, key registry.Key, path string) (string, string, error) {
+	_, span := traces.StartSpan(ctx, "product_data_path", path)
+	defer span.End()
+
 	key, err := registry.OpenKey(key, path, registry.READ)
 	if err != nil {
 		return "", "", fmt.Errorf("opening key: %w", err)
@@ -168,7 +174,10 @@ func getRegistryKeyProductData(key registry.Key, path string) (string, string, e
 //
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
 // the exe like 'OneDriveSetup.exe,-101'
-func parseIcoFile(fullPath string) (icon, error) {
+func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
+	_, span := traces.StartSpan(ctx, "icon_path", fullPath)
+	defer span.End()
+
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
 	if err != nil {
