@@ -88,7 +88,7 @@ func calcCertFingerprint(t *testing.T, certpath string) string {
 
 	digest := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
 
-	return fmt.Sprintf("%x", digest)
+	return fmt.Sprintf("%x", digest) //nolint:perfsprint // Don't care in tests
 }
 
 func TestSwappingCert(t *testing.T) { // nolint:paralleltest

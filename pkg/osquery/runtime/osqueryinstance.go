@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -897,7 +898,7 @@ func getOsqueryInfoForLog(path string) []interface{} {
 
 	msgPairs = append(
 		msgPairs,
-		"sha256", fmt.Sprintf("%x", sum.Sum(nil)),
+		"sha256", hex.EncodeToString(sum.Sum(nil)),
 	)
 
 	return msgPairs
