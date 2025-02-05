@@ -28,8 +28,8 @@ func TestForceNoChunkedEncoding(t *testing.T) {
 
 	// Check contents are still as expected
 	content := &bytes.Buffer{}
-	len, err := io.Copy(content, req.Body)
+	written, err := io.Copy(content, req.Body)
 	require.NoError(t, err)
-	require.Equal(t, int64(11), len)
+	require.Equal(t, int64(11), written)
 	require.Equal(t, "Hello World", content.String())
 }
