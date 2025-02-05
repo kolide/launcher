@@ -72,7 +72,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			c.slogger.Log(ctx, slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,

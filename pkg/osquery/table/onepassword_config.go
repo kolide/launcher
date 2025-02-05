@@ -83,7 +83,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			o.slogger.Log(ctx, slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,

@@ -67,7 +67,7 @@ func (c *ChromeLoginKeychain) generateForPath(ctx context.Context, path string) 
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			c.slogger.Log(ctx, slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,

@@ -69,7 +69,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			g.slogger.Log(ctx, slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,

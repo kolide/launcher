@@ -70,7 +70,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			g.slogger.Log(ctx, slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,

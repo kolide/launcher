@@ -91,7 +91,7 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 				"err", err,
 			)
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			s.slogger.Log(context.TODO(), slog.LevelWarn,
 				"encountered iteration error",
 				"err", err,
