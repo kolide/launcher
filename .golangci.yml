@@ -17,6 +17,7 @@ linters:
     - sloglint
     - sqlclosecheck
     - staticcheck
+    - tenv
     - unconvert
     - unused
   disable:

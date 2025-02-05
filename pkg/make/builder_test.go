@@ -140,8 +140,7 @@ func TestExecOut(t *testing.T) {
 
 }
 
-func TestGetVersion(t *testing.T) {
-	t.Parallel()
+func TestGetVersion(t *testing.T) { //nolint:paralleltest
 	var tests = []struct {
 		in  string
 		out string
@@ -190,14 +189,12 @@ func TestGetVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.in, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.in, func(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			ctx = context.WithValue(ctx, contextKeyEnv, []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
-			os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
+			t.Setenv("FAKE_GIT_DESCRIBE", tt.in)
 			ver, err := b.getVersion(ctx)
 			if tt.err == true {
 				require.Error(t, err, tt.in)
