@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -85,7 +86,7 @@ func TestUninstall(t *testing.T) {
 			// additionally seed all stores with some data to ensure we are clearing all values later
 			for _, store := range stores {
 				for j := 0; j < 3; j++ {
-					require.NoError(t, store.Set([]byte(fmt.Sprint(j)), []byte(fmt.Sprint(j))))
+					require.NoError(t, store.Set([]byte(strconv.Itoa(j)), []byte(strconv.Itoa(j))))
 				}
 
 				require.NoError(t, err)
