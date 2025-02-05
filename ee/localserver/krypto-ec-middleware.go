@@ -374,6 +374,11 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 	ctx, cancel := context.WithTimeout(context.Background(), presencedetection.DetectionTimeout)
 	defer cancel()
 
+	// presence detection is not yet available on linux
+	if runtime.GOOS == "linux" {
+		return
+	}
+
 	var cmdReq v2CmdRequestType
 	if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
@@ -386,11 +391,6 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 	// figure out if we need to do presence detection
 	detectionIntervalStr, ok := cmdReq.Headers[kolidePresenceDetectionIntervalHeaderKey]
 	if !ok || len(detectionIntervalStr) == 0 || detectionIntervalStr[0] == "" {
-		return
-	}
-
-	// presence detection is not yet available on linux
-	if runtime.GOOS == "linux" {
 		return
 	}
 
