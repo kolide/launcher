@@ -16,8 +16,11 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -26,7 +29,7 @@ type Table struct {
 	parser  *OutputParser
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("option_roms_allowed"),
 		table.IntegerColumn("password_enabled"),
@@ -35,7 +38,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
-	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_firmwarepasswd", columns, t.generate)
 
 }
 
@@ -67,6 +70,9 @@ func New(slogger *slog.Logger) *Table {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_firmwarepasswd")
+	defer span.End()
+
 	result := make(map[string]string)
 
 	for _, mode := range []string{"-check", "-mode"} {
@@ -91,6 +97,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output *bytes.Buffer) error {
+	ctx, span := traces.StartSpan(ctx, "subcommand", subcommand)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {
 		return fmt.Errorf("mktemp: %w", err)

@@ -2,14 +2,17 @@ package table
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
 const launcherAutoupdateConfigTableName = "kolide_launcher_autoupdate_config"
 
-func LauncherAutoupdateConfigTable(flags types.Flags) *table.Plugin {
+func LauncherAutoupdateConfigTable(slogger *slog.Logger, flags types.Flags) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("autoupdate"),
 		table.TextColumn("mirror_server_url"),
@@ -18,7 +21,7 @@ func LauncherAutoupdateConfigTable(flags types.Flags) *table.Plugin {
 		table.TextColumn("update_channel"),
 	}
 
-	return table.NewPlugin(launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
+	return tablewrapper.New(flags, slogger, launcherAutoupdateConfigTableName, columns, generateLauncherAutoupdateConfigTable(flags))
 }
 
 func boolToString(in bool) string {
@@ -31,6 +34,9 @@ func boolToString(in bool) string {
 
 func generateLauncherAutoupdateConfigTable(flags types.Flags) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+		_, span := traces.StartSpan(ctx, "table_name", launcherAutoupdateConfigTableName)
+		defer span.End()
+
 		return []map[string]string{
 			{
 				"autoupdate":          boolToString(flags.Autoupdate()),

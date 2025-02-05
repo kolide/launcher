@@ -9,10 +9,13 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -22,7 +25,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_apple_silicon_security_policy"
@@ -31,10 +34,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return table.NewPlugin(tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_apple_silicon_security_policy")
+	defer span.End()
+
 	var results []map[string]string
 
 	output, err := tablehelpers.RunSimple(ctx, t.slogger, 30, allowedcmd.Bputil, []string{bootPolicyUtilArgs})

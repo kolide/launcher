@@ -12,8 +12,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -21,8 +24,9 @@ import (
 const allowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.@/"
 
 type Table struct {
-	slogger *slog.Logger
-	cmd     allowedcmd.AllowedCommand
+	slogger   *slog.Logger
+	cmd       allowedcmd.AllowedCommand
+	tableName string
 }
 
 func columns() []table.ColumnDefinition {
@@ -34,25 +38,30 @@ func columns() []table.ColumnDefinition {
 	}
 }
 
-func ZfsPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
+func ZfsPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &Table{
-		slogger: slogger.With("table", "kolide_zfs_properties"),
-		cmd:     allowedcmd.Zfs,
+		slogger:   slogger.With("table", "kolide_zfs_properties"),
+		cmd:       allowedcmd.Zfs,
+		tableName: "kolide_zfs_properties",
 	}
 
-	return table.NewPlugin("kolide_zfs_properties", columns(), t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_zfs_properties", columns(), t.generate)
 }
 
-func ZpoolPropertiesPlugin(slogger *slog.Logger) *table.Plugin {
+func ZpoolPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &Table{
-		slogger: slogger.With("table", "kolide_zpool_properties"),
-		cmd:     allowedcmd.Zpool,
+		slogger:   slogger.With("table", "kolide_zpool_properties"),
+		cmd:       allowedcmd.Zpool,
+		tableName: "kolide_zpool_properties",
 	}
 
-	return table.NewPlugin("kolide_zpool_properties", columns(), t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_zpool_properties", columns(), t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	// Generate ZFS commands.
 	//
 	// keys are comma separated. Default to `all` to get everything

@@ -6,12 +6,15 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
+func TouchIDSystemConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &touchIDSystemConfigTable{
 		slogger: slogger.With("table", "kolide_touchid_system_config"),
 	}
@@ -22,7 +25,7 @@ func TouchIDSystemConfig(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("touchid_unlock"),
 	}
 
-	return table.NewPlugin("kolide_touchid_system_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_system_config", columns, t.generate)
 }
 
 type touchIDSystemConfigTable struct {
@@ -31,6 +34,9 @@ type touchIDSystemConfigTable struct {
 
 // TouchIDSystemConfigGenerate will be called whenever the table is queried.
 func (t *touchIDSystemConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_touchid_system_config")
+	defer span.End()
+
 	var results []map[string]string
 	var touchIDCompatible, secureEnclaveCPU, touchIDEnabled, touchIDUnlock string
 

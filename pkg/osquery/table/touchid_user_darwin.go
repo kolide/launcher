@@ -7,12 +7,15 @@ import (
 	"os/user"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDUserConfig(slogger *slog.Logger) *table.Plugin {
+func TouchIDUserConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &touchIDUserConfigTable{
 		slogger: slogger.With("table", "kolide_touchid_user_config"),
 	}
@@ -25,7 +28,7 @@ func TouchIDUserConfig(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("effective_applepay"),
 	}
 
-	return table.NewPlugin("kolide_touchid_user_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate)
 }
 
 type touchIDUserConfigTable struct {
@@ -33,6 +36,9 @@ type touchIDUserConfigTable struct {
 }
 
 func (t *touchIDUserConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_touchid_user_config")
+	defer span.End()
+
 	q := queryContext.Constraints["uid"]
 	if len(q.Constraints) == 0 {
 		t.slogger.Log(ctx, slog.LevelDebug,

@@ -14,14 +14,18 @@ import (
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/sys/unix"
 )
 
-func MacOSUpdate() *table.Plugin {
+func MacOSUpdate(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("autoupdate_managed"),
 		table.IntegerColumn("autoupdate_enabled"),
@@ -37,7 +41,7 @@ func MacOSUpdate() *table.Plugin {
 		table.IntegerColumn("last_successful_check_timestamp"),
 	}
 	tableGen := &osUpdateTable{}
-	return table.NewPlugin("kolide_macos_software_update", columns, tableGen.generateMacUpdate)
+	return tablewrapper.New(flags, slogger, "kolide_macos_software_update", columns, tableGen.generateMacUpdate)
 }
 
 type osUpdateTable struct {
@@ -45,6 +49,9 @@ type osUpdateTable struct {
 }
 
 func (table *osUpdateTable) generateMacUpdate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_macos_software_update")
+	defer span.End()
+
 	if table.macOSBuildVersionPrefix == 0 {
 		buildPrefix, err := macOSBuildVersionPrefix()
 		if err != nil {

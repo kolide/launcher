@@ -7,15 +7,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/groob/plist"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func MDMInfo() *table.Plugin {
+func MDMInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("enrolled"),
 		table.TextColumn("server_url"),
@@ -30,10 +34,13 @@ func MDMInfo() *table.Plugin {
 		table.TextColumn("installed_from_dep"),
 		table.TextColumn("user_approved"),
 	}
-	return table.NewPlugin("kolide_mdm_info", columns, generateMDMInfo)
+	return tablewrapper.New(flags, slogger, "kolide_mdm_info", columns, generateMDMInfo)
 }
 
 func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_mdm_info")
+	defer span.End()
+
 	profiles, err := getMDMProfile(ctx)
 	if err != nil {
 		return nil, err
@@ -88,6 +95,9 @@ func generateMDMInfo(ctx context.Context, queryContext table.QueryContext) ([]ma
 }
 
 func getMDMProfile(ctx context.Context) (*profilesOutput, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -134,6 +144,9 @@ type payloadContent struct {
 }
 
 func getMDMProfileStatus(ctx context.Context) (profileStatus, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

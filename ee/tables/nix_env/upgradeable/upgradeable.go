@@ -10,10 +10,13 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -23,7 +26,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("uid"),
 	)
@@ -32,10 +35,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_nix_upgradeable"),
 	}
 
-	return table.NewPlugin("kolide_nix_upgradeable", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_nix_upgradeable", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_nix_upgradeable")
+	defer span.End()
+
 	var results []map[string]string
 
 	uids := tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters))

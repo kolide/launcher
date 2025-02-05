@@ -4,22 +4,29 @@ import (
 	"context"
 	"debug/macho"
 	"errors"
+	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func MachoInfo() *table.Plugin {
+func MachoInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("name"),
 		table.TextColumn("cpu"),
 	}
 
-	return table.NewPlugin("kolide_macho_info", columns, generateMacho)
+	return tablewrapper.New(flags, slogger, "kolide_macho_info", columns, generateMacho)
 }
 
 func generateMacho(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_macho_info")
+	defer span.End()
+
 	q, ok := queryContext.Constraints["path"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The kolide_macho_info table requires that you specify a constraint WHERE path =")

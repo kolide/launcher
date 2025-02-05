@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"hash/crc64"
 	"image/png"
+	"log/slog"
 	"os"
 
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -24,26 +28,32 @@ type icon struct {
 	hash   uint64
 }
 
-func ProgramIcons() *table.Plugin {
+func ProgramIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("version"),
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return table.NewPlugin("kolide_program_icons", columns, generateProgramIcons)
+	return tablewrapper.New(flags, slogger, "kolide_program_icons", columns, generateProgramIcons)
 }
 
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_program_icons")
+	defer span.End()
+
 	var results []map[string]string
 
-	results = append(results, generateUninstallerProgramIcons()...)
-	results = append(results, generateInstallersProgramIcons()...)
+	results = append(results, generateUninstallerProgramIcons(ctx)...)
+	results = append(results, generateInstallersProgramIcons(ctx)...)
 
 	return results, nil
 }
 
-func generateUninstallerProgramIcons() []map[string]string {
+func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var uninstallerIcons []map[string]string
 
 	uninstallRegPaths := map[registry.Key][]string{
@@ -100,7 +110,10 @@ func getRegistryKeyDisplayData(key registry.Key, path string) (string, string, s
 	return iconPath, name, version, nil
 }
 
-func generateInstallersProgramIcons() []map[string]string {
+func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var installerIcons []map[string]string
 
 	productRegPaths := map[registry.Key][]string{

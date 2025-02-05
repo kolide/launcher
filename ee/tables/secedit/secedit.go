@@ -15,10 +15,13 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 
 	"golang.org/x/text/encoding/unicode"
@@ -29,7 +32,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("mergedpolicy"),
 	)
@@ -38,10 +41,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_secedit"),
 	}
 
-	return table.NewPlugin("kolide_secedit", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_secedit", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_secedit")
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, mergedpolicy := range tablehelpers.GetConstraints(queryContext, "mergedpolicy", tablehelpers.WithDefaults("false")) {
@@ -93,6 +99,9 @@ func (t *Table) flattenOutput(dataQuery string, systemOutput []byte) ([]dataflat
 }
 
 func (t *Table) execSecedit(ctx context.Context, mergedPolicy bool) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// The secedit.exe binary does not support outputting the data we need to stdout
 	// Instead we create a tmp directory and pass it to secedit to write the data we need
 	// in INI format.

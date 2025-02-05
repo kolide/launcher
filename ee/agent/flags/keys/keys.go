@@ -58,6 +58,7 @@ const (
 	LauncherWatchdogEnabled         FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
 	SystrayRestartEnabled           FlagKey = "systray_restart_enabled"
 	CurrentRunningOsqueryVersion    FlagKey = "osquery_version"
+	TableGenerateTimeout            FlagKey = "table_generate_timeout"
 )
 
 func (key FlagKey) String() string {

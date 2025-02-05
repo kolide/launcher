@@ -48,6 +48,8 @@ linters-settings:
         msg: use gowrapper.Go() instead of raw goroutines for proper panic handling
       - p: \.Cmd\.(Run|Start|Output|CombinedOutput)
         msg: "Do not call embedded exec.Cmd methods directly on TracedCmd; call TracedCmd.Run(), TracedCmd.Start(), etc. instead"
+      - p: ^table\.NewPlugin.*$
+        msg: use ee/tables/tablewrapper to enforce timeouts on table queries
   sloglint:
     kv-only: true
     context: "all"

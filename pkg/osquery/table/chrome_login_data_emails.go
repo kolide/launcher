@@ -12,6 +12,9 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -21,7 +24,7 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
+func ChromeLoginDataEmails(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
 		slogger: slogger.With("table", "kolide_chrome_login_data_emails"),
 	}
@@ -30,7 +33,7 @@ func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("email"),
 		table.BigIntColumn("count"),
 	}
-	return table.NewPlugin("kolide_chrome_login_data_emails", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_data_emails", columns, c.generate)
 }
 
 type ChromeLoginDataEmailsTable struct {
@@ -38,6 +41,9 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", file)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)
@@ -84,6 +90,9 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 }
 
 func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_chrome_login_data_emails")
+	defer span.End()
+
 	var results []map[string]string
 	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {

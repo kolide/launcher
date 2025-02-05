@@ -16,8 +16,11 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -32,7 +35,7 @@ type GsettingsValues struct {
 
 // Settings returns a table plugin for querying setting values from the
 // gsettings command.
-func Settings(slogger *slog.Logger) *table.Plugin {
+func Settings(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("schema"),
 		table.TextColumn("key"),
@@ -45,10 +48,13 @@ func Settings(slogger *slog.Logger) *table.Plugin {
 		getBytes: execGsettings,
 	}
 
-	return table.NewPlugin("kolide_gsettings", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings", columns, t.generate)
 }
 
 func (t *GsettingsValues) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_gsettings")
+	defer span.End()
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedCharacters))
@@ -78,6 +84,9 @@ func (t *GsettingsValues) generate(ctx context.Context, queryContext table.Query
 // execGsettings writes the output of running 'gsettings' command into the
 // supplied bytes buffer
 func execGsettings(ctx context.Context, slogger *slog.Logger, username string, buf *bytes.Buffer) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	u, err := user.Lookup(username)
 	if err != nil {
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
@@ -110,6 +119,9 @@ func execGsettings(ctx context.Context, slogger *slog.Logger, username string, b
 }
 
 func (t *GsettingsValues) parse(ctx context.Context, username string, input io.Reader) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)

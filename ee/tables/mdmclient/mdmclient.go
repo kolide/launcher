@@ -14,10 +14,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -52,7 +55,7 @@ type Table struct {
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("command"),
 	)
@@ -62,10 +65,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_mdmclient",
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_mdmclient")
+	defer span.End()
+
 	var results []map[string]string
 
 	gcOpts := []tablehelpers.GetConstraintOpts{
@@ -120,6 +126,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) flattenOutput(ctx context.Context, dataQuery string, systemOutput []byte) ([]dataflatten.Row, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	converted, err := t.transformOutput(systemOutput)
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
