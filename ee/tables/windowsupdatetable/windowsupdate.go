@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -34,7 +35,7 @@ type Table struct {
 	name      string
 }
 
-func TablePlugin(mode tableMode, slogger *slog.Logger) *table.Plugin {
+func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
@@ -54,7 +55,7 @@ func TablePlugin(mode tableMode, slogger *slog.Logger) *table.Plugin {
 
 	t.slogger = slogger.With("name", t.name)
 
-	return tablewrapper.New(slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
 }
 
 func queryUpdates(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {

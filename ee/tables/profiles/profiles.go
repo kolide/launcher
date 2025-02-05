@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -42,7 +43,7 @@ type Table struct {
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	// profiles options. See `man profiles`. These may not be needed,
 	// we use `show -all` as the default, and it probably covers
 	// everything.
@@ -57,7 +58,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_profiles",
 	}
 
-	return tablewrapper.New(slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

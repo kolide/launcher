@@ -18,11 +18,13 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -125,6 +127,8 @@ func TestProc(t *testing.T) {
 			store, err := storageci.NewStore(t, slogger, storage.KatcConfigStore.String())
 			require.NoError(t, err)
 			mockSack.On("KatcConfigStore").Return(store)
+			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process

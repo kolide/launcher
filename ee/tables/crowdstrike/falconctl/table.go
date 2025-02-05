@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -48,7 +49,7 @@ type falconctlOptionsTable struct {
 	execFunc  execFunc
 }
 
-func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
+func NewFalconctlOptionTable(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("options"),
 	)
@@ -59,7 +60,7 @@ func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
 		execFunc:  tablehelpers.RunSimple,
 	}
 
-	return tablewrapper.New(slogger, t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {

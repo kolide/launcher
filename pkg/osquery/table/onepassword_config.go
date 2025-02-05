@@ -12,6 +12,7 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -26,7 +27,7 @@ var onepasswordDataFiles = map[string][]string{
 	},
 }
 
-func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
+func OnePasswordAccounts(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
@@ -41,7 +42,7 @@ func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate)
 }
 
 type onePasswordAccountsTable struct {
@@ -75,7 +76,20 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	if err != nil {
 		return nil, fmt.Errorf("query rows from onepassword account configuration db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 	for rows.Next() {

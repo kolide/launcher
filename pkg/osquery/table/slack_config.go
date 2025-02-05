@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -30,7 +31,7 @@ var slackConfigDirs = map[string][]string{
 // try the list of known linux paths if runtime.GOOS doesn't match 'darwin' or 'windows'
 var slackConfigDirDefault = []string{".config/Slack"}
 
-func SlackConfig(slogger *slog.Logger) *table.Plugin {
+func SlackConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("team_id"),
 		table.TextColumn("team_name"),
@@ -44,7 +45,7 @@ func SlackConfig(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_slack_config"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_slack_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_slack_config", columns, t.generate)
 }
 
 type SlackConfigTable struct {

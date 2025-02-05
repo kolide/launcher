@@ -10,12 +10,13 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func GDriveSyncHistoryInfo(slogger *slog.Logger) *table.Plugin {
+func GDriveSyncHistoryInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	g := &GDriveSyncHistory{
 		slogger: slogger.With("table", "kolide_gdrive_sync_history"),
 	}
@@ -25,7 +26,7 @@ func GDriveSyncHistoryInfo(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("mtime"),
 		table.TextColumn("size"),
 	}
-	return tablewrapper.New(slogger, "kolide_gdrive_sync_history", columns, g.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gdrive_sync_history", columns, g.generate)
 }
 
 type GDriveSyncHistory struct {
@@ -61,7 +62,20 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 	if err != nil {
 		return nil, fmt.Errorf("query rows from gdrive sync history db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			g.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			g.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 

@@ -30,16 +30,16 @@ import (
 // around _launcher_ things thus do not make sense in tables.ext
 func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
-		LauncherConfigTable(slogger, k.ConfigStore(), k),
-		LauncherDbInfo(slogger, k.BboltDB()),
-		LauncherInfoTable(slogger, k.ConfigStore(), k.LauncherHistoryStore()),
-		launcher_db.TablePlugin(slogger, "kolide_server_data", k.ServerProvidedDataStore()),
-		launcher_db.TablePlugin(slogger, "kolide_control_flags", k.AgentFlagsStore()),
+		LauncherConfigTable(k, slogger, k.ConfigStore(), k),
+		LauncherDbInfo(k, slogger, k.BboltDB()),
+		LauncherInfoTable(k, slogger, k.ConfigStore(), k.LauncherHistoryStore()),
+		launcher_db.TablePlugin(k, slogger, "kolide_server_data", k.ServerProvidedDataStore()),
+		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore()),
 		LauncherAutoupdateConfigTable(slogger, k),
-		osquery_instance_history.TablePlugin(slogger),
+		osquery_instance_history.TablePlugin(k, slogger),
 		tufinfo.TufReleaseVersionTable(slogger, k),
-		launcher_db.TablePlugin(slogger, "kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
-		desktopprocs.TablePlugin(slogger),
+		launcher_db.TablePlugin(k, slogger, "kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
+		desktopprocs.TablePlugin(k, slogger),
 	}
 }
 
@@ -47,30 +47,30 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	// Common tables to all platforms
 	tables := []osquery.OsqueryPlugin{
-		ChromeLoginDataEmails(slogger),
-		ChromeUserProfiles(slogger),
-		KeyInfo(slogger),
-		OnePasswordAccounts(slogger),
-		SlackConfig(slogger),
-		SshKeys(slogger),
-		cryptoinfotable.TablePlugin(slogger),
-		dev_table_tooling.TablePlugin(slogger),
-		firefox_preferences.TablePlugin(slogger),
-		jwt.TablePlugin(slogger),
-		dataflattentable.TablePluginExec(slogger,
+		ChromeLoginDataEmails(k, slogger),
+		ChromeUserProfiles(k, slogger),
+		KeyInfo(k, slogger),
+		OnePasswordAccounts(k, slogger),
+		SlackConfig(k, slogger),
+		SshKeys(k, slogger),
+		cryptoinfotable.TablePlugin(k, slogger),
+		dev_table_tooling.TablePlugin(k, slogger),
+		firefox_preferences.TablePlugin(k, slogger),
+		jwt.TablePlugin(k, slogger),
+		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
-		dataflattentable.TablePluginExec(slogger,
+		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_zerotier_networks", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listnetworks"}),
-		dataflattentable.TablePluginExec(slogger,
+		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_zerotier_peers", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"listpeers"}),
-		tdebug.LauncherGcInfo(slogger),
+		tdebug.LauncherGcInfo(k, slogger),
 	}
 
 	// The dataflatten tables
-	tables = append(tables, dataflattentable.AllTablePlugins(slogger)...)
+	tables = append(tables, dataflattentable.AllTablePlugins(k, slogger)...)
 
 	// add in the platform specific ones (as denoted by build tags)
-	tables = append(tables, platformSpecificTables(slogger, currentOsquerydBinaryPath)...)
+	tables = append(tables, platformSpecificTables(k, slogger, currentOsquerydBinaryPath)...)
 
 	// Add in the Kolide custom ATC tables
 	tables = append(tables, kolideCustomAtcTables(k, registrationId, slogger)...)
@@ -99,7 +99,7 @@ func kolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slo
 		}
 	}
 
-	return katc.ConstructKATCTables(config, slogger)
+	return katc.ConstructKATCTables(config, k, slogger)
 }
 
 func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, error) {
@@ -122,7 +122,7 @@ func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, err
 }
 
 func katcFromStartupSettings(k types.Knapsack, registrationId string) (map[string]string, error) {
-	r, err := startupsettings.OpenReader(context.TODO(), k.RootDirectory())
+	r, err := startupsettings.OpenReader(context.TODO(), k.Slogger(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}

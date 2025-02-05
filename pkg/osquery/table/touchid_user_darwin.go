@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -14,7 +15,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TouchIDUserConfig(slogger *slog.Logger) *table.Plugin {
+func TouchIDUserConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	t := &touchIDUserConfigTable{
 		slogger: slogger.With("table", "kolide_touchid_user_config"),
 	}
@@ -27,7 +28,7 @@ func TouchIDUserConfig(slogger *slog.Logger) *table.Plugin {
 		table.IntegerColumn("effective_applepay"),
 	}
 
-	return tablewrapper.New(slogger, "kolide_touchid_user_config", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_touchid_user_config", columns, t.generate)
 }
 
 type touchIDUserConfigTable struct {

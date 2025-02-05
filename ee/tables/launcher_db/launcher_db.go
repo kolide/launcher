@@ -13,13 +13,13 @@ import (
 
 // TablePlugin provides an osquery table plugin that exposes data found in the server_provided_data launcher.db bucket.
 // This data is intended to be updated by the control server.
-func TablePlugin(slogger *slog.Logger, tableName string, iterator types.Iterator) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger, tableName string, iterator types.Iterator) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
 	}
 
-	return tablewrapper.New(slogger, tableName, columns, generateServerDataTable(tableName, iterator))
+	return tablewrapper.New(flags, slogger, tableName, columns, generateServerDataTable(tableName, iterator))
 }
 
 func generateServerDataTable(tableName string, iterator types.Iterator) table.GenerateFunc {

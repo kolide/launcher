@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -30,7 +31,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func RecommendedUpdates(slogger *slog.Logger) *table.Plugin {
+func RecommendedUpdates(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	tableName := "kolide_macos_recommended_updates"
@@ -39,7 +40,7 @@ func RecommendedUpdates(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return tablewrapper.New(slogger, tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
