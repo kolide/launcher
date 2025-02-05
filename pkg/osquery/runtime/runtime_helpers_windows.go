@@ -25,7 +25,7 @@ func killProcessGroup(origCmd *exec.Cmd) error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	// some discussion here https://github.com/golang/dep/pull/857
