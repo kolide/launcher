@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 )
 
@@ -21,25 +22,34 @@ func setpgid() *syscall.SysProcAttr {
 }
 
 func killProcessGroup(origCmd *exec.Cmd) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// some discussion here https://github.com/golang/dep/pull/857
 	cmd, err := allowedcmd.Taskkill(ctx, "/F", "/T", "/PID", fmt.Sprint(origCmd.Process.Pid))
 	if err != nil {
+		traces.SetError(span, fmt.Errorf("creating command: %w", err))
 		return fmt.Errorf("creating command: %w", err)
 	}
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if len(out) > 0 {
-			return fmt.Errorf("running taskkill: output: %s, err: %w", string(out), err)
+			err = fmt.Errorf("running taskkill: output: %s, err: %w", string(out), err)
+			traces.SetError(span, err)
+			return err
 		}
 
 		if ctx.Err() != nil {
-			return fmt.Errorf("running taskkill: context err: %v, err: %w", ctx.Err(), err)
+			err = fmt.Errorf("running taskkill: context err: %v, err: %w", ctx.Err(), err)
+			traces.SetError(span, err)
+			return err
 		}
 
+		traces.SetError(span, fmt.Errorf("running taskkill: %w", err))
 		return fmt.Errorf("running taskkill: err: %w", err)
 	}
 
