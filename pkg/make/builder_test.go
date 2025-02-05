@@ -1,4 +1,4 @@
-package make
+package make //nolint:predeclared
 
 import (
 	"context"

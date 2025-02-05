@@ -12,6 +12,7 @@ linters:
     - misspell
     - nakedret
     - paralleltest
+    - predeclared
     - revive
     - rowserrcheck
     - sloglint
