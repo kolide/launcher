@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +24,7 @@ func TestOpenRO_DatabaseExists(t *testing.T) {
 	require.NoError(t, s1.Close(), "closing database")
 
 	// Create RO-connection to database
-	s2, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s2, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s2.Close(), "closing database")
 }
@@ -33,7 +34,7 @@ func TestOpenRO_DatabaseDoesNotExist(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "no validation should be performed on RO connection")
 	require.NoFileExists(t, dbLocation(testRootDir), "database should not have been created")
 	require.NoError(t, s.Close(), "closing database")
@@ -227,7 +228,7 @@ func TestSetUpdate_RO(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 
 	require.Error(t, s.Set([]byte(keys.UpdateChannel.String()), []byte("beta")), "should not be able to perform set with RO connection")

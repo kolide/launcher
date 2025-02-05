@@ -1,8 +1,10 @@
 package agentsqlite
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -82,7 +84,20 @@ func (s *sqliteStore) ForEach(fn func(rowid, timestamp int64, v []byte) error) e
 		return fmt.Errorf("issuing foreach query: %w", err)
 	}
 
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if rows.Err() != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	for rows.Next() {
 		var rowid int64

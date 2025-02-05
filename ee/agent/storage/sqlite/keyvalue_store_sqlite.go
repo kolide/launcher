@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"path"
@@ -45,6 +46,7 @@ func (s storeName) String() string {
 var migrations embed.FS
 
 type sqliteStore struct {
+	slogger       *slog.Logger
 	conn          *sql.DB
 	readOnly      bool
 	rootDirectory string
@@ -62,7 +64,7 @@ type sqliteColumns struct {
 
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+func OpenRO(ctx context.Context, slogger *slog.Logger, rootDirectory string, name storeName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
@@ -73,6 +75,7 @@ func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 	}
 
 	return &sqliteStore{
+		slogger:       slogger.With("component", "keyvalue_store_sqlite", "table_name", name.String()),
 		conn:          conn,
 		readOnly:      true,
 		rootDirectory: rootDirectory,
@@ -324,7 +327,20 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 		}
 		return nil, fmt.Errorf("deleting keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if rows.Err() != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	deletedKeys := make([]string, 0)
 	for rows.Next() {
