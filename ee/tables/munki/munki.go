@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/groob/plist"
@@ -71,7 +72,7 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 	for _, install := range m.report.ManagedInstalls {
 		results = append(results, map[string]string{
 			"installed_version": install.InstalledVersion,
-			"installed":         fmt.Sprintf("%v", install.Installed),
+			"installed":         strconv.FormatBool(install.Installed),
 			"name":              install.Name,
 			"end_time":          m.report.EndTime,
 		})
@@ -101,7 +102,7 @@ func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.
 			"end_time":      m.report.EndTime,
 			"console_user":  m.report.ConsoleUser,
 			"version":       m.report.ManagedInstallVersion,
-			"success":       fmt.Sprintf("%v", len(m.report.Errors) == 0),
+			"success":       strconv.FormatBool(len(m.report.Errors) == 0),
 			"errors":        errors,
 			"warnings":      warnings,
 			"manifest_name": m.report.ManifestName,
