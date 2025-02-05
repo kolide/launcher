@@ -408,7 +408,7 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 
 	// now check body
 	if r.Body == nil {
-		return nil, fmt.Errorf("no box found in url params or request body: body nil")
+		return nil, errors.New("no box found in url params or request body: body nil")
 	}
 
 	var body map[string]any
@@ -418,12 +418,12 @@ func extractChallenge(r *http.Request) (*challenge.OuterChallenge, error) {
 
 	val, ok := body["box"]
 	if !ok {
-		return nil, fmt.Errorf("no box key found in request body json")
+		return nil, errors.New("no box key found in request body json")
 	}
 
 	valStr, ok := val.(string)
 	if !ok {
-		return nil, fmt.Errorf("box value is not a string")
+		return nil, errors.New("box value is not a string")
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(valStr)
