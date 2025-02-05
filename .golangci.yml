@@ -18,6 +18,7 @@ linters:
     - staticcheck
     - unconvert
     - unused
+    - tenv
   disable:
     - errcheck
     - gosec

@@ -197,7 +197,7 @@ func TestGetVersion(t *testing.T) {
 			defer cancel()
 
 			ctx = context.WithValue(ctx, contextKeyEnv, []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
-			os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
+			t.Setenv("FAKE_GIT_DESCRIBE", tt.in)
 			ver, err := b.getVersion(ctx)
 			if tt.err == true {
 				require.Error(t, err, tt.in)

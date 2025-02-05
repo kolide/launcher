@@ -120,7 +120,7 @@ func setUpConfigFiles(t *testing.T) (string, string) {
 	fsutil.CopyFile(filepath.Join("testdata", "xfce4-power-manager-default.xml"), filepath.Join(tmpDefaultDir, xfconfChannelXmlPath, "xfce4-power-manager.xml"))
 
 	// Set the environment variable for the default directory
-	os.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
+	t.Setenv("XDG_CONFIG_DIRS", tmpDefaultDir)
 
 	// Make a temporary directory for user-specific config, put config files there
 	tmpUserDir := t.TempDir()
@@ -129,7 +129,7 @@ func setUpConfigFiles(t *testing.T) (string, string) {
 	fsutil.CopyFile(filepath.Join("testdata", "thunar-volman.xml"), filepath.Join(tmpUserDir, xfconfChannelXmlPath, "thunar-volman.xml"))
 
 	// Set the environment variable for the user config directory
-	os.Setenv("XDG_CONFIG_HOME", tmpUserDir)
+	t.Setenv("XDG_CONFIG_HOME", tmpUserDir)
 
 	return tmpDefaultDir, tmpUserDir
 }
