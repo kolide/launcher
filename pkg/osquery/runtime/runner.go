@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,7 @@ type settingsStoreWriter interface {
 
 type Runner struct {
 	registrationIds []string                    // we expect to run one instance per registration ID
+	regIDLock       sync.Mutex                  // locks access to registrationIds
 	instances       map[string]*OsqueryInstance // maps registration ID to currently-running instance
 	instanceLock    sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger         *slog.Logger
@@ -34,7 +36,8 @@ type Runner struct {
 	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
 	settingsWriter  settingsStoreWriter     // writes to startup settings store
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown        chan struct{}
+	shutdown        chan struct{}           // buffered shutdown channel to enable shutting down to restart or exit
+	rerunRequired   atomic.Bool
 	interrupted     atomic.Bool
 }
 
@@ -46,8 +49,9 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 		knapsack:        k,
 		serviceClient:   serviceClient,
 		settingsWriter:  settingsWriter,
-		shutdown:        make(chan struct{}),
-		opts:            opts,
+		// the buffer length is arbitrarily set at 100, this number just needs to be higher than the total possible instances
+		shutdown: make(chan struct{}, 100),
+		opts:     opts,
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -57,12 +61,56 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 	return runner
 }
 
+// String method is only added to runner because it is often used in our runtime tests as an argument
+// passed to mocked knapsack calls. when we AssertExpectations, the runner struct is traversed by the
+// Diff logic inside testify. This causes data races to be incorrectly reported for structs containing mutexes-
+// the second read is coming from testify.
+// see (one of) the issues here for additional context https://github.com/stretchr/testify/issues/1597
+// If we really needed to expose more here, we could acquire all locks and return fmt.Sprintf("%#v", r). but given
+// that we do not, it seems safer to avoid introducing any additional lock contention in case our Stringer call
+// is invoked someday in a production flow
+func (r *Runner) String() string {
+	return "runtime.Runner{}"
+}
+
 func (r *Runner) Run() error {
+	for {
+		err := r.runRegisteredInstances()
+		if err != nil {
+			// log any errors but continue, in case we intend to reload
+			r.slogger.Log(context.TODO(), slog.LevelWarn,
+				"runRegisteredInstances terminated with error",
+				"err", err,
+			)
+		}
+
+		// if we're in a state that required re-running all registered instances,
+		// reset the field and do that
+		if r.rerunRequired.Load() {
+			r.rerunRequired.Store(false)
+			continue
+		}
+
+		return err
+	}
+}
+
+func (r *Runner) runRegisteredInstances() error {
+	// clear the internal instances to add back in fresh as we runInstance,
+	// this prevents old instances from sticking around if a registrationID is ever removed
+	r.instanceLock.Lock()
+	r.instances = make(map[string]*OsqueryInstance)
+	r.instanceLock.Unlock()
+
 	// Create a group to track the workers running each instance
 	wg, ctx := errgroup.WithContext(context.TODO())
 
 	// Start each worker for each instance
-	for _, registrationId := range r.registrationIds {
+	r.regIDLock.Lock()
+	regIDs := r.registrationIds
+	r.regIDLock.Unlock()
+
+	for _, registrationId := range regIDs {
 		id := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
@@ -205,6 +253,13 @@ func (r *Runner) Query(query string) ([]map[string]string, error) {
 }
 
 func (r *Runner) Interrupt(_ error) {
+	if r.interrupted.Load() {
+		// Already shut down, nothing else to do
+		return
+	}
+
+	r.interrupted.Store(true)
+
 	if err := r.Shutdown(); err != nil {
 		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not shut down runner on interrupt",
@@ -218,14 +273,12 @@ func (r *Runner) Interrupt(_ error) {
 func (r *Runner) Shutdown() error {
 	ctx, span := traces.StartSpan(context.TODO())
 	defer span.End()
-
-	if r.interrupted.Load() {
-		// Already shut down, nothing else to do
-		return nil
+	// ensure one shutdown is sent for each instance to read
+	r.instanceLock.Lock()
+	for range r.instances {
+		r.shutdown <- struct{}{}
 	}
-
-	r.interrupted.Store(true)
-	close(r.shutdown)
+	r.instanceLock.Unlock()
 
 	if err := r.triggerShutdownForInstances(ctx); err != nil {
 		return fmt.Errorf("triggering shutdown for instances during runner shutdown: %w", err)
@@ -326,7 +379,11 @@ func (r *Runner) Healthy() error {
 	defer r.instanceLock.Unlock()
 
 	healthcheckErrs := make([]error, 0)
-	for _, registrationId := range r.registrationIds {
+	r.regIDLock.Lock()
+	regIDs := r.registrationIds
+	r.regIDLock.Unlock()
+
+	for _, registrationId := range regIDs {
 		instance, ok := r.instances[registrationId]
 		if !ok {
 			healthcheckErrs = append(healthcheckErrs, fmt.Errorf("running instance does not exist for %s", registrationId))
@@ -349,8 +406,11 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	r.instanceLock.Lock()
 	defer r.instanceLock.Unlock()
 
+	r.regIDLock.Lock()
+	regIDs := r.registrationIds
+	r.regIDLock.Unlock()
 	instanceStatuses := make(map[string]types.InstanceStatus)
-	for _, registrationId := range r.registrationIds {
+	for _, registrationId := range regIDs {
 		instance, ok := r.instances[registrationId]
 		if !ok {
 			instanceStatuses[registrationId] = types.InstanceStatusNotStarted
@@ -366,4 +426,48 @@ func (r *Runner) InstanceStatuses() map[string]types.InstanceStatus {
 	}
 
 	return instanceStatuses
+}
+
+// UpdateRegistrationIDs detects any changes between the new and stored registration IDs,
+// and resets the runner instances for the new registrationIDs if required
+func (r *Runner) UpdateRegistrationIDs(newRegistrationIDs []string) error {
+	slices.Sort(newRegistrationIDs)
+
+	r.regIDLock.Lock()
+	existingRegistrationIDs := r.registrationIds
+	r.regIDLock.Unlock()
+	slices.Sort(existingRegistrationIDs)
+
+	if slices.Equal(newRegistrationIDs, existingRegistrationIDs) {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"skipping runner restarts for updated registration IDs, no changes detected",
+		)
+
+		return nil
+	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"detected changes to registrationIDs, will restart runner instances",
+		"previous_registration_ids", existingRegistrationIDs,
+		"new_registration_ids", newRegistrationIDs,
+	)
+
+	// we know there are changes, safe to update the internal registrationIDs now
+	r.regIDLock.Lock()
+	r.registrationIds = newRegistrationIDs
+	r.regIDLock.Unlock()
+	// mark rerun as required so that we can safely shutdown all workers and have the changes
+	// picked back up from within the main Run function
+	r.rerunRequired.Store(true)
+
+	if err := r.Shutdown(); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not shut down runner instances for restart after registration changes",
+			"err", err,
+		)
+
+		return err
+	}
+
+	return nil
 }
