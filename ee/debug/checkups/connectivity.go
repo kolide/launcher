@@ -110,6 +110,9 @@ func (c *Connectivity) Data() any {
 }
 
 func checkKolideServer(ctx context.Context, client *http.Client, server string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
