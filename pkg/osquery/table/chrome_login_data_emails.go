@@ -41,7 +41,7 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	_, span := traces.StartSpan(ctx, "path", file)
+	_, span := traces.StartSpan(ctx, "path", file.path)
 	defer span.End()
 
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
@@ -84,19 +84,19 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 
 	// loop through all the sqlite rows and add them as osquery rows in the results map
 	for rows.Next() { // we initialize these variables for every row, that way we don't have data from the previous iteration
-		var username_value string
-		var username_count string
-		if err := rows.Scan(&username_value, &username_count); err != nil {
+		var usernameValue string
+		var usernameCount string
+		if err := rows.Scan(&usernameValue, &usernameCount); err != nil {
 			return nil, fmt.Errorf("scanning chrome login keychain db row: %w", err)
 		}
 		// append anything that could be an email
-		if !strings.Contains(username_value, "@") {
+		if !strings.Contains(usernameValue, "@") {
 			continue
 		}
 		results = append(results, map[string]string{
 			"username": file.user,
-			"email":    username_value,
-			"count":    username_count,
+			"email":    usernameValue,
+			"count":    usernameCount,
 		})
 	}
 	return results, nil
