@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
+	_ "modernc.org/sqlite"
 )
 
 func GDriveSyncConfig(flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -47,7 +48,7 @@ func (g *gdrive) generateForPath(ctx context.Context, path string) ([]map[string
 		return nil, fmt.Errorf("copying sqlite db to tmp dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite3", dst)
+	db, err := sql.Open("sqlite", dst)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
