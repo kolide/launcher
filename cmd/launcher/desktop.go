@@ -246,9 +246,6 @@ func makeGetRequest(client desktopClient, requestUrl string, timeout time.Durati
 }
 
 func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	client := authedclient.New(authToken, 2*time.Second)
 	menuOpenedUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
 
@@ -257,7 +254,7 @@ func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken
 
 		response, err := makeGetRequest(client, menuOpenedUrl, client.Timeout)
 		if err != nil {
-			slogger.Log(ctx, slog.LevelError,
+			slogger.Log(context.TODO(), slog.LevelError,
 				"sending menu opened request to root server",
 				"err", err,
 			)
