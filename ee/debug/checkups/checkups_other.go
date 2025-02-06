@@ -15,7 +15,9 @@ func (s Status) Emoji() string {
 		return "❌"
 	case Erroring:
 		return "❌"
-	default:
+	case Unknown:
 		return "? "
+	default:
+		return " "
 	}
 }

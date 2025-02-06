@@ -560,6 +560,8 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 				gotStatusLogs = logs
 			case logger.LogTypeString:
 				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
 			default:
 				t.Error("Unknown log type")
 			}
@@ -675,6 +677,8 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 				gotStatusLogs = logs
 			case logger.LogTypeString:
 				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
 			default:
 				t.Error("Unknown log type")
 			}
@@ -749,6 +753,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 				gotStatusLogs = logs
 			case logger.LogTypeString:
 				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
 			default:
 				t.Error("Unknown log type")
 			}
@@ -829,6 +835,8 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 				gotStatusLogs = logs
 			case logger.LogTypeString:
 				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
 			default:
 				t.Error("Unknown log type")
 			}
@@ -951,6 +959,8 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 				gotStatusLogs = logs
 			case logger.LogTypeString:
 				gotResultLogs = logs
+			case logger.LogTypeSnapshot, logger.LogTypeHealth, logger.LogTypeInit:
+				t.Errorf("unexpected log type %v", logType)
 			default:
 				t.Error("Unknown log type")
 			}
