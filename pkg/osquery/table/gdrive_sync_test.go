@@ -39,6 +39,7 @@ func TestGDriveSyncConfig(t *testing.T) { //nolint:paralleltest // We need to up
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO data (entry_key, data_value) VALUES ("user_email", "testusername@example.com"), ("local_sync_root_path", "test");`)
 	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Point the table to this new db by modifying package vars
 	homeDirLocations[runtime.GOOS] = append(homeDirLocations[runtime.GOOS], tempHomeDir)

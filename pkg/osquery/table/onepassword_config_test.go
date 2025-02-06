@@ -38,6 +38,7 @@ func TestOnePasswordAccounts(t *testing.T) { //nolint:paralleltest // We need to
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO accounts (user_email, team_name, server, user_first_name, user_last_name, account_type) VALUES ("testusername@example.com", "Test Team", "myteam.example.com", "Jane", "Test", "");`)
 	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Point the table to this new db by modifying package vars
 	homeDirLocations[runtime.GOOS] = append(homeDirLocations[runtime.GOOS], tempHomeDir)

@@ -43,6 +43,7 @@ func TestChromeLoginDataEmails(t *testing.T) { //nolint:paralleltest // We need 
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO logins (username_value) VALUES ("testusername@example.com");`)
 	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Point the table to this new db by modifying package vars
 	homeDirLocations[runtime.GOOS] = append(homeDirLocations[runtime.GOOS], tempHomeDir)
