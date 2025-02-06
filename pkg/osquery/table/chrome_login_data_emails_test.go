@@ -14,11 +14,10 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
-func TestChromeLoginDataEmails(t *testing.T) {
-	t.Parallel()
-
+func TestChromeLoginDataEmails(t *testing.T) { //nolint:paralleltest // We need to update package-level vars in this test
 	// Set up table dependencies
 	mockFlags := typesmocks.NewFlags(t)
 	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
@@ -39,7 +38,7 @@ func TestChromeLoginDataEmails(t *testing.T) {
 	f, err := os.Create(tempSqliteFilepath)
 	require.NoError(t, err)
 	f.Close()
-	db, err := sql.Open("sqlite3", tempSqliteFilepath)
+	db, err := sql.Open("sqlite", tempSqliteFilepath)
 	require.NoError(t, err)
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS logins (username_value TEXT);`)
 	require.NoError(t, err)
