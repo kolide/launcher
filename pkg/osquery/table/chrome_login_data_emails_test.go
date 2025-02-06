@@ -14,7 +14,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	_ "modernc.org/sqlite"
 )
 
 func TestChromeLoginDataEmails(t *testing.T) { //nolint:paralleltest // We need to update package-level vars in this test
