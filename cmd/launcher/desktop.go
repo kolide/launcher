@@ -224,6 +224,27 @@ func listenSignals(slogger *slog.Logger) {
 	)
 }
 
+type desktopClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func makeGetRequest(client desktopClient, requestUrl string, timeout time.Duration) (*http.Response, error) {
+	if timeout == 0 {
+		// Make sure we have a reasonable default value
+		timeout = 5 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	return client.Do(req)
+}
+
 func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -234,16 +255,7 @@ func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken
 	for {
 		<-systray.SystrayMenuOpened
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, menuOpenedUrl, nil)
-		if err != nil {
-			slogger.Log(ctx, slog.LevelError,
-				"could not create menu opened request",
-				"err", err,
-			)
-			return
-		}
-
-		response, err := client.Do(req)
+		response, err := makeGetRequest(client, menuOpenedUrl, client.Timeout)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"sending menu opened request to root server",
@@ -278,16 +290,7 @@ func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAut
 			break
 		}
 
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, runnerHealthUrl, nil)
-		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelError,
-				"could not create menu opened request",
-				"err", err,
-			)
-			continue
-		}
-
-		response, err := client.Do(req)
+		response, err := makeGetRequest(client, runnerHealthUrl, client.Timeout)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
 			// before closing, otherwise a new connection is established each time.
