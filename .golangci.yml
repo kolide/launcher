@@ -5,6 +5,7 @@ linters:
   enable:
     - bodyclose
     - containedctx
+    - exhaustive
     - forbidigo
     - gofmt
     - govet

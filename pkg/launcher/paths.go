@@ -50,7 +50,7 @@ func DefaultPath(path defaultPath) string {
 		switch path {
 		case RootDirectory:
 			return "C:\\ProgramData\\Kolide\\Launcher-kolide-k2\\data"
-		case WindowsConfigDirectory:
+		case EtcDirectory, WindowsConfigDirectory:
 			return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf"
 		case BinDirectory:
 			return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
@@ -82,6 +82,9 @@ func DefaultPath(path defaultPath) string {
 		return filepath.Join(DefaultPath(EtcDirectory), "launcher.flags")
 	case SecretFile:
 		return filepath.Join(DefaultPath(EtcDirectory), "secret")
+	case WindowsConfigDirectory:
+		// Not valid for non-Windows, but included for completeness
+		fallthrough
 	default:
 		return ""
 	}

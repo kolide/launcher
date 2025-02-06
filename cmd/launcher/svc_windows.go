@@ -225,6 +225,8 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
+			case svc.Pause, svc.Continue, svc.ParamChange, svc.NetBindAdd, svc.NetBindRemove, svc.NetBindEnable, svc.NetBindDisable, svc.DeviceEvent, svc.HardwareProfileChange, svc.PowerEvent, svc.SessionChange, svc.PreShutdown:
+				fallthrough
 			default:
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"unexpected change request",

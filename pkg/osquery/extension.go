@@ -703,9 +703,10 @@ func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) 
 		return s.ResultLogsStore(), nil
 	case logger.LogTypeStatus:
 		return s.StatusLogsStore(), nil
+	case logger.LogTypeHealth, logger.LogTypeInit:
+		return nil, fmt.Errorf("storing log type %v is unsupported", typ)
 	default:
 		return nil, fmt.Errorf("unknown log type: %v", typ)
-
 	}
 }
 
