@@ -18,7 +18,7 @@ func (st *systemTime) Name() string {
 	return "System Time"
 }
 
-func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
+func (st *systemTime) Run(ctx context.Context, extraFh io.Writer) error {
 	var (
 		urls = []string{
 			"https://k2control.kolide.com/version",
@@ -28,7 +28,7 @@ func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 	)
 
 	for _, url := range urls {
-		serverTime, err := getTimeFromDateHeader(url)
+		serverTime, err := getTimeFromDateHeader(ctx, url)
 		if err != nil {
 			fmt.Fprintf(extraFh, "error from url %s: %v\n", url, err)
 			continue
@@ -66,9 +66,13 @@ func (st *systemTime) Run(_ context.Context, extraFh io.Writer) error {
 	return nil
 }
 
-func getTimeFromDateHeader(url string) (time.Time, error) {
+func getTimeFromDateHeader(ctx context.Context, url string) (time.Time, error) {
 	// Make an HTTP GET request to the specified URL.
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("creating request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return time.Time{}, err
 	}
