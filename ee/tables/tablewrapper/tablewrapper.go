@@ -121,6 +121,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 	}
 
 	// Kick off running the query
+	queryStartTime := time.Now()
 	resultChan := make(chan *generateResult)
 	gowrapper.Go(ctx, wt.slogger, func() {
 		rows, err := wt.gen(ctx, queryContext)
@@ -141,6 +142,8 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 		wt.slogger.Log(ctx, slog.LevelWarn,
 			"query timed out",
 			"queried_columns", fmt.Sprintf("%+v", queriedColumns),
+			"query_start_time", queryStartTime.String(),
+			"query_timeout", genTimeout.String(),
 		)
 		return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, genTimeout.String(), queriedColumns)
 	}
