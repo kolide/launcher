@@ -538,7 +538,7 @@ func mustMakeGetRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Reques
 
 	urlString := fmt.Sprint("https://127.0.0.1:8080?", v.Encode())
 
-	req, err := http.NewRequest(http.MethodGet, urlString, nil)
+	req, err := http.NewRequest(http.MethodGet, urlString, nil) //nolint:noctx // We don't care about this in tests
 	require.NoError(t, err)
 
 	return req
@@ -552,7 +552,7 @@ func mustMakePostRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Reque
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body))
+	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body)) //nolint:noctx // We don't care about this in tests
 	require.NoError(t, err)
 
 	return req

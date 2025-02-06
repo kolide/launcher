@@ -50,7 +50,21 @@ func (a actionMessage) Perform(m *menu) {
 		return
 	}
 
-	response, err := client.Post(runnerMessageUrl, "application/json", bytes.NewReader(jsonBody))
+	ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, runnerMessageUrl, bytes.NewReader(jsonBody))
+	if err != nil {
+		m.slogger.Log(context.TODO(), slog.LevelError,
+			"failed to create request",
+			"err", err,
+		)
+
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	response, err := client.Do(req)
 	if err != nil {
 		m.slogger.Log(context.TODO(), slog.LevelError,
 			"failed to perform message action",

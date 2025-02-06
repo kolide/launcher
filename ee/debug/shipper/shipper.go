@@ -110,8 +110,12 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 	s.uploadRequestWg.Add(1)
 	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
 		defer s.uploadRequestWg.Done()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
 		// will close the body in the close function
-		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
+		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
 	})
 
 	return s.writer.Write(p)
@@ -149,12 +153,15 @@ func (s *shipper) Close() error {
 }
 
 func (s *shipper) signedUrl() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	body, err := launcherData(s.knapsack, s.note)
 	if err != nil {
 		return "", fmt.Errorf("creating launcher data: %w", err)
 	}
 
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
+	signedUrlRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}

@@ -36,7 +36,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 
 	server := testServer(t, mockKnapsack)
 
-	req, err := http.NewRequest("", "", nil)
+	req, err := http.NewRequest("", "", nil) //nolint:noctx // Don't care about this in tests
 	require.NoError(t, err)
 
 	handler := http.HandlerFunc(server.requestIdHandlerFunc)
