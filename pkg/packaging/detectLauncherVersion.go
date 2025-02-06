@@ -114,7 +114,9 @@ func formatVersion(rawVersion string, platform PlatformFlavor) (string, error) {
 	case Darwin:
 		// Darwin expects a <major>.<minor>.<patch> packaging string
 		return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+	case Linux:
+		return rawVersion, nil
+	default:
+		return "", fmt.Errorf("unsupported platform %v", platform)
 	}
-
-	return rawVersion, nil
 }

@@ -47,7 +47,7 @@ func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 	// For now this should be enough because we don't use the Agent LogType anywhere.
 	// A more robust fix should come from fixing https://github.com/kolide/launcher/issues/183
 	var typ logger.LogType
-	switch req.LogType {
+	switch req.LogType { //nolint:exhaustive // This code is old and not in use
 	case pb.LogCollection_STATUS:
 		typ = logger.LogTypeStatus
 	case pb.LogCollection_RESULT:
@@ -83,7 +83,7 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 	}
 
 	var typ pb.LogCollection_LogType
-	switch req.LogType {
+	switch req.LogType { //nolint:exhaustive // This code is old and not in use
 	case logger.LogTypeStatus:
 		typ = pb.LogCollection_STATUS
 	case logger.LogTypeString, logger.LogTypeSnapshot:

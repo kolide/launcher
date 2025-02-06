@@ -221,6 +221,8 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 			warningCheckups = append(warningCheckups, c.Name())
 		case Failing, Erroring:
 			failingCheckups = append(failingCheckups, c.Name())
+		case Unknown, Informational, Passing:
+			// No need to print additional information about unknown, informational, or passing checkups
 		}
 	}
 
