@@ -17,7 +17,7 @@ import (
 // and object store specified in `query`, which it expects to be in the format
 // `<db name>.<object store name>`.
 func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
-	_, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.
@@ -49,7 +49,7 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 				continue
 			}
 
-			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(db, dbName, objectStoreName)
+			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(ctx, db, dbName, objectStoreName)
 			if err != nil {
 				return nil, fmt.Errorf("querying %s: %w", db, err)
 			}
