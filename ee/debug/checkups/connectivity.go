@@ -70,7 +70,7 @@ func (c *Connectivity) Run(ctx context.Context, extraFH io.Writer) error {
 			continue
 		}
 
-		body, err := checkKolideServer(c.k, httpClient, extraFH, versionEndpoint)
+		body, err := checkKolideServer(ctx, httpClient, versionEndpoint)
 		if err != nil {
 			fmt.Fprintf(extraFH, "error: %s\n", err)
 			c.data[n] = err.Error()
@@ -109,8 +109,12 @@ func (c *Connectivity) Data() any {
 	return c.data
 }
 
-func checkKolideServer(k types.Knapsack, client *http.Client, fh io.Writer, server string) ([]byte, error) {
-	response, err := client.Get(server)
+func checkKolideServer(ctx context.Context, client *http.Client, server string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	response, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching url: %w", err)
 	}

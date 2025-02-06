@@ -53,7 +53,7 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 		return nil, nil
 	}
 
-	req, err := http.NewRequest(http.MethodPost, cmdReq.CallbackUrl, nil)
+	req, err := http.NewRequest(http.MethodPost, cmdReq.CallbackUrl, nil) //nolint:noctx // Context added in sendCallback()
 	if err != nil {
 		return nil, fmt.Errorf("making http request: %w", err)
 	}
@@ -127,8 +127,10 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 	client := http.Client{
 		Timeout: 5 * time.Second,
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+	defer cancel()
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		e.slogger.Log(req.Context(), slog.LevelError,
 			"got error in callback",

@@ -449,7 +449,7 @@ func makeGetRequest(t *testing.T, boxParameter string) *http.Request {
 
 	urlString := "https://127.0.0.1:8080?" + v.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, urlString, nil)
+	req, err := http.NewRequest(http.MethodGet, urlString, nil) //nolint:noctx // We don't care about this in tests
 	require.NoError(t, err)
 
 	return req
@@ -463,7 +463,7 @@ func makePostRequest(t *testing.T, boxValue string) *http.Request {
 	})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body))
+	req, err := http.NewRequest(http.MethodPost, urlString, bytes.NewBuffer(body)) //nolint:noctx // We don't care about this in tests
 	require.NoError(t, err)
 
 	return req

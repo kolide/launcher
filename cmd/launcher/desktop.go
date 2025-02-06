@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -224,15 +225,27 @@ func listenSignals(slogger *slog.Logger) {
 }
 
 func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	client := authedclient.New(authToken, 2*time.Second)
-	menuOpendUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
+	menuOpenedUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
 
 	for {
 		<-systray.SystrayMenuOpened
 
-		response, err := client.Get(menuOpendUrl)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, menuOpenedUrl, nil)
 		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelError,
+			slogger.Log(ctx, slog.LevelError,
+				"could not create menu opened request",
+				"err", err,
+			)
+			return
+		}
+
+		response, err := client.Do(req)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelError,
 				"sending menu opened request to root server",
 				"err", err,
 			)
@@ -265,7 +278,16 @@ func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAut
 			break
 		}
 
-		response, err := client.Get(runnerHealthUrl)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, runnerHealthUrl, nil)
+		if err != nil {
+			slogger.Log(context.TODO(), slog.LevelError,
+				"could not create menu opened request",
+				"err", err,
+			)
+			continue
+		}
+
+		response, err := client.Do(req)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
 			// before closing, otherwise a new connection is established each time.

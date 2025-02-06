@@ -74,7 +74,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 				"query": tt.query,
 			})
 			require.NoError(t, err)
-			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
+			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes)) //nolint:noctx // Don't care about this in tests
 			require.NoError(t, err)
 
 			queryParams := req.URL.Query()
@@ -248,7 +248,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			// set up request
-			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
+			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes)) //nolint:noctx // Don't care about this in tests
 			require.NoError(t, err)
 
 			// set up handler
