@@ -11,6 +11,7 @@ linters:
     - ineffassign
     - misspell
     - nakedret
+    - noctx
     - paralleltest
     - predeclared
     - revive
@@ -25,7 +26,6 @@ linters:
     - errcheck
     - gosec
     - gosimple
-    - noctx
 
 linters-settings:
   errcheck:
