@@ -12,10 +12,13 @@ linters:
     - misspell
     - nakedret
     - paralleltest
+    - predeclared
     - revive
+    - rowserrcheck
     - sloglint
     - sqlclosecheck
     - staticcheck
+    - tenv
     - unconvert
     - unused
   disable:

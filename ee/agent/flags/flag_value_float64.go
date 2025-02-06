@@ -23,15 +23,15 @@ func WithFloat64ValueDefault(defaultVal float64) float64Option {
 	}
 }
 
-func WithFloat64ValueMin(min float64) float64Option {
+func WithFloat64ValueMin(minimum float64) float64Option {
 	return func(f *float64FlagValue) {
-		f.min = min
+		f.min = minimum
 	}
 }
 
-func WithFloat64ValueMax(max float64) float64Option {
+func WithFloat64ValueMax(maximum float64) float64Option {
 	return func(f *float64FlagValue) {
-		f.max = max
+		f.max = maximum
 	}
 }
 
@@ -89,12 +89,12 @@ func (f *float64FlagValue) get(controlServerValue []byte) float64 {
 }
 
 // clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampFloat64Value(value float64, min, max float64) float64 {
+func clampFloat64Value(value float64, minimum, maximum float64) float64 {
 	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
+	case value < minimum:
+		return minimum
+	case value > maximum:
+		return maximum
 	default:
 		return value
 	}

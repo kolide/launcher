@@ -62,7 +62,20 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 	if err != nil {
 		return nil, fmt.Errorf("query rows from gdrive sync history db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			g.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			g.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 

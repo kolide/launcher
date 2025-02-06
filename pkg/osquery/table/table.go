@@ -122,7 +122,7 @@ func katcFromDb(k types.Knapsack, registrationId string) (map[string]string, err
 }
 
 func katcFromStartupSettings(k types.Knapsack, registrationId string) (map[string]string, error) {
-	r, err := startupsettings.OpenReader(context.TODO(), k.RootDirectory())
+	r, err := startupsettings.OpenReader(context.TODO(), k.Slogger(), k.RootDirectory())
 	if err != nil {
 		return nil, fmt.Errorf("error opening startup settings reader: %w", err)
 	}
