@@ -12,9 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kolide/krypto"
@@ -22,7 +20,6 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -59,9 +56,6 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
-
-	presenceDetector       presenceDetector
-	presenceDetectionMutex sync.Mutex
 }
 
 const (
@@ -78,12 +72,11 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	defer span.End()
 
 	ls := &localServer{
-		slogger:          k.Slogger().With("component", "localserver"),
-		knapsack:         k,
-		limiter:          rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer:     k.KolideServerURL(),
-		myLocalDbSigner:  agent.LocalDbKeys(),
-		presenceDetector: presenceDetector,
+		slogger:         k.Slogger().With("component", "localserver"),
+		knapsack:        k,
+		limiter:         rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer:    k.KolideServerURL(),
+		myLocalDbSigner: agent.LocalDbKeys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -99,7 +92,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	}
 	ls.myKey = privateKey
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey)
+	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
@@ -113,13 +106,13 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ls.presenceDetectionHandler(ecAuthedMux)))
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.presenceDetectionHandler(ecAuthedMux)))
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -411,73 +404,6 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (ls *localServer) presenceDetectionHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// can test this by adding an unauthed endpoint to the mux and running, for example:
-		// curl -i -H "X-Kolide-Presence-Detection-Interval: 10s" -H "X-Kolide-Presence-Detection-Reason: my reason" localhost:12519/id
-		detectionIntervalStr := r.Header.Get(kolidePresenceDetectionIntervalHeaderKey)
-
-		// no presence detection requested
-		if detectionIntervalStr == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// presence detection is only supported on macos currently
-		if runtime.GOOS == "linux" {
-			w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, presencedetection.DetectionFailedDurationValue.String())
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		detectionIntervalDuration, err := time.ParseDuration(detectionIntervalStr)
-		if err != nil {
-			// this is the only time this should returna non-200 status code
-			// asked for presence detection, but the interval is invalid
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		reason := r.Header.Get(kolidePresenceDetectionReasonMacosHeaderKey)
-		if runtime.GOOS == "windows" {
-			reason = r.Header.Get(kolidePresenceDetectionReasonWindowsHeaderKey)
-		}
-
-		if reason == "" {
-			reason = "authenticate"
-			ls.slogger.Log(r.Context(), slog.LevelInfo,
-				"no reason found for presence detection, using default",
-				"reason", reason,
-			)
-		}
-
-		if !ls.presenceDetectionMutex.TryLock() {
-			http.Error(w, "presence detection already in progress", http.StatusTooManyRequests)
-			return
-		}
-		defer ls.presenceDetectionMutex.Unlock()
-
-		durationSinceLastDetection, err := ls.presenceDetector.DetectPresence(reason, detectionIntervalDuration)
-
-		if err != nil {
-			ls.slogger.Log(r.Context(), slog.LevelInfo,
-				"presence_detection",
-				"reason", reason,
-				"interval", detectionIntervalDuration,
-				"duration_since_last_detection", durationSinceLastDetection,
-				"err", err,
-			)
-		}
-
-		// if there was an error, we still want to return a 200 status code
-		// and send the request through
-		// allow the server to decide what to do based on last detection duration
-
-		w.Header().Add(kolideDurationSinceLastPresenceDetectionHeaderKey, durationSinceLastDetection.String())
 		next.ServeHTTP(w, r)
 	})
 }

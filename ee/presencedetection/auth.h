@@ -5,6 +5,7 @@
 #ifndef AUTH_H
 #define AUTH_H
 
+#include <stdint.h>
 #include <stdbool.h>
 
 struct AuthResult {
@@ -13,6 +14,7 @@ struct AuthResult {
     int error_code;     // Error code if any
 };
 
-struct AuthResult Authenticate(char const* reason);
+// Function to authenticate with a timeout (in nanoseconds)
+struct AuthResult Authenticate(const char *reason, int64_t timeout_ns);
 
 #endif

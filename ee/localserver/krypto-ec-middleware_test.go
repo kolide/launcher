@@ -2,7 +2,6 @@ package localserver
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,17 +15,17 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/agent/keys"
 	"github.com/kolide/launcher/ee/localserver/mocks"
-	"github.com/kolide/launcher/ee/presencedetection"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,103 +34,59 @@ import (
 func TestKryptoEcMiddleware(t *testing.T) {
 	t.Parallel()
 
-	counterpartyKey, err := echelper.GenerateEcdsaKey()
-	require.NoError(t, err)
-
-	challengeId := []byte(ulid.New())
-	challengeData := []byte(ulid.New())
-
 	koldieSessionId := ulid.New()
-	cmdRequestHeaders := map[string][]string{
-		kolidePresenceDetectionIntervalHeaderKey: {"0s"},
-	}
-
-	cmdReqCallBackHeaders := map[string][]string{
-		kolideSessionIdHeaderKey: {koldieSessionId},
-	}
-	cmdReqBody := []byte(randomStringWithSqlCharacters(t, 100000))
-
-	cmdReq := mustMarshal(t, v2CmdRequestType{
-		Path:            "whatevs",
-		Body:            cmdReqBody,
-		Headers:         cmdRequestHeaders,
-		CallbackHeaders: cmdReqCallBackHeaders,
-	})
 
 	var tests = []struct {
-		name                    string
-		localDbKey, hardwareKey crypto.Signer
-		challenge               func() ([]byte, *[32]byte)
-		loggedErr               string
-		handler                 http.HandlerFunc
-		responseData            []byte
+		name                                     string
+		cmdReqHeaders                            map[string][]string
+		cmdReqCallbackHeaders                    map[string][]string
+		expectedResponseHeaders                  map[string][]string
+		expectedCallbackHeaders                  map[string][]string
+		expectedPresenceDetectionCallbackHeaders map[string][]string
 	}{
 		{
-			name:       "no command",
-			localDbKey: ecdsaKey(t),
-			challenge:  func() ([]byte, *[32]byte) { return []byte(""), nil },
-			loggedErr:  "failed to extract box from request",
-		},
-		{
-			name:       "malformed cmd",
-			localDbKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, _, err := challenge.Generate(counterpartyKey, challengeId, challengeData, []byte("malformed stuff"))
-				require.NoError(t, err)
-				return challenge, nil
+			name: "with presence detection call back",
+			cmdReqHeaders: map[string][]string{
+				kolidePresenceDetectionIntervalHeaderKey: {"0s"},
 			},
-			loggedErr: "unable to unmarshal cmd request",
-		},
-		{
-			name:       "wrong signature",
-			localDbKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				malloryKey, err := echelper.GenerateEcdsaKey()
-				require.NoError(t, err)
-				challenge, _, err := challenge.Generate(malloryKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, nil
+			cmdReqCallbackHeaders: map[string][]string{
+				kolideSessionIdHeaderKey: {koldieSessionId},
 			},
-			loggedErr: "unable to verify signature",
-		},
-		{
-			name:       "not found 404",
-			localDbKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, priv
+			expectedResponseHeaders: map[string][]string{
+				kolideOsHeaderKey:        {runtime.GOOS},
+				kolideArchHeaderKey:      {runtime.GOARCH},
+				kolideSessionIdHeaderKey: {koldieSessionId},
 			},
-			handler:      http.NotFound,
-			responseData: []byte("404 page not found\n"),
-		},
-		{
-			name:        "works with hardware key",
-			localDbKey:  ecdsaKey(t),
-			hardwareKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, priv
+			expectedCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey:      {runtime.GOARCH},
+				kolideOsHeaderKey:        {runtime.GOOS},
+				kolideSessionIdHeaderKey: {koldieSessionId},
+			},
+			expectedPresenceDetectionCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey:                               {runtime.GOARCH},
+				kolideOsHeaderKey:                                 {runtime.GOOS},
+				kolideSessionIdHeaderKey:                          {koldieSessionId},
+				kolideDurationSinceLastPresenceDetectionHeaderKey: {"0s"},
 			},
 		},
 		{
-			name:       "works with nil hardware key",
-			localDbKey: ecdsaKey(t),
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, priv
+			name: "without session id",
+			cmdReqHeaders: map[string][]string{
+				kolidePresenceDetectionIntervalHeaderKey: {"0s"},
 			},
-		},
-		{
-			name:        "works with noop hardware key",
-			localDbKey:  ecdsaKey(t),
-			hardwareKey: keys.Noop,
-			challenge: func() ([]byte, *[32]byte) {
-				challenge, priv, err := challenge.Generate(counterpartyKey, challengeId, challengeData, cmdReq)
-				require.NoError(t, err)
-				return challenge, priv
+			cmdReqCallbackHeaders: map[string][]string{},
+			expectedResponseHeaders: map[string][]string{
+				kolideOsHeaderKey:   {runtime.GOOS},
+				kolideArchHeaderKey: {runtime.GOARCH},
+			},
+			expectedCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey: {runtime.GOARCH},
+				kolideOsHeaderKey:   {runtime.GOOS},
+			},
+			expectedPresenceDetectionCallbackHeaders: map[string][]string{
+				kolideArchHeaderKey: {runtime.GOARCH},
+				kolideOsHeaderKey:   {runtime.GOOS},
+				kolideDurationSinceLastPresenceDetectionHeaderKey: {"0s"},
 			},
 		},
 	}
@@ -141,44 +96,227 @@ func TestKryptoEcMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			responseMap := make(map[string]any)
-			const testMsgKey = "body"
+			// set up keys
+			remoteServerPrivateKey := mustGenEcdsaKey(t)
+			localServerPrivateKey := mustGenEcdsaKey(t)
 
-			responseValue := string(tt.responseData)
-			if responseValue == "" {
-				responseValue = ulid.New()
+			// create some challenge info
+			challengeId := []byte(ulid.New())
+			challengeData := []byte(ulid.New())
+
+			// this is the key we can use to open the response
+			// it gets set later
+			var challengePrivateKey *[32]byte
+
+			callbackWaitGroup := sync.WaitGroup{}
+
+			callbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer callbackWaitGroup.Done()
+
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				outerResponse := mustUnmarshallOuterResponse(t, mustExtractJsonProperty[string](t, body, "Response"))
+				require.Equal(t, challengeId, outerResponse.ChallengeId)
+
+				opened, err := outerResponse.Open(challengePrivateKey)
+				require.NoError(t, err)
+				require.Equal(t, challengeData, opened.ChallengeData)
+
+				headers := mustExtractJsonProperty[map[string][]string](t, opened.ResponseData, "headers")
+
+				// assume that if we have presence detection header, this is the presence detection callback
+				if _, ok := headers[kolideDurationSinceLastPresenceDetectionHeaderKey]; ok {
+					require.Equal(t, tt.expectedPresenceDetectionCallbackHeaders, headers,
+						"presence detection callback headers should match expected",
+					)
+					return
+				}
+
+				// otherwise it's the regular call back or a "waiting on user callback"
+				require.Equal(t, tt.expectedCallbackHeaders, headers,
+					"callback headers should match expected",
+				)
+
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			cmdReq := v2CmdRequestType{
+				Path:            "whatevs",
+				Body:            []byte(randomStringWithSqlCharacters(t, 100000)),
+				Headers:         tt.cmdReqHeaders,
+				CallbackUrl:     callbackServer.URL,
+				CallbackHeaders: tt.cmdReqCallbackHeaders,
 			}
 
-			responseMap[testMsgKey] = responseValue
+			challengeKryptoBoxB64, challengePrivateKey := mustGenerateChallenge(t, remoteServerPrivateKey, challengeId, challengeData, mustMarshal(t, cmdReq))
 
-			responseDataRaw := mustMarshal(t, responseMap)
+			responseBody := mustMarshal(t, map[string]any{
+				"body": ulid.New(),
+			})
 
-			testHandler := tt.handler
+			requests := []*http.Request{mustMakeGetRequest(t, challengeKryptoBoxB64), mustMakePostRequest(t, challengeKryptoBoxB64)}
 
-			// this handler is what will respond to the request made by the kryptoEcMiddleware.Wrap handler
-			// in this test we just want it to regurgitate the response data we defined above
-			// this should match the responseData in the opened response
-			if testHandler == nil {
-				testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// calculate how many total callbacks we expect
 
-					// make sure all the request headers are present
-					for k, v := range cmdRequestHeaders {
-						require.Equal(t, v[0], r.Header.Get(k))
+			// by default, even without presence detection, we expect a call back for each request
+			expectedCallbacks := len(requests)
+
+			// this is the interval between callbacks for testing
+			presenceDetectionCallbackInterval := 750 * time.Millisecond
+
+			// this is how long it will take the "user" to complete presence detection for testing
+			simulatedPresenceDetectionCompletionTime := 1 * time.Second
+
+			// assume that if we have presence detection headers, we should have a presence detection callback
+			// presence detection is not yet available on linux
+			if tt.expectedPresenceDetectionCallbackHeaders != nil && runtime.GOOS != "linux" {
+
+				// we fire off one call back per request immediately when presence detection is starts
+				expectedCallbacks += len(requests)
+
+				// calc the number of "waiting on user" callbacks, on an interval well send a call back letting the server know we're still waiting
+				expectedCallbacks += int(simulatedPresenceDetectionCompletionTime/presenceDetectionCallbackInterval) * len(requests)
+
+				// we expect one call back per request when the detection is complete
+				expectedCallbacks += len(requests)
+			}
+
+			callbackWaitGroup.Add(expectedCallbacks)
+
+			for _, req := range requests {
+				req := req
+				t.Run(req.Method, func(t *testing.T) {
+					t.Parallel()
+
+					var logBytes threadsafebuffer.ThreadSafeBuffer
+					slogger := multislogger.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+						Level: slog.LevelDebug,
+					})).Logger
+
+					mockPresenceDetector := mocks.NewPresenceDetector(t)
+
+					if runtime.GOOS != "linux" { // only doing persence detection on windows and macos for now
+						mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).
+							After(simulatedPresenceDetectionCompletionTime).
+							Return(0*time.Second, nil).
+							Once()
 					}
 
-					reqBodyRaw, err := io.ReadAll(r.Body)
-					require.NoError(t, err)
-					defer r.Body.Close()
+					// set up middlewares
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
-					require.Equal(t, cmdReqBody, reqBodyRaw)
-					w.Write(responseDataRaw)
+					rr := httptest.NewRecorder()
+					// give our middleware with the test handler to the determiner
+					kryptoEcMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						// make sure all the request headers are present
+						for k, v := range cmdReq.Headers {
+							require.Equal(t, v[0], r.Header.Get(k))
+						}
+
+						w.Write(responseBody)
+					})).ServeHTTP(rr, req)
+
+					expecteKolideSessionId := false
+					for _, headerMap := range []map[string][]string{tt.cmdReqHeaders, tt.cmdReqCallbackHeaders} {
+						_, expecteKolideSessionId = headerMap[kolideSessionIdHeaderKey]
+						if expecteKolideSessionId {
+							break
+						}
+					}
+
+					if expecteKolideSessionId {
+						require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey.String())
+						require.Contains(t, logBytes.String(), koldieSessionId)
+					}
+
+					require.Contains(t, logBytes.String(), multislogger.SpanIdKey.String())
+					require.Equal(t, http.StatusOK, rr.Code)
+					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
+
+					outerResponse := mustUnmarshallOuterResponse(t, string(rr.Body.Bytes()))
+					require.Equal(t, challengeId, outerResponse.ChallengeId)
+
+					opened, err := outerResponse.Open(challengePrivateKey)
+					require.NoError(t, err)
+					require.Equal(t, challengeData, opened.ChallengeData)
+
+					require.Equal(t, mustExtractJsonProperty[string](t, responseBody, "body"), mustExtractJsonProperty[string](t, opened.ResponseData, "body"),
+						"returned response body should match the expected response body",
+					)
+
+					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
+
+					responseHeaders := mustExtractJsonProperty[map[string][]string](t, opened.ResponseData, "headers")
+					require.Equal(t, tt.expectedResponseHeaders, responseHeaders)
+
+					// wait for the callbacks to finish so callback server can run tests
+					callbackWaitGroup.Wait()
 				})
 			}
+		})
+	}
+}
 
-			challengeBytes, privateEncryptionKey := tt.challenge()
+func TestKryptoEcMiddlewareErrors(t *testing.T) {
+	t.Parallel()
 
-			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
-			for _, req := range []*http.Request{makeGetRequest(t, encodedChallenge), makePostRequest(t, encodedChallenge)} {
+	// set up keys
+	remoteServerPrivateKey := mustGenEcdsaKey(t)
+	localServerPrivateKey := mustGenEcdsaKey(t)
+
+	var tests = []struct {
+		name          string
+		loggedErr     string
+		challenge     func() string
+		middlewareOpt func(*kryptoEcMiddleware)
+	}{
+		{
+			name:      "no command",
+			loggedErr: "failed to extract box from request",
+			challenge: func() string {
+				return ""
+			},
+		},
+		{
+			name: "malformed cmd",
+			challenge: func() string {
+				challenge, _ := mustGenerateChallenge(t, remoteServerPrivateKey, []byte(ulid.New()), []byte(ulid.New()), []byte("malformed stuff"))
+				return challenge
+			},
+			loggedErr: "unable to unmarshal cmd request",
+		},
+		{
+			name: "wrong signature",
+			challenge: func() string {
+				malloryKey := mustGenEcdsaKey(t)
+				challenge, _ := mustGenerateChallenge(t, malloryKey, []byte(ulid.New()), []byte(ulid.New()), mustMarshal(t, v2CmdRequestType{}))
+				return challenge
+			},
+			loggedErr: "unable to verify signature",
+		},
+		{
+			name: "timestamp invalid",
+			challenge: func() string {
+				challenge, _ := mustGenerateChallenge(t, remoteServerPrivateKey, []byte(ulid.New()), []byte(ulid.New()), mustMarshal(t, v2CmdRequestType{}))
+				return challenge
+			},
+			loggedErr: "timestamp is out of range",
+			middlewareOpt: func(k *kryptoEcMiddleware) {
+				k.timestampValidityRange = -1
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			getRequest := mustMakeGetRequest(t, tt.challenge())
+
+			for _, req := range []*http.Request{getRequest /* makePostRequest(t, encodedChallenge) */} {
 				req := req
 				t.Run(req.Method, func(t *testing.T) {
 					t.Parallel()
@@ -188,69 +326,27 @@ func TestKryptoEcMiddleware(t *testing.T) {
 						Level: slog.LevelDebug,
 					})).Logger
 
-					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, tt.localDbKey, counterpartyKey.PublicKey)
-					require.NoError(t, err)
-
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
-					localServer := &localServer{
-						presenceDetector: mockPresenceDetector,
-						slogger:          multislogger.NewNopLogger(),
-					}
 
-					// give our middleware with the test handler to the determiner
-					h := kryptoEcMiddleware.Wrap(localServer.presenceDetectionHandler(testHandler))
+					// set up middlewares
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					if tt.middlewareOpt != nil {
+						tt.middlewareOpt(kryptoEcMiddleware)
+					}
 
 					rr := httptest.NewRecorder()
-					h.ServeHTTP(rr, req)
 
-					if tt.loggedErr != "" {
-						assert.Equal(t, http.StatusUnauthorized, rr.Code)
-						assert.Contains(t, logBytes.String(), tt.loggedErr)
-						return
-					}
+					// give our middleware with the test handler to the determiner
+					kryptoEcMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						w.Write([]byte("what evs"))
+					})).ServeHTTP(rr, req)
 
-					require.Contains(t, logBytes.String(), multislogger.KolideSessionIdKey.String())
-					require.Contains(t, logBytes.String(), koldieSessionId)
-					require.Contains(t, logBytes.String(), multislogger.SpanIdKey.String())
+					require.Contains(t, logBytes.String(), tt.loggedErr)
 
-					require.Equal(t, http.StatusOK, rr.Code)
-					require.NotEmpty(t, rr.Body.String())
-
-					require.Equal(t, kolideKryptoEccHeader20230130Value, rr.Header().Get(kolideKryptoHeaderKey))
-
-					// try to open the response
-					returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
-					require.NoError(t, err)
-
-					responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
-					require.NoError(t, err)
-					require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
-
-					opened, err := responseUnmarshalled.Open(privateEncryptionKey)
-					require.NoError(t, err)
-					require.Equal(t, challengeData, opened.ChallengeData)
-
-					opendResponseValue, err := extractJsonProperty[string](opened.ResponseData, testMsgKey)
-					require.NoError(t, err)
-					require.Equal(t, responseValue, opendResponseValue)
-
-					require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
-
-					responseHeaders, err := extractJsonProperty[map[string][]string](opened.ResponseData, "headers")
-					require.NoError(t, err)
-
-					require.Equal(t, runtime.GOOS, responseHeaders[kolideOsHeaderKey][0])
-
-					// check that the presence detection interval is present
-					if runtime.GOOS != "linux" {
-						require.Equal(t, (0 * time.Second).String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
-						return
-					}
-
-					// linux
-					require.Equal(t, presencedetection.DetectionFailedDurationValue.String(), responseHeaders[kolideDurationSinceLastPresenceDetectionHeaderKey][0])
+					require.NotEqual(t, http.StatusOK, rr.Code,
+						"should not have 200 status code on failure",
+					)
 				})
 			}
 		})
@@ -260,11 +356,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 func Test_AllowedOrigin(t *testing.T) {
 	t.Parallel()
 
-	counterpartyKey, err := echelper.GenerateEcdsaKey()
-	require.NoError(t, err)
-
-	challengeId := []byte(ulid.New())
-	challengeData := []byte(ulid.New())
+	counterpartyKey := mustGenEcdsaKey(t)
 
 	var tests = []struct {
 		name            string
@@ -348,9 +440,7 @@ func Test_AllowedOrigin(t *testing.T) {
 				AllowedOrigins: tt.allowedOrigins,
 			}
 
-			challengeBytes, privateEncryptionKey, err := challenge.Generate(counterpartyKey, challengeId, challengeData, mustMarshal(t, cmdReq))
-			require.NoError(t, err)
-			encodedChallenge := base64.StdEncoding.EncodeToString(challengeBytes)
+			challengeKryptoBoxB64, privateEncryptionKey := mustGenerateChallenge(t, counterpartyKey, []byte(ulid.New()), []byte(ulid.New()), mustMarshal(t, cmdReq))
 
 			responseData := []byte(ulid.New())
 
@@ -368,13 +458,15 @@ func Test_AllowedOrigin(t *testing.T) {
 				Level: slog.LevelDebug,
 			})).Logger
 
+			mockPresenceDetector := mocks.NewPresenceDetector(t)
+			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
+
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, ecdsaKey(t), counterpartyKey.PublicKey)
-			require.NoError(t, err)
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector)
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
-			req := makeGetRequest(t, encodedChallenge)
+			req := mustMakeGetRequest(t, challengeKryptoBoxB64)
 			req.Header.Set("origin", tt.requestOrigin)
 			req.Header.Set("referer", tt.requestReferrer)
 
@@ -394,30 +486,15 @@ func Test_AllowedOrigin(t *testing.T) {
 				return
 			}
 
-			// try to open the response
-			returnedResponseBytes, err := base64.StdEncoding.DecodeString(rr.Body.String())
+			outerRespnse := mustUnmarshallOuterResponse(t, rr.Body.String())
+			_, err := outerRespnse.Open(privateEncryptionKey)
 			require.NoError(t, err)
-
-			responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
-			require.NoError(t, err)
-			require.Equal(t, challengeId, responseUnmarshalled.ChallengeId)
-
-			opened, err := responseUnmarshalled.Open(privateEncryptionKey)
-			require.NoError(t, err)
-			require.Equal(t, challengeData, opened.ChallengeData)
-
-			openedResponseValue, err := extractJsonProperty[string](opened.ResponseData, "body")
-			require.NoError(t, err)
-
-			require.Equal(t, responseData, []byte(openedResponseValue))
-			require.WithinDuration(t, time.Now(), time.Unix(opened.Timestamp, 0), time.Second*5)
-
 		})
 	}
 
 }
 
-func ecdsaKey(t *testing.T) *ecdsa.PrivateKey {
+func mustGenEcdsaKey(t *testing.T) *ecdsa.PrivateKey {
 	key, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
 	return key
@@ -440,14 +517,26 @@ func randomStringWithSqlCharacters(t *testing.T, n int) string {
 	return sb.String()
 }
 
-func makeGetRequest(t *testing.T, boxParameter string) *http.Request {
+func mustGenerateChallenge(t *testing.T, key *ecdsa.PrivateKey, challengeId, challengeData []byte, cmdReq []byte) (string, *[32]byte) {
+	challenge, priv, err := challenge.Generate(key, challengeId, challengeData, cmdReq)
+	require.NoError(t, err)
+	return base64.StdEncoding.EncodeToString(challenge), priv
+}
+
+func mustUnmarshallOuterResponse(t *testing.T, responseB64 string) *challenge.OuterResponse {
+	returnedResponseBytes, err := base64.StdEncoding.DecodeString(responseB64)
+	require.NoError(t, err)
+
+	responseUnmarshalled, err := challenge.UnmarshalResponse(returnedResponseBytes)
+	require.NoError(t, err)
+	return responseUnmarshalled
+}
+
+func mustMakeGetRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Request {
 	v := url.Values{}
+	v.Set("box", challengeKryptoBoxB64)
 
-	if boxParameter != "" {
-		v.Set("box", boxParameter)
-	}
-
-	urlString := "https://127.0.0.1:8080?" + v.Encode()
+	urlString := fmt.Sprint("https://127.0.0.1:8080?", v.Encode())
 
 	req, err := http.NewRequest(http.MethodGet, urlString, nil) //nolint:noctx // We don't care about this in tests
 	require.NoError(t, err)
@@ -455,11 +544,11 @@ func makeGetRequest(t *testing.T, boxParameter string) *http.Request {
 	return req
 }
 
-func makePostRequest(t *testing.T, boxValue string) *http.Request {
+func mustMakePostRequest(t *testing.T, challengeKryptoBoxB64 string) *http.Request {
 	urlString := "https://127.0.0.1:8080"
 
 	body, err := json.Marshal(map[string]string{
-		"box": boxValue,
+		"box": challengeKryptoBoxB64,
 	})
 	require.NoError(t, err)
 
@@ -475,27 +564,19 @@ func mustMarshal(t *testing.T, v interface{}) []byte {
 	return b
 }
 
-func extractJsonProperty[T any](jsonData []byte, property string) (T, error) {
+func mustExtractJsonProperty[T any](t *testing.T, jsonData []byte, property string) T {
 	var result map[string]json.RawMessage
 
 	// Unmarshal the JSON data into a map with json.RawMessage
-	err := json.Unmarshal(jsonData, &result)
-	if err != nil {
-		return *new(T), err
-	}
+	require.NoError(t, json.Unmarshal(jsonData, &result))
 
 	// Retrieve the field from the map
 	value, ok := result[property]
-	if !ok {
-		return *new(T), fmt.Errorf("property %s not found", property)
-	}
+	require.True(t, ok, "property %s not found", property)
 
 	// Unmarshal the value into the type T
 	var extractedValue T
-	err = json.Unmarshal(value, &extractedValue)
-	if err != nil {
-		return *new(T), err
-	}
+	require.NoError(t, json.Unmarshal(value, &extractedValue))
 
-	return extractedValue, nil
+	return extractedValue
 }

@@ -8,7 +8,7 @@ import (
 
 const (
 	DetectionFailedDurationValue = -1 * time.Second
-	DetectionTimeout             = 1 * time.Minute
+	DetectionTimeout             = 5 * time.Minute
 )
 
 type PresenceDetector struct {
@@ -20,13 +20,13 @@ type PresenceDetector struct {
 
 // just exists for testing purposes
 type detectorIface interface {
-	Detect(reason string) (bool, error)
+	Detect(reason string, timeout time.Duration) (bool, error)
 }
 
 type detector struct{}
 
-func (d *detector) Detect(reason string) (bool, error) {
-	return Detect(reason)
+func (d *detector) Detect(reason string, timeout time.Duration) (bool, error) {
+	return Detect(reason, timeout)
 }
 
 // DetectPresence checks if the user is present by detecting the presence of a user.
@@ -44,7 +44,7 @@ func (pd *PresenceDetector) DetectPresence(reason string, detectionInterval time
 		return time.Since(pd.lastDetection), nil
 	}
 
-	success, err := pd.detector.Detect(reason)
+	success, err := pd.detector.Detect(reason, DetectionTimeout)
 	if err != nil {
 		// if we got an error, we behave as if there have been no successful detections in the past
 		return DetectionFailedDurationValue, fmt.Errorf("detecting presence: %w", err)
