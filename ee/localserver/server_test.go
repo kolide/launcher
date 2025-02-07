@@ -3,9 +3,12 @@ package localserver
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -80,4 +83,81 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	k.AssertExpectations(t)
 	querier.AssertExpectations(t)
+}
+
+func TestMunemoCheckHandler(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		headers        map[string]string
+		tokenClaims    jwt.MapClaims
+		expectedStatus int
+	}{
+		{
+			name:           "matching munemo",
+			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:    jwt.MapClaims{"organization": "test-munemo"},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "no munemo header",
+			headers:        map[string]string{},
+			tokenClaims:    jwt.MapClaims{"organization": "other-munemo"},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "no org claim",
+			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:    jwt.MapClaims{},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "non matching munemo",
+			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:    jwt.MapClaims{"organization": "other-munemo"},
+			expectedStatus: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.tokenClaims).SignedString([]byte("test"))
+			require.NoError(t, err)
+
+			knapsack := typesmocks.NewKnapsack(t)
+
+			if _, ok := tt.headers["X-Kolide-Munemo"]; ok {
+				knapsack.On("ReadEnrollSecret").Return(token, nil)
+			}
+
+			server := &localServer{
+				knapsack: knapsack,
+				slogger:  multislogger.NewNopLogger(),
+			}
+
+			// Create a test handler for the middleware to call
+			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Wrap the test handler in the middleware
+			handlerToTest := server.munemoCheckHandler(nextHandler)
+
+			// Create a request with the specified headers
+			req := httptest.NewRequest("GET", "/", nil)
+
+			for key, value := range tt.headers {
+				req.Header.Add(key, value)
+			}
+
+			rr := httptest.NewRecorder()
+			handlerToTest.ServeHTTP(rr, req)
+
+			require.Equal(t, tt.expectedStatus, rr.Code)
+		})
+	}
 }
