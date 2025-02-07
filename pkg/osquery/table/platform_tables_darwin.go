@@ -31,7 +31,6 @@ import (
 	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
 	"github.com/kolide/launcher/ee/tables/zfs"
-	_ "github.com/mattn/go-sqlite3"
 	osquery "github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
