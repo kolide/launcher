@@ -429,10 +429,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	err = backoff.WaitFor(func() error {
 		details := e.knapsack.GetEnrollmentDetails()
-		if err != nil {
-			traces.SetError(span, fmt.Errorf("error getting enrollment details: %w", err))
-			return err
-		}
 		if details.OSVersion == "" || details.Hostname == "" {
 			return errors.New("incomplete enrollment details")
 		}
