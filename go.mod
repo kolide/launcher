@@ -17,7 +17,7 @@ require (
 	github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a
 	github.com/kolide/krypto v0.1.1-0.20241212211625-46a8d5cad1cc
 	github.com/mat/besticon v3.9.0+incompatible
-	github.com/mattn/go-sqlite3 v1.14.19
+	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/osquery/osquery-go v0.0.0-20250131154556-629f995b6947
 	github.com/peterbourgon/ff/v3 v3.1.2
