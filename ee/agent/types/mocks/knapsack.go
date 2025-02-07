@@ -526,24 +526,6 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
-// TableGenerateTimeout provides a mock function with given fields:
-func (_m *Knapsack) TableGenerateTimeout() time.Duration {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for TableGenerateTimeout")
-	}
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
 // GetRunID provides a mock function with given fields:
 func (_m *Knapsack) GetRunID() string {
 	ret := _m.Called()
@@ -1516,24 +1498,6 @@ func (_m *Knapsack) SetForceControlSubsystems(force bool) error {
 	return r0
 }
 
-// SetTableGenerateTimeout provides a mock function with given fields: interval
-func (_m *Knapsack) SetTableGenerateTimeout(interval time.Duration) error {
-	ret := _m.Called(interval)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetTableGenerateTimeout")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
-		r0 = rf(interval)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetInModernStandby provides a mock function with given fields: enabled
 func (_m *Knapsack) SetInModernStandby(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -1807,6 +1771,24 @@ func (_m *Knapsack) SetSystrayRestartEnabled(enabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetTableGenerateTimeout provides a mock function with given fields: interval
+func (_m *Knapsack) SetTableGenerateTimeout(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetTableGenerateTimeout")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2097,6 +2079,24 @@ func (_m *Knapsack) SystrayRestartEnabled() bool {
 	return r0
 }
 
+// TableGenerateTimeout provides a mock function with given fields:
+func (_m *Knapsack) TableGenerateTimeout() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TableGenerateTimeout")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // TokenStore provides a mock function with given fields:
 func (_m *Knapsack) TokenStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -2310,6 +2310,26 @@ func (_m *Knapsack) WatchdogUtilizationLimitPercent() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// ZtaInfoStore provides a mock function with given fields:
+func (_m *Knapsack) ZtaInfoStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ZtaInfoStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
 	}
 
 	return r0

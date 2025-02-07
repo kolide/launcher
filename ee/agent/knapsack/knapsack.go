@@ -176,6 +176,10 @@ func (k *knapsack) LauncherHistoryStore() types.KVStore {
 	return k.getKVStore(storage.LauncherHistoryStore)
 }
 
+func (k *knapsack) ZtaInfoStore() types.KVStore {
+	return k.getKVStore(storage.ZtaInfoStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
 	return k.flags.SetLauncherWatchdogEnabled(enabled)
 }
