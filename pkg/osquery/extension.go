@@ -428,7 +428,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	var enrollDetails types.EnrollmentDetails
 
 	err = backoff.WaitFor(func() error {
-		details, err := e.knapsack.GetEnrollmentDetails()
+		details := e.knapsack.GetEnrollmentDetails()
 		if err != nil {
 			traces.SetError(span, fmt.Errorf("error getting enrollment details: %w", err))
 			return err
@@ -444,7 +444,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	if err != nil {
 		span.AddEvent("enrollment_details_timeout")
 		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
-		enrollDetails, _ = e.knapsack.GetEnrollmentDetails()
+		enrollDetails = e.knapsack.GetEnrollmentDetails()
 	}
 
 	// If no cached node key, enroll for new node key

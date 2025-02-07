@@ -78,7 +78,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	defer span.End()
 
 	enrollmentStatus, _ := ls.knapsack.CurrentEnrollmentStatus()
-	enrollmentDetails, _ := ls.knapsack.GetEnrollmentDetails()
+	enrollmentDetails := ls.knapsack.GetEnrollmentDetails()
 
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
