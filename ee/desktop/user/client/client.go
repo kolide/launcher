@@ -32,7 +32,15 @@ type client struct {
 	base http.Client
 }
 
-func New(authToken, socketPath string) client {
+type clientOption func(*client)
+
+func WithTimeout(timeout time.Duration) clientOption {
+	return func(c *client) {
+		c.base.Timeout = timeout
+	}
+}
+
+func New(authToken, socketPath string, opts ...clientOption) client {
 	transport := &transport{
 		authToken: authToken,
 		base: http.Transport{
@@ -45,6 +53,10 @@ func New(authToken, socketPath string) client {
 			Transport: otelhttp.NewTransport(transport),
 			Timeout:   30 * time.Second,
 		},
+	}
+
+	for _, opt := range opts {
+		opt(&client)
 	}
 
 	return client
@@ -83,7 +95,17 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 	encodedInterval := url.QueryEscape(interval.String())
 
 	// default time out of 30s is set in New()
-	resp, requestErr := c.base.Get(fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval))
+	timeout := c.base.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://unix/detect_presence?reason=%s&interval=%s", encodedReason, encodedInterval), nil)
+	if err != nil {
+		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("creating presence request: %w", err)
+	}
+	resp, requestErr := c.base.Do(req)
 	if requestErr != nil {
 		return presencedetection.DetectionFailedDurationValue, fmt.Errorf("getting presence: %w", requestErr)
 	}
@@ -111,7 +133,20 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 }
 
 func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
-	resp, err := c.base.Post("http://unix/secure_enclave_key", "application/json", http.NoBody)
+	timeout := c.base.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/secure_enclave_key", http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating secure enclave key request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.base.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("getting secure enclave key: %w", err)
 	}
@@ -135,6 +170,14 @@ func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
 }
 
 func (c *client) Notify(n notify.Notification) error {
+	timeout := c.base.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	notificationToSend := notify.Notification{
 		Title:     n.Title,
 		Body:      n.Body,
@@ -145,7 +188,13 @@ func (c *client) Notify(n notify.Notification) error {
 		return fmt.Errorf("could not marshal notification: %w", err)
 	}
 
-	resp, err := c.base.Post("http://unix/notification", "application/json", bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/notification", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("creating notification request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.base.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not send notification: %w", err)
 	}
@@ -160,25 +209,20 @@ func (c *client) Notify(n notify.Notification) error {
 }
 
 func (c *client) get(path string) error {
-	resp, err := c.base.Get(fmt.Sprintf("http://unix/%s", path))
-	if err != nil {
-		return err
-	}
-
-	if resp.Body != nil {
-		resp.Body.Close()
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
+	return c.getWithContext(context.Background(), path)
 }
 
 func (c *client) getWithContext(ctx context.Context, path string) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
+
+	timeout := c.base.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://unix/%s", path), nil)
 	if err != nil {

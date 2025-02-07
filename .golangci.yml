@@ -5,13 +5,16 @@ linters:
   enable:
     - bodyclose
     - containedctx
+    - exhaustive
     - forbidigo
     - gofmt
     - govet
     - ineffassign
     - misspell
     - nakedret
+    - noctx
     - paralleltest
+    - predeclared
     - revive
     - rowserrcheck
     - sloglint
@@ -24,7 +27,6 @@ linters:
     - errcheck
     - gosec
     - gosimple
-    - noctx
 
 linters-settings:
   errcheck:

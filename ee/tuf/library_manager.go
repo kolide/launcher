@@ -132,9 +132,22 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	}
 	stagedUpdatePath := filepath.Join(stagingDir, targetFilename)
 
+	// Ensure we set a timeout on our request to download the binary
+	timeout := ulm.mirrorClient.Timeout
+	if timeout == 0 {
+		// Set a high-but-reasonable default
+		timeout = 8 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	// Request download from mirror
 	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + downloadPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ulm.mirrorUrl+downloadPath, nil)
+	if err != nil {
+		return stagedUpdatePath, fmt.Errorf("creating request to download target %s: %w", targetFilename, err)
+	}
+	resp, err := ulm.mirrorClient.Do(req)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}

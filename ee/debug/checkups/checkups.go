@@ -221,6 +221,8 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 			warningCheckups = append(warningCheckups, c.Name())
 		case Failing, Erroring:
 			failingCheckups = append(failingCheckups, c.Name())
+		case Unknown, Informational, Passing:
+			// No need to print additional information about unknown, informational, or passing checkups
 		}
 	}
 
@@ -263,7 +265,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	flare := zip.NewWriter(flareStream)
 	combinedSummary := bytes.Buffer{}
 
-	close := func() error {
+	finalize := func() error {
 		closeFlares := func() error {
 			return errors.Join(flare.Close(), flareStream.Close())
 		}
@@ -284,13 +286,13 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	// Note our runtime context.
 	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
 	if err := writeFlareEnv(flare, runtimeEnvironment); err != nil {
-		return errors.Join(fmt.Errorf("writing flare environment: %w", err), close())
+		return errors.Join(fmt.Errorf("writing flare environment: %w", err), finalize())
 	}
 
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
-			return errors.Join(fmt.Errorf("writing flare zip: %w", err), close())
+			return errors.Join(fmt.Errorf("writing flare zip: %w", err), finalize())
 		}
 	}
 
@@ -299,7 +301,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	noteMultipleInstallations(flare)
 
 	// we could defer this close, but we want to return any errors
-	return close()
+	return finalize()
 }
 
 // noteMultipleInstallations checks for whether the results of running flare for this installation may be complicated

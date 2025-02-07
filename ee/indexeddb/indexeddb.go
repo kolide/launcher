@@ -3,6 +3,7 @@ package indexeddb
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -30,9 +32,12 @@ var indexeddbComparer = newChromeComparer()
 
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+	ctx, span := traces.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
+	defer span.End()
+
 	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.
-	tempDbCopyLocation, err := copyIndexeddb(dbLocation)
+	tempDbCopyLocation, err := copyIndexeddb(ctx, dbLocation)
 	if err != nil {
 		if tempDbCopyLocation != "" {
 			_ = os.RemoveAll(tempDbCopyLocation)
@@ -57,8 +62,10 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 		if dbRecoverErr != nil {
 			return nil, fmt.Errorf("opening db: `%+v`; recovering db: %w", dbOpenErr, dbRecoverErr)
 		}
+		span.AddEvent("db_recovered")
 	}
 	defer db.Close()
+	span.AddEvent("db_opened")
 
 	// Get the database ID from the name
 	databaseNameKey, err := databaseIdKey(dbLocation, dbName)
@@ -93,6 +100,7 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 			break
 		}
 	}
+	span.AddEvent("got_object_store_id")
 
 	if objectStoreId == 0 {
 		// If the object store doesn't exist, return an empty list of objects
@@ -120,11 +128,15 @@ func QueryIndexeddbObjectStore(dbLocation string, dbName string, objectStoreName
 	if err := iter.Error(); err != nil {
 		return objs, fmt.Errorf("iterator error: %w", err)
 	}
+	span.AddEvent("completed_iteration")
 
 	return objs, nil
 }
 
-func copyIndexeddb(sourceDb string) (string, error) {
+func copyIndexeddb(ctx context.Context, sourceDb string) (string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	dbCopyLocation, err := agent.MkdirTemp(filepath.Base(sourceDb))
 	if err != nil {
 		return "", fmt.Errorf("making temporary directory: %w", err)
@@ -146,7 +158,7 @@ func copyIndexeddb(sourceDb string) (string, error) {
 		}
 		src := filepath.Join(sourceDb, entry.Name())
 		dest := filepath.Join(dbCopyLocation, entry.Name())
-		if err := copyFile(src, dest); err != nil {
+		if err := copyFile(ctx, src, dest); err != nil {
 			return dbCopyLocation, fmt.Errorf("copying file: %w", err)
 		}
 	}
@@ -154,7 +166,10 @@ func copyIndexeddb(sourceDb string) (string, error) {
 	return dbCopyLocation, nil
 }
 
-func copyFile(src string, dest string) error {
+func copyFile(ctx context.Context, src string, dest string) error {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	srcFh, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("opening %s: %w", src, err)

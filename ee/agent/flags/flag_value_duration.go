@@ -24,15 +24,15 @@ func WithDefault(defaultVal time.Duration) durationOption {
 	}
 }
 
-func WithMin(min time.Duration) durationOption {
+func WithMin(minimum time.Duration) durationOption {
 	return func(d *durationFlagValue) {
-		d.min = int64(min)
+		d.min = int64(minimum)
 	}
 }
 
-func WithMax(max time.Duration) durationOption {
+func WithMax(maximum time.Duration) durationOption {
 	return func(d *durationFlagValue) {
-		d.max = int64(max)
+		d.max = int64(maximum)
 	}
 }
 
@@ -91,12 +91,12 @@ func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 }
 
 // clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampValue(value int64, min, max int64) int64 {
+func clampValue(value int64, minimum, maximum int64) int64 {
 	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
+	case value < minimum:
+		return minimum
+	case value > maximum:
+		return maximum
 	default:
 		return value
 	}

@@ -67,7 +67,7 @@ func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	}
 
 	// Primarily, we want to validate that we can talk to the TUF server
-	releaseVersion, remoteMetadataVersion, err := tc.remoteTufMetadata(httpClient, tufUrl)
+	releaseVersion, remoteMetadataVersion, err := tc.remoteTufMetadata(ctx, httpClient, tufUrl)
 	if err != nil {
 		tc.status = Erroring
 		tc.data[tufUrl.String()] = err.Error()
@@ -127,8 +127,12 @@ func (tc *tufCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 // which should look like:
 // https://[TUF_HOST]/repository/targets.json -> full targets blob
 // ---> signed -> targets -> launcher/<GOOS>/<GOARCH|universal>/<RELEASE_CHANNEL>/release.json -> custom -> target
-func (tc *tufCheckup) remoteTufMetadata(client *http.Client, tufUrl *url.URL) (string, int, error) {
-	response, err := client.Get(tufUrl.String())
+func (tc *tufCheckup) remoteTufMetadata(ctx context.Context, client *http.Client, tufUrl *url.URL) (string, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tufUrl.String(), nil)
+	if err != nil {
+		return "", 0, fmt.Errorf("creating request: %w", err)
+	}
+	response, err := client.Do(req)
 	if err != nil {
 		return "", 0, err
 	}

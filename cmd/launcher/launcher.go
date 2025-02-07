@@ -62,6 +62,7 @@ import (
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
 )
@@ -535,8 +536,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	if k.Autoupdate() {
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 30 * time.Second
+		metadataClient.Transport = otelhttp.NewTransport(metadataClient.Transport)
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
+		mirrorClient.Transport = otelhttp.NewTransport(mirrorClient.Transport)
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			ctx,
 			k,
