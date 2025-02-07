@@ -89,34 +89,51 @@ func TestMunemoCheckHandler(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		headers        map[string]string
-		tokenClaims    jwt.MapClaims
-		expectedStatus int
+		name                            string
+		headers                         map[string]string
+		tokenClaims                     jwt.MapClaims
+		expectedStatus                  int
+		expectedCallsToReadEnrollSecret int
 	}{
 		{
-			name:           "matching munemo",
-			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
-			tokenClaims:    jwt.MapClaims{"organization": "test-munemo"},
-			expectedStatus: http.StatusOK,
+			name:                            "matching munemo",
+			headers:                         map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:                     jwt.MapClaims{"organization": "test-munemo"},
+			expectedStatus:                  http.StatusOK,
+			expectedCallsToReadEnrollSecret: 1,
 		},
 		{
-			name:           "no munemo header",
-			headers:        map[string]string{},
-			tokenClaims:    jwt.MapClaims{"organization": "other-munemo"},
-			expectedStatus: http.StatusOK,
+			name:                            "no munemo header",
+			tokenClaims:                     jwt.MapClaims{"organization": "test-munemo"},
+			expectedStatus:                  http.StatusOK,
+			expectedCallsToReadEnrollSecret: 0,
 		},
 		{
-			name:           "no org claim",
-			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
-			tokenClaims:    jwt.MapClaims{},
-			expectedStatus: http.StatusOK,
+			name:                            "no token claims",
+			headers:                         map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			expectedStatus:                  http.StatusOK,
+			expectedCallsToReadEnrollSecret: 2,
 		},
 		{
-			name:           "non matching munemo",
-			headers:        map[string]string{"X-Kolide-Munemo": "test-munemo"},
-			tokenClaims:    jwt.MapClaims{"organization": "other-munemo"},
-			expectedStatus: http.StatusUnauthorized,
+			name:                            "token claim not string",
+			headers:                         map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:                     jwt.MapClaims{"organization": 1},
+			expectedStatus:                  http.StatusOK,
+			expectedCallsToReadEnrollSecret: 2,
+		},
+		{
+			name:                            "empty org claim",
+			headers:                         map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:                     jwt.MapClaims{"organization": ""},
+			expectedStatus:                  http.StatusOK,
+			expectedCallsToReadEnrollSecret: 2,
+		},
+		{
+			name:                            "header and munemo dont match",
+			headers:                         map[string]string{"X-Kolide-Munemo": "test-munemo"},
+			tokenClaims:                     jwt.MapClaims{"organization": "other-munemo"},
+			expectedStatus:                  http.StatusUnauthorized,
+			expectedCallsToReadEnrollSecret: 1,
 		},
 	}
 
@@ -129,9 +146,8 @@ func TestMunemoCheckHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			knapsack := typesmocks.NewKnapsack(t)
-
-			if _, ok := tt.headers["X-Kolide-Munemo"]; ok {
-				knapsack.On("ReadEnrollSecret").Return(token, nil)
+			if tt.expectedCallsToReadEnrollSecret > 0 {
+				knapsack.On("ReadEnrollSecret").Return(token, nil).Times(tt.expectedCallsToReadEnrollSecret)
 			}
 
 			server := &localServer{
@@ -157,6 +173,10 @@ func TestMunemoCheckHandler(t *testing.T) {
 			rr := httptest.NewRecorder()
 			handlerToTest.ServeHTTP(rr, req)
 
+			require.Equal(t, tt.expectedStatus, rr.Code)
+
+			// run it again to make sure we actually cached the munemo
+			handlerToTest.ServeHTTP(rr, req)
 			require.Equal(t, tt.expectedStatus, rr.Code)
 		})
 	}

@@ -57,6 +57,8 @@ type localServer struct {
 
 	serverKey   *rsa.PublicKey
 	serverEcKey *ecdsa.PublicKey
+
+	tenantMunemo string
 }
 
 const (
@@ -413,42 +415,87 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 // if either the header or the enroll secret are missing, the request is allowed through
 func (ls *localServer) munemoCheckHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		munemo := r.Header.Get("X-Kolide-Munemo")
-		if munemo == "" {
+		munemoHeaderValue := r.Header.Get("X-Kolide-Munemo")
+		if munemoHeaderValue == "" {
+			ls.slogger.Log(r.Context(), slog.LevelDebug,
+				"munemo header is empty, continuing",
+			)
+
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		rawToken, err := ls.knapsack.ReadEnrollSecret()
+		localServerMunemo, err := ls.getMunemoFromEnrollSecret()
 		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelError,
+				"getting munemo from enroll secret, conitnuing",
+				"err", err,
+			)
+
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
-		if err != nil {
+		if localServerMunemo == "" {
+			ls.slogger.Log(r.Context(), slog.LevelDebug,
+				"munemo in enroll secret is empty, continuing",
+				"header", munemoHeaderValue,
+			)
+
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
+		if munemoHeaderValue == localServerMunemo {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		org, ok := claims["organization"]
-		if !ok {
-			next.ServeHTTP(w, r)
-			return
-		}
+		ls.slogger.Log(r.Context(), slog.LevelDebug,
+			"munemo in request does not match munemo in enroll secret",
+			"header", munemoHeaderValue,
+			"enroll_secret", localServerMunemo,
+		)
 
-		if org == munemo {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		http.Error(w, "organization does not match enroll secret organization", http.StatusUnauthorized)
+		http.Error(w, "munemo in request does not match munemo in enroll secret", http.StatusUnauthorized)
 		return
 	})
+}
+
+// munemoCheckHandler returns an http error if the request's X-Kolide-Munemo header does not match the organization in the enroll secret
+// if either the header or the enroll secret are missing, the request is allowed through
+func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
+	if ls.tenantMunemo != "" {
+		return ls.tenantMunemo, nil
+	}
+
+	rawToken, err := ls.knapsack.ReadEnrollSecret()
+	if err != nil {
+		return "", err
+	}
+
+	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	org, ok := claims["organization"]
+	if !ok {
+		return "", errors.New("no organization claim")
+	}
+
+	// convert org to string
+	munemo, ok := org.(string)
+	if !ok {
+		return "", errors.New("organization claim not a string")
+	}
+
+	ls.tenantMunemo = munemo
+
+	return munemo, nil
 }
