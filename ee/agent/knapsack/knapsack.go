@@ -245,8 +245,7 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 
 func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
 	if enrollmentDetails == nil {
-		newDetails := details
-		enrollmentDetails = &newDetails
+		enrollmentDetails = &details
 		k.Slogger().Log(context.Background(), slog.LevelDebug,
 			"initializing enrollment details",
 			"details", fmt.Sprintf("%+v", enrollmentDetails),
