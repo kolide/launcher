@@ -507,7 +507,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 
 		// Set up consumer to receive ZTA info from the control server
-		ztaInfoConsumer := keyvalueconsumer.New(k.ZtaInfoStore())
+		ztaInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.ZtaInfoStore())
 		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, ztaInfoConsumer); err != nil {
 			return fmt.Errorf("failed to register ZTA info consumer: %w", err)
 		}
