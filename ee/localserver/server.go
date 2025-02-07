@@ -428,7 +428,7 @@ func (ls *localServer) munemoCheckHandler(next http.Handler) http.Handler {
 		localServerMunemo, err := ls.getMunemoFromEnrollSecret()
 		if err != nil {
 			ls.slogger.Log(r.Context(), slog.LevelError,
-				"getting munemo from enroll secret, conitnuing",
+				"getting munemo from enroll secret, continuing",
 				"err", err,
 			)
 
@@ -462,8 +462,8 @@ func (ls *localServer) munemoCheckHandler(next http.Handler) http.Handler {
 	})
 }
 
-// munemoCheckHandler returns an http error if the request's X-Kolide-Munemo header does not match the organization in the enroll secret
-// if either the header or the enroll secret are missing, the request is allowed through
+// getMunemoFromEnrollSecret extracts the munemo from the enroll or returns already
+// extracted cached value
 func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
 	if ls.tenantMunemo != "" {
 		return ls.tenantMunemo, nil
