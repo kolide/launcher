@@ -474,6 +474,7 @@ func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
 		return "", err
 	}
 
+	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
 	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
 	if err != nil {
 		return "", err
