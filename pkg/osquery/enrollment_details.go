@@ -7,12 +7,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -144,4 +147,33 @@ func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *serv
 	}
 
 	return nil
+}
+
+// CollectAndSetEnrollmentDetails collects enrollment details from osquery and sets them in the knapsack.
+func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k types.Knapsack, collectTimeout time.Duration, collectRetryInterval time.Duration) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	// Get the runtime details
+	details := getRuntimeEnrollDetails()
+
+	// Set the osquery version and save everything to knapsack before attempting to get osquery enrollment details
+	k.SetEnrollmentDetails(details)
+
+	latestOsquerydPath := k.LatestOsquerydPath(ctx)
+
+	if latestOsquerydPath == "" {
+		return
+	}
+	if err := backoff.WaitFor(func() error {
+		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
+		if err != nil {
+			span.AddEvent("failed to get enrollment details")
+		}
+		return err
+	}, collectTimeout, collectRetryInterval); err != nil {
+		traces.SetError(span, fmt.Errorf("enrollment details collection failed: %w", err))
+	}
+
+	k.SetEnrollmentDetails(details)
 }
