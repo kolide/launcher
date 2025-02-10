@@ -239,7 +239,7 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: ./build
-        key: ${{ matrix.artifactos }}-${{ github.run_id }}
+        key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
     - name: Upload Build
