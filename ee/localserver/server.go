@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -159,7 +158,6 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		return nil
 	}
 
-	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 
 	ctx := context.TODO()
@@ -171,14 +169,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 			"using developer certificates",
 		)
 
-		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using review app certificates",
 		)
 
-		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
 	default:
 		ls.slogger.Log(ctx, slogLevel,
@@ -186,18 +182,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		)
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
-	if err != nil {
-		return fmt.Errorf("parsing default public key: %w", err)
-	}
-
-	serverKey, ok := serverKeyRaw.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("public key not an rsa public key")
-	}
-
-	ls.serverKey = serverKey
-
+	var err error
 	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default server ec key: %w", err)
