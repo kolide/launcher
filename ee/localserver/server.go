@@ -114,6 +114,9 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
+	// In the future, we will want to make this authenticated; for now, it is not authenticated.
+	mux.Handle("/zta", ls.requestZtaInfoHandler())
+
 	// uncomment to test without going through middleware
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'

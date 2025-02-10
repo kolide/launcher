@@ -19,6 +19,7 @@ const (
 	TokenStore                  Store = "token_store"              // The store used for holding bearer auth tokens, e.g. the ones used to authenticate with the observability ingest server.
 	ControlServerActionsStore   Store = "action_store"             // The store used for storing actions sent by control server.
 	LauncherHistoryStore        Store = "launcher_history"         // The store used for storing launcher start time history currently.
+	ZtaInfoStore                Store = "zta_info"                 // The store used for storing ZTA info about this device
 )
 
 func (storeType Store) String() string {
