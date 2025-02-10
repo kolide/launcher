@@ -23,10 +23,11 @@ type (
 	requestIdsResponse struct {
 		RequestId string
 		identifiers
-		Nonce     string
-		Timestamp time.Time
-		Status    status
-		Origin    string
+		Nonce             string
+		Timestamp         time.Time
+		Status            status
+		Origin            string
+		EnrollmentDetails types.EnrollmentDetails
 	}
 
 	status struct {
@@ -77,6 +78,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	defer span.End()
 
 	enrollmentStatus, _ := ls.knapsack.CurrentEnrollmentStatus()
+	enrollmentDetails := ls.knapsack.GetEnrollmentDetails()
 
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
@@ -85,6 +87,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		Status: status{
 			EnrollmentStatus: string(enrollmentStatus),
 		},
+		EnrollmentDetails: enrollmentDetails,
 	}
 	response.identifiers = ls.identifiers
 

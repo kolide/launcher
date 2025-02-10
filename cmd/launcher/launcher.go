@@ -210,6 +210,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
 
 	gowrapper.Go(ctx, slogger, func() {
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 30*time.Second, 5*time.Second)
+	})
+	gowrapper.Go(ctx, slogger, func() {
 		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	})
 	gowrapper.Go(ctx, slogger, func() {

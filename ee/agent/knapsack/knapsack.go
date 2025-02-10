@@ -20,6 +20,9 @@ import (
 // Package-level runID variable
 var runID string
 
+// Package-level enrollmentDetails variable
+var enrollmentDetails *types.EnrollmentDetails
+
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
 
@@ -242,4 +245,36 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	}
 
 	return types.Enrolled, nil
+}
+
+func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
+	if enrollmentDetails == nil {
+		enrollmentDetails = &details
+		k.Slogger().Log(context.Background(), slog.LevelDebug,
+			"initializing enrollment details",
+			"details", fmt.Sprintf("%+v", enrollmentDetails),
+		)
+
+	}
+
+	current := *enrollmentDetails
+
+	k.Slogger().Log(context.Background(), slog.LevelDebug,
+		"updating enrollment details",
+		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
+		"new_details", fmt.Sprintf("%+v", current),
+	)
+	enrollmentDetails = &current
+}
+
+func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
+	if enrollmentDetails == nil {
+		return types.EnrollmentDetails{}
+	}
+
+	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
+	osqueryVersion := k.CurrentRunningOsqueryVersion()
+	enrollmentDetails.OsqueryVersion = osqueryVersion
+
+	return *enrollmentDetails
 }

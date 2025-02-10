@@ -27,6 +27,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil)
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{

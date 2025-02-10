@@ -5,8 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,4 +37,41 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 	// We expect getEnrollDetails to fail when called against an executable that is not osquery
 	err = getOsqEnrollDetails(context.TODO(), currentExecutable, &details)
 	require.Error(t, err, "should not have been able to get enroll details with non-osqueryd executable")
+}
+
+func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
+	t.Parallel()
+	k := typesmocks.NewKnapsack(t)
+	ctx := context.Background()
+	slogger := multislogger.NewNopLogger()
+
+	k.On("LatestOsquerydPath", mock.Anything).Return("")
+	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Return(nil).Once()
+
+	CollectAndSetEnrollmentDetails(ctx, slogger, k, 1*time.Second, 100*time.Millisecond)
+
+	k.AssertNumberOfCalls(t, "SetEnrollmentDetails", 1)
+}
+
+func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
+	t.Parallel()
+
+	k := typesmocks.NewKnapsack(t)
+
+	expectedOsquerydPath := "/some/fake/path/to/osquerd"
+	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
+	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Twice()
+
+	ctx := context.Background()
+	logger := multislogger.NewNopLogger()
+
+	collectTimeout := 5 * time.Second
+	collectRetryInterval := 500 * time.Millisecond
+
+	CollectAndSetEnrollmentDetails(ctx, logger, k, collectTimeout, collectRetryInterval)
+
+	k.AssertExpectations(t)
+
+	k.AssertCalled(t, "LatestOsquerydPath", mock.Anything)
+	k.AssertNumberOfCalls(t, "SetEnrollmentDetails", 2)
 }
