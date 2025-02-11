@@ -65,7 +65,7 @@ func (h *History) GetHistory() ([]map[string]string, error) {
 }
 
 // LatestInstance returns the latest osquery instance
-func (h *History) LatestInstance() (Instance, error) {
+func (h *History) latestInstance() (Instance, error) {
 	h.Lock()
 	defer h.Unlock()
 
@@ -111,7 +111,7 @@ func (h *History) LatestInstanceIDByRegistrationID(registrationId string) (strin
 }
 
 func (h *History) LatestInstanceUptimeMinutes() (int64, error) {
-	lastInstance, err := h.LatestInstance()
+	lastInstance, err := h.latestInstance()
 	if err != nil {
 		return 0, fmt.Errorf("getting latest instance: %w", err)
 	}

@@ -15,7 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewInstance(t *testing.T) { // nolint:paralleltest
+func TestNewInstance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		initialInstances []*Instance
@@ -51,15 +52,16 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 			wantNumInstances: 10,
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
-			t.Cleanup(func() { currentHistory = &History{} })
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
-
-			_, err := NewInstance(ulid.New(), ulid.New())
+			err = currentHistory.NewInstance(ulid.New(), ulid.New())
+			require.NoError(t, err, "expected to be able to add new instance to history")
 
 			assert.Equal(t, tt.wantNumInstances, len(currentHistory.instances), "expect history length to reflect new instance")
 
@@ -68,7 +70,7 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 				return
 			}
 
-			currInstance, err := LatestInstance()
+			currInstance, err := currentHistory.latestInstance()
 			assert.NoError(t, err, "expect no error getting current instance")
 
 			// make sure start time was set
@@ -84,11 +86,12 @@ func TestNewInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestGetHistory(t *testing.T) { // nolint:paralleltest
+func TestGetHistory(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		initialInstances []*Instance
-		want             []Instance
+		want             []map[string]string
 		errString        string
 	}{
 		{
@@ -101,13 +104,9 @@ func TestGetHistory(t *testing.T) { // nolint:paralleltest
 					StartTime: "second_expected_start_time",
 				},
 			},
-			want: []Instance{
-				{
-					StartTime: "first_expected_start_time",
-				},
-				{
-					StartTime: "second_expected_start_time",
-				},
+			want: []map[string]string {
+				{"connect_time": "", "errors": "", "exit_time": "", "hostname": "", "instance_id": "", "instance_run_id": "", "registration_id": "", "start_time": "first_expected_start_time", "version": ""},
+				{"connect_time": "", "errors": "", "exit_time": "", "hostname": "", "instance_id": "", "instance_run_id": "", "registration_id": "", "start_time": "second_expected_start_time", "version": ""},
 			},
 		},
 		{
@@ -115,14 +114,14 @@ func TestGetHistory(t *testing.T) { // nolint:paralleltest
 			errString: NoInstancesError{}.Error(),
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Cleanup(func() { currentHistory = &History{} })
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
-
-			got, err := GetHistory()
+			got, err := currentHistory.GetHistory()
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -133,7 +132,8 @@ func TestGetHistory(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestLatestInstance(t *testing.T) { // nolint:paralleltest
+func TestLatestInstance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		initialInstances []*Instance
@@ -159,13 +159,13 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 			errString: NoInstancesError{}.Error(),
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Cleanup(func() { currentHistory = &History{} })
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
-
-			got, err := LatestInstance()
+			got, err := currentHistory.latestInstance()
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -176,7 +176,8 @@ func TestLatestInstance(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestLatestInstanceForRegistrationID(t *testing.T) { // nolint:paralleltest
+func TestLatestInstanceForRegistrationID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		registrationID   string
@@ -235,13 +236,13 @@ func TestLatestInstanceForRegistrationID(t *testing.T) { // nolint:paralleltest
 			errString: NoInstancesError{}.Error(),
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Cleanup(func() { currentHistory = &History{} })
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
-
-			got, err := LatestInstanceByRegistrationID(tt.registrationID)
+			got, err := currentHistory.LatestInstanceByRegistrationID(tt.registrationID)
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -252,7 +253,8 @@ func TestLatestInstanceForRegistrationID(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestLatestInstanceUptimeMinutes(t *testing.T) { // nolint:paralleltest
+func TestLatestInstanceUptimeMinutes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		initialInstances []*Instance
@@ -278,13 +280,13 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) { // nolint:paralleltest
 			expectedErr: true,
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Cleanup(func() { currentHistory = &History{} })
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			require.NoError(t, InitHistory(setupStorage(t, tt.initialInstances...)))
-
-			got, err := LatestInstanceUptimeMinutes()
+			got, err := currentHistory.LatestInstanceUptimeMinutes()
 
 			if tt.expectedErr {
 				require.Error(t, err)
