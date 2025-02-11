@@ -170,11 +170,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		)
 	}
 
-	var err error
-	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
+	serverEcKey, err := echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default server ec key: %w", err)
 	}
+
+	ls.serverEcKey = serverEcKey
 
 	return nil
 }
