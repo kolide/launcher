@@ -69,13 +69,6 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 			return nil, err
 		}
 
-		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(configStore)
-		if err != nil {
-			// No logger here, so we can't easily log. Move on with blank values
-			publicKey = ""
-			fingerprint = ""
-		}
-
 		uptimeBytes, err := LauncherHistoryStore.Get([]byte("process_start_time"))
 		if err != nil {
 			uptimeBytes = nil
@@ -101,8 +94,8 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 				"registration_id":     types.DefaultRegistrationID,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
-				"fingerprint":         fingerprint,
-				"public_key":          publicKey,
+				"fingerprint":         "not_in_use",
+				"public_key":          "not_in_use",
 				"uptime":              uptime,
 			},
 		}

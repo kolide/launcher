@@ -1167,29 +1167,6 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.Equal(t, expectedResults, gotResults)
 }
 
-func TestSetupLauncherKeys(t *testing.T) {
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
-	require.NoError(t, err)
-
-	require.NoError(t, SetupLauncherKeys(configStore))
-
-	key, err := PrivateRSAKeyFromDB(configStore)
-	require.NoError(t, err)
-
-	pubkeyPem, fingerprintStored, err := PublicRSAKeyFromDB(configStore)
-	require.NoError(t, err)
-
-	fingerprint, err := rsaFingerprint(key)
-	require.NoError(t, err)
-	require.Equal(t, fingerprint, fingerprintStored)
-
-	pubkey, err := KeyFromPem([]byte(pubkeyPem))
-	require.NoError(t, err)
-
-	require.Equal(t, &key.PublicKey, pubkey)
-}
-
 func Test_setOsqueryOptions(t *testing.T) {
 	t.Parallel()
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
 	"errors"
@@ -19,7 +18,6 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
@@ -50,11 +48,8 @@ type localServer struct {
 	kolideServer string
 	cancel       context.CancelFunc
 
-	myKey           *rsa.PrivateKey
 	myLocalDbSigner crypto.Signer
-
-	serverKey   *rsa.PublicKey
-	serverEcKey *ecdsa.PublicKey
+	serverEcKey     *ecdsa.PublicKey
 }
 
 const (
@@ -83,13 +78,6 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	if err := ls.LoadDefaultKeyIfNotSet(); err != nil {
 		return nil, err
 	}
-
-	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(k.ConfigStore())
-	if err != nil {
-		return nil, fmt.Errorf("fetching private key: %w", err)
-	}
-	ls.myKey = privateKey
 
 	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector)
 	ecAuthedMux := http.NewServeMux()
@@ -154,7 +142,7 @@ func (ls *localServer) SetQuerier(querier Querier) {
 }
 
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {
-	if ls.serverKey != nil {
+	if ls.serverEcKey != nil {
 		return nil
 	}
 
