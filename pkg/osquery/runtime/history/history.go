@@ -11,8 +11,6 @@ import (
 
 const maxInstances = 10
 
-var currentHistory *History = &History{}
-
 type History struct {
 	sync.Mutex
 	instances []*Instance
@@ -26,67 +24,94 @@ func (c NoInstancesError) Error() string {
 }
 
 // InitHistory loads the osquery instance history from bbolt DB if exists, sets up bucket if it does not
-func InitHistory(store types.GetterSetter) error {
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
-
-	currentHistory.store = store
-
-	if err := currentHistory.load(); err != nil {
-		return fmt.Errorf("error loading osquery_instance_history: %w", err)
+func InitHistory(store types.GetterSetter) (*History, error) {
+	history := History{
+		instances: make([]*Instance, 0),
+		store:     store,
 	}
 
-	return nil
+	if err := history.load(); err != nil {
+		return nil, fmt.Errorf("error loading osquery_instance_history: %w", err)
+	}
+
+	return &history, nil
 }
 
 // GetHistory returns the last 10 instances of osquery started / restarted by launcher, each start / restart cycle is an entry
-func GetHistory() ([]Instance, error) {
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
+func (h *History) GetHistory() ([]map[string]string, error) {
+	h.Lock()
+	defer h.Unlock()
 
-	if currentHistory.instances == nil {
+	if len(h.instances) == 0 {
 		return nil, NoInstancesError{}
 	}
 
-	results := make([]Instance, len(currentHistory.instances))
-	for i, v := range currentHistory.instances {
-		results[i] = *v
+	results := make([]map[string]string, len(h.instances))
+	for i, v := range h.instances {
+		results[i] = map[string]string{
+			"registration_id": v.RegistrationId,
+			"instance_run_id": v.RunId,
+			"start_time":      v.StartTime,
+			"connect_time":    v.ConnectTime,
+			"exit_time":       v.ExitTime,
+			"instance_id":     v.InstanceId,
+			"version":         v.Version,
+			"hostname":        v.Hostname,
+			"errors":          v.Error,
+		}
 	}
 
 	return results, nil
 }
 
 // LatestInstance returns the latest osquery instance
-func LatestInstance() (Instance, error) {
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
+func (h *History) LatestInstance() (Instance, error) {
+	h.Lock()
+	defer h.Unlock()
 
-	if len(currentHistory.instances) == 0 {
+	if len(h.instances) == 0 {
 		return Instance{}, NoInstancesError{}
 	}
 
-	return *currentHistory.instances[len(currentHistory.instances)-1], nil
+	return *h.instances[len(h.instances)-1], nil
 }
 
-func LatestInstanceByRegistrationID(registrationId string) (Instance, error) {
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
+func (h *History) LatestInstanceByRegistrationID(registrationId string) (Instance, error) {
+	h.Lock()
+	defer h.Unlock()
 
-	if len(currentHistory.instances) == 0 {
+	if len(h.instances) == 0 {
 		return Instance{}, NoInstancesError{}
 	}
 
-	for i := len(currentHistory.instances) - 1; i > -1; i -= 1 {
-		if currentHistory.instances[i].RegistrationId == registrationId {
-			return *currentHistory.instances[i], nil
+	for i := len(h.instances) - 1; i > -1; i -= 1 {
+		if h.instances[i].RegistrationId == registrationId {
+			return *h.instances[i], nil
 		}
 	}
 
 	return Instance{}, NoInstancesError{}
 }
 
-func LatestInstanceUptimeMinutes() (int64, error) {
-	lastInstance, err := LatestInstance()
+func (h *History) LatestInstanceIDByRegistrationID(registrationId string) (string, error) {
+	h.Lock()
+	defer h.Unlock()
+
+	if len(h.instances) == 0 {
+		return "", NoInstancesError{}
+	}
+
+	for i := len(h.instances) - 1; i > -1; i -= 1 {
+		if h.instances[i].RegistrationId == registrationId {
+			return h.instances[i].InstanceId, nil
+		}
+	}
+
+	return "", NoInstancesError{}
+}
+
+func (h *History) LatestInstanceUptimeMinutes() (int64, error) {
+	lastInstance, err := h.LatestInstance()
 	if err != nil {
 		return 0, fmt.Errorf("getting latest instance: %w", err)
 	}
@@ -105,13 +130,13 @@ func LatestInstanceUptimeMinutes() (int64, error) {
 }
 
 // NewInstance adds a new instance to the osquery instance history and returns it
-func NewInstance(registrationId string, runId string) (*Instance, error) {
-	currentHistory.Lock()
-	defer currentHistory.Unlock()
+func (h *History) NewInstance(registrationId string, runId string) error {
+	h.Lock()
+	defer h.Unlock()
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	newInstance := &Instance{
@@ -121,13 +146,67 @@ func NewInstance(registrationId string, runId string) (*Instance, error) {
 		Hostname:       hostname,
 	}
 
-	currentHistory.addInstanceToHistory(newInstance)
+	h.addInstanceToHistory(newInstance)
 
-	if err := currentHistory.save(); err != nil {
-		return newInstance, fmt.Errorf("error saving osquery_instance_history: %w", err)
+	if err := h.save(); err != nil {
+		return fmt.Errorf("error saving osquery_instance_history: %w", err)
 	}
 
-	return newInstance, nil
+	return nil
+}
+
+func (h *History) SetConnected(runID string, querier types.Querier) error {
+	h.Lock()
+	defer h.Unlock()
+
+	instanceFound := false
+	for i := len(h.instances) - 1; i > -1; i -= 1 {
+		if h.instances[i].RunId != runID {
+			continue
+		}
+
+		instanceFound = true
+		if err := h.instances[i].Connected(querier); err != nil {
+			return fmt.Errorf("error setting connected for osquery instance: %w", err)
+		}
+	}
+
+	if !instanceFound {
+		return NoInstancesError{}
+	}
+
+	if err := h.save(); err != nil {
+		return fmt.Errorf("error saving osquery_instance_history: %w", err)
+	}
+
+	return nil
+}
+
+func (h *History) SetExited(runID string, exitError error) error {
+	h.Lock()
+	defer h.Unlock()
+
+	instanceFound := false
+	for i := len(h.instances) - 1; i > -1; i -= 1 {
+		if h.instances[i].RunId != runID {
+			continue
+		}
+
+		instanceFound = true
+		if err := h.instances[i].Exited(exitError); err != nil {
+			return fmt.Errorf("error setting exited for osquery instance: %w", err)
+		}
+	}
+
+	if !instanceFound {
+		return NoInstancesError{}
+	}
+
+	if err := h.save(); err != nil {
+		return fmt.Errorf("error saving osquery_instance_history: %w", err)
+	}
+
+	return nil
 }
 
 func (h *History) addInstanceToHistory(instance *Instance) {

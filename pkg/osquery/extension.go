@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -617,16 +616,20 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 
 	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
 	configOptsToSet := startupOsqueryConfigOptions
-	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
-		// Only log the state change once -- RequestConfig happens every 5 mins
-		if uptimeMins <= 15 {
-			e.slogger.Log(ctx, slog.LevelDebug,
-				"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
-				"uptime_mins", uptimeMins,
-			)
+	osqHistory := e.knapsack.OsqueryHistory()
+	if osqHistory != nil {
+		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
+			// Only log the state change once -- RequestConfig happens every 5 mins
+			if uptimeMins <= 15 {
+				e.slogger.Log(ctx, slog.LevelDebug,
+					"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
+					"uptime_mins", uptimeMins,
+				)
+			}
+			configOptsToSet = postStartupOsqueryConfigOptions
 		}
-		configOptsToSet = postStartupOsqueryConfigOptions
 	}
+
 	config = e.setOsqueryOptions(config, configOptsToSet)
 
 	return config, nil

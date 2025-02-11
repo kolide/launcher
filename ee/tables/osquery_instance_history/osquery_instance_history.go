@@ -2,16 +2,16 @@ package osquery_instance_history
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
+func TablePlugin(k types.Knapsack, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("registration_id"),
 		table.TextColumn("instance_run_id"),
@@ -23,34 +23,24 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("errors"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_launcher_osquery_instance_history", columns, generate())
+	return tablewrapper.New(k, slogger, "kolide_launcher_osquery_instance_history", columns, generate(k))
 }
 
-func generate() table.GenerateFunc {
+func generate(k types.Knapsack) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
 		defer span.End()
 
 		results := []map[string]string{}
 
-		history, err := history.GetHistory()
-		if err != nil {
-			return nil, err
+		osqHistory := k.OsqueryHistory()
+		if osqHistory == nil {
+			return nil, errors.New("osquery history is unavailable")
 		}
 
-		for _, instance := range history {
-
-			results = append(results, map[string]string{
-				"registration_id": instance.RegistrationId,
-				"instance_run_id": instance.RunId,
-				"start_time":      instance.StartTime,
-				"connect_time":    instance.ConnectTime,
-				"exit_time":       instance.ExitTime,
-				"instance_id":     instance.InstanceId,
-				"version":         instance.Version,
-				"hostname":        instance.Hostname,
-				"errors":          instance.Error,
-			})
+		results, err := osqHistory.GetHistory()
+		if err != nil {
+			return nil, err
 		}
 
 		return results, nil

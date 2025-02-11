@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,12 +18,11 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func LauncherInfoTable(flags types.Flags, slogger *slog.Logger, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
+func LauncherInfoTable(knapsack types.Knapsack, slogger *slog.Logger, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("branch"),
 		table.TextColumn("build_date"),
@@ -51,10 +51,10 @@ func LauncherInfoTable(flags types.Flags, slogger *slog.Logger, configStore type
 		table.TextColumn("fingerprint"),
 		table.TextColumn("public_key"),
 	}
-	return tablewrapper.New(flags, slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(configStore, LauncherHistoryStore))
+	return tablewrapper.New(knapsack, slogger, "kolide_launcher_info", columns, generateLauncherInfoTable(knapsack, configStore, LauncherHistoryStore))
 }
 
-func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
+func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.GetterSetter, LauncherHistoryStore types.GetterSetter) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_info")
 		defer span.End()
@@ -64,7 +64,12 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 			return nil, err
 		}
 
-		osqueryInstance, err := history.LatestInstanceByRegistrationID(types.DefaultRegistrationID)
+		osqHistory := knapsack.OsqueryHistory()
+		if osqHistory == nil {
+			return nil, errors.New("osquery history is unavailable")
+		}
+
+		osqueryInstanceID, err := osqHistory.LatestInstanceIDByRegistrationID(types.DefaultRegistrationID)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +105,7 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 				"version_chain":       os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"),
 				"registration_id":     types.DefaultRegistrationID,
 				"identifier":          identifier,
-				"osquery_instance_id": osqueryInstance.InstanceId,
+				"osquery_instance_id": osqueryInstanceID,
 				"fingerprint":         fingerprint,
 				"public_key":          publicKey,
 				"uptime":              uptime,

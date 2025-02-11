@@ -41,6 +41,7 @@ type knapsack struct {
 
 	querier types.InstanceQuerier
 
+	osqHistory types.OsqueryHistorian
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -238,4 +239,12 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	}
 
 	return types.Enrolled, nil
+}
+
+func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
+	return k.osqHistory
+}
+
+func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
+	k.osqHistory = osqHistory
 }

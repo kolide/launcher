@@ -287,7 +287,7 @@ func TestLaunch(t *testing.T) {
 		}
 
 		// Confirm instance setup is complete
-		if i.stats == nil || i.stats.ConnectTime == "" {
+		if i.history == nil || i.history.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 

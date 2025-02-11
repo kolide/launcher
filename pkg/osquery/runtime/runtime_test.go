@@ -388,7 +388,7 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		if runner.instances[types.DefaultRegistrationID] == nil {
 			return errors.New("default instance does not exist yet")
 		}
-		if runner.instances[types.DefaultRegistrationID].stats == nil || runner.instances[types.DefaultRegistrationID].stats.ConnectTime == "" {
+		if runner.instances[types.DefaultRegistrationID].history == nil || runner.instances[types.DefaultRegistrationID].history.ConnectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 
@@ -462,8 +462,8 @@ func TestSimplePath(t *testing.T) {
 
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to instance stats on start up")
 
 	waitShutdown(t, runner, logBytes)
 }
@@ -515,15 +515,15 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Confirm the default instance was started
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to default instance stats on start up")
 
 	// Confirm the additional instance was started
 	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
+	require.NotNil(t, runner.instances[extraRegistrationId].history)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.StartTime, "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ConnectTime, "connect time should be added to secondary instance stats on start up")
 
 	// Confirm instance statuses are reported correctly
 	instanceStatuses := runner.InstanceStatuses()
@@ -536,11 +536,11 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Confirm both instances exited
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ExitTime, "exit time should be added to default instance stats on shutdown")
 	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+	require.NotNil(t, runner.instances[extraRegistrationId].history)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
 func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
@@ -594,17 +594,17 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 	// Confirm the default instance was started, and then exited
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ExitTime, "exit time should be added to default instance stats on shutdown")
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to default instance stats on start up")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ExitTime, "exit time should be added to default instance stats on shutdown")
 
 	// Confirm the additional instance was started, and then exited
 	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].stats)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.StartTime, "start time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ConnectTime, "connect time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].stats.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+	require.NotNil(t, runner.instances[extraRegistrationId].history)
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.StartTime, "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ConnectTime, "connect time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ExitTime, "exit time should be added to secondary instance stats on shutdown")
 }
 
 func TestMultipleShutdowns(t *testing.T) {
@@ -693,8 +693,8 @@ func TestOsqueryDies(t *testing.T) {
 	waitHealthy(t, runner, logBytes)
 
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].stats)
-	previousStats := runner.instances[types.DefaultRegistrationID].stats
+	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
+	previousStats := runner.instances[types.DefaultRegistrationID].history
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
@@ -772,24 +772,24 @@ func TestRestart(t *testing.T) {
 	runner, logBytes := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	previousStats := runner.instances[types.DefaultRegistrationID].stats
+	previousStats := runner.instances[types.DefaultRegistrationID].history
 
 	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be set on latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be set on latest instance stats after restart")
 
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
 	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
 
-	previousStats = runner.instances[types.DefaultRegistrationID].stats
+	previousStats = runner.instances[types.DefaultRegistrationID].history
 
 	require.NoError(t, runner.Restart(context.TODO()))
 	waitHealthy(t, runner, logBytes)
 
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].stats.ConnectTime, "connect time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to latest instance stats after restart")
+	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to latest instance stats after restart")
 
 	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
 	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")

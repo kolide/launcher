@@ -23,7 +23,6 @@ import (
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
@@ -117,7 +116,7 @@ type OsqueryInstance struct {
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
 	extensionManagerServers []*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
-	stats                   *history.Instance
+	history                 types.OsqueryHistorian
 	startFunc               func(cmd *exec.Cmd) error
 }
 
@@ -210,6 +209,7 @@ func newInstance(registrationId string, knapsack types.Knapsack, serviceClient s
 		serviceClient:  serviceClient,
 		settingsWriter: settingsWriter,
 		runId:          runId,
+		history:        knapsack.OsqueryHistory(),
 	}
 
 	for _, opt := range opts {
@@ -241,8 +241,8 @@ func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
 	exitErr := i.errgroup.Wait(ctx)
 
 	// Record shutdown in stats, if initialized
-	if i.stats != nil {
-		if err := i.stats.Exited(exitErr); err != nil {
+	if i.history != nil {
+		if err := i.history.SetExited(i.runId, exitErr); err != nil {
 			i.slogger.Log(ctx, slog.LevelWarn,
 				"error recording osquery instance exit to history",
 				"exit_err", exitErr,
@@ -375,14 +375,21 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
-	stats, err := history.NewInstance(i.registrationId, i.runId)
-	if err != nil {
+	osqHistory := i.knapsack.OsqueryHistory()
+	if osqHistory == nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
-			"could not create new osquery instance history",
+			"osquery history is not initialized in knapsack, unable to record stats",
 			"err", err,
 		)
+	} else {
+		err := osqHistory.NewInstance(i.registrationId, i.runId)
+		if err != nil {
+			i.slogger.Log(ctx, slog.LevelWarn,
+				"could not create new osquery instance history",
+				"err", err,
+			)
+		}
 	}
-	i.stats = stats
 
 	// This loop runs in the background when the process was
 	// successfully started. ("successful" is independent of exit
@@ -438,7 +445,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
-	if err := i.stats.Connected(i); err != nil {
+	if err := i.history.SetConnected(i.runId, i); err != nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"could not set connection time for osquery instance history",
 			"err", err,
