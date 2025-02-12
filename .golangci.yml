@@ -20,9 +20,7 @@ linters:
     - sloglint
     - sqlclosecheck
     - staticcheck
-    # disabled due to blocking CI:
-    # level=warning msg="The linter 'tenv' is deprecated (since v1.64.0) due to: Duplicate feature another linter. Replaced by usetesting."
-    # - tenv
+    - tenv
     - unconvert
     - unused
   disable:
