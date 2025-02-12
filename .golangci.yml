@@ -23,7 +23,6 @@ linters:
     # disabled due to blocking CI:
     # level=warning msg="The linter 'tenv' is deprecated (since v1.64.0) due to: Duplicate feature another linter. Replaced by usetesting."
     # - tenv
-    - usetesting
     - unconvert
     - unused
   disable:
