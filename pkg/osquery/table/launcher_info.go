@@ -6,7 +6,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"runtime"
@@ -69,13 +71,6 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 			return nil, err
 		}
 
-		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(configStore)
-		if err != nil {
-			// No logger here, so we can't easily log. Move on with blank values
-			publicKey = ""
-			fingerprint = ""
-		}
-
 		uptimeBytes, err := LauncherHistoryStore.Get([]byte("process_start_time"))
 		if err != nil {
 			uptimeBytes = nil
@@ -101,15 +96,15 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 				"registration_id":     types.DefaultRegistrationID,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
-				"fingerprint":         fingerprint,
-				"public_key":          publicKey,
+				"fingerprint":         "",
+				"public_key":          "",
 				"uptime":              uptime,
 			},
 		}
 
 		// always use local key as signing key for now until k2 is updated to handle hardware keys
 		var localPem bytes.Buffer
-		if err := osquery.PublicKeyToPem(agent.LocalDbKeys().Public(), &localPem); err == nil {
+		if err := publicKeyToPem(agent.LocalDbKeys().Public(), &localPem); err == nil {
 			results[0]["signing_key"] = localPem.String()
 			results[0]["signing_key_source"] = agent.LocalDbKeys().Type()
 		}
@@ -154,4 +149,16 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 
 		return results, nil
 	}
+}
+
+func publicKeyToPem(pub any, out io.Writer) error {
+	der, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return fmt.Errorf("pkix marshalling: %w", err)
+	}
+
+	return pem.Encode(out, &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: der,
+	})
 }

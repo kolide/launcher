@@ -12,7 +12,6 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,12 +29,8 @@ func Test_requestZtaInfoHandler(t *testing.T) {
 	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
 
 	// Set up the rest of our localserver dependencies
-	configStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
-	require.NoError(t, err)
-	require.NoError(t, osquery.SetupLauncherKeys(configStore))
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
-	k.On("ConfigStore").Return(configStore)
 	k.On("Slogger").Return(slogger)
 	k.On("ZtaInfoStore").Return(ztaInfoStore)
 
@@ -91,12 +86,8 @@ func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 
 			// Set up our localserver dependencies
 			slogger := multislogger.NewNopLogger()
-			configStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
-			require.NoError(t, err)
-			require.NoError(t, osquery.SetupLauncherKeys(configStore))
 			k := typesmocks.NewKnapsack(t)
 			k.On("KolideServerURL").Return("localserver")
-			k.On("ConfigStore").Return(configStore)
 			k.On("Slogger").Return(slogger)
 
 			// Set up localserver
@@ -125,12 +116,8 @@ func Test_requestZtaInfoHandler_noDataAvailable(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
-	configStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
-	require.NoError(t, err)
-	require.NoError(t, osquery.SetupLauncherKeys(configStore))
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
-	k.On("ConfigStore").Return(configStore)
 	k.On("Slogger").Return(slogger)
 	k.On("ZtaInfoStore").Return(ztaInfoStore)
 

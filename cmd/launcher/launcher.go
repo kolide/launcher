@@ -369,9 +369,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
-	if err := osquery.SetupLauncherKeys(k.ConfigStore()); err != nil {
-		return fmt.Errorf("setting up initial launcher keys: %w", err)
-	}
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
 	}
