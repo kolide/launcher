@@ -52,7 +52,7 @@ func (i *Instance) Connected(querier types.Querier) error {
 	return nil
 }
 
-// InstanceExited sets the exit time and appends provided error (if any) to current osquery instance
+// Exited sets the exit time and appends provided error (if any) to current osquery instance
 func (i *Instance) Exited(exitError error) error {
 	if exitError != nil {
 		i.Error = exitError.Error()
@@ -61,4 +61,22 @@ func (i *Instance) Exited(exitError error) error {
 	i.ExitTime = timeNow()
 
 	return nil
+}
+
+func (i *Instance) toMap() map[string]string {
+	if i == nil {
+		return nil
+	}
+
+	return map[string]string{
+		"registration_id": i.RegistrationId,
+		"instance_run_id": i.RunId,
+		"start_time":      i.StartTime,
+		"connect_time":    i.ConnectTime,
+		"exit_time":       i.ExitTime,
+		"hostname":        i.Hostname,
+		"instance_id":     i.InstanceId,
+		"version":         i.Version,
+		"errors":          i.Error,
+	}
 }

@@ -12,10 +12,11 @@ type OsqueryInstanceTracker interface {
 type OsqueryHistorian interface {
 	NewInstance(registrationId string, runId string) error
 	GetHistory() ([]map[string]string, error)
-	LatestInstanceIDByRegistrationID(registrationId string) (string, error)
-	LatestInstanceUptimeMinutes() (int64, error)
-	SetConnected(runID string, querier Querier) error
-	SetExited(runID string, exitError error) error
+	LatestInstanceStats(registrationId string) (map[string]string, error)
+	LatestInstanceId(registrationId string) (string, error)
+	LatestInstanceUptimeMinutes(registrationId string) (int64, error)
+	SetConnected(runId string, querier Querier) error
+	SetExited(runId string, exitError error) error
 }
 
 type Querier interface {

@@ -59,18 +59,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
-	s, err := storageci.NewStore(nil, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
-	if err != nil {
-		fmt.Println("Failed to make new store")
-		os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)              //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-	if err := history.InitHistory(s); err != nil {
-		fmt.Println("Failed to init history")
-		os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)              //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
 	testOsqueryBinary = filepath.Join(binDirectory, "osqueryd")
 	if runtime.GOOS == "windows" {
 		testOsqueryBinary += ".exe"
@@ -154,6 +142,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	setupHistory(t, k)
 
 	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 	ensureShutdownOnCleanup(t, runner, logBytes)
@@ -201,6 +190,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -208,7 +198,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	runner := New(k, mockServiceClient(t), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 	waitShutdown(t, runner, logBytes)
 }
 
@@ -246,6 +236,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -256,7 +247,7 @@ func TestFlagsChanged(t *testing.T) {
 	go runner.Run()
 
 	// Wait for the instance to start
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Confirm watchdog is disabled
 	watchdogDisabled := false
@@ -276,7 +267,7 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Now confirm that the instance is new
 	require.NotEqual(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance not replaced")
@@ -377,7 +368,7 @@ func ensureShutdownOnCleanup(t *testing.T, runner *Runner, logBytes *threadsafeb
 
 // waitHealthy expects the instance to be healthy within 30 seconds, or else
 // fatals the test.
-func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
+func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
 	err := backoff.WaitFor(func() error {
 		// Instance self-reports as healthy
 		if err := runner.Healthy(); err != nil {
@@ -388,8 +379,27 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 		if runner.instances[types.DefaultRegistrationID] == nil {
 			return errors.New("default instance does not exist yet")
 		}
-		if runner.instances[types.DefaultRegistrationID].history == nil || runner.instances[types.DefaultRegistrationID].history.ConnectTime == "" {
-			return errors.New("no connect time set yet")
+
+		osqHistory := runner.knapsack.OsqueryHistory()
+		if osqHistory == nil {
+			return errors.New("osquery history is uninitialized in knapsack")
+		}
+
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		if err != nil {
+			return fmt.Errorf("gathering latest default history instance for waitHealthy: %w", err)
+		}
+
+		if latestInstanceStats == nil {
+			return errors.New("no latest instance stats for registration id")
+		}
+
+		if startTime, ok := latestInstanceStats["start_time"]; !ok || startTime == "" {
+			return errors.New("no start time set for latest instance stats")
+		}
+
+		if connectTime, ok := latestInstanceStats["connect_time"]; !ok || connectTime == "" {
+			return errors.New("no connect time set for latest instance stats")
 		}
 
 		// Good to go
@@ -452,6 +462,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -460,11 +471,7 @@ func TestSimplePath(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes)
-
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to instance stats on start up")
-
+	waitHealthy(t, runner, logBytes, osqHistory)
 	waitShutdown(t, runner, logBytes)
 }
 
@@ -501,6 +508,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -511,19 +519,20 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Start the instance
 	go runner.Run()
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Confirm the default instance was started
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to default instance stats on start up")
 
 	// Confirm the additional instance was started
 	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].history)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.StartTime, "start time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ConnectTime, "connect time should be added to secondary instance stats on start up")
+	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraRegistrationId)
+	require.NoError(t, err)
+	require.Contains(t, extraInstanceStats, "start_time")
+	require.Contains(t, extraInstanceStats, "connect_time")
+	require.NotEmpty(t, extraInstanceStats["start_time"], "start time should be added to secondary instance stats on start up")
+	require.NotEmpty(t, extraInstanceStats["connect_time"], "connect time should be added to secondary instance stats on start up")
 
 	// Confirm instance statuses are reported correctly
 	instanceStatuses := runner.InstanceStatuses()
@@ -536,11 +545,16 @@ func TestMultipleInstances(t *testing.T) {
 
 	// Confirm both instances exited
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ExitTime, "exit time should be added to default instance stats on shutdown")
+	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	require.NoError(t, err)
+	require.Contains(t, defaultInstanceStats, "exit_time")
+	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
+
 	require.Contains(t, runner.instances, extraRegistrationId)
-	require.NotNil(t, runner.instances[extraRegistrationId].history)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+	extraInstanceStats, err = osqHistory.LatestInstanceStats(extraRegistrationId)
+	require.NoError(t, err)
+	require.Contains(t, extraInstanceStats, "exit_time")
+	require.NotEmpty(t, extraInstanceStats["exit_time"], "exit time should be added to secondary instance stats on shutdown")
 }
 
 func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
@@ -573,6 +587,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
@@ -594,17 +609,26 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 	// Confirm the default instance was started, and then exited
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to default instance stats on start up")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ExitTime, "exit time should be added to default instance stats on shutdown")
+	defaultInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	require.NoError(t, err)
+	require.Contains(t, defaultInstanceStats, "start_time")
+	require.NotEmpty(t, defaultInstanceStats["start_time"], "start time should be added to default instance stats on start up")
+	require.Contains(t, defaultInstanceStats, "connect_time")
+	require.NotEmpty(t, defaultInstanceStats["connect_time"], "connect time should be added to default instance stats on start up")
+	require.Contains(t, defaultInstanceStats, "exit_time")
+	require.NotEmpty(t, defaultInstanceStats["exit_time"], "exit time should be added to default instance stats on shutdown")
 
 	// Confirm the additional instance was started, and then exited
 	require.Contains(t, runner.instances, extraRegistrationId)
 	require.NotNil(t, runner.instances[extraRegistrationId].history)
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.StartTime, "start time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ConnectTime, "connect time should be added to secondary instance stats on start up")
-	require.NotEmpty(t, runner.instances[extraRegistrationId].history.ExitTime, "exit time should be added to secondary instance stats on shutdown")
+	extraInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	require.NoError(t, err)
+	require.Contains(t, extraInstanceStats, "start_time")
+	require.NotEmpty(t, extraInstanceStats["start_time"], "start time should be added to secondary instance stats on start up")
+	require.Contains(t, extraInstanceStats, "connect_time")
+	require.NotEmpty(t, extraInstanceStats["connect_time"], "connect time should be added to secondary instance stats on start up")
+	require.Contains(t, extraInstanceStats, "exit_time")
+	require.NotEmpty(t, extraInstanceStats["exit_time"], "exit time should be added to secondary instance stats on shutdown")
 }
 
 func TestMultipleShutdowns(t *testing.T) {
@@ -637,6 +661,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -645,7 +670,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	for i := 0; i < 3; i += 1 {
 		waitShutdown(t, runner, logBytes)
@@ -682,6 +707,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -690,11 +716,9 @@ func TestOsqueryDies(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	require.Contains(t, runner.instances, types.DefaultRegistrationID)
-	require.NotNil(t, runner.instances[types.DefaultRegistrationID].history)
-	previousStats := runner.instances[types.DefaultRegistrationID].history
 
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
@@ -702,9 +726,23 @@ func TestOsqueryDies(t *testing.T) {
 	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
 	runner.instanceLock.Unlock()
 
-	waitHealthy(t, runner, logBytes)
-	require.NotEmpty(t, previousStats.Error, "error should be added to stats when unexpected shutdown occurs")
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be added to instance when unexpected shutdown occurs")
+	waitHealthy(t, runner, logBytes, osqHistory)
+	allHistory, err := osqHistory.GetHistory()
+	require.NoError(t, err, "expected to be able to view osquery history after unexpected shutdown")
+	// should be 2 total instances
+	require.Equal(t, 2, len(allHistory))
+	firstInstance, lastInstance := allHistory[0], allHistory[1]
+	// the first instance should have had an error and exit time set
+	require.Contains(t, firstInstance, "exit_time")
+	require.Contains(t, firstInstance, "errors")
+	require.NotEmpty(t, firstInstance["errors"], "error should be added to stats when unexpected shutdown occurs")
+	require.NotEmpty(t, firstInstance["exit_time"], "exit time should be added to instance when unexpected shutdown occurs")
+	// the second instance will have already had it's start and connect time checked by wait healthy
+	// check that there is no exit time or error set
+	require.Contains(t, lastInstance, "exit_time")
+	require.Contains(t, lastInstance, "errors")
+	require.Empty(t, lastInstance["errors"], "error should not be added to stats for newly created instance")
+	require.Empty(t, lastInstance["exit_time"], "exit time should be added to stats for newly created instance")
 
 	waitShutdown(t, runner, logBytes)
 }
@@ -719,6 +757,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	setupHistory(t, k)
 	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
@@ -741,7 +780,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
 
-	runner, logBytes := setupOsqueryInstanceForTests(t)
+	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
@@ -758,7 +797,7 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 	timer1 := time.NewTimer(35 * time.Second)
 
 	// Wait for osquery to respawn
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// Ensure we've waited at least 32s
 	<-timer1.C
@@ -769,36 +808,42 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
-	runner, logBytes := setupOsqueryInstanceForTests(t)
+	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	previousStats := runner.instances[types.DefaultRegistrationID].history
+	require.NoError(t, runner.Restart(context.TODO()))
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	require.NoError(t, runner.Restart(context.TODO()))
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be set on latest instance stats after restart")
+	allStats, err := osqHistory.GetHistory()
+	require.NoError(t, err, "expected to be able to view osquery history after restarts")
+	// we started an instance and then restarted twice, expect 3 entries
+	require.Equal(t, 3, len(allStats))
 
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+	for idx, stats := range allStats {
+		require.Contains(t, stats, "start_time", "expected start time field to be present in stats entry")
+		require.NotEmpty(t, stats["start_time"], "expected start time field to be populated in stats entry")
+		require.Contains(t, stats, "connect_time", "expected connect time field to be present in stats entry")
+		require.NotEmpty(t, stats["connect_time"], "expected connect time field to be populated in stats entry")
+		require.Contains(t, stats, "exit_time", "expected exit time field to be present in stats entry")
+		require.Contains(t, stats, "errors", "expected errors field to be present in stats entry")
 
-	previousStats = runner.instances[types.DefaultRegistrationID].history
-
-	require.NoError(t, runner.Restart(context.TODO()))
-	waitHealthy(t, runner, logBytes)
-
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instances[types.DefaultRegistrationID].history.ConnectTime, "connect time should be added to latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+		if idx < 2 { // the latest instance should be healthy still (no exit)
+			require.NotEmpty(t, stats["exit_time"], "expected exit time field to be populated in stats entry")
+			require.NotEmpty(t, stats["errors"], "expected errors field to be populated in stats entry after restart")
+		} else {
+			require.Empty(t, stats["exit_time"], "expected exit time field to be empty for latest stats entry")
+			require.Empty(t, stats["errors"], "expected errors field to be empty for latest stats entry")
+		}
+	}
 
 	waitShutdown(t, runner, logBytes)
 }
 
 // sets up an osquery instance with a running extension to be used in tests.
-func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer) {
+func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threadsafebuffer.ThreadSafeBuffer, osqHistory *history.History) {
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -830,17 +875,18 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	setUpMockStores(t, k)
+	osqHistory = setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
 	runner = New(k, mockServiceClient(t), s)
 	go runner.Run()
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	requirePgidMatch(t, runner.instances[types.DefaultRegistrationID].cmd.Process.Pid)
 
-	return runner, logBytes
+	return runner, logBytes, osqHistory
 }
 
 // setUpMockStores creates test stores in the test knapsack
@@ -856,6 +902,15 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+}
+
+func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {
+	store := inmemory.NewStore()
+	osqHistory, err := history.InitHistory(store)
+	require.NoError(t, err)
+	k.On("OsqueryHistory").Return(osqHistory).Maybe()
+
+	return osqHistory
 }
 
 // mockServiceClient returns a mock KolideService that returns the minimum possible response

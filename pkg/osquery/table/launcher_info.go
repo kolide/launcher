@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -64,14 +63,13 @@ func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.Getter
 			return nil, err
 		}
 
+		osqueryInstanceID := ""
 		osqHistory := knapsack.OsqueryHistory()
-		if osqHistory == nil {
-			return nil, errors.New("osquery history is unavailable")
-		}
-
-		osqueryInstanceID, err := osqHistory.LatestInstanceIDByRegistrationID(types.DefaultRegistrationID)
-		if err != nil {
-			return nil, err
+		if osqHistory != nil { // gather latest instance id if able, move on otherwise
+			latestId, err := osqHistory.LatestInstanceId(types.DefaultRegistrationID)
+			if err == nil {
+				osqueryInstanceID = latestId
+			}
 		}
 
 		publicKey, fingerprint, err := osquery.PublicRSAKeyFromDB(configStore)

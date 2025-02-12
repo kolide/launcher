@@ -618,7 +618,7 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	configOptsToSet := startupOsqueryConfigOptions
 	osqHistory := e.knapsack.OsqueryHistory()
 	if osqHistory != nil {
-		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
+		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(e.registrationId); err == nil && uptimeMins >= 10 {
 			// Only log the state change once -- RequestConfig happens every 5 mins
 			if uptimeMins <= 15 {
 				e.slogger.Log(ctx, slog.LevelDebug,

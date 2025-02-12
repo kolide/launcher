@@ -48,70 +48,52 @@ func (h *History) GetHistory() ([]map[string]string, error) {
 
 	results := make([]map[string]string, len(h.instances))
 	for i, v := range h.instances {
-		results[i] = map[string]string{
-			"registration_id": v.RegistrationId,
-			"instance_run_id": v.RunId,
-			"start_time":      v.StartTime,
-			"connect_time":    v.ConnectTime,
-			"exit_time":       v.ExitTime,
-			"instance_id":     v.InstanceId,
-			"version":         v.Version,
-			"hostname":        v.Hostname,
-			"errors":          v.Error,
-		}
+		results[i] = v.toMap()
 	}
 
 	return results, nil
 }
 
-// LatestInstance returns the latest osquery instance
-func (h *History) latestInstance() (Instance, error) {
-	h.Lock()
-	defer h.Unlock()
-
+func (h *History) latestInstance(registrationId string) (*Instance, error) {
 	if len(h.instances) == 0 {
-		return Instance{}, NoInstancesError{}
-	}
-
-	return *h.instances[len(h.instances)-1], nil
-}
-
-func (h *History) LatestInstanceByRegistrationID(registrationId string) (Instance, error) {
-	h.Lock()
-	defer h.Unlock()
-
-	if len(h.instances) == 0 {
-		return Instance{}, NoInstancesError{}
+		return nil, NoInstancesError{}
 	}
 
 	for i := len(h.instances) - 1; i > -1; i -= 1 {
 		if h.instances[i].RegistrationId == registrationId {
-			return *h.instances[i], nil
+			return h.instances[i], nil
 		}
 	}
 
-	return Instance{}, NoInstancesError{}
+	return nil, NoInstancesError{}
 }
 
-func (h *History) LatestInstanceIDByRegistrationID(registrationId string) (string, error) {
+func (h *History) LatestInstanceStats(registrationId string) (map[string]string, error) {
 	h.Lock()
 	defer h.Unlock()
 
-	if len(h.instances) == 0 {
-		return "", NoInstancesError{}
+	instance, err := h.latestInstance(registrationId)
+	if err != nil {
+		return nil, fmt.Errorf("gathering latest instance stats: %w", err)
 	}
 
-	for i := len(h.instances) - 1; i > -1; i -= 1 {
-		if h.instances[i].RegistrationId == registrationId {
-			return h.instances[i].InstanceId, nil
-		}
-	}
-
-	return "", NoInstancesError{}
+	return instance.toMap(), nil
 }
 
-func (h *History) LatestInstanceUptimeMinutes() (int64, error) {
-	lastInstance, err := h.latestInstance()
+func (h *History) LatestInstanceId(registrationId string) (string, error) {
+	h.Lock()
+	defer h.Unlock()
+
+	instance, err := h.latestInstance(registrationId)
+	if err != nil {
+		return "", fmt.Errorf("gathering latest instance stats: %w", err)
+	}
+
+	return instance.InstanceId, nil
+}
+
+func (h *History) LatestInstanceUptimeMinutes(registrationId string) (int64, error) {
+	lastInstance, err := h.latestInstance(registrationId)
 	if err != nil {
 		return 0, fmt.Errorf("getting latest instance: %w", err)
 	}
