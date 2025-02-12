@@ -96,8 +96,8 @@ func generateLauncherInfoTable(configStore types.GetterSetter, LauncherHistorySt
 				"registration_id":     types.DefaultRegistrationID,
 				"identifier":          identifier,
 				"osquery_instance_id": osqueryInstance.InstanceId,
-				"fingerprint":         "not_in_use",
-				"public_key":          "not_in_use",
+				"fingerprint":         "",
+				"public_key":          "",
 				"uptime":              uptime,
 			},
 		}
