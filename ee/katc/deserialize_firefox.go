@@ -168,13 +168,13 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		case tagNull, tagUndefined:
 			resultObj[nextKeyStr] = nil
 		default:
-			if valTag < tagFloatMax {
-				// We want to reinterpret (valTag, valData) as a single double value instead
-				d := uint64(valData) | uint64(valTag)<<32
-				resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
-			} else {
+			if valTag >= tagFloatMax {
 				return nil, fmt.Errorf("cannot process object key `%s`: unknown tag type `%x` with data `%d`", nextKeyStr, valTag, valData)
 			}
+
+			// We want to reinterpret (valTag, valData) as a single double value instead
+			d := uint64(valData) | uint64(valTag)<<32
+			resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
 		}
 	}
 
