@@ -141,6 +141,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	setupHistory(t, k)
 
@@ -189,6 +190,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -235,6 +237,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -461,6 +464,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -507,6 +511,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
@@ -586,6 +591,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
@@ -660,6 +666,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -706,6 +713,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -874,6 +882,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory = setupHistory(t, k)
 

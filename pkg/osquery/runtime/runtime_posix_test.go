@@ -66,6 +66,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -127,6 +128,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return("").Maybe()
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
 	"errors"
@@ -15,12 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
@@ -51,11 +48,8 @@ type localServer struct {
 	kolideServer string
 	cancel       context.CancelFunc
 
-	myKey           *rsa.PrivateKey
 	myLocalDbSigner crypto.Signer
-
-	serverKey   *rsa.PublicKey
-	serverEcKey *ecdsa.PublicKey
+	serverEcKey     *ecdsa.PublicKey
 }
 
 const (
@@ -85,13 +79,6 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		return nil, err
 	}
 
-	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(k.ConfigStore())
-	if err != nil {
-		return nil, fmt.Errorf("fetching private key: %w", err)
-	}
-	ls.myKey = privateKey
-
 	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
@@ -113,6 +100,9 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+
+	// In the future, we will want to make this authenticated; for now, it is not authenticated.
+	mux.Handle("/zta", ls.requestZtaInfoHandler())
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -152,11 +142,10 @@ func (ls *localServer) SetQuerier(querier Querier) {
 }
 
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {
-	if ls.serverKey != nil {
+	if ls.serverEcKey != nil {
 		return nil
 	}
 
-	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 
 	ctx := context.TODO()
@@ -168,14 +157,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 			"using developer certificates",
 		)
 
-		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using review app certificates",
 		)
 
-		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
 	default:
 		ls.slogger.Log(ctx, slogLevel,
@@ -183,22 +170,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		)
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
-	if err != nil {
-		return fmt.Errorf("parsing default public key: %w", err)
-	}
-
-	serverKey, ok := serverKeyRaw.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("public key not an rsa public key")
-	}
-
-	ls.serverKey = serverKey
-
-	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
+	serverEcKey, err := echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default server ec key: %w", err)
 	}
+
+	ls.serverEcKey = serverEcKey
 
 	return nil
 }

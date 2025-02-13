@@ -526,6 +526,24 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
+// GetEnrollmentDetails provides a mock function with given fields:
+func (_m *Knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEnrollmentDetails")
+	}
+
+	var r0 types.EnrollmentDetails
+	if rf, ok := ret.Get(0).(func() types.EnrollmentDetails); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(types.EnrollmentDetails)
+	}
+
+	return r0
+}
+
 // GetRunID provides a mock function with given fields:
 func (_m *Knapsack) GetRunID() string {
 	ret := _m.Called()
@@ -1477,6 +1495,11 @@ func (_m *Knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 	return r0
 }
 
+// SetEnrollmentDetails provides a mock function with given fields: details
+func (_m *Knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
+	_m.Called(details)
+}
+
 // SetExportTraces provides a mock function with given fields: enabled
 func (_m *Knapsack) SetExportTraces(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -2335,6 +2358,26 @@ func (_m *Knapsack) WatchdogUtilizationLimitPercent() int {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// ZtaInfoStore provides a mock function with given fields:
+func (_m *Knapsack) ZtaInfoStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ZtaInfoStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
 	}
 
 	return r0

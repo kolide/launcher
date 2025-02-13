@@ -10,6 +10,7 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 	"github.com/kolide/launcher/pkg/traces"
 )
@@ -20,25 +21,7 @@ type enrollmentRequest struct {
 	EnrollmentDetails EnrollmentDetails
 }
 
-type EnrollmentDetails struct {
-	OSVersion                 string `json:"os_version"`
-	OSBuildID                 string `json:"os_build_id"`
-	OSPlatform                string `json:"os_platform"`
-	Hostname                  string `json:"hostname"`
-	HardwareVendor            string `json:"hardware_vendor"`
-	HardwareModel             string `json:"hardware_model"`
-	HardwareSerial            string `json:"hardware_serial"`
-	OsqueryVersion            string `json:"osquery_version"`
-	LauncherHardwareKey       string `json:"launcher_hardware_key"`
-	LauncherHardwareKeySource string `json:"launcher_hardware_key_source"`
-	LauncherLocalKey          string `json:"launcher_local_key"`
-	LauncherVersion           string `json:"launcher_version"`
-	OSName                    string `json:"os_name"`
-	OSPlatformLike            string `json:"os_platform_like"`
-	GOOS                      string `json:"goos"`
-	GOARCH                    string `json:"goarch"`
-	HardwareUUID              string `json:"hardware_uuid"`
-}
+type EnrollmentDetails = types.EnrollmentDetails
 
 type enrollmentResponse struct {
 	jsonRpcResponse
