@@ -1,13 +1,13 @@
 package types
 
-// OsqueryInstanceTracker is the interface that we'll expect knapsack to implement,
+// OsqueryInstanceTracker is the interface that we expect knapsack to implement,
 // allowing setting and retrieving of the underlying osquery history
 type OsqueryInstanceTracker interface {
 	OsqueryHistory() OsqueryHistorian
 	SetOsqueryHistory(osqHistory OsqueryHistorian)
 }
 
-// OsqueryHistory is the interface that our history.History implements, allowing any paths towards
+// OsqueryHistorian is the interface that our history.History implements, allowing any paths towards
 // reading and writing various parts of our collected history. all instance history manipulation should go through here
 type OsqueryHistorian interface {
 	NewInstance(registrationId string, runId string) error

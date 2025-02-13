@@ -156,16 +156,16 @@ func TestLatestInstance(t *testing.T) {
 			name: "success",
 			initialInstances: []*Instance{
 				{
-					StartTime: "first_expected_start_time",
+					StartTime:      "first_expected_start_time",
 					RegistrationId: types.DefaultRegistrationID,
 				},
 				{
-					StartTime: "second_expected_start_time",
+					StartTime:      "second_expected_start_time",
 					RegistrationId: types.DefaultRegistrationID,
 				},
 			},
 			want: &Instance{
-				StartTime: "second_expected_start_time",
+				StartTime:      "second_expected_start_time",
 				RegistrationId: types.DefaultRegistrationID,
 			},
 		},
@@ -222,15 +222,15 @@ func TestLatestInstanceStats(t *testing.T) {
 				},
 			},
 			want: map[string]string{
-				"connect_time": "",
-				"errors": "",
-				"exit_time": "",
-				"hostname": "",
-				"instance_id": "",
+				"connect_time":    "",
+				"errors":          "",
+				"exit_time":       "",
+				"hostname":        "",
+				"instance_id":     "",
 				"instance_run_id": "",
 				"registration_id": "test",
-				"start_time": "third_expected_start_time",
-				"version": "",
+				"start_time":      "third_expected_start_time",
+				"version":         "",
 			},
 		},
 		{
@@ -288,11 +288,11 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			initialInstances: []*Instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
-					StartTime: time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
+					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 				},
 				{
 					RegistrationId: types.DefaultRegistrationID,
-					StartTime: time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
+					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 				},
 			},
 			want:        10,
@@ -311,6 +311,94 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
 			got, err := currentHistory.LatestInstanceUptimeMinutes(types.DefaultRegistrationID)
+
+			if tt.expectedErr {
+				require.Error(t, err)
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestLatestInstanceId(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name             string
+		initialInstances []*Instance
+		registrationId   string
+		want             string
+		expectedErr      bool
+	}{
+		{
+			name: "success_same_registration_ids",
+			registrationId: types.DefaultRegistrationID,
+			initialInstances: []*Instance{
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
+					InstanceId:     "9b093496-9999-9999-ab70-6ceb816b8775",
+				},
+			},
+			want:        "9b093496-9999-9999-ab70-6ceb816b8775",
+			expectedErr: false,
+		},
+		{
+			name: "success_different_registration_ids",
+			registrationId: types.DefaultRegistrationID,
+			initialInstances: []*Instance{
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+				{
+					RegistrationId: types.DefaultRegistrationID,
+					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
+					InstanceId:     "9b093496-9999-9999-ab70-6ceb816b8775",
+				},
+				{
+					RegistrationId: ulid.New(),
+					StartTime:      time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+				{
+					RegistrationId: ulid.New(),
+					StartTime:      time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339),
+					InstanceId:     ulid.New(),
+				},
+			},
+			want:        "9b093496-9999-9999-ab70-6ceb816b8775",
+			expectedErr: false,
+		},
+		{
+			name:        "no_instances_error",
+			want:        "",
+			expectedErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
+			require.NoError(t, err, "expected to be able to initialize history without error")
+
+			got, err := currentHistory.LatestInstanceId(types.DefaultRegistrationID)
 
 			if tt.expectedErr {
 				require.Error(t, err)
