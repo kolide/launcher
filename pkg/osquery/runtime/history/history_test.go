@@ -18,7 +18,9 @@ import (
 func TestNewInstance(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name             string
+		name string
+		// registrationId will automatically be added to any new instances (if missing in test case) before seeding
+		registrationId   string
 		initialInstances []*Instance
 		wantNumInstances int
 		wantErr          error
@@ -26,6 +28,7 @@ func TestNewInstance(t *testing.T) {
 		{
 			name:             "zero_value",
 			wantNumInstances: 1,
+			registrationId:   ulid.New(),
 		},
 		{
 			name: "existing_instances",
@@ -40,6 +43,7 @@ func TestNewInstance(t *testing.T) {
 				},
 			},
 			wantNumInstances: 3,
+			registrationId:   ulid.New(),
 		},
 		{
 			name: "max_instances_reached",
@@ -50,6 +54,7 @@ func TestNewInstance(t *testing.T) {
 				},
 			},
 			wantNumInstances: 10,
+			registrationId:   ulid.New(),
 		},
 	}
 	for _, tt := range tests {
@@ -57,10 +62,17 @@ func TestNewInstance(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			// make sure registration ids are set to ensure proper behavior when searching by registration id later
+			for idx, instance := range tt.initialInstances {
+				if instance.RegistrationId == "" {
+					tt.initialInstances[idx].RegistrationId = tt.registrationId
+				}
+			}
+
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			err = currentHistory.NewInstance(ulid.New(), ulid.New())
+			err = currentHistory.NewInstance(tt.registrationId, ulid.New())
 			require.NoError(t, err, "expected to be able to add new instance to history")
 
 			assert.Equal(t, tt.wantNumInstances, len(currentHistory.instances), "expect history length to reflect new instance")
@@ -70,7 +82,7 @@ func TestNewInstance(t *testing.T) {
 				return
 			}
 
-			currInstance, err := currentHistory.latestInstance()
+			currInstance, err := currentHistory.latestInstance(tt.registrationId)
 			assert.NoError(t, err, "expect no error getting current instance")
 
 			// make sure start time was set
@@ -104,7 +116,7 @@ func TestGetHistory(t *testing.T) {
 					StartTime: "second_expected_start_time",
 				},
 			},
-			want: []map[string]string {
+			want: []map[string]string{
 				{"connect_time": "", "errors": "", "exit_time": "", "hostname": "", "instance_id": "", "instance_run_id": "", "registration_id": "", "start_time": "first_expected_start_time", "version": ""},
 				{"connect_time": "", "errors": "", "exit_time": "", "hostname": "", "instance_id": "", "instance_run_id": "", "registration_id": "", "start_time": "second_expected_start_time", "version": ""},
 			},
@@ -137,7 +149,7 @@ func TestLatestInstance(t *testing.T) {
 	tests := []struct {
 		name             string
 		initialInstances []*Instance
-		want             Instance
+		want             *Instance
 		errString        string
 	}{
 		{
@@ -145,13 +157,16 @@ func TestLatestInstance(t *testing.T) {
 			initialInstances: []*Instance{
 				{
 					StartTime: "first_expected_start_time",
+					RegistrationId: types.DefaultRegistrationID,
 				},
 				{
 					StartTime: "second_expected_start_time",
+					RegistrationId: types.DefaultRegistrationID,
 				},
 			},
-			want: Instance{
+			want: &Instance{
 				StartTime: "second_expected_start_time",
+				RegistrationId: types.DefaultRegistrationID,
 			},
 		},
 		{
@@ -165,7 +180,7 @@ func TestLatestInstance(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.latestInstance()
+			got, err := currentHistory.latestInstance(types.DefaultRegistrationID)
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -176,13 +191,13 @@ func TestLatestInstance(t *testing.T) {
 	}
 }
 
-func TestLatestInstanceForRegistrationID(t *testing.T) {
+func TestLatestInstanceStats(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
 		registrationID   string
 		initialInstances []*Instance
-		want             Instance
+		want             map[string]string
 		errString        string
 	}{
 		{
@@ -206,9 +221,16 @@ func TestLatestInstanceForRegistrationID(t *testing.T) {
 					RegistrationId: "another",
 				},
 			},
-			want: Instance{
-				StartTime:      "third_expected_start_time",
-				RegistrationId: "test",
+			want: map[string]string{
+				"connect_time": "",
+				"errors": "",
+				"exit_time": "",
+				"hostname": "",
+				"instance_id": "",
+				"instance_run_id": "",
+				"registration_id": "test",
+				"start_time": "third_expected_start_time",
+				"version": "",
 			},
 		},
 		{
@@ -242,7 +264,7 @@ func TestLatestInstanceForRegistrationID(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.LatestInstanceByRegistrationID(tt.registrationID)
+			got, err := currentHistory.LatestInstanceStats(tt.registrationID)
 
 			if tt.errString != "" {
 				assert.EqualError(t, err, tt.errString)
@@ -265,9 +287,11 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			name: "success",
 			initialInstances: []*Instance{
 				{
+					RegistrationId: types.DefaultRegistrationID,
 					StartTime: time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
 				},
 				{
+					RegistrationId: types.DefaultRegistrationID,
 					StartTime: time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
 				},
 			},
@@ -286,7 +310,7 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 			currentHistory, err := InitHistory(setupStorage(t, tt.initialInstances...))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			got, err := currentHistory.LatestInstanceUptimeMinutes()
+			got, err := currentHistory.LatestInstanceUptimeMinutes(types.DefaultRegistrationID)
 
 			if tt.expectedErr {
 				require.Error(t, err)

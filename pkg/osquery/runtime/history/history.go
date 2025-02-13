@@ -74,7 +74,7 @@ func (h *History) LatestInstanceStats(registrationId string) (map[string]string,
 
 	instance, err := h.latestInstance(registrationId)
 	if err != nil {
-		return nil, fmt.Errorf("gathering latest instance stats: %w", err)
+		return nil, err
 	}
 
 	return instance.toMap(), nil
@@ -86,7 +86,7 @@ func (h *History) LatestInstanceId(registrationId string) (string, error) {
 
 	instance, err := h.latestInstance(registrationId)
 	if err != nil {
-		return "", fmt.Errorf("gathering latest instance stats: %w", err)
+		return "", err
 	}
 
 	return instance.InstanceId, nil
