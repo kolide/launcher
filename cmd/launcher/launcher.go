@@ -204,10 +204,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	logger = log.With(logger, "run_id", newRunID)
 	slogger = slogger.With("run_id", newRunID)
 
-	// start counting uptime
-	processStartTime := time.Now().UTC()
-
-	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
+	// set start time, first runtime, first version
+	initLauncherHistory(k)
 
 	gowrapper.Go(ctx, slogger, func() {
 		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 30*time.Second, 5*time.Second)
@@ -606,6 +604,48 @@ func writePidFile(path string) error {
 		return fmt.Errorf("writing pidfile: %w", err)
 	}
 	return nil
+}
+
+func initLauncherHistory(k types.Knapsack) {
+	// start counting uptime (want to reset on every run)
+	utcTimeNow := time.Now().UTC()
+	if err := k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(utcTimeNow.Format(time.RFC3339))); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error setting process start time",
+			"err", err,
+		)
+	}
+
+	// set first recorded version (do not want to reset on every run)
+	installVersion, err := k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
+	if err != nil {
+		installVersion = nil
+	}
+
+	if installVersion == nil {
+		if err := k.LauncherHistoryStore().Set([]byte("first_recorded_version"), []byte(version.Version().Version)); err != nil {
+			k.Slogger().Log(context.Background(), slog.LevelError,
+				"error setting first recorded version",
+				"err", err,
+				"version", string(installVersion),
+			)
+		}
+	}
+
+	// set first recorded run time (do not want to reset on every run)
+	installDateTime, err := k.LauncherHistoryStore().Get([]byte("first_recorded_run_time"))
+	if err != nil {
+		installDateTime = nil
+	}
+
+	if installDateTime == nil {
+		if err := k.LauncherHistoryStore().Set([]byte("first_recorded_run_time"), []byte(utcTimeNow.Format(time.RFC3339))); err != nil {
+			k.Slogger().Log(context.Background(), slog.LevelError,
+				"error setting first recorded run time",
+				"err", err,
+			)
+		}
+	}
 }
 
 // runOsqueryVersionCheckAndAddToKnapsack execs the osqueryd binary in the background when we're running
