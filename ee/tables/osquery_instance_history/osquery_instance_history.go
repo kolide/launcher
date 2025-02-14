@@ -31,8 +31,6 @@ func generate(k types.Knapsack) table.GenerateFunc {
 		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
 		defer span.End()
 
-		results := []map[string]string{}
-
 		osqHistory := k.OsqueryHistory()
 		if osqHistory == nil {
 			return nil, errors.New("osquery history is unavailable")

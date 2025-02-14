@@ -586,15 +586,15 @@ func TestSetConnected(t *testing.T) {
 func TestSetExited(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name               string
-		initialInstances   []*Instance
-		runId              string
-		expectedErr        error
-		exitErr            error
+		name             string
+		initialInstances []*Instance
+		runId            string
+		expectedErr      error
+		exitErr          error
 	}{
 		{
-			name:               "success_same_registration_ids",
-			runId:              "99999999-9999-9999-9999-999999999999",
+			name:  "success_same_registration_ids",
+			runId: "99999999-9999-9999-9999-999999999999",
 			initialInstances: []*Instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
@@ -616,8 +616,8 @@ func TestSetExited(t *testing.T) {
 			exitErr:     errors.New("unexpected exit"),
 		},
 		{
-			name:               "success_different_registration_ids",
-			runId:              "99999999-9999-9999-9999-999999999999",
+			name:  "success_different_registration_ids",
+			runId: "99999999-9999-9999-9999-999999999999",
 			initialInstances: []*Instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
