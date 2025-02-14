@@ -54,6 +54,10 @@ func (h *History) GetHistory() ([]map[string]string, error) {
 	return results, nil
 }
 
+// latestInstance is our internal helper for grabbing the latest history instance
+// by registration id. it does not lock history because many of our exposed methods
+// need to do further manipulation after grabbing the instance here, so that
+// responsibility is maintained outside of this
 func (h *History) latestInstance(registrationId string) (*Instance, error) {
 	if len(h.instances) == 0 {
 		return nil, NoInstancesError{}
@@ -68,6 +72,8 @@ func (h *History) latestInstance(registrationId string) (*Instance, error) {
 	return nil, NoInstancesError{}
 }
 
+// LatestInstanceStats provides a map[string]string copy of our latest instance
+// for the provided registration id
 func (h *History) LatestInstanceStats(registrationId string) (map[string]string, error) {
 	h.Lock()
 	defer h.Unlock()
@@ -80,6 +86,8 @@ func (h *History) LatestInstanceStats(registrationId string) (map[string]string,
 	return instance.toMap(), nil
 }
 
+// LatestInstanceId provides the instance id (queried from osquery) for our
+// latest history instance by registration id
 func (h *History) LatestInstanceId(registrationId string) (string, error) {
 	h.Lock()
 	defer h.Unlock()
@@ -92,7 +100,12 @@ func (h *History) LatestInstanceId(registrationId string) (string, error) {
 	return instance.InstanceId, nil
 }
 
+// LatestInstanceUptimeMinutes calculates the number of minutes since StartTime for our
+// latest history instance by registration id
 func (h *History) LatestInstanceUptimeMinutes(registrationId string) (int64, error) {
+	h.Lock()
+	defer h.Unlock()
+
 	lastInstance, err := h.latestInstance(registrationId)
 	if err != nil {
 		return 0, fmt.Errorf("getting latest instance: %w", err)
@@ -111,7 +124,8 @@ func (h *History) LatestInstanceUptimeMinutes(registrationId string) (int64, err
 	return uptimeSeconds / 60, nil
 }
 
-// NewInstance adds a new instance to the osquery instance history and returns it
+// NewInstance adds a new instance to the osquery instance history after setting
+// all available metadata and saves this new instance internally
 func (h *History) NewInstance(registrationId string, runId string) error {
 	h.Lock()
 	defer h.Unlock()
@@ -137,6 +151,9 @@ func (h *History) NewInstance(registrationId string, runId string) error {
 	return nil
 }
 
+// SetConnected finds the target instance by the provided run id, and utilizes the
+// provided querier to set the proper instance id and version before saving the updates
+// internally
 func (h *History) SetConnected(runID string, querier types.Querier) error {
 	h.Lock()
 	defer h.Unlock()
@@ -164,6 +181,8 @@ func (h *History) SetConnected(runID string, querier types.Querier) error {
 	return nil
 }
 
+// SetExited finds the target instance by the provided run id, notes the exit
+// time and exitError (if provided), and saves the updates to our internal history
 func (h *History) SetExited(runID string, exitError error) error {
 	h.Lock()
 	defer h.Unlock()
