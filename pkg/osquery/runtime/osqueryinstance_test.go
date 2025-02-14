@@ -66,6 +66,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -87,6 +88,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -121,6 +123,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -171,6 +174,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -212,6 +216,7 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -223,6 +228,7 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -235,6 +241,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	setupHistory(t, k)
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
@@ -276,6 +283,7 @@ func TestLaunch(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	osqHistory := setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
 	go i.Launch()
@@ -288,7 +296,12 @@ func TestLaunch(t *testing.T) {
 		}
 
 		// Confirm instance setup is complete
-		if i.stats == nil || i.stats.ConnectTime == "" {
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		if err != nil {
+			return fmt.Errorf("collecting latest instance stats: %w", err)
+		}
+
+		if connectTime, ok := latestInstanceStats["connect_time"]; !ok || connectTime == "" {
 			return errors.New("no connect time set yet")
 		}
 

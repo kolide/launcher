@@ -28,6 +28,7 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
+	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 

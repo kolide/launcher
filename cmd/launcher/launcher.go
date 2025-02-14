@@ -374,8 +374,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
+	if osqHistory, err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
 		return fmt.Errorf("error initializing osquery instance history: %w", err)
+	} else {
+		k.SetOsqueryHistory(osqHistory)
 	}
 
 	// create the runner that will launch osquery

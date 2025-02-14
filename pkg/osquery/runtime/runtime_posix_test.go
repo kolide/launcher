@@ -68,6 +68,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -88,7 +89,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	}))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// ensure that we actually had to wait on the socket
 	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
@@ -129,6 +130,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -139,7 +141,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner, logBytes)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
