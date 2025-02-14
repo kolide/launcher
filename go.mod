@@ -15,7 +15,7 @@ require (
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a
-	github.com/kolide/krypto v0.1.1-0.20241212211625-46a8d5cad1cc
+	github.com/kolide/krypto v0.1.1-0.20250210222038-bc46b527cd83
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -121,8 +121,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.22
-
-toolchain go1.22.2
+go 1.22.12
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767

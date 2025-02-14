@@ -61,6 +61,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	m.On("RootDirectory").Maybe().Return("whatever")
+	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	return m
 }
 
@@ -71,6 +72,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	// We should be able to make an extension despite an empty enroll secret
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
@@ -221,6 +223,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	e, err := NewExtension(context.TODO(), m, s, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -650,6 +653,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -658,7 +662,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
 
 	// long timeout is due to github actions runners IO slowness
-	testutil.FatalAfterFunc(t, 4*time.Second, func() {
+	testutil.FatalAfterFunc(t, 7*time.Second, func() {
 		err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	})
 	assert.Nil(t, err)
@@ -1050,6 +1054,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -1160,29 +1165,6 @@ func TestExtensionWriteResults(t *testing.T) {
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedResults, gotResults)
-}
-
-func TestSetupLauncherKeys(t *testing.T) {
-	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
-	require.NoError(t, err)
-	require.NoError(t, err)
-
-	require.NoError(t, SetupLauncherKeys(configStore))
-
-	key, err := PrivateRSAKeyFromDB(configStore)
-	require.NoError(t, err)
-
-	pubkeyPem, fingerprintStored, err := PublicRSAKeyFromDB(configStore)
-	require.NoError(t, err)
-
-	fingerprint, err := rsaFingerprint(key)
-	require.NoError(t, err)
-	require.Equal(t, fingerprint, fingerprintStored)
-
-	pubkey, err := KeyFromPem([]byte(pubkeyPem))
-	require.NoError(t, err)
-
-	require.Equal(t, &key.PublicKey, pubkey)
 }
 
 func Test_setOsqueryOptions(t *testing.T) {

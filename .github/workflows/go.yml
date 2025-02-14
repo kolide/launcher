@@ -230,9 +230,9 @@ jobs:
       matrix:
         artifactos:
           # artifactos needs to match the runner.os set by the builds. (Which is not quite the same as matrix.os)
-          - linux
-          - macos
-          - windows
+          - Linux
+          - macOS
+          - Windows
     needs: exec_testing
     steps:
     - name: cache restore build output

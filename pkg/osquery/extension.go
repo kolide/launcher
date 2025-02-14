@@ -1,15 +1,11 @@
 package osquery
 
 import (
-	"bytes"
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -60,12 +56,6 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
-	// DB keys for the rsa keys
-	privateKeyKey = "privateKey"
-
-	// Old things to delete
-	xPublicKeyKey      = "publicKey"
-	xKeyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -216,94 +206,6 @@ func (e *Extension) getHostIdentifier() (string, error) {
 	return IdentifierFromDB(e.knapsack.ConfigStore(), e.registrationId)
 }
 
-// SetupLauncherKeys configures the various keys used for communication.
-//
-// There are 3 keys:
-// 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
-// 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
-// 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
-func SetupLauncherKeys(configStore types.KVStore) error {
-	// Soon-to-be-deprecated RSA keys
-	if err := ensureRsaKey(configStore); err != nil {
-		return fmt.Errorf("ensuring rsa key: %w", err)
-	}
-
-	// Remove things we don't keep in the bucket any more
-	for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
-		if err := configStore.Delete([]byte(k)); err != nil {
-			return fmt.Errorf("deleting %s: %w", k, err)
-		}
-	}
-
-	return nil
-}
-
-// ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
-func ensureRsaKey(configStore types.GetterSetter) error {
-	// If it exists, we're good
-	_, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil
-	}
-
-	// Create a random key
-	key, err := rsaRandomKey()
-	if err != nil {
-		return fmt.Errorf("generating private key: %w", err)
-	}
-
-	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("marshalling private key: %w", err)
-	}
-
-	if err := configStore.Set([]byte(privateKeyKey), keyDer); err != nil {
-		return fmt.Errorf("storing private key: %w", err)
-	}
-
-	return nil
-}
-
-// PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
-func PrivateRSAKeyFromDB(configStore types.Getter) (*rsa.PrivateKey, error) {
-	privateKey, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil, fmt.Errorf("error reading private key info from db: %w", err)
-	}
-
-	key, err := x509.ParsePKCS8PrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
-	}
-
-	rsakey, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Private key is not an rsa key")
-	}
-
-	return rsakey, nil
-}
-
-// PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicRSAKeyFromDB(configStore types.Getter) (string, string, error) {
-	privateKey, err := PrivateRSAKeyFromDB(configStore)
-	if err != nil {
-		return "", "", fmt.Errorf("reading private key: %w", err)
-	}
-
-	fingerprint, err := rsaFingerprint(privateKey)
-	if err != nil {
-		return "", "", fmt.Errorf("generating fingerprint: %w", err)
-	}
-
-	var publicKey bytes.Buffer
-	if err := RsaPrivateKeyToPem(privateKey, &publicKey); err != nil {
-		return "", "", fmt.Errorf("marshalling pub: %w", err)
-	}
-
-	return publicKey.String(), fingerprint, nil
-}
-
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
 func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
@@ -426,38 +328,24 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
-	// We used to see the enrollment details fail, but now that we're running as an exec,
-	// it seems less likely. Try a couple times, but backoff fast.
-	enrollDetails := getRuntimeEnrollDetails()
-	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		e.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment osquery details, no osqueryd path, this is probably CI",
-		)
-		span.AddEvent("skipping_enrollment_details")
-	} else {
-		if err := backoff.WaitFor(func() error {
-			err = getOsqEnrollDetails(ctx, osqPath, &enrollDetails)
-			if err != nil {
-				e.slogger.Log(ctx, slog.LevelDebug,
-					"getOsqEnrollDetails failed in backoff",
-					"err", err,
-				)
-			}
-			return err
-		}, 30*time.Second, 5*time.Second); err != nil {
-			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return "", true, fmt.Errorf("query osq enrollment details: %w", err)
-			}
+	var enrollDetails types.EnrollmentDetails
 
-			e.slogger.Log(ctx, slog.LevelError,
-				"failed to get osq enrollment details with retries, moving on",
-				"err", err,
-			)
-			traces.SetError(span, fmt.Errorf("query osq enrollment details: %w", err))
-		} else {
-			span.AddEvent("got_enrollment_details")
+	err = backoff.WaitFor(func() error {
+		details := e.knapsack.GetEnrollmentDetails()
+		if details.OSVersion == "" || details.Hostname == "" {
+			return errors.New("incomplete enrollment details")
 		}
+		enrollDetails = details
+		span.AddEvent("got_complete_enrollment_details")
+		return nil
+	}, 60*time.Second, 5*time.Second)
+
+	if err != nil {
+		span.AddEvent("enrollment_details_timeout")
+		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
+		enrollDetails = e.knapsack.GetEnrollmentDetails()
 	}
+
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)

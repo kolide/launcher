@@ -5,7 +5,7 @@ package allowedcmd
 
 import (
 	"context"
-	"errors"
+	"fmt"
 )
 
 func Airport(ctx context.Context, arg ...string) (*TracedCmd, error) {
@@ -32,7 +32,7 @@ func Brew(ctx context.Context, arg ...string) (*TracedCmd, error) {
 		return validatedCmd, nil
 	}
 
-	return nil, errors.New("homebrew not found")
+	return nil, fmt.Errorf("%w: homebrew", ErrCommandNotFound)
 }
 
 func Diskutil(ctx context.Context, arg ...string) (*TracedCmd, error) {

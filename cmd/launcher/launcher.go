@@ -74,6 +74,7 @@ const (
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
 	katcSubsystemName        = "katc_config" // Kolide ATC
+	ztaInfoSubsystemName     = "zta_info"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -208,6 +209,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(processStartTime.Format(time.RFC3339)))
 
+	gowrapper.Go(ctx, slogger, func() {
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 30*time.Second, 5*time.Second)
+	})
 	gowrapper.Go(ctx, slogger, func() {
 		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	})
@@ -365,9 +369,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// make sure keys exist -- we expect these keys to exist before rungroup starts
-	if err := osquery.SetupLauncherKeys(k.ConfigStore()); err != nil {
-		return fmt.Errorf("setting up initial launcher keys: %w", err)
-	}
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
 	}
@@ -482,8 +483,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			return fmt.Errorf("failed to register auth token consumer: %w", err)
 		}
 
-		// begin log shipping and subsribe to token updates
-		// nil check incase it failed to create for some reason
+		// begin log shipping and subscribe to token updates
+		// nil check in case it failed to create for some reason
 		if logShipper != nil {
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 		}
@@ -503,6 +504,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			// on upgrades, the subscriber will continue to do this automatically when new
 			// information is made available from server_data (e.g. on a fresh install)
 			metadataWriter.Ping()
+		}
+
+		// Set up consumer to receive ZTA info from the control server
+		ztaInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.ZtaInfoStore())
+		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, ztaInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register ZTA info consumer: %w", err)
 		}
 	}
 
