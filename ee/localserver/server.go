@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -49,9 +48,10 @@ type localServer struct {
 	querier      Querier
 	kolideServer string
 	cancel       context.CancelFunc
-	serverEcKey     *ecdsa.PublicKey
+
 	myLocalDbSigner crypto.Signer
-  
+	serverEcKey     *ecdsa.PublicKey
+
 	tenantMunemo string
 }
 

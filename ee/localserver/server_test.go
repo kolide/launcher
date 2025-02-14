@@ -8,10 +8,7 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
