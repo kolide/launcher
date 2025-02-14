@@ -275,7 +275,7 @@ func (ls *LogShipper) updateSenderAuthToken() error {
 	}
 
 	if len(token) == 0 {
-		return fmt.Errorf("no token found")
+		return errors.New("no token found")
 	}
 
 	ls.sender.authtoken = string(token)

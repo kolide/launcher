@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
@@ -32,7 +33,7 @@ func generate() table.GenerateFunc {
 		for k, v := range runner.InstanceDesktopProcessRecords() {
 			results = append(results, map[string]string{
 				"uid":               k,
-				"pid":               fmt.Sprint(v.Process.Pid),
+				"pid":               strconv.Itoa(v.Process.Pid),
 				"start_time":        fmt.Sprint(v.StartTime),
 				"last_health_check": fmt.Sprint(v.LastHealthCheck),
 			})

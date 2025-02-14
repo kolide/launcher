@@ -3,6 +3,7 @@ package agentbbolt
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -263,7 +264,7 @@ func (s *bboltKeyValueStore) Count() (int, error) {
 // after generating the next autoincrementing key for each
 func (s *bboltKeyValueStore) AppendValues(values ...[]byte) error {
 	if s == nil || s.db == nil {
-		return fmt.Errorf("unable to append values into uninitialized bbolt db store")
+		return errors.New("unable to append values into uninitialized bbolt db store")
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {

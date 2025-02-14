@@ -1184,13 +1184,13 @@ func Test_cleanUpOldErrors(t *testing.T) {
 
 	// Add one legitimate timestamp
 	oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", oneHourAgo)), []byte("{}")), "could not set recent timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", oneHourAgo)), []byte("{}")), "could not set recent timestamp for test") //nolint:perfsprint // Don't care in tests
 
 	// Add some old timestamps
 	eightDaysAgo := time.Now().Add(-8 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", eightDaysAgo)), []byte("{}")), "could not set old timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", eightDaysAgo)), []byte("{}")), "could not set old timestamp for test") //nolint:perfsprint // Don't care in tests
 	twoWeeksAgo := time.Now().Add(-14 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", twoWeeksAgo)), []byte("{}")), "could not set old timestamp for test")
+	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", twoWeeksAgo)), []byte("{}")), "could not set old timestamp for test") //nolint:perfsprint // Don't care in tests
 
 	// Add a malformed entry
 	require.NoError(t, autoupdater.store.Set([]byte("not a timestamp"), []byte("{}")), "could not set old timestamp for test")

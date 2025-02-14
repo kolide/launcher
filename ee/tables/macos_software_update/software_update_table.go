@@ -13,6 +13,7 @@ import (
 )
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -117,7 +118,7 @@ func macOSBuildVersionPrefix() (int, error) {
 
 	parts := strings.Split(version, ".")
 	if len(parts) < 1 {
-		return 0, fmt.Errorf("failed to parse build train prefix from sysctl call for kern.osrelease")
+		return 0, errors.New("failed to parse build train prefix from sysctl call for kern.osrelease")
 	}
 
 	buildPrefix, err := strconv.Atoi(parts[0])

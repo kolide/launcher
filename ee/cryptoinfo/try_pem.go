@@ -2,6 +2,7 @@ package cryptoinfo
 
 import (
 	"encoding/pem"
+	"errors"
 	"fmt"
 )
 
@@ -22,7 +23,7 @@ func tryPem(pemBytes []byte, _password string) ([]*KeyInfo, error) {
 	}
 
 	if len(expanded) == 0 {
-		return nil, fmt.Errorf("no pem decoded")
+		return nil, errors.New("no pem decoded")
 	}
 
 	return expanded, nil

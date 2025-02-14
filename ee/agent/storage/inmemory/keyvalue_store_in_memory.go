@@ -3,7 +3,6 @@ package inmemory
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -147,7 +146,7 @@ func (s *inMemoryKeyValueStore) Count() (int, error) {
 
 func (s *inMemoryKeyValueStore) AppendValues(values ...[]byte) error {
 	if s == nil {
-		return fmt.Errorf("unable to append values into uninitialized inmemory db store")
+		return errors.New("unable to append values into uninitialized inmemory db store")
 	}
 
 	for _, value := range values {

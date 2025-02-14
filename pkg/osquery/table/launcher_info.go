@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -81,7 +82,7 @@ func generateLauncherInfoTable(knapsack types.Knapsack, configStore types.Getter
 		uptime := "uptime not available"
 		if uptimeBytes != nil {
 			if startTime, err := time.Parse(time.RFC3339, string(uptimeBytes)); err == nil {
-				uptime = fmt.Sprintf("%d", int64(time.Since(startTime).Seconds()))
+				uptime = strconv.FormatInt(int64(time.Since(startTime).Seconds()), 10)
 			}
 		}
 

@@ -315,7 +315,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 
 			if strings.Contains(line, "osqueryd.exe") {
 				if currentArchSpecificBinDir == none {
-					return fmt.Errorf("osqueryd.exe found, but not in a bin directory")
+					return errors.New("osqueryd.exe found, but not in a bin directory")
 				}
 
 				// create a condition based on architecture

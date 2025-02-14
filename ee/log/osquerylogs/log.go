@@ -207,7 +207,7 @@ func getIntStat(getFunc func() (int64, error)) string {
 	if err != nil {
 		return fmt.Sprintf("could not get stat: %v", err)
 	}
-	return fmt.Sprintf("%d", stat)
+	return strconv.FormatInt(stat, 10)
 }
 
 // getSliceStat is a small wrapper around gopsutil/process functions

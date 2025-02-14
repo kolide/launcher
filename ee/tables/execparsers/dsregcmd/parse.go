@@ -2,6 +2,7 @@ package dsregcmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -35,7 +36,7 @@ func parseDsreg(reader io.Reader) (any, error) {
 		// Check if we've found a section header. If so, grab the next line and get the section title.
 		if startHeaderRegex.MatchString(line) {
 			if ok := scanner.Scan(); !ok {
-				return nil, fmt.Errorf("failed to read second section header line")
+				return nil, errors.New("failed to read second section header line")
 			}
 			line = scanner.Text()
 			m := titleRegex.FindStringSubmatch(line)
@@ -47,7 +48,7 @@ func parseDsreg(reader io.Reader) (any, error) {
 
 			// Consume the last line of the section header.
 			if ok := scanner.Scan(); !ok {
-				return nil, fmt.Errorf("failed to read third section header line")
+				return nil, errors.New("failed to read third section header line")
 			} else {
 				line := scanner.Text()
 				if !startHeaderRegex.MatchString(line) {

@@ -1,6 +1,7 @@
 package presencedetection
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -57,5 +58,5 @@ func (pd *PresenceDetector) DetectPresence(reason string, detectionInterval time
 
 	// if we got here it means we failed without an error
 	// this "should" never happen, but here for completeness
-	return DetectionFailedDurationValue, fmt.Errorf("detection failed without OS error")
+	return DetectionFailedDurationValue, errors.New("detection failed without OS error")
 }

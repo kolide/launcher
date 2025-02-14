@@ -174,7 +174,7 @@ func (ser *secureEnclaveRunner) Type() string {
 }
 
 func (ser *secureEnclaveRunner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecdsa.PublicKey, error) {
@@ -266,7 +266,7 @@ func (ser *secureEnclaveRunner) UnmarshalJSON(data []byte) error {
 
 		ecdsaPubKey, ok := pubKey.(*ecdsa.PublicKey)
 		if !ok {
-			return fmt.Errorf("public key is not ecdsa")
+			return errors.New("public key is not ecdsa")
 		}
 
 		ser.uidPubKeyMap[k] = ecdsaPubKey
