@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -50,6 +51,8 @@ type localServer struct {
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
+
+	tenantMunemo string
 }
 
 const (
@@ -93,13 +96,13 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
 
 	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
 
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
 	mux.Handle("/zta", ls.requestZtaInfoHandler())
@@ -383,4 +386,94 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// munemoCheckHandler returns an http error if the request's X-Kolide-Munemo header does not match the organization in the enroll secret
+// if either the header or the enroll secret are missing, the request is allowed through
+func (ls *localServer) munemoCheckHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		munemoHeaderValue := r.Header.Get("X-Kolide-Munemo")
+		if munemoHeaderValue == "" {
+			ls.slogger.Log(r.Context(), slog.LevelDebug,
+				"munemo header is empty, continuing",
+			)
+
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		localServerMunemo, err := ls.getMunemoFromEnrollSecret()
+		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelError,
+				"getting munemo from enroll secret, continuing",
+				"err", err,
+			)
+
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if localServerMunemo == "" {
+			ls.slogger.Log(r.Context(), slog.LevelDebug,
+				"munemo in enroll secret is empty, continuing",
+				"header", munemoHeaderValue,
+			)
+
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if munemoHeaderValue == localServerMunemo {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ls.slogger.Log(r.Context(), slog.LevelDebug,
+			"munemo in request does not match munemo in enroll secret",
+			"header", munemoHeaderValue,
+			"enroll_secret", localServerMunemo,
+		)
+
+		http.Error(w, "munemo in request does not match munemo in enroll secret", http.StatusUnauthorized)
+		return
+	})
+}
+
+// getMunemoFromEnrollSecret extracts the munemo from the enroll or returns already
+// extracted cached value
+func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
+	if ls.tenantMunemo != "" {
+		return ls.tenantMunemo, nil
+	}
+
+	rawToken, err := ls.knapsack.ReadEnrollSecret()
+	if err != nil {
+		return "", err
+	}
+
+	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
+	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	org, ok := claims["organization"]
+	if !ok {
+		return "", errors.New("no organization claim")
+	}
+
+	// convert org to string
+	munemo, ok := org.(string)
+	if !ok {
+		return "", errors.New("organization claim not a string")
+	}
+
+	ls.tenantMunemo = munemo
+
+	return munemo, nil
 }
