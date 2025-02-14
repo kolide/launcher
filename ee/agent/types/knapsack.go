@@ -11,6 +11,7 @@ type Knapsack interface {
 	Slogger
 	RegistrationTracker
 	InstanceQuerier
+	OsqueryInstanceTracker
 	SetInstanceQuerier(q InstanceQuerier)
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
 	LatestOsquerydPath(ctx context.Context) string

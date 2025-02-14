@@ -27,7 +27,12 @@ func (orc *osqRestartCheckup) Summary() string       { return orc.summary }
 func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	orc.data = make(map[string]any)
 
-	restartHistory, err := history.GetHistory()
+	osqHistory := orc.k.OsqueryHistory()
+	if osqHistory == nil {
+		return errors.New("osquery history is not initialized in knapsack")
+	}
+
+	results, err := osqHistory.GetHistory()
 	if err != nil && errors.Is(err, history.NoInstancesError{}) {
 		orc.status = Informational
 		orc.summary = "No osquery restart history instances available"
@@ -39,21 +44,6 @@ func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 		orc.summary = "Unable to collect osquery restart history"
 		orc.data["error"] = err.Error()
 		return nil
-	}
-
-	results := make([]map[string]string, len(restartHistory))
-
-	for idx, instance := range restartHistory {
-		results[idx] = map[string]string{
-			"registration_id": instance.RegistrationId,
-			"instance_run_id": instance.RunId,
-			"start_time":      instance.StartTime,
-			"connect_time":    instance.ConnectTime,
-			"exit_time":       instance.ExitTime,
-			"instance_id":     instance.InstanceId,
-			"version":         instance.Version,
-			"errors":          instance.Error,
-		}
 	}
 
 	orc.status = Passing
