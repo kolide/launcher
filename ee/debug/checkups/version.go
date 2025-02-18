@@ -48,15 +48,21 @@ func (c *Version) Summary() string {
 }
 
 func (c *Version) Data() any {
-	firstRunTIme, err := getTimeFromStore(c.k.LauncherHistoryStore(), "first_recorded_run_time")
-	if err != nil {
-		firstRunTIme = ""
-	}
-
+	firstRunTIme := ""
 	firstRunVersionStr := ""
-	firstRunVersionBytes, err := c.k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
-	if err == nil && firstRunVersionBytes != nil {
-		firstRunVersionStr = string(firstRunVersionBytes)
+
+	if c.k.LauncherHistoryStore() != nil {
+		runTIme, err := getTimeFromStore(c.k.LauncherHistoryStore(), "first_recorded_run_time")
+		if err != nil {
+			firstRunTIme = ""
+		} else {
+			firstRunTIme = runTIme
+		}
+
+		firstRunVersionBytes, err := c.k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
+		if err == nil && firstRunVersionBytes != nil {
+			firstRunVersionStr = string(firstRunVersionBytes)
+		}
 	}
 
 	return map[string]any{
