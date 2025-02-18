@@ -50,10 +50,10 @@ func (c *Version) Summary() string {
 func (c *Version) Data() any {
 	firstRunTIme, err := getTimeFromStore(c.k.LauncherHistoryStore(), "first_recorded_run_time")
 	if err != nil {
-		firstRunTIme = "unknown"
+		firstRunTIme = ""
 	}
 
-	firstRunVersionStr := "unknown"
+	firstRunVersionStr := ""
 	firstRunVersionBytes, err := c.k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
 	if err == nil && firstRunVersionBytes != nil {
 		firstRunVersionStr = string(firstRunVersionBytes)
