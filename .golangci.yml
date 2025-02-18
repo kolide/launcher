@@ -30,7 +30,7 @@ linters:
 
 linters-settings:
   errcheck:
-    exclude-functions: github.com/go-kit/kit/log:Log
+    exclude-functions: [github.com/go-kit/kit/log:Log]
   gofmt:
     simplify: false
   forbidigo:
