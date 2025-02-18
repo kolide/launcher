@@ -37,6 +37,11 @@ func Test_tpmRunner(t *testing.T) {
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
+		// force the runner to think the machine has a TPM
+		// not using usual detection methods since were
+		// mocking it
+		tpmRunner.machineHasTpm.Store(true)
+
 		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, errors.New("not available yet")).Once()
 		require.Nil(t, tpmRunner.Public())
 
