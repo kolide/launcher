@@ -2,8 +2,10 @@ package checkups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/Masterminds/semver"
@@ -48,19 +50,29 @@ func (c *Version) Summary() string {
 }
 
 func (c *Version) Data() any {
-	firstRunTIme := ""
+	firstRunTime := ""
 	firstRunVersionStr := ""
 
 	if c.k.LauncherHistoryStore() != nil {
-		runTIme, err := getTimeFromStore(c.k.LauncherHistoryStore(), "first_recorded_run_time")
+
+		runtime, err := getTimeFromStore(c.k.LauncherHistoryStore(), "first_recorded_run_time")
 		if err != nil {
-			firstRunTIme = ""
+			c.k.Slogger().Log(context.Background(), slog.LevelDebug,
+				"getting first recorded run time from store",
+				"err", err,
+			)
 		} else {
-			firstRunTIme = runTIme
+			firstRunTime = runtime
 		}
 
 		firstRunVersionBytes, err := c.k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
-		if err == nil && firstRunVersionBytes != nil {
+		if err != nil || firstRunVersionBytes == nil {
+			c.k.Slogger().Log(context.Background(), slog.LevelDebug,
+				"getting first recorded version from store",
+				"err", err,
+				"nil_value", firstRunVersionBytes == nil,
+			)
+		} else {
 			firstRunVersionStr = string(firstRunVersionBytes)
 		}
 	}
@@ -69,14 +81,14 @@ func (c *Version) Data() any {
 		"update_channel":          c.k.UpdateChannel(),
 		"tufServer":               c.k.TufServerURL(),
 		"launcher_version":        version.Version().Version,
-		"first_recorded_run_time": firstRunTIme,
+		"first_recorded_run_time": firstRunTime,
 		"first_recorded_version":  firstRunVersionStr,
 	}
 }
 
 func getTimeFromStore(store types.Getter, key string) (string, error) {
 	if store == nil {
-		return "", fmt.Errorf("store is nil")
+		return "", errors.New("store is nil")
 	}
 
 	bytes, err := store.Get([]byte(key))

@@ -621,6 +621,11 @@ func initLauncherHistory(k types.Knapsack) {
 	// set first recorded version (do not want to reset on every run)
 	installVersion, err := k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
 	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error getting first recorded version",
+			"err", err,
+		)
+
 		installVersion = nil
 	}
 
@@ -637,6 +642,11 @@ func initLauncherHistory(k types.Knapsack) {
 	// set first recorded run time (do not want to reset on every run)
 	installDateTime, err := k.LauncherHistoryStore().Get([]byte("first_recorded_run_time"))
 	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error getting first recorded run time",
+			"err", err,
+		)
+
 		installDateTime = nil
 	}
 
