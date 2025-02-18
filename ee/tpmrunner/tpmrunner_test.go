@@ -71,6 +71,11 @@ func Test_tpmRunner(t *testing.T) {
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), store, withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
+		// force the runner to think the machine has a TPM
+		// not using usual detection methods since were
+		// mocking it
+		tpmRunner.machineHasTpm.Store(true)
+
 		tpmSignerCreatorMock.On("New", fakePrivData, fakePubData).Return(privKey, nil).Once()
 
 		// the call to public should load the key from the store and signer creator should not be called any more after
@@ -92,6 +97,11 @@ func Test_tpmRunner(t *testing.T) {
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
 		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
+
+		// force the runner to think the machine has a TPM
+		// not using usual detection methods since were
+		// mocking it
+		tpmRunner.machineHasTpm.Store(true)
 
 		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, errors.New("not available yet")).Once()
 		require.Nil(t, tpmRunner.Public())
