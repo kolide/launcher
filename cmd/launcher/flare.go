@@ -40,18 +40,12 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		flConfigFilePath   = flagset.String("config", launcher.DefaultConfigFilePath, "config file to parse options from (optional)")
 	)
 
-	// Set up ff options for config file parsing
-	ffOpts := []ff.Option{
-		ff.WithConfigFileFlag(*flConfigFilePath),
-		ff.WithConfigFileParser(ff.PlainParser),
-	}
-
-	if err := ff.Parse(flagset, args, ffOpts...); err != nil {
+	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
 	// were passing an empty array here just to get the default options
-	opts, err := launcher.ParseOptions("flare", flagset.Args())
+	opts, err := launcher.ParseOptions("flare", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return err
 	}
