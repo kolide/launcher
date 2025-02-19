@@ -706,6 +706,10 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 		args = append(args, fmt.Sprintf("--watchdog_delay=%d", i.knapsack.WatchdogDelaySec()))
 	} else {
 		args = append(args, "--disable_watchdog")
+		// if we aren't enabling watchdog then we don't want the denylist functionality either. Currently
+		// any distributed queries that are running when osquery is restarted will be added to the denylist.
+		// without this arg those queries would be skipped for the default duration of 24 hours
+		args = append(args, "--distributed_denylist_duration=0")
 	}
 
 	cmd := exec.Command( //nolint:forbidigo // We trust the autoupdate library to find the correct path
