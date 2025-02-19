@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,7 +69,23 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 	}
 
 	// assume we have a tpm until we know otherwise
-	tpmRunner.machineHasTpm.Store(true)
+	hasTPM := true
+
+	// on linux the TPM is at /dev/tpm0
+	// if it doesn't exist, we don't have a TPM
+	if runtime.GOOS == "linux" {
+		_, err := os.Stat("/dev/tpm0")
+		hasTPM = err == nil
+
+		if !hasTPM {
+			slogger.Log(ctx, slog.LevelInfo,
+				"no tpm found",
+				"err", err,
+			)
+		}
+	}
+
+	tpmRunner.machineHasTpm.Store(hasTPM)
 
 	for _, opt := range opts {
 		opt(tpmRunner)
@@ -228,11 +246,11 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 		priData, pubData, err = tr.signerCreator.CreateKey()
 		if err != nil {
 
-			if isTPMNotFoundErr(err) {
+			if isTerminalTPMError(err) {
 				tr.machineHasTpm.Store(false)
 
 				tr.slogger.Log(ctx, slog.LevelInfo,
-					"tpm not found",
+					"terminal tpm error, not retrying",
 					"err", err,
 				)
 

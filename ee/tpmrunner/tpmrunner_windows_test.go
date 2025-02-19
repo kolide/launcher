@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-tpm/tpm2"
 	"github.com/google/go-tpm/tpmutil/tbs"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/tpmrunner/mocks"
@@ -41,7 +42,7 @@ func Test_tpmRunner_windows(t *testing.T) {
 		require.Nil(t, tpmRunner.Public())
 	})
 
-	t.Run("handles no tpm in Public() call", func(t *testing.T) {
+	t.Run("handles terminal errors Public() call", func(t *testing.T) {
 		t.Parallel()
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
@@ -63,5 +64,38 @@ func Test_tpmRunner_windows(t *testing.T) {
 		require.NoError(t, tpmRunner.Execute())
 		require.Nil(t, tpmRunner.Public())
 	})
+}
 
+func Test_isTerminalError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "tpm not found err",
+			err:      tbs.ErrTPMNotFound,
+			expected: true,
+		},
+		{
+			name:     "integrity check failed",
+			err:      tpm2.Error{Code: tpm2.RCIntegrity},
+			expected: true,
+		},
+		{
+			name:     "is not terminal error",
+			err:      errors.New("not terminal"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.expected, isTerminalTPMError(tt.err))
+		})
+	}
 }
