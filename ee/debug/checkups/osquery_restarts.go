@@ -29,7 +29,10 @@ func (orc *osqRestartCheckup) Run(ctx context.Context, extraFH io.Writer) error 
 
 	osqHistory := orc.k.OsqueryHistory()
 	if osqHistory == nil {
-		return errors.New("osquery history is not initialized in knapsack")
+		// We are probably running standalone instead of in situ
+		orc.status = Informational
+		orc.summary = "No osquery restart history instances available"
+		return nil
 	}
 
 	results, err := osqHistory.GetHistory()

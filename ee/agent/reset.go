@@ -62,11 +62,13 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	hardwareUUIDChanged := false
 	munemoChanged := false
 
-	defer k.Slogger().Log(ctx, slog.LevelDebug, "finished check to see if database should be reset...",
-		"serial", serialChanged,
-		"hardware_uuid", hardwareUUIDChanged,
-		"munemo", munemoChanged,
-	)
+	defer func() {
+		k.Slogger().Log(ctx, slog.LevelDebug, "finished check to see if database should be reset...",
+			"serial", serialChanged,
+			"hardware_uuid", hardwareUUIDChanged,
+			"munemo", munemoChanged,
+		)
+	}()
 
 	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
 	if err != nil {

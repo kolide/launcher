@@ -78,8 +78,8 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		targets targetBits
 	}{
 		{&Platform{}, doctorSupported | flareSupported | logSupported},
-		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
+		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Processes{}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
