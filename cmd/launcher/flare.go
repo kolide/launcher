@@ -44,7 +44,6 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	// were passing an empty array here just to get the default options
 	opts, err := launcher.ParseOptions("flare", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return err
