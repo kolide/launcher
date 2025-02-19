@@ -44,46 +44,58 @@ func Test_tpmRunner_windows(t *testing.T) {
 
 	t.Run("handles terminal errors Public() call", func(t *testing.T) {
 		t.Parallel()
-		tests := []struct {
-			name string
-			err  error
-		}{
-			{
-				name: "TPMNotFound",
-				err:  tbs.ErrTPMNotFound,
-			},
-			{
-				name: "TPMIntegrity",
-				err: tpm2.Error{
-					Code: tpm2.RCIntegrity,
-				},
-			},
-		}
 
-		for _, tt := range tests {
-			tt := tt
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
+		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		require.NoError(t, err)
 
-				tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-				tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
-				require.NoError(t, err)
+		// we should never try again after getting TPMNotFound err
+		tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, tbs.ErrTPMNotFound).Once()
 
-				// we should never try again after getting TPMNotFound err
-				tpmSignerCreatorMock.On("CreateKey").Return(nil, nil, tt.err).Once()
+		// this is the only time "CreateKey" should be called
+		require.Nil(t, tpmRunner.Public())
 
-				// this is the only time "CreateKey" should be called
-				require.Nil(t, tpmRunner.Public())
+		go func() {
+			// sleep long enough to get through 2 cycles of execute
+			time.Sleep(3 * time.Second)
+			tpmRunner.Interrupt(errors.New("test"))
+		}()
 
-				go func() {
-					// sleep long enough to get through 2 cycles of execute
-					time.Sleep(3 * time.Second)
-					tpmRunner.Interrupt(errors.New("test"))
-				}()
-
-				require.NoError(t, tpmRunner.Execute())
-				require.Nil(t, tpmRunner.Public())
-			})
-		}
+		require.NoError(t, tpmRunner.Execute())
+		require.Nil(t, tpmRunner.Public())
 	})
+}
+
+func Test_isTerminalError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "tpm not found err",
+			err:      tbs.ErrTPMNotFound,
+			expected: true,
+		},
+		{
+			name:     "integrity check failed",
+			err:      tpm2.Error{Code: tpm2.RCIntegrity},
+			expected: true,
+		},
+		{
+			name:     "is not terminal error",
+			err:      errors.New("not terminal"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.expected, isTerminalTPMError(tt.err))
+		})
+	}
 }
