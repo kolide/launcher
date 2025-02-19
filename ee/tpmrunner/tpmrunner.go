@@ -76,6 +76,13 @@ func New(ctx context.Context, slogger *slog.Logger, store types.GetterSetterDele
 	if runtime.GOOS == "linux" {
 		_, err := os.Stat("/dev/tpm0")
 		hasTPM = err == nil
+
+		if !hasTPM {
+			slogger.Log(ctx, slog.LevelInfo,
+				"no tpm found",
+				"err", err,
+			)
+		}
 	}
 
 	tpmRunner.machineHasTpm.Store(hasTPM)
@@ -243,7 +250,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 				tr.machineHasTpm.Store(false)
 
 				tr.slogger.Log(ctx, slog.LevelInfo,
-					"termial tpm error, not retrying",
+					"terminal tpm error, not retrying",
 					"err", err,
 				)
 
