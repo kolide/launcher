@@ -37,14 +37,14 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		flSave             = flagset.String("save", "upload", "local | upload")
 		flOutputDir        = flagset.String("output_dir", ".", "path to directory to save flare output")
 		flUploadRequestURL = flagset.String("upload_request_url", "https://api.kolide.com/api/agent/flare", "URL to request a signed upload URL")
+		flConfigFilePath   = flagset.String("config", launcher.DefaultConfigFilePath, "config file to parse options from (optional)")
 	)
 
 	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	// were passing an empty array here just to get the default options
-	opts, err := launcher.ParseOptions("flareupload", make([]string, 0))
+	opts, err := launcher.ParseOptions("flare", []string{"-config", *flConfigFilePath})
 	if err != nil {
 		return err
 	}
@@ -104,6 +104,7 @@ func runFlare(systemMultiSlogger *multislogger.MultiSlogger, args []string) erro
 		"flare creation complete",
 		"status", successMessage,
 		"file", flareDest.Name(),
+		"config_path", *flConfigFilePath,
 	)
 
 	return nil
