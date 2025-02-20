@@ -375,14 +375,13 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
-	osqHistory := i.knapsack.OsqueryHistory()
-	if osqHistory == nil {
+	if i.history == nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"osquery history is not initialized in knapsack, unable to record stats",
 			"err", err,
 		)
 	} else {
-		err := osqHistory.NewInstance(i.registrationId, i.runId)
+		err := i.history.NewInstance(i.registrationId, i.runId)
 		if err != nil {
 			i.slogger.Log(ctx, slog.LevelWarn,
 				"could not create new osquery instance history",

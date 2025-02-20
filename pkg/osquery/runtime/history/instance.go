@@ -6,7 +6,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-type Instance struct {
+type instance struct {
 	RegistrationId string // which registration this instance belongs to
 	RunId          string // ID for instance, assigned by launcher
 	StartTime      string
@@ -25,13 +25,13 @@ func (e ExpectedAtLeastOneRowError) Error() string {
 }
 
 // Connected sets the connect time and instance id of the current osquery instance
-func (i *Instance) Connected(querier types.Querier) error {
+func (i *instance) Connected(querier types.Querier) error {
 	results, err := querier.Query("select instance_id, version from osquery_info order by start_time limit 1")
 	if err != nil {
 		return err
 	}
 
-	if results == nil || len(results) < 1 {
+	if len(results) < 1 {
 		return ExpectedAtLeastOneRowError{}
 	}
 
@@ -53,7 +53,7 @@ func (i *Instance) Connected(querier types.Querier) error {
 }
 
 // Exited sets the exit time and appends provided error (if any) to current osquery instance
-func (i *Instance) Exited(exitError error) error {
+func (i *instance) Exited(exitError error) error {
 	if exitError != nil {
 		i.Error = exitError.Error()
 	}
@@ -63,7 +63,7 @@ func (i *Instance) Exited(exitError error) error {
 	return nil
 }
 
-func (i *Instance) toMap() map[string]string {
+func (i *instance) toMap() map[string]string {
 	if i == nil {
 		return nil
 	}
