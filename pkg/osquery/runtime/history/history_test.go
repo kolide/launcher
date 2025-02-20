@@ -23,7 +23,7 @@ func TestNewInstance(t *testing.T) {
 		name string
 		// registrationId will automatically be added to any new instances (if missing in test case) before seeding
 		registrationId   string
-		initialInstances []*Instance
+		initialInstances []*instance
 		wantNumInstances int
 		wantErr          error
 	}{
@@ -34,7 +34,7 @@ func TestNewInstance(t *testing.T) {
 		},
 		{
 			name: "existing_instances",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					StartTime: "first_start_time",
 					ExitTime:  "first_exit_time",
@@ -49,7 +49,7 @@ func TestNewInstance(t *testing.T) {
 		},
 		{
 			name: "max_instances_reached",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{}, {}, {}, {}, {}, {}, {}, {}, {},
 				{
 					ExitTime: "last_exit_time",
@@ -104,13 +104,13 @@ func TestGetHistory(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		initialInstances []*Instance
+		initialInstances []*instance
 		want             []map[string]string
 		errString        string
 	}{
 		{
 			name: "success",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					StartTime: "first_expected_start_time",
 				},
@@ -150,13 +150,13 @@ func TestLatestInstance(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		initialInstances []*Instance
-		want             *Instance
+		initialInstances []*instance
+		want             *instance
 		errString        string
 	}{
 		{
 			name: "success",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					StartTime:      "first_expected_start_time",
 					RegistrationId: types.DefaultRegistrationID,
@@ -166,7 +166,7 @@ func TestLatestInstance(t *testing.T) {
 					RegistrationId: types.DefaultRegistrationID,
 				},
 			},
-			want: &Instance{
+			want: &instance{
 				StartTime:      "second_expected_start_time",
 				RegistrationId: types.DefaultRegistrationID,
 			},
@@ -198,14 +198,14 @@ func TestLatestInstanceStats(t *testing.T) {
 	tests := []struct {
 		name             string
 		registrationID   string
-		initialInstances []*Instance
+		initialInstances []*instance
 		want             map[string]string
 		errString        string
 	}{
 		{
 			name:           "success",
 			registrationID: "test",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					StartTime:      "first_expected_start_time",
 					RegistrationId: "some other",
@@ -243,7 +243,7 @@ func TestLatestInstanceStats(t *testing.T) {
 		{
 			name:           "no matching instances",
 			registrationID: "test3",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					StartTime:      "first_expected_start_time",
 					RegistrationId: "test",
@@ -282,14 +282,14 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 	tests := []struct {
 		name             string
 		registrationId   string
-		initialInstances []*Instance
+		initialInstances []*instance
 		want             int64
 		expectedErr      bool
 	}{
 		{
 			name:           "success",
 			registrationId: types.DefaultRegistrationID,
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -305,7 +305,7 @@ func TestLatestInstanceUptimeMinutes(t *testing.T) {
 		{
 			name:           "success_different_registration_ids",
 			registrationId: "notTheDefault",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-45 * time.Minute).Format(time.RFC3339),
@@ -358,7 +358,7 @@ func TestLatestInstanceId(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		initialInstances []*Instance
+		initialInstances []*instance
 		registrationId   string
 		want             string
 		expectedErr      bool
@@ -366,7 +366,7 @@ func TestLatestInstanceId(t *testing.T) {
 		{
 			name:           "success_same_registration_ids",
 			registrationId: types.DefaultRegistrationID,
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -389,7 +389,7 @@ func TestLatestInstanceId(t *testing.T) {
 		{
 			name:           "success_different_registration_ids",
 			registrationId: types.DefaultRegistrationID,
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -446,7 +446,7 @@ func TestSetConnected(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name               string
-		initialInstances   []*Instance
+		initialInstances   []*instance
 		querierReturn      func() ([]map[string]string, error)
 		runId              string
 		expectedInstanceId string
@@ -464,7 +464,7 @@ func TestSetConnected(t *testing.T) {
 					},
 				}, nil
 			},
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -495,7 +495,7 @@ func TestSetConnected(t *testing.T) {
 					},
 				}, nil
 			},
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -534,7 +534,7 @@ func TestSetConnected(t *testing.T) {
 			querierReturn: func() ([]map[string]string, error) {
 				return nil, ExpectedAtLeastOneRowError{}
 			},
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339),
@@ -587,7 +587,7 @@ func TestSetExited(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name             string
-		initialInstances []*Instance
+		initialInstances []*instance
 		runId            string
 		expectedErr      error
 		exitErr          error
@@ -595,7 +595,7 @@ func TestSetExited(t *testing.T) {
 		{
 			name:  "success_same_registration_ids",
 			runId: "99999999-9999-9999-9999-999999999999",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -618,7 +618,7 @@ func TestSetExited(t *testing.T) {
 		{
 			name:  "success_different_registration_ids",
 			runId: "99999999-9999-9999-9999-999999999999",
-			initialInstances: []*Instance{
+			initialInstances: []*instance{
 				{
 					RegistrationId: types.DefaultRegistrationID,
 					StartTime:      time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339),
@@ -685,7 +685,7 @@ func TestSetExited(t *testing.T) {
 }
 
 // setupStorage creates storage and seeds it with the given instances.
-func setupStorage(t *testing.T, seedInstances ...*Instance) types.KVStore {
+func setupStorage(t *testing.T, seedInstances ...*instance) types.KVStore {
 	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.OsqueryHistoryInstanceStore.String())
 	require.NoError(t, err)
 
