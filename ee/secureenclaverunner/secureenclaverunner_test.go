@@ -5,7 +5,6 @@ package secureenclaverunner
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -29,7 +28,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 		require.NotNil(t, ser.Public())
@@ -37,15 +36,21 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		// key should have been created in public call
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
-			require.Equal(t, &privKey.PublicKey, v)
+			require.Equal(t, &privKey.PublicKey, v.pubKey)
+			require.Equal(t, true, v.verifiedInSecureEnclave,
+				"key should have been verified in secure enclave since just created",
+			)
 		}
+
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
 	})
 
 	t.Run("creates key in execute", func(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
@@ -53,10 +58,10 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		require.Nil(t, ser.Public())
 
 		// give error on first execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
 
 		// give key on second execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 
 		go func() {
 			// sleep long enough to get through 2 cycles of exectue
@@ -66,23 +71,35 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// key should have been created in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
-			require.Equal(t, &privKey.PublicKey, v)
+			require.Equal(t, &privKey.PublicKey, v.pubKey)
+			require.Equal(t, true, v.verifiedInSecureEnclave,
+				"key should have been verified in secure enclave since just created",
+			)
 		}
 	})
 
-	t.Run("loads existing key", func(t *testing.T) {
+	t.Run("loads existing and verifies existing key", func(t *testing.T) {
 		t.Parallel()
 
 		// populate store with key
 		store := inmemory.NewStore()
 		firstConsoleUser, err := firstConsoleUser(context.TODO())
 		require.NoError(t, err)
+
 		serToSerialize := &secureEnclaveRunner{
-			uidPubKeyMap: map[string]*ecdsa.PublicKey{
-				firstConsoleUser.Uid: &privKey.PublicKey,
+			uidPubKeyMap: map[string]*keyEntry{
+				firstConsoleUser.Uid: {
+					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
+				},
 			},
 		}
 		serJson, err := json.Marshal(serToSerialize)
@@ -90,8 +107,11 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		err = store.Set([]byte(publicEccDataKey), serJson)
 		require.NoError(t, err)
 
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+
 		// create new signer with store containing key
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, nil)
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {
@@ -102,10 +122,16 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// key should have been loaded in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
-			require.Equal(t, &privKey.PublicKey, v)
+			require.Equal(t, &privKey.PublicKey, v.pubKey)
+			require.Equal(t, true, v.verifiedInSecureEnclave,
+				"key should have been verified in secure enclave",
+			)
 		}
 	})
 
@@ -113,7 +139,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
@@ -155,7 +181,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
@@ -166,13 +192,13 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		ser.noConsoleUsersDelay = 100 * time.Millisecond
 
 		// give error on first execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
 
 		// give error on first execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("some other error")).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("some other error")).Once()
 
 		// give key on second execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 
 		go func() {
 			// sleep long enough to get through 2 cycles of exectue
@@ -182,10 +208,16 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// key should have been loaded in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
-			require.Equal(t, &privKey.PublicKey, v)
+			require.Equal(t, &privKey.PublicKey, v.pubKey)
+			require.Equal(t, true, v.verifiedInSecureEnclave,
+				"key should have been verified in secure enclave since just created",
+			)
 		}
 	})
 
@@ -193,7 +225,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
 		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
@@ -201,7 +233,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		require.Nil(t, ser.Public())
 
 		// give error on first execute loop
-		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, noConsoleUsersError{}).Once()
 
 		go func() {
 			// sleep long enough to get through 2 cycles of exectue
@@ -214,5 +246,117 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		// no key should be created since loop didn't execute
 		// and public not called
 		require.Len(t, ser.uidPubKeyMap, 0)
+	})
+
+	t.Run("creates new key when existing not found in secure enclave", func(t *testing.T) {
+		t.Parallel()
+
+		// populate store with key
+		store := inmemory.NewStore()
+		firstConsoleUser, err := firstConsoleUser(context.TODO())
+		require.NoError(t, err)
+
+		serToSerialize := &secureEnclaveRunner{
+			uidPubKeyMap: map[string]*keyEntry{
+				firstConsoleUser.Uid: {
+					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
+				},
+			},
+		}
+		serJson, err := json.Marshal(serToSerialize)
+		require.NoError(t, err)
+		err = store.Set([]byte(publicEccDataKey), serJson)
+		require.NoError(t, err)
+
+		newKey, err := echelper.GenerateEcdsaKey()
+		require.NoError(t, err)
+
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+
+		// report key doesnt exist
+		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+
+		// create new key
+		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&newKey.PublicKey, nil).Once()
+
+		// create new signer with store containing key
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
+		require.NoError(t, err)
+
+		go func() {
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, ser.Execute())
+
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
+		// old key should have been replaced with new one
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &newKey.PublicKey, v.pubKey,
+				"key should have been replaced with new one",
+			)
+			require.Equal(t, true, v.verifiedInSecureEnclave,
+				"key should have been verified in secure enclave since just created",
+			)
+		}
+	})
+
+	t.Run("does not delete key when cant verify if in secure enclave", func(t *testing.T) {
+		t.Parallel()
+
+		// populate store with key
+		store := inmemory.NewStore()
+		firstConsoleUser, err := firstConsoleUser(context.TODO())
+		require.NoError(t, err)
+
+		serToSerialize := &secureEnclaveRunner{
+			uidPubKeyMap: map[string]*keyEntry{
+				firstConsoleUser.Uid: {
+					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
+				},
+			},
+		}
+		serJson, err := json.Marshal(serToSerialize)
+		require.NoError(t, err)
+		err = store.Set([]byte(publicEccDataKey), serJson)
+		require.NoError(t, err)
+
+		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
+
+		// report error verifying key
+		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(false, errors.New("cant talk to secure enclave"))
+
+		// create new signer with store containing key
+		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
+		require.NoError(t, err)
+
+		go func() {
+			// sleep long enough to get through 2 cycles of exectue
+			time.Sleep(3 * time.Second)
+			ser.Interrupt(errors.New("test"))
+		}()
+
+		require.NoError(t, ser.Execute())
+
+		require.Len(t, ser.uidPubKeyMap, 1)
+		for _, v := range ser.uidPubKeyMap {
+			require.Equal(t, &privKey.PublicKey, v.pubKey,
+				"key should not have been replaced with new one",
+			)
+			require.Equal(t, false, v.verifiedInSecureEnclave,
+				"key should not have been verified in secure enclave",
+			)
+		}
 	})
 }

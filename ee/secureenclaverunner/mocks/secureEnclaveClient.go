@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	context "context"
 	ecdsa "crypto/ecdsa"
 
 	mock "github.com/stretchr/testify/mock"
@@ -13,9 +14,9 @@ type SecureEnclaveClient struct {
 	mock.Mock
 }
 
-// CreateSecureEnclaveKey provides a mock function with given fields: uid
-func (_m *SecureEnclaveClient) CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error) {
-	ret := _m.Called(uid)
+// CreateSecureEnclaveKey provides a mock function with given fields: ctx, uid
+func (_m *SecureEnclaveClient) CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error) {
+	ret := _m.Called(ctx, uid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateSecureEnclaveKey")
@@ -23,19 +24,47 @@ func (_m *SecureEnclaveClient) CreateSecureEnclaveKey(uid string) (*ecdsa.Public
 
 	var r0 *ecdsa.PublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*ecdsa.PublicKey, error)); ok {
-		return rf(uid)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*ecdsa.PublicKey, error)); ok {
+		return rf(ctx, uid)
 	}
-	if rf, ok := ret.Get(0).(func(string) *ecdsa.PublicKey); ok {
-		r0 = rf(uid)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *ecdsa.PublicKey); ok {
+		r0 = rf(ctx, uid)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*ecdsa.PublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(uid)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// VerifySecureEnclaveKey provides a mock function with given fields: ctx, uid, pubKey
+func (_m *SecureEnclaveClient) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
+	ret := _m.Called(ctx, uid, pubKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifySecureEnclaveKey")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *ecdsa.PublicKey) (bool, error)); ok {
+		return rf(ctx, uid, pubKey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *ecdsa.PublicKey) bool); ok {
+		r0 = rf(ctx, uid, pubKey)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *ecdsa.PublicKey) error); ok {
+		r1 = rf(ctx, uid, pubKey)
 	} else {
 		r1 = ret.Error(1)
 	}

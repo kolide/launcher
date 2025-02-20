@@ -29,8 +29,13 @@ const (
 	publicEccDataKey = "publicEccData"
 )
 
+type keyEntry struct {
+	pubKey                  *ecdsa.PublicKey
+	verifiedInSecureEnclave bool
+}
+
 type secureEnclaveRunner struct {
-	uidPubKeyMap        map[string]*ecdsa.PublicKey
+	uidPubKeyMap        map[string]*keyEntry
 	uidPubKeyMapMux     *sync.Mutex
 	secureEnclaveClient secureEnclaveClient
 	store               types.GetterSetterDeleter
@@ -41,12 +46,13 @@ type secureEnclaveRunner struct {
 }
 
 type secureEnclaveClient interface {
-	CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error)
+	CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error)
+	VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error)
 }
 
 func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, secureEnclaveClient secureEnclaveClient) (*secureEnclaveRunner, error) {
 	return &secureEnclaveRunner{
-		uidPubKeyMap:        make(map[string]*ecdsa.PublicKey),
+		uidPubKeyMap:        make(map[string]*keyEntry),
 		store:               store,
 		secureEnclaveClient: secureEnclaveClient,
 		slogger:             slogger.With("component", "secureenclaverunner"),
@@ -195,17 +201,62 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 		return nil, nil
 	}
 
-	key, ok := ser.uidPubKeyMap[cu.Uid]
-	if ok {
+	entry, ok := ser.uidPubKeyMap[cu.Uid]
+
+	// found key, already verified in secure enclave
+	if ok && entry.verifiedInSecureEnclave {
 		ser.slogger.Log(ctx, slog.LevelDebug,
 			"found existing key for console user",
 			"uid", cu.Uid,
+			"verified_in_secure_enclave", entry.verifiedInSecureEnclave,
 		)
-		span.AddEvent("found_existing_key_for_console_user")
-		return key, nil
+		span.AddEvent("found_existing_verified_key_for_console_user")
+		return entry.pubKey, nil
 	}
 
-	key, err = ser.secureEnclaveClient.CreateSecureEnclaveKey(cu.Uid)
+	// found key, but not verified in secure enclave
+	if ok {
+		verfied, err := ser.secureEnclaveClient.VerifySecureEnclaveKey(ctx, cu.Uid, entry.pubKey)
+
+		// got err, cannot determine if key is valid
+		if err != nil {
+			traces.SetError(span, fmt.Errorf("verifying existing key: %w", err))
+			span.AddEvent("verifying_existing_key_for_console_user_failed")
+			return nil, fmt.Errorf("verifying existing key: %w", err)
+		}
+
+		// key exists in secure enclave
+		if verfied {
+			ser.slogger.Log(ctx, slog.LevelDebug,
+				"verified key exists in secure enclave",
+				"uid", cu.Uid,
+			)
+			entry.verifiedInSecureEnclave = verfied
+			return entry.pubKey, nil
+		}
+
+		// key does not exist in secure enclave
+		span.AddEvent("key_does_not_exist_in_secure_enclave")
+		delete(ser.uidPubKeyMap, cu.Uid)
+		ser.slogger.Log(ctx, slog.LevelInfo,
+			"key does not exist in secure enclave, deleting from store",
+			"uid", cu.Uid,
+		)
+
+		if err := ser.save(); err != nil {
+			traces.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
+			ser.slogger.Log(ctx, slog.LevelError,
+				"error saving secure enclave signer after key deletion",
+				"err", err,
+			)
+
+			return nil, fmt.Errorf("saving secure enclave signer: %w", err)
+		}
+
+		span.AddEvent("deleted_key_for_console_user")
+	}
+
+	key, err := ser.secureEnclaveClient.CreateSecureEnclaveKey(ctx, cu.Uid)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("creating key: %w", err))
 		return nil, fmt.Errorf("creating key: %w", err)
@@ -217,7 +268,12 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 	)
 	span.AddEvent("created_new_key_for_console_user")
 
-	ser.uidPubKeyMap[cu.Uid] = key
+	ser.uidPubKeyMap[cu.Uid] = &keyEntry{
+		pubKey: key,
+		// since we just created, we can verify that it's in the secure enclave
+		verifiedInSecureEnclave: true,
+	}
+
 	if err := ser.save(); err != nil {
 		delete(ser.uidPubKeyMap, cu.Uid)
 		traces.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
@@ -231,8 +287,12 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 func (ser *secureEnclaveRunner) MarshalJSON() ([]byte, error) {
 	keyMap := make(map[string]string)
 
-	for uid, pubKey := range ser.uidPubKeyMap {
-		pubKeyBytes, err := x509.MarshalPKIXPublicKey(pubKey)
+	for uid, entry := range ser.uidPubKeyMap {
+		// It's important to note that when we are marshalling the key, we are not saving whether
+		// or not it was verified in the secure enclave. We want this to happen on every launcher run
+		// so that if the db was copied to a new machine or the secure enclave was reset,
+		// we don't falsely assume the key is valid
+		pubKeyBytes, err := x509.MarshalPKIXPublicKey(entry.pubKey)
 		if err != nil {
 			return nil, fmt.Errorf("marshalling to PXIX public key: %w", err)
 		}
@@ -245,7 +305,7 @@ func (ser *secureEnclaveRunner) MarshalJSON() ([]byte, error) {
 
 func (ser *secureEnclaveRunner) UnmarshalJSON(data []byte) error {
 	if ser.uidPubKeyMap == nil {
-		ser.uidPubKeyMap = make(map[string]*ecdsa.PublicKey)
+		ser.uidPubKeyMap = make(map[string]*keyEntry)
 	}
 
 	var keyMap map[string]string
@@ -269,7 +329,12 @@ func (ser *secureEnclaveRunner) UnmarshalJSON(data []byte) error {
 			return errors.New("public key is not ecdsa")
 		}
 
-		ser.uidPubKeyMap[k] = ecdsaPubKey
+		ser.uidPubKeyMap[k] = &keyEntry{
+			pubKey: ecdsaPubKey,
+			// we can't verify the key here because we can't be sure a user is
+			// logged in and the secure enclave is available
+			verifiedInSecureEnclave: false,
+		}
 	}
 
 	return nil
