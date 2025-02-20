@@ -288,6 +288,10 @@ func (ser *secureEnclaveRunner) MarshalJSON() ([]byte, error) {
 	keyMap := make(map[string]string)
 
 	for uid, entry := range ser.uidPubKeyMap {
+		// It's important to note that when we are marshalling the key, we are not saving whether
+		// or not it was verified in the secure enclave. We want this to happen on every launcher run
+		// so that if the db was copied to a new machine or the secure enclave was reset,
+		// we don't falsely assume the key is valid
 		pubKeyBytes, err := x509.MarshalPKIXPublicKey(entry.pubKey)
 		if err != nil {
 			return nil, fmt.Errorf("marshalling to PXIX public key: %w", err)
