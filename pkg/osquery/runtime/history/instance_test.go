@@ -57,7 +57,7 @@ func TestInstance_Connected(t *testing.T) {
 			_, err := InitHistory(setupStorage(t))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			i := &Instance{}
+			i := &instance{}
 			querier := &mocks.Querier{}
 			querier.On("Query", "select instance_id, version from osquery_info order by start_time limit 1").Return(tt.querierReturn()).Once()
 
@@ -104,7 +104,7 @@ func TestInstance_Exited(t *testing.T) {
 			_, err := InitHistory(setupStorage(t))
 			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			i := &Instance{}
+			i := &instance{}
 			i.Exited(tt.args.exitError)
 
 			assert.Equal(t, tt.wantErr, i.Error)

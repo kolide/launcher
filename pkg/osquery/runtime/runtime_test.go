@@ -610,7 +610,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	go runner.Run()
 
 	// Wait briefly for the launch routines to begin, then shut it down
-	time.Sleep(10 * time.Second)
+	waitHealthy(t, runner, logBytes, osqHistory)
 	waitShutdown(t, runner, logBytes)
 
 	// Confirm the default instance was started, and then exited
@@ -627,7 +627,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	// Confirm the additional instance was started, and then exited
 	require.Contains(t, runner.instances, extraRegistrationId)
 	require.NotNil(t, runner.instances[extraRegistrationId].history)
-	extraInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+	extraInstanceStats, err := osqHistory.LatestInstanceStats(extraRegistrationId)
 	require.NoError(t, err)
 	require.Contains(t, extraInstanceStats, "start_time")
 	require.NotEmpty(t, extraInstanceStats["start_time"], "start time should be added to secondary instance stats on start up")

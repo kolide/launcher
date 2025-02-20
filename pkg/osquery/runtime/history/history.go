@@ -13,7 +13,7 @@ const maxInstances = 10
 
 type History struct {
 	sync.Mutex
-	instances []*Instance
+	instances []*instance
 	store     types.GetterSetter
 }
 
@@ -26,7 +26,7 @@ func (c NoInstancesError) Error() string {
 // InitHistory loads the osquery instance history from bbolt DB if exists, sets up bucket if it does not
 func InitHistory(store types.GetterSetter) (*History, error) {
 	history := History{
-		instances: make([]*Instance, 0),
+		instances: make([]*instance, 0),
 		store:     store,
 	}
 
@@ -58,7 +58,7 @@ func (h *History) GetHistory() ([]map[string]string, error) {
 // by registration id. it does not lock history because many of our exposed methods
 // need to do further manipulation after grabbing the instance here, so that
 // responsibility is maintained outside of this
-func (h *History) latestInstance(registrationId string) (*Instance, error) {
+func (h *History) latestInstance(registrationId string) (*instance, error) {
 	if len(h.instances) == 0 {
 		return nil, NoInstancesError{}
 	}
@@ -135,7 +135,7 @@ func (h *History) NewInstance(registrationId string, runId string) error {
 		return err
 	}
 
-	newInstance := &Instance{
+	newInstance := &instance{
 		RegistrationId: registrationId,
 		RunId:          runId,
 		StartTime:      timeNow(),
@@ -210,13 +210,13 @@ func (h *History) SetExited(runID string, exitError error) error {
 	return nil
 }
 
-func (h *History) addInstanceToHistory(instance *Instance) {
+func (h *History) addInstanceToHistory(newInstance *instance) {
 	if h.instances == nil {
-		h.instances = []*Instance{instance}
+		h.instances = []*instance{newInstance}
 		return
 	}
 
-	h.instances = append(h.instances, instance)
+	h.instances = append(h.instances, newInstance)
 
 	if len(h.instances) >= maxInstances {
 		h.instances = h.instances[len(h.instances)-maxInstances:]
