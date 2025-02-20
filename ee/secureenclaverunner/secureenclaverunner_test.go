@@ -310,7 +310,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 
-		// report key doesnt exist
+		// report error verifying key
 		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(false, errors.New("cant talk to secure enclave"))
 
 		// create new signer with store containing key
@@ -325,7 +325,6 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
-		// old key should have been replaced with new one
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
 			require.Equal(t, &privKey.PublicKey, v.pubKey,
