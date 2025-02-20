@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -110,7 +111,7 @@ func execPwsh(slogger *slog.Logger) execer {
 			)
 
 			if err == nil {
-				err = fmt.Errorf("exec succeeded, but emitted to stderr")
+				err = errors.New("exec succeeded, but emitted to stderr")
 			}
 			return fmt.Errorf("execing powershell, got: %s: %w", errOutput, err)
 		}

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,7 +150,7 @@ func decodeJsonL(data io.Reader) ([]any, error) {
 		count += 1
 
 		if count > 50 {
-			return nil, fmt.Errorf("stuck in a loop. Count exceeds 50")
+			return nil, errors.New("stuck in a loop. Count exceeds 50")
 		}
 	}
 }

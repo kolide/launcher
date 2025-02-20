@@ -6,7 +6,7 @@ package nix_env_upgradeable
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -46,7 +46,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	uids := tablehelpers.GetConstraints(queryContext, "uid", tablehelpers.WithAllowedCharacters(allowedCharacters))
 	if len(uids) < 1 {
-		return results, fmt.Errorf("kolide_nix_upgradeable requires at least one user id to be specified")
+		return results, errors.New("kolide_nix_upgradeable requires at least one user id to be specified")
 	}
 
 	for _, uid := range uids {

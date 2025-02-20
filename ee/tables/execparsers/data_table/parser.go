@@ -2,7 +2,7 @@ package data_table
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 )
@@ -64,7 +64,7 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 		p.skipLines--
 
 		if !scanner.Scan() {
-			return results, fmt.Errorf("skipped past all lines of data")
+			return results, errors.New("skipped past all lines of data")
 		}
 	}
 
