@@ -6,6 +6,7 @@ package watchdog
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -388,7 +389,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	defer trigger.Release()
 
 	if _, err = oleutil.PutProperty(trigger, "ExecutionTimeLimit", "PT1M"); err != nil {
-		return fmt.Errorf("setting execution time limit property")
+		return errors.New("setting execution time limit property")
 	}
 
 	// found the guid here https://github.com/capnspacehook/taskmaster/blob/1629df7c85e96aab410af7f1747ba264d3276505/fill.go#L168
@@ -434,7 +435,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	defer noDelayEventTrigger.Release()
 
 	if _, err = oleutil.PutProperty(noDelayEventTrigger, "ExecutionTimeLimit", "PT1M"); err != nil {
-		return fmt.Errorf("setting execution time limit property")
+		return errors.New("setting execution time limit property")
 	}
 
 	secondaryEventTrigger, err := noDelayEventTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
