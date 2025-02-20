@@ -205,15 +205,13 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	// found key, already verified in secure enclave
 	if ok && entry.verifiedInSecureEnclave {
-		if entry.verifiedInSecureEnclave {
-			ser.slogger.Log(ctx, slog.LevelDebug,
-				"found existing key for console user",
-				"uid", cu.Uid,
-				"verified_in_secure_enclave", entry.verifiedInSecureEnclave,
-			)
-			span.AddEvent("found_existing_verified_key_for_console_user")
-			return entry.pubKey, nil
-		}
+		ser.slogger.Log(ctx, slog.LevelDebug,
+			"found existing key for console user",
+			"uid", cu.Uid,
+			"verified_in_secure_enclave", entry.verifiedInSecureEnclave,
+		)
+		span.AddEvent("found_existing_verified_key_for_console_user")
+		return entry.pubKey, nil
 	}
 
 	// found key, but not verified in secure enclave
