@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/presencedetection"
@@ -132,14 +134,9 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 	return durationSinceLastDetection, detectionErr
 }
 
-func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
-	timeout := c.base.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Second
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+func (c *client) CreateSecureEnclaveKey(ctx context.Context) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/secure_enclave_key", http.NoBody)
 	if err != nil {
@@ -167,6 +164,44 @@ func (c *client) CreateSecureEnclaveKey() ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+// VerifySecureEnclaveKey verifies that the public key exists in the secure enclave.
+// Returns:
+// true, nil if the key exists;
+// false, nil if the key does not exist;
+// false, error don't know if key exists because of some other error
+func (c *client) VerifySecureEnclaveKey(ctx context.Context, key *ecdsa.PublicKey) (bool, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	b64, err := echelper.PublicEcdsaToB64Der(key)
+	if err != nil {
+		return false, fmt.Errorf("serializing key: %w", err)
+	}
+
+	encodedB64 := url.QueryEscape(string(b64))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://unix/secure_enclave_key?pub_key=%s", encodedB64), http.NoBody)
+	if err != nil {
+		return false, fmt.Errorf("creating secure enclave key request: %w", err)
+	}
+
+	if req.Body != nil {
+		defer req.Body.Close()
+	}
+
+	// key exists
+	if req.Response.StatusCode == http.StatusOK {
+		return true, nil
+	}
+
+	// key does not exist
+	if req.Response.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+
+	// uncertain if key exists
+	return false, fmt.Errorf("unexpected status code, cannot verify existence of key: %d", req.Response.StatusCode)
 }
 
 func (c *client) Notify(n notify.Notification) error {

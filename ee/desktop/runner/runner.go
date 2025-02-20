@@ -309,7 +309,7 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 	return presencedetection.DetectionFailedDurationValue, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
 }
 
-func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa.PublicKey, error) {
+func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error) {
 	if r.uidProcs == nil || len(r.uidProcs) == 0 {
 		return nil, errors.New("no desktop processes running")
 	}
@@ -320,7 +320,7 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa
 	}
 
 	client := client.New(r.userServerAuthToken, proc.socketPath)
-	keyBytes, err := client.CreateSecureEnclaveKey()
+	keyBytes, err := client.CreateSecureEnclaveKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating secure enclave key: %w", err)
 	}
@@ -331,6 +331,25 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(uid string) (*ecdsa
 	}
 
 	return key, nil
+}
+
+// VerifySecureEnclaveKey verifies that the public key exists in the secure enclave.
+// Returns:
+// true, nil if the key exists;
+// false, nil if the key does not exist;
+// false, error don't know if key exists because of some other error
+func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return false, errors.New("no desktop processes running")
+	}
+
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return false, fmt.Errorf("no desktop process for uid: %s", uid)
+	}
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	return client.VerifySecureEnclaveKey(ctx, pubKey)
 }
 
 // killDesktopProcesses kills any existing desktop processes
