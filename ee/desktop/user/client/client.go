@@ -145,7 +145,7 @@ func (c *client) CreateSecureEnclaveKey(ctx context.Context) ([]byte, error) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.base.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("getting secure enclave key: %w", err)
+		return nil, fmt.Errorf("creating secure enclave key: %w", err)
 	}
 
 	if resp.Body == nil {
@@ -186,22 +186,27 @@ func (c *client) VerifySecureEnclaveKey(ctx context.Context, key *ecdsa.PublicKe
 		return false, fmt.Errorf("creating secure enclave key request: %w", err)
 	}
 
-	if req.Body != nil {
-		defer req.Body.Close()
+	resp, err := c.base.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("getting secure enclave key: %w", err)
+	}
+
+	if resp.Body != nil {
+		defer resp.Body.Close()
 	}
 
 	// key exists
-	if req.Response.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusOK {
 		return true, nil
 	}
 
 	// key does not exist
-	if req.Response.StatusCode == http.StatusNotFound {
+	if resp.StatusCode == http.StatusNotFound {
 		return false, nil
 	}
 
 	// uncertain if key exists
-	return false, fmt.Errorf("unexpected status code, cannot verify existence of key: %d", req.Response.StatusCode)
+	return false, fmt.Errorf("unexpected status code, cannot verify existence of key: %d", resp.StatusCode)
 }
 
 func (c *client) Notify(n notify.Notification) error {
