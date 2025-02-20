@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -70,7 +69,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 	paths := tablehelpers.GetConstraints(queryContext, "path")
 	if len(paths) < 1 {
-		return nil, fmt.Errorf("kolide_jwt requires at least one path to be specified")
+		return nil, errors.New("kolide_jwt requires at least one path to be specified")
 	}
 
 	for _, path := range paths {

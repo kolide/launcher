@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -44,7 +45,7 @@ func NewTemplateParser(td *TemplateData) *templateParser {
 // if an error occurs while parsing, an empty string is returned along with the error
 func (tp *templateParser) Parse(text string) (string, error) {
 	if tp == nil || tp.td == nil {
-		return "", fmt.Errorf("templateData is nil")
+		return "", errors.New("templateData is nil")
 	}
 
 	t, err := template.New("menu_template").Funcs(template.FuncMap{
