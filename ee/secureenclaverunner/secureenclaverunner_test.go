@@ -41,6 +41,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 				"key should have been verified in secure enclave since just created",
 			)
 		}
+
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
 	})
 
 	t.Run("creates key in execute", func(t *testing.T) {
@@ -68,6 +71,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// key should have been created in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
@@ -90,6 +96,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 			uidPubKeyMap: map[string]*keyEntry{
 				firstConsoleUser.Uid: {
 					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
 				},
 			},
 		}
@@ -112,6 +121,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		}()
 
 		require.NoError(t, ser.Execute())
+
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
 
 		// key should have been loaded in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
@@ -196,6 +208,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// key should have been loaded in execute
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
@@ -245,6 +260,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 			uidPubKeyMap: map[string]*keyEntry{
 				firstConsoleUser.Uid: {
 					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
 				},
 			},
 		}
@@ -276,6 +294,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		require.NoError(t, ser.Execute())
 
+		// calling public here to make sure we don't try to verify key again
+		require.NotNil(t, ser.Public())
+
 		// old key should have been replaced with new one
 		require.Len(t, ser.uidPubKeyMap, 1)
 		for _, v := range ser.uidPubKeyMap {
@@ -300,6 +321,9 @@ func Test_secureEnclaveRunner(t *testing.T) {
 			uidPubKeyMap: map[string]*keyEntry{
 				firstConsoleUser.Uid: {
 					pubKey: &privKey.PublicKey,
+					// setting this to true just to make sure it does NOT get serialized
+					// should always start a new run as false
+					verifiedInSecureEnclave: true,
 				},
 			},
 		}
