@@ -16,9 +16,9 @@ import (
 
 const pathColumnName = "path"
 
-// katcTable is a Kolide ATC table. It queries the source and transforms the response data
+// KatcTable is a Kolide ATC table. It queries the source and transforms the response data
 // per the configuration in its `cfg`.
-type katcTable struct {
+type KatcTable struct {
 	tableName         string
 	sourceType        katcSourceType
 	sourcePaths       []string
@@ -29,7 +29,7 @@ type katcTable struct {
 }
 
 // newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
-func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*katcTable, []table.ColumnDefinition) {
+func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*KatcTable, []table.ColumnDefinition) {
 	columns := []table.ColumnDefinition{
 		{
 			Name: pathColumnName,
@@ -47,7 +47,7 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		columnLookup[cfg.Columns[i]] = struct{}{}
 	}
 
-	k := katcTable{
+	k := KatcTable{
 		tableName:    tableName,
 		columnLookup: columnLookup,
 		slogger:      slogger,
@@ -106,7 +106,7 @@ func filtersMatch(filters map[string]string) bool {
 	return false
 }
 
-func (k *katcTable) Equals(x *katcTable) bool {
+func (k *KatcTable) Equals(x *KatcTable) bool {
 	// Compare all relevant elements of these two table's configuration to see whether they're the same.
 	// Start with the config values that are simple to compare.
 	if k.tableName != x.tableName {
@@ -150,7 +150,7 @@ func (k *katcTable) Equals(x *katcTable) bool {
 }
 
 // generate handles queries against a KATC table.
-func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+func (k *KatcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := traces.StartSpan(ctx, "table_name", k.tableName)
 	defer span.End()
 
