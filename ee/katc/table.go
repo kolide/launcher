@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/kolide/launcher/pkg/traces"
@@ -103,6 +104,49 @@ func filtersMatch(filters map[string]string) bool {
 		return goos == runtime.GOOS
 	}
 	return false
+}
+
+func (k *katcTable) Equals(x *katcTable) bool {
+	// Compare all relevant elements of these two table's configuration to see whether they're the same.
+	// Start with the config values that are simple to compare.
+	if k.tableName != x.tableName {
+		return false
+	}
+	if k.sourceType.name != x.sourceType.name {
+		return false
+	}
+	if k.sourceQuery != x.sourceQuery {
+		return false
+	}
+
+	// Compare source paths. The order of the source paths shouldn't technically matter much,
+	// but for simplicity's sake we require them to be in the same order for the tables to be equal.
+	if !slices.Equal(k.sourcePaths, x.sourcePaths) {
+		return false
+	}
+
+	// Compare row transform steps. Order DOES matter for transform steps.
+	if len(k.rowTransformSteps) != len(x.rowTransformSteps) {
+		return false
+	}
+	for i := range k.rowTransformSteps {
+		if k.rowTransformSteps[i].name != x.rowTransformSteps[i].name {
+			return false
+		}
+	}
+
+	// Make sure we have the same columns.
+	if len(k.columnLookup) != len(x.columnLookup) {
+		return false
+	}
+	for colName := range k.columnLookup {
+		if _, ok := x.columnLookup[colName]; !ok {
+			return false
+		}
+	}
+
+	// Everything matches -- these tables have identical configurations.
+	return true
 }
 
 // generate handles queries against a KATC table.

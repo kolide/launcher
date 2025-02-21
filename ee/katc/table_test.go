@@ -478,3 +478,532 @@ func Test_checkSourcePathConstraints(t *testing.T) {
 		})
 	}
 }
+
+func TestEquals(t *testing.T) {
+	t.Parallel()
+
+	testSourceQueryA := "test query a"
+	testSourceQueryB := "test query b"
+
+	for _, tt := range []struct {
+		testCaseName   string
+		tableNameA     string
+		cfgA           katcTableConfig
+		tableNameB     string
+		cfgB           katcTableConfig
+		expectedEquals bool
+	}{
+		{
+			testCaseName: "configurations match",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: true,
+		},
+		{
+			testCaseName: "configurations match with overlays",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{filepath.Join("some", "correct", "path")},
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+				Overlays: []katcTableConfigOverlay{
+					{
+						Filters: map[string]string{
+							"goos": runtime.GOOS,
+						},
+						katcTableDefinition: katcTableDefinition{
+							SourcePaths: &[]string{filepath.Join("some", "correct", "path")},
+						},
+					},
+				},
+			},
+			expectedEquals: true,
+		},
+		{
+			testCaseName: "table names differ",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "different_test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "source types differ",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     indexeddbLeveldbSourceType,
+						dataFunc: indexeddbLeveldbData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "source queries differ",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryB,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "source paths differ",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "other", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "row transform steps differ in length",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "row transform steps differ in order",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "columns differ in length",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+		{
+			testCaseName: "columns differ in content",
+			tableNameA:   "test_table",
+			cfgA: katcTableConfig{
+				Columns: []string{"uuid", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			tableNameB: "test_table",
+			cfgB: katcTableConfig{
+				Columns: []string{"id", "name", "version"},
+				katcTableDefinition: katcTableDefinition{
+					SourceType: &katcSourceType{
+						name:     sqliteSourceType,
+						dataFunc: sqliteData,
+					},
+					SourcePaths: &[]string{filepath.Join("some", "incorrect", "path")},
+					SourceQuery: &testSourceQueryA,
+					RowTransformSteps: &[]rowTransformStep{
+						{
+							name:          snappyDecodeTransformStep,
+							transformFunc: snappyDecode,
+						},
+						{
+							name:          deserializeFirefoxTransformStep,
+							transformFunc: deserializeFirefox,
+						},
+					},
+				},
+			},
+			expectedEquals: false,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			testTableA, _ := newKatcTable(tt.tableNameA, tt.cfgA, multislogger.NewNopLogger())
+			testTableB, _ := newKatcTable(tt.tableNameB, tt.cfgB, multislogger.NewNopLogger())
+
+			if tt.expectedEquals {
+				require.True(t, testTableA.Equals(testTableB))
+				require.True(t, testTableB.Equals(testTableA))
+			} else {
+				require.False(t, testTableA.Equals(testTableB))
+				require.False(t, testTableB.Equals(testTableA))
+			}
+		})
+	}
+}
