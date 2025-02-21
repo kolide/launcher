@@ -9,6 +9,11 @@ import (
 
 var (
 	localserverZtaInfoKey = []byte("localserver_zta_info")
+
+	// allowlistedZtaOriginsLookup contains the complete list of origins that are permitted to access the /zta endpoint.
+	allowlistedZtaOriginsLookup = map[string]struct{}{
+		"https://app.kolide.com": {}, // TODO RM -- placeholder, awaiting actual values
+	}
 )
 
 func (ls *localServer) requestZtaInfoHandler() http.Handler {
@@ -21,6 +26,13 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate origin
+	requestOrigin := r.Header.Get("Origin")
+	if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok {
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
