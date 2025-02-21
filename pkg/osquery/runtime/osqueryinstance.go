@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/errgroup"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/katc"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
@@ -111,6 +112,8 @@ type OsqueryInstance struct {
 	// of launching an osqueryd process
 	runId                   string // string identifier for this instance
 	errgroup                *errgroup.LoggedErrgroup
+	katcTables              map[string]*katc.KatcTable
+	katcTablesLock          *sync.Mutex
 	saasExtension           *launcherosq.Extension
 	cmd                     *exec.Cmd
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
@@ -210,6 +213,8 @@ func newInstance(registrationId string, knapsack types.Knapsack, serviceClient s
 		settingsWriter: settingsWriter,
 		runId:          runId,
 		history:        knapsack.OsqueryHistory(),
+		katcTables:     make(map[string]*katc.KatcTable),
+		katcTablesLock: &sync.Mutex{},
 	}
 
 	for _, opt := range opts {
@@ -257,6 +262,37 @@ func (i *OsqueryInstance) WaitShutdown(ctx context.Context) error {
 // Exited returns a channel to monitor for signal that instance has shut itself down
 func (i *OsqueryInstance) Exited() <-chan struct{} {
 	return i.errgroup.Exited()
+}
+
+func (i *OsqueryInstance) updateKatcTablesInPlace() error {
+	i.katcTablesLock.Lock()
+	defer i.katcTablesLock.Unlock()
+
+	// For now, we only handle adding new KATC tables -- not updating the configuration of existing tables.
+	// We also cannot handle deleting KATC tables.
+	updatedKatcTables := table.KolideCustomAtcTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "katc_tables"))
+	for _, updatedTable := range updatedKatcTables {
+		if existingTable, ok := i.katcTables[updatedTable.Name()]; ok {
+			// This table already exists -- check to see whether the configuration has changed.
+			if existingTable.Equals(updatedTable) {
+				// No config change, nothing to do here
+				continue
+			}
+
+			return fmt.Errorf("table %s has changed configuration, cannot update in place", existingTable.Name())
+		}
+
+		// This is a new table! Register it and add it to our list of tables.
+		i.emsLock.RLock()
+		for _, srv := range i.extensionManagerServers {
+			srv.RegisterPlugin(updatedTable)
+		}
+		i.emsLock.RUnlock()
+
+		i.katcTables[updatedTable.Name()] = updatedTable
+	}
+
+	return nil
 }
 
 // Launch starts the osquery instance and its components. It will run until one of its
@@ -431,6 +467,16 @@ func (i *OsqueryInstance) Launch() error {
 	}
 	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
 	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack, i.knapsack.Slogger().With("component", "launcher_tables"))...)
+	katcTables := table.KolideCustomAtcTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "katc_tables"))
+
+	// Maintain a reference to the KATC tables so that we can update them in-place if necessary
+	i.katcTablesLock.Lock()
+	for _, t := range katcTables {
+		i.katcTables[t.Name()] = t
+	}
+	i.katcTablesLock.Unlock()
+
+	kolideSaasPlugins = append(kolideSaasPlugins, katcTables...)
 
 	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,

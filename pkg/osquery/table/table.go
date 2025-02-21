@@ -72,15 +72,12 @@ func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logge
 	// add in the platform specific ones (as denoted by build tags)
 	tables = append(tables, platformSpecificTables(k, slogger, currentOsquerydBinaryPath)...)
 
-	// Add in the Kolide custom ATC tables
-	tables = append(tables, kolideCustomAtcTables(k, registrationId, slogger)...)
-
 	return tables
 }
 
-// kolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s),
+// KolideCustomAtcTables retrieves Kolide ATC config from the appropriate data store(s),
 // then constructs the tables.
-func kolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slog.Logger) []osquery.OsqueryPlugin {
+func KolideCustomAtcTables(k types.Knapsack, registrationId string, slogger *slog.Logger) []*katc.KatcTable {
 	// Fetch tables from KVStore or from startup settings
 	config, err := katcFromDb(k, registrationId)
 	if err != nil {

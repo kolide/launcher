@@ -8,8 +8,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/indexeddb"
-	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -131,8 +129,8 @@ type (
 
 // ConstructKATCTables takes stored configuration of KATC tables, parses the configuration,
 // and returns the constructed tables.
-func ConstructKATCTables(config map[string]string, flags types.Flags, slogger *slog.Logger) []osquery.OsqueryPlugin {
-	plugins := make([]osquery.OsqueryPlugin, 0)
+func ConstructKATCTables(config map[string]string, flags types.Flags, slogger *slog.Logger) []*KatcTable {
+	plugins := make([]*KatcTable, 0)
 
 	for tableName, tableConfigStr := range config {
 		var cfg katcTableConfig
@@ -145,8 +143,7 @@ func ConstructKATCTables(config map[string]string, flags types.Flags, slogger *s
 			continue
 		}
 
-		t, columns := newKatcTable(tableName, cfg, slogger)
-		plugins = append(plugins, tablewrapper.New(flags, slogger, tableName, columns, t.generate))
+		plugins = append(plugins, newKatcTable(flags, tableName, cfg, slogger))
 	}
 
 	return plugins

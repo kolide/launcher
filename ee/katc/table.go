@@ -10,7 +10,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/traces"
+	"github.com/osquery/osquery-go"
+	osquerygen "github.com/osquery/osquery-go/gen/osquery"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -25,11 +29,12 @@ type KatcTable struct {
 	sourceQuery       string
 	rowTransformSteps []rowTransformStep
 	columnLookup      map[string]struct{}
+	plugin            osquery.OsqueryPlugin
 	slogger           *slog.Logger
 }
 
 // newKatcTable returns a new table with the given `cfg`, as well as the osquery columns for that table.
-func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (*KatcTable, []table.ColumnDefinition) {
+func newKatcTable(flags types.Flags, tableName string, cfg katcTableConfig, slogger *slog.Logger) *KatcTable {
 	columns := []table.ColumnDefinition{
 		{
 			Name: pathColumnName,
@@ -95,7 +100,9 @@ func newKatcTable(tableName string, cfg katcTableConfig, slogger *slog.Logger) (
 		"table_type", cfg.SourceType.String(),
 	)
 
-	return &k, columns
+	k.plugin = tablewrapper.New(flags, slogger, tableName, columns, k.generate)
+
+	return &k
 }
 
 func filtersMatch(filters map[string]string) bool {
@@ -104,6 +111,36 @@ func filtersMatch(filters map[string]string) bool {
 		return goos == runtime.GOOS
 	}
 	return false
+}
+
+// Name implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) Name() string {
+	return k.plugin.Name()
+}
+
+// RegistryName implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) RegistryName() string {
+	return k.plugin.RegistryName()
+}
+
+// Routes implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) Routes() osquerygen.ExtensionPluginResponse {
+	return k.plugin.Routes()
+}
+
+// Ping implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) Ping() osquerygen.ExtensionStatus {
+	return k.plugin.Ping()
+}
+
+// Call implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) Call(ctx context.Context, request osquerygen.ExtensionPluginRequest) osquerygen.ExtensionResponse {
+	return k.plugin.Call(ctx, request)
+}
+
+// Shutdown implements osquery.OsqueryPlugin and calls the KATC table's underlying osquery plugin.
+func (k *KatcTable) Shutdown() {
+	k.plugin.Shutdown()
 }
 
 func (k *KatcTable) Equals(x *KatcTable) bool {
