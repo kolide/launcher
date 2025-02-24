@@ -3,6 +3,7 @@ package localserver
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/kolide/launcher/pkg/traces"
 )
@@ -32,6 +33,11 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 	// Validate origin
 	requestOrigin := r.Header.Get("Origin")
 	if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok {
+		escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+		ls.slogger.Log(r.Context(), slog.LevelInfo,
+			"received zta request with origin not in allowlist",
+			"req_origin", escapedOrigin,
+		)
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
