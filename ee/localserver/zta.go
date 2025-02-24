@@ -44,9 +44,9 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Validate origin. We cannot validate Safari against an allowlist because the UUID
-	// is generated randomly at each Safari startup, so for now, we also allow origins
-	// with scheme safari-web-extension.
+	// Validate origin. We cannot validate Safari extension origins against an allowlist
+	// because the UUID is generated randomly at extension startup, so for now, we also
+	// allow origins with scheme safari-web-extension.
 	requestOrigin := r.Header.Get("Origin")
 	if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
 		escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
