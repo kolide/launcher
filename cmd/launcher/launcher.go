@@ -683,24 +683,27 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 	defer versionCancel()
 
 	osqErr := osq.RunVersion(versionCtx)
-	outTrimmed := strings.TrimSpace(output.String())
+
+	// Output looks like `osquery version x.y.z`, so split on `version` and return the last part of the string
+	parts := strings.SplitAfter(strings.TrimSpace(output.String()), "version")
+	osquerydVersion := strings.TrimSpace(parts[len(parts)-1])
 
 	if osqErr != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"could not check osqueryd version",
-			"output", outTrimmed,
+			"output", osquerydVersion,
 			"err", err,
 			"osqueryd_path", osquerydPath,
 		)
 		return
 	}
 
-	// log the version to the knappsack
-	k.SetCurrentRunningOsqueryVersion(outTrimmed)
+	// log the version to the knapsack
+	k.SetCurrentRunningOsqueryVersion(osquerydVersion)
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
-		"osqueryd_version", outTrimmed,
+		"osqueryd_version", osquerydVersion,
 		"osqueryd_path", osquerydPath,
 	)
 }
