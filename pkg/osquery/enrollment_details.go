@@ -163,8 +163,12 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 	latestOsquerydPath := k.LatestOsquerydPath(ctx)
 
 	if latestOsquerydPath == "" {
+		slogger.Log(ctx, slog.LevelWarn,
+			"osqueryd path is empty, cannot collect enrollment details from osquery",
+		)
 		return
 	}
+
 	if err := backoff.WaitFor(func() error {
 		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
 		if err != nil {
@@ -173,6 +177,11 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 		return err
 	}, collectTimeout, collectRetryInterval); err != nil {
 		traces.SetError(span, fmt.Errorf("enrollment details collection failed: %w", err))
+		slogger.Log(ctx, slog.LevelWarn,
+			"could not fetch osqueryd enrollment details before timeout",
+			"osqueryd_path", latestOsquerydPath,
+			"err", err,
+		)
 	}
 
 	k.SetEnrollmentDetails(details)
