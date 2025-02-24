@@ -22,9 +22,11 @@ var (
 		"moz-extension://25fc87fa-4d31-4fee-b5c1-c32a7844c063":        {},
 		"moz-extension://d634138d-c276-4fc8-924b-40a0ea21d284":        {},
 		"safari-web-extension://7cba6ce0-bc55-43bd-b2a3-562b703ecbea": {},
-		// Development
+		// Development and internal builds
 		"chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo":  {},
 		"moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82": {},
+		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
+		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
 	}
 )
 
