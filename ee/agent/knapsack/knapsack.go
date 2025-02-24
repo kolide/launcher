@@ -262,10 +262,10 @@ func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
 
 	k.Slogger().Log(context.Background(), slog.LevelDebug,
 		"updating enrollment details",
-		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
-		"new_details", fmt.Sprintf("%+v", current),
+		"old_details", fmt.Sprintf("%+v", current),
+		"new_details", fmt.Sprintf("%+v", details),
 	)
-	enrollmentDetails = &current
+	enrollmentDetails = &details
 }
 
 func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
