@@ -27,7 +27,9 @@ var (
 		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
 		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
 	}
+)
 
+const (
 	safariWebExtensionScheme = "safari-web-extension://"
 )
 
