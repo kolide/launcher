@@ -173,6 +173,11 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 		err := getOsqEnrollDetails(ctx, latestOsquerydPath, &details)
 		if err != nil {
 			span.AddEvent("failed to get enrollment details")
+			slogger.Log(ctx, slog.LevelDebug,
+				"failed to get enrollment details",
+				"osqueryd_path", latestOsquerydPath,
+				"err", err,
+			)
 		}
 		return err
 	}, collectTimeout, collectRetryInterval); err != nil {
