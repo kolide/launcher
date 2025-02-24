@@ -346,7 +346,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting DisallowStartIfOnBatteries flag: %w", err)
 	}
 
-	// task will be continue even if the computer changes power source to battery
+	// task will continue even if the computer changes power source to battery
 	if _, err = oleutil.PutProperty(settings, "StopIfGoingOnBatteries", false); err != nil {
 		return fmt.Errorf("setting StopIfGoingOnBatteries flag: %w", err)
 	}
@@ -483,6 +483,47 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting time trigger interval: %w", err)
 	}
 
+	//////// now add boot up trigger
+	createBootTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
+	if err != nil {
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
+	}
+
+	bootTrigger := createBootTriggerResp.ToIDispatch()
+	defer bootTrigger.Release()
+
+	if _, err = oleutil.PutProperty(bootTrigger, "ExecutionTimeLimit", "PT1M"); err != nil {
+		return errors.New("setting execution time limit property")
+	}
+
+	bootEventTrigger, err := bootTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+	if err != nil {
+		return fmt.Errorf("getting boot trigger interface: %w", err)
+	}
+	defer bootEventTrigger.Release()
+
+	// EventLog event ID 6005 is the EventLog service starting. This should happen reliably on startup.
+	// There are more explicit Kernel-General startup events that may happen before but this is the earliest event I think we'd want
+	// to trigger off of. see here for relevant event notes:
+	// https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/troubleshoot-unexpected-reboots-system-event-logs
+	bootEventSubscription := `
+<QueryList>
+	<Query Path="System">
+		<Select Path="System">*[System[Provider[@Name='EventLog'] and (EventID=6005)]]</Select>
+	</Query>
+</QueryList>
+`
+
+	if _, err = oleutil.PutProperty(bootEventTrigger, "Subscription", bootEventSubscription); err != nil {
+		return fmt.Errorf("setting subscription property: %w", err)
+	}
+
+	// see details for how this string is created here: https://learn.microsoft.com/en-us/windows/win32/taskschd/eventtrigger-delay
+	// PT2M here means 2 minutes
+	if _, err = oleutil.PutProperty(bootEventTrigger, "Delay", "PT2M"); err != nil {
+		return fmt.Errorf("setting boot event trigger delay: %w", err)
+	}
+
 	// begin creation of the task action
 	actionsProp, err := oleutil.GetProperty(taskDefinition, "Actions")
 	if err != nil {
@@ -530,6 +571,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("registering task definition: %w", err)
 	}
+
 
 	return nil
 }
