@@ -10,6 +10,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
@@ -33,7 +34,7 @@ var archAttributeMap = map[string]attribute.KeyValue{
 	"arm":   semconv.HostArchARM32,
 }
 
-var enrollmentDetailsRecheckInterval = 30 * time.Second
+var enrollmentDetailsRecheckInterval = 5 * time.Second
 
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
@@ -105,7 +106,17 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 	))
 
 	t.addDeviceIdentifyingAttributes()
-	t.addAttributesFromOsquery()
+
+	// Check if enrollment details are already available, add them immediately if so
+	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+	if hasRequiredEnrollmentDetails(enrollmentDetails) {
+		t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+	} else {
+		// Launch a goroutine to wait for enrollment details
+		gowrapper.Go(context.TODO(), t.slogger, func() {
+			t.addAttributesFromOsquery()
+		})
+	}
 
 	return t, nil
 }
