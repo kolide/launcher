@@ -14,7 +14,6 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	"github.com/stretchr/testify/mock"
@@ -46,19 +45,14 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-
-	osqueryClient := mocks.NewQuerier(t)
-	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
-		{
-			"osquery_version": "5.8.0",
-			"os_name":         runtime.GOOS,
-			"os_version":      "3.4.5",
-			"hostname":        "Test-Hostname2",
-		},
-	}, nil)
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		OsqueryVersion: "5.8.0",
+		OSName:         runtime.GOOS,
+		OSVersion:      "3.4.5",
+		Hostname:       "Test-Hostname2",
+	})
 
 	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
-	traceExporter.SetOsqueryClient(osqueryClient)
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
@@ -75,7 +69,6 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	require.NotNil(t, traceExporter.provider, "expected provider to be created")
 
 	mockKnapsack.AssertExpectations(t)
-	osqueryClient.AssertExpectations(t)
 }
 
 func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
@@ -189,7 +182,6 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 
 	traceExporter := &TraceExporter{
 		knapsack:                  mockKnapsack,
-		osqueryClient:             mocks.NewQuerier(t),
 		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
@@ -226,24 +218,21 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 func Test_addAttributesFromOsquery(t *testing.T) {
 	t.Parallel()
 
-	expectedOsqueryVersion := "5.7.1"
+	expectedOsqueryVersion := "5.8.0"
 	expectedOsName := runtime.GOOS
-	expectedOsVersion := "1.2.3"
+	expectedOsVersion := "3.4.5"
 	expectedHostname := "Test-Hostname"
 
-	osqueryClient := mocks.NewQuerier(t)
-	osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
-		{
-			"osquery_version": expectedOsqueryVersion,
-			"os_name":         expectedOsName,
-			"os_version":      expectedOsVersion,
-			"hostname":        expectedHostname,
-		},
-	}, nil)
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		OsqueryVersion: expectedOsqueryVersion,
+		OSName:         expectedOsName,
+		OSVersion:      expectedOsVersion,
+		Hostname:       expectedHostname,
+	})
 
 	traceExporter := &TraceExporter{
-		knapsack:                  typesmocks.NewKnapsack(t),
-		osqueryClient:             osqueryClient,
+		knapsack:                  mockKnapsack,
 		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
@@ -274,7 +263,6 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 		}
 	}
 
-	osqueryClient.AssertExpectations(t)
 }
 
 func TestPing(t *testing.T) {
@@ -362,25 +350,20 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			osqueryClient := mocks.NewQuerier(t)
-
 			if tt.shouldReplaceProvider {
 				mockKnapsack.On("ServerProvidedDataStore").Return(s)
-				osqueryClient.On("Query", mock.Anything).Return([]map[string]string{
-					{
-						"osquery_version": "5.9.0",
-						"os_name":         "Windows",
-						"os_version":      "11",
-						"hostname":        "Test device",
-					},
-				}, nil)
+				mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+					OsqueryVersion: "5.8.0",
+					OSName:         "Windows",
+					OSVersion:      "11",
+					Hostname:       "Test device",
+				})
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-				osqueryClient:             osqueryClient,
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -400,7 +383,6 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 
 			if tt.shouldReplaceProvider {
 				mockKnapsack.AssertExpectations(t)
-				osqueryClient.AssertExpectations(t)
 				require.Greater(t, len(traceExporter.attrs), 0)
 				require.NotNil(t, traceExporter.provider)
 			}
@@ -448,13 +430,11 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			if tt.shouldReplaceProvider {
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
-			osqueryClient := mocks.NewQuerier(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-				osqueryClient:             osqueryClient,
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -518,13 +498,11 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 		t.Run(tt.testName, func(t *testing.T) {
 			mockKnapsack := typesmocks.NewKnapsack(t)
 			mockKnapsack.On("TraceIngestServerURL").Return(tt.newObservabilityIngestServerURL)
-			osqueryClient := mocks.NewQuerier(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-				osqueryClient:             osqueryClient,
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -591,7 +569,6 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			if tt.shouldReplaceProvider {
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
-			osqueryClient := mocks.NewQuerier(t)
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
 
@@ -599,7 +576,6 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-				osqueryClient:             osqueryClient,
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -668,13 +644,10 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			osqueryClient := mocks.NewQuerier(t)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TraceExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
-				osqueryClient:             osqueryClient,
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
