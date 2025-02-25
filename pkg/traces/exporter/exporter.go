@@ -33,6 +33,8 @@ var archAttributeMap = map[string]attribute.KeyValue{
 	"arm":   semconv.HostArchARM32,
 }
 
+var enrollmentDetailsRecheckInterval = 30 * time.Second
+
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
@@ -187,7 +189,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 				"trace exporter interrupted while waiting for enrollment details",
 			)
 			return
-		case <-time.After(5 * time.Second):
+		case <-time.After(enrollmentDetailsRecheckInterval):
 			continue
 		}
 	}

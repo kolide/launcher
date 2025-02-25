@@ -218,9 +218,9 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 func Test_addAttributesFromOsquery(t *testing.T) {
 	t.Parallel()
 
-	expectedOsqueryVersion := "5.8.0"
+	expectedOsqueryVersion := "5.7.1"
 	expectedOsName := runtime.GOOS
-	expectedOsVersion := "3.4.5"
+	expectedOsVersion := "1.2.3"
 	expectedHostname := "Test-Hostname"
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
