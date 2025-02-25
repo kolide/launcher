@@ -248,24 +248,13 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	return types.Enrolled, nil
 }
 
-func (k *knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
-	if enrollmentDetails == nil {
-		enrollmentDetails = &details
-		k.Slogger().Log(context.Background(), slog.LevelDebug,
-			"initializing enrollment details",
-			"details", fmt.Sprintf("%+v", enrollmentDetails),
-		)
-
-	}
-
-	current := *enrollmentDetails
-
+func (k *knapsack) SetEnrollmentDetails(newDetails types.EnrollmentDetails) {
 	k.Slogger().Log(context.Background(), slog.LevelDebug,
 		"updating enrollment details",
 		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
-		"new_details", fmt.Sprintf("%+v", current),
+		"new_details", fmt.Sprintf("%+v", newDetails),
 	)
-	enrollmentDetails = &current
+	enrollmentDetails = &newDetails
 }
 
 func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
