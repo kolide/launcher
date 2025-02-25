@@ -51,6 +51,7 @@ type localServer struct {
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
+	ztaEcKey        *ecdsa.PublicKey
 
 	tenantMunemo string
 }
@@ -104,8 +105,16 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
 
+	if ls.ztaEcKey == nil {
+		panic("ahhhhh, need actual zta key")
+	}
+
+	ztaAuthMiddleware := &ztaAuthMiddleware{
+		counterPartyPubKey: ls.ztaEcKey,
+	}
+
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
-	mux.Handle("/zta", ls.requestZtaInfoHandler())
+	mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:
