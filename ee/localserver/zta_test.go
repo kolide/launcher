@@ -105,6 +105,79 @@ func Test_requestZtaInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T)
 	k.AssertExpectations(t)
 }
 
+func Test_requestZtaInfoHandler_allowsMissingOrigin(t *testing.T) {
+	t.Parallel()
+
+	// Set up our ZTA store with some test data in it
+	slogger := multislogger.NewNopLogger()
+	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	require.NoError(t, err)
+	testZtaInfo, err := json.Marshal(map[string]string{
+		"some_test_data": "some_test_value",
+	})
+	require.NoError(t, err)
+	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+
+	// Set up the rest of our localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(slogger)
+	k.On("ZtaInfoStore").Return(ztaInfoStore)
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	responseRecorder := httptest.NewRecorder()
+	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was successful and contains the data we expect
+	require.Equal(t, http.StatusOK, responseRecorder.Code)
+	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
+	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+
+	k.AssertExpectations(t)
+}
+
+func Test_requestZtaInfoHandler_allowsEmptyOrigin(t *testing.T) {
+	t.Parallel()
+
+	// Set up our ZTA store with some test data in it
+	slogger := multislogger.NewNopLogger()
+	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	require.NoError(t, err)
+	testZtaInfo, err := json.Marshal(map[string]string{
+		"some_test_data": "some_test_value",
+	})
+	require.NoError(t, err)
+	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+
+	// Set up the rest of our localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(slogger)
+	k.On("ZtaInfoStore").Return(ztaInfoStore)
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request.Header.Set("origin", "")
+	responseRecorder := httptest.NewRecorder()
+	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was successful and contains the data we expect
+	require.Equal(t, http.StatusOK, responseRecorder.Code)
+	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
+	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+
+	k.AssertExpectations(t)
+}
+
 func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 	t.Parallel()
 
