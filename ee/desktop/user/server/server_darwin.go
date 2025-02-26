@@ -45,10 +45,22 @@ func (s *UserServer) getSecureEnclaveKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// we will try to create a key first to verify that we can access secure enclave
+	testPubKey, err := secureenclave.CreateKey()
+	if err != nil {
+		http.Error(w, fmt.Errorf("secure enclave unavailable, could not create test key: %w", err).Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := secureenclave.DeleteKey(testPubKey); err != nil {
+		// this is unlikely, but if we fail to delete now, we should probalby assume something is wrong
+		http.Error(w, fmt.Errorf("secure enclave unavailable, could not delete test key: %w", err).Error(), http.StatusServiceUnavailable)
+		return
+	}
+
 	// this verifies that the key exists in the secure enclave
 	signer, err := secureenclave.New(pubKey)
 	if err != nil {
-
 		// errKCItemNotFound = -25300
 		// means item was not found, any other error we assume is a different problem
 		// apple docs
