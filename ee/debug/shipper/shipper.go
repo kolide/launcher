@@ -54,6 +54,7 @@ type shipper struct {
 	uploadRequestErr     error
 	uploadResponse       *http.Response
 	uploadRequestWg      *sync.WaitGroup
+	uploadRequestCancel  context.CancelFunc
 
 	// note is intended to help humans identify the object being shipped
 	note string
@@ -111,10 +112,9 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
 		defer s.uploadRequestWg.Done()
 
+		// will cancel and close the request body in the close function
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-
-		// will close the body in the close function
+		s.uploadRequestCancel = cancel
 		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
 	})
 
@@ -131,6 +131,9 @@ func (s *shipper) Close() error {
 	if !s.uploadRequestStarted {
 		return nil
 	}
+
+	// write has been called -- make sure we call cancel at the end
+	defer s.uploadRequestCancel()
 
 	// wait for upload request to finish
 	s.uploadRequestWg.Wait()
