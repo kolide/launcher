@@ -46,18 +46,20 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Validate origin. We cannot validate Safari extension origins against an allowlist
-	// because the UUID is generated randomly at extension startup, so for now, we also
-	// allow origins with scheme safari-web-extension.
+	// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
+	// present but empty, or to be missing. We will not allow a request with a nonempty origin
+	// that is not in the allowlist.
 	requestOrigin := r.Header.Get("Origin")
-	if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
-		escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
-		ls.slogger.Log(r.Context(), slog.LevelInfo,
-			"received zta request with origin not in allowlist",
-			"req_origin", escapedOrigin,
-		)
-		w.WriteHeader(http.StatusForbidden)
-		return
+	if requestOrigin != "" {
+		if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
+			escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"received zta request with origin not in allowlist",
+				"req_origin", escapedOrigin,
+			)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 	}
 
 	ztaInfo, err := ls.knapsack.ZtaInfoStore().Get(localserverZtaInfoKey)
