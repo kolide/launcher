@@ -395,10 +395,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		"build", versionInfo.Revision,
 	)
 
-	if traceExporter != nil {
-		traceExporter.SetOsqueryClient(osqueryRunner)
-	}
-
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
 	var actionsQueue *actionqueue.ActionQueue
