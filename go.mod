@@ -123,6 +123,4 @@ require (
 
 go 1.23.0
 
-toolchain go1.23.1
-
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
