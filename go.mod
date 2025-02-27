@@ -15,7 +15,7 @@ require (
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a
-	github.com/kolide/krypto v0.1.1-0.20250210222038-bc46b527cd83
+	github.com/kolide/krypto v0.1.1-0.20250226233608-47a978efa339
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646

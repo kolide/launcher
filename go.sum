@@ -176,8 +176,10 @@ github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6 h1:6/RKW8FQlrtaBe
 github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6/go.mod h1:zgOxCKTwS/xpJtz6LH60b3lZoQ30kqtc252N+SM4enc=
 github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a h1:QCPXSz6xocQ6V3Qph0H+qSnA1ewlr7GsVZ3FNZsYR/Y=
 github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a/go.mod h1:pFbEKXFww1uqu4RRO7qCnUmQ2EIwKYRzUqpJbODNlfc=
-github.com/kolide/krypto v0.1.1-0.20250210222038-bc46b527cd83 h1:sN042RpmV1rWmOf8lrSij4l+fY7KMS42r6+ynEjc69Y=
-github.com/kolide/krypto v0.1.1-0.20250210222038-bc46b527cd83/go.mod h1:mzKLqqmWKO3EiEQuQBYy27YmbprsQgmGl3KH4CdTrJo=
+github.com/kolide/krypto v0.1.1-0.20250226193256-95724872febd h1:av6xQQgrM+AQEUYGSJ5bBxc10UdIiDftobk9Fj1d5N4=
+github.com/kolide/krypto v0.1.1-0.20250226193256-95724872febd/go.mod h1:mzKLqqmWKO3EiEQuQBYy27YmbprsQgmGl3KH4CdTrJo=
+github.com/kolide/krypto v0.1.1-0.20250226233608-47a978efa339 h1:qUnzoQd0IqspCHcnKWOsXa/oUowK3BySzZ/SrmmWMqU=
+github.com/kolide/krypto v0.1.1-0.20250226233608-47a978efa339/go.mod h1:mzKLqqmWKO3EiEQuQBYy27YmbprsQgmGl3KH4CdTrJo=
 github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb h1:d2pfEh5Yd6+C+D096YQlHwcq28TPOjoeoG+lCQojkJM=
 github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb/go.mod h1:rnPcECLGM9DY/+fb3O9WNKiPBPMCdNg3rkyadLWOCTU=
 github.com/kolide/toast v1.0.2 h1:BQlIfO3wbKIEWfF0c8v4UkdhSIZYnSWaKkZl+Yarptk=
