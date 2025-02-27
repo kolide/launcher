@@ -2,7 +2,7 @@ package checkups
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -71,7 +71,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				"InsecureTransportTLS": false,
 			},
 			onLookupHostReturns: map[string]resolution{
-				"kolide-server.example.com":  {ips: []string{}, err: fmt.Errorf("Unable to resolve: No Such Host")},
+				"kolide-server.example.com":  {ips: []string{}, err: errors.New("Unable to resolve: No Such Host")},
 				"control-server.example.com": {ips: []string{"111.2.3.4", "111.2.3.5"}, err: nil},
 				"tuf-server.example.com":     {ips: []string{"34.149.84.181"}, err: nil},
 				"google.com":                 {ips: []string{"2620:149:af0::10", "17.253.144.10"}, err: nil},

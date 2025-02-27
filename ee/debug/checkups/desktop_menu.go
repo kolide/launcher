@@ -57,7 +57,7 @@ func (d *desktopMenu) Run(_ context.Context, fullFH io.Writer) error {
 	}
 
 	d.status = Passing
-	d.summary = fmt.Sprintf("menu.json exists and is valid json")
+	d.summary = "menu.json exists and is valid json"
 
 	return nil
 }

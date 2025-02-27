@@ -329,17 +329,19 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	var enrollDetails types.EnrollmentDetails
 
-	err = backoff.WaitFor(func() error {
+	if err := backoff.WaitFor(func() error {
 		details := e.knapsack.GetEnrollmentDetails()
 		if details.OSVersion == "" || details.Hostname == "" {
-			return errors.New("incomplete enrollment details")
+			return fmt.Errorf("incomplete enrollment details (missing hostname or os version): %+v", details)
 		}
 		enrollDetails = details
 		span.AddEvent("got_complete_enrollment_details")
 		return nil
-	}, 60*time.Second, 5*time.Second)
-
-	if err != nil {
+	}, 60*time.Second, 5*time.Second); err != nil {
+		e.slogger.Log(ctx, slog.LevelWarn,
+			"could not fetch enrollment details before timeout",
+			"err", err,
+		)
 		span.AddEvent("enrollment_details_timeout")
 		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
 		enrollDetails = e.knapsack.GetEnrollmentDetails()

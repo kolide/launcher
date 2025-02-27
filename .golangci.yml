@@ -14,6 +14,7 @@ linters:
     - nakedret
     - noctx
     - paralleltest
+    - perfsprint
     - predeclared
     - revive
     - rowserrcheck
@@ -88,5 +89,20 @@ issues:
     - linters:
         - paralleltest
       text: "does not use range value in test Run"
+    # We prefer fmt.Sprintf over string concatenation for readability
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with string concatenation"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster hex.EncodeToString"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatBool"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatInt"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatUint"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.Itoa"
+    - linters: [perfsprint]
+      text: "fmt.Sprint can be replaced with faster strconv.Itoa"
   exclude-dirs:
     - test-cmds
