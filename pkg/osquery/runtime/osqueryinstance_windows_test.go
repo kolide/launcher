@@ -31,13 +31,14 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
-
-	cmd, err := i.createOsquerydCommand(osquerydPath, &osqueryFilePaths{
+	i.paths = &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",
 		databasePath:          "/foo/bar/osquery.db",
 		extensionSocketPath:   "/foo/bar/osquery.sock",
 		extensionAutoloadPath: "/foo/bar/osquery.autoload",
-	})
+	}
+
+	cmd, err := i.createOsquerydCommand(osquerydPath)
 	require.NoError(t, err)
 
 	systemDriveEnvVarFound := false

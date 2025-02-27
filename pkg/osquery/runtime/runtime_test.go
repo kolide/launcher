@@ -310,6 +310,141 @@ func TestFlagsChanged(t *testing.T) {
 	waitShutdown(t, runner, logBytes)
 }
 
+func TestPing(t *testing.T) {
+	t.Parallel()
+
+	// Set up all dependencies
+	rootDirectory := testRootDirectory(t)
+	logBytes, slogger := setUpTestSlogger()
+	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
+	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
+	k.On("WatchdogEnabled").Return(false)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryFlags").Return([]string{"verbose=false"})
+	k.On("OsqueryVerbose").Return(false)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	katcConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
+	require.NoError(t, err)
+	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
+	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
+	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AutoupdateErrorsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+	osqHistory := setupHistory(t, k)
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	// Start the runner
+	runner := New(k, mockServiceClient(t), s)
+	ensureShutdownOnCleanup(t, runner, logBytes)
+	go runner.Run()
+
+	// Wait for the instance to start
+	waitHealthy(t, runner, logBytes, osqHistory)
+	startingInstance := runner.instances[types.DefaultRegistrationID]
+
+	// Confirm the instance doesn't have the KATC table yet
+	testKatcTableName := "katc_test"
+	testKatcTableQuery := fmt.Sprintf("SELECT * FROM %s", testKatcTableName)
+	_, err = runner.Query(testKatcTableQuery)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such table")
+
+	// Now, add a KATC config
+	tableConfig := map[string]any{
+		"columns":      []string{"id"},
+		"source_type":  "sqlite",
+		"source_query": "",
+		"source_paths": []string{},
+	}
+	tableConfigRaw, err := json.Marshal(tableConfig)
+	require.NoError(t, err)
+	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), tableConfigRaw))
+	runner.Ping()
+
+	// Wait for the instance to start its KATC extension manager and confirm the new table is queryable
+	err = backoff.WaitFor(func() error {
+		if _, err := runner.Query(testKatcTableQuery); err != nil {
+			return fmt.Errorf("querying table: %w", err)
+		}
+		return nil
+	}, 10*time.Second, 1*time.Second)
+	require.NoError(t, err, "could not query new table", logBytes.String())
+
+	// Confirm that the instance did not restart
+	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+
+	// Now, add a new table to our KATC configuration
+	secondTestKatcTableName := "katc_test"
+	secondTestKatcTableQuery := fmt.Sprintf("SELECT * FROM %s", secondTestKatcTableName)
+	secondTableConfig := map[string]any{
+		"columns":      []string{"uuid", "name"},
+		"source_type":  "sqlite",
+		"source_query": "",
+		"source_paths": []string{},
+	}
+	secondTableConfigRaw, err := json.Marshal(secondTableConfig)
+	require.NoError(t, err)
+	require.NoError(t, katcConfigStore.Set([]byte(secondTestKatcTableName), secondTableConfigRaw))
+	runner.Ping()
+
+	// Wait for the instance to restart its KATC extension manager and confirm the second table is queryable
+	err = backoff.WaitFor(func() error {
+		if _, err := runner.Query(secondTestKatcTableQuery); err != nil {
+			return fmt.Errorf("querying table: %w", err)
+		}
+		return nil
+	}, 10*time.Second, 1*time.Second)
+	require.NoError(t, err, "could not query new table", logBytes.String())
+
+	// Confirm that the instance did not restart
+	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+
+	// Delete both tables from the KATC config
+	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName), []byte(secondTestKatcTableName)))
+	runner.Ping()
+
+	// Confirm we can't query either table anymore
+	err = backoff.WaitFor(func() error {
+		if _, err := runner.Query(testKatcTableQuery); err == nil {
+			return fmt.Errorf("could query %s", testKatcTableName)
+		}
+		if _, err := runner.Query(secondTestKatcTableQuery); err == nil {
+			return fmt.Errorf("could query %s", secondTestKatcTableName)
+		}
+		return nil
+	}, 10*time.Second, 1*time.Second)
+	require.NoError(t, err, "able to query deleted tables", logBytes.String())
+
+	// Confirm that the instance did not restart
+	require.Equal(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance restarted, but it should not have")
+
+	k.AssertExpectations(t)
+
+	waitShutdown(t, runner, logBytes)
+}
+
 // waitShutdown is used as a test helper, it performs additional tests to ensure proper shutdown
 // at the end of a passing test run. Tests can additionally use ensureShutdownOnCleanup as a cleanup method
 // to ensure a shutdown is attempted in the event of an earlier test failure, but this is the correct method

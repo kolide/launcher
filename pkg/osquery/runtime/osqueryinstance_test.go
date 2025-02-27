@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -12,11 +13,15 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
+	"github.com/osquery/osquery-go/gen/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,8 +74,9 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i.paths = paths
 
-	_, err := i.createOsquerydCommand(osquerydPath, paths)
+	_, err := i.createOsquerydCommand(osquerydPath)
 	require.NoError(t, err)
 
 	k.AssertExpectations(t)
@@ -91,11 +97,9 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinary,
-		&osqueryFilePaths{},
-	)
+	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
 	require.NoError(t, err)
 
 	// count of flags that cannot be overridden with this option
@@ -126,11 +130,9 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinary,
-		&osqueryFilePaths{},
-	)
+	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
 	require.NoError(t, err)
 
 	watchdogMemoryLimitMBFound := false
@@ -177,11 +179,9 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(
-		testOsqueryBinary,
-		&osqueryFilePaths{},
-	)
+	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
 	require.NoError(t, err)
 
 	disableWatchdogFound := false
@@ -310,6 +310,194 @@ func TestLaunch(t *testing.T) {
 	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
 
 	// Now wait for full shutdown
+	i.BeginShutdown()
+	shutdownErr := make(chan error)
+	go func() {
+		shutdownErr <- i.WaitShutdown(context.TODO())
+	}()
+
+	select {
+	case err := <-shutdownErr:
+		require.True(t, errors.Is(err, context.Canceled), fmt.Sprintf("unexpected err at %s: %v; instance logs:\n\n%s", time.Now().String(), err, logBytes.String()))
+	case <-time.After(1 * time.Minute):
+		t.Error("instance did not shut down within timeout", fmt.Sprintf("instance logs: %s", logBytes.String()))
+		t.FailNow()
+	}
+
+	k.AssertExpectations(t)
+}
+
+func TestReloadKatcExtension(t *testing.T) {
+	t.Parallel()
+
+	// Set up all million dependencies
+	logBytes, slogger := setUpTestSlogger()
+	rootDirectory := testRootDirectory(t)
+	k := typesMocks.NewKnapsack(t)
+	k.On("WatchdogEnabled").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+	k.On("OsqueryFlags").Return([]string{"verbose=true"})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("Slogger").Return(slogger)
+	k.On("RootDirectory").Return(rootDirectory)
+	k.On("LoggingInterval").Return(1 * time.Second)
+	k.On("LogMaxBytesPerBatch").Return(500)
+	k.On("Transport").Return("jsonrpc")
+	katcConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.KatcConfigStore.String())
+	require.NoError(t, err)
+	k.On("KatcConfigStore").Return(katcConfigStore).Maybe()
+	k.On("ConfigStore").Return(inmemory.NewStore()).Maybe()
+	k.On("LauncherHistoryStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("AutoupdateErrorsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+	k.On("ReadEnrollSecret").Return("", nil)
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+	osqHistory := setupHistory(t, k)
+
+	// Create an instance and launch it
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	go i.Launch()
+
+	// Wait for the instance to become healthy
+	require.NoError(t, backoff.WaitFor(func() error {
+		// Instance self-reports as healthy
+		if err := i.Healthy(); err != nil {
+			return fmt.Errorf("instance not healthy: %w", err)
+		}
+
+		// Confirm instance setup is complete
+		latestInstanceStats, err := osqHistory.LatestInstanceStats(types.DefaultRegistrationID)
+		if err != nil {
+			return fmt.Errorf("collecting latest instance stats: %w", err)
+		}
+
+		if connectTime, ok := latestInstanceStats["connect_time"]; !ok || connectTime == "" {
+			return errors.New("no connect time set yet")
+		}
+
+		// Good to go
+		return nil
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
+
+	// We shouldn't have a KATC extension manager server yet
+	i.emsLock.Lock()
+	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
+	i.emsLock.Unlock()
+
+	// Query for a KATC table that doesn't exist yet
+	testKatcTableName := "katc_test"
+	testKatcTableQuery := fmt.Sprintf("SELECT * FROM %s", testKatcTableName)
+	_, err = i.Query(testKatcTableQuery)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such table")
+
+	// Call ReloadKatcExtension with no changes -- it shouldn't do anything.
+	// We still shouldn't have a KATC server or be able to query for the table.
+	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	i.emsLock.Lock()
+	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
+	i.emsLock.Unlock()
+	_, err = i.Query(testKatcTableQuery)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no such table")
+
+	// Update KATC configuration to add a new table
+	tableConfig := map[string]any{
+		"columns":      []string{"id"},
+		"source_type":  "sqlite",
+		"source_query": "",
+		"source_paths": []string{},
+	}
+	tableConfigRaw, err := json.Marshal(tableConfig)
+	require.NoError(t, err)
+	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), tableConfigRaw))
+	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+
+	// We should have an extension manager server for KATC, and it should know about our table
+	i.emsLock.Lock()
+	require.Contains(t, i.extensionManagerServers, katcExtensionName)
+	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquery.ExtensionPluginRequest{
+		"action": "columns",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(columnsResponse.Response)) // we expect "id" per the config, plus "path" for every KATC table
+	i.emsLock.Unlock()
+
+	// Now, we should be able to query our new table, too.
+	// We may need to try a couple times to wait for the server to be fully running.
+	err = backoff.WaitFor(func() error {
+		if _, err := i.Query(testKatcTableQuery); err != nil {
+			return fmt.Errorf("querying table: %w", err)
+		}
+		return nil
+	}, 10*time.Second, 1*time.Second)
+	require.NoError(t, err, "could not query new table", logBytes.String())
+
+	// Update KATC configuration to modify existing table
+	updatedTableConfig := map[string]any{
+		"columns":      []string{"id", "uuid"},
+		"source_type":  "sqlite",
+		"source_query": "",
+		"source_paths": []string{},
+	}
+	updatedTableConfigRaw, err := json.Marshal(updatedTableConfig)
+	require.NoError(t, err)
+	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), updatedTableConfigRaw))
+	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+
+	// We should still have an extension manager server for KATC
+	i.emsLock.Lock()
+	require.Contains(t, i.extensionManagerServers, katcExtensionName)
+	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquery.ExtensionPluginRequest{
+		"action": "columns",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 3, len(updatedColumnsResponse.Response)) // we expect "id" and "uuid" per the config, plus "path" for every KATC table
+	i.emsLock.Unlock()
+
+	// We should still be able to query our KATC table
+	err = backoff.WaitFor(func() error {
+		if _, err := i.Query(testKatcTableQuery); err != nil {
+			return fmt.Errorf("querying table: %w", err)
+		}
+		return nil
+	}, 10*time.Second, 1*time.Second)
+	require.NoError(t, err, "could not query new table", logBytes.String())
+
+	// Delete KATC configuration entirely
+	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName)))
+	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+
+	// We should no longer have an extension manager server for KATC
+	i.emsLock.Lock()
+	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
+	i.emsLock.Unlock()
+
+	// We should no longer be able to query our KATC table
+	_, err = i.Query(testKatcTableQuery)
+	require.Error(t, err)
+
+	// All done testing -- now wait for full shutdown
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
