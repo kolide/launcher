@@ -19,7 +19,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
           - macos-13
           - windows-latest
     steps:
@@ -91,7 +91,7 @@ jobs:
   # that the version of launcher is the same across all runners.
   version_baseline:
     name: Version Baseline
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: build
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -117,7 +117,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
           - macos-13
           - windows-latest
     steps:
@@ -179,8 +179,8 @@ jobs:
       matrix:
         os:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
-          - ubuntu-20.04
           - ubuntu-22.04
+          - ubuntu-24.04
           - macos-13
           - macos-14
           - macos-15
@@ -224,7 +224,7 @@ jobs:
   # be able to do this entirely on ubuntu, so let's try!
   store_artifacts:
     name: Store Artifacts
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -257,7 +257,7 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-22.04
           - macos-13
           - windows-latest
     steps:
