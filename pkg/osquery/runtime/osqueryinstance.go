@@ -916,7 +916,10 @@ func (i *OsqueryInstance) StartOsqueryClient() (*osquery.ExtensionManagerClient,
 
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
-// If allowRestart is set
+// If allowRestart is set, then the errgroup goroutine responsible for
+// starting the server will not return an error when the `Start` function
+// returns, allowing the server to be restarted without triggering a full
+// shutdown of the goroutine.
 func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin, allowRestart bool) error {
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
