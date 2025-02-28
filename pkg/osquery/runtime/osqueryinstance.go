@@ -303,7 +303,7 @@ func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 	}
 	i.emsLock.Unlock()
 
-	if err := i.startKatcExtensionManagerServer(ctx); err != nil {
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
 		return fmt.Errorf("starting katc server: %w", err)
 	}
 
@@ -321,7 +321,7 @@ func (i *OsqueryInstance) instanceStarted() bool {
 
 // startKatcExtensionManagerServer starts a new extension manager server that provides
 // access to the KATC tables.
-func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context) error {
+func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, client *osquery.ExtensionManagerClient) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -332,7 +332,7 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context) e
 
 	// We start this server with allowRestart=true so that we can restart it in the future
 	// if the KATC configuration changes, without shutting down the entire errgroup.
-	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, i.extensionManagerClient, katcTables, true); err != nil {
+	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, client, katcTables, true); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"unable to create KATC extension manager server",
 			"err", err,
@@ -529,7 +529,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Register the KATC tables via a separate extension manager server, so that we can safely
 	// restart when the configuration changes.
-	if err := i.startKatcExtensionManagerServer(ctx); err != nil {
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"unable to create KATC extension server, stopping",
 			"err", err,
