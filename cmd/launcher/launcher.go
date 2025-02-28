@@ -214,6 +214,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	})
 	gowrapper.Go(ctx, slogger, func() {
+		// Wait a little bit before adding exclusions -- some osquery files get created right after
+		// startup and we want to let that settle before handling exclusions.
+		time.Sleep(2 * time.Minute)
 		timemachine.AddExclusions(ctx, k)
 	})
 
