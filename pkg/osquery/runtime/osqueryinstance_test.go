@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
-	"github.com/osquery/osquery-go/gen/osquery"
+	osquerygen "github.com/osquery/osquery-go/gen/osquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -248,6 +248,78 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	require.Error(t, i.healthcheckWithRetries(context.TODO(), 5, 100*time.Millisecond))
 }
 
+func TestHealthy(t *testing.T) {
+	t.Parallel()
+
+	// Set up instance dependencies
+	logBytes, slogger := setUpTestSlogger()
+	rootDirectory := testRootDirectory(t)
+	k := typesMocks.NewKnapsack(t)
+	k.On("WatchdogEnabled").Return(true)
+	k.On("WatchdogMemoryLimitMB").Return(150)
+	k.On("WatchdogUtilizationLimitPercent").Return(20)
+	k.On("WatchdogDelaySec").Return(120)
+	k.On("OsqueryFlags").Return([]string{"verbose=true"})
+	k.On("OsqueryVerbose").Return(true)
+	k.On("Slogger").Return(slogger)
+	k.On("RootDirectory").Return(rootDirectory)
+	k.On("LoggingInterval").Return(1 * time.Second)
+	k.On("LogMaxBytesPerBatch").Return(500)
+	k.On("Transport").Return("jsonrpc")
+	setUpMockStores(t, k)
+	k.On("ReadEnrollSecret").Return("", nil)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID}).Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+	setupHistory(t, k)
+
+	// Run the instance
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	go i.Launch()
+
+	// Wait for `Healthy` to pass
+	require.NoError(t, backoff.WaitFor(func() error {
+		return i.Healthy()
+	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
+
+	// Add a new extension manager server that we can shut down without killing the errgroup
+	testAdditionalServerName := "kolide_test_ext"
+	require.NoError(t, i.StartOsqueryExtensionManagerServer(testAdditionalServerName, i.extensionManagerClient, nil, true), "adding test server")
+
+	// Confirm we're still in a healthy state
+	require.NoError(t, backoff.WaitFor(func() error {
+		return i.Healthy()
+	}, 10*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
+
+	// Now, shut down our new server
+	i.emsLock.Lock()
+	require.NoError(t, i.extensionManagerServers[testAdditionalServerName].Shutdown(context.TODO()))
+	i.emsLock.Unlock()
+
+	// Expect that the healthcheck begins to fail soon
+	require.NoError(t, backoff.WaitFor(func() error {
+		if err := i.Healthy(); err != nil {
+			if strings.Contains(err.Error(), fmt.Sprintf("missing extension %s", testAdditionalServerName)) {
+				return nil
+			}
+			return fmt.Errorf("unexpected healthcheck error: %w", err)
+		}
+
+		return errors.New("healthcheck is still passing")
+	}, 10*time.Second, 1*time.Second))
+}
+
 func TestLaunch(t *testing.T) {
 	t.Parallel()
 
@@ -436,7 +508,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	// We should have an extension manager server for KATC, and it should know about our table
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquery.ExtensionPluginRequest{
+	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)
@@ -468,7 +540,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	// We should still have an extension manager server for KATC
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquery.ExtensionPluginRequest{
+	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)

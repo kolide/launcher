@@ -127,6 +127,9 @@ type OsqueryInstance struct {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (i *OsqueryInstance) Healthy() error {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	// Do not add/remove servers from i.extensionManagerServers while we're accessing them
 	i.emsLock.RLock()
 	defer i.emsLock.RUnlock()
@@ -137,26 +140,38 @@ func (i *OsqueryInstance) Healthy() error {
 
 	resultsChan := make(chan error)
 	gowrapper.Go(context.TODO(), i.slogger, func() {
-		for _, srv := range i.extensionManagerServers {
-			serverStatus, err := srv.Ping(context.TODO())
+		// Make sure servers are pingable. We're calling the servers directly here (rather than over
+		// the thrift socket) so we pretty much always expect this to pass.
+		for srvName, srv := range i.extensionManagerServers {
+			serverStatus, err := srv.Ping(ctx)
 			if err != nil {
-				resultsChan <- fmt.Errorf("could not ping extension server: %w", err)
+				resultsChan <- fmt.Errorf("could not ping extension server %s: %w", srvName, err)
 				return
 			}
 			if serverStatus.Code != 0 {
-				resultsChan <- fmt.Errorf("ping extension server returned %d: %s", serverStatus.Code, serverStatus.Message)
+				resultsChan <- fmt.Errorf("ping extension server %s returned %d: %s", srvName, serverStatus.Code, serverStatus.Message)
 				return
 			}
 		}
 
-		clientStatus, err := i.extensionManagerClient.Ping()
+		// Make sure that all of the servers we have registered in i.extensionManagerServers
+		// are actually active and registered. Since we request extension info via the extension
+		// manager client, this also confirms we can talk to osquery via the client.
+		extensionList, err := i.extensionManagerClient.ExtensionsContext(ctx)
 		if err != nil {
-			resultsChan <- fmt.Errorf("could not ping osquery extension client: %w", err)
-			return
+			resultsChan <- fmt.Errorf("could not get extensions list via osquery extension client: %w", err)
 		}
-		if clientStatus.Code != 0 {
-			resultsChan <- fmt.Errorf("ping extension client returned %d: %s", clientStatus.Code, clientStatus.Message)
-			return
+		for expectedExtensionName := range i.extensionManagerServers {
+			extFound := false
+			for _, extInfo := range extensionList {
+				if extInfo.Name == expectedExtensionName {
+					extFound = true
+					break
+				}
+			}
+			if !extFound {
+				resultsChan <- fmt.Errorf("missing extension %s", expectedExtensionName)
+			}
 		}
 
 		resultsChan <- nil
