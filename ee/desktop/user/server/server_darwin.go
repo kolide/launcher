@@ -6,6 +6,7 @@ package server
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -13,10 +14,14 @@ import (
 	"github.com/kolide/krypto/pkg/secureenclave"
 )
 
-func (s *UserServer) createSecureEnclaveKey(w http.ResponseWriter, _ *http.Request) {
+func (s *UserServer) createSecureEnclaveKey(w http.ResponseWriter, r *http.Request) {
 	key, err := secureenclave.CreateKey()
 	if err != nil {
-		http.Error(w, fmt.Errorf("creating key: %w", err).Error(), http.StatusInternalServerError)
+		s.slogger.Log(r.Context(), slog.LevelDebug,
+			"secure enclave unavailable, could not create key",
+			"err", err,
+		)
+		http.Error(w, fmt.Errorf("secure enclave unavailable, could not create key: %w", err).Error(), http.StatusServiceUnavailable)
 		return
 	}
 
@@ -27,7 +32,6 @@ func (s *UserServer) createSecureEnclaveKey(w http.ResponseWriter, _ *http.Reque
 	}
 
 	w.Write(keyBytes)
-	w.WriteHeader(http.StatusOK)
 }
 
 // getSecureEnclaveKey verifies that the public key exists in the secure enclave
@@ -48,12 +52,21 @@ func (s *UserServer) getSecureEnclaveKey(w http.ResponseWriter, r *http.Request)
 	// we will try to create a key first to verify that we can access secure enclave
 	testPubKey, err := secureenclave.CreateKey()
 	if err != nil {
+		s.slogger.Log(r.Context(), slog.LevelDebug,
+			"secure enclave unavailable, could not create test key",
+			"err", err,
+		)
+
 		http.Error(w, fmt.Errorf("secure enclave unavailable, could not create test key: %w", err).Error(), http.StatusServiceUnavailable)
 		return
 	}
 
 	if err := secureenclave.DeleteKey(testPubKey); err != nil {
 		// this is unlikely, but if we fail to delete now, we should probalby assume something is wrong
+		s.slogger.Log(r.Context(), slog.LevelError,
+			"secure enclave unavailable, could not delete test key",
+			"err", err,
+		)
 		http.Error(w, fmt.Errorf("secure enclave unavailable, could not delete test key: %w", err).Error(), http.StatusServiceUnavailable)
 		return
 	}
@@ -68,12 +81,21 @@ func (s *UserServer) getSecureEnclaveKey(w http.ResponseWriter, r *http.Request)
 		// apple site where you can search for error codes, just enter error code
 		// https://developer.apple.com/bugreporter/
 		if strings.Contains(err.Error(), "-25300") {
+			s.slogger.Log(r.Context(), slog.LevelInfo,
+				"secure enclave key does not exist",
+				"err", err,
+			)
 			http.Error(w, "key not found", http.StatusNotFound)
 			return
 		}
 
+		s.slogger.Log(r.Context(), slog.LevelError,
+			"encountered unexpected error, cannot determine if key exists in secure enclave",
+			"err", err,
+		)
+
 		// encountered some other error, cannot confirm if key exists
-		http.Error(w, fmt.Errorf("encounter error, cannot determine if key exists in secure enclave: %w", err).Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Errorf("encounter unexpected error, cannot determine if key exists in secure enclave: %w", err).Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -91,5 +113,4 @@ func (s *UserServer) getSecureEnclaveKey(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Write(keyBytes)
-	w.WriteHeader(http.StatusOK)
 }

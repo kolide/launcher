@@ -1,6 +1,12 @@
 //go:build darwin
 // +build darwin
 
+// Package secureenclaverunner is a runner that manages the secure enclave key for the current console user.
+// It's a runner because we can not perform any secure enclave operations without a console user logged in, so we keep trying until we have one.
+// In order to use the secure enclave, you need a macOS app that is signed with the correct entitlements.
+// There are some instructions for signing with a developer key here: https://github.com/kolide/krypto/blob/main/pkg/secureenclave/test_app_resources/readme.md.
+// It's important to note that secure enclave keys can only be accessed by an app with the signature that created the key, so if you attempt to access keys created by
+// the production app with your development signature, you will get an error.
 package secureenclaverunner
 
 import (
