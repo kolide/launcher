@@ -134,7 +134,7 @@ func (i *OsqueryInstance) Healthy() error {
 	i.emsLock.RLock()
 	defer i.emsLock.RUnlock()
 
-	if len(i.extensionManagerServers) == 0 || i.extensionManagerClient == nil {
+	if !i.instanceStarted() {
 		return errors.New("instance not started")
 	}
 
@@ -285,6 +285,10 @@ func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	if !i.instanceStarted() {
+		return errors.New("instance not started, cannot reload extension")
+	}
+
 	i.emsLock.Lock()
 	if katcServer, ok := i.extensionManagerServers[katcExtensionName]; ok {
 		// KATC extension manager server already exists -- we must stop it so that we can start a new one.
@@ -293,6 +297,9 @@ func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 		// errgroup.
 		katcServer.Shutdown(ctx)
 		delete(i.extensionManagerServers, katcExtensionName)
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"shut down KATC extension manager server in preparation for reload",
+		)
 	}
 	i.emsLock.Unlock()
 
@@ -301,6 +308,10 @@ func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (i *OsqueryInstance) instanceStarted() bool {
+	return len(i.extensionManagerServers) > 0 && i.extensionManagerClient != nil
 }
 
 // startKatcExtensionManagerServer starts a new extension manager server that provides
