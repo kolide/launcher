@@ -130,13 +130,13 @@ func (i *OsqueryInstance) Healthy() error {
 	ctx, span := traces.StartSpan(context.Background())
 	defer span.End()
 
-	// Do not add/remove servers from i.extensionManagerServers while we're accessing them
-	i.emsLock.RLock()
-	defer i.emsLock.RUnlock()
-
 	if !i.instanceStarted() {
 		return errors.New("instance not started")
 	}
+
+	// Do not add/remove servers from i.extensionManagerServers while we're accessing them
+	i.emsLock.RLock()
+	defer i.emsLock.RUnlock()
 
 	resultsChan := make(chan error)
 	gowrapper.Go(context.TODO(), i.slogger, func() {
@@ -310,7 +310,12 @@ func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
 	return nil
 }
 
+// instanceStarted checks whether the instance has successfully launched -- it looks
+// for the client and extension manager server(s) to exist.
 func (i *OsqueryInstance) instanceStarted() bool {
+	i.emsLock.RLock()
+	defer i.emsLock.RUnlock()
+
 	return len(i.extensionManagerServers) > 0 && i.extensionManagerClient != nil
 }
 

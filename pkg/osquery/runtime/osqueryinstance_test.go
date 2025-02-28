@@ -375,6 +375,7 @@ func TestLaunch(t *testing.T) {
 	osqHistory := setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	require.False(t, i.instanceStarted())
 	go i.Launch()
 
 	// Wait for the instance to become healthy
@@ -397,6 +398,8 @@ func TestLaunch(t *testing.T) {
 		// Good to go
 		return nil
 	}, 30*time.Second, 1*time.Second), fmt.Sprintf("instance not healthy by %s: instance logs:\n\n%s", time.Now().String(), logBytes.String()))
+
+	require.True(t, i.instanceStarted())
 
 	// Now wait for full shutdown
 	i.BeginShutdown()
