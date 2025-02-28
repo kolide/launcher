@@ -21,7 +21,7 @@ func (s *UserServer) createSecureEnclaveKey(w http.ResponseWriter, r *http.Reque
 			"secure enclave unavailable, could not create key",
 			"err", err,
 		)
-		http.Error(w, fmt.Errorf("secure enclave unavailable, could not creating key: %w", err).Error(), http.StatusServiceUnavailable)
+		http.Error(w, fmt.Errorf("secure enclave unavailable, could not create key: %w", err).Error(), http.StatusServiceUnavailable)
 		return
 	}
 
