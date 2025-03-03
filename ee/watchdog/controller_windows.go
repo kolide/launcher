@@ -484,7 +484,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	//////// now add boot up trigger
-	createBootTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(0)) // 0=TASK_TRIGGER_EVENT
+	createBootTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(8)) // 8=TASK_TRIGGER_BOOT
 	if err != nil {
 		return fmt.Errorf("encountered error creating event trigger: %w", err)
 	}
@@ -496,31 +496,19 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return errors.New("setting execution time limit property")
 	}
 
-	bootEventTrigger, err := bootTrigger.QueryInterface(ole.NewGUID("{d45b0167-9653-4eef-b94f-0732ca7af251}"))
+	// GUID taken from https://github.com/capnspacehook/taskmaster/blob/1629df7c85e96aab410af7f1747ba264d3276505/fill.go#L157
+	bootEventTrigger, err := bootTrigger.QueryInterface(ole.NewGUID("{2a9c35da-d357-41f4-bbc1-207ac1b1f3cb}"))
 	if err != nil {
 		return fmt.Errorf("getting boot trigger interface: %w", err)
 	}
 	defer bootEventTrigger.Release()
 
-	// EventLog event ID 6005 is the EventLog service starting. This should happen reliably on startup.
-	// There are more explicit Kernel-General startup events that may happen before but this is the earliest event I think we'd want
-	// to trigger off of. see here for relevant event notes:
-	// https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/troubleshoot-unexpected-reboots-system-event-logs
-	bootEventSubscription := `
-<QueryList>
-	<Query Path="System">
-		<Select Path="System">*[System[Provider[@Name='EventLog'] and (EventID=6005)]]</Select>
-	</Query>
-</QueryList>
-`
-
-	if _, err = oleutil.PutProperty(bootEventTrigger, "Subscription", bootEventSubscription); err != nil {
-		return fmt.Errorf("setting subscription property: %w", err)
-	}
-
-	// see details for how this string is created here: https://learn.microsoft.com/en-us/windows/win32/taskschd/eventtrigger-delay
-	// PT2M here means 2 minutes
-	if _, err = oleutil.PutProperty(bootEventTrigger, "Delay", "PT2M"); err != nil {
+	// we expect that as an automatic start type service (not delayed), the system will attempt to start launcher immediately.
+	// we occasionally see that during periods of high activity, launcher is unable to respond to the service control manager
+	// within the configured timeout (depends on device, we usually see 30-45 seconds). We really don't want to duplicate any work
+	// during this time, so wait 2 minutes to ensure the service control manager has had a chance to start launcher, and launcher
+	// received the full timeout period to attempt to start before having this task try again
+	if _, err = oleutil.PutProperty(bootEventTrigger, "Delay", "PT2M"); err != nil { // PT2M here means 2 minutes
 		return fmt.Errorf("setting boot event trigger delay: %w", err)
 	}
 
@@ -571,7 +559,6 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("registering task definition: %w", err)
 	}
-
 
 	return nil
 }
