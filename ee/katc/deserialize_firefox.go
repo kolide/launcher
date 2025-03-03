@@ -28,6 +28,8 @@ const (
 	tagObjectObject  uint32 = 0xffff0008
 	tagBooleanObject uint32 = 0xffff000a
 	tagStringObject  uint32 = 0xffff000b
+	tagMapObject     uint32 = 0xffff0011
+	tagSetObject     uint32 = 0xffff0012
 	tagEndOfKeys     uint32 = 0xffff0013
 	tagFloatMax      uint32 = 0xfff00000
 )
@@ -126,59 +128,61 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading next pair for value in object: %w", err)
 		}
-
-		switch valTag {
-		case tagInt32:
-			resultObj[nextKeyStr] = []byte(strconv.Itoa(int(valData)))
-		case tagString, tagStringObject:
-			str, err := deserializeString(valData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading string for key `%s`: %w", nextKeyStr, err)
-			}
-			resultObj[nextKeyStr] = str
-		case tagBoolean:
-			if valData > 0 {
-				resultObj[nextKeyStr] = []byte("true")
-			} else {
-				resultObj[nextKeyStr] = []byte("false")
-			}
-		case tagDateObject:
-			// Date objects are stored as follows:
-			// * first, a tagDateObject with valData `0`
-			// * next, a double
-			// So, we want to ignore our current `valData`, and read the next pair as a double.
-			nextTag, nextData, err := nextPair(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading next pair as date object for key `%s`: %w", nextKeyStr, err)
-			}
-			d := uint64(nextData) | uint64(nextTag)<<32
-			resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
-		case tagObjectObject:
-			obj, err := deserializeNestedObject(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading object for key `%s`: %w", nextKeyStr, err)
-			}
-			resultObj[nextKeyStr] = obj
-		case tagArrayObject:
-			arr, err := deserializeArray(valData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading array for key `%s`: %w", nextKeyStr, err)
-			}
-			resultObj[nextKeyStr] = arr
-		case tagNull, tagUndefined:
-			resultObj[nextKeyStr] = nil
-		default:
-			if valTag >= tagFloatMax {
-				return nil, fmt.Errorf("cannot process object key `%s`: unknown tag type `%x` with data `%d`", nextKeyStr, valTag, valData)
-			}
-
-			// We want to reinterpret (valTag, valData) as a single double value instead
-			d := uint64(valData) | uint64(valTag)<<32
-			resultObj[nextKeyStr] = []byte(strconv.FormatUint(d, 10))
+		valDeserialized, err := deserializeNext(valTag, valData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing value for key `%s`: %w", nextKeyStr, err)
 		}
+		resultObj[nextKeyStr] = valDeserialized
 	}
 
 	return resultObj, nil
+}
+
+// deserializeNext deserializes the item with the given tag `itemTag` and its associated data.
+// Depending on the type indicated by `itemTag`, it may read additional data from `srcReader`
+// to complete deserializing the item.
+func deserializeNext(itemTag uint32, itemData uint32, srcReader io.ByteReader) ([]byte, error) {
+	switch itemTag {
+	case tagInt32:
+		return []byte(strconv.Itoa(int(itemData))), nil
+	case tagString, tagStringObject:
+		return deserializeString(itemData, srcReader)
+	case tagBoolean:
+		if itemData > 0 {
+			return []byte("true"), nil
+		} else {
+			return []byte("false"), nil
+		}
+	case tagDateObject:
+		// Date objects are stored as follows:
+		// * first, a tagDateObject with valData `0`
+		// * next, a double
+		// So, we want to ignore our current `valData`, and read the next pair as a double.
+		nextTag, nextData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next pair as date object: %w", err)
+		}
+		d := uint64(nextData) | uint64(nextTag)<<32
+		return []byte(strconv.FormatUint(d, 10)), nil
+	case tagObjectObject:
+		return deserializeNestedObject(srcReader)
+	case tagArrayObject:
+		return deserializeArray(itemData, srcReader)
+	case tagMapObject:
+		return deserializeMap(srcReader)
+	case tagSetObject:
+		return deserializeSet(srcReader)
+	case tagNull, tagUndefined:
+		return nil, nil
+	default:
+		if itemTag >= tagFloatMax {
+			return nil, fmt.Errorf("unknown tag type `%x` with data `%d`", itemTag, itemData)
+		}
+
+		// We want to reinterpret (valTag, valData) as a single double value instead
+		d := uint64(itemData) | uint64(itemTag)<<32
+		return []byte(strconv.FormatUint(d, 10)), nil
+	}
 }
 
 func deserializeString(strData uint32, srcReader io.ByteReader) ([]byte, error) {
@@ -308,6 +312,95 @@ func deserializeNestedObject(srcReader io.ByteReader) ([]byte, error) {
 	resultObj, err := json.Marshal(readableNestedObj)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling nested object: %w", err)
+	}
+
+	return resultObj, nil
+}
+
+// deserializeMap is similar to deserializeNestedObject -- except the keys can be complex objects instead of only strings.
+// Data is stored in the following format:
+// <map tag, 0>
+// <key1 tag, key1 tag data>
+// <value1 tag, value1 tag data>
+// ...key1 fields...
+// <tagEndOfKeys, 0> (signals end of key1)
+// ...value1 fields...
+// <tagEndOfKeys, 0> (signals end of value1)
+// ...continue for other key-val pairs...
+// <tagEndOfKeys, 0> (signals end of Map)
+func deserializeMap(srcReader io.ByteReader) ([]byte, error) {
+	mapObject := make(map[string]string)
+
+	for {
+		keyTag, keyData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next pair for key in map: %w", err)
+		}
+
+		if keyTag == tagEndOfKeys {
+			// All done! Return map
+			break
+		}
+
+		valTag, valData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next pair for value in map: %w", err)
+		}
+
+		// Now process all fields for key obj until we hit tagEndOfKeys
+		keyBytes, err := deserializeNext(keyTag, keyData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing key in map: %w", err)
+		}
+
+		// Now process all fields for val obj until we hit tagEndOfKeys
+		valBytes, err := deserializeNext(valTag, valData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing value in map for key `%s`: %w", string(keyBytes), err)
+		}
+
+		mapObject[string(keyBytes)] = string(valBytes)
+
+		// All done processing current keyTag, valTag -- iterate!
+	}
+
+	resultObj, err := json.Marshal(mapObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling map: %w", err)
+	}
+
+	return resultObj, nil
+}
+
+// deserializeSet is similar to deserializeMap, just without the keys.
+func deserializeSet(srcReader io.ByteReader) ([]byte, error) {
+	setObject := make(map[string]struct{})
+
+	for {
+		keyTag, keyData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next pair for key in set: %w", err)
+		}
+
+		if keyTag == tagEndOfKeys {
+			// All done! Return map
+			break
+		}
+
+		// Now process all fields for key obj until we hit tagEndOfKeys
+		keyBytes, err := deserializeNext(keyTag, keyData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing key in map: %w", err)
+		}
+
+		setObject[string(keyBytes)] = struct{}{}
+
+		// All done processing current keyTag, valTag -- iterate!
+	}
+
+	resultObj, err := json.Marshal(setObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling set: %w", err)
 	}
 
 	return resultObj, nil
