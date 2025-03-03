@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -35,18 +34,13 @@ var archAttributeMap = map[string]attribute.KeyValue{
 	"arm":   semconv.HostArchARM32,
 }
 
-var osqueryClientRecheckInterval = 30 * time.Second
-
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
+var enrollmentDetailsRecheckInterval = 5 * time.Second
 
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
-	osqueryClient             querier
 	slogger                   *slog.Logger
 	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
 	attrLock                  sync.RWMutex
@@ -113,15 +107,18 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 
 	t.addDeviceIdentifyingAttributes()
 
+	// Check if enrollment details are already available, add them immediately if so
+	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+	if hasRequiredEnrollmentDetails(enrollmentDetails) {
+		t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+	} else {
+		// Launch a goroutine to wait for enrollment details
+		gowrapper.Go(context.TODO(), t.slogger, func() {
+			t.addAttributesFromOsquery()
+		})
+	}
+
 	return t, nil
-}
-
-func (t *TraceExporter) SetOsqueryClient(client querier) {
-	t.osqueryClient = client
-
-	gowrapper.Go(context.TODO(), t.slogger, func() {
-		t.addAttributesFromOsquery()
-	})
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -168,64 +165,61 @@ func (t *TraceExporter) addDeviceIdentifyingAttributes() {
 	}
 }
 
-// addAttributesFromOsquery retrieves device and OS details from osquery and adds them
-// to our resource attributes. Since this is called on startup when the osquery client
-// may not be ready yet, we perform a few retries.
+// hasRequiredEnrollmentDetails checks if the provided enrollment details contain
+// all the required fields for adding trace attributes
+func hasRequiredEnrollmentDetails(details types.EnrollmentDetails) bool {
+	// Check that all required fields have values
+	return details.OsqueryVersion != "" &&
+		details.OSName != "" &&
+		details.OSVersion != "" &&
+		details.Hostname != ""
+}
+
+// addAttributesFromOsquery waits for enrollment details to be available
+// and then adds the relevant attributes
 func (t *TraceExporter) addAttributesFromOsquery() {
-	t.attrLock.Lock()
-	defer t.attrLock.Unlock()
-
-	osqueryInfoQuery := `
-	SELECT
-		osquery_info.version as osquery_version,
-		os_version.name as os_name,
-		os_version.version as os_version,
-		system_info.hostname
-	FROM
-		os_version,
-		system_info,
-		osquery_info;
-	`
-
-	// The osqueryd client may not have initialized yet, so retry for up to three minutes on error.
-	var resp []map[string]string
-	var err error
+	// Wait until enrollment details are available
 	retryTimeout := time.Now().Add(3 * time.Minute)
 	for {
 		if time.Now().After(retryTimeout) {
-			err = errors.New("could not get osquery details before timeout")
-			break
+			t.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not get enrollment details before timeout",
+			)
+			return
 		}
 
-		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
-		if err == nil && len(resp) > 0 {
-			break
+		enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+		if hasRequiredEnrollmentDetails(enrollmentDetails) {
+			t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+			return
 		}
 
 		select {
 		case <-t.ctx.Done():
 			t.slogger.Log(context.TODO(), slog.LevelDebug,
-				"trace exporter interrupted while waiting to add osquery attributes",
+				"trace exporter interrupted while waiting for enrollment details",
 			)
 			return
-		case <-time.After(osqueryClientRecheckInterval):
+		case <-time.After(enrollmentDetailsRecheckInterval):
 			continue
 		}
 	}
+}
 
-	if err != nil || len(resp) == 0 {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"trace exporter could not fetch osquery attributes",
-			"err", err,
-		)
-		return
-	}
+func (t *TraceExporter) addAttributesFromEnrollmentDetails(details types.EnrollmentDetails) {
+	t.attrLock.Lock()
+	defer t.attrLock.Unlock()
 
+	// Add OS and system attributes from enrollment details
 	t.attrs = append(t.attrs,
-		attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
-		semconv.OSName(resp[0]["os_name"]),
-		semconv.OSVersion(resp[0]["os_version"]),
-		semconv.HostName(resp[0]["hostname"]),
+		attribute.String("launcher.osquery_version", details.OsqueryVersion),
+		semconv.OSName(details.OSName),
+		semconv.OSVersion(details.OSVersion),
+		semconv.HostName(details.Hostname),
+	)
+
+	t.slogger.Log(context.TODO(), slog.LevelDebug,
+		"added attributes from enrollment details",
 	)
 }
 

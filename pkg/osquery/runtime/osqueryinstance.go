@@ -48,6 +48,8 @@ const (
 	// communication with Kolide SaaS happens over JSONRPC.
 	KolideSaasExtensionName = "kolide_grpc"
 
+	katcExtensionName = "katc"
+
 	// How long to wait before erroring because the osquery process has not started up successfully.
 	// This is a generous timeout -- the average osquery startup takes just over a second, and the
 	// 95th percentile startup takes just over two seconds. We rounded up to 20 seconds to give
@@ -111,10 +113,11 @@ type OsqueryInstance struct {
 	// of launching an osqueryd process
 	runId                   string // string identifier for this instance
 	errgroup                *errgroup.LoggedErrgroup
+	paths                   *osqueryFilePaths
 	saasExtension           *launcherosq.Extension
 	cmd                     *exec.Cmd
 	emsLock                 sync.RWMutex // Lock for extensionManagerServers
-	extensionManagerServers []*osquery.ExtensionManagerServer
+	extensionManagerServers map[string]*osquery.ExtensionManagerServer
 	extensionManagerClient  *osquery.ExtensionManagerClient
 	history                 types.OsqueryHistorian
 	startFunc               func(cmd *exec.Cmd) error
@@ -124,36 +127,51 @@ type OsqueryInstance struct {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (i *OsqueryInstance) Healthy() error {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
+	if !i.instanceStarted() {
+		return errors.New("instance not started")
+	}
+
 	// Do not add/remove servers from i.extensionManagerServers while we're accessing them
 	i.emsLock.RLock()
 	defer i.emsLock.RUnlock()
 
-	if len(i.extensionManagerServers) == 0 || i.extensionManagerClient == nil {
-		return errors.New("instance not started")
-	}
-
 	resultsChan := make(chan error)
 	gowrapper.Go(context.TODO(), i.slogger, func() {
-		for _, srv := range i.extensionManagerServers {
-			serverStatus, err := srv.Ping(context.TODO())
+		// Make sure servers are pingable. We're calling the servers directly here (rather than over
+		// the thrift socket) so we pretty much always expect this to pass.
+		for srvName, srv := range i.extensionManagerServers {
+			serverStatus, err := srv.Ping(ctx)
 			if err != nil {
-				resultsChan <- fmt.Errorf("could not ping extension server: %w", err)
+				resultsChan <- fmt.Errorf("could not ping extension server %s: %w", srvName, err)
 				return
 			}
 			if serverStatus.Code != 0 {
-				resultsChan <- fmt.Errorf("ping extension server returned %d: %s", serverStatus.Code, serverStatus.Message)
+				resultsChan <- fmt.Errorf("ping extension server %s returned %d: %s", srvName, serverStatus.Code, serverStatus.Message)
 				return
 			}
 		}
 
-		clientStatus, err := i.extensionManagerClient.Ping()
+		// Make sure that all of the servers we have registered in i.extensionManagerServers
+		// are actually active and registered. Since we request extension info via the extension
+		// manager client, this also confirms we can talk to osquery via the client.
+		extensionList, err := i.extensionManagerClient.ExtensionsContext(ctx)
 		if err != nil {
-			resultsChan <- fmt.Errorf("could not ping osquery extension client: %w", err)
-			return
+			resultsChan <- fmt.Errorf("could not get extensions list via osquery extension client: %w", err)
 		}
-		if clientStatus.Code != 0 {
-			resultsChan <- fmt.Errorf("ping extension client returned %d: %s", clientStatus.Code, clientStatus.Message)
-			return
+		for expectedExtensionName := range i.extensionManagerServers {
+			extFound := false
+			for _, extInfo := range extensionList {
+				if extInfo.Name == expectedExtensionName {
+					extFound = true
+					break
+				}
+			}
+			if !extFound {
+				resultsChan <- fmt.Errorf("missing extension %s", expectedExtensionName)
+			}
 		}
 
 		resultsChan <- nil
@@ -203,13 +221,14 @@ type osqueryOptions struct {
 func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
-		registrationId: registrationId,
-		knapsack:       knapsack,
-		slogger:        knapsack.Slogger().With("component", "osquery_instance", "registration_id", registrationId, "instance_run_id", runId),
-		serviceClient:  serviceClient,
-		settingsWriter: settingsWriter,
-		runId:          runId,
-		history:        knapsack.OsqueryHistory(),
+		registrationId:          registrationId,
+		knapsack:                knapsack,
+		slogger:                 knapsack.Slogger().With("component", "osquery_instance", "registration_id", registrationId, "instance_run_id", runId),
+		serviceClient:           serviceClient,
+		settingsWriter:          settingsWriter,
+		runId:                   runId,
+		extensionManagerServers: make(map[string]*osquery.ExtensionManagerServer),
+		history:                 knapsack.OsqueryHistory(),
 	}
 
 	for _, opt := range opts {
@@ -259,6 +278,71 @@ func (i *OsqueryInstance) Exited() <-chan struct{} {
 	return i.errgroup.Exited()
 }
 
+// ReloadKatcExtension can be called on a running osquery instance to reload its KATC extension
+// manager server, to add new KATC tables or update existing KATC tables' configurations
+// without restarting the entire instance.
+func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	if !i.instanceStarted() {
+		return errors.New("instance not started, cannot reload extension")
+	}
+
+	i.emsLock.Lock()
+	if katcServer, ok := i.extensionManagerServers[katcExtensionName]; ok {
+		// KATC extension manager server already exists -- we must stop it so that we can start a new one.
+		// We created the KATC extension manager server by calling StartOsqueryExtensionManagerServer with
+		// allowRestart=true so that we can shut it down here without triggering a full shutdown of the
+		// errgroup.
+		katcServer.Shutdown(ctx)
+		delete(i.extensionManagerServers, katcExtensionName)
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"shut down KATC extension manager server in preparation for reload",
+		)
+	}
+	i.emsLock.Unlock()
+
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
+		return fmt.Errorf("starting katc server: %w", err)
+	}
+
+	return nil
+}
+
+// instanceStarted checks whether the instance has successfully launched -- it looks
+// for the client and extension manager server(s) to exist.
+func (i *OsqueryInstance) instanceStarted() bool {
+	i.emsLock.RLock()
+	defer i.emsLock.RUnlock()
+
+	return len(i.extensionManagerServers) > 0 && i.extensionManagerClient != nil
+}
+
+// startKatcExtensionManagerServer starts a new extension manager server that provides
+// access to the KATC tables.
+func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, client *osquery.ExtensionManagerClient) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	katcTables := table.KolideCustomAtcTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "katc_tables"))
+	if len(katcTables) == 0 {
+		return nil
+	}
+
+	// We start this server with allowRestart=true so that we can restart it in the future
+	// if the KATC configuration changes, without shutting down the entire errgroup.
+	if err := i.StartOsqueryExtensionManagerServer(katcExtensionName, client, katcTables, true); err != nil {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"unable to create KATC extension manager server",
+			"err", err,
+		)
+		traces.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		return fmt.Errorf("could not create KATC extension server: %w", err)
+	}
+	return nil
+}
+
 // Launch starts the osquery instance and its components. It will run until one of its
 // components becomes unhealthy, or until it is asked to shutdown via `BeginShutdown`.
 func (i *OsqueryInstance) Launch() error {
@@ -278,6 +362,7 @@ func (i *OsqueryInstance) Launch() error {
 		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
+	i.paths = paths
 
 	// Register as many of our shutdown functions ahead of time as we can, so that we can make sure
 	// we fully clean up after any partially-launched erroring instances.
@@ -305,12 +390,12 @@ func (i *OsqueryInstance) Launch() error {
 		// We do a couple retries -- on Windows, the PID file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.pidfilePath); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(i.paths.pidfilePath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("removing PID file: %w", err)
 			}
 			return nil
 		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			return fmt.Errorf("removing PID file %s failed with retries: %w", paths.pidfilePath, err)
+			return fmt.Errorf("removing PID file %s failed with retries: %w", i.paths.pidfilePath, err)
 		}
 		return nil
 	})
@@ -320,24 +405,24 @@ func (i *OsqueryInstance) Launch() error {
 		// We do a couple retries -- on Windows, the socket file may still be in use
 		// and therefore unable to be removed.
 		if err := backoff.WaitFor(func() error {
-			if err := os.Remove(paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(i.paths.extensionSocketPath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("removing socket file: %w", err)
 			}
 			return nil
 		}, 5*time.Second, 500*time.Millisecond); err != nil {
-			return fmt.Errorf("removing socket file %s failed with retries: %w", paths.extensionSocketPath, err)
+			return fmt.Errorf("removing socket file %s failed with retries: %w", i.paths.extensionSocketPath, err)
 		}
 		return nil
 	})
 
 	// Populate augeas lenses, if requested
 	if i.opts.augeasLensFunc != nil {
-		if err := os.MkdirAll(paths.augeasPath, 0755); err != nil {
+		if err := os.MkdirAll(i.paths.augeasPath, 0755); err != nil {
 			traces.SetError(span, fmt.Errorf("making augeas lenses directory: %w", err))
 			return fmt.Errorf("making augeas lenses directory: %w", err)
 		}
 
-		if err := i.opts.augeasLensFunc(paths.augeasPath); err != nil {
+		if err := i.opts.augeasLensFunc(i.paths.augeasPath); err != nil {
 			traces.SetError(span, fmt.Errorf("setting up augeas lenses: %w", err))
 			return fmt.Errorf("setting up augeas lenses: %w", err)
 		}
@@ -351,7 +436,7 @@ func (i *OsqueryInstance) Launch() error {
 	// Now that we have accepted options from the caller and/or determined what
 	// they should be due to them not being set, we are ready to create and start
 	// the *exec.Cmd instance that will run osqueryd.
-	i.cmd, err = i.createOsquerydCommand(currentOsquerydBinaryPath, paths)
+	i.cmd, err = i.createOsquerydCommand(currentOsquerydBinaryPath)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
@@ -362,16 +447,16 @@ func (i *OsqueryInstance) Launch() error {
 
 	// remove any socket already at the extension socket path to ensure
 	// that it's not left over from a previous instance
-	if err := os.RemoveAll(paths.extensionSocketPath); err != nil {
+	if err := os.RemoveAll(i.paths.extensionSocketPath); err != nil {
 		i.slogger.Log(ctx, slog.LevelWarn,
 			"error removing osquery extension socket",
-			"path", paths.extensionSocketPath,
+			"path", i.paths.extensionSocketPath,
 			"err", err,
 		)
 	}
 
 	// Launch osquery process (async)
-	if err := i.startOsquerydProcess(ctx, paths); err != nil {
+	if err := i.startOsquerydProcess(ctx); err != nil {
 		return fmt.Errorf("starting osqueryd process: %w", err)
 	}
 
@@ -417,7 +502,7 @@ func (i *OsqueryInstance) Launch() error {
 
 	// Start an extension manager for the extensions that osquery
 	// needs for config/log/etc.
-	i.extensionManagerClient, err = i.StartOsqueryClient(paths)
+	i.extensionManagerClient, err = i.StartOsqueryClient()
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
 		return fmt.Errorf("could not create an extension client: %w", err)
@@ -432,7 +517,7 @@ func (i *OsqueryInstance) Launch() error {
 	kolideSaasPlugins = append(kolideSaasPlugins, table.PlatformTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "platform_tables"), currentOsquerydBinaryPath)...)
 	kolideSaasPlugins = append(kolideSaasPlugins, table.LauncherTables(i.knapsack, i.knapsack.Slogger().With("component", "launcher_tables"))...)
 
-	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, paths.extensionSocketPath, i.extensionManagerClient, kolideSaasPlugins); err != nil {
+	if err := i.StartOsqueryExtensionManagerServer(KolideSaasExtensionName, i.extensionManagerClient, kolideSaasPlugins, false); err != nil {
 		i.slogger.Log(ctx, slog.LevelInfo,
 			"unable to create Kolide SaaS extension server, stopping",
 			"err", err,
@@ -441,6 +526,17 @@ func (i *OsqueryInstance) Launch() error {
 		return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
 	}
 	span.AddEvent("extension_server_created")
+
+	// Register the KATC tables via a separate extension manager server, so that we can safely
+	// restart when the configuration changes.
+	if err := i.startKatcExtensionManagerServer(ctx, i.extensionManagerClient); err != nil {
+		i.slogger.Log(ctx, slog.LevelInfo,
+			"unable to create KATC extension server, stopping",
+			"err", err,
+		)
+		traces.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		return fmt.Errorf("could not create KATC extension server: %w", err)
+	}
 
 	// All done with osquery setup! Mark instance as connected, then proceed
 	// with setting up remaining errgroups.
@@ -471,7 +567,7 @@ func (i *OsqueryInstance) Launch() error {
 
 // startOsquerydProcess starts the osquery instance's `cmd` and waits for the osqueryd process
 // to create a socket file, indicating it's started up successfully.
-func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, paths *osqueryFilePaths) error {
+func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -509,17 +605,17 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context, paths *osque
 	// for osquery, if it's started successfully it will create
 	// a socket
 	if err := backoff.WaitFor(func() error {
-		_, err := os.Stat(paths.extensionSocketPath)
+		_, err := os.Stat(i.paths.extensionSocketPath)
 		if err != nil {
 			i.slogger.Log(ctx, slog.LevelDebug,
 				"osquery extension socket not created yet ... will retry",
-				"path", paths.extensionSocketPath,
+				"path", i.paths.extensionSocketPath,
 			)
 		}
 		return err
 	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
-		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err))
-		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", paths.extensionSocketPath, err)
+		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err))
+		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err)
 	}
 
 	span.AddEvent("socket_created")
@@ -686,7 +782,7 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
-func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *osqueryFilePaths) (*exec.Cmd, error) {
+func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cmd, error) {
 	// Create the reference instance for the running osquery instance
 	args := []string{
 		fmt.Sprintf("--logger_plugin=%s", KolideSaasExtensionName),
@@ -729,8 +825,8 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	)
 
 	// Augeas. No windows support, and only makes sense if we populated it.
-	if paths.augeasPath != "" && runtime.GOOS != "windows" {
-		cmd.Args = append(cmd.Args, fmt.Sprintf("--augeas_lenses=%s", paths.augeasPath))
+	if i.paths.augeasPath != "" && runtime.GOOS != "windows" {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--augeas_lenses=%s", i.paths.augeasPath))
 	}
 
 	cmd.Args = append(cmd.Args, platformArgs()...)
@@ -765,10 +861,10 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 	// by providing invalid flags)
 	cmd.Args = append(
 		cmd.Args,
-		fmt.Sprintf("--pidfile=%s", paths.pidfilePath),
-		fmt.Sprintf("--database_path=%s", paths.databasePath),
-		fmt.Sprintf("--extensions_socket=%s", paths.extensionSocketPath),
-		fmt.Sprintf("--extensions_autoload=%s", paths.extensionAutoloadPath),
+		fmt.Sprintf("--pidfile=%s", i.paths.pidfilePath),
+		fmt.Sprintf("--database_path=%s", i.paths.databasePath),
+		fmt.Sprintf("--extensions_socket=%s", i.paths.extensionSocketPath),
+		fmt.Sprintf("--extensions_autoload=%s", i.paths.extensionAutoloadPath),
 		"--disable_extensions=false",
 		"--extensions_timeout=20",
 		fmt.Sprintf("--config_plugin=%s", KolideSaasExtensionName),
@@ -805,11 +901,11 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string, paths *os
 // StartOsqueryClient will create and return a new osquery client with a connection
 // over the socket at the provided path. It will retry for up to 10 seconds to create
 // the connection in the event of a failure.
-func (i *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.ExtensionManagerClient, error) {
+func (i *OsqueryInstance) StartOsqueryClient() (*osquery.ExtensionManagerClient, error) {
 	var client *osquery.ExtensionManagerClient
 	if err := backoff.WaitFor(func() error {
 		var newErr error
-		client, newErr = osquery.NewClient(paths.extensionSocketPath, socketOpenTimeout/2, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(maxSocketWaitTime))
+		client, newErr = osquery.NewClient(i.paths.extensionSocketPath, socketOpenTimeout/2, osquery.DefaultWaitTime(1*time.Second), osquery.MaxWaitTime(maxSocketWaitTime))
 		return newErr
 	}, socketOpenTimeout, socketOpenInterval); err != nil {
 		return nil, fmt.Errorf("could not create an extension client: %w", err)
@@ -820,13 +916,17 @@ func (i *OsqueryInstance) StartOsqueryClient(paths *osqueryFilePaths) (*osquery.
 
 // startOsqueryExtensionManagerServer takes a set of plugins, creates
 // an osquery.NewExtensionManagerServer for them, and then starts it.
-func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socketPath string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin) error {
+// If allowRestart is set, then the errgroup goroutine responsible for
+// starting the server will not return an error when the `Start` function
+// returns, allowing the server to be restarted without triggering a full
+// shutdown of the goroutine.
+func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, client *osquery.ExtensionManagerClient, plugins []osquery.OsqueryPlugin, allowRestart bool) error {
 	var extensionManagerServer *osquery.ExtensionManagerServer
 	if err := backoff.WaitFor(func() error {
 		var newErr error
 		extensionManagerServer, newErr = osquery.NewExtensionManagerServer(
 			name,
-			socketPath,
+			i.paths.extensionSocketPath,
 			osquery.ServerTimeout(1*time.Minute),
 			osquery.WithClient(client),
 		)
@@ -840,7 +940,7 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 	i.emsLock.Lock()
 	defer i.emsLock.Unlock()
 
-	i.extensionManagerServers = append(i.extensionManagerServers, extensionManagerServer)
+	i.extensionManagerServers[name] = extensionManagerServer
 
 	// Start!
 	i.errgroup.StartGoroutine(context.TODO(), name, func() error {
@@ -851,6 +951,11 @@ func (i *OsqueryInstance) StartOsqueryExtensionManagerServer(name string, socket
 				"extension_name", name,
 			)
 			return fmt.Errorf("running extension server: %w", err)
+		}
+
+		// Don't return an error, so the errgroup won't exit
+		if allowRestart {
+			return nil
 		}
 
 		return errors.New("extension manager server exited")

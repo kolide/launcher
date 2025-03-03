@@ -35,8 +35,7 @@ func AddExclusions(ctx context.Context, k types.Knapsack) {
 
 	exclusionPatternsFirstBatch := []string{
 		"*.json",
-		"*.json.gz",
-		"*.db",
+		"*.db*", // expected to match osquery.db, launcher.db, and any launcher.db.bak.X
 	}
 
 	addExclusionsFromPathPatterns(ctx, k, exclusionPatternsFirstBatch)

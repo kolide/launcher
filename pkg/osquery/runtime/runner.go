@@ -289,6 +289,27 @@ func (r *Runner) Ping() {
 	ctx, span := traces.StartSpan(context.TODO())
 	defer span.End()
 
+	r.instanceLock.Lock()
+	updatedInPlace := true
+	for _, instance := range r.instances {
+		if err := instance.ReloadKatcExtension(ctx); err != nil {
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"could not update KATC info in-place -- must restart instances to apply",
+				"err", err,
+			)
+			updatedInPlace = false
+			break
+		}
+	}
+	r.instanceLock.Unlock()
+
+	if updatedInPlace {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"KATC configuration changed, successfully updated in-place without restarting instances",
+		)
+		return
+	}
+
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"KATC configuration changed, restarting instance to apply",
 	)

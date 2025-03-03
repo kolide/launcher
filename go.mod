@@ -15,7 +15,7 @@ require (
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a
-	github.com/kolide/krypto v0.1.1-0.20250210222038-bc46b527cd83
+	github.com/kolide/krypto v0.1.1-0.20250226233608-47a978efa339
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -30,13 +30,13 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
 	go.opencensus.io v0.24.0
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 	golang.org/x/image v0.18.0
 	golang.org/x/net v0.33.0
-	golang.org/x/sync v0.10.0
-	golang.org/x/sys v0.28.0
-	golang.org/x/text v0.21.0
+	golang.org/x/sync v0.11.0
+	golang.org/x/sys v0.30.0
+	golang.org/x/text v0.22.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.58.3
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -121,6 +121,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.22.12
+go 1.23.0
 
 replace github.com/go-ole/go-ole v1.3.0 => github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767
