@@ -36,6 +36,12 @@ const (
 	// types: object
 	tokenObjectBegin byte = 0x6f // o
 	tokenObjectEnd   byte = 0x7b // {
+	// types: map
+	tokenMapBegin byte = 0x3b // ;
+	tokenMapEnd   byte = 0x3a // :
+	// types: set
+	tokenSetBegin byte = 0x27 // '
+	tokenSetEnd   byte = 0x2c // ,
 	// types: array
 	tokenBeginSparseArray byte = 0x61 // a
 	tokenEndSparseArray   byte = 0x40 // @
@@ -183,75 +189,11 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 		}
 
 		// Handle the object property value by its type.
-		switch nextByte {
-		case tokenObjectBegin:
-			// Object nested inside this object
-			nestedObj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding nested object for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = nestedObj
-		case tokenAsciiStr:
-			// ASCII string
-			strVal, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = strVal
-		case tokenUtf16Str:
-			// UTF-16 string
-			strVal, err := deserializeUtf16Str(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = strVal
-		case tokenTrue:
-			obj[currentPropertyName] = []byte("true")
-		case tokenFalse:
-			obj[currentPropertyName] = []byte("false")
-		case tokenUndefined, tokenNull:
-			obj[currentPropertyName] = nil
-		case tokenInt32:
-			propertyInt, err := binary.ReadVarint(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding int32 for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
-		case tokenDouble:
-			var d float64
-			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
-				return obj, fmt.Errorf("decoding double for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
-		case tokenDate:
-			var d float64
-			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
-				return obj, fmt.Errorf("decoding double as date for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
-		case tokenBeginSparseArray:
-			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding sparse array for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = arr
-		case tokenBeginDenseArray:
-			arr, err := deserializeDenseArray(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding dense array for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = arr
-		case tokenPadding, tokenVerifyObjectCount:
-			// We don't care about these types
-			continue
-		default:
-			slogger.Log(ctx, slog.LevelWarn,
-				"unknown token type",
-				"current_property_name", currentPropertyName,
-				"token", fmt.Sprintf("%02x", nextByte),
-			)
-			continue
+		val, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return obj, fmt.Errorf("decoding value for `%s`: %w", currentPropertyName, err)
 		}
+		obj[currentPropertyName] = val
 	}
 }
 
@@ -270,6 +212,69 @@ func nextNonPaddingByte(srcReader *bytes.Reader) (byte, error) {
 			continue
 		}
 		return nextByte, nil
+	}
+}
+
+func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, srcReader *bytes.Reader) ([]byte, error) {
+	for {
+		switch nextToken {
+		case tokenObjectBegin:
+			return deserializeNestedObject(ctx, slogger, srcReader)
+		case tokenAsciiStr:
+			return deserializeAsciiStr(srcReader)
+		case tokenUtf16Str:
+			return deserializeUtf16Str(srcReader)
+		case tokenTrue:
+			return []byte("true"), nil
+		case tokenFalse:
+			return []byte("false"), nil
+		case tokenUndefined, tokenNull:
+			return nil, nil
+		case tokenInt32:
+			propertyInt, err := binary.ReadVarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding int32: %w", err)
+			}
+			return []byte(strconv.Itoa(int(propertyInt))), nil
+		case tokenDouble:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding double: %w", err)
+			}
+			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+		case tokenDate:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding double as date: %w", err)
+			}
+			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+		case tokenBeginSparseArray:
+			return deserializeSparseArray(ctx, slogger, srcReader)
+		case tokenBeginDenseArray:
+			return deserializeDenseArray(ctx, slogger, srcReader)
+		case tokenMapBegin:
+			return deserializeMap(ctx, slogger, srcReader)
+		case tokenSetBegin:
+			return deserializeSet(ctx, slogger, srcReader)
+		case tokenPadding, tokenVerifyObjectCount:
+			// We don't care about these types -- we want to try reading again
+			var err error
+			nextToken, err = nextNonPaddingByte(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading next non-padding byte after padding byte: %w", err)
+			}
+			continue
+		default:
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown token type, will attempt to keep reading",
+				"token", fmt.Sprintf("%02x", nextToken),
+			)
+			var err error
+			nextToken, err = nextNonPaddingByte(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte: %w", err)
+			}
+		}
 	}
 }
 
@@ -435,6 +440,82 @@ func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReade
 	}
 
 	return resultObj, nil
+}
+
+// deserializeMap deserializes a JS map. The map is a bunch of items in a row, where the first item
+// is a key and the item after it is its corresponding value, and so on until we read `tokenMapEnd`.
+func deserializeMap(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	mapObject := make(map[string]string)
+
+	for {
+		// Check to see if we're done with the map
+		tokenByteForKey, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		if tokenByteForKey == tokenMapEnd {
+			// All done with the map! Read the length and break
+			_, _ = srcReader.ReadByte()
+			break
+		}
+
+		keyObj, err := deserializeNext(ctx, slogger, tokenByteForKey, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing map key: %w", err)
+		}
+
+		tokenByteForValue, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+
+		valObj, err := deserializeNext(ctx, slogger, tokenByteForValue, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing map value: %w", err)
+		}
+
+		mapObject[string(keyObj)] = string(valObj)
+	}
+
+	resultMap, err := json.Marshal(mapObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling map: %w", err)
+	}
+
+	return resultMap, nil
+}
+
+// deserializeSet deserializes a JS set. The set is just a bunch of items in a row
+// until we reach `tokenSetEnd`.
+func deserializeSet(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	setObject := make(map[string]struct{})
+
+	for {
+		// Check to see if we're done with the map
+		nextToken, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		if nextToken == tokenSetEnd {
+			// All done with the set! Read the length and break
+			_, _ = srcReader.ReadByte()
+			break
+		}
+
+		nextSetObj, err := deserializeNext(ctx, slogger, nextToken, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next item in set: %w", err)
+		}
+
+		setObject[string(nextSetObj)] = struct{}{}
+	}
+
+	resultMap, err := json.Marshal(setObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling set: %w", err)
+	}
+
+	return resultMap, nil
 }
 
 // deserializeAsciiStr handles the upcoming ascii string in srcReader.
