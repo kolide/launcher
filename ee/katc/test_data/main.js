@@ -59,6 +59,10 @@
                 someTimestamp: 1720034607, // *unint32
                 someDate: new Date(), // Date object, empty
                 someMap: new Map(), // Map object, empty
+                someComplexMap: new Map([
+                    ["set_a", new Set(["set_a_item1", "set_a_item2", "set_a_item3"])],
+                    [new Set(["b1", "b2"]), "set_b"],
+                ]), // Map object with complex items
                 someSet: new Set() // Set object, empty
             },
             {
@@ -98,6 +102,10 @@
                     [2, "two"],
                     [3, "three"],
                 ]), // Map object, not empty
+                someComplexMap: new Map([
+                    [1726096500, [{"id": 2}]],
+                    [new Map([["someNestedMapKey", false]]), null],
+                ]), // Map object with complex items
                 someSet: new Set(["a", "b", "c"]) // Set object
             },
         ];
