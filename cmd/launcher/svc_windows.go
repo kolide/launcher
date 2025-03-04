@@ -26,8 +26,13 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
-// TODO This should be inherited from some setting
-const serviceName = "launcher"
+const (
+	// TODO This should be inherited from some setting
+	serviceName = "launcher"
+
+	// How long it's acceptable to retry calling `svc.Run`
+	svcRunRetryTimeout = 15 * time.Second
+)
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
@@ -95,21 +100,45 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		}
 	}()
 
-	if err := svc.Run(serviceName, &winSvc{
-		logger:        logger,
-		slogger:       localSlogger,
-		systemSlogger: systemSlogger,
-		opts:          opts,
-	}); err != nil {
-		// TODO The caller doesn't have the event log configured, so we
-		// need to log here. this implies we need some deeper refactoring
-		// of the logging
-		systemSlogger.Log(context.TODO(), slog.LevelInfo,
-			"error in service run",
-			"err", err,
-		)
-		time.Sleep(time.Second)
-		return err
+	// Occasionally, we see svc.Run fail almost immediately, with the message
+	// "The service process could not connect to the service controller."
+	// In this case, we don't see the Service Manager attempt to restart launcher,
+	// so, we want to retry svc.Run. We have about ~30 seconds until
+	// the Service Manager (calling `runWindowsSvc`) declares a timeout, so
+	// we don't want to keep retrying indefinitely. Nor do we want to do retries
+	// for svc.Run failures that take more than a few seconds -- in that case,
+	// we assume we've hit a different type of failure that can be handled via
+	// the usual path, "exit and let Service Manager restart launcher".
+	svcRunRetryDeadline := time.Now().Add(svcRunRetryTimeout)
+	for {
+		if err := svc.Run(serviceName, &winSvc{
+			logger:        logger,
+			slogger:       localSlogger,
+			systemSlogger: systemSlogger,
+			opts:          opts,
+		}); err != nil {
+			// Check to see if we're within the retry window
+			if svcRunRetryDeadline.After(time.Now()) {
+				systemSlogger.Log(context.TODO(), slog.LevelInfo,
+					"error in service run, will retry",
+					"err", err,
+					"retry_until", svcRunRetryDeadline.String(),
+				)
+				continue
+			}
+
+			// We're passed the retry window -- log the error, and return
+			systemSlogger.Log(context.TODO(), slog.LevelInfo,
+				"error in service run",
+				"err", err,
+			)
+			time.Sleep(time.Second)
+			return err
+		}
+
+		// Error is nil, so the service exited without error.
+		// No need for a retry.
+		break
 	}
 
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
