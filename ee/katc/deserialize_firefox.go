@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -29,6 +30,7 @@ const (
 	tagObjectObject  uint32 = 0xffff0008
 	tagBooleanObject uint32 = 0xffff000a
 	tagStringObject  uint32 = 0xffff000b
+	tagNumberObject  uint32 = 0xffff000c
 	tagMapObject     uint32 = 0xffff0011
 	tagSetObject     uint32 = 0xffff0012
 	tagEndOfKeys     uint32 = 0xffff0013
@@ -81,7 +83,7 @@ func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[strin
 }
 
 // nextPair returns the next (tag, data) pair from `srcReader`.
-func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
+func nextPair(srcReader *bytes.Reader) (uint32, uint32, error) {
 	// Tags and data are written as a singular little-endian uint64 value.
 	// For example, the pair (`tagBoolean`, 1) is written as 01 00 00 00 02 00 FF FF,
 	// where 0xffff0002 is `tagBoolean`.
@@ -100,7 +102,7 @@ func nextPair(srcReader io.ByteReader) (uint32, uint32, error) {
 }
 
 // deserializeObject deserializes the next object from `srcReader`.
-func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
+func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
 	resultObj := make(map[string][]byte, 0)
 
 	for {
@@ -142,13 +144,23 @@ func deserializeObject(srcReader io.ByteReader) (map[string][]byte, error) {
 // deserializeNext deserializes the item with the given tag `itemTag` and its associated data.
 // Depending on the type indicated by `itemTag`, it may read additional data from `srcReader`
 // to complete deserializing the item.
-func deserializeNext(itemTag uint32, itemData uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) ([]byte, error) {
 	switch itemTag {
 	case tagInt32:
 		return []byte(strconv.Itoa(int(itemData))), nil
+	case tagNumberObject:
+		// Number objects are stored as follows:
+		// * first, tagNumberObject with valData `0`
+		// * next, a double
+		// So, we want to ignore our current `valData`, and read the next pair as a double.
+		var d float64
+		if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+			return nil, fmt.Errorf("decoding double: %w", err)
+		}
+		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
 	case tagString, tagStringObject:
 		return deserializeString(itemData, srcReader)
-	case tagBoolean:
+	case tagBoolean, tagBooleanObject:
 		if itemData > 0 {
 			return []byte("true"), nil
 		} else {
@@ -159,12 +171,12 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader io.ByteReader) (
 		// * first, a tagDateObject with valData `0`
 		// * next, a double
 		// So, we want to ignore our current `valData`, and read the next pair as a double.
-		nextTag, nextData, err := nextPair(srcReader)
-		if err != nil {
-			return nil, fmt.Errorf("reading next pair as date object: %w", err)
+		var d float64
+		if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+			return nil, fmt.Errorf("decoding double: %w", err)
 		}
-		d := uint64(nextData) | uint64(nextTag)<<32
-		return []byte(strconv.FormatUint(d, 10)), nil
+		// d is milliseconds since epoch
+		return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
 	case tagRegexpObject:
 		return deserializeRegexp(itemData, srcReader)
 	case tagObjectObject:
@@ -182,13 +194,23 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader io.ByteReader) (
 			return nil, fmt.Errorf("unknown tag type `%x` with data `%d`", itemTag, itemData)
 		}
 
-		// We want to reinterpret (valTag, valData) as a single double value instead
-		d := uint64(itemData) | uint64(itemTag)<<32
-		return []byte(strconv.FormatUint(d, 10)), nil
+		// We want to reinterpret (itemTag, itemData) as a single double value instead.
+		// Unread the last 8 bytes so we can re-read them as a double.
+		for i := 0; i < 8; i += 1 {
+			if err := srcReader.UnreadByte(); err != nil {
+				return nil, fmt.Errorf("unreading byte in preparation for reinterpreting tag as double: %w", err)
+			}
+		}
+
+		var d float64
+		if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+			return nil, fmt.Errorf("decoding double: %w", err)
+		}
+		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
 	}
 }
 
-func deserializeString(strData uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeString(strData uint32, srcReader *bytes.Reader) ([]byte, error) {
 	strLen := strData & bitMask(31)
 	isAscii := strData & (1 << 31)
 
@@ -199,7 +221,7 @@ func deserializeString(strData uint32, srcReader io.ByteReader) ([]byte, error) 
 	return deserializeUtf16String(strLen, srcReader)
 }
 
-func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeAsciiString(strLen uint32, srcReader *bytes.Reader) ([]byte, error) {
 	// Read bytes for string
 	var i uint32
 	var err error
@@ -223,7 +245,7 @@ func deserializeAsciiString(strLen uint32, srcReader io.ByteReader) ([]byte, err
 	return strBytes, nil
 }
 
-func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeUtf16String(strLen uint32, srcReader *bytes.Reader) ([]byte, error) {
 	// Two bytes per char
 	lenToRead := strLen * 2
 	var i uint32
@@ -270,7 +292,7 @@ const (
 // deserializeRegexp deserializes a regular expression, which is stored as follows:
 // * first, a tagRegexpObject with corresponding data indicating the regex flags
 // * next, a tagString with corresponding data indicating the regex itself
-func deserializeRegexp(regexpData uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeRegexp(regexpData uint32, srcReader *bytes.Reader) ([]byte, error) {
 	// First, parse the flags
 	flags := make([]byte, 0)
 	if regexpData&regexFlagIgnoreCase != 0 {
@@ -318,7 +340,7 @@ func deserializeRegexp(regexpData uint32, srcReader io.ByteReader) ([]byte, erro
 	return regexFull, nil
 }
 
-func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, error) {
+func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, error) {
 	resultArr := make([]any, arrayLength)
 
 	for {
@@ -364,7 +386,7 @@ func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, erro
 	return arrBytes, nil
 }
 
-func deserializeNestedObject(srcReader io.ByteReader) ([]byte, error) {
+func deserializeNestedObject(srcReader *bytes.Reader) ([]byte, error) {
 	nestedObj, err := deserializeObject(srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
@@ -395,7 +417,7 @@ func deserializeNestedObject(srcReader io.ByteReader) ([]byte, error) {
 // <tagEndOfKeys, 0> (signals end of value1)
 // ...continue for other key-val pairs...
 // <tagEndOfKeys, 0> (signals end of Map)
-func deserializeMap(srcReader io.ByteReader) ([]byte, error) {
+func deserializeMap(srcReader *bytes.Reader) ([]byte, error) {
 	mapObject := make(map[string]string)
 
 	for {
@@ -440,7 +462,7 @@ func deserializeMap(srcReader io.ByteReader) ([]byte, error) {
 }
 
 // deserializeSet is similar to deserializeMap, just without the keys.
-func deserializeSet(srcReader io.ByteReader) ([]byte, error) {
+func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
 	setObject := make(map[string]struct{})
 
 	for {

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -22,13 +23,16 @@ const (
 	// header token
 	tokenVersion byte = 0xff
 	// booleans
-	tokenTrue  byte = 0x54 // T
-	tokenFalse byte = 0x46 // F
+	tokenTrue     byte = 0x54 // T
+	tokenFalse    byte = 0x46 // F
+	tokenTrueObj  byte = 0x79 // y
+	tokenFalseObj byte = 0x78 // x
 	// numbers
-	tokenInt32  byte = 0x49 // I
-	tokenUint32 byte = 0x55 // U
-	tokenDouble byte = 0x4e // N
-	// strings
+	tokenInt32     byte = 0x49 // I
+	tokenUint32    byte = 0x55 // U
+	tokenDouble    byte = 0x4e // N
+	tokenNumberObj byte = 0x6e // n
+	// strings -- string (S) and string object (s) don't appear to be used
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
 	// regex
@@ -181,7 +185,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"next_byte", fmt.Sprintf("%02x", nextByte),
 				"next_byte_read_err", err,
 			)
-			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
+			return obj, fmt.Errorf("object property name has unexpected non-string type %02x / `%s`", objPropertyStart, string(objPropertyStart))
 		}
 
 		// Now process the object property's value. The next byte will tell us its type.
@@ -228,9 +232,9 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeUtf16Str(srcReader)
 		case tokenRegexp:
 			return deserializeRegexp(srcReader)
-		case tokenTrue:
+		case tokenTrue, tokenTrueObj:
 			return []byte("true"), nil
-		case tokenFalse:
+		case tokenFalse, tokenFalseObj:
 			return []byte("false"), nil
 		case tokenUndefined, tokenNull:
 			return nil, nil
@@ -240,7 +244,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("decoding int32: %w", err)
 			}
 			return []byte(strconv.Itoa(int(propertyInt))), nil
-		case tokenDouble:
+		case tokenDouble, tokenNumberObj:
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double: %w", err)
@@ -251,7 +255,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double as date: %w", err)
 			}
-			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+			// d is milliseconds since epoch
+			return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
 		case tokenBeginSparseArray:
 			return deserializeSparseArray(ctx, slogger, srcReader)
 		case tokenBeginDenseArray:
