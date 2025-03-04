@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"crypto/ecdsa"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -112,18 +113,30 @@ func (c *chain) validate(trustedRoot *ecdsa.PublicKey) error {
 		return errors.New("chain is empty")
 	}
 
-	for i := 0; i < len(c.Links)-1; i++ {
-		parentKey, err := echelper.PublicB64DerToEcdsaKey(c.Links[i].Data)
+	for i := range len(c.Links) - 1 {
+		parentKey, err := x509.ParsePKIXPublicKey(c.Links[i].Data)
 		if err != nil {
 			return fmt.Errorf("failed to convert public key from DER: %w", err)
 		}
 
-		// The first key in the chain must match the trusted root
-		if i == 0 && !equalPubEcdsaKeys(trustedRoot, parentKey) {
-			return errors.New("first key in chain does not match trusted root")
+		// verify it's an ecdsa key
+		parentEcdsa, ok := parentKey.(*ecdsa.PublicKey)
+		if !ok {
+			return errors.New("parent key is not an ECDSA key")
 		}
 
-		if err := echelper.VerifySignature(parentKey, c.Links[i+1].Data, c.Links[i+1].Sig); err != nil {
+		// The first key in the chain must match the trusted root and be self signed
+		if i == 0 {
+			if !equalPubEcdsaKeys(trustedRoot, parentEcdsa) {
+				return errors.New("first key in chain does not match trusted root")
+			}
+
+			if err := echelper.VerifySignature(trustedRoot, c.Links[i].Data, c.Links[i].Sig); err != nil {
+				return fmt.Errorf("failed to verify root self signature: %w", err)
+			}
+		}
+
+		if err := echelper.VerifySignature(parentEcdsa, c.Links[i+1].Data, c.Links[i+1].Sig); err != nil {
 			return fmt.Errorf("failed to verify signature: %w", err)
 		}
 	}

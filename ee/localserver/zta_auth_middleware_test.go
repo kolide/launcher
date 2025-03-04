@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -67,7 +68,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		t.Parallel()
 
 		invalidKeys := make([]*ecdsa.PrivateKey, 3)
-		for i := 0; i < len(invalidKeys); i++ {
+		for i := range invalidKeys {
 			invalidKeys[i] = mustGenEcdsaKey(t)
 		}
 
@@ -136,7 +137,7 @@ func Test_ValidateCertChain(t *testing.T) {
 
 	keyCount := 3
 	keys := make([]*ecdsa.PrivateKey, keyCount)
-	for i := 0; i < keyCount; i++ {
+	for i := range keyCount {
 		keys[i] = mustGenEcdsaKey(t)
 	}
 
@@ -182,6 +183,20 @@ func Test_ValidateCertChain(t *testing.T) {
 		)
 	})
 
+	t.Run("bad sig last item in chain", func(t *testing.T) {
+		t.Parallel()
+
+		chain, err := newChain([]byte("whatevs"), keys...)
+		require.NoError(t, err)
+
+		// replace last item in chain
+		chain.Links[len(chain.Links)-1].Data = []byte("something_different")
+
+		require.Error(t, chain.validate(&keys[0].PublicKey),
+			"should not be able to validate chain with malformed key",
+		)
+	})
+
 	t.Run("invalid signature in chain", func(t *testing.T) {
 		t.Parallel()
 
@@ -189,10 +204,30 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.NoError(t, err)
 
 		badKey := mustGenEcdsaKey(t)
-		badPubDer, err := echelper.PublicEcdsaToB64Der(&badKey.PublicKey)
+		badPubDer, err := x509.MarshalPKIXPublicKey(&badKey.PublicKey)
 		require.NoError(t, err)
 
 		chain.Links[1].Data = badPubDer
+
+		require.Error(t, chain.validate(&keys[0].PublicKey),
+			"should not be able to validate chain with malformed key",
+		)
+	})
+
+	t.Run("invalid root self sign", func(t *testing.T) {
+		t.Parallel()
+
+		chain, err := newChain([]byte("whatevs"), keys...)
+		require.NoError(t, err)
+
+		badKey := mustGenEcdsaKey(t)
+		badPubDer, err := x509.MarshalPKIXPublicKey(&badKey.PublicKey)
+		require.NoError(t, err)
+
+		badPubDerSig, err := echelper.Sign(badKey, badPubDer)
+		require.NoError(t, err)
+
+		chain.Links[0].Sig = badPubDerSig
 
 		require.Error(t, chain.validate(&keys[0].PublicKey),
 			"should not be able to validate chain with malformed key",
@@ -284,33 +319,39 @@ func newChain(data []byte, ecdsaKeys ...*ecdsa.PrivateKey) (*chain, error) {
 	// data will be last link in links
 	links := make([]chainLink, len(ecdsaKeys)+1)
 
-	rootB64der, err := echelper.PublicEcdsaToB64Der(&ecdsaKeys[0].PublicKey)
+	rootDer, err := x509.MarshalPKIXPublicKey(&ecdsaKeys[0].PublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert public key to DER: %w", err)
+		return nil, err
+	}
+
+	sig, err := echelper.Sign(ecdsaKeys[0], rootDer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to self sign root key: %w", err)
 	}
 
 	// The first link is self-signed.
 	links[0] = chainLink{
-		Data: rootB64der,
-		Sig:  nil,
+		Data: rootDer,
+		Sig:  sig,
 	}
 
-	for i := 0; i < len(ecdsaKeys)-1; i++ {
+	for i := range len(ecdsaKeys) - 1 {
 		parentKey := ecdsaKeys[i]
+
 		childKey := ecdsaKeys[i+1]
 
-		childB64Der, err := echelper.PublicEcdsaToB64Der(&childKey.PublicKey)
+		childDer, err := x509.MarshalPKIXPublicKey(&childKey.PublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert public key to DER: %w", err)
+			return nil, err
 		}
 
-		sig, err := echelper.Sign(parentKey, childB64Der)
+		sig, err := echelper.Sign(parentKey, childDer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign DER: %w", err)
 		}
 
 		links[i+1] = chainLink{
-			Data: childB64Der,
+			Data: childDer,
 			Sig:  sig,
 		}
 	}
@@ -318,7 +359,7 @@ func newChain(data []byte, ecdsaKeys ...*ecdsa.PrivateKey) (*chain, error) {
 	lastKey := ecdsaKeys[len(ecdsaKeys)-1]
 
 	// sign data with the last key
-	sig, err := echelper.Sign(lastKey, data)
+	sig, err = echelper.Sign(lastKey, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign data with last key: %w", err)
 	}
