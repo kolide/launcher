@@ -160,7 +160,7 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
 	case tagString, tagStringObject:
 		return deserializeString(itemData, srcReader)
-	case tagBoolean:
+	case tagBoolean, tagBooleanObject:
 		if itemData > 0 {
 			return []byte("true"), nil
 		} else {

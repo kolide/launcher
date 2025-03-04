@@ -23,8 +23,10 @@ const (
 	// header token
 	tokenVersion byte = 0xff
 	// booleans
-	tokenTrue  byte = 0x54 // T
-	tokenFalse byte = 0x46 // F
+	tokenTrue     byte = 0x54 // T
+	tokenFalse    byte = 0x46 // F
+	tokenTrueObj  byte = 0x79 // y
+	tokenFalseObj byte = 0x78 // x
 	// numbers
 	tokenInt32     byte = 0x49 // I
 	tokenUint32    byte = 0x55 // U
@@ -230,9 +232,9 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeUtf16Str(srcReader)
 		case tokenRegexp:
 			return deserializeRegexp(srcReader)
-		case tokenTrue:
+		case tokenTrue, tokenTrueObj:
 			return []byte("true"), nil
-		case tokenFalse:
+		case tokenFalse, tokenFalseObj:
 			return []byte("false"), nil
 		case tokenUndefined, tokenNull:
 			return nil, nil

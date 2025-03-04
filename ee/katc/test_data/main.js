@@ -67,7 +67,8 @@
                 someRegex: new RegExp("\\w+", "sm"), // Regex
                 someStringObject: new String(""), // String object, empty
                 someNumberObject: new Number(0), // Number object, empty
-                someDouble: 0.0 // double
+                someDouble: 0.0, // double
+                someBoolean: new Boolean(true), // Boolean object, true
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -114,7 +115,8 @@
                 someRegex: new RegExp("[abc]", "i"), // Regex
                 someStringObject: new String("testing"), // String object
                 someNumberObject: new Number(123456.789), // Number object
-                someDouble: 304.302 // double
+                someDouble: 304.302, // double
+                someBoolean: new Boolean(false), // Boolean object, false
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
