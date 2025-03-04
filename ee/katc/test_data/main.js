@@ -57,7 +57,13 @@
                 noDetails: [], // Empty array
                 email: "test1@example.com",
                 someTimestamp: 1720034607, // *unint32
-                someDate: new Date() // Date object, empty
+                someDate: new Date(), // Date object, empty
+                someMap: new Map(), // Map object, empty
+                someComplexMap: new Map([
+                    ["set_a", new Set(["set_a_item1", "set_a_item2", "set_a_item3"])],
+                    [new Set(["b1", "b2"]), "set_b"],
+                ]), // Map object with complex items
+                someSet: new Set() // Set object, empty
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -90,7 +96,17 @@
                 noDetails: [], // Empty array
                 email: "test2@example.com",
                 someTimestamp: 1726096312, // *unint32
-                someDate: new Date("December 17, 1995 03:24:00") // Date object, not empty
+                someDate: new Date("December 17, 1995 03:24:00"), // Date object, not empty
+                someMap: new Map([
+                    [1, "one"],
+                    [2, "two"],
+                    [3, "three"],
+                ]), // Map object, not empty
+                someComplexMap: new Map([
+                    [1726096500, [{"id": 2}]],
+                    [new Map([["someNestedMapKey", false]]), null],
+                ]), // Map object with complex items
+                someSet: new Set(["a", "b", "c"]) // Set object
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
