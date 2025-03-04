@@ -24,6 +24,7 @@ const (
 	tagInt32         uint32 = 0xffff0003
 	tagString        uint32 = 0xffff0004
 	tagDateObject    uint32 = 0xffff0005
+	tagRegexpObject  uint32 = 0xffff0006
 	tagArrayObject   uint32 = 0xffff0007
 	tagObjectObject  uint32 = 0xffff0008
 	tagBooleanObject uint32 = 0xffff000a
@@ -164,6 +165,8 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader io.ByteReader) (
 		}
 		d := uint64(nextData) | uint64(nextTag)<<32
 		return []byte(strconv.FormatUint(d, 10)), nil
+	case tagRegexpObject:
+		return deserializeRegexp(itemData, srcReader)
 	case tagObjectObject:
 		return deserializeNestedObject(srcReader)
 	case tagArrayObject:
@@ -249,6 +252,69 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, err
 		return nil, fmt.Errorf("decoding: %w", err)
 	}
 	return decoded, nil
+}
+
+const (
+	regexFlagIgnoreCase  = 0b00000001 // /i
+	regexFlagGlobal      = 0b00000010 // /g
+	regexFlagMultiline   = 0b00000100 // /m
+	regexFlagSticky      = 0b00001000 // /y
+	regexFlagUnicode     = 0b00010000 // /u
+	regexFlagDotAll      = 0b00100000 // /s
+	regexFlagHasIndices  = 0b01000000 // /d
+	regexFlagUnicodeSets = 0b10000000 // /v
+)
+
+// deserializeRegexp deserializes a regular expression, which is stored as follows:
+// * first, a tagRegexpObject with corresponding data indicating the regex flags
+// * next, a tagString with corresponding data indicating the regex itself
+// Flag parsing is found here: https://searchfox.org/mozilla-central/source/js/public/RegExpFlags.h.
+func deserializeRegexp(regexpData uint32, srcReader io.ByteReader) ([]byte, error) {
+	// First, parse the flags
+	flags := make([]byte, 0)
+	if regexpData&regexFlagIgnoreCase != 0 {
+		flags = append(flags, []byte("i")...)
+	}
+	if regexpData&regexFlagGlobal != 0 {
+		flags = append(flags, []byte("g")...)
+	}
+	if regexpData&regexFlagMultiline != 0 {
+		flags = append(flags, []byte("m")...)
+	}
+	if regexpData&regexFlagSticky != 0 {
+		flags = append(flags, []byte("y")...)
+	}
+	if regexpData&regexFlagUnicode != 0 {
+		flags = append(flags, []byte("u")...)
+	}
+	if regexpData&regexFlagDotAll != 0 {
+		flags = append(flags, []byte("s")...)
+	}
+	if regexpData&regexFlagHasIndices != 0 {
+		flags = append(flags, []byte("d")...)
+	}
+	if regexpData&regexFlagUnicodeSets != 0 {
+		flags = append(flags, []byte("v")...)
+	}
+
+	// Now, read the next string to get the regex
+	nextTag, nextData, err := nextPair(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading next pair as string for regex object: %w", err)
+	}
+	if nextTag != tagString {
+		return nil, fmt.Errorf("regex tag followed by unexpected tag `%x` (expected `%x`, tagString)", nextTag, tagString)
+	}
+	regexStrBytes, err := deserializeString(nextData, srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing string portion of regex: %w", err)
+	}
+
+	regexFull := append([]byte("/"), regexStrBytes...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }
 
 func deserializeArray(arrayLength uint32, srcReader io.ByteReader) ([]byte, error) {
