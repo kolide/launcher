@@ -254,6 +254,8 @@ func deserializeUtf16String(strLen uint32, srcReader io.ByteReader) ([]byte, err
 	return decoded, nil
 }
 
+// Please note that these values are NOT identical to the ones used by Chrome -- global
+// and ignorecase are swapped. Flag values retrieved from https://searchfox.org/mozilla-central/source/js/public/RegExpFlags.h.
 const (
 	regexFlagIgnoreCase  = 0b00000001 // /i
 	regexFlagGlobal      = 0b00000010 // /g
@@ -268,7 +270,6 @@ const (
 // deserializeRegexp deserializes a regular expression, which is stored as follows:
 // * first, a tagRegexpObject with corresponding data indicating the regex flags
 // * next, a tagString with corresponding data indicating the regex itself
-// Flag parsing is found here: https://searchfox.org/mozilla-central/source/js/public/RegExpFlags.h.
 func deserializeRegexp(regexpData uint32, srcReader io.ByteReader) ([]byte, error) {
 	// First, parse the flags
 	flags := make([]byte, 0)
