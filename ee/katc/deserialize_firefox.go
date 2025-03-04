@@ -193,9 +193,19 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 			return nil, fmt.Errorf("unknown tag type `%x` with data `%d`", itemTag, itemData)
 		}
 
-		// We want to reinterpret (valTag, valData) as a single double value instead
-		d := uint64(itemData) | uint64(itemTag)<<32
-		return []byte(strconv.FormatUint(d, 10)), nil
+		// We want to reinterpret (itemTag, itemData) as a single double value instead.
+		// Unread the last 8 bytes so we can re-read them as a double.
+		for i := 0; i < 8; i += 1 {
+			if err := srcReader.UnreadByte(); err != nil {
+				return nil, fmt.Errorf("unreading byte in preparation for reinterpreting tag as double: %w", err)
+			}
+		}
+
+		var d float64
+		if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+			return nil, fmt.Errorf("decoding double: %w", err)
+		}
+		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
 	}
 }
 
