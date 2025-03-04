@@ -31,6 +31,8 @@ const (
 	// strings
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
+	// regex
+	tokenRegexp byte = 0x52 // R
 	// dates
 	tokenDate byte = 0x44 // D
 	// types: object
@@ -224,6 +226,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeAsciiStr(srcReader)
 		case tokenUtf16Str:
 			return deserializeUtf16Str(srcReader)
+		case tokenRegexp:
+			return deserializeRegexp(srcReader)
 		case tokenTrue:
 			return []byte("true"), nil
 		case tokenFalse:
@@ -562,4 +566,75 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+// Please note that these values are NOT identical to the ones used by Firefox -- global
+// and ignorecase are swapped. Flag values retrieved from https://github.com/v8/v8/blob/main/src/regexp/regexp-flags.h.
+const (
+	regexFlagGlobal      = 0b00000001 // /g
+	regexFlagIgnoreCase  = 0b00000010 // /i
+	regexFlagMultiline   = 0b00000100 // /m
+	regexFlagSticky      = 0b00001000 // /y
+	regexFlagUnicode     = 0b00010000 // /u
+	regexFlagDotAll      = 0b00100000 // /s
+	regexFlagHasIndices  = 0b01000000 // /d
+	regexFlagUnicodeSets = 0b10000000 // /v
+)
+
+// deserializeRegexp handles the upcoming regular expression in srcReader.
+// The data takes the following form:
+// * tokenAsciiStr
+// * byteLength:uint32_t
+// * raw data (the regex)
+// * flags:uint32_t
+func deserializeRegexp(srcReader *bytes.Reader) ([]byte, error) {
+	// Read in the string portion of the regexp
+	nextByte, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading first byte of regexp object: %w", err)
+	}
+	if nextByte != tokenAsciiStr {
+		return nil, fmt.Errorf("unexpected tag 0x%02x / `%s` at start of regexp object (expected 0x%02x / `%s`)", nextByte, string(nextByte), tokenAsciiStr, string(tokenAsciiStr))
+	}
+	regexpStrBytes, err := deserializeAsciiStr(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing string portion of regexp: %w", err)
+	}
+
+	// Read in the flags
+	regexpFlags, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as regexp flag: %w", err)
+	}
+	flags := make([]byte, 0)
+	if regexpFlags&regexFlagIgnoreCase != 0 {
+		flags = append(flags, []byte("i")...)
+	}
+	if regexpFlags&regexFlagGlobal != 0 {
+		flags = append(flags, []byte("g")...)
+	}
+	if regexpFlags&regexFlagMultiline != 0 {
+		flags = append(flags, []byte("m")...)
+	}
+	if regexpFlags&regexFlagSticky != 0 {
+		flags = append(flags, []byte("y")...)
+	}
+	if regexpFlags&regexFlagUnicode != 0 {
+		flags = append(flags, []byte("u")...)
+	}
+	if regexpFlags&regexFlagDotAll != 0 {
+		flags = append(flags, []byte("s")...)
+	}
+	if regexpFlags&regexFlagHasIndices != 0 {
+		flags = append(flags, []byte("d")...)
+	}
+	if regexpFlags&regexFlagUnicodeSets != 0 {
+		flags = append(flags, []byte("v")...)
+	}
+
+	regexFull := append([]byte("/"), regexpStrBytes...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }
