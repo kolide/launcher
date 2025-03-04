@@ -25,10 +25,11 @@ const (
 	tokenTrue  byte = 0x54 // T
 	tokenFalse byte = 0x46 // F
 	// numbers
-	tokenInt32  byte = 0x49 // I
-	tokenUint32 byte = 0x55 // U
-	tokenDouble byte = 0x4e // N
-	// strings
+	tokenInt32     byte = 0x49 // I
+	tokenUint32    byte = 0x55 // U
+	tokenDouble    byte = 0x4e // N
+	tokenNumberObj byte = 0x6e // n
+	// strings -- string (S) and string object (s) don't appear to be used
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
 	// regex
@@ -181,7 +182,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"next_byte", fmt.Sprintf("%02x", nextByte),
 				"next_byte_read_err", err,
 			)
-			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
+			return obj, fmt.Errorf("object property name has unexpected non-string type %02x / `%s`", objPropertyStart, string(objPropertyStart))
 		}
 
 		// Now process the object property's value. The next byte will tell us its type.
@@ -240,7 +241,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("decoding int32: %w", err)
 			}
 			return []byte(strconv.Itoa(int(propertyInt))), nil
-		case tokenDouble:
+		case tokenDouble, tokenNumberObj:
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double: %w", err)
