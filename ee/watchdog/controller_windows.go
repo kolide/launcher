@@ -493,7 +493,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	defer bootTrigger.Release()
 
 	if _, err = oleutil.PutProperty(bootTrigger, "ExecutionTimeLimit", "PT1M"); err != nil {
-		return errors.New("setting execution time limit property")
+		return fmt.Errorf("setting execution time limit property: %w", err)
 	}
 
 	// GUID taken from https://github.com/capnspacehook/taskmaster/blob/1629df7c85e96aab410af7f1747ba264d3276505/fill.go#L157
