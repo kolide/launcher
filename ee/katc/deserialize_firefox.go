@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -170,12 +171,12 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 		// * first, a tagDateObject with valData `0`
 		// * next, a double
 		// So, we want to ignore our current `valData`, and read the next pair as a double.
-		nextTag, nextData, err := nextPair(srcReader)
-		if err != nil {
-			return nil, fmt.Errorf("reading next pair as date object: %w", err)
+		var d float64
+		if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+			return nil, fmt.Errorf("decoding double: %w", err)
 		}
-		d := uint64(nextData) | uint64(nextTag)<<32
-		return []byte(strconv.FormatUint(d, 10)), nil
+		// d is milliseconds since epoch
+		return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
 	case tagRegexpObject:
 		return deserializeRegexp(itemData, srcReader)
 	case tagObjectObject:

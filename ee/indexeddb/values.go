@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -252,7 +253,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double as date: %w", err)
 			}
-			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+			// d is milliseconds since epoch
+			return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
 		case tokenBeginSparseArray:
 			return deserializeSparseArray(ctx, slogger, srcReader)
 		case tokenBeginDenseArray:
