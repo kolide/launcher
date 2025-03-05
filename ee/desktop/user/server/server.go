@@ -69,6 +69,7 @@ func New(slogger *slog.Logger,
 	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
 	authedMux.HandleFunc("POST /secure_enclave_key", userServer.createSecureEnclaveKey)
 	authedMux.HandleFunc("GET /secure_enclave_key", userServer.getSecureEnclaveKey)
+	authedMux.HandleFunc("POST /secure_enclave_sign", userServer.signWithSecureEnclave)
 
 	userServer.server = &http.Server{
 		Handler: userServer.authMiddleware(authedMux),
@@ -100,6 +101,11 @@ func New(slogger *slog.Logger,
 	})
 
 	return userServer, nil
+}
+
+type SignWithSecureEnclaveRequest struct {
+	Data      []byte `msgpack:"data"`
+	PubKeyDer []byte `msgpack:"pub_key_der"`
 }
 
 func (s *UserServer) Serve() error {
