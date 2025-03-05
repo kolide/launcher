@@ -346,7 +346,7 @@ func installWatchdogTask(identifier, configFilePath string) error {
 		return fmt.Errorf("setting DisallowStartIfOnBatteries flag: %w", err)
 	}
 
-	// task will be continue even if the computer changes power source to battery
+	// task will continue even if the computer changes power source to battery
 	if _, err = oleutil.PutProperty(settings, "StopIfGoingOnBatteries", false); err != nil {
 		return fmt.Errorf("setting StopIfGoingOnBatteries flag: %w", err)
 	}
@@ -481,6 +481,35 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	// set the repetition interval. PT30M=30 minutes
 	if _, err = oleutil.PutProperty(repetition, "Interval", "PT30M"); err != nil {
 		return fmt.Errorf("setting time trigger interval: %w", err)
+	}
+
+	//////// now add boot up trigger
+	createBootTriggerResp, err := oleutil.CallMethod(triggers, "Create", uint(8)) // 8=TASK_TRIGGER_BOOT
+	if err != nil {
+		return fmt.Errorf("encountered error creating event trigger: %w", err)
+	}
+
+	bootTrigger := createBootTriggerResp.ToIDispatch()
+	defer bootTrigger.Release()
+
+	if _, err = oleutil.PutProperty(bootTrigger, "ExecutionTimeLimit", "PT1M"); err != nil {
+		return fmt.Errorf("setting execution time limit property: %w", err)
+	}
+
+	// GUID taken from https://github.com/capnspacehook/taskmaster/blob/1629df7c85e96aab410af7f1747ba264d3276505/fill.go#L157
+	bootEventTrigger, err := bootTrigger.QueryInterface(ole.NewGUID("{2a9c35da-d357-41f4-bbc1-207ac1b1f3cb}"))
+	if err != nil {
+		return fmt.Errorf("getting boot trigger interface: %w", err)
+	}
+	defer bootEventTrigger.Release()
+
+	// we expect that as an automatic start type service (not delayed), the system will attempt to start launcher immediately.
+	// we occasionally see that during periods of high activity, launcher is unable to respond to the service control manager
+	// within the configured timeout (depends on device, we usually see 30-45 seconds). We really don't want to duplicate any work
+	// during this time, so wait 2 minutes to ensure the service control manager has had a chance to start launcher, and launcher
+	// received the full timeout period to attempt to start before having this task try again
+	if _, err = oleutil.PutProperty(bootEventTrigger, "Delay", "PT2M"); err != nil { // PT2M here means 2 minutes
+		return fmt.Errorf("setting boot event trigger delay: %w", err)
 	}
 
 	// begin creation of the task action

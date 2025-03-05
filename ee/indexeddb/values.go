@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -22,15 +23,20 @@ const (
 	// header token
 	tokenVersion byte = 0xff
 	// booleans
-	tokenTrue  byte = 0x54 // T
-	tokenFalse byte = 0x46 // F
+	tokenTrue     byte = 0x54 // T
+	tokenFalse    byte = 0x46 // F
+	tokenTrueObj  byte = 0x79 // y
+	tokenFalseObj byte = 0x78 // x
 	// numbers
-	tokenInt32  byte = 0x49 // I
-	tokenUint32 byte = 0x55 // U
-	tokenDouble byte = 0x4e // N
-	// strings
+	tokenInt32     byte = 0x49 // I
+	tokenUint32    byte = 0x55 // U
+	tokenDouble    byte = 0x4e // N
+	tokenNumberObj byte = 0x6e // n
+	// strings -- string (S) and string object (s) don't appear to be used
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
+	// regex
+	tokenRegexp byte = 0x52 // R
 	// dates
 	tokenDate byte = 0x44 // D
 	// types: object
@@ -179,7 +185,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"next_byte", fmt.Sprintf("%02x", nextByte),
 				"next_byte_read_err", err,
 			)
-			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
+			return obj, fmt.Errorf("object property name has unexpected non-string type %02x / `%s`", objPropertyStart, string(objPropertyStart))
 		}
 
 		// Now process the object property's value. The next byte will tell us its type.
@@ -224,9 +230,11 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeAsciiStr(srcReader)
 		case tokenUtf16Str:
 			return deserializeUtf16Str(srcReader)
-		case tokenTrue:
+		case tokenRegexp:
+			return deserializeRegexp(srcReader)
+		case tokenTrue, tokenTrueObj:
 			return []byte("true"), nil
-		case tokenFalse:
+		case tokenFalse, tokenFalseObj:
 			return []byte("false"), nil
 		case tokenUndefined, tokenNull:
 			return nil, nil
@@ -236,7 +244,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("decoding int32: %w", err)
 			}
 			return []byte(strconv.Itoa(int(propertyInt))), nil
-		case tokenDouble:
+		case tokenDouble, tokenNumberObj:
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double: %w", err)
@@ -247,7 +255,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
 				return nil, fmt.Errorf("decoding double as date: %w", err)
 			}
-			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+			// d is milliseconds since epoch
+			return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
 		case tokenBeginSparseArray:
 			return deserializeSparseArray(ctx, slogger, srcReader)
 		case tokenBeginDenseArray:
@@ -562,4 +571,75 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+// Please note that these values are NOT identical to the ones used by Firefox -- global
+// and ignorecase are swapped. Flag values retrieved from https://github.com/v8/v8/blob/main/src/regexp/regexp-flags.h.
+const (
+	regexFlagGlobal      = 0b00000001 // /g
+	regexFlagIgnoreCase  = 0b00000010 // /i
+	regexFlagMultiline   = 0b00000100 // /m
+	regexFlagSticky      = 0b00001000 // /y
+	regexFlagUnicode     = 0b00010000 // /u
+	regexFlagDotAll      = 0b00100000 // /s
+	regexFlagHasIndices  = 0b01000000 // /d
+	regexFlagUnicodeSets = 0b10000000 // /v
+)
+
+// deserializeRegexp handles the upcoming regular expression in srcReader.
+// The data takes the following form:
+// * tokenAsciiStr
+// * byteLength:uint32_t
+// * raw data (the regex)
+// * flags:uint32_t
+func deserializeRegexp(srcReader *bytes.Reader) ([]byte, error) {
+	// Read in the string portion of the regexp
+	nextByte, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading first byte of regexp object: %w", err)
+	}
+	if nextByte != tokenAsciiStr {
+		return nil, fmt.Errorf("unexpected tag 0x%02x / `%s` at start of regexp object (expected 0x%02x / `%s`)", nextByte, string(nextByte), tokenAsciiStr, string(tokenAsciiStr))
+	}
+	regexpStrBytes, err := deserializeAsciiStr(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing string portion of regexp: %w", err)
+	}
+
+	// Read in the flags
+	regexpFlags, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as regexp flag: %w", err)
+	}
+	flags := make([]byte, 0)
+	if regexpFlags&regexFlagIgnoreCase != 0 {
+		flags = append(flags, []byte("i")...)
+	}
+	if regexpFlags&regexFlagGlobal != 0 {
+		flags = append(flags, []byte("g")...)
+	}
+	if regexpFlags&regexFlagMultiline != 0 {
+		flags = append(flags, []byte("m")...)
+	}
+	if regexpFlags&regexFlagSticky != 0 {
+		flags = append(flags, []byte("y")...)
+	}
+	if regexpFlags&regexFlagUnicode != 0 {
+		flags = append(flags, []byte("u")...)
+	}
+	if regexpFlags&regexFlagDotAll != 0 {
+		flags = append(flags, []byte("s")...)
+	}
+	if regexpFlags&regexFlagHasIndices != 0 {
+		flags = append(flags, []byte("d")...)
+	}
+	if regexpFlags&regexFlagUnicodeSets != 0 {
+		flags = append(flags, []byte("v")...)
+	}
+
+	regexFull := append([]byte("/"), regexpStrBytes...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }

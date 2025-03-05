@@ -63,7 +63,12 @@
                     ["set_a", new Set(["set_a_item1", "set_a_item2", "set_a_item3"])],
                     [new Set(["b1", "b2"]), "set_b"],
                 ]), // Map object with complex items
-                someSet: new Set() // Set object, empty
+                someSet: new Set(), // Set object, empty
+                someRegex: new RegExp("\\w+", "sm"), // Regex
+                someStringObject: new String(""), // String object, empty
+                someNumberObject: new Number(0), // Number object, empty
+                someDouble: 0.0, // double
+                someBoolean: new Boolean(true), // Boolean object, true
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -106,7 +111,12 @@
                     [1726096500, [{"id": 2}]],
                     [new Map([["someNestedMapKey", false]]), null],
                 ]), // Map object with complex items
-                someSet: new Set(["a", "b", "c"]) // Set object
+                someSet: new Set(["a", "b", "c"]), // Set object
+                someRegex: new RegExp("[abc]", "i"), // Regex
+                someStringObject: new String("testing"), // String object
+                someNumberObject: new Number(123456.789), // Number object
+                someDouble: 304.302, // double
+                someBoolean: new Boolean(false), // Boolean object, false
             },
         ];
         objectStore.transaction.oncomplete = (event) => {

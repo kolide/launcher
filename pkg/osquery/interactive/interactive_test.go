@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -119,6 +120,7 @@ func TestProc(t *testing.T) {
 				Level:     slog.LevelDebug,
 			}))
 
+			// Set up knapsack
 			mockSack := mocks.NewKnapsack(t)
 			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
@@ -129,6 +131,12 @@ func TestProc(t *testing.T) {
 			mockSack.On("KatcConfigStore").Return(store)
 			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+
+			// Set up the startup settings store -- opening RW ensures that the db exists
+			// with the appropriate migrations.
+			startupSettingsStore, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			require.NoError(t, err, "initializing startup settings store")
+			require.NoError(t, startupSettingsStore.Close())
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
