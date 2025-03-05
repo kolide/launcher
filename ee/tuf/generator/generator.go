@@ -28,7 +28,7 @@ func main() {
 		flDebug        = flagset.Bool("debug", false, "use a debug logger")
 		flTufURL       = flagset.String("tuf-url", "https://tuf.kolide.com", "TUF repository URL")
 		flMetadataPath = flagset.String("metadata-path", "/repository", "TUF metadata path")
-		flOutputDirs   = flagset.String("output-dirs", "ee/tuf/assets/tuf,pkg/packaging/assets/tuf", "comma-separated output directories")
+		flOutputDirs   = flagset.String("output-dirs", "./assets/tuf,../../pkg/packaging/assets/tuf", "comma-separated output directories")
 	)
 	if err := flagset.Parse(os.Args[1:]); err != nil {
 		level.Error(logger).Log("msg", "error parsing flags", "err", err)
