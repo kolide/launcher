@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -124,7 +125,7 @@ func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataP
 	// Parse and process output directories
 	outputDirs := strings.Split(outputDirsStr, ",")
 	if len(outputDirs) == 0 {
-		return fmt.Errorf("no output directories specified")
+		return errors.New("no output directories specified")
 	}
 
 	// Write the updated root.json to all specified locations
