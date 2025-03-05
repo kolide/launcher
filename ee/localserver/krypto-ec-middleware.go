@@ -617,9 +617,13 @@ func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, data 
 	// it's possible the keys will be noop keys, then they will error or give nil when crypto.Signer funcs are called
 	// krypto library has a nil check for the object but not the funcs, so if are getting nil from the funcs, just
 	// pass nil to krypto
-	// hardware signing is not implemented for darwin
+
+	// we add these kolide tags to the data so that we can identify the response as a kolide response
+	// and mitigate the agent signing arbitrary data
+	data = fmt.Appendf(nil, "kolide:%s:kolide", data)
+
 	var err error
-	if runtime.GOOS != "darwin" && agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
+	if agent.HardwareKeys() != nil && agent.HardwareKeys().Public() != nil {
 		response, err = box.Respond(e.localDbSigner, agent.HardwareKeys(), data)
 	} else {
 		response, err = box.Respond(e.localDbSigner, nil, data)

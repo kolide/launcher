@@ -54,6 +54,7 @@ type secureEnclaveRunner struct {
 type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error)
 	VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error)
+	SignWithSecureEnclave(ctx context.Context, uid string, pubKey *ecdsa.PublicKey, data []byte) ([]byte, error)
 }
 
 func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDeleter, secureEnclaveClient secureEnclaveClient) (*secureEnclaveRunner, error) {
@@ -185,8 +186,36 @@ func (ser *secureEnclaveRunner) Type() string {
 	return "secure_enclave"
 }
 
-func (ser *secureEnclaveRunner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
-	return nil, errors.New("not implemented")
+func (ser *secureEnclaveRunner) Sign(rand io.Reader, digest []byte, _ crypto.SignerOpts) ([]byte, error) {
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	ser.uidPubKeyMapMux.Lock()
+	defer ser.uidPubKeyMapMux.Unlock()
+
+	cu, err := firstConsoleUser(ctx)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("getting first console user: %w", err))
+		return nil, fmt.Errorf("getting first console user: %w", err)
+	}
+
+	// we don't really care if the key is verified in the secure enclave, attempting to sign with
+	// it will act as a verification
+	entry, ok := ser.uidPubKeyMap[cu.Uid]
+	if !ok {
+		return nil, errors.New("no key found for console user")
+	}
+
+	sig, err := ser.secureEnclaveClient.SignWithSecureEnclave(ctx, cu.Uid, entry.pubKey, digest)
+	if err != nil {
+		traces.SetError(span, fmt.Errorf("signing with secure enclave: %w", err))
+		return nil, fmt.Errorf("signing with secure enclave: %w", err)
+	}
+
+	// if the sign worked, the key is verified in the secure enclave
+	entry.verifiedInSecureEnclave = true
+
+	return sig, nil
 }
 
 func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecdsa.PublicKey, error) {
