@@ -432,42 +432,47 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	// Read from srcReader until we've filled the array to the correct size.
-	arrItems := make([]any, 0)
+	arrItems := make([]any, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		// Read next token to see if the array is completed
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		// Array item! Unread the byte
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
+	}
+
+	// At the end of the array we have some padding and additional data -- consume
+	// that data
 	reachedEndOfArray := false
 	for {
 		if reachedEndOfArray {
 			break
 		}
 
-		// Read item at index
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte: %w", err)
+			return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
 		}
+
 		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(obj)) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(str)) // cast to string so it's readable when marshalled again below
 		case tokenEndDenseArray:
 			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
 			_, _ = srcReader.ReadByte()
 			_, _ = srcReader.ReadByte()
 			reachedEndOfArray = true
+			continue
 		case 0x01, 0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s` in array of length %d", nextByte, string(nextByte), arrayLen)
+			return nil, fmt.Errorf("unexpected byte at end of dense array %02x / `%s`", nextByte, string(nextByte))
 		}
 	}
 
