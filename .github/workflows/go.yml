@@ -38,12 +38,14 @@ jobs:
         cache: false
       id: go
 
-    # use bash, because the powershell syntax is different and this is a cross platform workflow
+    # use pwsh because it's already on all the runners
     - id: go-cache-paths
-      shell: bash
+      shell: pwsh
       run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        $goBuild = & go env GOCACHE
+        $goMod = & go env GOMODCACHE
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-build=$goBuild"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-mod=$goMod"
 
     - name: Go Build Cache
       uses: actions/cache@v4
@@ -107,8 +109,16 @@ jobs:
     - id: version
       name: Launcher Version
       working-directory: build
-      shell: bash
-      run: ./launcher --version 2>/dev/null | awk '/version /{print "version="$4}' >> "$GITHUB_OUTPUT"
+      shell: pwsh
+      run: |
+        $versionOutput = & ./launcher --version 2>$null
+        if ($versionOutput -match 'version\s+(\S+)') {
+          $version = "version=$($matches[1])"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value $version
+        } else {
+          Write-Error "Version string not found."
+          exit 1
+        }
 
   launcher_test:
     name: test
@@ -143,10 +153,12 @@ jobs:
         enableCrossOsArchive: true
 
     - id: go-cache-paths
-      shell: bash
+      shell: pwsh
       run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        $goBuild = & go env GOCACHE
+        $goMod = & go env GOMODCACHE
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-build=$goBuild"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-mod=$goMod"
 
     - name: cache restore - GOCACHE
       uses: actions/cache/restore@v4
@@ -198,15 +210,15 @@ jobs:
 
     - name: Launcher Version
       working-directory: build
-      shell: bash
+      shell: pwsh
       run: |
-        ./launcher --version
-        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
-        baseVersion="${{ needs.version_baseline.outputs.version }}"
-        if [[ "$thisVersion" != "$baseVersion" ]]; then
-          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+        & ./launcher --version
+        $thisVersion = (& ./launcher --version 2>$null) -replace '.*version\s+', ''
+        $baseVersion = '${{ needs.version_baseline.outputs.version }}'
+        if ($thisVersion -ne $baseVersion) {
+          Write-Output "launcher version $thisVersion does not match baseline version $baseVersion"
           exit 1
-        fi
+        }
 
     - name: Download Osquery
       working-directory: build
@@ -274,10 +286,12 @@ jobs:
       id: go
 
     - id: go-cache-paths
-      shell: bash
+      shell: pwsh
       run: |
-        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        $goBuild = & go env GOCACHE
+        $goMod = & go env GOMODCACHE
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-build=$goBuild"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "go-mod=$goMod"
 
     - name: Go Build Cache
       uses: actions/cache@v4
