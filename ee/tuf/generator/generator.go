@@ -118,7 +118,7 @@ func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataP
 	if err != nil {
 		return fmt.Errorf("reading updated metadata from local store: %w", err)
 	}
-	latestRoot = metadata["root.json"]
+	latestRoot := metadata["root.json"]
 
 	level.Debug(logger).Log("msg", "Read updated root.json", "size_bytes", len(latestRoot))
 
