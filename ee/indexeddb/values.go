@@ -393,22 +393,11 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 		if err != nil {
 			return nil, fmt.Errorf("reading next byte: %w", err)
 		}
-		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array: %w", err)
-			}
-			arrItems[i] = string(obj) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array: %w", err)
-			}
-			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
 		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(arrItems)
