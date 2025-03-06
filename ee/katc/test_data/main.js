@@ -3,6 +3,15 @@
     const objectStoreName = "launchertestobjstore";
     const objectStoreKeyPath = "uuid";
 
+    // In case the database already exists -- delete it so we can refresh the data.
+    const deleteReq = window.indexedDB.deleteDatabase(databaseName);
+    deleteReq.onerror = (event) => {
+        console.log(event.error);
+    }
+    deleteReq.onsuccess = (event) => {
+        console.log("Deleted db in preparation for re-creation");
+    }
+
     // Open database. Second arg is database version. We're not dealing with
     // migrations at the moment, so just leave it at 1.
     const request = window.indexedDB.open(databaseName, 1);
@@ -56,7 +65,7 @@
                     ],
                 noDetails: [], // Empty array
                 email: "test1@example.com",
-                someTimestamp: 1720034607, // *unint32
+                someTimestamp: 1720034607, // *uint32
                 someDate: new Date(), // Date object, empty
                 someMap: new Map(), // Map object, empty
                 someComplexMap: new Map([
@@ -100,7 +109,7 @@
                     ],
                 noDetails: [], // Empty array
                 email: "test2@example.com",
-                someTimestamp: 1726096312, // *unint32
+                someTimestamp: 1726096312, // *uint32
                 someDate: new Date("December 17, 1995 03:24:00"), // Date object, not empty
                 someMap: new Map([
                     [1, "one"],
@@ -120,14 +129,29 @@
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
-            // Store values in the newly created objectStore.
+            // Store values in the newly-created objectStore.
             const objectStoreTransaction = db
                 .transaction(objectStoreName, "readwrite")
                 .objectStore(objectStoreName);
             storeData.forEach((row) => {
                 objectStoreTransaction.add(row);
             });
-            console.log("Added all data to IndexedDB")
+            objectStoreTransaction.onsuccess = (event) => {
+                console.log("Added all data to IndexedDB");
+            };
+            objectStoreTransaction.onerror = (event) => {
+                console.log("Error adding data to database", event.error);
+            };
         };
-    }
+        objectStore.transaction.onerror = (event) => {
+            console.log("Error creating object store", event.error);
+        };
+    };
+
+    request.onerror = (event) => {
+        console.log("Error creating database", request.error);
+    };
+    request.onsuccess = (event) => {
+        console.log("Successfully created database");
+    };
 })();
