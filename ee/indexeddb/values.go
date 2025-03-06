@@ -32,6 +32,8 @@ const (
 	tokenUint32    byte = 0x55 // U
 	tokenDouble    byte = 0x4e // N
 	tokenNumberObj byte = 0x6e // n
+	tokenBigInt    byte = 0x5a // Z
+	tokenBigIntObj byte = 0x7a // z
 	// strings -- string (S) and string object (s) don't appear to be used
 	tokenAsciiStr byte = 0x22 // "
 	tokenUtf16Str byte = 0x63 // c
@@ -250,6 +252,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("decoding double: %w", err)
 			}
 			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+		case tokenBigInt, tokenBigIntObj:
+			return deserializeBigInt(srcReader)
 		case tokenDate:
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
@@ -285,6 +289,40 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			}
 		}
 	}
+}
+
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(srcReader *bytes.Reader) ([]byte, error) {
+	// First up -- read the bitfield. It's a uint32.
+	bitfield, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading bitfield for BigInt: %w", err)
+	}
+
+	// Use the bitfield to determine a) the sign for this bigint and b) the number of bytes
+	// used to store this bigint. The sign is the last bit, and the length is the remainder.
+	isNegative := bitfield & 1
+	bigIntLen := bitfield & ((1 << 32) - 1)
+	numBytesToRead := bigIntLen / 2
+
+	// Read the next bigIntLenInBytes bytes
+	bigIntRawBytes := make([]byte, numBytesToRead)
+	for i := 0; i < int(numBytesToRead); i++ {
+		b, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, numBytesToRead, err)
+		}
+		bigIntRawBytes[i] = b
+	}
+
+	// Return a placeholder string
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
 }
 
 // deserializeSparseArray deserializes the next sparse array from the srcReader.

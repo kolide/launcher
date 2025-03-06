@@ -35,6 +35,8 @@ const (
 	tagSetObject     uint32 = 0xffff0012
 	tagEndOfKeys     uint32 = 0xffff0013
 	tagFloatMax      uint32 = 0xfff00000
+	tagBigInt        uint32 = 0xffff001d
+	tagBigIntObject  uint32 = 0xffff001e
 )
 
 // deserializeFirefox deserializes a JS object that has been stored by Firefox
@@ -158,6 +160,8 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 			return nil, fmt.Errorf("decoding double: %w", err)
 		}
 		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+	case tagBigInt, tagBigIntObject:
+		return deserializeBigInt(itemData, srcReader)
 	case tagString, tagStringObject:
 		return deserializeString(itemData, srcReader)
 	case tagBoolean, tagBooleanObject:
@@ -274,6 +278,32 @@ func deserializeUtf16String(strLen uint32, srcReader *bytes.Reader) ([]byte, err
 		return nil, fmt.Errorf("decoding: %w", err)
 	}
 	return decoded, nil
+}
+
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(bitfield uint32, srcReader *bytes.Reader) ([]byte, error) {
+	// Determine BigInt length from bitfield
+	bigIntRawLen := bitfield & bitMask(31)
+	if bigIntRawLen == 0 {
+		return []byte("0n"), nil
+	}
+
+	// Read the raw bytes of the BigInt
+	for i := 0; i < int(bigIntRawLen); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, bigIntRawLen, err)
+		}
+	}
+
+	// Determine sign for BigInt from bitfield, then return placeholder string
+	isNegative := bitfield & (1 << 31)
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
 }
 
 // Please note that these values are NOT identical to the ones used by Chrome -- global
