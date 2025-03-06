@@ -19,9 +19,10 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-13
-          - windows-latest
+          # - ubuntu-22.04
+          # - macos-13
+          # - windows-latest
+          - test.windows11.arm64
     steps:
     - name: Check out code
       id: checkout
