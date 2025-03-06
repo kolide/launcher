@@ -18,23 +18,45 @@ import (
 )
 
 const (
-	tagHeader        uint32 = 0xfff10000
-	tagNull          uint32 = 0xffff0000
-	tagUndefined     uint32 = 0xffff0001
-	tagBoolean       uint32 = 0xffff0002
-	tagInt32         uint32 = 0xffff0003
-	tagString        uint32 = 0xffff0004
-	tagDateObject    uint32 = 0xffff0005
-	tagRegexpObject  uint32 = 0xffff0006
-	tagArrayObject   uint32 = 0xffff0007
-	tagObjectObject  uint32 = 0xffff0008
-	tagBooleanObject uint32 = 0xffff000a
-	tagStringObject  uint32 = 0xffff000b
-	tagNumberObject  uint32 = 0xffff000c
-	tagMapObject     uint32 = 0xffff0011
-	tagSetObject     uint32 = 0xffff0012
-	tagEndOfKeys     uint32 = 0xffff0013
-	tagFloatMax      uint32 = 0xfff00000
+	tagFloatMax     uint32 = 0xfff00000
+	tagHeader       uint32 = 0xfff10000
+	tagNull         uint32 = 0xffff0000
+	tagUndefined    uint32 = 0xffff0001
+	tagBoolean      uint32 = 0xffff0002
+	tagInt32        uint32 = 0xffff0003
+	tagString       uint32 = 0xffff0004
+	tagDateObject   uint32 = 0xffff0005
+	tagRegexpObject uint32 = 0xffff0006
+	tagArrayObject  uint32 = 0xffff0007
+	tagObjectObject uint32 = 0xffff0008
+	// SCTAG_ARRAY_BUFFER_OBJECT_V2 omitted
+	tagBooleanObject    uint32 = 0xffff000a
+	tagStringObject     uint32 = 0xffff000b
+	tagNumberObject     uint32 = 0xffff000c
+	tagBackReferenceObj uint32 = 0xffff000d
+	// SCTAG_DO_NOT_USE_1 omitted
+	// SCTAG_DO_NOT_USE_2 omitted
+	// SCTAG_TYPED_ARRAY_OBJECT_V2 omitted
+	tagMapObject uint32 = 0xffff0011
+	tagSetObject uint32 = 0xffff0012
+	tagEndOfKeys uint32 = 0xffff0013
+	// SCTAG_DO_NOT_USE_3 omitted
+	// SCTAG_DATA_VIEW_OBJECT_V2 omitted
+	// SCTAG_SAVED_FRAME_OBJECT omitted
+	// SCTAG_JSPRINCIPALS omitted
+	// SCTAG_NULL_JSPRINCIPALS omitted
+	// SCTAG_RECONSTRUCTED_SAVED_FRAME_PRINCIPALS_IS_SYSTEM omitted
+	// SCTAG_RECONSTRUCTED_SAVED_FRAME_PRINCIPALS_IS_NOT_SYSTEM omitted
+	// SCTAG_SHARED_ARRAY_BUFFER_OBJECT omitted
+	// SCTAG_SHARED_WASM_MEMORY_OBJECT omitted
+	tagBigInt                       uint32 = 0xffff001d
+	tagBigIntObject                 uint32 = 0xffff001e
+	tagArrayBufferObj               uint32 = 0xffff001f
+	tagTypedArrayObj                uint32 = 0xffff0020
+	tagDataViewObj                  uint32 = 0xffff0021
+	tagErrorObj                     uint32 = 0xffff0022
+	tagResizableArrayBufferObj      uint32 = 0xffff0023
+	tagGrowableSharedArrayBufferObj uint32 = 0xffff0024
 )
 
 // deserializeFirefox deserializes a JS object that has been stored by Firefox
@@ -158,6 +180,8 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 			return nil, fmt.Errorf("decoding double: %w", err)
 		}
 		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+	case tagBigInt, tagBigIntObject:
+		return deserializeBigInt(itemData, srcReader)
 	case tagString, tagStringObject:
 		return deserializeString(itemData, srcReader)
 	case tagBoolean, tagBooleanObject:
@@ -189,6 +213,18 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 		return deserializeSet(srcReader)
 	case tagNull, tagUndefined:
 		return nil, nil
+	case tagArrayBufferObj:
+		return nil, errors.New("parsing not implemented for array buffer object")
+	case tagTypedArrayObj:
+		return nil, errors.New("parsing not implemented for typed array object")
+	case tagDataViewObj:
+		return nil, errors.New("parsing not implemented for data view object")
+	case tagErrorObj:
+		return nil, errors.New("parsing not implemented for error object")
+	case tagResizableArrayBufferObj:
+		return nil, errors.New("parsing not implemented for resizable array buffer object")
+	case tagGrowableSharedArrayBufferObj:
+		return nil, errors.New("parsing not implemented for growable shared array buffer object")
 	default:
 		if itemTag >= tagFloatMax {
 			return nil, fmt.Errorf("unknown tag type `%x` with data `%d`", itemTag, itemData)
@@ -276,6 +312,32 @@ func deserializeUtf16String(strLen uint32, srcReader *bytes.Reader) ([]byte, err
 	return decoded, nil
 }
 
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(bitfield uint32, srcReader *bytes.Reader) ([]byte, error) {
+	// Determine BigInt length from bitfield
+	bigIntRawLen := bitfield & bitMask(31)
+	if bigIntRawLen == 0 {
+		return []byte("0n"), nil
+	}
+
+	// Read the raw bytes of the BigInt
+	for i := 0; i < int(bigIntRawLen); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, bigIntRawLen, err)
+		}
+	}
+
+	// Determine sign for BigInt from bitfield, then return placeholder string
+	isNegative := bitfield & (1 << 31)
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
+}
+
 // Please note that these values are NOT identical to the ones used by Chrome -- global
 // and ignorecase are swapped. Flag values retrieved from https://searchfox.org/mozilla-central/source/js/public/RegExpFlags.h.
 const (
@@ -359,23 +421,11 @@ func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, erro
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
-
-		switch itemTag {
-		case tagObjectObject:
-			obj, err := deserializeNestedObject(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading object at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(obj) // cast to string so it's readable when marshalled again below
-		case tagString:
-			str, err := deserializeString(itemData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading string at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", idx, itemTag)
+		arrayItem, err := deserializeNext(itemTag, itemData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
+		resultArr[idx] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(resultArr)
