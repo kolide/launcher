@@ -114,11 +114,11 @@ func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataP
 	}
 
 	// Get the latest root.json
-	rootPath := filepath.Join(tempDir, "root.json")
-	latestRoot, err := os.ReadFile(rootPath)
+	metadata, err := localStore.GetMeta()
 	if err != nil {
-		return fmt.Errorf("reading updated root.json: %w", err)
+		return fmt.Errorf("reading updated metadata from local store: %w", err)
 	}
+	latestRoot = metadata["root.json"]
 
 	level.Debug(logger).Log("msg", "Read updated root.json", "size_bytes", len(latestRoot))
 
