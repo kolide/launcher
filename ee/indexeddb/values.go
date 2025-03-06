@@ -20,46 +20,47 @@ import (
 
 // See: https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc
 const (
-	// header token
-	tokenVersion byte = 0xff
-	// booleans
-	tokenTrue     byte = 0x54 // T
-	tokenFalse    byte = 0x46 // F
-	tokenTrueObj  byte = 0x79 // y
-	tokenFalseObj byte = 0x78 // x
-	// numbers
-	tokenInt32     byte = 0x49 // I
-	tokenUint32    byte = 0x55 // U
-	tokenDouble    byte = 0x4e // N
-	tokenNumberObj byte = 0x6e // n
-	tokenBigInt    byte = 0x5a // Z
-	tokenBigIntObj byte = 0x7a // z
-	// strings -- string (S) and string object (s) don't appear to be used
-	tokenAsciiStr byte = 0x22 // "
-	tokenUtf16Str byte = 0x63 // c
-	// regex
-	tokenRegexp byte = 0x52 // R
-	// dates
-	tokenDate byte = 0x44 // D
-	// types: object
-	tokenObjectBegin byte = 0x6f // o
-	tokenObjectEnd   byte = 0x7b // {
-	// types: map
-	tokenMapBegin byte = 0x3b // ;
-	tokenMapEnd   byte = 0x3a // :
-	// types: set
-	tokenSetBegin byte = 0x27 // '
-	tokenSetEnd   byte = 0x2c // ,
-	// types: array
-	tokenBeginSparseArray byte = 0x61 // a
-	tokenEndSparseArray   byte = 0x40 // @
-	tokenBeginDenseArray  byte = 0x41 // A
-	tokenEndDenseArray    byte = 0x24 // $
-	// misc
-	tokenPadding           byte = 0x00
-	tokenVerifyObjectCount byte = 0x3f // ?
-	tokenUndefined         byte = 0x5f // _
-	tokenNull              byte = 0x30
+	tokenVersion             byte = 0xff // in header
+	tokenPadding             byte = 0x00
+	tokenVerifyObjectCount   byte = 0x3f // ?
+	tokenTheHole             byte = 0x2d // -
+	tokenUndefined           byte = 0x5f // _
+	tokenNull                byte = 0x30
+	tokenTrue                byte = 0x54 // T
+	tokenFalse               byte = 0x46 // F
+	tokenInt32               byte = 0x49 // I
+	tokenUint32              byte = 0x55 // U
+	tokenDouble              byte = 0x4e // N
+	tokenBigInt              byte = 0x5a // Z
+	tokenUtf8Str             byte = 0x53 // S
+	tokenAsciiStr            byte = 0x22 // "
+	tokenUtf16Str            byte = 0x63 // c
+	tokenObjReference        byte = 0x5e // ^
+	tokenObjectBegin         byte = 0x6f // o
+	tokenObjectEnd           byte = 0x7b // {
+	tokenBeginSparseArray    byte = 0x61 // a
+	tokenEndSparseArray      byte = 0x40 // @
+	tokenBeginDenseArray     byte = 0x41 // A
+	tokenEndDenseArray       byte = 0x24 // $
+	tokenDate                byte = 0x44 // D
+	tokenTrueObj             byte = 0x79 // y
+	tokenFalseObj            byte = 0x78 // x
+	tokenNumberObj           byte = 0x6e // n
+	tokenBigIntObj           byte = 0x7a // z
+	tokenStringObj           byte = 0x73 // s
+	tokenRegexp              byte = 0x52 // R
+	tokenMapBegin            byte = 0x3b // ;
+	tokenMapEnd              byte = 0x3a // :
+	tokenSetBegin            byte = 0x27 // '
+	tokenSetEnd              byte = 0x2c // ,
+	tokenArrayBuffer         byte = 0x42 // B
+	tokenArrayBufferTransfer byte = 0x74 // t
+	tokenArrayBufferView     byte = 0x56 // V
+	tokenSharedArrayBuffer   byte = 0x75 // u
+	tokenWasmModuleTransfer  byte = 0x77 // w
+	tokenHostObj             byte = 0x5c // /
+	tokenWasmMemoryTransfer  byte = 0x6d // m
+	tokenError               byte = 0x72 // r
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
@@ -228,10 +229,12 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		switch nextToken {
 		case tokenObjectBegin:
 			return deserializeNestedObject(ctx, slogger, srcReader)
-		case tokenAsciiStr:
+		case tokenUtf8Str, tokenAsciiStr:
 			return deserializeAsciiStr(srcReader)
 		case tokenUtf16Str:
 			return deserializeUtf16Str(srcReader)
+		case tokenStringObj:
+			return deserializeStringObject(srcReader)
 		case tokenRegexp:
 			return deserializeRegexp(srcReader)
 		case tokenTrue, tokenTrueObj:
@@ -269,7 +272,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeMap(ctx, slogger, srcReader)
 		case tokenSetBegin:
 			return deserializeSet(ctx, slogger, srcReader)
-		case tokenPadding, tokenVerifyObjectCount:
+		case tokenPadding, tokenVerifyObjectCount, tokenTheHole:
 			// We don't care about these types -- we want to try reading again
 			var err error
 			nextToken, err = nextNonPaddingByte(srcReader)
@@ -277,6 +280,16 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("reading next non-padding byte after padding byte: %w", err)
 			}
 			continue
+		case tokenObjReference:
+			return nil, errors.New("deserialization not implemented for serialized object")
+		case tokenArrayBuffer, tokenArrayBufferTransfer, tokenArrayBufferView, tokenSharedArrayBuffer:
+			return nil, errors.New("deserialization not implemented for array buffers")
+		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
+			return nil, errors.New("deserialization not implemented for wasm transfers")
+		case tokenError:
+			return nil, errors.New("deserialization not implemented for error")
+		case tokenHostObj:
+			return nil, errors.New("deserialization not implemented for host object")
 		default:
 			slogger.Log(ctx, slog.LevelWarn,
 				"unknown token type, will attempt to keep reading",
@@ -609,6 +622,23 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+// deserializeStringObject handles the upcoming String in srcReader.
+func deserializeStringObject(srcReader *bytes.Reader) ([]byte, error) {
+	stringTypeToken, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading token to determine encoding for String: %w", err)
+	}
+
+	switch stringTypeToken {
+	case tokenAsciiStr, tokenUtf8Str:
+		return deserializeAsciiStr(srcReader)
+	case tokenUtf16Str:
+		return deserializeUtf16Str(srcReader)
+	default:
+		return nil, fmt.Errorf("unknown token for String %02x / `%s`", stringTypeToken, string(stringTypeToken))
+	}
 }
 
 // Please note that these values are NOT identical to the ones used by Firefox -- global
