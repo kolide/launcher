@@ -421,23 +421,11 @@ func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, erro
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
-
-		switch itemTag {
-		case tagObjectObject:
-			obj, err := deserializeNestedObject(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading object at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(obj) // cast to string so it's readable when marshalled again below
-		case tagString:
-			str, err := deserializeString(itemData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading string at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", idx, itemTag)
+		arrayItem, err := deserializeNext(itemTag, itemData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
+		resultArr[idx] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(resultArr)

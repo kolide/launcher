@@ -26,6 +26,10 @@
         // a[2] and a[3] skipped, making this array sparse
         sparseArr[4] = "four";
 
+        // Create a sparse array with a different data type in it
+        let secondSparseArray = [1, 1];
+        secondSparseArray[6] = 1;
+
         // Shove some data in the object store. We want at least a couple items,
         // and a variety of data structures to really test our deserialization.
         const storeData = [
@@ -45,6 +49,7 @@
                         "alias2"
                     ],
                 linkedIds: sparseArr, // Sparse array of strings
+                anotherSparseArray: secondSparseArray, // Sparse array of integers
                 someDetails: // Dense array of nested objects
                     [
                         {
@@ -64,6 +69,7 @@
                         }
                     ],
                 noDetails: [], // Empty array
+                numArray: [1, 2, 3], // Dense array of numbers
                 email: "test1@example.com",
                 someTimestamp: 1720034607, // *uint32
                 someDate: new Date(), // Date object, empty
@@ -94,6 +100,7 @@
                         "anotheralias1"
                     ],
                 linkedIds: sparseArr, // Sparse array of strings
+                anotherSparseArray: secondSparseArray, // Sparse array of integers
                 someDetails: // Dense array of nested objects
                     [
                         {
@@ -108,6 +115,7 @@
                         }
                     ],
                 noDetails: [], // Empty array
+                numArray: [1, 2, 3], // Dense array of numbers
                 email: "test2@example.com",
                 someTimestamp: 1726096312, // *uint32
                 someDate: new Date("December 17, 1995 03:24:00"), // Date object, not empty
