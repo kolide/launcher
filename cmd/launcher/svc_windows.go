@@ -26,8 +26,10 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
-// TODO This should be inherited from some setting
-const serviceName = "launcher"
+const (
+	serviceName                   = "launcher" // TODO This should be inherited from some setting
+	serviceShutdownTimeoutSeconds = 20
+)
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
@@ -220,22 +222,23 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"shutdown request received",
 				)
-				changes <- svc.Status{State: svc.StopPending}
-				cancel()
 				// launcher's rungroup can take up to 15 seconds to shut down. We want to give it
 				// the full 15+ seconds if possible, to allow it to gracefully shut down
 				// and to allow deferred calls in runLauncher (e.g. db.Close) to run.
 				// Documentation indicates we are allowed to take approximately 20 seconds
 				// to respond to svc.Shutdown, so we wait up to that amount of time.
 				// See: https://learn.microsoft.com/en-us/windows/win32/services/service-control-handler-function
+				changes <- svc.Status{State: svc.StopPending, WaitHint: serviceShutdownTimeoutSeconds}
+				cancel()
 				select {
 				case <-runLauncherResults:
 					w.systemSlogger.Log(ctx, slog.LevelInfo,
 						"runLauncher successfully returned after shutdown call",
 					)
-				case <-time.After(20 * time.Second):
+				case <-time.After(serviceShutdownTimeoutSeconds * time.Second):
 					w.systemSlogger.Log(ctx, slog.LevelWarn,
-						"runLauncher did not return within 20 seconds of calling cancel",
+						"runLauncher did not return within timeout after calling cancel",
+						"timeout_s", serviceShutdownTimeoutSeconds,
 					)
 				}
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
