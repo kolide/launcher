@@ -30,6 +30,16 @@
         let secondSparseArray = [1, 1];
         secondSparseArray[6] = 1;
 
+        // Create some TypedArrays with a variety of types, some with explicit underlying ArrayBuffers
+        const unsignedIntArrBuf = new ArrayBuffer(1);
+        const unsignedIntArr = new Uint8Array(unsignedIntArrBuf);
+        unsignedIntArr[0] = 20;
+        const signedIntArrBuf = new ArrayBuffer(16);
+        const signedIntArr = new Int32Array(signedIntArrBuf);
+        signedIntArr[2] = 3000;
+        const floatArr = new Float64Array([4.4, 4.5]);
+        const clampedUintArr = new Uint8ClampedArray([1000, -20]); // clamped to [255, 0]
+
         // Shove some data in the object store. We want at least a couple items,
         // and a variety of data structures to really test our deserialization.
         const storeData = [
@@ -84,6 +94,9 @@
                 someNumberObject: new Number(0), // Number object, empty
                 someDouble: 0.0, // double
                 someBoolean: new Boolean(true), // Boolean object, true
+                someTypedArray: unsignedIntArr, // TypedArray, Uint8Array (covers unsigned int types)
+                someArrayBuffer: unsignedIntArr.buffer, // ArrayBuffer object
+                anotherTypedArray: floatArr, // TypedArray, Float64Array (covers float types)
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -134,6 +147,9 @@
                 someNumberObject: new Number(123456.789), // Number object
                 someDouble: 304.302, // double
                 someBoolean: new Boolean(false), // Boolean object, false
+                someTypedArray: signedIntArr, // TypedArray, Int32Array (covers signed int types)
+                someArrayBuffer: signedIntArr.buffer, // ArrayBuffer object
+                anotherTypedArray: clampedUintArr, // TypedArray, Uint8ClampedArray (covers clamped types)
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
