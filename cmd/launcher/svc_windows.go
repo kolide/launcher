@@ -222,7 +222,22 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				)
 				changes <- svc.Status{State: svc.StopPending}
 				cancel()
-				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
+				// launcher's rungroup can take up to 15 seconds to shut down. We want to give it
+				// the full 15+ seconds if possible, to allow it to gracefully shut down
+				// and to allow deferred calls in runLauncher (e.g. db.Close) to run.
+				// Documentation indicates we are allowed to take approximately 20 seconds
+				// to respond to svc.Shutdown, so we wait up to that amount of time.
+				// See: https://learn.microsoft.com/en-us/windows/win32/services/service-control-handler-function
+				select {
+				case <-runLauncherResults:
+					w.systemSlogger.Log(ctx, slog.LevelInfo,
+						"runLauncher successfully returned after shutdown call",
+					)
+				case <-time.After(20 * time.Second):
+					w.systemSlogger.Log(ctx, slog.LevelWarn,
+						"runLauncher did not return within 20 seconds of calling cancel",
+					)
+				}
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			case svc.Pause, svc.Continue, svc.ParamChange, svc.NetBindAdd, svc.NetBindRemove, svc.NetBindEnable, svc.NetBindDisable, svc.DeviceEvent, svc.HardwareProfileChange, svc.PowerEvent, svc.SessionChange, svc.PreShutdown:
