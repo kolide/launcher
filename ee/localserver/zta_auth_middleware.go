@@ -19,7 +19,7 @@ type ztaResponseBox struct {
 }
 
 type ztaAuthMiddleware struct {
-	counterPartyPubKey *ecdsa.PublicKey
+	counterPartyKeys map[string]*ecdsa.PublicKey
 }
 
 func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
@@ -42,7 +42,17 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := chain.validate(z.counterPartyPubKey); err != nil {
+		chainValidated := false
+
+		for _, key := range z.counterPartyKeys {
+			if err := chain.validate(key); err != nil {
+				continue
+			}
+			chainValidated = true
+			break
+		}
+
+		if !chainValidated {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -113,6 +123,12 @@ func (c *chain) validate(trustedRoot *ecdsa.PublicKey) error {
 		return errors.New("chain is empty")
 	}
 
+	for i := range len(c.Links) {
+		if c.Links[i].Data == nil || c.Links[i].Sig == nil {
+			return fmt.Errorf("link %d is missing data or sig", i)
+		}
+	}
+
 	for i := range len(c.Links) - 1 {
 		parentKey, err := x509.ParsePKIXPublicKey(c.Links[i].Data)
 		if err != nil {
@@ -127,7 +143,7 @@ func (c *chain) validate(trustedRoot *ecdsa.PublicKey) error {
 
 		// The first key in the chain must match the trusted root and be self signed
 		if i == 0 {
-			if !equalPubEcdsaKeys(trustedRoot, parentEcdsa) {
+			if !trustedRoot.Equal(parentEcdsa) {
 				return errors.New("first key in chain does not match trusted root")
 			}
 
@@ -142,28 +158,4 @@ func (c *chain) validate(trustedRoot *ecdsa.PublicKey) error {
 	}
 
 	return nil
-}
-
-// EqualPublicKeys compares two ECDSA public keys for equality.
-func equalPubEcdsaKeys(k1, k2 *ecdsa.PublicKey) bool {
-	// Both nil => equal
-	if k1 == nil && k2 == nil {
-		return true
-	}
-	// One nil => not equal
-	if k1 == nil || k2 == nil {
-		return false
-	}
-	// Compare curve (assuming standard library named curves)
-	if k1.Curve != k2.Curve {
-		return false
-	}
-	// Compare big.Int values for X, Y
-	if k1.X.Cmp(k2.X) != 0 {
-		return false
-	}
-	if k1.Y.Cmp(k2.Y) != 0 {
-		return false
-	}
-	return true
 }

@@ -2,21 +2,18 @@ package localserver
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/crypto/nacl/box"
@@ -26,7 +23,10 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 	rootTrustedEcKey := mustGenEcdsaKey(t)
 
 	ztaMiddleware := &ztaAuthMiddleware{
-		counterPartyPubKey: &rootTrustedEcKey.PublicKey,
+		counterPartyKeys: map[string]*ecdsa.PublicKey{
+			"for_funzies": mustGenEcdsaKey(t).Public().(*ecdsa.PublicKey),
+			"test":        rootTrustedEcKey.Public().(*ecdsa.PublicKey),
+		},
 	}
 
 	returnData := []byte("Congrats!, you got the data back!")
@@ -244,66 +244,6 @@ func Test_ValidateCertChain(t *testing.T) {
 			"should be able to validate chain",
 		)
 	})
-}
-
-func TestEqualPubEcdsaKeys(t *testing.T) {
-	t.Parallel()
-
-	p256 := elliptic.P256()
-	p384 := elliptic.P384()
-
-	testCases := []struct {
-		name     string
-		k1       *ecdsa.PublicKey
-		k2       *ecdsa.PublicKey
-		expected bool
-	}{
-		{
-			name:     "both nil",
-			k1:       nil,
-			k2:       nil,
-			expected: true,
-		},
-		{
-			name:     "one nil, other non-nil",
-			k1:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			k2:       nil,
-			expected: false,
-		},
-		{
-			name:     "same curve, same X, same Y",
-			k1:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			k2:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			expected: true,
-		},
-		{
-			name:     "different curve",
-			k1:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			k2:       &ecdsa.PublicKey{Curve: p384, X: big.NewInt(1), Y: big.NewInt(2)},
-			expected: false,
-		},
-		{
-			name:     "same curve, different X",
-			k1:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			k2:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(3), Y: big.NewInt(2)},
-			expected: false,
-		},
-		{
-			name:     "same curve, same X, different Y",
-			k1:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(2)},
-			k2:       &ecdsa.PublicKey{Curve: p256, X: big.NewInt(1), Y: big.NewInt(3)},
-			expected: false,
-		},
-	}
-
-	for _, tt := range testCases {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := equalPubEcdsaKeys(tt.k1, tt.k2)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
 }
 
 // newChain creates a new chain of keys, where each key signs the next key in the chain.
