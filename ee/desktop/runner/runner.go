@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/ecdsa"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
@@ -350,6 +352,33 @@ func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context
 
 	client := client.New(r.userServerAuthToken, proc.socketPath)
 	return client.VerifySecureEnclaveKey(ctx, pubKey)
+}
+
+func (r *DesktopUsersProcessesRunner) SignWithSecureEnclave(ctx context.Context, uid string, pubKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return nil, errors.New("no desktop processes running")
+	}
+
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return nil, fmt.Errorf("no desktop process for uid: %s", uid)
+	}
+
+	pubKeyDer, err := x509.MarshalPKIXPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling public key: %w", err)
+	}
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	sig, err := client.SignWithSecureEnclave(ctx, server.SignWithSecureEnclaveRequest{
+		PubKeyDer: pubKeyDer,
+		Data:      data,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("signing with secure enclave: %w", err)
+	}
+
+	return sig, nil
 }
 
 // killDesktopProcesses kills any existing desktop processes

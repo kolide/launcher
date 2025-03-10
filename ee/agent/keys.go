@@ -31,6 +31,7 @@ func LocalDbKeys() keyInt {
 type secureEnclaveClient interface {
 	CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error)
 	VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error)
+	SignWithSecureEnclave(ctx context.Context, uid string, pubKey *ecdsa.PublicKey, data []byte) ([]byte, error)
 }
 
 func SetupKeys(_ context.Context, slogger *slog.Logger, store types.GetterSetterDeleter) error {
