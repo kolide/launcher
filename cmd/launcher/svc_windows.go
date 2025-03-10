@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	serviceName                   = "launcher" // TODO This should be inherited from some setting
-	serviceShutdownTimeoutSeconds = 20
+	serviceName                        = "launcher" // TODO This should be inherited from some setting
+	serviceShutdownTimeoutMilliseconds = 20000      // 20 seconds
 )
 
 // runWindowsSvc starts launcher as a windows service. This will
@@ -228,17 +228,17 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				// Documentation indicates we are allowed to take approximately 20 seconds
 				// to respond to svc.Shutdown, so we wait up to that amount of time.
 				// See: https://learn.microsoft.com/en-us/windows/win32/services/service-control-handler-function
-				changes <- svc.Status{State: svc.StopPending, WaitHint: serviceShutdownTimeoutSeconds}
+				changes <- svc.Status{State: svc.StopPending, WaitHint: serviceShutdownTimeoutMilliseconds}
 				cancel()
 				select {
 				case <-runLauncherResults:
 					w.systemSlogger.Log(ctx, slog.LevelInfo,
 						"runLauncher successfully returned after shutdown call",
 					)
-				case <-time.After(serviceShutdownTimeoutSeconds * time.Second):
+				case <-time.After(serviceShutdownTimeoutMilliseconds * time.Millisecond):
 					w.systemSlogger.Log(ctx, slog.LevelWarn,
 						"runLauncher did not return within timeout after calling cancel",
-						"timeout_s", serviceShutdownTimeoutSeconds,
+						"timeout_ms", serviceShutdownTimeoutMilliseconds,
 					)
 				}
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
