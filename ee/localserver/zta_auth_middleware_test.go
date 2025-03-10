@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -75,7 +75,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		chain, err := newChain([]byte("whatevs"), invalidKeys...)
 		require.NoError(t, err)
 
-		chainMarshalled, err := msgpack.Marshal(chain)
+		chainMarshalled, err := json.Marshal(chain)
 		require.NoError(t, err)
 
 		b64 := base64.StdEncoding.EncodeToString(chainMarshalled)
@@ -103,7 +103,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		chain, err := newChain(callerPubKey[:], validKeys...)
 		require.NoError(t, err)
 
-		chainMarshalled, err := msgpack.Marshal(chain)
+		chainMarshalled, err := json.Marshal(chain)
 		require.NoError(t, err)
 
 		b64 := base64.StdEncoding.EncodeToString(chainMarshalled)
@@ -121,7 +121,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		var ztaResponse ztaResponseBox
-		require.NoError(t, msgpack.Unmarshal(bodyDecoded, &ztaResponse))
+		require.NoError(t, json.Unmarshal(bodyDecoded, &ztaResponse))
 
 		opened, err := echelper.OpenNaCl(ztaResponse.Data, &ztaResponse.PubKey, callerPrivKey)
 		require.NoError(t, err)

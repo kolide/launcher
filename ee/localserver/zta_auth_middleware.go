@@ -4,18 +4,18 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type ztaResponseBox struct {
-	Data   []byte   `msgpack:"data"`
-	PubKey [32]byte `msgpack:"pubKey"`
+	Data   []byte   `json:"data"`
+	PubKey [32]byte `json:"pubKey"`
 }
 
 type ztaAuthMiddleware struct {
@@ -86,7 +86,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			PubKey: *pubKey,
 		}
 
-		data, err := msgpack.Marshal(ztaResponse)
+		data, err := json.Marshal(ztaResponse)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -98,17 +98,17 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 }
 
 type chainLink struct {
-	Data []byte `msgpack:"data"`
-	Sig  []byte `msgpack:"sig"`
+	Data []byte `json:"data"`
+	Sig  []byte `json:"sig"`
 }
 
 type chain struct {
-	Links []chainLink `msgpack:"links"`
+	Links []chainLink `json:"links"`
 }
 
 func unmarshallChain(data []byte) (*chain, error) {
 	var c chain
-	if err := msgpack.Unmarshal(data, &c); err != nil {
+	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal chain: %w", err)
 	}
 	return &c, nil
