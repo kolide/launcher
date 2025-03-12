@@ -141,7 +141,7 @@ func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
 
 		// Read key
 		if nextObjTag != tagString {
-			// Discard padding and continue
+			// Ignore padding
 			if nextObjTag == 0 {
 				continue
 			}
@@ -492,7 +492,6 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 
 	// Read in the TypedArray
 	var results any
-	var err error
 	switch arrayType {
 	case typedArrayInt8:
 		int8Arr := make([]int8, length)
@@ -583,22 +582,45 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		return nil, fmt.Errorf("marshalling TypedArray of type %d: %w", arrayType, err)
 	}
 
+	// Handle padding -- data is packed into uint64_t words. See StructuredClone's ComputePadding.
+	elemSize, err := elementSize(arrayType)
+	if err != nil {
+		return nil, fmt.Errorf("getting element size to calculate padding: %w", err)
+	}
+	leftoverLength := (length % 8) * elemSize
+	padding := -leftoverLength & 7
+	// We have to add an extra 8 to the padding beyond what ComputePadding tells us to -- I do not know why.
+	padding = padding + 8
+	for i := 0; i < int(padding); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d of padding after TypedArray: %w", i, padding, err)
+		}
+	}
+
 	return arrBytes, nil
 }
 
-func byteLengthToTypedArrayLength(arrayType uint32, byteLength uint64) (uint64, error) {
+func elementSize(arrayType uint32) (uint64, error) {
 	switch arrayType {
 	case typedArrayInt8, typedArrayUint8, typedArrayUint8Clamped:
-		return byteLength, nil
+		return 1, nil
 	case typedArrayInt16, typedArrayUint16:
-		return byteLength / 2, nil
+		return 2, nil
 	case typedArrayInt32, typedArrayUint32, typedArrayFloat32:
-		return byteLength / 4, nil
+		return 4, nil
 	case typedArrayFloat64, typedArrayBigInt64, typedArrayBigUint64:
-		return byteLength / 8, nil
+		return 8, nil
 	default:
 		return 0, fmt.Errorf("unsupported TypedArray type %d", arrayType)
 	}
+}
+
+func byteLengthToTypedArrayLength(arrayType uint32, byteLength uint64) (uint64, error) {
+	elemSize, err := elementSize(arrayType)
+	if err != nil {
+		return 0, fmt.Errorf("calculating element size: %w", err)
+	}
+	return byteLength / elemSize, nil
 }
 
 func deserializeNestedObject(srcReader *bytes.Reader) ([]byte, error) {
