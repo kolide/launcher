@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -280,9 +281,11 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("reading next non-padding byte after padding byte: %w", err)
 			}
 			continue
+		case tokenArrayBuffer:
+			return deserializeArrayBuffer(ctx, slogger, srcReader)
 		case tokenObjReference:
 			return nil, errors.New("deserialization not implemented for serialized object")
-		case tokenArrayBuffer, tokenArrayBufferTransfer, tokenArrayBufferView, tokenSharedArrayBuffer:
+		case tokenArrayBufferView, tokenArrayBufferTransfer, tokenSharedArrayBuffer:
 			return nil, errors.New("deserialization not implemented for array buffers")
 		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
 			return nil, errors.New("deserialization not implemented for wasm transfers")
@@ -471,6 +474,170 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	return arrBytes, nil
+}
+
+// Represent values from enum class ArrayBufferViewTag
+const (
+	arrayBufferViewTagInt8Array         byte = 0x62 // b
+	arrayBufferViewTagUint8Array        byte = 0x42 // B
+	arrayBufferViewTagUint8ClampedArray byte = 0x43 // C
+	arrayBufferViewTagInt16Array        byte = 0x77 // w
+	arrayBufferViewTagUint16Array       byte = 0x57 // W
+	arrayBufferViewTagInt32Array        byte = 0x64 // d
+	arrayBufferViewTagUint32Array       byte = 0x44 // D
+	arrayBufferViewTagFloat32Array      byte = 0x66 // f
+	arrayBufferViewTagFloat64Array      byte = 0x46 // F
+	arrayBufferViewTagBigInt64Array     byte = 0x71 // q
+	arrayBufferViewTagBigUint64Array    byte = 0x51 // Q
+	arrayBufferViewTagDataView          byte = 0x3f // ?
+)
+
+func deserializeArrayBuffer(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	// Next up is the raw length of the array buffer -- read that, then read in the raw data
+	arrayBufLen, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as ArrayBuffer length: %w", err)
+	}
+	rawArrayBufferData := make([]byte, arrayBufLen)
+	for i := 0; i < int(arrayBufLen); i++ {
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in ArrayBuffer: %w", i, arrayBufLen, err)
+		}
+		rawArrayBufferData[i] = nextByte
+	}
+
+	// After the ArrayBuffer may come the view -- check for that next
+	nextByte, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("peeking byte after ArrayBuffer: %w", err)
+	}
+	if nextByte != tokenArrayBufferView {
+		// Not a view next -- the ArrayBuffer is standalone. Unread the byte and return the raw data.
+		if err := srcReader.UnreadByte(); err != nil {
+			return nil, fmt.Errorf("unreading byte after peeking ahead post-ArrayBuffer: %w", err)
+		}
+
+		return rawArrayBufferData, nil
+	}
+
+	// Now the view! The view effectively "consumes" the ArrayBuffer that came before it
+	// by telling us how to interpret the raw data. The next values to read the subtag
+	// ArrayBufferViewTag, then two uint32s: the byte offset and the byte length.
+	arrayBufferViewTag, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading array buffer view tag: %w", err)
+	}
+	byteOffset, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte offset for ArrayBuffer view: %w", err)
+	}
+	byteLength, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
+	}
+
+	// Handle the only non-TypedArray case
+	if arrayBufferViewTag == arrayBufferViewTagDataView {
+		// We're not implementing data views right now -- return the raw data
+		slogger.Log(ctx, slog.LevelWarn,
+			"data view parsing not implemented for array buffer view, returning raw data instead",
+		)
+		return rawArrayBufferData, nil
+	}
+
+	// Handle auto-length TypedArrays. This is the only case where byteLength does not match len(rawArrayBufferData).
+	if byteLength == math.MaxUint64 {
+		// We're not implementing auto-length TypedArrays right now -- return the raw data
+		slogger.Log(ctx, slog.LevelWarn,
+			"parsing not implemented for auto-length TypedArrays, returning raw data instead",
+		)
+		return rawArrayBufferData, nil
+	}
+
+	// Create reader to re-interpret TypedArray data
+	typedArrayReader := bytes.NewReader(rawArrayBufferData)
+
+	// Read through padding, if any
+	for i := 0; i < int(byteOffset); i++ {
+		if _, err := typedArrayReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in padding: %w", i, byteOffset, err)
+		}
+	}
+
+	// Reinterpret TypedArray data as appropriate type
+	var result any
+	switch arrayBufferViewTag {
+	case arrayBufferViewTagInt8Array, arrayBufferViewTagUint8Array, arrayBufferViewTagUint8ClampedArray:
+		result, err = readUint8Array(typedArrayReader)
+	case arrayBufferViewTagInt16Array, arrayBufferViewTagUint16Array:
+		result, err = readUint16Array(typedArrayReader)
+	case arrayBufferViewTagInt32Array, arrayBufferViewTagUint32Array, arrayBufferViewTagFloat32Array:
+		result, err = readUint32Array(typedArrayReader)
+	case arrayBufferViewTagBigInt64Array, arrayBufferViewTagBigUint64Array, arrayBufferViewTagFloat64Array:
+		result, err = readUint64Array(typedArrayReader)
+	default:
+		return nil, fmt.Errorf("unsupported TypedArray type %s", string(arrayBufferViewTag))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading TypedArray of type %d: %w", arrayBufferViewTag, err)
+	}
+
+	arrBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling TypedArray of type %s: %w", string(arrayBufferViewTag), err)
+	}
+
+	return arrBytes, nil
+}
+
+// readUint8Array is suitable for reading TypedArrays: Uint8Array, Int8Array, Uint8ClampedArray
+func readUint8Array(typedArrayReader *bytes.Reader) ([]uint8, error) {
+	// rawArrayLength is the same as actual array length for uint8
+	arrayLen := typedArrayReader.Len()
+	result := make([]uint8, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint16Array is suitable for reading TypedArrays: Uint16Array, Int16Array
+func readUint16Array(typedArrayReader *bytes.Reader) ([]uint16, error) {
+	arrayLen := typedArrayReader.Len() / 2
+	result := make([]uint16, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint32Array is suitable for reading TypedArrays: Uint32Array, Int32Array, Float32Array
+func readUint32Array(typedArrayReader *bytes.Reader) ([]uint32, error) {
+	arrayLen := typedArrayReader.Len() / 4
+	result := make([]uint32, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint64Array is suitable for reading TypedArrays: BigUint64Array, BigInt64Array, Float64Array
+func readUint64Array(typedArrayReader *bytes.Reader) ([]uint64, error) {
+	arrayLen := typedArrayReader.Len() / 8
+	result := make([]uint64, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
 }
 
 func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
