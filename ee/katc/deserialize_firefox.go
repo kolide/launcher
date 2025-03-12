@@ -222,7 +222,10 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 	case tagTypedArrayObj:
 		return deserializeTypedArray(itemData, srcReader)
 	case tagBackReferenceObj:
-		return nil, errors.New("parsing not implemented for back reference object")
+		// This is a reference to an already-deserialized object. For now, we don't
+		// really care which one -- we just want to continue parsing. Return the
+		// object ID.
+		return []byte(strconv.Itoa(int(itemData))), nil
 	case tagDataViewObj:
 		return nil, errors.New("parsing not implemented for data view object")
 	case tagErrorObj:
@@ -472,10 +475,14 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		results, err = readUint8Array(srcReader, length)
 	case typedArrayInt16, typedArrayUint16:
 		results, err = readUint16Array(srcReader, length)
-	case typedArrayInt32, typedArrayUint32, typedArrayFloat32:
+	case typedArrayInt32, typedArrayUint32:
 		results, err = readUint32Array(srcReader, length)
-	case typedArrayBigInt64, typedArrayBigUint64, typedArrayFloat64:
+	case typedArrayFloat32:
+		results, err = readFloat32Array(srcReader, length)
+	case typedArrayBigInt64, typedArrayBigUint64:
 		results, err = readUint64Array(srcReader, length)
+	case typedArrayFloat64:
+		results, err = readFloat64Array(srcReader, length)
 	default:
 		return nil, fmt.Errorf("unsupported TypedArray type %d", arrayType)
 	}
@@ -515,7 +522,7 @@ func readUint16Array(srcReader *bytes.Reader, arrayLength uint64) ([]uint16, err
 	return result, nil
 }
 
-// readUint32Array is suitable for reading TypedArrays: Uint32Array, Int32Array, Float32Array
+// readUint32Array is suitable for reading TypedArrays: Uint32Array, Int32Array
 func readUint32Array(srcReader *bytes.Reader, arrayLength uint64) ([]uint32, error) {
 	result := make([]uint32, arrayLength)
 	for i := 0; i < int(arrayLength); i++ {
@@ -527,9 +534,33 @@ func readUint32Array(srcReader *bytes.Reader, arrayLength uint64) ([]uint32, err
 	return result, nil
 }
 
-// readUint64Array is suitable for reading TypedArrays: BigUint64Array, BigInt64Array, Float64Array
+// readFloat32Array is suitable for reading TypedArrays: Float32Array
+func readFloat32Array(srcReader *bytes.Reader, arrayLength uint64) ([]float32, error) {
+	result := make([]float32, arrayLength)
+	for i := 0; i < int(arrayLength); i++ {
+		if err := binary.Read(srcReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", result[i], i, err)
+		}
+	}
+
+	return result, nil
+}
+
+// readUint64Array is suitable for reading TypedArrays: BigUint64Array, BigInt64Array
 func readUint64Array(srcReader *bytes.Reader, arrayLength uint64) ([]uint64, error) {
 	result := make([]uint64, arrayLength)
+	for i := 0; i < int(arrayLength); i++ {
+		if err := binary.Read(srcReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint64 at index %d in TypedArray: %w", i, err)
+		}
+	}
+
+	return result, nil
+}
+
+// readFloat64Array is suitable for reading TypedArrays: BigUint64Array, BigInt64Array, Float64Array
+func readFloat64Array(srcReader *bytes.Reader, arrayLength uint64) ([]float64, error) {
+	result := make([]float64, arrayLength)
 	for i := 0; i < int(arrayLength); i++ {
 		if err := binary.Read(srcReader, binary.NativeEndian, &result[i]); err != nil {
 			return nil, fmt.Errorf("reading uint64 at index %d in TypedArray: %w", i, err)
