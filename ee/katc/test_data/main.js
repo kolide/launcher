@@ -39,6 +39,13 @@
         signedIntArr[2] = 3000;
         const floatArr = new Float64Array([4.4, 4.5]);
         const clampedUintArr = new Uint8ClampedArray([1000, -20]); // clamped to [255, 0]
+        const withOffsetArrBuf = new ArrayBuffer(32);
+        const withOffsetArr = new Uint16Array(withOffsetArrBuf, 2);
+        withOffsetArr[4] = 101;
+        withOffsetArr[6] = 201;
+        const lengthTrackingArrBuf = new ArrayBuffer(8, { maxByteLength: 16 });
+        const lengthTrackingArr = new Float32Array(lengthTrackingArrBuf);
+        lengthTrackingArrBuf.resize(12); // will also resize lengthTrackingArr
 
         // Shove some data in the object store. We want at least a couple items,
         // and a variety of data structures to really test our deserialization.
@@ -97,6 +104,7 @@
                 someTypedArray: unsignedIntArr, // TypedArray, Uint8Array (covers unsigned int types)
                 someArrayBuffer: unsignedIntArr.buffer, // ArrayBuffer object
                 anotherTypedArray: floatArr, // TypedArray, Float64Array (covers float types)
+                yetAnotherTypedArray: withOffsetArr, // TypedArray, Uint16Array with byte offset
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -150,6 +158,7 @@
                 someTypedArray: signedIntArr, // TypedArray, Int32Array (covers signed int types)
                 someArrayBuffer: signedIntArr.buffer, // ArrayBuffer object
                 anotherTypedArray: clampedUintArr, // TypedArray, Uint8ClampedArray (covers clamped types)
+                yetAnotherTypedArray: lengthTrackingArr, // TypedArray, Float32Array with length tracking
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
