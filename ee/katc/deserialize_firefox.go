@@ -141,10 +141,6 @@ func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
 
 		// Read key
 		if nextObjTag != tagString {
-			// Ignore padding
-			if nextObjTag == 0 {
-				continue
-			}
 			return nil, fmt.Errorf("unsupported key type %x", nextObjTag)
 		}
 		nextKey, err := deserializeString(nextObjData, srcReader)
@@ -468,9 +464,10 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		return nil, fmt.Errorf("reading nelems in TypedArray: %w", err)
 	}
 
-	// Next up is the byte offset and the byte length.
-	var byteOffset uint64
-	if err := binary.Read(srcReader, binary.NativeEndian, &byteOffset); err != nil {
+	// Next up is some uint64 that appears to indicate something about max capacity,
+	// and then byte length.
+	var discard uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &discard); err != nil {
 		return nil, fmt.Errorf("reading byteoffset in TypedArray: %w", err)
 	}
 	var byteLength uint64
@@ -478,10 +475,10 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		return nil, fmt.Errorf("reading bytelength in TypedArray: %w", err)
 	}
 
-	// TODO RM: handle byteOffset
-
-	// Sometimes the length is uint64_t(-1) to indicate that this typed array is "auto-length".
-	// In this case, we'd use the byte length to set the expected length of the array.
+	// Figure out the length of the upcoming TypedArray (in elements, not bytes),
+	// so that we can correctly compute padding later. Sometimes the length is
+	// uint64_t(-1) to indicate that this typed array is "auto-length". In this case,
+	// we'd use the byte length to set the expected length of the array.
 	if length == math.MaxUint64 {
 		newLength, err := byteLengthToTypedArrayLength(arrayType, byteLength)
 		if err != nil {
@@ -490,13 +487,54 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		length = newLength
 	}
 
-	// Read in the TypedArray
+	// Read in the TypedArray: byteLength raw data bytes, then byte offset, then finally the padding.
+	rawTypedArrayBytes := make([]byte, byteLength)
+	for i := 0; i < int(byteLength); i++ {
+		b, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in TypedArray: %w", i, byteLength, err)
+		}
+		rawTypedArrayBytes[i] = b
+	}
+	var byteOffset uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &byteOffset); err != nil {
+		return nil, fmt.Errorf("reading byteoffset in TypedArray: %w", err)
+	}
+
+	// Handle padding -- data is packed into uint64_t words. See StructuredClone's ComputePadding.
+	// We read and discard this data.
+	elemSize, err := elementSize(arrayType)
+	if err != nil {
+		return nil, fmt.Errorf("getting element size to calculate padding: %w", err)
+	}
+	leftoverLength := (length % 8) * elemSize
+	padding := -leftoverLength & 7
+	for i := 0; i < int(padding); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d of padding after TypedArray: %w", i, padding, err)
+		}
+	}
+
+	// We have all the data we need from srcReader to handle the TypedArray.
+	// Create a new reader for our raw TypedArray bytes.
+	typedArrayReader := bytes.NewReader(rawTypedArrayBytes)
+
+	// If we have an offset at the start of the TypedArray, read and discard that number of bytes.
+	for i := 0; i < int(byteOffset); i++ {
+		if _, err := typedArrayReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d of offset in TypedArray: %w", i, byteOffset, err)
+		}
+	}
+
+	// Finally! We have the raw data that we can interpret as the correct type for the TypedArray,
+	// we've handled padding, we've handled the offset, and we know how many elements are in our array.
+	// We can proceed with reinterpreting the data in typedArrayReader as the correct TypedArray.
 	var results any
 	switch arrayType {
 	case typedArrayInt8:
 		int8Arr := make([]int8, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &int8Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int8Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int8Arr[i], i, err)
 			}
 		}
@@ -504,7 +542,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayUint8, typedArrayUint8Clamped:
 		uint8Arr := make([]uint8, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &uint8Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint8Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint8Arr[i], i, err)
 			}
 		}
@@ -512,7 +550,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayInt16:
 		int16Arr := make([]int16, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &int16Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int16Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int16Arr[i], i, err)
 			}
 		}
@@ -520,7 +558,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayUint16:
 		uint16Arr := make([]uint16, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &uint16Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint16Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint16Arr[i], i, err)
 			}
 		}
@@ -528,7 +566,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayInt32:
 		int32Arr := make([]int32, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &int32Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int32Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int32Arr[i], i, err)
 			}
 		}
@@ -536,7 +574,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayUint32:
 		uint32Arr := make([]uint32, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &uint32Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint32Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint32Arr[i], i, err)
 			}
 		}
@@ -544,7 +582,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayFloat32:
 		float32Arr := make([]float32, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &float32Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &float32Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", float32Arr[i], i, err)
 			}
 		}
@@ -552,7 +590,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayBigInt64:
 		bigInt64Arr := make([]int64, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &bigInt64Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &bigInt64Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", bigInt64Arr[i], i, err)
 			}
 		}
@@ -560,7 +598,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayBigUint64:
 		bigUint64Arr := make([]uint64, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &bigUint64Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &bigUint64Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", bigUint64Arr[i], i, err)
 			}
 		}
@@ -568,7 +606,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	case typedArrayFloat64:
 		float64Arr := make([]float64, length)
 		for i := 0; i < int(length); i++ {
-			if err := binary.Read(srcReader, binary.NativeEndian, &float64Arr[i]); err != nil {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &float64Arr[i]); err != nil {
 				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", float64Arr[i], i, err)
 			}
 		}
@@ -580,21 +618,6 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	arrBytes, err := json.Marshal(results)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling TypedArray of type %d: %w", arrayType, err)
-	}
-
-	// Handle padding -- data is packed into uint64_t words. See StructuredClone's ComputePadding.
-	elemSize, err := elementSize(arrayType)
-	if err != nil {
-		return nil, fmt.Errorf("getting element size to calculate padding: %w", err)
-	}
-	leftoverLength := (length % 8) * elemSize
-	padding := -leftoverLength & 7
-	// We have to add an extra 8 to the padding beyond what ComputePadding tells us to -- I do not know why.
-	padding = padding + 8
-	for i := 0; i < int(padding); i++ {
-		if _, err := srcReader.ReadByte(); err != nil {
-			return nil, fmt.Errorf("reading byte %d of %d of padding after TypedArray: %w", i, padding, err)
-		}
 	}
 
 	return arrBytes, nil
