@@ -292,8 +292,12 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("reading id of object: %w", err)
 			}
 			return []byte(fmt.Sprintf("object id %d", objectId)), nil
-		case tokenArrayBufferView, tokenArrayBufferTransfer, tokenSharedArrayBuffer:
-			return nil, errors.New("deserialization not implemented for array buffers")
+		case tokenArrayBufferView:
+			return deserializePresumablyEmptyArrayBufferView(srcReader)
+		case tokenArrayBufferTransfer:
+			return nil, errors.New("deserialization not implemented for array buffer transfers")
+		case tokenSharedArrayBuffer:
+			return nil, errors.New("deserialization not implemented for shared ArrayBuffer")
 		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
 			return nil, errors.New("deserialization not implemented for wasm transfers")
 		case tokenError:
@@ -555,7 +559,7 @@ func deserializeArrayBuffer(ctx context.Context, slogger *slog.Logger, srcReader
 
 	// Handle auto-length TypedArrays. This is the only case where byteLength does not match len(rawArrayBufferData).
 	if byteLength == math.MaxUint64 {
-		// We're not implementing auto-length TypedArrays right now -- return the raw data
+		// We're not implementing auto-length TypedArrays right now -- return the raw data.
 		slogger.Log(ctx, slog.LevelWarn,
 			"parsing not implemented for auto-length TypedArrays, returning raw data instead",
 		)
@@ -673,6 +677,42 @@ func readFloat64Array(typedArrayReader *bytes.Reader) ([]float64, error) {
 		}
 	}
 	return result, nil
+}
+
+// deserializePresumablyEmptyArrayBufferView handles the case where we have an array buffer view
+// with no data in it. Array buffer views typically always follow an ArrayBuffer, and they consume
+// that data. However, when there is no data, sometimes they appear standalone. In that case,
+// we confirm that the view is standalone, and return an empty array.
+func deserializePresumablyEmptyArrayBufferView(srcReader *bytes.Reader) ([]byte, error) {
+	// An array buffer view starts with its subtag (indicating type), byte offset,
+	// and byte length. We only really care about the byte length here, since
+	// we are expecting a totally empty array.
+	if _, err := srcReader.ReadByte(); err != nil {
+		return nil, fmt.Errorf("reading array buffer view tag: %w", err)
+	}
+	if _, err := binary.ReadUvarint(srcReader); err != nil {
+		return nil, fmt.Errorf("reading byte offset for ArrayBuffer view: %w", err)
+	}
+	byteLength, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
+	}
+
+	// Check to make sure the length is 0, like we expect
+	if byteLength != 0 {
+		return nil, fmt.Errorf("found standalone array buffer view with length %d despite no preceeding data", byteLength)
+	}
+
+	// Next, we expect an array termination byte.
+	nextByte, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
+	}
+	if nextByte != 0x03 {
+		return nil, fmt.Errorf("unexpected byte at end of standalone array buffer view: %02x / `%s`", nextByte, string(nextByte))
+	}
+
+	return []byte("[]"), nil
 }
 
 func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
