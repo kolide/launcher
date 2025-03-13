@@ -26,8 +26,10 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
-// TODO This should be inherited from some setting
-const serviceName = "launcher"
+const (
+	serviceName                        = "launcher" // TODO This should be inherited from some setting
+	serviceShutdownTimeoutMilliseconds = 20000      // 20 seconds
+)
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
@@ -220,9 +222,25 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"shutdown request received",
 				)
-				changes <- svc.Status{State: svc.StopPending}
+				// launcher's rungroup can take up to 15 seconds to shut down. We want to give it
+				// the full 15+ seconds if possible, to allow it to gracefully shut down
+				// and to allow deferred calls in runLauncher (e.g. db.Close) to run.
+				// Documentation indicates we are allowed to take approximately 20 seconds
+				// to respond to svc.Shutdown, so we wait up to that amount of time.
+				// See: https://learn.microsoft.com/en-us/windows/win32/services/service-control-handler-function
+				changes <- svc.Status{State: svc.StopPending, WaitHint: serviceShutdownTimeoutMilliseconds}
 				cancel()
-				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
+				select {
+				case <-runLauncherResults:
+					w.systemSlogger.Log(ctx, slog.LevelInfo,
+						"runLauncher successfully returned after shutdown call",
+					)
+				case <-time.After(serviceShutdownTimeoutMilliseconds * time.Millisecond):
+					w.systemSlogger.Log(ctx, slog.LevelWarn,
+						"runLauncher did not return within timeout after calling cancel",
+						"timeout_ms", serviceShutdownTimeoutMilliseconds,
+					)
+				}
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
 			case svc.Pause, svc.Continue, svc.ParamChange, svc.NetBindAdd, svc.NetBindRemove, svc.NetBindEnable, svc.NetBindDisable, svc.DeviceEvent, svc.HardwareProfileChange, svc.PowerEvent, svc.SessionChange, svc.PreShutdown:
