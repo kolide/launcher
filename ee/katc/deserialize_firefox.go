@@ -464,15 +464,26 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 		return nil, fmt.Errorf("reading nelems in TypedArray: %w", err)
 	}
 
-	// Next up is some uint64 that appears to indicate something about max capacity,
+	// Next up is some uint64 that appears to indicate something about maxByteLength,
 	// and then byte length.
-	var discard uint64
-	if err := binary.Read(srcReader, binary.NativeEndian, &discard); err != nil {
-		return nil, fmt.Errorf("reading byteoffset in TypedArray: %w", err)
+	var maxByteLengthFlag uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &maxByteLengthFlag); err != nil {
+		return nil, fmt.Errorf("reading maxByteLength sentinel in TypedArray: %w", err)
 	}
 	var byteLength uint64
 	if err := binary.Read(srcReader, binary.NativeEndian, &byteLength); err != nil {
 		return nil, fmt.Errorf("reading bytelength in TypedArray: %w", err)
+	}
+
+	// maxByteLengthFlag is 18446462731876827136 when the underlying ArrayBuffer does not
+	// have a maxByteLength set, and 18446462749056696320 when it does. I can't find documentation
+	// for what these values are, so this is the best we have. We don't actually need to know the
+	// maxByteLength, so read and discard it.
+	if maxByteLengthFlag != 18446462731876827136 {
+		var maxByteLength uint64
+		if err := binary.Read(srcReader, binary.NativeEndian, &maxByteLength); err != nil {
+			return nil, fmt.Errorf("reading maxByteLength in TypedArray: %w", err)
+		}
 	}
 
 	// Figure out the length of the upcoming TypedArray (in elements, not bytes),
