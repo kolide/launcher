@@ -30,19 +30,19 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		boxBytes, err := base64.StdEncoding.DecodeString(boxParam)
+		boxBytes, err := base64.URLEncoding.DecodeString(boxParam)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		chain, err := unmarshallChain(boxBytes)
-		if err != nil {
+		var myChain chain
+		if err := json.Unmarshal(boxBytes, &myChain); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if err := chain.validate(z.counterPartyKeys); err != nil {
+		if err := myChain.validate(z.counterPartyKeys); err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -60,7 +60,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), chain.counterPartyPubEncryptionKey)
+		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), myChain.counterPartyPubEncryptionKey)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -78,7 +78,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Write([]byte(base64.StdEncoding.EncodeToString(data)))
+		w.Write([]byte(base64.URLEncoding.EncodeToString(data)))
 	})
 }
 
@@ -131,16 +131,31 @@ type chainLink struct {
 }
 
 type chain struct {
-	Links                        []chainLink `json:"links"`
+	Links []chainLink `json:"links"`
+	// counterPartyPubEncryptionKey is the last public key in the chain, which is a x25519 key
+	// we set this after we extract and verify in the validate method
 	counterPartyPubEncryptionKey *[32]byte
 }
 
-func unmarshallChain(data []byte) (*chain, error) {
-	var c chain
-	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal chain: %w", err)
+func (c *chain) UnmarshalJSON(data []byte) error {
+	// incomming data is just an array of chain links
+	var links []chainLink
+	if err := json.Unmarshal(data, &links); err != nil {
+		return fmt.Errorf("failed to unmarshal chain links: %w", err)
 	}
-	return &c, nil
+
+	c.Links = links
+	return nil
+}
+
+func (c *chain) MarshalJSON() ([]byte, error) {
+	// outgoing data is just an aray of chain links
+	bytes, err := json.Marshal(c.Links)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal chain links: %w", err)
+	}
+	return bytes, nil
 }
 
 func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
@@ -166,10 +181,6 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 		Y:     rootKey.Y,
 	}
 
-	if !ok {
-		return fmt.Errorf("root key with kid %s not found in trusted keys", c.Links[0].SignedBy)
-	}
-
 	for i := range len(c.Links) - 1 {
 		if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[i].Payload), c.Links[i].Signature); err != nil {
 			return fmt.Errorf("failed to verify signature: %w", err)
@@ -185,10 +196,15 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 			return fmt.Errorf("failed to unmarshal payload: %w", err)
 		}
 
+		// reassign the parent key to be used in next iteration
 		if err := thisPayload.PublicKey.Raw(parentEcdsa); err != nil {
 			return fmt.Errorf("failed to extract public key from payload: %w", err)
 		}
 	}
+
+	// now we have verified all the p256 ecdsa keys in the chain, and we have the last
+	// public key, which is a x25519 key, we need to verify the last link in the chain
+	// and extract that key
 
 	// use the last parent key to verify the last link
 	if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[len(c.Links)-1].Payload), c.Links[len(c.Links)-1].Signature); err != nil {
@@ -203,29 +219,30 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 
 	var lastPayload payload
 	if err := json.Unmarshal(payloadBytes, &lastPayload); err != nil {
-		return fmt.Errorf("failed to unmarshal payload: %w", err)
+		return fmt.Errorf("failed to unmarshal last payload: %w", err)
 	}
 
-	var raw any
-	if err := lastPayload.PublicKey.Raw(&raw); err != nil {
+	var rawX25519Key any
+	if err := lastPayload.PublicKey.Raw(&rawX25519Key); err != nil {
 		return fmt.Errorf("failed to extract last public key from payload: %w", err)
 	}
 
 	// Depending on the library version, raw might be a []byte or a *[32]byte.
 	var pubKeyBytes []byte
-	switch v := raw.(type) {
+	switch v := rawX25519Key.(type) {
 	case []byte:
 		pubKeyBytes = v
 	case *[32]byte:
 		pubKeyBytes = v[:]
 	default:
-		return fmt.Errorf("unexpected type for raw: %T", raw)
+		return fmt.Errorf("unexpected type for last public key: %T", rawX25519Key)
 	}
 
 	if len(pubKeyBytes) != 32 {
 		return errors.New("invalid public key length")
 	}
 
+	// set the counter party key
 	c.counterPartyPubEncryptionKey = new([32]byte)
 	copy(c.counterPartyPubEncryptionKey[:], pubKeyBytes)
 

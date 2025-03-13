@@ -48,7 +48,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		)
 	})
 
-	t.Run("handles missing bad b64", func(t *testing.T) {
+	t.Run("handles bad b64", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/?payload=badb64", nil))
@@ -60,14 +60,14 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 	t.Run("handles chain unmarshall failure", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
-		encoded := base64.StdEncoding.EncodeToString([]byte("badchain"))
+		encoded := base64.URLEncoding.EncodeToString([]byte("badchain"))
 		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", encoded), nil))
 		require.Equal(t, http.StatusBadRequest, rr.Code,
 			"should return bad request when chain cannot be unmarshalled",
 		)
 	})
 
-	t.Run("handles invalid chain unmarshall failure", func(t *testing.T) {
+	t.Run("handles invalid chain", func(t *testing.T) {
 		t.Parallel()
 
 		invalidKeys := make([]*ecdsa.PrivateKey, 3)
@@ -84,7 +84,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		chainMarshalled, err := json.Marshal(chain)
 		require.NoError(t, err)
 
-		b64 := base64.StdEncoding.EncodeToString(chainMarshalled)
+		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", url.QueryEscape(b64)), nil))
@@ -112,7 +112,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		chainMarshalled, err := json.Marshal(chain)
 		require.NoError(t, err)
 
-		b64 := base64.StdEncoding.EncodeToString(chainMarshalled)
+		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", url.QueryEscape(b64)), nil))
@@ -279,7 +279,7 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 		return nil, errors.New("only one key provided")
 	}
 
-	// data will be last link in links
+	// counterPartyPubEncryptionKey will be last link in links
 	links := make([]chainLink, len(ecdsaKeys))
 
 	for i := range len(ecdsaKeys) - 1 {
