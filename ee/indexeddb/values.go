@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/text/encoding/unicode"
@@ -19,33 +20,47 @@ import (
 
 // See: https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc
 const (
-	// header token
-	tokenVersion byte = 0xff
-	// booleans
-	tokenTrue  byte = 0x54 // T
-	tokenFalse byte = 0x46 // F
-	// numbers
-	tokenInt32  byte = 0x49 // I
-	tokenUint32 byte = 0x55 // U
-	tokenDouble byte = 0x4e // N
-	// strings
-	tokenAsciiStr byte = 0x22 // "
-	tokenUtf16Str byte = 0x63 // c
-	// dates
-	tokenDate byte = 0x44 // D
-	// types: object
-	tokenObjectBegin byte = 0x6f // o
-	tokenObjectEnd   byte = 0x7b // {
-	// types: array
-	tokenBeginSparseArray byte = 0x61 // a
-	tokenEndSparseArray   byte = 0x40 // @
-	tokenBeginDenseArray  byte = 0x41 // A
-	tokenEndDenseArray    byte = 0x24 // $
-	// misc
-	tokenPadding           byte = 0x00
-	tokenVerifyObjectCount byte = 0x3f // ?
-	tokenUndefined         byte = 0x5f // _
-	tokenNull              byte = 0x30
+	tokenVersion             byte = 0xff // in header
+	tokenPadding             byte = 0x00
+	tokenVerifyObjectCount   byte = 0x3f // ?
+	tokenTheHole             byte = 0x2d // -
+	tokenUndefined           byte = 0x5f // _
+	tokenNull                byte = 0x30
+	tokenTrue                byte = 0x54 // T
+	tokenFalse               byte = 0x46 // F
+	tokenInt32               byte = 0x49 // I
+	tokenUint32              byte = 0x55 // U
+	tokenDouble              byte = 0x4e // N
+	tokenBigInt              byte = 0x5a // Z
+	tokenUtf8Str             byte = 0x53 // S
+	tokenAsciiStr            byte = 0x22 // "
+	tokenUtf16Str            byte = 0x63 // c
+	tokenObjReference        byte = 0x5e // ^
+	tokenObjectBegin         byte = 0x6f // o
+	tokenObjectEnd           byte = 0x7b // {
+	tokenBeginSparseArray    byte = 0x61 // a
+	tokenEndSparseArray      byte = 0x40 // @
+	tokenBeginDenseArray     byte = 0x41 // A
+	tokenEndDenseArray       byte = 0x24 // $
+	tokenDate                byte = 0x44 // D
+	tokenTrueObj             byte = 0x79 // y
+	tokenFalseObj            byte = 0x78 // x
+	tokenNumberObj           byte = 0x6e // n
+	tokenBigIntObj           byte = 0x7a // z
+	tokenStringObj           byte = 0x73 // s
+	tokenRegexp              byte = 0x52 // R
+	tokenMapBegin            byte = 0x3b // ;
+	tokenMapEnd              byte = 0x3a // :
+	tokenSetBegin            byte = 0x27 // '
+	tokenSetEnd              byte = 0x2c // ,
+	tokenArrayBuffer         byte = 0x42 // B
+	tokenArrayBufferTransfer byte = 0x74 // t
+	tokenArrayBufferView     byte = 0x56 // V
+	tokenSharedArrayBuffer   byte = 0x75 // u
+	tokenWasmModuleTransfer  byte = 0x77 // w
+	tokenHostObj             byte = 0x5c // /
+	tokenWasmMemoryTransfer  byte = 0x6d // m
+	tokenError               byte = 0x72 // r
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
@@ -173,7 +188,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"next_byte", fmt.Sprintf("%02x", nextByte),
 				"next_byte_read_err", err,
 			)
-			return obj, fmt.Errorf("object property name has unexpected non-string type %02x", objPropertyStart)
+			return obj, fmt.Errorf("object property name has unexpected non-string type %02x / `%s`", objPropertyStart, string(objPropertyStart))
 		}
 
 		// Now process the object property's value. The next byte will tell us its type.
@@ -183,75 +198,11 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 		}
 
 		// Handle the object property value by its type.
-		switch nextByte {
-		case tokenObjectBegin:
-			// Object nested inside this object
-			nestedObj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding nested object for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = nestedObj
-		case tokenAsciiStr:
-			// ASCII string
-			strVal, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = strVal
-		case tokenUtf16Str:
-			// UTF-16 string
-			strVal, err := deserializeUtf16Str(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding ascii string for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = strVal
-		case tokenTrue:
-			obj[currentPropertyName] = []byte("true")
-		case tokenFalse:
-			obj[currentPropertyName] = []byte("false")
-		case tokenUndefined, tokenNull:
-			obj[currentPropertyName] = nil
-		case tokenInt32:
-			propertyInt, err := binary.ReadVarint(srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding int32 for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.Itoa(int(propertyInt)))
-		case tokenDouble:
-			var d float64
-			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
-				return obj, fmt.Errorf("decoding double for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
-		case tokenDate:
-			var d float64
-			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
-				return obj, fmt.Errorf("decoding double as date for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = []byte(strconv.FormatFloat(d, 'f', -1, 64))
-		case tokenBeginSparseArray:
-			arr, err := deserializeSparseArray(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding sparse array for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = arr
-		case tokenBeginDenseArray:
-			arr, err := deserializeDenseArray(ctx, slogger, srcReader)
-			if err != nil {
-				return obj, fmt.Errorf("decoding dense array for `%s`: %w", currentPropertyName, err)
-			}
-			obj[currentPropertyName] = arr
-		case tokenPadding, tokenVerifyObjectCount:
-			// We don't care about these types
-			continue
-		default:
-			slogger.Log(ctx, slog.LevelWarn,
-				"unknown token type",
-				"current_property_name", currentPropertyName,
-				"token", fmt.Sprintf("%02x", nextByte),
-			)
-			continue
+		val, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return obj, fmt.Errorf("decoding value for `%s`: %w", currentPropertyName, err)
 		}
+		obj[currentPropertyName] = val
 	}
 }
 
@@ -271,6 +222,120 @@ func nextNonPaddingByte(srcReader *bytes.Reader) (byte, error) {
 		}
 		return nextByte, nil
 	}
+}
+
+func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, srcReader *bytes.Reader) ([]byte, error) {
+	for {
+		switch nextToken {
+		case tokenObjectBegin:
+			return deserializeNestedObject(ctx, slogger, srcReader)
+		case tokenUtf8Str, tokenAsciiStr:
+			return deserializeAsciiStr(srcReader)
+		case tokenUtf16Str:
+			return deserializeUtf16Str(srcReader)
+		case tokenStringObj:
+			return deserializeStringObject(srcReader)
+		case tokenRegexp:
+			return deserializeRegexp(srcReader)
+		case tokenTrue, tokenTrueObj:
+			return []byte("true"), nil
+		case tokenFalse, tokenFalseObj:
+			return []byte("false"), nil
+		case tokenUndefined, tokenNull:
+			return nil, nil
+		case tokenInt32:
+			propertyInt, err := binary.ReadVarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("decoding int32: %w", err)
+			}
+			return []byte(strconv.Itoa(int(propertyInt))), nil
+		case tokenDouble, tokenNumberObj:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding double: %w", err)
+			}
+			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+		case tokenBigInt, tokenBigIntObj:
+			return deserializeBigInt(srcReader)
+		case tokenDate:
+			var d float64
+			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
+				return nil, fmt.Errorf("decoding double as date: %w", err)
+			}
+			// d is milliseconds since epoch
+			return []byte(time.UnixMilli(int64(d)).UTC().String()), nil
+		case tokenBeginSparseArray:
+			return deserializeSparseArray(ctx, slogger, srcReader)
+		case tokenBeginDenseArray:
+			return deserializeDenseArray(ctx, slogger, srcReader)
+		case tokenMapBegin:
+			return deserializeMap(ctx, slogger, srcReader)
+		case tokenSetBegin:
+			return deserializeSet(ctx, slogger, srcReader)
+		case tokenPadding, tokenVerifyObjectCount, tokenTheHole:
+			// We don't care about these types -- we want to try reading again
+			var err error
+			nextToken, err = nextNonPaddingByte(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading next non-padding byte after padding byte: %w", err)
+			}
+			continue
+		case tokenObjReference:
+			return nil, errors.New("deserialization not implemented for serialized object")
+		case tokenArrayBuffer, tokenArrayBufferTransfer, tokenArrayBufferView, tokenSharedArrayBuffer:
+			return nil, errors.New("deserialization not implemented for array buffers")
+		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
+			return nil, errors.New("deserialization not implemented for wasm transfers")
+		case tokenError:
+			return nil, errors.New("deserialization not implemented for error")
+		case tokenHostObj:
+			return nil, errors.New("deserialization not implemented for host object")
+		default:
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown token type, will attempt to keep reading",
+				"token", fmt.Sprintf("%02x", nextToken),
+			)
+			var err error
+			nextToken, err = nextNonPaddingByte(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading next non-padding byte after unknown token byte: %w", err)
+			}
+		}
+	}
+}
+
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(srcReader *bytes.Reader) ([]byte, error) {
+	// First up -- read the bitfield. It's a uint32.
+	bitfield, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading bitfield for BigInt: %w", err)
+	}
+
+	// Use the bitfield to determine a) the sign for this bigint and b) the number of bytes
+	// used to store this bigint. The sign is the last bit, and the length is the remainder.
+	isNegative := bitfield & 1
+	bigIntLen := bitfield & ((1 << 32) - 1)
+	numBytesToRead := bigIntLen / 2
+
+	// Read the next bigIntLenInBytes bytes
+	bigIntRawBytes := make([]byte, numBytesToRead)
+	for i := 0; i < int(numBytesToRead); i++ {
+		b, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, numBytesToRead, err)
+		}
+		bigIntRawBytes[i] = b
+	}
+
+	// Return a placeholder string
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
 }
 
 // deserializeSparseArray deserializes the next sparse array from the srcReader.
@@ -328,22 +393,11 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 		if err != nil {
 			return nil, fmt.Errorf("reading next byte: %w", err)
 		}
-		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array: %w", err)
-			}
-			arrItems[i] = string(obj) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array: %w", err)
-			}
-			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
 		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(arrItems)
@@ -367,42 +421,47 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	// Read from srcReader until we've filled the array to the correct size.
-	arrItems := make([]any, 0)
+	arrItems := make([]any, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		// Read next token to see if the array is completed
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		// Array item! Unread the byte
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
+	}
+
+	// At the end of the array we have some padding and additional data -- consume
+	// that data
 	reachedEndOfArray := false
 	for {
 		if reachedEndOfArray {
 			break
 		}
 
-		// Read item at index
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte: %w", err)
+			return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
 		}
+
 		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(obj)) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(str)) // cast to string so it's readable when marshalled again below
 		case tokenEndDenseArray:
 			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
 			_, _ = srcReader.ReadByte()
 			_, _ = srcReader.ReadByte()
 			reachedEndOfArray = true
+			continue
 		case 0x01, 0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s` in array of length %d", nextByte, string(nextByte), arrayLen)
+			return nil, fmt.Errorf("unexpected byte at end of dense array %02x / `%s`", nextByte, string(nextByte))
 		}
 	}
 
@@ -435,6 +494,82 @@ func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReade
 	}
 
 	return resultObj, nil
+}
+
+// deserializeMap deserializes a JS map. The map is a bunch of items in a row, where the first item
+// is a key and the item after it is its corresponding value, and so on until we read `tokenMapEnd`.
+func deserializeMap(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	mapObject := make(map[string]string)
+
+	for {
+		// Check to see if we're done with the map
+		tokenByteForKey, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		if tokenByteForKey == tokenMapEnd {
+			// All done with the map! Read the length and break
+			_, _ = srcReader.ReadByte()
+			break
+		}
+
+		keyObj, err := deserializeNext(ctx, slogger, tokenByteForKey, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing map key: %w", err)
+		}
+
+		tokenByteForValue, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+
+		valObj, err := deserializeNext(ctx, slogger, tokenByteForValue, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing map value: %w", err)
+		}
+
+		mapObject[string(keyObj)] = string(valObj)
+	}
+
+	resultMap, err := json.Marshal(mapObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling map: %w", err)
+	}
+
+	return resultMap, nil
+}
+
+// deserializeSet deserializes a JS set. The set is just a bunch of items in a row
+// until we reach `tokenSetEnd`.
+func deserializeSet(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	setObject := make(map[string]struct{})
+
+	for {
+		// Check to see if we're done with the map
+		nextToken, err := nextNonPaddingByte(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		if nextToken == tokenSetEnd {
+			// All done with the set! Read the length and break
+			_, _ = srcReader.ReadByte()
+			break
+		}
+
+		nextSetObj, err := deserializeNext(ctx, slogger, nextToken, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing next item in set: %w", err)
+		}
+
+		setObject[string(nextSetObj)] = struct{}{}
+	}
+
+	resultMap, err := json.Marshal(setObject)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling set: %w", err)
+	}
+
+	return resultMap, nil
 }
 
 // deserializeAsciiStr handles the upcoming ascii string in srcReader.
@@ -481,4 +616,92 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+// deserializeStringObject handles the upcoming String in srcReader.
+func deserializeStringObject(srcReader *bytes.Reader) ([]byte, error) {
+	stringTypeToken, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading token to determine encoding for String: %w", err)
+	}
+
+	switch stringTypeToken {
+	case tokenAsciiStr, tokenUtf8Str:
+		return deserializeAsciiStr(srcReader)
+	case tokenUtf16Str:
+		return deserializeUtf16Str(srcReader)
+	default:
+		return nil, fmt.Errorf("unknown token for String %02x / `%s`", stringTypeToken, string(stringTypeToken))
+	}
+}
+
+// Please note that these values are NOT identical to the ones used by Firefox -- global
+// and ignorecase are swapped. Flag values retrieved from https://github.com/v8/v8/blob/main/src/regexp/regexp-flags.h.
+const (
+	regexFlagGlobal      = 0b00000001 // /g
+	regexFlagIgnoreCase  = 0b00000010 // /i
+	regexFlagMultiline   = 0b00000100 // /m
+	regexFlagSticky      = 0b00001000 // /y
+	regexFlagUnicode     = 0b00010000 // /u
+	regexFlagDotAll      = 0b00100000 // /s
+	regexFlagHasIndices  = 0b01000000 // /d
+	regexFlagUnicodeSets = 0b10000000 // /v
+)
+
+// deserializeRegexp handles the upcoming regular expression in srcReader.
+// The data takes the following form:
+// * tokenAsciiStr
+// * byteLength:uint32_t
+// * raw data (the regex)
+// * flags:uint32_t
+func deserializeRegexp(srcReader *bytes.Reader) ([]byte, error) {
+	// Read in the string portion of the regexp
+	nextByte, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading first byte of regexp object: %w", err)
+	}
+	if nextByte != tokenAsciiStr {
+		return nil, fmt.Errorf("unexpected tag 0x%02x / `%s` at start of regexp object (expected 0x%02x / `%s`)", nextByte, string(nextByte), tokenAsciiStr, string(tokenAsciiStr))
+	}
+	regexpStrBytes, err := deserializeAsciiStr(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("deserializing string portion of regexp: %w", err)
+	}
+
+	// Read in the flags
+	regexpFlags, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as regexp flag: %w", err)
+	}
+	flags := make([]byte, 0)
+	if regexpFlags&regexFlagIgnoreCase != 0 {
+		flags = append(flags, []byte("i")...)
+	}
+	if regexpFlags&regexFlagGlobal != 0 {
+		flags = append(flags, []byte("g")...)
+	}
+	if regexpFlags&regexFlagMultiline != 0 {
+		flags = append(flags, []byte("m")...)
+	}
+	if regexpFlags&regexFlagSticky != 0 {
+		flags = append(flags, []byte("y")...)
+	}
+	if regexpFlags&regexFlagUnicode != 0 {
+		flags = append(flags, []byte("u")...)
+	}
+	if regexpFlags&regexFlagDotAll != 0 {
+		flags = append(flags, []byte("s")...)
+	}
+	if regexpFlags&regexFlagHasIndices != 0 {
+		flags = append(flags, []byte("d")...)
+	}
+	if regexpFlags&regexFlagUnicodeSets != 0 {
+		flags = append(flags, []byte("v")...)
+	}
+
+	regexFull := append([]byte("/"), regexpStrBytes...)
+	regexFull = append(regexFull, []byte("/")...)
+	regexFull = append(regexFull, flags...)
+
+	return regexFull, nil
 }

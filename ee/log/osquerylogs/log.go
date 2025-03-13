@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -239,6 +240,16 @@ func (l *OsqueryLogAdapter) logInfoAboutProcessHoldingLockfile(ctx context.Conte
 	}
 
 	lockFilePath := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
+	if runtime.GOOS == "windows" {
+		// for some reason the last separator in the path that we see from the logs is a forward slash even on windows.
+		// this causes it to fail to match the open files we check later. so if we see that suffix on windows,
+		// just flip that part of the path to correctly match the open file paths we'll check against
+		lockSuffix := "/LOCK"
+		if strings.HasSuffix(lockFilePath, lockSuffix) {
+			lockFilePath = lockFilePath[:len(lockFilePath)-len(lockSuffix)] + "\\LOCK"
+		}
+	}
+
 	infoToLog := []any{
 		"lockfile_path", lockFilePath,
 	}
