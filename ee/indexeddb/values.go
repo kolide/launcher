@@ -62,6 +62,11 @@ const (
 	tokenHostObj             byte = 0x5c // /
 	tokenWasmMemoryTransfer  byte = 0x6d // m
 	tokenError               byte = 0x72 // r
+
+	// The name of these consts is a guess based on the context where I've seen 0x03 and 0x01 pop up.
+	// They may signal something besides array termination.
+	tokenPossiblyArrayTermination0x03 byte = 0x03
+	tokenPossiblyArrayTermination0x01 byte = 0x01
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
@@ -391,7 +396,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 			_, _ = srcReader.ReadByte()
 			// The array has ended -- return.
 			reachedEndOfArray = true
-		case 0x01, 0x03:
+		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
@@ -471,7 +476,7 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 			_, _ = srcReader.ReadByte()
 			reachedEndOfArray = true
 			continue
-		case 0x01, 0x03:
+		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
@@ -703,12 +708,12 @@ func deserializePresumablyEmptyArrayBufferView(srcReader *bytes.Reader) ([]byte,
 		return nil, fmt.Errorf("found standalone array buffer view with length %d despite no preceding data", byteLength)
 	}
 
-	// Next, we expect an array termination byte.
+	// Next, we typically see an 0x03, which we interpret as an array termination byte.
 	nextByte, err := srcReader.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
 	}
-	if nextByte != 0x03 {
+	if nextByte != tokenPossiblyArrayTermination0x03 {
 		return nil, fmt.Errorf("unexpected byte at end of standalone array buffer view: %02x / `%s`", nextByte, string(nextByte))
 	}
 
