@@ -625,7 +625,7 @@ func readUint16Array(typedArrayReader *bytes.Reader) ([]uint16, error) {
 	result := make([]uint16, arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+			return nil, fmt.Errorf("reading uint16 at index %d in TypedArray: %w", i, err)
 		}
 	}
 	return result, nil
@@ -637,7 +637,7 @@ func readUint32Array(typedArrayReader *bytes.Reader) ([]uint32, error) {
 	result := make([]uint32, arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+			return nil, fmt.Errorf("reading uint32 at index %d in TypedArray: %w", i, err)
 		}
 	}
 	return result, nil
@@ -649,7 +649,7 @@ func readFloat32Array(typedArrayReader *bytes.Reader) ([]float32, error) {
 	result := make([]float32, arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+			return nil, fmt.Errorf("reading float32 at index %d in TypedArray: %w", i, err)
 		}
 	}
 	return result, nil
@@ -661,7 +661,7 @@ func readUint64Array(typedArrayReader *bytes.Reader) ([]uint64, error) {
 	result := make([]uint64, arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+			return nil, fmt.Errorf("reading uint64 at index %d in TypedArray: %w", i, err)
 		}
 	}
 	return result, nil
@@ -673,7 +673,7 @@ func readFloat64Array(typedArrayReader *bytes.Reader) ([]float64, error) {
 	result := make([]float64, arrayLen)
 	for i := 0; i < arrayLen; i++ {
 		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
-			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+			return nil, fmt.Errorf("reading float64 at index %d in TypedArray: %w", i, err)
 		}
 	}
 	return result, nil
