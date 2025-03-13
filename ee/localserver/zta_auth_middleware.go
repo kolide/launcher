@@ -96,6 +96,8 @@ type payload struct {
 
 func (p *payload) UnmarshalJSON(data []byte) error {
 	// Create a temporary struct with PublicKey as json.RawMessage
+	// since it's actually an interface in the dst struct we can't
+	// unmarshal it directly into the struct
 	type tmpPayload struct {
 		AccountUuid    string          `json:"accountUuid"`
 		DateTimeSigned int64           `json:"dateTimeSigned"`
@@ -130,17 +132,25 @@ func (p *payload) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type chainLink struct {
-	Payload   string `json:"payload"`
-	Signature []byte `json:"signature"`
-	SignedBy  string `json:"signedBy"`
-}
-
+// chain represents a chain of trust, where each link in the chain has a payload signed by the key in the previous link.
+// The first link in the chain is signed by a trusted root key.
+// There can by any number if keys between the root and the last key.
+// The last key is an∂ x25519 key which is the public half of a NaCl box key.
 type chain struct {
 	Links []chainLink `json:"links"`
 	// counterPartyPubEncryptionKey is the last public key in the chain, which is a x25519 key
 	// we set this after we extract and verify in the validate method
 	counterPartyPubEncryptionKey *[32]byte
+}
+
+// chainLink represents a link in a chain of trust
+type chainLink struct {
+	// Payload a b64 url encoded json
+	Payload string `json:"payload"`
+	// Signature is the raw bytes of the signature of the b64 url encoded json
+	Signature []byte `json:"signature"`
+	// Signed by is the key id "kid" of the key that signed this link
+	SignedBy string `json:"signedBy"`
 }
 
 func (c *chain) UnmarshalJSON(data []byte) error {
@@ -154,6 +164,7 @@ func (c *chain) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON marshals the chain as a json array of chain links
 func (c *chain) MarshalJSON() ([]byte, error) {
 	// outgoing data is just an aray of chain links
 	bytes, err := json.Marshal(c.Links)
@@ -164,6 +175,8 @@ func (c *chain) MarshalJSON() ([]byte, error) {
 	return bytes, nil
 }
 
+// validate iterates over all the links in the chain and verifies the signatures and timestamps
+// the root p256 ecdsa key must be in the trusted keys map, the map key is the "kid" of the key
 func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	if len(c.Links) == 0 {
 		return errors.New("chain is empty")

@@ -269,7 +269,9 @@ func Test_ValidateCertChain(t *testing.T) {
 	})
 }
 
-// newChain creates a new chain of keys, where each key signs the next key in the chain.
+// newChain creates a new chain of keys, where each key signs the next key in the chain
+// leaving this in the _test file since we will always be receiving a chain of keys
+// so this is only needed for testing
 func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.PrivateKey) (*chain, error) {
 	if len(ecdsaKeys) == 0 {
 		return nil, errors.New("no keys provided")
@@ -282,21 +284,28 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 	// counterPartyPubEncryptionKey will be last link in links
 	links := make([]chainLink, len(ecdsaKeys))
 
-	for i := range len(ecdsaKeys) - 1 {
+	for i := range len(ecdsaKeys) {
+
 		parentKey := ecdsaKeys[i]
 
-		childKey := ecdsaKeys[i+1]
-		jwkPubKey, err := jwk.New(childKey.Public().(*ecdsa.PublicKey))
-		jwkPubKey.Set("kid", fmt.Sprint(i))
+		var childKey jwk.Key
+		var err error
+
+		if i == len(ecdsaKeys)-1 {
+			childKey, err = jwk.New(counterPartyPubEncryptionKey[:])
+		} else {
+			childKey, err = jwk.New(ecdsaKeys[i+1].Public())
+		}
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create jwk from ecdsa key: %w", err)
 		}
+		childKey.Set("kid", fmt.Sprint(i))
 
 		thisPayload := payload{
 			AccountUuid:    "some_account",
 			DateTimeSigned: time.Now().Unix(),
-			PublicKey:      jwkPubKey,
+			PublicKey:      childKey,
 			UserUuid:       "some_user",
 			ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
 			Version:        1,
@@ -319,41 +328,6 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 			Signature: sig,
 			SignedBy:  fmt.Sprint(i),
 		}
-	}
-
-	lastKey := ecdsaKeys[len(ecdsaKeys)-1]
-
-	pubEncryptionKey, err := jwk.New(counterPartyPubEncryptionKey[:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to create jwk from x25519 key: %w", err)
-	}
-
-	payload := payload{
-		AccountUuid:    "some_account",
-		DateTimeSigned: time.Now().Unix(),
-		PublicKey:      pubEncryptionKey,
-		UserUuid:       "some_user",
-		ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
-		Version:        1,
-	}
-
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	payloadB64 := base64.URLEncoding.EncodeToString(payloadBytes)
-
-	// sign data with the last key
-	sig, err := echelper.Sign(lastKey, []byte(payloadB64))
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign data with last key: %w", err)
-	}
-
-	links[len(ecdsaKeys)-1] = chainLink{
-		Payload:   payloadB64,
-		Signature: sig,
-		SignedBy:  fmt.Sprint(len(ecdsaKeys) - 1),
 	}
 
 	return &chain{Links: links}, nil
