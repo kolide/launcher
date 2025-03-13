@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -85,10 +86,12 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 type payload struct {
 	AccountUuid    string  `json:"accountUuid"`
 	DateTimeSigned int64   `json:"dateTimeSigned"`
+	Environment    string  `json:"environment"`
+	ExpirationDate int64   `json:"expirationDate"`
 	PublicKey      jwk.Key `json:"publicKey"`
+	SignedBy       string  `json:"signedBy"`
 	UserUuid       string  `json:"userUuid"`
-	Ttl            int64   `json:"ttl"`
-	Version        string  `json:"version"`
+	Version        uint8   `json:"version"`
 }
 
 func (p *payload) UnmarshalJSON(data []byte) error {
@@ -96,10 +99,12 @@ func (p *payload) UnmarshalJSON(data []byte) error {
 	type tmpPayload struct {
 		AccountUuid    string          `json:"accountUuid"`
 		DateTimeSigned int64           `json:"dateTimeSigned"`
+		Environment    string          `json:"environment"`
+		ExpirationDate int64           `json:"expirationDate"`
 		PublicKey      json.RawMessage `json:"publicKey"`
+		SignedBy       string          `json:"signedBy"`
 		UserUuid       string          `json:"userUuid"`
-		Ttl            int64           `json:"ttl"`
-		Version        string          `json:"version"`
+		Version        uint8           `json:"version"`
 	}
 
 	var tmp tmpPayload
@@ -113,12 +118,13 @@ func (p *payload) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("failed to parse publicKey: %w", err)
 	}
 
-	// Populate the payload struct
 	p.AccountUuid = tmp.AccountUuid
 	p.DateTimeSigned = tmp.DateTimeSigned
+	p.Environment = tmp.Environment
+	p.ExpirationDate = tmp.ExpirationDate
 	p.PublicKey = key
+	p.SignedBy = tmp.SignedBy
 	p.UserUuid = tmp.UserUuid
-	p.Ttl = tmp.Ttl
 	p.Version = tmp.Version
 
 	return nil
@@ -181,9 +187,11 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 		Y:     rootKey.Y,
 	}
 
-	for i := range len(c.Links) - 1 {
+	var lastPayload payload
+
+	for i := range len(c.Links) {
 		if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[i].Payload), c.Links[i].Signature); err != nil {
-			return fmt.Errorf("failed to verify signature: %w", err)
+			return fmt.Errorf("invalid signature: %w", err)
 		}
 
 		payloadBytes, err := base64.URLEncoding.DecodeString(c.Links[i].Payload)
@@ -191,37 +199,25 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 			return fmt.Errorf("failed to decode payload: %w", err)
 		}
 
-		var thisPayload payload
-		if err := json.Unmarshal(payloadBytes, &thisPayload); err != nil {
+		if err := json.Unmarshal(payloadBytes, &lastPayload); err != nil {
 			return fmt.Errorf("failed to unmarshal payload: %w", err)
 		}
 
-		// reassign the parent key to be used in next iteration
-		if err := thisPayload.PublicKey.Raw(parentEcdsa); err != nil {
-			return fmt.Errorf("failed to extract public key from payload: %w", err)
+		if lastPayload.ExpirationDate < time.Now().Unix() {
+			return fmt.Errorf("payload %d has expired", i)
+		}
+
+		if i < len(c.Links)-1 {
+			// last key is not p256 ecdsa so don't reassign it
+			// we handle last key after the loop
+			if err := lastPayload.PublicKey.Raw(parentEcdsa); err != nil {
+				return fmt.Errorf("failed to extract public key from payload: %w", err)
+			}
 		}
 	}
 
-	// now we have verified all the p256 ecdsa keys in the chain, and we have the last
-	// public key, which is a x25519 key, we need to verify the last link in the chain
-	// and extract that key
-
-	// use the last parent key to verify the last link
-	if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[len(c.Links)-1].Payload), c.Links[len(c.Links)-1].Signature); err != nil {
-		return fmt.Errorf("failed to verify last link signature: %w", err)
-	}
-
-	// unmarshal the last payload
-	payloadBytes, err := base64.URLEncoding.DecodeString(c.Links[len(c.Links)-1].Payload)
-	if err != nil {
-		return fmt.Errorf("failed to decode payload: %w", err)
-	}
-
-	var lastPayload payload
-	if err := json.Unmarshal(payloadBytes, &lastPayload); err != nil {
-		return fmt.Errorf("failed to unmarshal last payload: %w", err)
-	}
-
+	// now we have verified all the entire chain, and we have the last
+	// public key, which is a x25519 key, extract and set as the counter party key
 	var rawX25519Key any
 	if err := lastPayload.PublicKey.Raw(&rawX25519Key); err != nil {
 		return fmt.Errorf("failed to extract last public key from payload: %w", err)

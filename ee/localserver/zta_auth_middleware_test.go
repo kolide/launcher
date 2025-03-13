@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"maps"
-
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/require"
@@ -143,10 +141,10 @@ func Test_ValidateCertChain(t *testing.T) {
 
 	keyCount := 3
 	keys := make([]*ecdsa.PrivateKey, keyCount)
-	pubKeyMap := make(map[string]*ecdsa.PublicKey)
+	trustedKeysMap := make(map[string]*ecdsa.PublicKey)
 	for i := range keyCount {
 		keys[i] = mustGenEcdsaKey(t)
-		pubKeyMap[fmt.Sprint(i)] = keys[i].Public().(*ecdsa.PublicKey)
+		trustedKeysMap[fmt.Sprint(i)] = keys[i].Public().(*ecdsa.PublicKey)
 	}
 
 	pubEncryptionKey, _, err := box.GenerateKey(rand.Reader)
@@ -156,34 +154,26 @@ func Test_ValidateCertChain(t *testing.T) {
 		t.Parallel()
 		chain, err := newChain(pubEncryptionKey, keys...)
 		require.NoError(t, err)
-		require.Error(t, chain.validate(nil),
-			"should not be able to validate with nil trusted root",
-		)
+
+		chain.Links[0] = chainLink{}
+
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "missing data")
 	})
 
 	t.Run("empty chain", func(t *testing.T) {
 		t.Parallel()
 
 		chain := &chain{}
-		require.Error(t, chain.validate(pubKeyMap),
-			"should not be able to validate empty chain",
-		)
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "chain is empty")
 	})
 
-	t.Run("different trusted root", func(t *testing.T) {
+	t.Run("key not found", func(t *testing.T) {
 		t.Parallel()
 
 		chain, err := newChain(pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
-		badMap := make(map[string]*ecdsa.PublicKey)
-		maps.Copy(badMap, pubKeyMap)
-
-		badMap["0"] = mustGenEcdsaKey(t).Public().(*ecdsa.PublicKey)
-
-		require.Error(t, chain.validate(badMap),
-			"should not be able to validate chain with different trusted root",
-		)
+		require.ErrorContains(t, chain.validate(make(map[string]*ecdsa.PublicKey)), "not found in trusted keys")
 	})
 
 	t.Run("bad sig last item in chain", func(t *testing.T) {
@@ -195,9 +185,7 @@ func Test_ValidateCertChain(t *testing.T) {
 		// replace last item in chain
 		chain.Links[len(chain.Links)-1].Signature = []byte("ahhhh")
 
-		require.Error(t, chain.validate(pubKeyMap),
-			"should not be able to validate chain with malformed key",
-		)
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "invalid signature")
 	})
 
 	t.Run("invalid signature in chain", func(t *testing.T) {
@@ -208,22 +196,7 @@ func Test_ValidateCertChain(t *testing.T) {
 
 		chain.Links[1].Payload = "ahhhh"
 
-		require.Error(t, chain.validate(pubKeyMap),
-			"should not be able to validate chain with malformed key",
-		)
-	})
-
-	t.Run("invalid root self sign", func(t *testing.T) {
-		t.Parallel()
-
-		chain, err := newChain(pubEncryptionKey, keys...)
-		require.NoError(t, err)
-
-		chain.Links[0].Signature = []byte("ahhhh")
-
-		require.Error(t, chain.validate(pubKeyMap),
-			"should not be able to validate chain with malformed key",
-		)
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "invalid signature")
 	})
 
 	t.Run("invalid public encryption key", func(t *testing.T) {
@@ -252,9 +225,36 @@ func Test_ValidateCertChain(t *testing.T) {
 
 		chain.Links[len(chain.Links)-1].Payload = base64.URLEncoding.EncodeToString(payloadBytes)
 
-		require.Error(t, chain.validate(pubKeyMap),
-			"should not be able to validate chain with malformed key",
-		)
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "invalid signature")
+	})
+
+	t.Run("handles expired chain", func(t *testing.T) {
+		t.Parallel()
+
+		chain, err := newChain(pubEncryptionKey, keys...)
+		require.NoError(t, err)
+
+		// get first payload
+		payloadBytes, err := base64.URLEncoding.DecodeString(chain.Links[0].Payload)
+		require.NoError(t, err)
+
+		var thisPayload payload
+		require.NoError(t, json.Unmarshal(payloadBytes, &thisPayload))
+		thisPayload.ExpirationDate = time.Now().Add(-1 * time.Hour).Unix()
+
+		payloadBytes, err = json.Marshal(thisPayload)
+		require.NoError(t, err)
+
+		payloadBytesB64 := base64.URLEncoding.EncodeToString(payloadBytes)
+
+		// sign the bytes with the first key
+		sig, err := echelper.Sign(keys[0], []byte(payloadBytesB64))
+		require.NoError(t, err)
+
+		chain.Links[0].Payload = payloadBytesB64
+		chain.Links[0].Signature = sig
+
+		require.ErrorContains(t, chain.validate(trustedKeysMap), "expired")
 	})
 
 	t.Run("valid chain", func(t *testing.T) {
@@ -263,7 +263,7 @@ func Test_ValidateCertChain(t *testing.T) {
 		chain, err := newChain(pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
-		require.NoError(t, chain.validate(pubKeyMap),
+		require.NoError(t, chain.validate(trustedKeysMap),
 			"should be able to validate chain",
 		)
 	})
@@ -293,16 +293,16 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 			return nil, fmt.Errorf("failed to create jwk from ecdsa key: %w", err)
 		}
 
-		payload := payload{
+		thisPayload := payload{
 			AccountUuid:    "some_account",
 			DateTimeSigned: time.Now().Unix(),
 			PublicKey:      jwkPubKey,
 			UserUuid:       "some_user",
-			Ttl:            3600,
-			Version:        "1",
+			ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
+			Version:        1,
 		}
 
-		payloadBytes, err := json.Marshal(payload)
+		payloadBytes, err := json.Marshal(thisPayload)
 		if err != nil {
 			return nil, err
 		}
@@ -333,8 +333,8 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 		DateTimeSigned: time.Now().Unix(),
 		PublicKey:      pubEncryptionKey,
 		UserUuid:       "some_user",
-		Ttl:            3600,
-		Version:        "1",
+		ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
+		Version:        1,
 	}
 
 	payloadBytes, err := json.Marshal(payload)
