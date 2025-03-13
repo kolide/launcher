@@ -147,7 +147,7 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 
-	for k, v := range certMap {
+	for _, v := range certMap {
 		xBytes, err := base64.RawURLEncoding.DecodeString(v["x"])
 		if err != nil {
 			return nil, err
@@ -173,7 +173,7 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 			return nil, fmt.Errorf("invalid public key: %w", err)
 		}
 
-		dt4aKeyMap[k] = pubKey
+		dt4aKeyMap[v["kid"]] = pubKey
 	}
 
 	return dt4aKeyMap, nil
