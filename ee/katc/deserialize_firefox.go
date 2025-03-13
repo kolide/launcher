@@ -489,13 +489,14 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	// Figure out the length of the upcoming TypedArray (in elements, not bytes),
 	// so that we can correctly compute padding later. Sometimes the length is
 	// uint64_t(-1) to indicate that this typed array is "auto-length". In this case,
-	// we'd use the byte length to set the expected length of the array.
+	// we'd use the byte length to set the expected length of the array. We also
+	// need the byte length to calculate padding.
+	lengthFromByteLength, err := byteLengthToTypedArrayLength(arrayType, byteLength)
+	if err != nil {
+		return nil, fmt.Errorf("converting byte length to array length: %w", err)
+	}
 	if length == math.MaxUint64 {
-		newLength, err := byteLengthToTypedArrayLength(arrayType, byteLength)
-		if err != nil {
-			return nil, fmt.Errorf("converting byte length to array length: %w", err)
-		}
-		length = newLength
+		length = lengthFromByteLength
 	}
 
 	// Read in the TypedArray: byteLength raw data bytes, then byte offset, then finally the padding.
@@ -518,7 +519,7 @@ func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("getting element size to calculate padding: %w", err)
 	}
-	leftoverLength := (length % 8) * elemSize
+	leftoverLength := (lengthFromByteLength % 8) * elemSize
 	padding := -leftoverLength & 7
 	for i := 0; i < int(padding); i++ {
 		if _, err := srcReader.ReadByte(); err != nil {
