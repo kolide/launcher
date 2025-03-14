@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/server"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/traces"
+	"github.com/vmihailenco/msgpack/v5"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -207,6 +208,44 @@ func (c *client) VerifySecureEnclaveKey(ctx context.Context, key *ecdsa.PublicKe
 
 	// uncertain if key exists
 	return false, fmt.Errorf("unexpected status code, cannot verify existence of key: %d", resp.StatusCode)
+}
+
+func (c *client) SignWithSecureEnclave(ctx context.Context, signReq server.SignWithSecureEnclaveRequest) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	requestBody, err := msgpack.Marshal(signReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling request body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/secure_enclave_sign", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("creating secure enclave sign request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.base.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("signing with secure enclave: %w", err)
+	}
+
+	if resp.Body == nil {
+		return nil, errors.New("response body is nil")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	return bodyBytes, nil
 }
 
 func (c *client) Notify(n notify.Notification) error {

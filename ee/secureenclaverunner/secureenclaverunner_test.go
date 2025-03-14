@@ -24,7 +24,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 	privKey, err := echelper.GenerateEcdsaKey()
 	require.NoError(t, err)
 
-	t.Run("creates key in public call", func(t *testing.T) {
+	t.Run("creates key in public call and signs", func(t *testing.T) {
 		t.Parallel()
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
@@ -44,6 +44,13 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		// calling public here to make sure we don't try to verify key again
 		require.NotNil(t, ser.Public())
+
+		secureEnclaveClientMock.On("SignWithSecureEnclave", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return([]byte("test"), nil).Once()
+
+		// sign should work
+		sig, err := ser.Sign(nil, []byte("test"), nil)
+		require.NoError(t, err)
+		require.NotNil(t, sig)
 	})
 
 	t.Run("creates key in execute", func(t *testing.T) {
