@@ -115,7 +115,10 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	}
 
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
-	mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
+	// TODO: make this authenticated or remove
+	mux.Handle("/zta", ls.requestZtaInfoHandler())
+
+	// mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
 	mux.Handle("/v0/dt4a", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
 
 	// uncomment to test without going through middleware
