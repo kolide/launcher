@@ -91,10 +91,11 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
     steps:
+    # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
     - name: Install build dependencies
       run: |
         apt-get -y update
-        apt-get -y install build-essential ca-certificates openssl git
+        apt-get -y install build-essential ca-certificates openssl git zstd
         update-ca-certificates
 
     - name: Check out code
@@ -158,6 +159,11 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
+    # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+    - name: Install zstd
+      run: |
+        apt-get -y update
+        apt-get -y install zstd
     - name: cache restore build output
       uses: actions/cache/restore@v4
       with:
