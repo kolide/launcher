@@ -150,7 +150,8 @@ jobs:
 
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
-  # that the version of launcher is the same across all runners.
+  # that the version of launcher is the same across all runners. We run this job in a container
+  # to confirm launcher support on ubuntu 20.04, since runners no longer support ubuntu 20.04.
   version_baseline:
     name: Version Baseline
     runs-on: ubuntu-22.04
