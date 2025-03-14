@@ -168,7 +168,7 @@ type chainLink struct {
 	// Payload a b64 url encoded json
 	Payload string `json:"payload"`
 	// Signature is the raw bytes of the signature of the b64 url encoded json
-	Signature []byte `json:"signature"`
+	Signature string `json:"signature"`
 	// Signed by is the key id "kid" of the key that signed this link
 	SignedBy string `json:"signedBy"`
 }
@@ -203,7 +203,7 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	}
 
 	for i := range len(c.Links) {
-		if c.Links[i].Payload == "" || c.Links[i].Signature == nil {
+		if c.Links[i].Payload == "" || c.Links[i].Signature == "" {
 			return fmt.Errorf("link %d is missing data or sig", i)
 		}
 	}
@@ -223,7 +223,13 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	var lastPayload payload
 
 	for i := range len(c.Links) {
-		if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[i].Payload), c.Links[i].Signature); err != nil {
+
+		signature, err := base64.URLEncoding.DecodeString(c.Links[i].Signature)
+		if err != nil {
+			return fmt.Errorf("failed to decode signature: %w", err)
+		}
+
+		if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[i].Payload), signature); err != nil {
 			return fmt.Errorf("invalid signature: %w", err)
 		}
 

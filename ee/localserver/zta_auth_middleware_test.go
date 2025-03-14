@@ -185,7 +185,7 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.NoError(t, err)
 
 		// replace last item in chain
-		chain.Links[len(chain.Links)-1].Signature = []byte("ahhhh")
+		chain.Links[len(chain.Links)-1].Signature = base64.URLEncoding.EncodeToString([]byte("bad sig"))
 
 		require.ErrorContains(t, chain.validate(trustedKeysMap), "invalid signature")
 	})
@@ -196,7 +196,7 @@ func Test_ValidateCertChain(t *testing.T) {
 		chain, err := newChain(pubEncryptionKey, keys...)
 		require.NoError(t, err)
 
-		chain.Links[1].Payload = "ahhhh"
+		chain.Links[1].Payload = base64.URLEncoding.EncodeToString([]byte("ahhh"))
 
 		require.ErrorContains(t, chain.validate(trustedKeysMap), "invalid signature")
 	})
@@ -254,7 +254,7 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.NoError(t, err)
 
 		chain.Links[0].Payload = payloadBytesB64
-		chain.Links[0].Signature = sig
+		chain.Links[0].Signature = base64.URLEncoding.EncodeToString(sig)
 
 		require.ErrorContains(t, chain.validate(trustedKeysMap), "expired")
 	})
@@ -327,7 +327,7 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 
 		links[i] = chainLink{
 			Payload:   payloadB64,
-			Signature: sig,
+			Signature: base64.URLEncoding.EncodeToString(sig),
 			SignedBy:  fmt.Sprint(i),
 		}
 	}
