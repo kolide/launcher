@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 type ztaAuthMiddleware struct {
 	counterPartyKeys map[string]*ecdsa.PublicKey
+	slogger          *slog.Logger
 }
 
 type ztaResponse struct {
@@ -27,23 +29,42 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		boxParam := r.URL.Query().Get("payload")
 		if boxParam == "" {
+			z.slogger.Log(r.Context(), slog.LevelDebug,
+				"missing payload url param",
+			)
+
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		boxBytes, err := base64.URLEncoding.DecodeString(boxParam)
 		if err != nil {
+			z.slogger.Log(r.Context(), slog.LevelDebug,
+				"failed to decode payload",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		var myChain chain
 		if err := json.Unmarshal(boxBytes, &myChain); err != nil {
+			z.slogger.Log(r.Context(), slog.LevelDebug,
+				"failed to unmarshal chain",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if err := myChain.validate(z.counterPartyKeys); err != nil {
+			z.slogger.Log(r.Context(), slog.LevelDebug,
+				"failed to validate chain",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -63,6 +84,11 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), myChain.counterPartyPubEncryptionKey)
 		if err != nil {
+			z.slogger.Log(r.Context(), slog.LevelError,
+				"failed to seal response",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -74,6 +100,11 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		data, err := json.Marshal(ztaResponse)
 		if err != nil {
+			z.slogger.Log(r.Context(), slog.LevelError,
+				"failed to marshal zta response",
+				"err", err,
+			)
+
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
