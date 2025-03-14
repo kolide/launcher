@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -69,6 +70,10 @@ func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) st
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	executablePath, _ := pathToTargetVersionExecutable(binary, targetFilename, ulm.baseDir)
+	// First, check if the file even exists, before we do a full executable check
+	if _, err := os.Stat(executablePath); err != nil && errors.Is(err, os.ErrNotExist) {
+		return false
+	}
 	return CheckExecutable(context.TODO(), ulm.slogger, executablePath, "--version") == nil
 }
 
