@@ -126,39 +126,28 @@ type payload struct {
 }
 
 func (p *payload) UnmarshalJSON(data []byte) error {
-	// Create a temporary struct with PublicKey as json.RawMessage
-	// since it's actually an interface in the dst struct we can't
-	// unmarshal it directly into the struct
-	type tmpPayload struct {
-		AccountUuid    string          `json:"accountUuid"`
-		DateTimeSigned int64           `json:"dateTimeSigned"`
-		Environment    string          `json:"environment"`
-		ExpirationDate int64           `json:"expirationDate"`
-		PublicKey      json.RawMessage `json:"publicKey"`
-		SignedBy       string          `json:"signedBy"`
-		UserUuid       string          `json:"userUuid"`
-		Version        uint8           `json:"version"`
+	// Create an alias type to avoid infinite recursion.
+	type alias payload
+
+	// Define a temporary struct that embeds the alias and overrides PublicKey.
+	tmp := &struct {
+		PublicKey json.RawMessage `json:"publicKey"`
+		*alias
+	}{
+		alias: (*alias)(p),
 	}
 
-	var tmp tmpPayload
-	if err := json.Unmarshal(data, &tmp); err != nil {
+	// Unmarshal into the temporary structure.
+	if err := json.Unmarshal(data, tmp); err != nil {
 		return fmt.Errorf("failed to unmarshal payload: %w", err)
 	}
 
-	// Parse the publicKey using jwk.ParseKey
+	// Convert the public key.
 	key, err := jwk.ParseKey(tmp.PublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to parse publicKey: %w", err)
 	}
-
-	p.AccountUuid = tmp.AccountUuid
-	p.DateTimeSigned = tmp.DateTimeSigned
-	p.Environment = tmp.Environment
-	p.ExpirationDate = tmp.ExpirationDate
 	p.PublicKey = key
-	p.SignedBy = tmp.SignedBy
-	p.UserUuid = tmp.UserUuid
-	p.Version = tmp.Version
 
 	return nil
 }
