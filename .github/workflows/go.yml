@@ -86,6 +86,60 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
+  buildubuntu2004:
+    name: launcher - ubuntu 20.04
+    runs-on: ubuntu-22.04
+    container: ubuntu:20.04
+    steps:
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: './go.mod'
+        check-latest: true
+        cache: false
+      id: go
+
+    # use bash, because the powershell syntax is different and this is a cross platform workflow
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - name: Go Build Cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+    - name: Go Mod Cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: Get dependencies
+      run: make deps
+
+    - name: Set up zig
+      uses: goto-bus-stop/setup-zig@v2
+
+    - name: Build
+      run: make -j2 github-build
+
+    - name: Cache build output
+      uses: actions/cache@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
   # that the version of launcher is the same across all runners.
@@ -93,7 +147,7 @@ jobs:
     name: Version Baseline
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
-    needs: build
+    needs: buildubuntu2004
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
