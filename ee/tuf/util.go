@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,12 +16,18 @@ import (
 
 // CheckExecutable tests whether something is an executable. It
 // examines permissions, mode, and tries to exec it directly.
-func CheckExecutable(ctx context.Context, potentialBinary string, args ...string) error {
+func CheckExecutable(ctx context.Context, slogger *slog.Logger, potentialBinary string, args ...string) error {
 	ctx, span := traces.StartSpan(ctx, "binary_path", potentialBinary)
 	defer span.End()
 
+	slogger = slogger.With("subcomponent", "CheckExecutable", "binary_path", potentialBinary, "args", fmt.Sprintf("%+v", args))
+
 	if err := checkExecutablePermissions(ctx, potentialBinary); err != nil {
-		return err
+		slogger.Log(ctx, slog.LevelWarn,
+			"failed executable permissions check",
+			"err", err,
+		)
+		return fmt.Errorf("checking executable permissions: %w", err)
 	}
 
 	// If we can determine that the requested executable is
@@ -28,6 +35,10 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 	// fork bomb. Ignore errors, either we get an answer or we don't.
 	selfPath, _ := os.Executable()
 	if filepath.Clean(selfPath) == filepath.Clean(potentialBinary) {
+		slogger.Log(ctx, slog.LevelInfo,
+			"binary path matches current executable path, no need to exec",
+			"self_path", selfPath,
+		)
 		return nil
 	}
 
@@ -41,8 +52,24 @@ func CheckExecutable(ctx context.Context, potentialBinary string, args ...string
 			continue
 		}
 
-		return supressRoutineErrors(ctx, execErr, out)
+		if err := supressRoutineErrors(ctx, execErr, out); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"executable check returned error",
+				"err", err,
+				"exec_err", execErr,
+				"command_output", string(out),
+			)
+			return err
+		}
+		slogger.Log(ctx, slog.LevelInfo,
+			"successfully checked executable",
+		)
+		return nil
 	}
+
+	slogger.Log(ctx, slog.LevelWarn,
+		"received ETXTBSY multiple times when running executable check",
+	)
 
 	return fmt.Errorf("could not exec %s despite retries due to text file busy", potentialBinary)
 }

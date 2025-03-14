@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,7 +99,7 @@ func TestCheckExecutable(t *testing.T) {
 	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			err := CheckExecutable(context.TODO(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
+			err := CheckExecutable(context.TODO(), multislogger.NewNopLogger(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
 
@@ -107,7 +108,7 @@ func TestCheckExecutable(t *testing.T) {
 				// trigger the match against os.Executable and don't
 				// invoked. This is here, and not a dedicated test,
 				// because we ensure the same test arguments.
-				require.NoError(t, CheckExecutable(context.TODO(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
+				require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
 			} else {
 				require.NoError(t, err, tt.testName)
 			}
@@ -129,7 +130,7 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
 
 	require.Error(t,
-		CheckExecutable(context.TODO(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
+		CheckExecutable(context.TODO(), multislogger.NewNopLogger(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
 		"truncated binary")
 }
 
