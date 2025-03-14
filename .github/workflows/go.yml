@@ -91,6 +91,12 @@ jobs:
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
     steps:
+    - name: Install build dependencies
+      run: |
+        apt-get -y update
+        apt-get -y install build-essential ca-certificates openssl git
+        update-ca-certificates
+
     - name: Check out code
       id: checkout
       uses: actions/checkout@v4
