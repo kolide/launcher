@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/nacl/box"
@@ -28,6 +29,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 			"for_funzies": mustGenEcdsaKey(t).Public().(*ecdsa.PublicKey),
 			"0":           rootTrustedEcKey.Public().(*ecdsa.PublicKey), // this is the trusted root
 		},
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	returnData := []byte("Congrats!, you got the data back!")
