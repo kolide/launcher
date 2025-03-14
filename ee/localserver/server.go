@@ -104,8 +104,22 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
 
+	dt4aKeys, err := dt4aKeys()
+	if err != nil {
+		return nil, fmt.Errorf("loading dt4a keys %w", err)
+	}
+
+	ztaAuthMiddleware := &ztaAuthMiddleware{
+		counterPartyKeys: dt4aKeys,
+		slogger:          k.Slogger().With("component", "dt4aAuthMiddleware"),
+	}
+
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
+	// TODO: make this authenticated or remove
 	mux.Handle("/zta", ls.requestZtaInfoHandler())
+
+	// mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
+	mux.Handle("/v0/dt4a", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:
