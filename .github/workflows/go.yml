@@ -92,6 +92,7 @@ jobs:
   version_baseline:
     name: Version Baseline
     runs-on: ubuntu-22.04
+    container: ubuntu:20.04
     needs: build
     outputs:
       version: ${{ steps.version.outputs.version }}
