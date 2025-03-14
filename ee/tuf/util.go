@@ -48,23 +48,25 @@ func CheckExecutable(ctx context.Context, slogger *slog.Logger, potentialBinary 
 	// See: https://github.com/golang/go/issues/22315
 	for i := 0; i < 3; i += 1 {
 		out, execErr := runExecutableCheck(ctx, potentialBinary, args...)
-		if execErr != nil && errors.Is(execErr, syscall.ETXTBSY) {
+		if execErr == nil {
+			slogger.Log(ctx, slog.LevelInfo,
+				"successfully checked executable",
+			)
+			return nil
+		}
+
+		// Check to see if we should retry
+		if errors.Is(execErr, syscall.ETXTBSY) {
 			continue
 		}
 
-		if err := supressRoutineErrors(ctx, execErr, out); err != nil {
-			slogger.Log(ctx, slog.LevelWarn,
-				"executable check returned error",
-				"err", err,
-				"exec_err", execErr,
-				"command_output", string(out),
-			)
-			return err
-		}
-		slogger.Log(ctx, slog.LevelInfo,
-			"successfully checked executable",
+		// Non-retryable error
+		slogger.Log(ctx, slog.LevelWarn,
+			"executable check returned error",
+			"exec_err", execErr,
+			"command_output", string(out),
 		)
-		return nil
+		return fmt.Errorf("running executable check: got output `%s` and error: %w", string(out), execErr)
 	}
 
 	slogger.Log(ctx, slog.LevelWarn,
@@ -93,28 +95,4 @@ func runExecutableCheck(ctx context.Context, potentialBinary string, args ...str
 	}
 
 	return out, err
-}
-
-// supressRoutineErrors attempts to tell whether the error was a
-// program that has executed, and then exited, vs one that's execution
-// was entirely unsuccessful. This differentiation allows us to
-// detect, and recover, from corrupt updates vs something in-app.
-func supressRoutineErrors(ctx context.Context, err error, combinedOutput []byte) error {
-	_, span := traces.StartSpan(ctx)
-	defer span.End()
-
-	if err == nil {
-		return nil
-	}
-
-	// Suppress exit codes of 1 or 2. These are generally indicative of
-	// an unknown command line flag, _not_ a corrupt download. (exit
-	// code 0 will be nil, and never trigger this block)
-	if exitError, ok := err.(*exec.ExitError); ok {
-		if exitError.ExitCode() == 1 || exitError.ExitCode() == 2 {
-			// suppress these
-			return nil
-		}
-	}
-	return fmt.Errorf("exec error: output: `%s`, err: %w", string(combinedOutput), err)
 }

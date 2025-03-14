@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +70,10 @@ func TestCheckExecutable(t *testing.T) {
 	tmpDir := t.TempDir()
 	binaryName := windowsAddExe("testbinary")
 	targetExe := filepath.Join(tmpDir, binaryName)
-	tufci.CopyBinary(t, targetExe)
+	require.NoError(t, os.MkdirAll(filepath.Dir(tmpDir), 0755))
+
+	// We use the golang test binary here so we can run `TestHelperProcess` with the desired outcome
+	require.NoError(t, os.Symlink(os.Args[0], targetExe))
 	require.NoError(t, os.Chmod(targetExe, 0755))
 
 	var tests = []struct {
@@ -84,11 +86,11 @@ func TestCheckExecutable(t *testing.T) {
 		},
 		{
 			testName:    "exit1",
-			expectedErr: false,
+			expectedErr: true,
 		},
 		{
 			testName:    "exit2",
-			expectedErr: false,
+			expectedErr: true,
 		},
 		{
 			testName:    "sleep",
