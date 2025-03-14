@@ -12,6 +12,8 @@ on:
 
 
 jobs:
+  # Our non-containerized launcher builds -- macOS and Windows. Linux is handled separately
+  # below to preserve Ubuntu 20.04 support.
   build:
     name: launcher
     runs-on: ${{ matrix.os }}
@@ -19,7 +21,6 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-22.04
           - macos-13
           - windows-latest
     steps:
@@ -59,10 +60,6 @@ jobs:
     - name: Get dependencies
       run: make deps
 
-    - name: Set up zig
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      uses: goto-bus-stop/setup-zig@v2
-
     - name: Build
       run: make -j2 github-build
 
@@ -86,10 +83,13 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
-  buildubuntu2004:
-    name: launcher - ubuntu 20.04
+  # Our containerized launcher build -- we need to build launcher on Ubuntu 20.04
+  # in order to continue to support that platform, but that GH runner has been EOL'ed --
+  # so we have a separate build here in an ubuntu:20.04 container instead.
+  build_linux:
+    name: launcher (linux)
     runs-on: ubuntu-22.04
-    container: ubuntu:20.04
+    container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
     steps:
     - name: Install build dependencies
       run: |
@@ -114,9 +114,7 @@ jobs:
         cache: false
       id: go
 
-    # use bash, because the powershell syntax is different and this is a cross platform workflow
     - id: go-cache-paths
-      shell: bash
       run: |
         echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
         echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
@@ -156,7 +154,7 @@ jobs:
     name: Version Baseline
     runs-on: ubuntu-22.04
     container: ubuntu:20.04
-    needs: buildubuntu2004
+    needs: build_linux
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -175,7 +173,9 @@ jobs:
 
   launcher_test:
     name: test
-    needs: build # a desktop runner test requires a build to exist
+    needs:
+      - build # a desktop runner test requires a build to exist
+      - build_linux
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -250,7 +250,9 @@ jobs:
           - macos-15
           - windows-2019
           - windows-2022
-    needs: version_baseline
+    needs:
+      - version_baseline # version_baseline implies build_linux
+      - build # need the other builds too
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v4
@@ -312,7 +314,6 @@ jobs:
         name: ${{ matrix.artifactos }}-build
         path: build/
         if-no-files-found: error
-
 
   package_builder_test:
     name: package_builder
@@ -386,6 +387,7 @@ jobs:
       - run: true
     needs:
       - build
+      - build_linux
       - launcher_test
       - package_builder_test
       - exec_testing
