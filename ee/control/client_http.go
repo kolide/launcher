@@ -39,6 +39,8 @@ const (
 	HeaderKey        = "X-Kolide-Key"
 	HeaderSignature2 = "X-Kolide-Signature2"
 	HeaderKey2       = "X-Kolide-Key2"
+
+	defaultRequestTimeout = 30 * time.Second
 )
 
 type configResponse struct {
@@ -70,17 +72,23 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	challengeReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/agent/config").String(), nil)
+	challengeCtx, challengeCancel := context.WithTimeout(ctx, defaultRequestTimeout)
+	defer challengeCancel()
+
+	challengeReq, err := http.NewRequestWithContext(challengeCtx, http.MethodGet, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(ctx, challengeReq)
+	challenge, err := c.do(challengeCtx, challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
 
-	configReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/config").String(), nil)
+	configCtx, configCancel := context.WithTimeout(ctx, defaultRequestTimeout)
+	defer configCancel()
+
+	configReq, err := http.NewRequestWithContext(configCtx, http.MethodPost, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create config request: %w", err)
 	}
@@ -121,7 +129,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
-	configAndAuthKeyRaw, err := c.do(ctx, configReq)
+	configAndAuthKeyRaw, err := c.do(configCtx, configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
 	}
@@ -141,6 +149,9 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+	defer cancel()
 
 	if c.token == "" {
 		return nil, errors.New("token is nil, cannot request subsystem data")
@@ -168,6 +179,9 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+	defer cancel()
 
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
