@@ -57,6 +57,16 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		)
 	})
 
+	t.Run("handles empty b64", func(t *testing.T) {
+		t.Parallel()
+		rr := httptest.NewRecorder()
+		payload := base64.URLEncoding.EncodeToString([]byte("[]"))
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", payload), http.NoBody))
+		require.Equal(t, http.StatusUnauthorized, rr.Code,
+			"should return bad request when box param is valid b64 but empty",
+		)
+	})
+
 	t.Run("handles chain unmarshall failure", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
@@ -115,7 +125,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
 		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", url.QueryEscape(b64)), nil))
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil))
 		require.Equal(t, http.StatusOK, rr.Code,
 			"should return ok when chain is valid",
 		)
@@ -126,10 +136,10 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		bodyDecoded, err := base64.StdEncoding.DecodeString(string(bodyBytes))
 		require.NoError(t, err)
 
-		var ztaResponse ztaResponse
-		require.NoError(t, json.Unmarshal(bodyDecoded, &ztaResponse))
+		var z ztaResponse
+		require.NoError(t, json.Unmarshal(bodyDecoded, &z))
 
-		opened, err := echelper.OpenNaCl(ztaResponse.Data, ztaResponse.PubKey, callerPrivKey)
+		opened, err := echelper.OpenNaCl(z.Data, z.PubKey, callerPrivKey)
 		require.NoError(t, err)
 
 		require.Equal(t, returnData, opened,
@@ -267,6 +277,10 @@ func Test_ValidateCertChain(t *testing.T) {
 
 		require.NoError(t, chain.validate(trustedKeysMap),
 			"should be able to validate chain",
+		)
+
+		require.Equal(t, chain.counterPartyPubEncryptionKey, pubEncryptionKey,
+			"counter party pub encryption key should get set in validate",
 		)
 	})
 }
