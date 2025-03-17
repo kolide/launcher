@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"strconv"
 	"time"
 
@@ -18,23 +19,45 @@ import (
 )
 
 const (
-	tagHeader        uint32 = 0xfff10000
-	tagNull          uint32 = 0xffff0000
-	tagUndefined     uint32 = 0xffff0001
-	tagBoolean       uint32 = 0xffff0002
-	tagInt32         uint32 = 0xffff0003
-	tagString        uint32 = 0xffff0004
-	tagDateObject    uint32 = 0xffff0005
-	tagRegexpObject  uint32 = 0xffff0006
-	tagArrayObject   uint32 = 0xffff0007
-	tagObjectObject  uint32 = 0xffff0008
-	tagBooleanObject uint32 = 0xffff000a
-	tagStringObject  uint32 = 0xffff000b
-	tagNumberObject  uint32 = 0xffff000c
-	tagMapObject     uint32 = 0xffff0011
-	tagSetObject     uint32 = 0xffff0012
-	tagEndOfKeys     uint32 = 0xffff0013
-	tagFloatMax      uint32 = 0xfff00000
+	tagFloatMax     uint32 = 0xfff00000
+	tagHeader       uint32 = 0xfff10000
+	tagNull         uint32 = 0xffff0000
+	tagUndefined    uint32 = 0xffff0001
+	tagBoolean      uint32 = 0xffff0002
+	tagInt32        uint32 = 0xffff0003
+	tagString       uint32 = 0xffff0004
+	tagDateObject   uint32 = 0xffff0005
+	tagRegexpObject uint32 = 0xffff0006
+	tagArrayObject  uint32 = 0xffff0007
+	tagObjectObject uint32 = 0xffff0008
+	// SCTAG_ARRAY_BUFFER_OBJECT_V2 omitted
+	tagBooleanObject    uint32 = 0xffff000a
+	tagStringObject     uint32 = 0xffff000b
+	tagNumberObject     uint32 = 0xffff000c
+	tagBackReferenceObj uint32 = 0xffff000d
+	// SCTAG_DO_NOT_USE_1 omitted
+	// SCTAG_DO_NOT_USE_2 omitted
+	// SCTAG_TYPED_ARRAY_OBJECT_V2 omitted
+	tagMapObject uint32 = 0xffff0011
+	tagSetObject uint32 = 0xffff0012
+	tagEndOfKeys uint32 = 0xffff0013
+	// SCTAG_DO_NOT_USE_3 omitted
+	// SCTAG_DATA_VIEW_OBJECT_V2 omitted
+	// SCTAG_SAVED_FRAME_OBJECT omitted
+	// SCTAG_JSPRINCIPALS omitted
+	// SCTAG_NULL_JSPRINCIPALS omitted
+	// SCTAG_RECONSTRUCTED_SAVED_FRAME_PRINCIPALS_IS_SYSTEM omitted
+	// SCTAG_RECONSTRUCTED_SAVED_FRAME_PRINCIPALS_IS_NOT_SYSTEM omitted
+	// SCTAG_SHARED_ARRAY_BUFFER_OBJECT omitted
+	// SCTAG_SHARED_WASM_MEMORY_OBJECT omitted
+	tagBigInt                       uint32 = 0xffff001d
+	tagBigIntObject                 uint32 = 0xffff001e
+	tagArrayBufferObj               uint32 = 0xffff001f
+	tagTypedArrayObj                uint32 = 0xffff0020
+	tagDataViewObj                  uint32 = 0xffff0021
+	tagErrorObj                     uint32 = 0xffff0022
+	tagResizableArrayBufferObj      uint32 = 0xffff0023
+	tagGrowableSharedArrayBufferObj uint32 = 0xffff0024
 )
 
 // deserializeFirefox deserializes a JS object that has been stored by Firefox
@@ -158,6 +181,8 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 			return nil, fmt.Errorf("decoding double: %w", err)
 		}
 		return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+	case tagBigInt, tagBigIntObject:
+		return deserializeBigInt(itemData, srcReader)
 	case tagString, tagStringObject:
 		return deserializeString(itemData, srcReader)
 	case tagBoolean, tagBooleanObject:
@@ -189,6 +214,23 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 		return deserializeSet(srcReader)
 	case tagNull, tagUndefined:
 		return nil, nil
+	case tagArrayBufferObj:
+		return nil, errors.New("parsing not implemented for array buffer object")
+	case tagTypedArrayObj:
+		return deserializeTypedArray(itemData, srcReader)
+	case tagBackReferenceObj:
+		// This is a reference to an already-deserialized object. For now, we don't
+		// really care which one -- we just want to continue parsing. Return the
+		// object ID.
+		return []byte(strconv.Itoa(int(itemData))), nil
+	case tagDataViewObj:
+		return nil, errors.New("parsing not implemented for data view object")
+	case tagErrorObj:
+		return nil, errors.New("parsing not implemented for error object")
+	case tagResizableArrayBufferObj:
+		return nil, errors.New("parsing not implemented for resizable array buffer object")
+	case tagGrowableSharedArrayBufferObj:
+		return nil, errors.New("parsing not implemented for growable shared array buffer object")
 	default:
 		if itemTag >= tagFloatMax {
 			return nil, fmt.Errorf("unknown tag type `%x` with data `%d`", itemTag, itemData)
@@ -276,6 +318,32 @@ func deserializeUtf16String(strLen uint32, srcReader *bytes.Reader) ([]byte, err
 	return decoded, nil
 }
 
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(bitfield uint32, srcReader *bytes.Reader) ([]byte, error) {
+	// Determine BigInt length from bitfield
+	bigIntRawLen := bitfield & bitMask(31)
+	if bigIntRawLen == 0 {
+		return []byte("0n"), nil
+	}
+
+	// Read the raw bytes of the BigInt
+	for i := 0; i < int(bigIntRawLen); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, bigIntRawLen, err)
+		}
+	}
+
+	// Determine sign for BigInt from bitfield, then return placeholder string
+	isNegative := bitfield & (1 << 31)
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
+}
+
 // Please note that these values are NOT identical to the ones used by Chrome -- global
 // and ignorecase are swapped. Flag values retrieved from https://searchfox.org/mozilla-central/source/js/public/RegExpFlags.h.
 const (
@@ -359,23 +427,11 @@ func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, erro
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
-
-		switch itemTag {
-		case tagObjectObject:
-			obj, err := deserializeNestedObject(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading object at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(obj) // cast to string so it's readable when marshalled again below
-		case tagString:
-			str, err := deserializeString(itemData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading string at index %d in array: %w", idx, err)
-			}
-			resultArr[idx] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("cannot process item at index %d in array: unsupported tag type %x", idx, itemTag)
+		arrayItem, err := deserializeNext(itemTag, itemData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
+		resultArr[idx] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(resultArr)
@@ -384,6 +440,222 @@ func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, erro
 	}
 
 	return arrBytes, nil
+}
+
+// Types for TypedArray are pulled from https://searchfox.org/mozilla-central/source/js/public/ScalarType.h
+const (
+	typedArrayInt8 = iota
+	typedArrayUint8
+	typedArrayInt16
+	typedArrayUint16
+	typedArrayInt32
+	typedArrayUint32
+	typedArrayFloat32
+	typedArrayFloat64
+	typedArrayUint8Clamped
+	typedArrayBigInt64
+	typedArrayBigUint64
+)
+
+func deserializeTypedArray(arrayType uint32, srcReader *bytes.Reader) ([]byte, error) {
+	// The upcoming uint64 indicates the length of the array
+	var length uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &length); err != nil {
+		return nil, fmt.Errorf("reading nelems in TypedArray: %w", err)
+	}
+
+	// Next up is some uint64 that appears to indicate something about maxByteLength,
+	// and then byte length.
+	var maxByteLengthFlag uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &maxByteLengthFlag); err != nil {
+		return nil, fmt.Errorf("reading maxByteLength sentinel in TypedArray: %w", err)
+	}
+	var byteLength uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &byteLength); err != nil {
+		return nil, fmt.Errorf("reading bytelength in TypedArray: %w", err)
+	}
+
+	// maxByteLengthFlag is 18446462731876827136 when the underlying ArrayBuffer does not
+	// have a maxByteLength set, and 18446462749056696320 when it does. I can't find documentation
+	// for what these values are, so this is the best we have. We don't actually need to know the
+	// maxByteLength, so read and discard it.
+	if maxByteLengthFlag != 18446462731876827136 {
+		var maxByteLength uint64
+		if err := binary.Read(srcReader, binary.NativeEndian, &maxByteLength); err != nil {
+			return nil, fmt.Errorf("reading maxByteLength in TypedArray: %w", err)
+		}
+	}
+
+	// Figure out the length of the upcoming TypedArray (in elements, not bytes),
+	// so that we can correctly compute padding later. Sometimes the length is
+	// uint64_t(-1) to indicate that this typed array is "auto-length". In this case,
+	// we'd use the byte length to set the expected length of the array. We also
+	// need the byte length to calculate padding.
+	lengthFromByteLength, err := byteLengthToTypedArrayLength(arrayType, byteLength)
+	if err != nil {
+		return nil, fmt.Errorf("converting byte length to array length: %w", err)
+	}
+	if length == math.MaxUint64 {
+		length = lengthFromByteLength
+	}
+
+	// Read in the TypedArray: byteLength raw data bytes, then byte offset, then finally the padding.
+	rawTypedArrayBytes := make([]byte, byteLength)
+	for i := 0; i < int(byteLength); i++ {
+		b, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in TypedArray: %w", i, byteLength, err)
+		}
+		rawTypedArrayBytes[i] = b
+	}
+	var byteOffset uint64
+	if err := binary.Read(srcReader, binary.NativeEndian, &byteOffset); err != nil {
+		return nil, fmt.Errorf("reading byteoffset in TypedArray: %w", err)
+	}
+
+	// Handle padding -- data is packed into uint64_t words. See StructuredClone's ComputePadding.
+	// We read and discard this data.
+	elemSize, err := elementSize(arrayType)
+	if err != nil {
+		return nil, fmt.Errorf("getting element size to calculate padding: %w", err)
+	}
+	leftoverLength := (lengthFromByteLength % 8) * elemSize
+	padding := -leftoverLength & 7
+	for i := 0; i < int(padding); i++ {
+		if _, err := srcReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d of padding after TypedArray: %w", i, padding, err)
+		}
+	}
+
+	// We have all the data we need from srcReader to handle the TypedArray.
+	// Create a new reader for our raw TypedArray bytes.
+	typedArrayReader := bytes.NewReader(rawTypedArrayBytes)
+
+	// If we have an offset at the start of the TypedArray, read and discard that number of bytes.
+	for i := 0; i < int(byteOffset); i++ {
+		if _, err := typedArrayReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d of offset in TypedArray: %w", i, byteOffset, err)
+		}
+	}
+
+	// Finally! We have the raw data that we can interpret as the correct type for the TypedArray,
+	// we've handled padding, we've handled the offset, and we know how many elements are in our array.
+	// We can proceed with reinterpreting the data in typedArrayReader as the correct TypedArray.
+	var results any
+	switch arrayType {
+	case typedArrayInt8:
+		int8Arr := make([]int8, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int8Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int8Arr[i], i, err)
+			}
+		}
+		results = int8Arr
+	case typedArrayUint8, typedArrayUint8Clamped:
+		uint8Arr := make([]uint8, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint8Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint8Arr[i], i, err)
+			}
+		}
+		results = uint8Arr
+	case typedArrayInt16:
+		int16Arr := make([]int16, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int16Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int16Arr[i], i, err)
+			}
+		}
+		results = int16Arr
+	case typedArrayUint16:
+		uint16Arr := make([]uint16, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint16Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint16Arr[i], i, err)
+			}
+		}
+		results = uint16Arr
+	case typedArrayInt32:
+		int32Arr := make([]int32, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &int32Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", int32Arr[i], i, err)
+			}
+		}
+		results = int32Arr
+	case typedArrayUint32:
+		uint32Arr := make([]uint32, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &uint32Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", uint32Arr[i], i, err)
+			}
+		}
+		results = uint32Arr
+	case typedArrayFloat32:
+		float32Arr := make([]float32, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &float32Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", float32Arr[i], i, err)
+			}
+		}
+		results = float32Arr
+	case typedArrayBigInt64:
+		bigInt64Arr := make([]int64, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &bigInt64Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", bigInt64Arr[i], i, err)
+			}
+		}
+		results = bigInt64Arr
+	case typedArrayBigUint64:
+		bigUint64Arr := make([]uint64, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &bigUint64Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", bigUint64Arr[i], i, err)
+			}
+		}
+		results = bigUint64Arr
+	case typedArrayFloat64:
+		float64Arr := make([]float64, length)
+		for i := 0; i < int(length); i++ {
+			if err := binary.Read(typedArrayReader, binary.NativeEndian, &float64Arr[i]); err != nil {
+				return nil, fmt.Errorf("reading %T at index %d in TypedArray: %w", float64Arr[i], i, err)
+			}
+		}
+		results = float64Arr
+	default:
+		return nil, fmt.Errorf("unsupported TypedArray type %d", arrayType)
+	}
+
+	arrBytes, err := json.Marshal(results)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling TypedArray of type %d: %w", arrayType, err)
+	}
+
+	return arrBytes, nil
+}
+
+func elementSize(arrayType uint32) (uint64, error) {
+	switch arrayType {
+	case typedArrayInt8, typedArrayUint8, typedArrayUint8Clamped:
+		return 1, nil
+	case typedArrayInt16, typedArrayUint16:
+		return 2, nil
+	case typedArrayInt32, typedArrayUint32, typedArrayFloat32:
+		return 4, nil
+	case typedArrayFloat64, typedArrayBigInt64, typedArrayBigUint64:
+		return 8, nil
+	default:
+		return 0, fmt.Errorf("unsupported TypedArray type %d", arrayType)
+	}
+}
+
+func byteLengthToTypedArrayLength(arrayType uint32, byteLength uint64) (uint64, error) {
+	elemSize, err := elementSize(arrayType)
+	if err != nil {
+		return 0, fmt.Errorf("calculating element size: %w", err)
+	}
+	return byteLength / elemSize, nil
 }
 
 func deserializeNestedObject(srcReader *bytes.Reader) ([]byte, error) {

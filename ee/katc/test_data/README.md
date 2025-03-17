@@ -23,10 +23,6 @@ Zip the .indexeddb.leveldb directory (for Chrome) or the .sqlite file (for Firef
 then move the zipped file to [indexeddbs](./indexeddbs). You can then reference this file
 in the indexeddb tests.
 
-If you are iteratively making changes to the database, Chrome will complain about re-creating
-the database. You can delete the database via Dev Tools and then reload the page to re-create
-the database successfully.
-
 ## Troubleshooting parsing errors
 
 First, it is helpful to understand how deserialization works. The general process is documented below,

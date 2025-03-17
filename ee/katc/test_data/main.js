@@ -3,6 +3,15 @@
     const objectStoreName = "launchertestobjstore";
     const objectStoreKeyPath = "uuid";
 
+    // In case the database already exists -- delete it so we can refresh the data.
+    const deleteReq = window.indexedDB.deleteDatabase(databaseName);
+    deleteReq.onerror = (event) => {
+        console.log(event.error);
+    }
+    deleteReq.onsuccess = (event) => {
+        console.log("Deleted db in preparation for re-creation");
+    }
+
     // Open database. Second arg is database version. We're not dealing with
     // migrations at the moment, so just leave it at 1.
     const request = window.indexedDB.open(databaseName, 1);
@@ -16,6 +25,27 @@
         let sparseArr = ["zero", "one"];
         // a[2] and a[3] skipped, making this array sparse
         sparseArr[4] = "four";
+
+        // Create a sparse array with a different data type in it
+        let secondSparseArray = [1, 1];
+        secondSparseArray[6] = 1;
+
+        // Create some TypedArrays with a variety of types, some with explicit underlying ArrayBuffers
+        const unsignedIntArrBuf = new ArrayBuffer(1);
+        const unsignedIntArr = new Uint8Array(unsignedIntArrBuf);
+        unsignedIntArr[0] = 20;
+        const signedIntArrBuf = new ArrayBuffer(16);
+        const signedIntArr = new Int32Array(signedIntArrBuf);
+        signedIntArr[2] = 3000;
+        const floatArr = new Float64Array([4.4, 4.5]);
+        const clampedUintArr = new Uint8ClampedArray([1000, -20]); // clamped to [255, 0]
+        const withOffsetArrBuf = new ArrayBuffer(32);
+        const withOffsetArr = new Uint16Array(withOffsetArrBuf, 2);
+        withOffsetArr[4] = 101;
+        withOffsetArr[6] = 201;
+        const lengthTrackingArrBuf = new ArrayBuffer(8, { maxByteLength: 16 });
+        const lengthTrackingArr = new Float32Array(lengthTrackingArrBuf);
+        lengthTrackingArrBuf.resize(12); // will also resize lengthTrackingArr
 
         // Shove some data in the object store. We want at least a couple items,
         // and a variety of data structures to really test our deserialization.
@@ -36,6 +66,7 @@
                         "alias2"
                     ],
                 linkedIds: sparseArr, // Sparse array of strings
+                anotherSparseArray: secondSparseArray, // Sparse array of integers
                 someDetails: // Dense array of nested objects
                     [
                         {
@@ -55,8 +86,9 @@
                         }
                     ],
                 noDetails: [], // Empty array
+                numArray: [1, 2, 3], // Dense array of numbers
                 email: "test1@example.com",
-                someTimestamp: 1720034607, // *unint32
+                someTimestamp: 1720034607, // *uint32
                 someDate: new Date(), // Date object, empty
                 someMap: new Map(), // Map object, empty
                 someComplexMap: new Map([
@@ -69,6 +101,10 @@
                 someNumberObject: new Number(0), // Number object, empty
                 someDouble: 0.0, // double
                 someBoolean: new Boolean(true), // Boolean object, true
+                someTypedArray: unsignedIntArr, // TypedArray, Uint8Array (covers unsigned int types)
+                someArrayBuffer: unsignedIntArr.buffer, // ArrayBuffer object
+                anotherTypedArray: floatArr, // TypedArray, Float64Array (covers float types)
+                yetAnotherTypedArray: withOffsetArr, // TypedArray, Uint16Array with byte offset
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -85,6 +121,7 @@
                         "anotheralias1"
                     ],
                 linkedIds: sparseArr, // Sparse array of strings
+                anotherSparseArray: secondSparseArray, // Sparse array of integers
                 someDetails: // Dense array of nested objects
                     [
                         {
@@ -99,8 +136,9 @@
                         }
                     ],
                 noDetails: [], // Empty array
+                numArray: [1, 2, 3], // Dense array of numbers
                 email: "test2@example.com",
-                someTimestamp: 1726096312, // *unint32
+                someTimestamp: 1726096312, // *uint32
                 someDate: new Date("December 17, 1995 03:24:00"), // Date object, not empty
                 someMap: new Map([
                     [1, "one"],
@@ -117,17 +155,36 @@
                 someNumberObject: new Number(123456.789), // Number object
                 someDouble: 304.302, // double
                 someBoolean: new Boolean(false), // Boolean object, false
+                someTypedArray: signedIntArr, // TypedArray, Int32Array (covers signed int types)
+                someArrayBuffer: signedIntArr.buffer, // ArrayBuffer object
+                anotherTypedArray: clampedUintArr, // TypedArray, Uint8ClampedArray (covers clamped types)
+                yetAnotherTypedArray: lengthTrackingArr, // TypedArray, Float32Array with length tracking
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
-            // Store values in the newly created objectStore.
+            // Store values in the newly-created objectStore.
             const objectStoreTransaction = db
                 .transaction(objectStoreName, "readwrite")
                 .objectStore(objectStoreName);
             storeData.forEach((row) => {
                 objectStoreTransaction.add(row);
             });
-            console.log("Added all data to IndexedDB")
+            objectStoreTransaction.onsuccess = (event) => {
+                console.log("Added all data to IndexedDB");
+            };
+            objectStoreTransaction.onerror = (event) => {
+                console.log("Error adding data to database", event.error);
+            };
         };
-    }
+        objectStore.transaction.onerror = (event) => {
+            console.log("Error creating object store", event.error);
+        };
+    };
+
+    request.onerror = (event) => {
+        console.log("Error creating database", request.error);
+    };
+    request.onsuccess = (event) => {
+        console.log("Successfully created database");
+    };
 })();
