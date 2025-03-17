@@ -18,6 +18,9 @@ import (
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 )
 
+// initialRootJSON contains the trusted first version of root.json
+// This is version 1 from https://tuf.kolide.com/repository/1.root.json
+
 //go:embed assets/initial_root.json
 var initialRootJSON []byte
 
@@ -65,10 +68,6 @@ func main() {
 
 func updateTUFMetadata(ctx context.Context, logger log.Logger, tufURL, metadataPath, outputDirsStr string) error {
 	level.Info(logger).Log("msg", "Starting TUF metadata update", "url", tufURL)
-
-	// initialRootJSON contains the trusted first version of root.json
-	// This is version 1 from https://tuf.kolide.com/repository/1.root.json
-	initialRootJSON := initialRootJSON
 
 	// Create a temporary directory to store TUF metadata
 	tempDir, err := os.MkdirTemp("", "tuf-update")
