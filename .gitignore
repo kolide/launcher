@@ -24,6 +24,7 @@ test-cmds
 # Generated assets
 pkg/packagekit/internal/assets.go
 pkg/packagekit/wix/internal/assets.go
+pkg/packaging/assets/tuf/root.json
 
 # VS Code Files
 .vscode/
@@ -35,3 +36,6 @@ scratch.*
 /debug
 
 go.work*
+
+# tuf root.json files
+ee/tuf/assets/tuf/root.json
