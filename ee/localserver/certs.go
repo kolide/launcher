@@ -177,7 +177,7 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 		// under the hood it calls Curve.IsOnCurve(...), but if you call that directly
 		// you get deprecated warnings
 		if _, err := pubKey.ECDH(); err != nil {
-			return nil, fmt.Errorf("invalid public key: %w", err)
+			return nil, fmt.Errorf("invalid public key, kid %s: %w", k, err)
 		}
 
 		dt4aKeyMap[k] = pubKey

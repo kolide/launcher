@@ -111,7 +111,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	ztaAuthMiddleware := &ztaAuthMiddleware{
 		counterPartyKeys: dt4aKeys,
-		slogger:          k.Slogger().With("component", "dt4aAuthMiddleware"),
+		slogger:          k.Slogger().With("component", "dt4a_auth_middleware"),
 	}
 
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
