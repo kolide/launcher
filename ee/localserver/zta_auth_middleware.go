@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,6 +17,7 @@ import (
 )
 
 type ztaAuthMiddleware struct {
+	// counterPartyKeys is a map of trusted keys, maps KID to pubkey
 	counterPartyKeys map[string]*ecdsa.PublicKey
 	slogger          *slog.Logger
 }
@@ -29,7 +31,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		boxParam := r.URL.Query().Get("payload")
 		if boxParam == "" {
-			z.slogger.Log(r.Context(), slog.LevelDebug,
+			z.slogger.Log(r.Context(), slog.LevelWarn,
 				"missing payload url param",
 			)
 
@@ -39,7 +41,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		boxBytes, err := base64.URLEncoding.DecodeString(boxParam)
 		if err != nil {
-			z.slogger.Log(r.Context(), slog.LevelDebug,
+			z.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to decode payload",
 				"err", err,
 			)
@@ -48,9 +50,9 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		var myChain chain
-		if err := json.Unmarshal(boxBytes, &myChain); err != nil {
-			z.slogger.Log(r.Context(), slog.LevelDebug,
+		var requestTrustChain chain
+		if err := json.Unmarshal(boxBytes, &requestTrustChain); err != nil {
+			z.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to unmarshal chain",
 				"err", err,
 			)
@@ -59,8 +61,8 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := myChain.validate(z.counterPartyKeys); err != nil {
-			z.slogger.Log(r.Context(), slog.LevelDebug,
+		if err := requestTrustChain.validate(z.counterPartyKeys); err != nil {
+			z.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to validate chain",
 				"err", err,
 			)
@@ -69,9 +71,12 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		bhrHeaders := make(http.Header)
+		maps.Copy(bhrHeaders, r.Header)
+
 		newReq := &http.Request{
-			Method: http.MethodGet,
-			Header: make(http.Header),
+			Method: r.Method,
+			Header: bhrHeaders,
 			URL: &url.URL{
 				Scheme: r.URL.Scheme,
 				Host:   r.Host,
@@ -82,7 +87,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		bhr := &bufferedHttpResponse{}
 		next.ServeHTTP(bhr, newReq)
 
-		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), myChain.counterPartyPubEncryptionKey)
+		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), requestTrustChain.counterPartyPubEncryptionKey)
 		if err != nil {
 			z.slogger.Log(r.Context(), slog.LevelError,
 				"failed to seal response",
@@ -154,8 +159,8 @@ func (p *payload) UnmarshalJSON(data []byte) error {
 
 // chain represents a chain of trust, where each link in the chain has a payload signed by the key in the previous link.
 // The first link in the chain is signed by a trusted root key.
-// There can by any number if keys between the root and the last key.
-// The last key is an∂ x25519 key which is the public half of a NaCl box key.
+// There can be any number of keys between the root and the last key.
+// The last key is an x25519 key which is the public half of a NaCl box key.
 type chain struct {
 	Links []chainLink `json:"links"`
 	// counterPartyPubEncryptionKey is the last public key in the chain, which is a x25519 key
@@ -167,7 +172,7 @@ type chain struct {
 type chainLink struct {
 	// Payload a b64 url encoded json
 	Payload string `json:"payload"`
-	// Signature is the raw bytes of the signature of the b64 url encoded json
+	// Signature is b64 url encode of signature
 	Signature string `json:"signature"`
 	// Signed by is the key id "kid" of the key that signed this link
 	SignedBy string `json:"signedBy"`
@@ -220,37 +225,37 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 		Y:     rootKey.Y,
 	}
 
-	var lastPayload payload
+	var currentPayload payload
 
 	for i := range len(c.Links) {
 
 		signature, err := base64.URLEncoding.DecodeString(c.Links[i].Signature)
 		if err != nil {
-			return fmt.Errorf("failed to decode signature: %w", err)
+			return fmt.Errorf("failed to decode signature at index %d: %w", i, err)
 		}
 
 		if err := echelper.VerifySignature(parentEcdsa, []byte(c.Links[i].Payload), signature); err != nil {
-			return fmt.Errorf("invalid signature: %w", err)
+			return fmt.Errorf("invalid signature at index %d: %w", i, err)
 		}
 
 		payloadBytes, err := base64.URLEncoding.DecodeString(c.Links[i].Payload)
 		if err != nil {
-			return fmt.Errorf("failed to decode payload: %w", err)
+			return fmt.Errorf("failed to decode payload of index %d: %w", i, err)
 		}
 
-		if err := json.Unmarshal(payloadBytes, &lastPayload); err != nil {
-			return fmt.Errorf("failed to unmarshal payload: %w", err)
+		if err := json.Unmarshal(payloadBytes, &currentPayload); err != nil {
+			return fmt.Errorf("failed to unmarshal payload of index %d: %w", i, err)
 		}
 
-		if lastPayload.ExpirationDate < time.Now().Unix() {
-			return fmt.Errorf("payload %d has expired", i)
+		if currentPayload.ExpirationDate < time.Now().Unix() {
+			return fmt.Errorf("payload at index %d has expired, kid %s", i, currentPayload.PublicKey.KeyID())
 		}
 
 		if i < len(c.Links)-1 {
 			// last key is not p256 ecdsa so don't reassign it
 			// we handle last key after the loop
-			if err := lastPayload.PublicKey.Raw(parentEcdsa); err != nil {
-				return fmt.Errorf("failed to extract public key from payload: %w", err)
+			if err := currentPayload.PublicKey.Raw(parentEcdsa); err != nil {
+				return fmt.Errorf("failed to convert public key at index %d, kid %s into public ecdsa key: %w", i, currentPayload.PublicKey.KeyID(), err)
 			}
 		}
 	}
@@ -258,7 +263,7 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	// now we have verified all the entire chain, and we have the last
 	// public key, which is a x25519 key, extract and set as the counter party key
 	var rawX25519Key any
-	if err := lastPayload.PublicKey.Raw(&rawX25519Key); err != nil {
+	if err := currentPayload.PublicKey.Raw(&rawX25519Key); err != nil {
 		return fmt.Errorf("failed to extract last public key from payload: %w", err)
 	}
 
@@ -274,7 +279,7 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 	}
 
 	if len(pubKeyBytes) != 32 {
-		return errors.New("invalid public key length")
+		return errors.New("invalid public key length of last key")
 	}
 
 	// set the counter party key

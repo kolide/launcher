@@ -300,7 +300,7 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to create jwk from ecdsa key: %w", err)
+			return nil, fmt.Errorf("failed to create jwk from public key: %w", err)
 		}
 		childKey.Set("kid", fmt.Sprint(i))
 
@@ -322,7 +322,7 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 
 		sig, err := echelper.Sign(parentKey, []byte(payloadB64))
 		if err != nil {
-			return nil, fmt.Errorf("failed to self sign root key: %w", err)
+			return nil, err
 		}
 
 		links[i] = chainLink{
