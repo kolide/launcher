@@ -104,13 +104,13 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
 
-	dt4aKeys, err := dt4aKeys()
+	trustedDt4aKeys, err := dt4aKeys()
 	if err != nil {
 		return nil, fmt.Errorf("loading dt4a keys %w", err)
 	}
 
 	ztaAuthMiddleware := &ztaAuthMiddleware{
-		counterPartyKeys: dt4aKeys,
+		counterPartyKeys: trustedDt4aKeys,
 		slogger:          k.Slogger().With("component", "dt4a_auth_middleware"),
 	}
 
