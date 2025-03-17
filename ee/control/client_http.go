@@ -72,23 +72,17 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	challengeCtx, challengeCancel := context.WithTimeout(ctx, defaultRequestTimeout)
-	defer challengeCancel()
-
-	challengeReq, err := http.NewRequestWithContext(challengeCtx, http.MethodGet, c.url("/api/agent/config").String(), nil)
+	challengeReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(challengeCtx, challengeReq)
+	challenge, err := c.do(ctx, challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
 
-	configCtx, configCancel := context.WithTimeout(ctx, defaultRequestTimeout)
-	defer configCancel()
-
-	configReq, err := http.NewRequestWithContext(configCtx, http.MethodPost, c.url("/api/agent/config").String(), nil)
+	configReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create config request: %w", err)
 	}
@@ -129,7 +123,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
-	configAndAuthKeyRaw, err := c.do(configCtx, configReq)
+	configAndAuthKeyRaw, err := c.do(ctx, configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
 	}
@@ -149,9 +143,6 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
-
-	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
-	defer cancel()
 
 	if c.token == "" {
 		return nil, errors.New("token is nil, cannot request subsystem data")
@@ -179,9 +170,6 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
-
-	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
-	defer cancel()
 
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
@@ -224,8 +212,13 @@ func (c *HTTPClient) SendMessage(ctx context.Context, method string, params inte
 
 // TODO: this should probably just return a io.Reader
 func (c *HTTPClient) do(ctx context.Context, req *http.Request) ([]byte, error) {
-	_, span := traces.StartSpan(ctx)
+	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
+
+	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+	defer cancel()
+
+	req = req.WithContext(ctx)
 
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
