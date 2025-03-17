@@ -155,12 +155,12 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 		// Note that a successful parsing of any type of key does NOT necessarily guarantee a valid key.
 		jwkKey, err := jwk.ParseKey(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse key, kid %s: %w", k, err)
 		}
 
 		var pubKey ecdsa.PublicKey
 		if err := jwkKey.Raw(&pubKey); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert public key to public ecdsa, kid %s: %w", k, err)
 		}
 
 		// this is a little weird, but it's the recommended way to validate a public key,
