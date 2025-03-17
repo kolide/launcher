@@ -2,11 +2,10 @@ package localserver
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/big"
+
+	"github.com/lestrrat-go/jwx/jwk"
 )
 
 // These are the hardcoded certificates
@@ -147,30 +146,21 @@ SC4TSfHtbHHv3lx2/Bfu+H0szXYZ75GF/qZ5edobq3UkABN6OaFnnJId3w==
 func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 	dt4aKeyMap := make(map[string]*ecdsa.PublicKey)
 
-	// unmarshall the certificates
-	certMap := make(map[string]map[string]string)
-	err := json.Unmarshal([]byte(dt4aCertsJWK), &certMap)
-	if err != nil {
+	certMap := make(map[string]json.RawMessage)
+	if err := json.Unmarshal([]byte(dt4aCertsJWK), &certMap); err != nil {
 		return nil, err
 	}
 
 	for k, v := range certMap {
-		xBytes, err := base64.RawURLEncoding.DecodeString(v["x"])
+		// Note that a successful parsing of any type of key does NOT necessarily guarantee a valid key.
+		jwkKey, err := jwk.ParseKey(v)
 		if err != nil {
 			return nil, err
 		}
-		x := new(big.Int).SetBytes(xBytes)
 
-		yBytes, err := base64.RawURLEncoding.DecodeString(v["y"])
-		if err != nil {
+		var pubKey ecdsa.PublicKey
+		if err := jwkKey.Raw(&pubKey); err != nil {
 			return nil, err
-		}
-		y := new(big.Int).SetBytes(yBytes)
-
-		pubKey := &ecdsa.PublicKey{
-			Curve: elliptic.P256(),
-			X:     x,
-			Y:     y,
 		}
 
 		// this is a little weird, but it's the recommended way to validate a public key,
@@ -180,7 +170,7 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 			return nil, fmt.Errorf("invalid public key, kid %s: %w", k, err)
 		}
 
-		dt4aKeyMap[k] = pubKey
+		dt4aKeyMap[k] = &pubKey
 	}
 
 	return dt4aKeyMap, nil
