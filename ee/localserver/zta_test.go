@@ -181,8 +181,6 @@ func Test_requestZtaInfoHandler_allowsEmptyOrigin(t *testing.T) {
 func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 	t.Parallel()
 
-	reqOrigin := acceptableOrigin(t)
-
 	for _, tt := range []struct {
 		testCaseName           string
 		httpMethod             string
@@ -190,34 +188,6 @@ func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 		requestBody            io.Reader
 		expectedResponseStatus int
 	}{
-		{
-			testCaseName:           http.MethodPost,
-			httpMethod:             http.MethodPost,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodPut,
-			httpMethod:             http.MethodPut,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodPatch,
-			httpMethod:             http.MethodPatch,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodDelete,
-			httpMethod:             http.MethodDelete,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
 		{
 			testCaseName:           "disallowed origin",
 			httpMethod:             http.MethodGet,

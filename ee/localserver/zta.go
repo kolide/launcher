@@ -41,11 +41,6 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
 	// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
 	// present but empty, or to be missing. We will not allow a request with a nonempty origin
 	// that is not in the allowlist.
