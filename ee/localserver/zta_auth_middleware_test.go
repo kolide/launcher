@@ -228,7 +228,6 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.NoError(t, json.Unmarshal(payloadBytes, &thisPayload))
 
 		thisPayload.PublicKey = jwk{
-			Type:  "OKP",
 			Curve: "X25519",
 			X:     base64.RawURLEncoding.EncodeToString(badPubEncryptionKey[:]),
 			KeyID: "bad",
@@ -373,7 +372,6 @@ func toJWK(key any, kid string) (*jwk, error) {
 		yStr := base64.RawURLEncoding.EncodeToString(k.Y.Bytes())
 
 		return &jwk{
-			Type:  "EC",
 			Curve: crv,
 			X:     xStr,
 			Y:     yStr,
@@ -384,9 +382,9 @@ func toJWK(key any, kid string) (*jwk, error) {
 		xStr := base64.RawURLEncoding.EncodeToString(k[:])
 
 		return &jwk{
-			Type:  "OKP",
 			Curve: "X25519",
 			X:     xStr,
+			KeyID: kid,
 		}, nil
 
 	default:

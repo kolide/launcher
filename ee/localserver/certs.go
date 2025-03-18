@@ -151,12 +151,12 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 
 	for k, v := range certMap {
 
-		var jwk jwk
-		if err := json.Unmarshal(v, &jwk); err != nil {
+		var j jwk
+		if err := json.Unmarshal(v, &j); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal JWK: %w", err)
 		}
 
-		pubKey, err := jwk.ecdsaPubKey()
+		pubKey, err := j.ecdsaPubKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert JWK to ECDSA public key: %w", err)
 		}

@@ -7,29 +7,45 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
+// jwk is a JSON Web Key (JWK) structure for representing public keys,
+// this a partial implementation using the stdlib for only the bits we care about,
+// RFC https://datatracker.ietf.org/doc/html/rfc7517
 type jwk struct {
-	Type  string `json:"kty"`
 	Curve string `json:"crv"`
 	X     string `json:"x"`
 	Y     string `json:"y"`
 	KeyID string `json:"kid"`
 }
 
-// jwkToECDSAPublicKey converts a JWK JSON string into an ECDSA public key.
-func (jwk jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
-	// Ensure the key type is EC.
-	if jwk.Type != "EC" {
-		return nil, fmt.Errorf("unexpected key type: %s", jwk.Type)
+func parseEllipticCurve(str string) (elliptic.Curve, error) {
+	switch strings.ToLower(str) {
+	case "p-256":
+		return elliptic.P256(), nil
+	case "p-384":
+		return elliptic.P384(), nil
+	case "p-521":
+		return elliptic.P521(), nil
+	default:
+		return &elliptic.CurveParams{}, fmt.Errorf("unsupported curve: %s", str)
+	}
+}
+
+// ecdsaPubKey converts jwk in to ecdsa public key
+func (j *jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
+	curve, err := parseEllipticCurve(j.Curve)
+	if err != nil {
+		return nil, err
 	}
 
 	// Decode the x and y coordinates using base64 URL decoding (unpadded).
-	xBytes, err := base64.RawURLEncoding.DecodeString(jwk.X)
+	xBytes, err := base64.RawURLEncoding.DecodeString(j.X)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding x coordinate: %v", err)
 	}
-	yBytes, err := base64.RawURLEncoding.DecodeString(jwk.Y)
+	yBytes, err := base64.RawURLEncoding.DecodeString(j.Y)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding y coordinate: %v", err)
 	}
@@ -37,19 +53,6 @@ func (jwk jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	// Convert the bytes into big.Int values.
 	x := new(big.Int).SetBytes(xBytes)
 	y := new(big.Int).SetBytes(yBytes)
-
-	// Determine the elliptic curve based on the crv field.
-	var curve elliptic.Curve
-	switch jwk.Curve {
-	case "P-256":
-		curve = elliptic.P256()
-	case "P-384":
-		curve = elliptic.P384()
-	case "P-521":
-		curve = elliptic.P521()
-	default:
-		return nil, fmt.Errorf("unsupported curve: %s", jwk.Curve)
-	}
 
 	// Construct the ECDSA public key.
 	pubKey := &ecdsa.PublicKey{
@@ -68,10 +71,10 @@ func (jwk jwk) ecdsaPubKey() (*ecdsa.PublicKey, error) {
 	return pubKey, nil
 }
 
-// jwkToX25519PublicKey converts jwk in to x25519 key (*[32]byte)
-func (jwk jwk) x25519PubKey() (*[32]byte, error) {
+// x25519PubKey converts jwk in to x25519 key (*[32]byte)
+func (j *jwk) x25519PubKey() (*[32]byte, error) {
 	// Decode the "x" coordinate using base64 URL decoding (unpadded).
-	xBytes, err := base64.RawURLEncoding.DecodeString(jwk.X)
+	xBytes, err := base64.RawURLEncoding.DecodeString(j.X)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding x coordinate: %v", err)
 	}
