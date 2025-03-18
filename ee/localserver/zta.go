@@ -26,6 +26,7 @@ var (
 		"moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82": {},
 		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
 		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
+		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
 	}
 )
 
