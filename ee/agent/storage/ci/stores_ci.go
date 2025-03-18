@@ -32,7 +32,7 @@ func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.S
 		storage.ServerProvidedDataStore,
 		storage.TokenStore,
 		storage.LauncherHistoryStore,
-		storage.ZtaInfoStore,
+		storage.Dt4aInfoStore,
 	}
 
 	if os.Getenv("CI") == "true" {

@@ -109,17 +109,17 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		return nil, fmt.Errorf("loading dt4a keys %w", err)
 	}
 
-	ztaAuthMiddleware := &ztaAuthMiddleware{
+	dt4aAuthMiddleware := &dt4aAuthMiddleware{
 		counterPartyKeys: trustedDt4aKeys,
 		slogger:          k.Slogger().With("component", "dt4a_auth_middleware"),
 	}
 
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
 	// TODO: make this authenticated or remove
-	mux.Handle("/zta", ls.requestZtaInfoHandler())
+	mux.Handle("/dt4a", ls.requestDt4aInfoHandler())
 
-	// mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
-	mux.Handle("/v3/dt4a", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
+	// mux.Handle("/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
+	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:

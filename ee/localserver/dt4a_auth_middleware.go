@@ -15,22 +15,22 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 )
 
-type ztaAuthMiddleware struct {
+type dt4aAuthMiddleware struct {
 	// counterPartyKeys is a map of trusted keys, maps KID to pubkey
 	counterPartyKeys map[string]*ecdsa.PublicKey
 	slogger          *slog.Logger
 }
 
-type ztaResponse struct {
+type dt4aResponse struct {
 	Data   []byte    `json:"data"`
 	PubKey *[32]byte `json:"pubKey"`
 }
 
-func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
+func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		boxParam := r.URL.Query().Get("payload")
 		if boxParam == "" {
-			z.slogger.Log(r.Context(), slog.LevelWarn,
+			d.slogger.Log(r.Context(), slog.LevelWarn,
 				"missing payload url param",
 			)
 
@@ -40,7 +40,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		boxBytes, err := base64.URLEncoding.DecodeString(boxParam)
 		if err != nil {
-			z.slogger.Log(r.Context(), slog.LevelWarn,
+			d.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to decode payload",
 				"err", err,
 			)
@@ -51,7 +51,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		var requestTrustChain chain
 		if err := json.Unmarshal(boxBytes, &requestTrustChain); err != nil {
-			z.slogger.Log(r.Context(), slog.LevelWarn,
+			d.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to unmarshal chain",
 				"err", err,
 			)
@@ -60,8 +60,8 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := requestTrustChain.validate(z.counterPartyKeys); err != nil {
-			z.slogger.Log(r.Context(), slog.LevelWarn,
+		if err := requestTrustChain.validate(d.counterPartyKeys); err != nil {
+			d.slogger.Log(r.Context(), slog.LevelWarn,
 				"failed to validate chain",
 				"err", err,
 			)
@@ -88,7 +88,7 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), requestTrustChain.counterPartyPubEncryptionKey)
 		if err != nil {
-			z.slogger.Log(r.Context(), slog.LevelError,
+			d.slogger.Log(r.Context(), slog.LevelError,
 				"failed to seal response",
 				"err", err,
 			)
@@ -97,15 +97,15 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		ztaResponse := ztaResponse{
+		dt4aResponse := dt4aResponse{
 			Data:   box,
 			PubKey: pubKey,
 		}
 
-		data, err := json.Marshal(ztaResponse)
+		data, err := json.Marshal(dt4aResponse)
 		if err != nil {
-			z.slogger.Log(r.Context(), slog.LevelError,
-				"failed to marshal zta response",
+			d.slogger.Log(r.Context(), slog.LevelError,
+				"failed to marshal dt4a response",
 				"err", err,
 			)
 

@@ -2363,12 +2363,12 @@ func (_m *Knapsack) WatchdogUtilizationLimitPercent() int {
 	return r0
 }
 
-// ZtaInfoStore provides a mock function with given fields:
-func (_m *Knapsack) ZtaInfoStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+// Dt4aInfoStore provides a mock function with given fields:
+func (_m *Knapsack) Dt4aInfoStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for ZtaInfoStore")
+		panic("no return value specified for Dt4aInfoStore")
 	}
 
 	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender

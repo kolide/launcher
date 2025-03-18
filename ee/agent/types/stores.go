@@ -18,5 +18,5 @@ type Stores interface {
 	ServerProvidedDataStore() KVStore
 	TokenStore() KVStore
 	LauncherHistoryStore() KVStore
-	ZtaInfoStore() KVStore
+	Dt4aInfoStore() KVStore
 }
