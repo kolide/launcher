@@ -34,6 +34,12 @@ linters-settings:
     exclude-functions: [github.com/go-kit/kit/log:Log]
   gofmt:
     simplify: false
+  govet:
+    enable:
+      - shadow
+    settings:
+      shadow:
+        strict: true
   forbidigo:
     forbid:
       - p: ^exec\.Command.*$
@@ -85,6 +91,10 @@ linters-settings:
 
 issues:
   exclude-rules:
+    - linters: [govet]
+      text: "shadow: declaration of \"err\" shadows declaration"
+    - linters: [govet]
+      text: "shadow: declaration of \"ctx\" shadows declaration"
     # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
     - linters:
         - paralleltest
