@@ -35,17 +35,20 @@ type settingsStoreWriter interface {
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey             string
-	Opts                ExtensionOpts
-	registrationId      string
-	knapsack            types.Knapsack
-	serviceClient       service.KolideService
-	settingsWriter      settingsStoreWriter
-	enrollMutex         sync.Mutex
-	done                chan struct{}
-	interrupted         atomic.Bool
-	slogger             *slog.Logger
-	logPublicationState *logPublicationState
+	NodeKey                       string
+	Opts                          ExtensionOpts
+	registrationId                string
+	knapsack                      types.Knapsack
+	serviceClient                 service.KolideService
+	settingsWriter                settingsStoreWriter
+	enrollMutex                   sync.Mutex
+	done                          chan struct{}
+	interrupted                   atomic.Bool
+	slogger                       *slog.Logger
+	logPublicationState           *logPublicationState
+	lastRequestQueriesTimestamp   *atomic.Int64
+	distributedForwardingInterval *atomic.Int64 // how frequently to forward RequestQueries requests to the cloud, in seconds
+	forwardAllDistributedUntil    *atomic.Int64 // allows for accelerated distributed requests until given timestamp
 }
 
 const (
@@ -154,16 +157,28 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		)
 	}
 
+	initialTimestamp := &atomic.Int64{}
+	initialTimestamp.Store(0)
+
+	distributedForwardingInterval := &atomic.Int64{}
+	distributedForwardingInterval.Store(60) // forward RequestQueries to the cloud once every 60 seconds
+
+	forwardAllDistributedUntil := &atomic.Int64{}
+	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
+
 	return &Extension{
-		slogger:             slogger,
-		serviceClient:       client,
-		settingsWriter:      settingsWriter,
-		registrationId:      registrationId,
-		knapsack:            k,
-		NodeKey:             nodekey,
-		Opts:                opts,
-		done:                make(chan struct{}),
-		logPublicationState: NewLogPublicationState(opts.MaxBytesPerBatch),
+		slogger:                       slogger,
+		serviceClient:                 client,
+		settingsWriter:                settingsWriter,
+		registrationId:                registrationId,
+		knapsack:                      k,
+		NodeKey:                       nodekey,
+		Opts:                          opts,
+		done:                          make(chan struct{}),
+		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
+		lastRequestQueriesTimestamp:   initialTimestamp,
+		distributedForwardingInterval: distributedForwardingInterval,
+		forwardAllDistributedUntil:    forwardAllDistributedUntil,
 	}, nil
 }
 
@@ -836,7 +851,32 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	return e.getQueriesWithReenroll(ctx, true)
+	// Check to see whether we should forward this request --
+	// 1. Check to see if we currently want to forward all distributed query requests to the cloud.
+	// 2. Check to see if we forwarded a request to the cloud within the last minute.
+	now := time.Now().Unix()
+	if now >= e.forwardAllDistributedUntil.Load() && now < e.lastRequestQueriesTimestamp.Load()+e.distributedForwardingInterval.Load() {
+		// Return an empty result to osquery.
+		return &distributed.GetQueriesResult{}, nil
+	}
+
+	// We haven't requested queries from the cloud within the last minute --
+	// forward this request.
+	e.lastRequestQueriesTimestamp.Store(now)
+
+	queries, err := e.getQueriesWithReenroll(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the cloud wants us to accelerate distributed requests by forwarding
+	// all requests to the cloud for the next `queries.AccelerateSeconds` seconds.
+	if queries.AccelerateSeconds > 0 {
+		// Store the timestamp when the acceleration ends
+		e.forwardAllDistributedUntil.Store(time.Now().Unix() + int64(queries.AccelerateSeconds))
+	}
+
+	return queries, nil
 }
 
 // Helper to allow for a single attempt at re-enrollment
