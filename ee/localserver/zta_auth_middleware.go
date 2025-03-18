@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/lestrrat-go/jwx/jwk"
 )
 
 type ztaAuthMiddleware struct {
@@ -120,41 +119,14 @@ func (z *ztaAuthMiddleware) Wrap(next http.Handler) http.Handler {
 }
 
 type payload struct {
-	AccountUuid    string  `json:"accountUuid"`
-	DateTimeSigned int64   `json:"dateTimeSigned"`
-	Environment    string  `json:"environment"`
-	ExpirationDate int64   `json:"expirationDate"`
-	PublicKey      jwk.Key `json:"publicKey"`
-	SignedBy       string  `json:"signedBy"`
-	UserUuid       string  `json:"userUuid"`
-	Version        uint8   `json:"version"`
-}
-
-func (p *payload) UnmarshalJSON(data []byte) error {
-	// Create an alias type to avoid infinite recursion.
-	type alias payload
-
-	// Define a temporary struct that embeds the alias and overrides PublicKey.
-	tmp := &struct {
-		PublicKey json.RawMessage `json:"publicKey"`
-		*alias
-	}{
-		alias: (*alias)(p),
-	}
-
-	// Unmarshal into the temporary structure.
-	if err := json.Unmarshal(data, tmp); err != nil {
-		return fmt.Errorf("failed to unmarshal payload: %w", err)
-	}
-
-	// Convert the public key.
-	key, err := jwk.ParseKey(tmp.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse publicKey: %w", err)
-	}
-	p.PublicKey = key
-
-	return nil
+	AccountUuid    string `json:"accountUuid"`
+	DateTimeSigned int64  `json:"dateTimeSigned"`
+	Environment    string `json:"environment"`
+	ExpirationDate int64  `json:"expirationDate"`
+	PublicKey      jwk    `json:"publicKey"`
+	SignedBy       string `json:"signedBy"`
+	UserUuid       string `json:"userUuid"`
+	Version        uint8  `json:"version"`
 }
 
 // chain represents a chain of trust, where each link in the chain has a payload signed by the key in the previous link.
@@ -248,43 +220,26 @@ func (c *chain) validate(trustedKeys map[string]*ecdsa.PublicKey) error {
 		}
 
 		if currentPayload.ExpirationDate < time.Now().Unix() {
-			return fmt.Errorf("payload at index %d has expired, kid %s", i, currentPayload.PublicKey.KeyID())
+			return fmt.Errorf("payload at index %d has expired, kid %s", i, currentPayload.PublicKey.KeyID)
 		}
 
 		if i < len(c.Links)-1 {
-			// last key is not p256 ecdsa so don't reassign it
-			// we handle last key after the loop
-			if err := currentPayload.PublicKey.Raw(parentEcdsa); err != nil {
-				return fmt.Errorf("failed to convert public key at index %d, kid %s into public ecdsa key: %w", i, currentPayload.PublicKey.KeyID(), err)
+			ecdsaPubKey, err := currentPayload.PublicKey.ecdsaPubKey()
+			if err != nil {
+				return fmt.Errorf("failed to convert public key at index %d, kid %s into public ecdsa key: %w", i, currentPayload.PublicKey.KeyID, err)
 			}
+
+			parentEcdsa = ecdsaPubKey
 		}
 	}
 
-	// now we have verified all the entire chain, and we have the last
-	// public key, which is a x25519 key, extract and set as the counter party key
-	var rawX25519Key any
-	if err := currentPayload.PublicKey.Raw(&rawX25519Key); err != nil {
-		return fmt.Errorf("failed to extract last public key from payload: %w", err)
-	}
-
-	// Depending on the library version, raw might be a []byte or a *[32]byte.
-	var pubKeyBytes []byte
-	switch v := rawX25519Key.(type) {
-	case []byte:
-		pubKeyBytes = v
-	case *[32]byte:
-		pubKeyBytes = v[:]
-	default:
-		return fmt.Errorf("unexpected type for last public key: %T", rawX25519Key)
-	}
-
-	if len(pubKeyBytes) != 32 {
-		return errors.New("invalid public key length of last key")
+	rawX25519Key, err := currentPayload.PublicKey.x25519PubKey()
+	if err != nil {
+		return fmt.Errorf("failed to convert last public key into x25519 key: %w", err)
 	}
 
 	// set the counter party key
-	c.counterPartyPubEncryptionKey = new([32]byte)
-	copy(c.counterPartyPubEncryptionKey[:], pubKeyBytes)
+	c.counterPartyPubEncryptionKey = rawX25519Key
 
 	return nil
 }

@@ -4,8 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
-
-	"github.com/lestrrat-go/jwx/jwk"
 )
 
 // These are the hardcoded certificates
@@ -152,25 +150,18 @@ func dt4aKeys() (map[string]*ecdsa.PublicKey, error) {
 	}
 
 	for k, v := range certMap {
-		// Note that a successful parsing of any type of key does NOT necessarily guarantee a valid key.
-		jwkKey, err := jwk.ParseKey(v)
+
+		var jwk jwk
+		if err := json.Unmarshal(v, &jwk); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JWK: %w", err)
+		}
+
+		pubKey, err := jwk.ecdsaPubKey()
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse key, kid %s: %w", k, err)
+			return nil, fmt.Errorf("failed to convert JWK to ECDSA public key: %w", err)
 		}
 
-		var pubKey ecdsa.PublicKey
-		if err := jwkKey.Raw(&pubKey); err != nil {
-			return nil, fmt.Errorf("failed to convert public key to public ecdsa, kid %s: %w", k, err)
-		}
-
-		// this is a little weird, but it's the recommended way to validate a public key,
-		// under the hood it calls Curve.IsOnCurve(...), but if you call that directly
-		// you get deprecated warnings
-		if _, err := pubKey.ECDH(); err != nil {
-			return nil, fmt.Errorf("invalid public key, kid %s: %w", k, err)
-		}
-
-		dt4aKeyMap[k] = &pubKey
+		dt4aKeyMap[k] = pubKey
 	}
 
 	return dt4aKeyMap, nil

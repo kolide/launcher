@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -227,10 +227,12 @@ func Test_ValidateCertChain(t *testing.T) {
 		var thisPayload payload
 		require.NoError(t, json.Unmarshal(payloadBytes, &thisPayload))
 
-		key, err := jwk.New(badPubEncryptionKey[:])
-		require.NoError(t, err)
-
-		thisPayload.PublicKey = key
+		thisPayload.PublicKey = jwk{
+			Type:  "OKP",
+			Curve: "X25519",
+			X:     base64.RawURLEncoding.EncodeToString(badPubEncryptionKey[:]),
+			KeyID: "bad",
+		}
 
 		payloadBytes, err = json.Marshal(thisPayload)
 		require.NoError(t, err)
@@ -304,24 +306,23 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 
 		parentKey := ecdsaKeys[i]
 
-		var childKey jwk.Key
+		var childKey *jwk
 		var err error
 
 		if i == len(ecdsaKeys)-1 {
-			childKey, err = jwk.New(counterPartyPubEncryptionKey[:])
+			childKey, err = toJWK(counterPartyPubEncryptionKey, "counter_party_pub_encryption_key")
 		} else {
-			childKey, err = jwk.New(ecdsaKeys[i+1].Public())
+			childKey, err = toJWK(&ecdsaKeys[i+1].PublicKey, fmt.Sprint(i))
 		}
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create jwk from public key: %w", err)
 		}
-		childKey.Set("kid", fmt.Sprint(i))
 
 		thisPayload := payload{
 			AccountUuid:    "some_account",
 			DateTimeSigned: time.Now().Unix(),
-			PublicKey:      childKey,
+			PublicKey:      *childKey,
 			UserUuid:       "some_user",
 			ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
 			Version:        1,
@@ -347,4 +348,48 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 	}
 
 	return &chain{Links: links}, nil
+}
+
+// toJWK accepts either an *ecdsa.PublicKey or *[32]byte (for X25519)
+// along with an optional kid value and returns a jwk object
+func toJWK(key any, kid string) (*jwk, error) {
+	switch k := key.(type) {
+	case *ecdsa.PublicKey:
+		// determine curve
+		var crv string
+		switch k.Curve {
+		case elliptic.P256():
+			crv = "P-256"
+		case elliptic.P384():
+			crv = "P-384"
+		case elliptic.P521():
+			crv = "P-521"
+		default:
+			return nil, fmt.Errorf("unsupported elliptic curve, %s", crv)
+		}
+
+		// Encode x and y coordinates using base64 URL encoding (unpadded).
+		xStr := base64.RawURLEncoding.EncodeToString(k.X.Bytes())
+		yStr := base64.RawURLEncoding.EncodeToString(k.Y.Bytes())
+
+		return &jwk{
+			Type:  "EC",
+			Curve: crv,
+			X:     xStr,
+			Y:     yStr,
+			KeyID: kid,
+		}, nil
+
+	case *[32]byte: // Handle X25519 public key.
+		xStr := base64.RawURLEncoding.EncodeToString(k[:])
+
+		return &jwk{
+			Type:  "OKP",
+			Curve: "X25519",
+			X:     xStr,
+		}, nil
+
+	default:
+		return nil, errors.New("unsupported key type")
+	}
 }
