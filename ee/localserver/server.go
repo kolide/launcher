@@ -116,9 +116,8 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
 	// TODO: make this authenticated or remove
-	mux.Handle("/dt4a", ls.requestDt4aInfoHandler())
+	mux.Handle("/zta", ls.requestDt4aInfoHandler())
 
-	// mux.Handle("/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
 	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
 
 	// uncomment to test without going through middleware

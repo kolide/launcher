@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	localserverDt4aInfoKey = []byte("localserver_dt4a_info")
+	localserverDt4aInfoKey = []byte("localserver_zta_info")
 
 	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
 	allowlistedDt4aOriginsLookup = map[string]struct{}{
