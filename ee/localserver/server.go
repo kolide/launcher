@@ -119,7 +119,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	mux.Handle("/zta", ls.requestZtaInfoHandler())
 
 	// mux.Handle("/zta", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
-	mux.Handle("/dt4a/v0", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
+	mux.Handle("/v3/dt4a", ztaAuthMiddleware.Wrap(ls.requestZtaInfoHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:
