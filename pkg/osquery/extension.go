@@ -68,26 +68,27 @@ const (
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
 
-	// How frequently osquery should check for distributed queries to run during
-	// osquery instance startup -- an accelerated interval, where the unit is seconds.
-	// This shorter interval should hopefully help launcher begin to process stale,
-	// slow-running queries as quickly as possible after device startup.
-	startupDistributedInterval = 5
+	// How frequently osquery should check for distributed queries to run.
+	// We set this to 5 seconds, which is more frequent than we think the
+	// server can comfortably handle, so we only forward these requests
+	// to the cloud once every 60 seconds.
+	osqueryDistributedInterval = 5
 )
 
 var (
 	// Osquery configuration options that we set during the osquery instance's startup period.
 	// These are the override, non-standard values.
 	startupOsqueryConfigOptions = map[string]any{
-		"verbose":              true,                       // receive as many osquery logs as we can, in case we need to troubleshoot an issue
-		"distributed_interval": startupDistributedInterval, // request distributed queries more frequently, so stale checks run ASAP
+		"verbose":              true, // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": osqueryDistributedInterval,
 	}
 
 	// Osquery configuration options that we set after the osquery instance has been up and running
-	// for at least 10 minutes. These are the "normal" values. We don't set the distributed interval
-	// here so that the cloud can set it instead.
+	// for at least 10 minutes. These are the "normal" values. We continue to override the distributed
+	// interval to 5 seconds.
 	postStartupOsqueryConfigOptions = map[string]any{
-		"verbose": false,
+		"verbose":              false,
+		"distributed_interval": osqueryDistributedInterval,
 	}
 )
 

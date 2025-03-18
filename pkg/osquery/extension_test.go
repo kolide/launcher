@@ -1191,7 +1191,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1201,7 +1201,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts:  postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1216,7 +1217,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1230,7 +1231,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts: postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1245,7 +1247,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1260,7 +1262,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              false,
-					"distributed_interval": float64(25), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1276,7 +1278,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 				"options": map[string]any{
 					"audit_allow_config":   false,
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1299,7 +1301,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts: postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 				"decorators": map[string]any{
 					"load": []any{
@@ -1336,7 +1339,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 				"auto_table_construction": map[string]any{
 					"tcc_system_entries": map[string]any{
@@ -1387,7 +1390,7 @@ func Test_setOsqueryOptions_EmptyConfig(t *testing.T) {
 	expectedCfg := map[string]any{
 		"options": map[string]any{
 			"verbose":              true,
-			"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+			"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 		},
 	}
 
