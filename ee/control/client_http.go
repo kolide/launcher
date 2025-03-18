@@ -39,6 +39,8 @@ const (
 	HeaderKey        = "X-Kolide-Key"
 	HeaderSignature2 = "X-Kolide-Signature2"
 	HeaderKey2       = "X-Kolide-Key2"
+
+	defaultRequestTimeout = 30 * time.Second
 )
 
 type configResponse struct {
@@ -75,7 +77,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(ctx, challengeReq)
+	challenge, err := c.do(challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
@@ -121,7 +123,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 		configReq.Header.Set(HeaderSignature2, sig2)
 	}
 
-	configAndAuthKeyRaw, err := c.do(ctx, configReq)
+	configAndAuthKeyRaw, err := c.do(configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
 	}
@@ -155,7 +157,7 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 	dataReq.Header.Set("Content-Type", "application/json")
 	dataReq.Header.Set("Accept", "application/json")
 
-	dataRaw, err := c.do(ctx, dataReq)
+	dataRaw, err := c.do(dataReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make subsystem data request: %w", err)
 	}
@@ -204,14 +206,19 @@ func (c *HTTPClient) SendMessage(ctx context.Context, method string, params inte
 
 	// we don't care about the response here, just want to know
 	// if there was an error sending our request
-	_, err = c.do(ctx, dataReq)
+	_, err = c.do(dataReq)
 	return err
 }
 
 // TODO: this should probably just return a io.Reader
-func (c *HTTPClient) do(ctx context.Context, req *http.Request) ([]byte, error) {
-	_, span := traces.StartSpan(ctx)
+func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
+	req, span := traces.StartHttpRequestSpan(req)
 	defer span.End()
+
+	// Ensure we set a timeout on the request
+	ctx, cancel := context.WithTimeout(req.Context(), defaultRequestTimeout)
+	defer cancel()
+	req = req.WithContext(ctx)
 
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
