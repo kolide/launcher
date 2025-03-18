@@ -74,7 +74,8 @@ const (
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
 	katcSubsystemName        = "katc_config" // Kolide ATC
-	dt4aInfoSubsystemName    = "zta_info"
+	ztaInfoSubsystemName     = "zta_info"    // legacy name for dt4aInfo subsystem
+	dt4aInfoSubsystemName    = "dt4a_info"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -508,6 +509,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// Set up consumer to receive dt4a info from the control server
 		dt4aInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.Dt4aInfoStore())
 		if err := controlService.RegisterConsumer(dt4aInfoSubsystemName, dt4aInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
+		}
+
+		//ztaInfoConsumer is the legacy consumer for zta
+		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, dt4aInfoConsumer); err != nil {
 			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
 		}
 	}
