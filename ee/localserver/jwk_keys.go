@@ -20,13 +20,19 @@ type jwk struct {
 	KeyID string `json:"kid"`
 }
 
+const (
+	curveP256 string = "P-256"
+	curveP384 string = "P-384"
+	curveP521 string = "P-521"
+)
+
 func parseEllipticCurve(str string) (elliptic.Curve, error) {
-	switch strings.ToLower(str) {
-	case "p-256":
+	switch strings.ToUpper(str) {
+	case curveP256:
 		return elliptic.P256(), nil
-	case "p-384":
+	case curveP384:
 		return elliptic.P384(), nil
-	case "p-521":
+	case curveP521:
 		return elliptic.P521(), nil
 	default:
 		return &elliptic.CurveParams{}, fmt.Errorf("unsupported curve: %s", str)

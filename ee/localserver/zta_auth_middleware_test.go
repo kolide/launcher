@@ -358,11 +358,11 @@ func toJWK(key any, kid string) (*jwk, error) {
 		var crv string
 		switch k.Curve {
 		case elliptic.P256():
-			crv = "P-256"
+			crv = curveP256
 		case elliptic.P384():
-			crv = "P-384"
+			crv = curveP384
 		case elliptic.P521():
-			crv = "P-521"
+			crv = curveP521
 		default:
 			return nil, fmt.Errorf("unsupported elliptic curve, %s", crv)
 		}
