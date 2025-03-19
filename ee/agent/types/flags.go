@@ -124,11 +124,11 @@ type Flags interface {
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
 
-	// OsqueryAccelerateDistributed accelerates the rate at which we forward osquery distributed requests
+	// DistributedForwardingInterval indicates the rate at which we forward osquery distributed requests
 	// to the cloud
-	SetOsqueryAccelerateDistributed(accelerate bool) error
-	SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration)
-	OsqueryAccelerateDistributed() bool
+	SetDistributedForwardingInterval(interval time.Duration) error
+	SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration)
+	DistributedForwardingInterval() time.Duration
 
 	// WatchdogEnabled enables the osquery watchdog
 	SetWatchdogEnabled(enable bool) error

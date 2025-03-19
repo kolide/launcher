@@ -454,6 +454,24 @@ func (_m *Knapsack) DisableTraceIngestTLS() bool {
 	return r0
 }
 
+// DistributedForwardingInterval provides a mock function with given fields:
+func (_m *Knapsack) DistributedForwardingInterval() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DistributedForwardingInterval")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // Dt4aInfoStore provides a mock function with given fields:
 func (_m *Knapsack) Dt4aInfoStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -963,24 +981,6 @@ func (_m *Knapsack) MirrorServerURL() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryAccelerateDistributed provides a mock function with given fields:
-func (_m *Knapsack) OsqueryAccelerateDistributed() bool {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryAccelerateDistributed")
-	}
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -1569,6 +1569,29 @@ func (_m *Knapsack) SetDisableTraceIngestTLS(enabled bool) error {
 	return r0
 }
 
+// SetDistributedForwardingInterval provides a mock function with given fields: interval
+func (_m *Knapsack) SetDistributedForwardingInterval(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDistributedForwardingInterval")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetDistributedForwardingIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetEnrollmentDetails provides a mock function with given fields: details
 func (_m *Knapsack) SetEnrollmentDetails(details types.EnrollmentDetails) {
 	_m.Called(details)
@@ -1803,29 +1826,6 @@ func (_m *Knapsack) SetMirrorServerURL(url string) error {
 	}
 
 	return r0
-}
-
-// SetOsqueryAccelerateDistributed provides a mock function with given fields: accelerate
-func (_m *Knapsack) SetOsqueryAccelerateDistributed(accelerate bool) error {
-	ret := _m.Called(accelerate)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryAccelerateDistributed")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(accelerate)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetOsqueryAccelerateDistributedOverride provides a mock function with given fields: value, duration
-func (_m *Knapsack) SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration) {
-	_m.Called(value, duration)
 }
 
 // SetOsqueryHealthcheckStartupDelay provides a mock function with given fields: delay

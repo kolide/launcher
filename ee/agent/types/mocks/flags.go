@@ -306,6 +306,24 @@ func (_m *Flags) DisableTraceIngestTLS() bool {
 	return r0
 }
 
+// DistributedForwardingInterval provides a mock function with given fields:
+func (_m *Flags) DistributedForwardingInterval() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DistributedForwardingInterval")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // EnableInitialRunner provides a mock function with given fields:
 func (_m *Flags) EnableInitialRunner() bool {
 	ret := _m.Called()
@@ -661,24 +679,6 @@ func (_m *Flags) MirrorServerURL() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// OsqueryAccelerateDistributed provides a mock function with given fields:
-func (_m *Flags) OsqueryAccelerateDistributed() bool {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryAccelerateDistributed")
-	}
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -1099,6 +1099,29 @@ func (_m *Flags) SetDisableTraceIngestTLS(enabled bool) error {
 	return r0
 }
 
+// SetDistributedForwardingInterval provides a mock function with given fields: interval
+func (_m *Flags) SetDistributedForwardingInterval(interval time.Duration) error {
+	ret := _m.Called(interval)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDistributedForwardingInterval")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(interval)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetDistributedForwardingIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetExportTraces provides a mock function with given fields: enabled
 func (_m *Flags) SetExportTraces(enabled bool) error {
 	ret := _m.Called(enabled)
@@ -1323,29 +1346,6 @@ func (_m *Flags) SetMirrorServerURL(url string) error {
 	}
 
 	return r0
-}
-
-// SetOsqueryAccelerateDistributed provides a mock function with given fields: accelerate
-func (_m *Flags) SetOsqueryAccelerateDistributed(accelerate bool) error {
-	ret := _m.Called(accelerate)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryAccelerateDistributed")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(accelerate)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetOsqueryAccelerateDistributedOverride provides a mock function with given fields: value, duration
-func (_m *Flags) SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration) {
-	_m.Called(value, duration)
 }
 
 // SetOsqueryHealthcheckStartupDelay provides a mock function with given fields: delay

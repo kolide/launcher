@@ -402,23 +402,25 @@ func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
 }
 
-func (fc *FlagController) SetOsqueryAccelerateDistributed(accelerate bool) error {
-	return fc.setControlServerValue(keys.OsqueryAccelerateDistributed, boolToBytes(accelerate))
+func (fc *FlagController) SetDistributedForwardingInterval(interval time.Duration) error {
+	return fc.setControlServerValue(keys.DistributedForwardingInterval, durationToBytes(interval))
 }
-func (fc *FlagController) SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration) {
+func (fc *FlagController) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
 	ctx, span := traces.StartSpan(context.TODO())
 	defer span.End()
 
-	fc.overrideFlag(ctx, keys.OsqueryAccelerateDistributed, duration, value)
+	fc.overrideFlag(ctx, keys.DistributedForwardingInterval, duration, value)
 }
-func (fc *FlagController) OsqueryAccelerateDistributed() bool {
+func (fc *FlagController) DistributedForwardingInterval() time.Duration {
 	fc.overrideMutex.RLock()
 	defer fc.overrideMutex.RUnlock()
 
-	return NewBoolFlagValue(
-		WithBoolOverride(fc.overrides[keys.OsqueryAccelerateDistributed]),
-		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.OsqueryAccelerateDistributed))
+	return NewDurationFlagValue(fc.slogger, keys.DistributedForwardingInterval,
+		WithOverride(fc.overrides[keys.DistributedForwardingInterval]),
+		WithDefault(1*time.Minute),
+		WithMin(5*time.Second),
+		WithMax(5*time.Minute),
+	).get(fc.getControlServerValue(keys.DistributedForwardingInterval))
 }
 
 func (fc *FlagController) SetWatchdogEnabled(enable bool) error {
