@@ -1099,6 +1099,99 @@ func TestExtensionGetQueries(t *testing.T) {
 	assert.Equal(t, expectedQueries, queries.Queries)
 }
 
+func TestGetQueries_Forwarding(t *testing.T) {
+	expectedQueries := map[string]string{
+		"time":    "select * from time",
+		"version": "select version from osquery_info",
+	}
+	m := &mock.KolideService{
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+			return &distributed.GetQueriesResult{
+				Queries: expectedQueries,
+			}, false, nil
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	k := makeKnapsack(t, db)
+	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	require.Nil(t, err)
+
+	// Shorten our accelerated startup period so we aren't waiting for a full two minutes for the test
+	acceleratedStartupPeriod := 10 * time.Second
+	e.forwardAllDistributedUntil.Store(time.Now().Unix() + int64(acceleratedStartupPeriod.Seconds()))
+
+	// Shorten the forwarding interval for the same reason
+	e.distributedForwardingInterval.Store(5)
+
+	// Request queries -- this first time, since we're requesting queries right after startup,
+	// the request should go through.
+	queries, err := e.GetQueries(context.TODO())
+	assert.True(t, m.RequestQueriesFuncInvoked)
+	require.Nil(t, err)
+	assert.Equal(t, expectedQueries, queries.Queries)
+
+	// Now, wait for the startup period to pass
+	time.Sleep(acceleratedStartupPeriod)
+
+	// Request queries -- this time, the request should go through because we haven't made a request
+	// within the last `e.distributedForwardingInterval` seconds.
+	queries, err = e.GetQueries(context.TODO())
+	require.Nil(t, err)
+	require.Equal(t, expectedQueries, queries.Queries)
+
+	// Immediately request queries again. This time, the request should NOT go through, because
+	// we made a request within the last `e.distributedForwardingInterval` seconds.
+	// We should get back an empty response.
+	queries, err = e.GetQueries(context.TODO())
+	require.Nil(t, err)
+	require.Nil(t, queries.Queries)
+}
+
+func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
+	expectedQueries := map[string]string{
+		"time":    "select * from time",
+		"version": "select version from osquery_info",
+	}
+	m := &mock.KolideService{
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+			return &distributed.GetQueriesResult{
+				Queries:           expectedQueries,
+				AccelerateSeconds: 30, // set AccelerateSeconds to make sure the extension responds accordingly
+			}, false, nil
+		},
+	}
+	db, cleanup := makeTempDB(t)
+	defer cleanup()
+	k := makeKnapsack(t, db)
+	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	require.Nil(t, err)
+
+	// Shorten our accelerated startup period so we aren't waiting for a full two minutes to start the test
+	e.forwardAllDistributedUntil.Store(0)
+
+	// Request queries -- this first time, since we're requesting queries right after startup,
+	// the request should go through.
+	queries, err := e.GetQueries(context.TODO())
+	assert.True(t, m.RequestQueriesFuncInvoked)
+	require.Nil(t, err)
+	assert.Equal(t, expectedQueries, queries.Queries)
+
+	// We should have responded to the `AccelerateSeconds` set by the response.
+	// Confirm that we set `e.forwardAllDistributedUntil` to accelerate requests.
+	require.Greater(t, e.forwardAllDistributedUntil.Load(), int64(0))
+
+	// Request queries twice more -- this will be before e.distributedForwardingInterval seconds have passed,
+	// but we should be in accelerated mode and should therefore see the request go through to the cloud.
+	queries, err = e.GetQueries(context.TODO())
+	require.Nil(t, err)
+	require.Equal(t, expectedQueries, queries.Queries)
+
+	queries, err = e.GetQueries(context.TODO())
+	require.Nil(t, err)
+	require.Equal(t, expectedQueries, queries.Queries)
+}
+
 func TestExtensionWriteResultsTransportError(t *testing.T) {
 
 	m := &mock.KolideService{
@@ -1191,7 +1284,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1201,7 +1294,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts:  postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1216,7 +1310,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1230,7 +1324,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts: postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1245,7 +1340,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1260,7 +1355,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              false,
-					"distributed_interval": float64(25), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1276,7 +1371,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 				"options": map[string]any{
 					"audit_allow_config":   false,
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 			},
 		},
@@ -1299,7 +1394,8 @@ func Test_setOsqueryOptions(t *testing.T) {
 			overrideOpts: postStartupOsqueryConfigOptions,
 			expectedConfig: map[string]any{
 				"options": map[string]any{
-					"verbose": false,
+					"verbose":              false,
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 				"decorators": map[string]any{
 					"load": []any{
@@ -1336,7 +1432,7 @@ func Test_setOsqueryOptions(t *testing.T) {
 			expectedConfig: map[string]any{
 				"options": map[string]any{
 					"verbose":              true,
-					"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+					"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 				},
 				"auto_table_construction": map[string]any{
 					"tcc_system_entries": map[string]any{
@@ -1387,7 +1483,7 @@ func Test_setOsqueryOptions_EmptyConfig(t *testing.T) {
 	expectedCfg := map[string]any{
 		"options": map[string]any{
 			"verbose":              true,
-			"distributed_interval": float64(startupDistributedInterval), // has to be a float64 due to json unmarshal nonsense
+			"distributed_interval": float64(osqueryDistributedInterval), // has to be a float64 due to json unmarshal nonsense
 		},
 	}
 
