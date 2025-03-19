@@ -341,13 +341,13 @@ func (fc *FlagController) ControlRequestInterval() time.Duration {
 	).get(fc.getControlServerValue(keys.ControlRequestInterval))
 }
 
-func (fc *FlagController) SetAllowDt4aAcceleration(enabled bool) error {
-	return fc.setControlServerValue(keys.AllowDt4aAcceleration, boolToBytes(enabled))
+func (fc *FlagController) SetAllowOverlyBroadDt4aAcceleration(enabled bool) error {
+	return fc.setControlServerValue(keys.AllowOverlyBroadDt4aAcceleration, boolToBytes(enabled))
 }
-func (fc *FlagController) AllowDt4aAcceleration() bool {
+func (fc *FlagController) AllowOverlyBroadDt4aAcceleration() bool {
 	return NewBoolFlagValue(
 		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.AllowDt4aAcceleration))
+	).get(fc.getControlServerValue(keys.AllowOverlyBroadDt4aAcceleration))
 }
 
 func (fc *FlagController) SetDisableControlTLS(disabled bool) error {

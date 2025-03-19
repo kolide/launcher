@@ -56,12 +56,12 @@ func (_m *Knapsack) AgentFlagsStore() types.GetterSetterDeleterIteratorUpdaterCo
 	return r0
 }
 
-// AllowDt4aAcceleration provides a mock function with given fields:
-func (_m *Knapsack) AllowDt4aAcceleration() bool {
+// AllowOverlyBroadDt4aAcceleration provides a mock function with given fields:
+func (_m *Knapsack) AllowOverlyBroadDt4aAcceleration() bool {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllowDt4aAcceleration")
+		panic("no return value specified for AllowOverlyBroadDt4aAcceleration")
 	}
 
 	var r0 bool
@@ -1312,12 +1312,12 @@ func (_m *Knapsack) ServerProvidedDataStore() types.GetterSetterDeleterIteratorU
 	return r0
 }
 
-// SetAllowDt4aAcceleration provides a mock function with given fields: enable
-func (_m *Knapsack) SetAllowDt4aAcceleration(enable bool) error {
+// SetAllowOverlyBroadDt4aAcceleration provides a mock function with given fields: enable
+func (_m *Knapsack) SetAllowOverlyBroadDt4aAcceleration(enable bool) error {
 	ret := _m.Called(enable)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetAllowDt4aAcceleration")
+		panic("no return value specified for SetAllowOverlyBroadDt4aAcceleration")
 	}
 
 	var r0 error

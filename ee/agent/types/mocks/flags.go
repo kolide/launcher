@@ -16,12 +16,12 @@ type Flags struct {
 	mock.Mock
 }
 
-// AllowDt4aAcceleration provides a mock function with given fields:
-func (_m *Flags) AllowDt4aAcceleration() bool {
+// AllowOverlyBroadDt4aAcceleration provides a mock function with given fields:
+func (_m *Flags) AllowOverlyBroadDt4aAcceleration() bool {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllowDt4aAcceleration")
+		panic("no return value specified for AllowOverlyBroadDt4aAcceleration")
 	}
 
 	var r0 bool
@@ -842,12 +842,12 @@ func (_m *Flags) RootPEM() string {
 	return r0
 }
 
-// SetAllowDt4aAcceleration provides a mock function with given fields: enable
-func (_m *Flags) SetAllowDt4aAcceleration(enable bool) error {
+// SetAllowOverlyBroadDt4aAcceleration provides a mock function with given fields: enable
+func (_m *Flags) SetAllowOverlyBroadDt4aAcceleration(enable bool) error {
 	ret := _m.Called(enable)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetAllowDt4aAcceleration")
+		panic("no return value specified for SetAllowOverlyBroadDt4aAcceleration")
 	}
 
 	var r0 error
