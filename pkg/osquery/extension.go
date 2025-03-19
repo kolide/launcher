@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
@@ -161,12 +162,12 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 	initialTimestamp.Store(0)
 
 	distributedForwardingInterval := &atomic.Int64{}
-	distributedForwardingInterval.Store(60) // forward RequestQueries to the cloud once every 60 seconds
+	distributedForwardingInterval.Store(int64(k.DistributedForwardingInterval().Seconds()))
 
 	forwardAllDistributedUntil := &atomic.Int64{}
 	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
 
-	return &Extension{
+	e := &Extension{
 		slogger:                       slogger,
 		serviceClient:                 client,
 		settingsWriter:                settingsWriter,
@@ -179,7 +180,10 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		lastRequestQueriesTimestamp:   initialTimestamp,
 		distributedForwardingInterval: distributedForwardingInterval,
 		forwardAllDistributedUntil:    forwardAllDistributedUntil,
-	}, nil
+	}
+	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
+
+	return e, nil
 }
 
 func (e *Extension) Execute() error {
@@ -211,7 +215,20 @@ func (e *Extension) Shutdown(_ error) {
 	}
 	e.interrupted.Store(true)
 
+	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which is DistributedForwardingInterval.
+func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	for _, flagKey := range flagKeys {
+		if flagKey == keys.DistributedForwardingInterval {
+			e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
+			// That's the only flag we care about -- we can break here
+			break
+		}
+	}
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
