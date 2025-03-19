@@ -25,6 +25,7 @@ const (
 	ForceControlSubsystems          FlagKey = "force_control_subsystems"
 	ControlServerURL                FlagKey = "control_server_url"
 	ControlRequestInterval          FlagKey = "control_request_interval"
+	AllowDt4aAcceleration           FlagKey = "allow_dt4a_acceleration"
 	DisableControlTLS               FlagKey = "disable_control_tls"
 	InsecureControlTLS              FlagKey = "insecure_control_tls"
 	InsecureTLS                     FlagKey = "insecure_tls"

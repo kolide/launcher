@@ -88,6 +88,10 @@ type Flags interface {
 	SetControlRequestIntervalOverride(value time.Duration, duration time.Duration)
 	ControlRequestInterval() time.Duration
 
+	// AllowDt4aAcceleration enables acceleration via /dt4a localserver endpoints.
+	SetAllowDt4aAcceleration(enable bool) error
+	AllowDt4aAcceleration() bool
+
 	// DisableControlTLS disables TLS transport with the control server.
 	SetDisableControlTLS(disabled bool) error
 	DisableControlTLS() bool
