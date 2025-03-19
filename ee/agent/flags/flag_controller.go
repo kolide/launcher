@@ -405,7 +405,7 @@ func (fc *FlagController) OsqueryVerbose() bool {
 func (fc *FlagController) SetOsqueryAccelerateDistributed(accelerate bool) error {
 	return fc.setControlServerValue(keys.OsqueryAccelerateDistributed, boolToBytes(accelerate))
 }
-func (fc *FlagController) SetOsqueryAccelerateDistributedOverride(value time.Duration, duration time.Duration) {
+func (fc *FlagController) SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration) {
 	ctx, span := traces.StartSpan(context.TODO())
 	defer span.End()
 

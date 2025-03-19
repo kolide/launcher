@@ -1344,7 +1344,7 @@ func (_m *Flags) SetOsqueryAccelerateDistributed(accelerate bool) error {
 }
 
 // SetOsqueryAccelerateDistributedOverride provides a mock function with given fields: value, duration
-func (_m *Flags) SetOsqueryAccelerateDistributedOverride(value time.Duration, duration time.Duration) {
+func (_m *Flags) SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration) {
 	_m.Called(value, duration)
 }
 

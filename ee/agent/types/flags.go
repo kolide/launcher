@@ -127,7 +127,7 @@ type Flags interface {
 	// OsqueryAccelerateDistributed accelerates the rate at which we forward osquery distributed requests
 	// to the cloud
 	SetOsqueryAccelerateDistributed(accelerate bool) error
-	SetOsqueryAccelerateDistributedOverride(value time.Duration, duration time.Duration)
+	SetOsqueryAccelerateDistributedOverride(value bool, duration time.Duration)
 	OsqueryAccelerateDistributed() bool
 
 	// WatchdogEnabled enables the osquery watchdog
