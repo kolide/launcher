@@ -292,6 +292,59 @@ jobs:
       working-directory: build
       run: ./launcher doctor
 
+  container_exec_testing:
+    name: Container Exec Test
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+          - ubuntu:20.04
+    needs:
+      - version_baseline # version_baseline implies build_linux
+      - build # need the other builds too
+    steps:
+
+    # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
+    # ca-certificates and openssl are needed to download osquery.
+    - name: Install dependencies
+      run: |
+        apt-get -y update
+        apt-get -y install zstd ca-certificates openssl
+        update-ca-certificates
+
+    - name: cache restore build output
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - name: Launcher Version
+      working-directory: build
+      shell: bash
+      run: |
+        ./launcher --version
+        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+        baseVersion="${{ needs.version_baseline.outputs.version }}"
+        if [[ "$thisVersion" != "$baseVersion" ]]; then
+          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+          exit 1
+        fi
+
+    - name: Download Osquery
+      working-directory: build
+      run: ./launcher download-osquery --directory .
+
+    - name: Osquery Version
+      working-directory: build
+      run: ./osqueryd --version
+
+    - name: Launcher Doctor
+      working-directory: build
+      run: ./launcher doctor
 
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
   # be able to do this entirely on ubuntu, so let's try!
@@ -306,7 +359,9 @@ jobs:
           - Linux
           - macOS
           - Windows
-    needs: exec_testing
+    needs:
+      - exec_testing
+      - container_exec_testing
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v4
@@ -398,3 +453,4 @@ jobs:
       - launcher_test
       - package_builder_test
       - exec_testing
+      - container_exec_testing
