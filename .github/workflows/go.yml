@@ -306,11 +306,15 @@ jobs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
-    # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
-    - name: Install zstd
+
+    # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
+    # ca-certificates and openssl are needed to download osquery.
+    - name: Install dependencies
       run: |
         apt-get -y update
-        apt-get -y install zstd
+        apt-get -y install zstd ca-certificates openssl
+        update-ca-certificates
+
     - name: cache restore build output
       uses: actions/cache/restore@v4
       with:
