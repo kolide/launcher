@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 )
@@ -32,6 +33,9 @@ var (
 
 const (
 	safariWebExtensionScheme = "safari-web-extension://"
+
+	accelerateInterval = 5 * time.Second
+	accelerateDuration = 5 * time.Minute
 )
 
 func (ls *localServer) requestDt4aInfoHandler() http.Handler {
@@ -58,6 +62,11 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		}
 	}
 
+	// We only allow acceleration via this endpoint if this testing flag is set.
+	if ls.knapsack.AllowOverlyBroadDt4aAcceleration() {
+		ls.accelerate()
+	}
+
 	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
 	if err != nil {
 		traces.SetError(span, err)
@@ -77,4 +86,41 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(dt4aInfo)
+}
+
+func (ls *localServer) requestDt4aAccelerationHandler() http.Handler {
+	return http.HandlerFunc(ls.requestDt4aAccelerationHandlerFunc)
+}
+
+func (ls *localServer) requestDt4aAccelerationHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	defer span.End()
+
+	// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
+	// present but empty, or to be missing. We will not allow a request with a nonempty origin
+	// that is not in the allowlist.
+	requestOrigin := r.Header.Get("Origin")
+	if requestOrigin != "" {
+		if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
+			escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+			ls.slogger.Log(r.Context(), slog.LevelInfo,
+				"received dt4a request with origin not in allowlist",
+				"req_origin", escapedOrigin,
+			)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+	}
+
+	ls.accelerate()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (ls *localServer) accelerate() {
+	// Accelerate requests to control server
+	ls.knapsack.SetControlRequestIntervalOverride(accelerateInterval, accelerateDuration)
+
+	// Accelerate osquery distributed requests
+	ls.knapsack.SetDistributedForwardingIntervalOverride(accelerateInterval, accelerateDuration)
 }

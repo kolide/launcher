@@ -34,6 +34,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -86,6 +87,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -123,6 +125,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -159,6 +162,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -205,6 +209,7 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			k := typesmocks.NewKnapsack(t)
 			k.On("KolideServerURL").Return("localserver")
 			k.On("Slogger").Return(slogger)
+			k.On("AllowOverlyBroadDt4aAcceleration").Maybe().Return(false)
 
 			// Set up localserver
 			ls, err := New(context.TODO(), k, nil)
@@ -237,6 +242,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
