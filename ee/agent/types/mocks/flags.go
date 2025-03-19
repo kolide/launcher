@@ -666,6 +666,24 @@ func (_m *Flags) MirrorServerURL() string {
 	return r0
 }
 
+// OsqueryAccelerateDistributed provides a mock function with given fields:
+func (_m *Flags) OsqueryAccelerateDistributed() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryAccelerateDistributed")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // OsqueryFlags provides a mock function with given fields:
 func (_m *Flags) OsqueryFlags() []string {
 	ret := _m.Called()
@@ -1305,6 +1323,29 @@ func (_m *Flags) SetMirrorServerURL(url string) error {
 	}
 
 	return r0
+}
+
+// SetOsqueryAccelerateDistributed provides a mock function with given fields: accelerate
+func (_m *Flags) SetOsqueryAccelerateDistributed(accelerate bool) error {
+	ret := _m.Called(accelerate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryAccelerateDistributed")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(accelerate)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryAccelerateDistributedOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetOsqueryAccelerateDistributedOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetOsqueryHealthcheckStartupDelay provides a mock function with given fields: delay

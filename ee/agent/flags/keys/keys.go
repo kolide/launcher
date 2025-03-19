@@ -34,6 +34,7 @@ const (
 	Debug                           FlagKey = "debug"
 	DebugLogFile                    FlagKey = "debug_log_file"
 	OsqueryVerbose                  FlagKey = "osquery_verbose"
+	OsqueryAccelerateDistributed    FlagKey = "osquery_accelerate_distributed"
 	WatchdogEnabled                 FlagKey = "watchdog_enabled"
 	WatchdogDelaySec                FlagKey = "watchdog_delay_sec"
 	WatchdogMemoryLimitMB           FlagKey = "watchdog_memory_limit_mb"

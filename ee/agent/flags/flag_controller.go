@@ -402,6 +402,25 @@ func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
 }
 
+func (fc *FlagController) SetOsqueryAccelerateDistributed(accelerate bool) error {
+	return fc.setControlServerValue(keys.OsqueryAccelerateDistributed, boolToBytes(accelerate))
+}
+func (fc *FlagController) SetOsqueryAccelerateDistributedOverride(value time.Duration, duration time.Duration) {
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.OsqueryAccelerateDistributed, duration, value)
+}
+func (fc *FlagController) OsqueryAccelerateDistributed() bool {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return NewBoolFlagValue(
+		WithBoolOverride(fc.overrides[keys.OsqueryAccelerateDistributed]),
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.OsqueryAccelerateDistributed))
+}
+
 func (fc *FlagController) SetWatchdogEnabled(enable bool) error {
 	return fc.setControlServerValue(keys.WatchdogEnabled, boolToBytes(enable))
 }
