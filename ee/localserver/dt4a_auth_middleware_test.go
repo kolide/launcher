@@ -21,10 +21,10 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
-func Test_ZtaAuthMiddleware(t *testing.T) {
+func Test_Dt4aAuthMiddleware(t *testing.T) {
 	rootTrustedEcKey := mustGenEcdsaKey(t)
 
-	ztaMiddleware := &ztaAuthMiddleware{
+	dt4aMiddleware := &dt4aAuthMiddleware{
 		counterPartyKeys: map[string]*ecdsa.PublicKey{
 			"for_funzies": mustGenEcdsaKey(t).Public().(*ecdsa.PublicKey),
 			"0":           rootTrustedEcKey.Public().(*ecdsa.PublicKey), // this is the trusted root
@@ -34,7 +34,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 
 	returnData := []byte("Congrats!, you got the data back!")
 
-	handler := ztaMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := dt4aMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(returnData)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -136,7 +136,7 @@ func Test_ZtaAuthMiddleware(t *testing.T) {
 		bodyDecoded, err := base64.StdEncoding.DecodeString(string(bodyBytes))
 		require.NoError(t, err)
 
-		var z ztaResponse
+		var z dt4aResponse
 		require.NoError(t, json.Unmarshal(bodyDecoded, &z))
 
 		opened, err := echelper.OpenNaCl(z.Data, z.PubKey, callerPrivKey)

@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	localserverZtaInfoKey = []byte("localserver_zta_info")
+	localserverDt4aInfoKey = []byte("localserver_zta_info")
 
-	// allowlistedZtaOriginsLookup contains the complete list of origins that are permitted to access the /zta endpoint.
-	allowlistedZtaOriginsLookup = map[string]struct{}{
+	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
+	allowlistedDt4aOriginsLookup = map[string]struct{}{
 		// Release extension
 		"chrome-extension://gejiddohjgogedgjnonbofjigllpkmbf":  {},
 		"chrome-extension://khgocmkkpikpnmmkgmdnfckapcdkgfaf":  {},
@@ -34,11 +34,11 @@ const (
 	safariWebExtensionScheme = "safari-web-extension://"
 )
 
-func (ls *localServer) requestZtaInfoHandler() http.Handler {
-	return http.HandlerFunc(ls.requestZtaInfoHandlerFunc)
+func (ls *localServer) requestDt4aInfoHandler() http.Handler {
+	return http.HandlerFunc(ls.requestDt4aInfoHandlerFunc)
 }
 
-func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.Request) {
+func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
@@ -47,10 +47,10 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 	// that is not in the allowlist.
 	requestOrigin := r.Header.Get("Origin")
 	if requestOrigin != "" {
-		if _, ok := allowlistedZtaOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
+		if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
 			escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
 			ls.slogger.Log(r.Context(), slog.LevelInfo,
-				"received zta request with origin not in allowlist",
+				"received dt4a request with origin not in allowlist",
 				"req_origin", escapedOrigin,
 			)
 			w.WriteHeader(http.StatusForbidden)
@@ -58,11 +58,11 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 		}
 	}
 
-	ztaInfo, err := ls.knapsack.ZtaInfoStore().Get(localserverZtaInfoKey)
+	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
 	if err != nil {
 		traces.SetError(span, err)
 		ls.slogger.Log(r.Context(), slog.LevelError,
-			"could not retrieve ZTA info from store",
+			"could not retrieve dt4a info from store",
 			"err", err,
 		)
 
@@ -70,11 +70,11 @@ func (ls *localServer) requestZtaInfoHandlerFunc(w http.ResponseWriter, r *http.
 		return
 	}
 	// No data stored yet
-	if len(ztaInfo) == 0 {
+	if len(dt4aInfo) == 0 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(ztaInfo)
+	w.Write(dt4aInfo)
 }
