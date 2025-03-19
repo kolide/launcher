@@ -216,6 +216,11 @@ func (_m *Flags) DebugServerData() bool {
 	return r0
 }
 
+// DeregisterChangeObserver provides a mock function with given fields: observer
+func (_m *Flags) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
+	_m.Called(observer)
+}
+
 // DesktopEnabled provides a mock function with given fields:
 func (_m *Flags) DesktopEnabled() bool {
 	ret := _m.Called()

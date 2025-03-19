@@ -364,6 +364,11 @@ func (_m *Knapsack) DebugServerData() bool {
 	return r0
 }
 
+// DeregisterChangeObserver provides a mock function with given fields: observer
+func (_m *Knapsack) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
+	_m.Called(observer)
+}
+
 // DesktopEnabled provides a mock function with given fields:
 func (_m *Knapsack) DesktopEnabled() bool {
 	ret := _m.Called()
