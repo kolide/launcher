@@ -303,8 +303,7 @@ jobs:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu:20.04
           #- centos:7 # Unsupported by actions/cache/restore GLIBC Issues
-          #- centos:8 # Unsupported by actions/cache/restore -- no zstd
-          - centos:9
+          - centos:8
           - debian:11
           - debian:10
     needs:
@@ -323,6 +322,12 @@ jobs:
     # ca-certificates and openssl are needed to download osquery.
     - name: Install dependencies
       run: |
+        if `grep NAME /etc/os-release | grep -q centos` ; then
+          sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo
+          sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo
+          sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo
+        fi
+
         if [ `command -v apt-get` ]; then
           apt-get -y update
           apt-get -y install zstd ca-certificates openssl
