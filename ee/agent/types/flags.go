@@ -10,6 +10,8 @@ import (
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
+	// Deregisters an existing observer
+	DeregisterChangeObserver(observer FlagsChangeObserver)
 
 	// KolideServerURL is the URL of the management server to connect to.
 	SetKolideServerURL(url string) error

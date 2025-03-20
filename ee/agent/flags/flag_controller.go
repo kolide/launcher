@@ -116,6 +116,18 @@ func (fc *FlagController) RegisterChangeObserver(observer types.FlagsChangeObser
 	fc.observers[observer] = append(fc.observers[observer], flagKeys...)
 }
 
+func (fc *FlagController) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
+	fc.observersMutex.Lock()
+	defer fc.observersMutex.Unlock()
+
+	if _, ok := fc.observers[observer]; !ok {
+		// Nothing to do
+		return
+	}
+
+	delete(fc.observers, observer)
+}
+
 // notifyObservers informs all observers of the keys that they have changed.
 func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := traces.StartSpan(ctx)

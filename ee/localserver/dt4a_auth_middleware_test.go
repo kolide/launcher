@@ -39,6 +39,17 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
+	t.Run("handles invalid origin", func(t *testing.T) {
+		t.Parallel()
+		rr := httptest.NewRecorder()
+		testRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+		testRequest.Header.Set("origin", "https://example.com")
+		handler.ServeHTTP(rr, testRequest)
+		require.Equal(t, http.StatusForbidden, rr.Code,
+			"should return forbidden when origin is present but not in allowlist",
+		)
+	})
+
 	t.Run("handles missing box param", func(t *testing.T) {
 		t.Parallel()
 		rr := httptest.NewRecorder()
