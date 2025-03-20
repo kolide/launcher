@@ -36,7 +36,9 @@ const (
 )
 
 type requestAcclerator interface {
+	// SetControlRequestIntervalOverride sets the interval for control requests
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
+	// SetDistributedForwardingIntervalOverride sets the interval for osquery
 	SetDistributedForwardingIntervalOverride(time.Duration, time.Duration)
 }
 
@@ -45,7 +47,7 @@ type Messenger interface {
 }
 
 func New(slogger *slog.Logger,
-	controlRequestIntervalOverrider requestAcclerator,
+	accelerator requestAcclerator,
 	messenger Messenger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -56,7 +58,7 @@ func New(slogger *slog.Logger,
 		listener:              listener,
 		slogger:               slogger,
 		desktopProcAuthTokens: make(map[string]string),
-		accelerator:           controlRequestIntervalOverrider,
+		accelerator:           accelerator,
 		messenger:             messenger,
 	}
 
