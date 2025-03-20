@@ -1,6 +1,7 @@
 package localserver
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -64,7 +65,7 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 
 	// We only allow acceleration via this endpoint if this testing flag is set.
 	if ls.knapsack.AllowOverlyBroadDt4aAcceleration() {
-		ls.accelerate()
+		ls.accelerate(r.Context())
 	}
 
 	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
@@ -112,15 +113,21 @@ func (ls *localServer) requestDt4aAccelerationHandlerFunc(w http.ResponseWriter,
 		}
 	}
 
-	ls.accelerate()
+	ls.accelerate(r.Context())
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (ls *localServer) accelerate() {
+func (ls *localServer) accelerate(ctx context.Context) {
 	// Accelerate requests to control server
 	ls.knapsack.SetControlRequestIntervalOverride(accelerateInterval, accelerateDuration)
 
 	// Accelerate osquery distributed requests
 	ls.knapsack.SetDistributedForwardingIntervalOverride(accelerateInterval, accelerateDuration)
+
+	ls.slogger.Log(ctx, slog.LevelInfo,
+		"accelerated control server and osquery distributed requests",
+		"interval", accelerateInterval.String(),
+		"duration", accelerateDuration.String(),
+	)
 }
