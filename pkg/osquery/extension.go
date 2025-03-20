@@ -42,7 +42,7 @@ type Extension struct {
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
 	settingsWriter                settingsStoreWriter
-	enrollMutex                   sync.Mutex
+	enrollMutex                   *sync.Mutex
 	done                          chan struct{}
 	interrupted                   atomic.Bool
 	slogger                       *slog.Logger
@@ -175,6 +175,7 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		knapsack:                      k,
 		NodeKey:                       nodekey,
 		Opts:                          opts,
+		enrollMutex:                   &sync.Mutex{},
 		done:                          make(chan struct{}),
 		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
 		lastRequestQueriesTimestamp:   initialTimestamp,
