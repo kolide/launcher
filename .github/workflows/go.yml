@@ -317,16 +317,19 @@ jobs:
 
         for f in /etc/*release; do echo -e "\n\n$f:"; cat $f || true; done
 
-    - name: OS Info -- uname -a
-      run: uname -a
-
     # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
     # ca-certificates and openssl are needed to download osquery.
     - name: Install dependencies
       run: |
-        apt-get -y update
-        apt-get -y install zstd ca-certificates openssl
-        update-ca-certificates
+        if [ `command -v apt-get` ]; then
+          apt-get -y update
+          apt-get -y install zstd ca-certificates openssl
+          update-ca-certificates
+        elif [ `command -v dnf` ]; then
+          echo dunno yet
+        elif [ `command -v yum` ]; then
+          echo dunno yet
+        fi
 
     - name: cache restore build output
       uses: actions/cache/restore@v4
