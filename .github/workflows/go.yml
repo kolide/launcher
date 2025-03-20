@@ -315,7 +315,7 @@ jobs:
         echo uname:
         uname -a
 
-        for f in "/etc/*release"; do echo -e "\n\n$f:"; cat $f || true; done
+        for f in /etc/*release; do echo -e "\n\n$f:"; cat $f || true; done
 
     - name: OS Info -- uname -a
       run: uname -a
