@@ -303,7 +303,8 @@ jobs:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu:20.04
           #- centos:7 # Unsupported by actions/cache/restore GLIBC Issues
-          - centos:8
+          #- centos:8 # Unsupported by actions/cache/restore -- no zstd
+          - centos:9
           - debian:11
           - debian:10
     needs:
@@ -329,7 +330,7 @@ jobs:
         elif [ `command -v dnf` ]; then
           echo dunno yet
         elif [ `command -v yum` ]; then
-          echo dunno yet
+          yum install zstd
         fi
 
     - name: cache restore build output
