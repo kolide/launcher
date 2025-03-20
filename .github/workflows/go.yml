@@ -322,20 +322,20 @@ jobs:
     # ca-certificates and openssl are needed to download osquery.
     - name: Install dependencies
       run: |
-        if `grep NAME /etc/os-release | grep -q centos` ; then
-          sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo
-          sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo
-          sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo
-        fi
+        if [ -n "$(grep NAME /etc/os-release | grep centos)" ]; then
+          echo CentOS detected
 
-        if [ `command -v apt-get` ]; then
+          sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/CentOS-*.repo
+
+          dnf install zstd
+        elif [ $(command -v apt-get) ]; then
+          echo apt-get detected
+
           apt-get -y update
           apt-get -y install zstd ca-certificates openssl
           update-ca-certificates
-        elif [ `command -v dnf` ]; then
-          echo dunno yet
-        elif [ `command -v yum` ]; then
-          yum install zstd
         fi
 
     - name: cache restore build output
