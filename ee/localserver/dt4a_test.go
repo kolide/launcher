@@ -13,6 +13,7 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -256,6 +257,34 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 
 	// Make sure response was a 404
 	require.Equal(t, http.StatusNotFound, responseRecorder.Code)
+
+	k.AssertExpectations(t)
+}
+
+func Test_requestDt4aAccelerationHandler(t *testing.T) {
+	t.Parallel()
+
+	// Set up localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	// Validate that we accelerate control requests
+	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
+	// Validate that we accelerate osquery distributed requests
+	k.On("SetDistributedForwardingIntervalOverride", mock.Anything, mock.Anything).Return()
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("origin", acceptableOrigin(t))
+	responseRecorder := httptest.NewRecorder()
+	ls.requestDt4aAccelerationHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was successful and contains the data we expect
+	require.Equal(t, http.StatusNoContent, responseRecorder.Code)
 
 	k.AssertExpectations(t)
 }
