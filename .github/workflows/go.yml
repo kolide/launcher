@@ -293,7 +293,7 @@ jobs:
       run: ./launcher doctor
 
   container_exec_testing:
-    name: Container Exec Test
+    name: Exec Test Containers
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
     strategy:
@@ -302,10 +302,23 @@ jobs:
         container:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu:20.04
+          - centos:7
+          - debian:11
+          - debian:10
     needs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
+
+    - name: OS Info
+      run: |
+        echo uname:
+        uname -a
+
+        for f in "/etc/*release"; do echo -e "\n\n$f:"; cat $f || true; done
+
+    - name: OS Info -- uname -a
+      run: uname -a
 
     # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
     # ca-certificates and openssl are needed to download osquery.
