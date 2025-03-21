@@ -21,7 +21,7 @@ endif
 
 
 all: build
-build: build_launcher
+build: deps build_launcher
 
 .pre-build: ${BUILD_DIR}
 
