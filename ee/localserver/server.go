@@ -51,8 +51,6 @@ type localServer struct {
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
-
-	tenantMunemo string
 }
 
 const (

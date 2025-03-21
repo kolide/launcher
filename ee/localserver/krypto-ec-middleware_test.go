@@ -604,11 +604,11 @@ func TestMunemoCheck(t *testing.T) {
 	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {"test-munemo"}}
 
 	tests := []struct {
-		name                       string
-		headers                    map[string][]string
-		tokenClaims                jwt.MapClaims
-		exptectMunemoExtractionErr bool
-		exptectMiddlewareErr       bool
+		name                      string
+		headers                   map[string][]string
+		tokenClaims               jwt.MapClaims
+		expectMunemoExtractionErr bool
+		expectMiddleWareCheckErr  bool
 	}{
 		{
 			name:        "matching munemo",
@@ -620,15 +620,15 @@ func TestMunemoCheck(t *testing.T) {
 			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
 		},
 		{
-			name:                       "no token claims",
-			headers:                    validTestHeader,
-			exptectMunemoExtractionErr: true,
+			name:                      "no token claims",
+			headers:                   validTestHeader,
+			expectMunemoExtractionErr: true,
 		},
 		{
-			name:                       "token claim not string",
-			headers:                    validTestHeader,
-			tokenClaims:                jwt.MapClaims{"organization": 1},
-			exptectMunemoExtractionErr: true,
+			name:                      "token claim not string",
+			headers:                   validTestHeader,
+			tokenClaims:               jwt.MapClaims{"organization": 1},
+			expectMunemoExtractionErr: true,
 		},
 		{
 			name:        "empty org claim",
@@ -636,10 +636,10 @@ func TestMunemoCheck(t *testing.T) {
 			tokenClaims: jwt.MapClaims{"organization": ""},
 		},
 		{
-			name:                 "header and munemo dont match",
-			headers:              map[string][]string{"kolideMunemoHeaderKey": {"other-munemo"}},
-			tokenClaims:          jwt.MapClaims{"organization": "test-munemo"},
-			exptectMiddlewareErr: true,
+			name:                     "header and munemo dont match",
+			headers:                  map[string][]string{"kolideMunemoHeaderKey": {"other-munemo"}},
+			tokenClaims:              jwt.MapClaims{"organization": "test-munemo"},
+			expectMiddleWareCheckErr: true,
 		},
 	}
 
@@ -652,7 +652,7 @@ func TestMunemoCheck(t *testing.T) {
 			require.NoError(t, err)
 
 			munemo, err := getMunemoFromEnrollSecret(token)
-			if tt.exptectMunemoExtractionErr {
+			if tt.expectMunemoExtractionErr {
 				require.Error(t, err)
 				return
 			}
@@ -660,7 +660,7 @@ func TestMunemoCheck(t *testing.T) {
 
 			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
 			err = e.checkMunemo(tt.headers)
-			if tt.exptectMiddlewareErr {
+			if tt.expectMiddleWareCheckErr {
 				require.Error(t, err)
 				return
 			}
