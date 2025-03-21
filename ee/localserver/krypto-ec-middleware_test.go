@@ -637,7 +637,7 @@ func TestMunemoCheck(t *testing.T) {
 		},
 		{
 			name:                     "header and munemo dont match",
-			headers:                  map[string][]string{"kolideMunemoHeaderKey": {"other-munemo"}},
+			headers:                  map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
 			tokenClaims:              jwt.MapClaims{"organization": "test-munemo"},
 			expectMiddleWareCheckErr: true,
 		},
