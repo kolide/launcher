@@ -293,7 +293,7 @@ jobs:
       run: ./launcher doctor
 
   container_exec_testing:
-    name: Container Exec Test
+    name: Exec Test Containers
     runs-on: ubuntu-22.04
     container: ${{ matrix.container }}
     strategy:
@@ -302,18 +302,41 @@ jobs:
         container:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu:20.04
+          #- centos:7 # Unsupported by actions/cache/restore GLIBC Issues
+          - centos:8
+          - debian:11
+          - debian:10
     needs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
     steps:
 
+    - name: OS Info
+      run: |
+        echo uname:
+        uname -a
+
+        for f in /etc/*release; do echo -e "\n\n$f:"; cat "$f" || true; done
+
     # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
     # ca-certificates and openssl are needed to download osquery.
     - name: Install dependencies
       run: |
-        apt-get -y update
-        apt-get -y install zstd ca-certificates openssl
-        update-ca-certificates
+        if grep NAME /etc/os-release | grep -q centos; then
+          echo CentOS detected
+
+          sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/CentOS-*.repo
+
+          dnf install -y zstd
+        elif command -v apt-get > /dev/null; then
+          echo apt-get detected
+
+          apt-get -y update
+          apt-get -y install zstd ca-certificates openssl
+          update-ca-certificates
+        fi
 
     - name: cache restore build output
       uses: actions/cache/restore@v4
