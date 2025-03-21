@@ -36,6 +36,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -89,6 +90,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -127,6 +129,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -164,6 +167,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -211,6 +215,7 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			k.On("KolideServerURL").Return("localserver")
 			k.On("Slogger").Return(slogger)
 			k.On("AllowOverlyBroadDt4aAcceleration").Maybe().Return(false)
+			k.On("EnrollSecret").Return("enroll_secret")
 
 			// Set up localserver
 			ls, err := New(context.TODO(), k, nil)
@@ -244,6 +249,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -272,6 +278,7 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
 	// Validate that we accelerate osquery distributed requests
 	k.On("SetDistributedForwardingIntervalOverride", mock.Anything, mock.Anything).Return()
+	k.On("EnrollSecret").Return("enroll_secret")
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)

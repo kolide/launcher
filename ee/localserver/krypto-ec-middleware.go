@@ -39,6 +39,7 @@ const (
 	kolideDurationSinceLastPresenceDetectionHeaderKey = "X-Kolide-Duration-Since-Last-Presence-Detection"
 	kolideOsHeaderKey                                 = "X-Kolide-Os"
 	kolideArchHeaderKey                               = "X-Kolide-Arch"
+	kolideMunemoHeaderKey                             = "X-Kolide-Munemo"
 )
 
 type v2CmdRequestType struct {
@@ -78,6 +79,7 @@ type kryptoEcMiddleware struct {
 	slogger               *slog.Logger
 	presenceDetector      presenceDetector
 	presenceDetectionLock sync.Mutex
+	tenantMunemo          string
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -85,7 +87,7 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:                         localDbSigner,
 		counterParty:                          counterParty,
@@ -93,6 +95,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, co
 		presenceDetector:                      presenceDetector,
 		timestampValidityRange:                timestampValidityRange,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
+		tenantMunemo:                          tenantMunemo,
 	}
 }
 
@@ -206,6 +209,17 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 				"err", err,
 			)
 
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// check to see if munemos match
+		if err := e.checkMunemo(cmdReq.Headers); err != nil {
+			span.AddEvent("munemo_mismatch")
+			e.slogger.Log(r.Context(), slog.LevelInfo,
+				"munemo mismatch",
+				"err", err,
+			)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -733,4 +747,30 @@ func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *ht
 	}
 
 	return newReq
+}
+
+func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
+	if e.tenantMunemo == "" {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"no munemo set in krypto middleware, continuing",
+		)
+		return nil
+	}
+
+	muneoHeaders, ok := headers[kolideMunemoHeaderKey]
+	if !ok || len(muneoHeaders) == 0 || muneoHeaders[0] == "" {
+		e.slogger.Log(context.TODO(), slog.LevelDebug,
+			"no munemo header in request, continuing",
+		)
+		return nil
+	}
+
+	if muneoHeaders[0] == e.tenantMunemo {
+		e.slogger.Log(context.TODO(), slog.LevelDebug,
+			"munemo in request matches munemo in enroll secret, continuing",
+		)
+		return nil
+	}
+
+	return errors.New("munemo in request does not match munemo in middleware")
 }
