@@ -360,3 +360,54 @@ func TestControllerOverride(t *testing.T) {
 		})
 	}
 }
+
+func TestDeregisterChangeObserver(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		valueToSet time.Duration
+		interval   time.Duration
+		duration   time.Duration
+	}{
+		{
+			name:       "happy path",
+			valueToSet: 8 * time.Second, // cannot be below 5 seconds for control request interval
+			interval:   6 * time.Second, // cannot be below 5 seconds for control request interval
+			duration:   100 * time.Millisecond,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+			require.NoError(t, err)
+			fc := NewFlagController(multislogger.NewNopLogger(), store)
+			assert.NotNil(t, fc)
+
+			// Create a change observer and register it
+			mockObserver := mocks.NewFlagsChangeObserver(t)
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval).Once()
+			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
+
+			// Set the control request interval -- the mock observer will have `FlagsChanged` called
+			err = fc.SetControlRequestInterval(tt.valueToSet)
+			require.NoError(t, err)
+
+			value := fc.ControlRequestInterval()
+			assert.Equal(t, tt.valueToSet, value)
+
+			// Now, deregister the change observer
+			fc.DeregisterChangeObserver(mockObserver)
+			require.NotContains(t, fc.observers, mockObserver)
+
+			// Set the control request interval again -- the mock observer will NOT have `FlagsChanged` called
+			fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
+			assert.Equal(t, tt.interval, fc.ControlRequestInterval())
+
+			mockObserver.AssertExpectations(t)
+		})
+	}
+}

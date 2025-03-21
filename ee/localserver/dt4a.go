@@ -1,37 +1,22 @@
 package localserver
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
 )
 
 var (
 	localserverDt4aInfoKey = []byte("localserver_zta_info")
-
-	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
-	allowlistedDt4aOriginsLookup = map[string]struct{}{
-		// Release extension
-		"chrome-extension://gejiddohjgogedgjnonbofjigllpkmbf":  {},
-		"chrome-extension://khgocmkkpikpnmmkgmdnfckapcdkgfaf":  {},
-		"chrome-extension://aeblfdkhhhdcdjpifhhbdiojplfjncoa":  {},
-		"chrome-extension://dppgmdbiimibapkepcbdbmkaabgiofem":  {},
-		"moz-extension://dfbae458-fb6f-4614-856e-094108a80852": {},
-		"moz-extension://25fc87fa-4d31-4fee-b5c1-c32a7844c063": {},
-		"moz-extension://d634138d-c276-4fc8-924b-40a0ea21d284": {},
-		// Development and internal builds
-		"chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo":  {},
-		"moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82": {},
-		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
-		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
-		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
-	}
 )
 
 const (
-	safariWebExtensionScheme = "safari-web-extension://"
+	accelerateInterval = 5 * time.Second
+	accelerateDuration = 5 * time.Minute
 )
 
 func (ls *localServer) requestDt4aInfoHandler() http.Handler {
@@ -42,9 +27,9 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
-	// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
-	// present but empty, or to be missing. We will not allow a request with a nonempty origin
-	// that is not in the allowlist.
+	// This check is superfluous with the check in the middleware -- but we still have one
+	// unauthenticated endpoint that points directly to this handler, so we're leaving the check
+	// in both places for now. We can remove it once /zta is removed.
 	requestOrigin := r.Header.Get("Origin")
 	if requestOrigin != "" {
 		if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
@@ -56,6 +41,11 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
+	}
+
+	// We only allow acceleration via this endpoint if this testing flag is set.
+	if ls.knapsack.AllowOverlyBroadDt4aAcceleration() {
+		ls.accelerate(r.Context())
 	}
 
 	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
@@ -77,4 +67,31 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(dt4aInfo)
+}
+
+func (ls *localServer) requestDt4aAccelerationHandler() http.Handler {
+	return http.HandlerFunc(ls.requestDt4aAccelerationHandlerFunc)
+}
+
+func (ls *localServer) requestDt4aAccelerationHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	defer span.End()
+
+	ls.accelerate(r.Context())
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (ls *localServer) accelerate(ctx context.Context) {
+	// Accelerate requests to control server
+	ls.knapsack.SetControlRequestIntervalOverride(accelerateInterval, accelerateDuration)
+
+	// Accelerate osquery distributed requests
+	ls.knapsack.SetDistributedForwardingIntervalOverride(accelerateInterval, accelerateDuration)
+
+	ls.slogger.Log(ctx, slog.LevelInfo,
+		"accelerated control server and osquery distributed requests",
+		"interval", accelerateInterval.String(),
+		"duration", accelerateDuration.String(),
+	)
 }

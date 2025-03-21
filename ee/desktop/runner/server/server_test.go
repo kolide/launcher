@@ -22,6 +22,7 @@ func TestRootServer(t *testing.T) {
 
 	mockSack := mocks.NewKnapsack(t)
 	mockSack.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything)
+	mockSack.On("SetDistributedForwardingIntervalOverride", mock.Anything, mock.Anything)
 
 	messenger := servermocks.NewMessenger(t)
 

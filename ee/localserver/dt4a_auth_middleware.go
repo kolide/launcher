@@ -10,9 +10,34 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
+)
+
+var (
+	// allowlistedDt4aOriginsLookup contains the complete list of origins that are permitted to access the /dt4a endpoint.
+	allowlistedDt4aOriginsLookup = map[string]struct{}{
+		// Release extension
+		"chrome-extension://gejiddohjgogedgjnonbofjigllpkmbf":  {},
+		"chrome-extension://khgocmkkpikpnmmkgmdnfckapcdkgfaf":  {},
+		"chrome-extension://aeblfdkhhhdcdjpifhhbdiojplfjncoa":  {},
+		"chrome-extension://dppgmdbiimibapkepcbdbmkaabgiofem":  {},
+		"moz-extension://dfbae458-fb6f-4614-856e-094108a80852": {},
+		"moz-extension://25fc87fa-4d31-4fee-b5c1-c32a7844c063": {},
+		"moz-extension://d634138d-c276-4fc8-924b-40a0ea21d284": {},
+		// Development and internal builds
+		"chrome-extension://hjlinigoblmkhjejkmbegnoaljkphmgo":  {},
+		"moz-extension://0a75d802-9aed-41e7-8daa-24c067386e82": {},
+		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
+		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
+		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
+	}
+)
+
+const (
+	safariWebExtensionScheme = "safari-web-extension://"
 )
 
 type dt4aAuthMiddleware struct {
@@ -28,6 +53,22 @@ type dt4aResponse struct {
 
 func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
+		// present but empty, or to be missing. We will not allow a request with a nonempty origin
+		// that is not in the allowlist.
+		requestOrigin := r.Header.Get("Origin")
+		if requestOrigin != "" {
+			if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
+				escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+				d.slogger.Log(r.Context(), slog.LevelInfo,
+					"received dt4a request with origin not in allowlist",
+					"req_origin", escapedOrigin,
+				)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+
 		boxParam := r.URL.Query().Get("payload")
 		if boxParam == "" {
 			d.slogger.Log(r.Context(), slog.LevelWarn,

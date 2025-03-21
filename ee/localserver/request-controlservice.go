@@ -41,7 +41,10 @@ func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *ht
 		return
 	}
 
+	// accelerate control server requests
 	ls.knapsack.SetControlRequestIntervalOverride(interval, duration)
+	// accelerate osquery requests
+	ls.knapsack.SetDistributedForwardingIntervalOverride(interval, duration)
 
 	span.AddEvent("control_accelerated")
 }

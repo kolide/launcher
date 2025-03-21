@@ -18,13 +18,13 @@ import (
 // RunnerServer provides IPC for user desktop processes to communicate back to the root desktop runner.
 // It allows the user process to notify and monitor the health of the runner process.
 type RunnerServer struct {
-	server                          *http.Server
-	listener                        net.Listener
-	slogger                         *slog.Logger
-	desktopProcAuthTokens           map[string]string
-	mutex                           sync.Mutex
-	controlRequestIntervalOverrider controlRequestIntervalOverrider
-	messenger                       Messenger
+	server                *http.Server
+	listener              net.Listener
+	slogger               *slog.Logger
+	desktopProcAuthTokens map[string]string
+	mutex                 sync.Mutex
+	accelerator           requestAcclerator
+	messenger             Messenger
 }
 
 const (
@@ -35,8 +35,11 @@ const (
 	controlRequestAcclerationDuration  = 1 * time.Minute
 )
 
-type controlRequestIntervalOverrider interface {
+type requestAcclerator interface {
+	// SetControlRequestIntervalOverride sets the interval for control requests
 	SetControlRequestIntervalOverride(time.Duration, time.Duration)
+	// SetDistributedForwardingIntervalOverride sets the interval for osquery
+	SetDistributedForwardingIntervalOverride(time.Duration, time.Duration)
 }
 
 type Messenger interface {
@@ -44,7 +47,7 @@ type Messenger interface {
 }
 
 func New(slogger *slog.Logger,
-	controlRequestIntervalOverrider controlRequestIntervalOverrider,
+	accelerator requestAcclerator,
 	messenger Messenger) (*RunnerServer, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
@@ -52,11 +55,11 @@ func New(slogger *slog.Logger,
 	}
 
 	rs := &RunnerServer{
-		listener:                        listener,
-		slogger:                         slogger,
-		desktopProcAuthTokens:           make(map[string]string),
-		controlRequestIntervalOverrider: controlRequestIntervalOverrider,
-		messenger:                       messenger,
+		listener:              listener,
+		slogger:               slogger,
+		desktopProcAuthTokens: make(map[string]string),
+		accelerator:           accelerator,
+		messenger:             messenger,
 	}
 
 	if rs.slogger == nil {
@@ -80,7 +83,10 @@ func New(slogger *slog.Logger,
 			r.Body.Close()
 		}
 
-		controlRequestIntervalOverrider.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
+		// accelerate control server requests
+		rs.accelerator.SetControlRequestIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
+		// accelerate osquery requests
+		rs.accelerator.SetDistributedForwardingIntervalOverride(controlRequestAccelerationInterval, controlRequestAcclerationDuration)
 	})
 
 	mux.Handle(MessageEndpoint, http.HandlerFunc(rs.sendMessage))

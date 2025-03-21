@@ -119,6 +119,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	mux.Handle("/zta", ls.requestDt4aInfoHandler())
 
 	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
+	mux.Handle("/v3/accelerate", dt4aAuthMiddleware.Wrap(ls.requestDt4aAccelerationHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:
