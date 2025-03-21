@@ -20,8 +20,8 @@ ifneq ($(OS), Windows_NT)
 endif
 
 
-all: build
-build: deps build_launcher
+all: deps build
+build: build_launcher
 
 .pre-build: ${BUILD_DIR}
 
