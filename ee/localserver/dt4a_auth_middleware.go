@@ -138,12 +138,9 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		boxB64Url := base64.URLEncoding.EncodeToString(box)
-		pubKeyB64Url := base64.URLEncoding.EncodeToString(pubKey[:])
-
 		dt4aResponse := dt4aResponse{
-			Data:   boxB64Url,
-			PubKey: pubKeyB64Url,
+			Data:   base64.URLEncoding.EncodeToString(box),
+			PubKey: base64.URLEncoding.EncodeToString(pubKey[:]),
 		}
 
 		dt4aResponseJson, err := json.Marshal(dt4aResponse)
