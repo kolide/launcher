@@ -2,6 +2,7 @@ package interactive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -207,6 +208,9 @@ func generateConfigPlugin(slogger *slog.Logger, launcherDaemonRootDir string) (*
 	atcConfig, err := r.Get(string(atcConfigKey))
 	if err != nil {
 		return nil, fmt.Errorf("error getting auto_table_construction from startup settings: %w", err)
+	}
+	if atcConfig == "" {
+		return nil, errors.New("auto_table_construction is not set in startup settings")
 	}
 
 	return config.NewPlugin(defaultConfigPluginName, func(ctx context.Context) (map[string]string, error) {
