@@ -47,8 +47,8 @@ type dt4aAuthMiddleware struct {
 }
 
 type dt4aResponse struct {
-	Data   []byte    `json:"data"`
-	PubKey *[32]byte `json:"pubKey"`
+	Data   string `json:"data"`
+	PubKey string `json:"pubKey"`
 }
 
 func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
@@ -139,11 +139,11 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		dt4aResponse := dt4aResponse{
-			Data:   box,
-			PubKey: pubKey,
+			Data:   base64.URLEncoding.EncodeToString(box),
+			PubKey: base64.URLEncoding.EncodeToString(pubKey[:]),
 		}
 
-		data, err := json.Marshal(dt4aResponse)
+		dt4aResponseJson, err := json.Marshal(dt4aResponse)
 		if err != nil {
 			d.slogger.Log(r.Context(), slog.LevelError,
 				"failed to marshal dt4a response",
@@ -155,7 +155,7 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Write([]byte(base64.URLEncoding.EncodeToString(data)))
+		w.Write(dt4aResponseJson)
 	})
 }
 

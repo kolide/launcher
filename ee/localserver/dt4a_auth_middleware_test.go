@@ -144,13 +144,19 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 		bodyBytes, err := io.ReadAll(rr.Body)
 		require.NoError(t, err)
 
-		bodyDecoded, err := base64.StdEncoding.DecodeString(string(bodyBytes))
+		var z dt4aResponse
+		require.NoError(t, json.Unmarshal(bodyBytes, &z))
+
+		dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
 		require.NoError(t, err)
 
-		var z dt4aResponse
-		require.NoError(t, json.Unmarshal(bodyDecoded, &z))
+		x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
+		require.NoError(t, err)
 
-		opened, err := echelper.OpenNaCl(z.Data, z.PubKey, callerPrivKey)
+		x25519 := new([32]byte)
+		copy(x25519[:], x25519Decoded)
+
+		opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
 		require.NoError(t, err)
 
 		require.Equal(t, returnData, opened,
