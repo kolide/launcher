@@ -19,8 +19,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
-	"go.opencensus.io/trace"
 )
 
 const (
@@ -32,9 +30,6 @@ const (
 // Sign uses signtool to add authenticode signatures. It supports
 // optional arguments to allow cert specification
 func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
-	ctx, span := trace.StartSpan(ctx, "authenticode.Sign")
-	defer span.End()
-
 	logger := log.With(ctxlog.FromContext(ctx), "caller", "authenticode.Sign")
 
 	level.Debug(logger).Log(
@@ -91,9 +86,6 @@ func Sign(ctx context.Context, file string, opts ...SigntoolOpt) error {
 // signtoolSign appends some arguments and execs
 func (so *signtoolOptions) signtoolSign(ctx context.Context, file string, args ...string) error {
 	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
-	ctx, span := trace.StartSpan(ctx, "signtoolSign")
-	defer span.End()
 
 	args = append([]string{"sign"}, args...)
 

@@ -7,17 +7,12 @@ import (
 	"io"
 	"strings"
 	"text/template"
-
-	"go.opencensus.io/trace"
 )
 
 //go:embed assets/init.sh
 var initdTemplate []byte
 
 func RenderInit(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
-	_, span := trace.StartSpan(ctx, "packagekit.RenderInit")
-	defer span.End()
-
 	var data = struct {
 		Common InitOptions
 	}{
