@@ -757,15 +757,15 @@ func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
 		return nil
 	}
 
-	muneoHeaders, ok := headers[kolideMunemoHeaderKey]
-	if !ok || len(muneoHeaders) == 0 || muneoHeaders[0] == "" {
+	munemoHeaders, ok := headers[kolideMunemoHeaderKey]
+	if !ok || len(munemoHeaders) == 0 || munemoHeaders[0] == "" {
 		e.slogger.Log(context.TODO(), slog.LevelDebug,
 			"no munemo header in request, continuing",
 		)
 		return nil
 	}
 
-	if muneoHeaders[0] == e.tenantMunemo {
+	if munemoHeaders[0] == e.tenantMunemo {
 		e.slogger.Log(context.TODO(), slog.LevelDebug,
 			"munemo in request matches munemo in enroll secret, continuing",
 		)
