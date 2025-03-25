@@ -7,8 +7,6 @@ import (
 	"io"
 	"strings"
 	"text/template"
-
-	"go.opencensus.io/trace"
 )
 
 //go:embed assets/upstart.sh
@@ -78,9 +76,6 @@ func WithUpstartFlavor(s string) UpstartOption {
 }
 
 func RenderUpstart(ctx context.Context, w io.Writer, initOptions *InitOptions, uOpts ...UpstartOption) error {
-	_, span := trace.StartSpan(ctx, "packagekit.Upstart")
-	defer span.End()
-
 	uOptions := &upstartOptions{}
 	for _, uOpt := range uOpts {
 		uOpt(uOptions)
