@@ -177,7 +177,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// unimplemented on windows, though empirically it seems to
 	// work.
 	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
-	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+	boltOptions := &bbolt.Options{
+		Timeout:      time.Duration(30) * time.Second,
+		FreelistType: bbolt.FreelistMapType,
+	}
 	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
