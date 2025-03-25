@@ -19,7 +19,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("EnrollSecret").Return("enroll_secret")
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown

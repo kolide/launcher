@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
@@ -651,7 +652,10 @@ func TestMunemoCheck(t *testing.T) {
 			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.tokenClaims).SignedString([]byte("test"))
 			require.NoError(t, err)
 
-			munemo, err := getMunemoFromEnrollSecret(token)
+			k := typesmocks.NewKnapsack(t)
+			k.On("ReadEnrollSecret").Return(token, nil)
+
+			munemo, err := getMunemoFromEnrollSecret(k)
 			if tt.expectMunemoExtractionErr {
 				require.Error(t, err)
 				return

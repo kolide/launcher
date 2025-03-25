@@ -28,7 +28,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	enrollSecret, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"organization": "test-munemo"}).SignedString([]byte("test"))
 	require.NoError(t, err)
 
-	mockKnapsack.On("EnrollSecret").Return(enrollSecret)
+	mockKnapsack.On("ReadEnrollSecret").Return(enrollSecret, nil)
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{

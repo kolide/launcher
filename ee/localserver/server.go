@@ -80,7 +80,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		return nil, err
 	}
 
-	munemo, err := getMunemoFromEnrollSecret(k.EnrollSecret())
+	munemo, err := getMunemoFromEnrollSecret(k)
 	if err != nil {
 		ls.slogger.Log(ctx, slog.LevelError,
 			"getting munemo from enroll secret, not fatal, continuing",
@@ -409,7 +409,12 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 }
 
 // getMunemoFromEnrollSecret extracts the munemo from the enroll secret
-func getMunemoFromEnrollSecret(enrollSecret string) (string, error) {
+func getMunemoFromEnrollSecret(k types.Knapsack) (string, error) {
+	enrollSecret, err := k.ReadEnrollSecret()
+	if err != nil {
+		return "", err
+	}
+
 	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
 	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
 	if err != nil {
