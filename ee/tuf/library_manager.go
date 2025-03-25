@@ -382,7 +382,7 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 		return
 	}
 
-	const numberOfVersionsToKeep = 3
+	const numberOfVersionsToKeep = 2
 
 	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), ulm.slogger, binary, ulm.baseDir)
 	if err != nil {
