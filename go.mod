@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
-	github.com/kolide/kit v0.0.0-20241126150023-fbf6f0f5bf6a
+	github.com/kolide/kit v0.0.0-20250324140823-36d978ef488c
 	github.com/kolide/krypto v0.1.1-0.20250226233608-47a978efa339
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/mattn/go-sqlite3 v1.14.19 // indirect
@@ -29,7 +29,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6
-	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 	golang.org/x/image v0.18.0
@@ -46,10 +45,10 @@ require (
 
 require (
 	github.com/apache/thrift v0.20.0
-	github.com/golang-jwt/jwt/v5 v5.0.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
-	github.com/kolide/goleveldb v0.0.0-20240514204455-8d30cd4d31c6
+	github.com/kolide/goleveldb v0.0.0-20250324141948-112c56cdb347
 	github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb
 	github.com/kolide/toast v1.0.2
 	github.com/saltosystems/winrt-go v0.0.0-20240510082706-db61b37f5877
@@ -95,7 +94,6 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-tpm v0.3.3
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect

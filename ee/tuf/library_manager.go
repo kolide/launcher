@@ -378,16 +378,18 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 	if currentVersion == "" {
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"cannot tidy update library without knowing current running version",
+			"binary", binary,
 		)
 		return
 	}
 
-	const numberOfVersionsToKeep = 3
+	const numberOfVersionsToKeep = 2
 
 	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), ulm.slogger, binary, ulm.baseDir)
 	if err != nil {
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not get versions in library to tidy update library",
+			"binary", binary,
 			"err", err,
 		)
 		return
@@ -397,12 +399,17 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"updates library contains invalid version",
 			"library_path", invalidVersion,
+			"binary", binary,
 			"err", err,
 		)
 		ulm.removeUpdate(binary, invalidVersion)
 	}
 
 	if len(versionsInLibrary) <= numberOfVersionsToKeep {
+		ulm.slogger.Log(context.TODO(), slog.LevelInfo,
+			"no need to tidy library",
+			"binary", binary,
+		)
 		return
 	}
 
@@ -423,6 +430,11 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 		nonCurrentlyRunningVersionsKept += 1
 	}
+
+	ulm.slogger.Log(context.TODO(), slog.LevelInfo,
+		"tidied update library",
+		"binary", binary,
+	)
 }
 
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all

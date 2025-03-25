@@ -20,7 +20,7 @@ ifneq ($(OS), Windows_NT)
 endif
 
 
-all: build
+all: deps build
 build: build_launcher
 
 .pre-build: ${BUILD_DIR}

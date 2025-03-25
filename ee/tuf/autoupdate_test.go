@@ -242,7 +242,14 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	require.GreaterOrEqual(t, len(logLines), 1)
 
 	// Check that we restarted osqueryd
-	require.Contains(t, logLines[len(logLines)-1], "restarted binary after update", fmt.Sprintf("logs missing restart: %s", strings.Join(logLines, "\n")))
+	restartFound := false
+	for _, logLine := range logLines {
+		if strings.Contains(logLine, "restarted binary after update") {
+			restartFound = true
+			break
+		}
+	}
+	require.True(t, restartFound, fmt.Sprintf("logs missing restart: %s", strings.Join(logLines, "\n")))
 
 	// The autoupdater won't stop after an osqueryd download, so interrupt it and let it shut down
 	autoupdater.Interrupt(errors.New("test error"))

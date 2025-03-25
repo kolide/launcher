@@ -18,8 +18,6 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/packagekit"
-
-	"go.opencensus.io/trace"
 )
 
 //go:embed assets/*
@@ -346,9 +344,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 //
 // TODO: add in file:// URLs
 func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion string) error {
-	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", symbolicName))
-	defer span.End()
-
 	var err error
 	var localPath string
 
@@ -415,9 +410,6 @@ func (p *PackageOptions) fullPathToBareBinary(binaryName string) string {
 }
 
 func (p *PackageOptions) makePackage(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "packaging.makePackage")
-	defer span.End()
-
 	// Linux packages used to be distributed named "launcher". We've
 	// moved to naming them "launcher-<identifier>". To provide a
 	// cleaner package replacement, we can flag this to the underlying

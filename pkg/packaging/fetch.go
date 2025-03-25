@@ -18,7 +18,6 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
-	"go.opencensus.io/trace"
 )
 
 // FetchBinary will synchronously download a binary as per the
@@ -28,9 +27,6 @@ import (
 //
 // You must specify a localCacheDir, to reuse downloads
 func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOrVersion string, target Target) (string, error) {
-	ctx, span := trace.StartSpan(ctx, "packaging.fetchbinary")
-	defer span.End()
-
 	logger := ctxlog.FromContext(ctx)
 
 	// Create the cache directory if it doesn't already exist

@@ -235,6 +235,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 		break
 	}
 
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"exiting initial delay",
+	)
+
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
 	ta.tidyLibrary()
@@ -245,11 +249,18 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	defer cleanupTicker.Stop()
 
 	for {
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"checking for updates",
+		)
 		if err := ta.checkForUpdate(context.TODO(), binaries); err != nil {
 			ta.storeError(err)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
 				"err", err,
+			)
+		} else {
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"completed check for update",
 			)
 		}
 
@@ -402,7 +413,15 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 			"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
 			"err", err,
 		)
+		return
 	}
+
+	ta.slogger.Log(ctx, slog.LevelInfo,
+		"checked for update after autoupdate setting changed",
+		"update_channel", ta.updateChannel,
+		"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
+		"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
+	)
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
