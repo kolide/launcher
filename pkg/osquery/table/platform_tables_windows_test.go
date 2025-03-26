@@ -6,6 +6,8 @@ package table
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tables/wmitable"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -207,5 +210,53 @@ func BenchmarkDsregcmd(b *testing.B) {
 		})
 
 		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+	}
+}
+
+func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
+	// Set up table dependencies
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	slogger := multislogger.NewNopLogger()
+
+	for _, tt := range []struct {
+		testCaseName string
+		kolideTable  *table.Plugin
+		queryContext string
+	}{
+		{
+			testCaseName: "kolide_program_icons",
+			kolideTable:  ProgramIcons(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_dsregcmd",
+			kolideTable:  dataflattentable.NewExecAndParseTable(mockFlags, slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
+			queryContext: "{}",
+		},
+	} { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			// Collect memstats before
+			var statsBefore runtime.MemStats
+			runtime.ReadMemStats(&statsBefore)
+
+			for i := 0; i < 10; i++ {
+				// Confirm we can call the table successfully
+				response := tt.kolideTable.Call(context.TODO(), map[string]string{
+					"action":  "generate",
+					"context": tt.queryContext,
+				})
+
+				require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+			}
+
+			// Collect memstats after
+			var statsAfter runtime.MemStats
+			runtime.ReadMemStats(&statsAfter)
+
+			fmt.Printf("before: %+v\nafter: %+v\n\n", statsBefore, statsAfter)
+		})
 	}
 }
