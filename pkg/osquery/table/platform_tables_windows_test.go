@@ -256,7 +256,12 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			var statsAfter runtime.MemStats
 			runtime.ReadMemStats(&statsAfter)
 
-			fmt.Printf("before: %+v\nafter: %+v\n\n", statsBefore, statsAfter)
+			fmt.Printf("Alloc diff: %d\n", statsAfter.Alloc-statsBefore.Alloc)
+			fmt.Printf("Sys diff: %d\n", statsAfter.Sys-statsBefore.Sys)
+			fmt.Printf("Live objects diff: %d\n", (statsAfter.Mallocs-statsAfter.Frees)-(statsBefore.Mallocs-statsBefore.Frees))
+			fmt.Printf("HeapAlloc diff: %d\n", statsAfter.HeapAlloc-statsBefore.HeapAlloc)
+			fmt.Printf("HeapInuse diff: %d\n", statsAfter.HeapInuse-statsBefore.HeapInuse)
+			fmt.Printf("HeapObjects diff: %d\n", statsAfter.HeapObjects-statsBefore.HeapObjects)
 		})
 	}
 }
