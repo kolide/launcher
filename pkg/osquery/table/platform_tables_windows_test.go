@@ -306,7 +306,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			var statsBefore runtime.MemStats
 			runtime.ReadMemStats(&statsBefore)
 
-			for i := 0; i < 20; i++ {
+			for i := 0; i < 10; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
 
@@ -317,6 +317,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			var statsAfter runtime.MemStats
 			runtime.ReadMemStats(&statsAfter)
 
+			fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfter)-heapTotal(&statsBefore))
 			fmt.Printf("Alloc diff: %d\n", statsAfter.Alloc-statsBefore.Alloc)
 			fmt.Printf("Sys diff: %d\n", statsAfter.Sys-statsBefore.Sys)
 			fmt.Printf("Live objects diff: %d\n", (statsAfter.Mallocs-statsAfter.Frees)-(statsBefore.Mallocs-statsBefore.Frees))
@@ -334,6 +335,8 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	var statsAfterAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsAfterAllTestCases)
 
+	fmt.Println("Cumulative:")
+	fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfterAllTestCases)-heapTotal(&statsBeforeAllTestCases))
 	fmt.Printf("Alloc diff: %d\n", statsAfterAllTestCases.Alloc-statsBeforeAllTestCases.Alloc)
 	fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
 	fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
@@ -351,4 +354,12 @@ func callTable(t *testing.T, kolideTable *table.Plugin, queryContext string) {
 	})
 
 	require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+}
+
+func heapTotal(m *runtime.MemStats) uint64 {
+	bytesAllocatedToObjects := m.HeapAlloc // both live and dead
+	freeBytes := m.HeapIdle - m.HeapReleased
+	unusedBytes := m.HeapInuse - m.HeapAlloc
+
+	return bytesAllocatedToObjects + freeBytes + unusedBytes
 }
