@@ -220,6 +220,34 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
 	slogger := multislogger.NewNopLogger()
 
+	// Set up WMI query
+	constraintsMap := map[string]any{
+		"constraints": []map[string]any{
+			{
+				"name":     "class",
+				"affinity": "TEXT",
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "SoftwareLicensingProduct",
+					},
+				},
+			},
+			{
+				"name":     "properties",
+				"affinity": "TEXT",
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
+					},
+				},
+			},
+		},
+	}
+	queryContext, err := json.Marshal(constraintsMap)
+	require.NoError(t, err)
+
 	for _, tt := range []struct {
 		testCaseName string
 		kolideTable  *table.Plugin
@@ -229,6 +257,36 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			testCaseName: "kolide_program_icons",
 			kolideTable:  ProgramIcons(mockFlags, slogger),
 			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_dsim_default_associations",
+			kolideTable:  dsim_default_associations.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_secedit",
+			kolideTable:  secedit.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_wifi_networks",
+			kolideTable:  wifi_networks.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_windows_updates",
+			kolideTable:  windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_windows_update_history",
+			kolideTable:  windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_wmi",
+			kolideTable:  wmitable.TablePlugin(mockFlags, slogger),
+			queryContext: string(queryContext),
 		},
 		{
 			testCaseName: "kolide_dsregcmd",
@@ -251,6 +309,8 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 
 				require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
 			}
+
+			time.Sleep(5 * time.Second)
 
 			// Collect memstats after
 			var statsAfter runtime.MemStats
