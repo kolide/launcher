@@ -52,6 +52,7 @@ func RunSimple(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, cm
 	return stdout.Bytes(), nil
 }
 
+
 // Run is a wrapper over allowedcmd.AllowedCommand. It enforces a timeout, logs, traces.
 // Use RunSimple() for a simpler interface.
 func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, stdout io.Writer, stderr io.Writer, opts ...ExecOps) error {
