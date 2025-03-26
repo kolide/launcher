@@ -23,10 +23,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf v0.5.2
-	github.com/tklauser/go-sysconf v0.3.11 // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
+	github.com/tklauser/go-sysconf v0.3.12 // indirect
+	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.3.6
 	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
@@ -51,7 +51,7 @@ require (
 	github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb
 	github.com/kolide/toast v1.0.2
 	github.com/saltosystems/winrt-go v0.0.0-20240510082706-db61b37f5877
-	github.com/shirou/gopsutil/v3 v3.23.3
+	github.com/shirou/gopsutil/v4 v4.25.2
 	github.com/spf13/pflag v1.0.5
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.19.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.19.0
@@ -61,6 +61,7 @@ require (
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -93,11 +94,10 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/samber/slog-multi v1.0.2
 	github.com/secure-systems-lab/go-securesystemslib v0.5.0 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
-	github.com/tklauser/numcpus v0.6.0 // indirect
+	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.45.0

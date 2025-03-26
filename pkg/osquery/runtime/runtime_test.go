@@ -37,7 +37,7 @@ import (
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
