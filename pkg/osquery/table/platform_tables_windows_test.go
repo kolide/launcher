@@ -152,40 +152,27 @@ func BenchmarkWmiTable(b *testing.B) {
 
 	wmiTable := wmitable.TablePlugin(mockFlags, slogger)
 
-	/*
-		type queryContextJSON struct {
-			Constraints []constraintListJSON `json:"constraints"`
-		}
-
-		type constraintListJSON struct {
-			Name     string          `json:"name"`
-			Affinity string          `json:"affinity"`
-			List     json.RawMessage `json:"list"`
-		}
-	*/
-	classConstraint := map[string]string{
-		"op":   "2", // table.OperatorEquals
-		"expr": "SoftwareLicensingProduct",
-	}
-	classConstraintRaw, err := json.Marshal(classConstraint)
-	require.NoError(b, err)
-	propertiesConstraint := map[string]string{
-		"op":   "2", // equals
-		"expr": "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
-	}
-	propertiesConstraintRaw, err := json.Marshal(propertiesConstraint)
-	require.NoError(b, err)
 	constraintsMap := map[string]any{
 		"constraints": []map[string]any{
 			{
 				"name":     "class",
 				"affinity": "TEXT",
-				"list":     classConstraintRaw,
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "SoftwareLicensingProduct",
+					},
+				},
 			},
 			{
 				"name":     "properties",
 				"affinity": "TEXT",
-				"list":     propertiesConstraintRaw,
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
+					},
+				},
 			},
 		},
 	}
