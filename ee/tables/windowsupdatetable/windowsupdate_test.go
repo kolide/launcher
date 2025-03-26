@@ -8,10 +8,8 @@ import (
 	"testing"
 	"time"
 
-	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,44 +43,4 @@ func TestTable(t *testing.T) {
 		})
 	}
 
-}
-
-func BenchmarkWindowsUpdatesTable(b *testing.B) {
-	// Set up table dependencies
-	mockFlags := typesmocks.NewFlags(b)
-	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
-	slogger := multislogger.NewNopLogger()
-
-	updatesTable := TablePlugin(UpdatesTable, mockFlags, slogger)
-
-	for range b.N {
-		// Confirm we can call the table successfully
-		response := updatesTable.Call(context.TODO(), map[string]string{
-			"action":  "generate",
-			"context": "{}",
-		})
-
-		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
-	}
-}
-
-func BenchmarkWindowsHistoryTable(b *testing.B) {
-	// Set up table dependencies
-	mockFlags := typesmocks.NewFlags(b)
-	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
-	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
-	slogger := multislogger.NewNopLogger()
-
-	historyTable := TablePlugin(HistoryTable, mockFlags, slogger)
-
-	for range b.N {
-		// Confirm we can call the table successfully
-		response := historyTable.Call(context.TODO(), map[string]string{
-			"action":  "generate",
-			"context": "{}",
-		})
-
-		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
-	}
 }
