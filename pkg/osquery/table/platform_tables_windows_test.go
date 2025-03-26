@@ -1,7 +1,11 @@
+//go:build windows
+// +build windows
+
 package table
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -15,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tables/wmitable"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -148,11 +153,34 @@ func BenchmarkWmiTable(b *testing.B) {
 
 	wmiTable := wmitable.TablePlugin(mockFlags, slogger)
 
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			"class": {
+				Constraints: []table.Constraint{
+					{
+						Operator:   table.OperatorEquals,
+						Expression: "SoftwareLicensingProduct",
+					},
+				},
+			},
+			"properties": {
+				Constraints: []table.Constraint{
+					{
+						Operator:   table.OperatorEquals,
+						Expression: "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
+					},
+				},
+			},
+		},
+	}
+	queryContextStr, err := json.Marshal(queryContext)
+	require.NoError(b, err)
+
 	for range b.N {
 		// Confirm we can call the table successfully
 		response := wmiTable.Call(context.TODO(), map[string]string{
 			"action":  "generate",
-			"context": "{}",
+			"context": string(queryContextStr),
 		})
 
 		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
