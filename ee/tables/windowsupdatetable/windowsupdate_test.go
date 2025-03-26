@@ -56,13 +56,15 @@ func BenchmarkWindowsUpdatesTable(b *testing.B) {
 
 	updatesTable := TablePlugin(UpdatesTable, mockFlags, slogger)
 
-	// Confirm we can call the table successfully
-	response := updatesTable.Call(context.TODO(), map[string]string{
-		"action":  "generate",
-		"context": "{}",
-	})
+	for b.Loop() {
+		// Confirm we can call the table successfully
+		response := updatesTable.Call(context.TODO(), map[string]string{
+			"action":  "generate",
+			"context": "{}",
+		})
 
-	require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+	}
 }
 
 func BenchmarkWindowsHistoryTable(b *testing.B) {
@@ -74,11 +76,13 @@ func BenchmarkWindowsHistoryTable(b *testing.B) {
 
 	historyTable := TablePlugin(HistoryTable, mockFlags, slogger)
 
-	// Confirm we can call the table successfully
-	response := historyTable.Call(context.TODO(), map[string]string{
-		"action":  "generate",
-		"context": "{}",
-	})
+	for b.Loop() {
+		// Confirm we can call the table successfully
+		response := historyTable.Call(context.TODO(), map[string]string{
+			"action":  "generate",
+			"context": "{}",
+		})
 
-	require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+	}
 }
