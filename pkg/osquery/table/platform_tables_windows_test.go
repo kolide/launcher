@@ -303,10 +303,11 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			kolideTable:  dataflattentable.NewExecAndParseTable(mockFlags, slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
 			queryContext: "{}",
 		},
-	} { //nolint:paralleltest
+	} {
+		t.Parallel()
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 20; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
 		})
@@ -420,7 +421,7 @@ func TestMemoryUsageWithMemprofile(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, pprof.WriteHeapProfile(outBefore))
 	require.NoError(t, outBefore.Close())
 
-	for _, tt := range []struct {
+	for _, tt := range []struct { //nolint:paralleltest
 		testCaseName string
 		kolideTable  *table.Plugin
 		queryContext string
