@@ -145,9 +145,6 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 
 	for {
 		// Parse the next property in this object.
-
-		// First, we'll want the object property name. Typically, we'll get " (denoting a string),
-		// then the length of the string, then the string itself.
 		objPropertyStart, err := nextNonPaddingByte(srcReader)
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
@@ -306,7 +303,17 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
 			return nil, errors.New("deserialization not implemented for wasm transfers")
 		case tokenError:
-			return nil, errors.New("deserialization not implemented for error")
+			// Try to deserialize the error, but handle any errors gracefully
+			errorBytes, err := deserializeError(ctx, slogger, srcReader)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error deserializing error object, returning placeholder",
+					"error", err,
+				)
+				// Return a placeholder error object instead of failing
+				return []byte(`{"name":"Error","message":"Failed to deserialize error"}`), nil
+			}
+			return errorBytes, nil
 		case tokenHostObj:
 			return nil, errors.New("deserialization not implemented for host object")
 		default:
@@ -951,4 +958,145 @@ func deserializeRegexp(srcReader *bytes.Reader) ([]byte, error) {
 	regexFull = append(regexFull, flags...)
 
 	return regexFull, nil
+}
+
+// ErrorTagType values - used to identify different parts of an Error object
+// These values come directly from the V8 source code's ErrorTag enum
+const (
+	// Error prototype tags
+	errorTagEvalErrorPrototype      byte = 'E' // The error is an EvalError
+	errorTagRangeErrorPrototype     byte = 'R' // The error is a RangeError
+	errorTagReferenceErrorPrototype byte = 'F' // The error is a ReferenceError
+	errorTagSyntaxErrorPrototype    byte = 'S' // The error is a SyntaxError
+	errorTagTypeErrorPrototype      byte = 'T' // The error is a TypeError
+	errorTagUriErrorPrototype       byte = 'U' // The error is a URIError
+
+	// Error property tags
+	errorTagMessage byte = 'm' // Followed by message: string
+	errorTagCause   byte = 'c' // Followed by a JS object: cause
+	errorTagStack   byte = 's' // Followed by stack: string
+	errorTagEnd     byte = '.' // The end of this error information
+
+	// Additional tags we've observed in practice
+	errorTagIsError byte = 0x72 // Is error flag (114 decimal = 0x72 hex)
+)
+
+// deserializeError handles the upcoming Error object in srcReader.
+func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	// Create a map to hold the error properties
+	errorObj := make(map[string]string)
+
+	// Default to generic Error
+	errorType := "Error"
+
+	// Process error subtags until we reach errorTagEnd or EOF
+	for {
+		// Read the subtag, handling EOF gracefully
+		subtag, err := srcReader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				// If we hit EOF, just return what we have so far
+				slogger.Log(ctx, slog.LevelWarn,
+					"reached EOF while reading error subtag, returning partial error object",
+				)
+				break
+			}
+			return nil, fmt.Errorf("reading error subtag: %w", err)
+		}
+
+		// If we've reached the end of the error object, break
+		if subtag == errorTagEnd {
+			break
+		}
+
+		// Handle error prototype tags (these don't have values, they just indicate the error type)
+		switch subtag {
+		case errorTagEvalErrorPrototype:
+			errorType = "EvalError"
+			continue
+		case errorTagRangeErrorPrototype:
+			errorType = "RangeError"
+			continue
+		case errorTagReferenceErrorPrototype:
+			errorType = "ReferenceError"
+			continue
+		case errorTagSyntaxErrorPrototype:
+			errorType = "SyntaxError"
+			continue
+		case errorTagTypeErrorPrototype:
+			errorType = "TypeError"
+			continue
+		case errorTagUriErrorPrototype:
+			errorType = "URIError"
+			continue
+		}
+
+		// For other tags, read the value token
+		valueToken, err := srcReader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				// If we hit EOF, just return what we have so far
+				slogger.Log(ctx, slog.LevelWarn,
+					"reached EOF while reading token for error subtag, returning partial error object",
+					"subtag", subtag,
+				)
+				break
+			}
+			return nil, fmt.Errorf("reading token for error subtag %c: %w", subtag, err)
+		}
+
+		// Try to deserialize the value, handling errors gracefully
+		value, err := deserializeNext(ctx, slogger, valueToken, srcReader)
+		if err != nil {
+			// If we encounter an error during deserialization, log it and continue
+			slogger.Log(ctx, slog.LevelWarn,
+				"error deserializing value for error subtag, continuing",
+				"subtag", fmt.Sprintf("%c", subtag),
+				"token", fmt.Sprintf("%02x", valueToken),
+				"error", err,
+			)
+			errorObj[fmt.Sprintf("property_%c", subtag)] = "[Error deserializing value]"
+			continue
+		}
+
+		// Map the subtag to a property name and store the value
+		switch subtag {
+		case errorTagMessage:
+			errorObj["message"] = string(value)
+		case errorTagStack:
+			errorObj["stack"] = string(value)
+		case errorTagCause:
+			errorObj["cause"] = string(value)
+		case errorTagIsError:
+			errorObj["isError"] = string(value)
+		default:
+			// For unknown subtags, use a generic property name
+			errorObj[fmt.Sprintf("property_%c", subtag)] = string(value)
+			slogger.Log(ctx, slog.LevelWarn,
+				"unknown error subtag encountered",
+				"subtag", fmt.Sprintf("%c", subtag),
+				"value", string(value),
+			)
+		}
+	}
+
+	// Set the error type and name
+	errorObj["type"] = errorType
+	errorObj["name"] = errorType
+
+	// Ensure we have at least a message
+	if _, hasMessage := errorObj["message"]; !hasMessage {
+		errorObj["message"] = ""
+	}
+
+	// Serialize the error object to JSON
+	resultBytes, err := json.Marshal(errorObj)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling error object: %w", err)
+	}
+
+	return resultBytes, nil
 }

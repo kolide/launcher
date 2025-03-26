@@ -216,7 +216,7 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			// Construct table
 			sourceQuery := fmt.Sprintf("%s.%s", tt.dbName, tt.objStoreName)
 			cfg := katcTableConfig{
-				Columns: []string{"uuid", "name", "version"},
+				Columns: []string{"uuid", "name", "version", "basicError"},
 				katcTableDefinition: katcTableDefinition{
 					SourceType: &katcSourceType{
 						name:     indexeddbLeveldbSourceType,
