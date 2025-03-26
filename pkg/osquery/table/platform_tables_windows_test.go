@@ -304,9 +304,9 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			queryContext: "{}",
 		},
 	} {
-		t.Parallel()
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
 			for i := 0; i < 20; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
