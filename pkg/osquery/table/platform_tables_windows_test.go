@@ -258,7 +258,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	goMemoryBeforeAllTestCases := goMemoryUsage(&statsBeforeAllTestCases)
 	nonGoMemoryBeforeAllTestCases := nonGoMemoryUsage(t, &statsBeforeAllTestCases)
 
-	for _, tt := range []struct {
+	for _, tt := range []struct { //nolint:paralleltest
 		testCaseName string
 		kolideTable  *table.Plugin
 		queryContext string
@@ -306,7 +306,6 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	} {
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
-			t.Parallel()
 			for i := 0; i < 20; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
@@ -321,14 +320,14 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 
 	heapTotalAfterAllTestCases := heapTotal(&statsAfterAllTestCases)
 	goMemoryAfterAllTestCases := goMemoryUsage(&statsAfterAllTestCases)
-	nonGoMemoryAfterAlltestCases := nonGoMemoryUsage(t, &statsAfterAllTestCases)
+	nonGoMemoryAfterAllTestCases := nonGoMemoryUsage(t, &statsAfterAllTestCases)
 
 	fmt.Println("Heap total:")
 	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", heapTotalBeforeAllTestCases, heapTotalAfterAllTestCases, heapTotalAfterAllTestCases-heapTotalBeforeAllTestCases)
 	fmt.Println("Go memory:")
 	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", goMemoryBeforeAllTestCases, goMemoryAfterAllTestCases, goMemoryAfterAllTestCases-goMemoryBeforeAllTestCases)
 	fmt.Println("Non-go memory:")
-	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", nonGoMemoryBeforeAllTestCases, nonGoMemoryAfterAlltestCases, nonGoMemoryAfterAlltestCases-nonGoMemoryBeforeAllTestCases)
+	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", nonGoMemoryBeforeAllTestCases, nonGoMemoryAfterAllTestCases, nonGoMemoryAfterAllTestCases-nonGoMemoryBeforeAllTestCases)
 
 	/*
 		fmt.Println("Cumulative:")
