@@ -248,6 +248,10 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	queryContext, err := json.Marshal(constraintsMap)
 	require.NoError(t, err)
 
+	// Collect memstats before
+	var statsBeforeAllTestCases runtime.MemStats
+	runtime.ReadMemStats(&statsBeforeAllTestCases)
+
 	for _, tt := range []struct {
 		testCaseName string
 		kolideTable  *table.Plugin
@@ -300,14 +304,8 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			var statsBefore runtime.MemStats
 			runtime.ReadMemStats(&statsBefore)
 
-			for i := 0; i < 10; i++ {
-				// Confirm we can call the table successfully
-				response := tt.kolideTable.Call(context.TODO(), map[string]string{
-					"action":  "generate",
-					"context": tt.queryContext,
-				})
-
-				require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+			for i := 0; i < 20; i++ {
+				callTable(t, tt.kolideTable, tt.queryContext)
 			}
 
 			time.Sleep(5 * time.Second)
@@ -324,4 +322,27 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			fmt.Printf("HeapObjects diff: %d\n", statsAfter.HeapObjects-statsBefore.HeapObjects)
 		})
 	}
+
+	time.Sleep(5 * time.Second)
+
+	// Collect memstats after
+	var statsAfterAllTestCases runtime.MemStats
+	runtime.ReadMemStats(&statsAfterAllTestCases)
+
+	fmt.Printf("Alloc diff: %d\n", statsAfterAllTestCases.Alloc-statsBeforeAllTestCases.Alloc)
+	fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
+	fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
+	fmt.Printf("HeapAlloc diff: %d\n", statsAfterAllTestCases.HeapAlloc-statsBeforeAllTestCases.HeapAlloc)
+	fmt.Printf("HeapInuse diff: %d\n", statsAfterAllTestCases.HeapInuse-statsBeforeAllTestCases.HeapInuse)
+	fmt.Printf("HeapObjects diff: %d\n", statsAfterAllTestCases.HeapObjects-statsBeforeAllTestCases.HeapObjects)
+}
+
+func callTable(t *testing.T, kolideTable *table.Plugin, queryContext string) {
+	// Confirm we can call the table successfully
+	response := kolideTable.Call(context.TODO(), map[string]string{
+		"action":  "generate",
+		"context": queryContext,
+	})
+
+	require.Equal(t, int32(0), response.Status.Code, response.Status.Message) // 0 means success
 }
