@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"runtime"
+	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -365,4 +367,106 @@ func heapTotal(m *runtime.MemStats) uint64 {
 	unusedBytes := m.HeapInuse - m.HeapAlloc
 
 	return bytesAllocatedToObjects + freeBytes + unusedBytes
+}
+
+func TestMemoryUsageWithMemprofile(t *testing.T) { //nolint:paralleltest
+	// Set up table dependencies
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	slogger := multislogger.NewNopLogger()
+
+	// Set up WMI query
+	constraintsMap := map[string]any{
+		"constraints": []map[string]any{
+			{
+				"name":     "class",
+				"affinity": "TEXT",
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "SoftwareLicensingProduct",
+					},
+				},
+			},
+			{
+				"name":     "properties",
+				"affinity": "TEXT",
+				"list": []map[string]any{
+					{
+						"op":   "2", // table.OperatorEquals
+						"expr": "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
+					},
+				},
+			},
+		},
+	}
+	queryContext, err := json.Marshal(constraintsMap)
+	require.NoError(t, err)
+
+	// Collect memprofile before
+	outBefore, err := os.Create("memprofile-before.out")
+	require.NoError(t, err)
+	require.NoError(t, pprof.WriteHeapProfile(outBefore))
+	require.NoError(t, outBefore.Close())
+
+	for _, tt := range []struct {
+		testCaseName string
+		kolideTable  *table.Plugin
+		queryContext string
+	}{
+		{
+			testCaseName: "kolide_program_icons",
+			kolideTable:  ProgramIcons(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_dsim_default_associations",
+			kolideTable:  dsim_default_associations.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_secedit",
+			kolideTable:  secedit.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_wifi_networks",
+			kolideTable:  wifi_networks.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_windows_updates",
+			kolideTable:  windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_windows_update_history",
+			kolideTable:  windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_wmi",
+			kolideTable:  wmitable.TablePlugin(mockFlags, slogger),
+			queryContext: string(queryContext),
+		},
+		{
+			testCaseName: "kolide_dsregcmd",
+			kolideTable:  dataflattentable.NewExecAndParseTable(mockFlags, slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
+			queryContext: "{}",
+		},
+	} { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			for i := 0; i < 10; i++ {
+				callTable(t, tt.kolideTable, tt.queryContext)
+			}
+		})
+	}
+
+	// Collect memprofile before
+	outAfter, err := os.Create("memprofile-after.out")
+	require.NoError(t, err)
+	require.NoError(t, pprof.WriteHeapProfile(outAfter))
+	require.NoError(t, outAfter.Close())
 }
