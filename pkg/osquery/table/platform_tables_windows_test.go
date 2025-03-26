@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/wmitable"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
+	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -251,10 +252,11 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 
 	// Collect memstats before
-	runtime.GC() // get up-to-date statistics
 	var statsBeforeAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsBeforeAllTestCases)
 	heapTotalBeforeAllTestCases := heapTotal(&statsBeforeAllTestCases)
+	goMemoryBeforeAllTestCases := goMemoryUsage(&statsBeforeAllTestCases)
+	nonGoMemoryBeforeAllTestCases := nonGoMemoryUsage(t, &statsBeforeAllTestCases)
 
 	for _, tt := range []struct {
 		testCaseName string
@@ -304,51 +306,40 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	} { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
-			// Collect memstats before
-			runtime.GC() // get up-to-date statistics
-			var statsBefore runtime.MemStats
-			runtime.ReadMemStats(&statsBefore)
-
 			for i := 0; i < 10; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
-
-			time.Sleep(5 * time.Second)
-
-			// Collect memstats after
-			runtime.GC() // get up-to-date statistics
-			var statsAfter runtime.MemStats
-			runtime.ReadMemStats(&statsAfter)
-			heapTotalAfter := heapTotal(&statsAfter)
-
-			fmt.Printf("HeapTotal diff: %d\n", heapTotalAfter-heapTotal(&statsBefore))
-			fmt.Printf("HeapTotal cumulative diff: %d\n", heapTotalAfter-heapTotalBeforeAllTestCases)
-			fmt.Printf("Alloc diff: %d\n", statsAfter.Alloc-statsBefore.Alloc)
-			fmt.Printf("Sys diff: %d\n", statsAfter.Sys-statsBefore.Sys)
-			fmt.Printf("Live objects diff: %d\n", (statsAfter.Mallocs-statsAfter.Frees)-(statsBefore.Mallocs-statsBefore.Frees))
-			fmt.Printf("HeapAlloc diff: %d\n", statsAfter.HeapAlloc-statsBefore.HeapAlloc)
-			fmt.Printf("HeapIdle diff: %d\n", statsAfter.HeapIdle-statsBefore.HeapIdle)
-			fmt.Printf("HeapInuse diff: %d\n", statsAfter.HeapInuse-statsBefore.HeapInuse)
-			fmt.Printf("HeapObjects diff: %d\n", statsAfter.HeapObjects-statsBefore.HeapObjects)
 		})
 	}
 
 	time.Sleep(5 * time.Second)
 
 	// Collect memstats after
-	runtime.GC() // get up-to-date statistics
 	var statsAfterAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsAfterAllTestCases)
 
-	fmt.Println("Cumulative:")
-	fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfterAllTestCases)-heapTotalBeforeAllTestCases)
-	fmt.Printf("Alloc diff: %d\n", statsAfterAllTestCases.Alloc-statsBeforeAllTestCases.Alloc)
-	fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
-	fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
-	fmt.Printf("HeapAlloc diff: %d\n", statsAfterAllTestCases.HeapAlloc-statsBeforeAllTestCases.HeapAlloc)
-	fmt.Printf("HeapIdle diff: %d\n", statsAfterAllTestCases.HeapIdle-statsBeforeAllTestCases.HeapIdle)
-	fmt.Printf("HeapInuse diff: %d\n", statsAfterAllTestCases.HeapInuse-statsBeforeAllTestCases.HeapInuse)
-	fmt.Printf("HeapObjects diff: %d\n", statsAfterAllTestCases.HeapObjects-statsBeforeAllTestCases.HeapObjects)
+	heapTotalAfterAllTestCases := heapTotal(&statsAfterAllTestCases)
+	goMemoryAfterAllTestCases := goMemoryUsage(&statsAfterAllTestCases)
+	nonGoMemoryAfterAlltestCases := nonGoMemoryUsage(t, &statsAfterAllTestCases)
+
+	fmt.Println("Heap total:")
+	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", heapTotalBeforeAllTestCases, heapTotalAfterAllTestCases, heapTotalAfterAllTestCases-heapTotalBeforeAllTestCases)
+	fmt.Println("Go memory:")
+	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", goMemoryBeforeAllTestCases, goMemoryAfterAllTestCases, goMemoryAfterAllTestCases-goMemoryBeforeAllTestCases)
+	fmt.Println("Non-go memory:")
+	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", nonGoMemoryBeforeAllTestCases, nonGoMemoryAfterAlltestCases, nonGoMemoryAfterAlltestCases-nonGoMemoryBeforeAllTestCases)
+
+	/*
+		fmt.Println("Cumulative:")
+		fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfterAllTestCases)-heapTotalBeforeAllTestCases)
+		fmt.Printf("Alloc diff: %d\n", statsAfterAllTestCases.Alloc-statsBeforeAllTestCases.Alloc)
+		fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
+		fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
+		fmt.Printf("HeapAlloc diff: %d\n", statsAfterAllTestCases.HeapAlloc-statsBeforeAllTestCases.HeapAlloc)
+		fmt.Printf("HeapIdle diff: %d\n", statsAfterAllTestCases.HeapIdle-statsBeforeAllTestCases.HeapIdle)
+		fmt.Printf("HeapInuse diff: %d\n", statsAfterAllTestCases.HeapInuse-statsBeforeAllTestCases.HeapInuse)
+		fmt.Printf("HeapObjects diff: %d\n", statsAfterAllTestCases.HeapObjects-statsBeforeAllTestCases.HeapObjects)
+	*/
 }
 
 func callTable(t *testing.T, kolideTable *table.Plugin, queryContext string) {
@@ -367,6 +358,25 @@ func heapTotal(m *runtime.MemStats) uint64 {
 	unusedBytes := m.HeapInuse - m.HeapAlloc
 
 	return bytesAllocatedToObjects + freeBytes + unusedBytes
+}
+
+// Non-Go memory usage (e.g. cgo) can maybe be estimated as Process RSS - Go memory
+func nonGoMemoryUsage(t *testing.T, m *runtime.MemStats) uint64 {
+	currentPid := os.Getpid()
+	currentProcess, err := process.NewProcess(int32(currentPid))
+	require.NoError(t, err)
+	memInfo, err := currentProcess.MemoryInfo()
+	require.NoError(t, err)
+	return memInfo.RSS - goMemoryUsage(m)
+}
+
+/*
+[T]he following expression accurately reflects the value the runtime attempts to maintain as the limit:
+
+runtime.MemStats.Sys − runtime.MemStats.HeapReleased
+*/
+func goMemoryUsage(m *runtime.MemStats) uint64 {
+	return m.Sys - m.HeapReleased
 }
 
 func TestMemoryUsageWithMemprofile(t *testing.T) { //nolint:paralleltest
