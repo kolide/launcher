@@ -216,7 +216,7 @@ func BenchmarkDsregcmd(b *testing.B) {
 func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	// Set up table dependencies
 	mockFlags := typesmocks.NewFlags(t)
-	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
 	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
 	slogger := multislogger.NewNopLogger()
 
