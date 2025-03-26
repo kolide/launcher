@@ -3,14 +3,14 @@ package packagekit
 // PackageOptions is the superset of all packaging options. Not all
 // packages will support all options.
 type PackageOptions struct {
-	Identifier    string // What is the identifier? (eg: kolide-app)
-	Name          string // What's the name for this package (eg: launcher)
-	Title         string // MacOS app bundle only -- the title displayed during installation
-	Root          string // source directory to package
-	Scripts       string // directory of packaging scripts (postinst, prerm, etc)
-	Version       string // package version
-	FlagFile      string // Path to the flagfile for configuration
-	ContainerTool string // Name of container orchestration system to use (docker, podman)
+	Identifier string // What is the identifier? (eg: kolide-app)
+	Name       string // What's the name for this package (eg: launcher)
+	Title      string // MacOS app bundle only -- the title displayed during installation
+	Root       string // source directory to package
+	Scripts    string // directory of packaging scripts (postinst, prerm, etc)
+	Version    string // package version
+	VersionNum int    // package version in numeric format. used to create comparable windows registry keys
+	FlagFile   string // Path to the flagfile for configuration
 
 	DisableService bool // Whether to install a system service in a disabled state
 

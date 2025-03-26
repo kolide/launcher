@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -38,15 +39,19 @@ const (
 	executeReturnTimeout = 5 * time.Second  // After interrupted, how long for all actors to exit their `execute` functions
 )
 
-func NewRunGroup(slogger *slog.Logger) *Group {
+func NewRunGroup() *Group {
 	return &Group{
-		slogger: slogger.With("component", "run_group"),
+		slogger: multislogger.NewNopLogger(),
 		actors:  make([]rungroupActor, 0),
 	}
 }
 
 func (g *Group) Add(name string, execute func() error, interrupt func(error)) {
 	g.actors = append(g.actors, rungroupActor{name, execute, interrupt})
+}
+
+func (g *Group) SetSlogger(slogger *slog.Logger) {
+	g.slogger = slogger.With("component", "run_group")
 }
 
 func (g *Group) Run() error {
@@ -63,7 +68,7 @@ func (g *Group) Run() error {
 	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
 		a := a
-		gowrapper.Go(context.TODO(), g.slogger, func() {
+		gowrapper.GoWithRecoveryAction(context.TODO(), g.slogger, func() {
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
@@ -83,7 +88,7 @@ func (g *Group) Run() error {
 			// add it now.
 			actorErrors <- actorError{
 				errorSourceName: a.name,
-				err:             fmt.Errorf("execute panicked: %+v", r),
+				err:             fmt.Errorf("executing rungroup actor %s panicked: %+v", a.name, r),
 			}
 		})
 	}
@@ -93,7 +98,8 @@ func (g *Group) Run() error {
 
 	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
-		"err", initialActorErr,
+		"err", initialActorErr.err,
+		"error_source", initialActorErr.errorSourceName,
 	)
 
 	defer g.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -107,7 +113,7 @@ func (g *Group) Run() error {
 	interruptWait := semaphore.NewWeighted(numActors)
 	for _, a := range g.actors {
 		interruptWait.Acquire(context.Background(), 1)
-		go func(a rungroupActor) {
+		gowrapper.Go(context.TODO(), g.slogger, func() {
 			defer interruptWait.Release(1)
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupting actor",
@@ -118,7 +124,7 @@ func (g *Group) Run() error {
 				"interrupt complete",
 				"actor", a.name,
 			)
-		}(a)
+		})
 	}
 
 	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), InterruptTimeout)

@@ -13,9 +13,11 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
 )
 
@@ -26,23 +28,36 @@ type notificationSender interface {
 // UserServer provides IPC for the root desktop runner to communicate with the user desktop processes.
 // It allows the runner process to send notficaitons and commands to the desktop processes.
 type UserServer struct {
-	slogger          *slog.Logger
-	server           *http.Server
-	listener         net.Listener
-	shutdownChan     chan<- struct{}
-	authToken        string
-	socketPath       string
-	notifier         notificationSender
-	refreshListeners []func()
+	slogger             *slog.Logger
+	server              *http.Server
+	listener            net.Listener
+	shutdownChan        chan<- struct{}
+	authToken           string
+	socketPath          string
+	notifier            notificationSender
+	refreshListeners    []func()
+	presenceDetector    presencedetection.PresenceDetector
+	showDesktopOnceFunc func()
 }
 
-func New(slogger *slog.Logger, authToken string, socketPath string, shutdownChan chan<- struct{}, notifier notificationSender) (*UserServer, error) {
+func New(slogger *slog.Logger,
+	authToken string,
+	socketPath string,
+	shutdownChan chan<- struct{},
+	showDesktopChan chan<- struct{},
+	notifier notificationSender) (*UserServer, error) {
 	userServer := &UserServer{
 		shutdownChan: shutdownChan,
 		authToken:    authToken,
 		slogger:      slogger.With("component", "desktop_server"),
 		socketPath:   socketPath,
 		notifier:     notifier,
+		showDesktopOnceFunc: sync.OnceFunc(func() {
+			if showDesktopChan == nil {
+				return
+			}
+			showDesktopChan <- struct{}{}
+		}),
 	}
 
 	authedMux := http.NewServeMux()
@@ -50,6 +65,10 @@ func New(slogger *slog.Logger, authToken string, socketPath string, shutdownChan
 	authedMux.HandleFunc("/ping", userServer.pingHandler)
 	authedMux.HandleFunc("/notification", userServer.notificationHandler)
 	authedMux.HandleFunc("/refresh", userServer.refreshHandler)
+	authedMux.HandleFunc("/show", userServer.showDesktop)
+	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
+	authedMux.HandleFunc("POST /secure_enclave_key", userServer.createSecureEnclaveKey)
+	authedMux.HandleFunc("GET /secure_enclave_key", userServer.getSecureEnclaveKey)
 
 	userServer.server = &http.Server{
 		Handler: userServer.authMiddleware(authedMux),
@@ -150,6 +169,70 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *UserServer) showDesktop(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	s.showDesktopOnceFunc()
+}
+
+type DetectPresenceResponse struct {
+	DurationSinceLastDetection string `json:"duration_since_last_detection,omitempty"`
+	Error                      string `json:"error,omitempty"`
+}
+
+func (s *UserServer) detectPresence(w http.ResponseWriter, req *http.Request) {
+	// get reason url param from req
+	reason := req.URL.Query().Get("reason")
+
+	if reason == "" {
+		http.Error(w, "reason is required", http.StatusBadRequest)
+		return
+	}
+
+	// get intervalString from url param
+	intervalString := req.URL.Query().Get("interval")
+	if intervalString == "" {
+		http.Error(w, "interval is required", http.StatusBadRequest)
+		return
+	}
+
+	interval, err := time.ParseDuration(intervalString)
+	if err != nil {
+		http.Error(w, "interval is not a valid duration", http.StatusBadRequest)
+		return
+	}
+
+	// detect presence
+	durationSinceLastDetection, err := s.presenceDetector.DetectPresence(reason, interval)
+	response := DetectPresenceResponse{
+		DurationSinceLastDetection: durationSinceLastDetection.String(),
+	}
+
+	if err != nil {
+		response.Error = err.Error()
+
+		s.slogger.Log(req.Context(), slog.LevelDebug,
+			"detecting presence",
+			"reason", reason,
+			"interval", interval,
+			"err", err,
+		)
+	}
+
+	// convert response to json
+	responseBytes, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, "could not marshal response", http.StatusInternalServerError)
+		return
+	}
+
+	// write response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseBytes)
 }
 
 func (s *UserServer) refreshHandler(w http.ResponseWriter, req *http.Request) {

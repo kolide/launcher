@@ -1,6 +1,7 @@
 package storageci
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -18,6 +19,7 @@ import (
 func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
 	var storeNames = []storage.Store{
 		storage.AgentFlagsStore,
+		storage.KatcConfigStore,
 		storage.AutoupdateErrorsStore,
 		storage.ConfigStore,
 		storage.ControlStore,
@@ -29,6 +31,8 @@ func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.S
 		storage.StatusLogsStore,
 		storage.ServerProvidedDataStore,
 		storage.TokenStore,
+		storage.LauncherHistoryStore,
+		storage.Dt4aInfoStore,
 	}
 
 	if os.Getenv("CI") == "true" {
@@ -52,7 +56,7 @@ func makeBboltStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB, storeName
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		store, err := agentbbolt.NewStore(slogger, db, storeName.String())
+		store, err := agentbbolt.NewStore(context.TODO(), slogger, db, storeName.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create '%s' KVStore: %w", storeName, err)
 		}

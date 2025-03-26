@@ -27,6 +27,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 
 	"fmt"
 	"hash/crc64"
@@ -34,6 +35,9 @@ import (
 	"image/png"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
 
@@ -42,16 +46,19 @@ import (
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
 
-func AppIcons() *table.Plugin {
+func AppIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return table.NewPlugin("kolide_app_icons", columns, generateAppIcons)
+	return tablewrapper.New(flags, slogger, "kolide_app_icons", columns, generateAppIcons)
 }
 
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "table_name", "kolide_app_icons")
+	defer span.End()
+
 	q, ok := queryContext.Constraints["path"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The kolide_app_icons table requires that you specify a constraint WHERE path =")

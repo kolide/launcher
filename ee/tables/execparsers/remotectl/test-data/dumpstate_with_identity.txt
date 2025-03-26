@@ -1,0 +1,71 @@
+Local device
+	UUID: EB958862-2222-1111-0000-000000000000
+	Messaging Protocol Version: 5
+	Product Type: MacBookPro18,1
+	OS Build: 15.0 (24A5264n)
+	Properties: {
+		AppleInternal => false
+		CPUArchitecture => arm64e
+		ChipID => 24576
+		EffectiveProductionStatusSEP => true
+		HWModel => J316sAP
+		HasSEP => true
+		HumanReadableProductVersionString => 15.0
+		ThinningProductType => MacBookPro18,1
+		IsUIBuild => true
+		RegionInfo => LL/A
+		RestoreLongVersion => 24.1.264.5.14,0
+		DeviceSupportsLockdown => false
+		EffectiveSecurityModeAp => true
+		SigningFuse => true
+		SupplementalBuildVersion => 24A5264n
+		BuildVersion => 24A5264n
+		OSVersion => 15.0
+		BridgeVersion => 22.16.5294.0.3,0
+		SensitivePropertiesVisible => true
+		Image4CryptoHashMethod => sha2-384
+		MobileDeviceMinimumVersion => 1742
+		ProductName => macOS
+		ProductType => MacBookPro18,1
+		SerialNumber => N10101010T
+		BootSessionUUID => 898E9447-2222-1111-0000-000000000000
+		BoardId => 10
+		DeviceColor => unknown
+		EffectiveProductionStatusAp => true
+		EffectiveSecurityModeSEP => true
+		UniqueChipID => 0000000000000000
+		UniqueDeviceID => 00006000-0000000000000000
+		EncryptedRemoteXPCPopulatedOIDs => [<capacity = 2>
+			0: 1.2.111.000000.100.6.22
+			1: 1.2.111.000000.100.6.23
+		]
+		OSInstallEnvironment => false
+		RemoteXPCVersionFlags => 72057594037927942
+		CertificateProductionStatus => true
+		CertificateSecurityMode => true
+		DeviceClass => Mac
+		DeviceEnclosureColor => 2
+		ModelNumber => Z14V0016E
+		RegionCode => LL
+		SecurityDomain => 1
+		HardwarePlatform => t6000
+		Image4Supported => true
+		IsVirtualDevice => false
+	}
+	Services:
+		com.apple.CSCSupportd
+		com.apple.remote.installcoordination_proxy
+		com.apple.testmanagerd.remote.automation
+		com.apple.security.cryptexd.remote
+		com.apple.mobile.storage_mounter_proxy.bridge.macOS
+		com.apple.corecaptured.remoteservice
+		com.apple.sysdiagnose.remote.trusted
+		com.apple.mobile.storage_mounter_proxy.bridge
+		com.apple.dt.remoteFetchSymbols
+		com.apple.sysdiagnose.remote
+		com.apple.mobile.notification_proxy.remote
+		com.apple.osanalytics.logRelay
+		ssh
+	Identity:
+		Public key SHA256: /3829hunfe927fh972eht972efhjeo82hfo2ehgo2ru=
+

@@ -24,23 +24,28 @@ import (
 	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/knapsack"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/timemachine"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/ee/control/actionqueue"
 	"github.com/kolide/launcher/ee/control/consumers/acceleratecontrolconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/flareconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
+	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
-	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
+	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/augeas"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -53,14 +58,11 @@ import (
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/exporter"
-	"github.com/osquery/osquery-go/plugin/config"
-	"github.com/osquery/osquery-go/plugin/distributed"
-	osquerylogger "github.com/osquery/osquery-go/plugin/logger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
 )
@@ -71,6 +73,9 @@ const (
 	serverDataSubsystemName  = "kolide_server_data"
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
+	katcSubsystemName        = "katc_config" // Kolide ATC
+	ztaInfoSubsystemName     = "zta_info"    // legacy name for dt4aInfo subsystem
+	dt4aInfoSubsystemName    = "dt4a_info"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -135,6 +140,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"using default system root directory",
 			"path", rootDirectory,
 		)
+		// Make sure we have record of this new root directory in the opts, so it will be set
+		// correctly in the knapsack later.
+		opts.RootDirectory = rootDirectory
 	}
 
 	if err := os.MkdirAll(rootDirectory, fsutil.DirMode); err != nil {
@@ -168,8 +176,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// this. Note that the timeout is documented as failing
 	// unimplemented on windows, though empirically it seems to
 	// work.
-	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
-	db, err := bbolt.Open(filepath.Join(rootDirectory, "launcher.db"), 0600, boltOptions)
+	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
+	boltOptions := &bbolt.Options{
+		Timeout:      time.Duration(30) * time.Second,
+		FreelistType: bbolt.FreelistMapType,
+	}
+	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
 	}
@@ -189,10 +201,30 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	go runOsqueryVersionCheck(ctx, slogger, k.LatestOsquerydPath(ctx))
-	go timemachine.AddExclusions(ctx, k)
+	// Generate a new run ID
+	newRunID := k.GetRunID()
 
-	if k.Debug() {
+	// Apply the run ID to both logger and slogger
+	logger = log.With(logger, "run_id", newRunID)
+	slogger = slogger.With("run_id", newRunID)
+
+	// set start time, first runtime, first version
+	initLauncherHistory(k)
+
+	gowrapper.Go(ctx, slogger, func() {
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
+	})
+	gowrapper.Go(ctx, slogger, func() {
+		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
+	})
+	gowrapper.Go(ctx, slogger, func() {
+		// Wait a little bit before adding exclusions -- some osquery files get created right after
+		// startup and we want to let that settle before handling exclusions.
+		time.Sleep(2 * time.Minute)
+		timemachine.AddExclusions(ctx, k)
+	})
+
+	if k.Debug() && runtime.GOOS != "windows" {
 		// If we're in debug mode, then we assume we want to echo _all_ logs to stderr.
 		k.AddSlogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 			AddSource: true,
@@ -201,7 +233,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	}
 
 	// create a rungroup for all the actors we create to allow for easy start/stop
-	runGroup := rungroup.NewRunGroup(slogger)
+	runGroup := rungroup.NewRunGroup()
 
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
@@ -241,13 +273,17 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		startupSpan.AddEvent("log_shipper_init_completed")
 	}
 
-	s, err := startupsettings.OpenWriter(ctx, k)
+	// Now that log shipping is set up, set the slogger on the rungroup so that rungroup logs
+	// will also be shipped.
+	runGroup.SetSlogger(k.Slogger())
+
+	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
 	}
-	defer s.Close()
+	defer startupSettingsWriter.Close()
 
-	if err := s.WriteSettings(); err != nil {
+	if err := startupSettingsWriter.WriteSettings(); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"writing startup settings",
 			"err", err,
@@ -258,6 +294,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// we expect we're live. Record the version for osquery to
 	// pickup
 	internal.RecordLauncherVersion(ctx, rootDirectory)
+
+	dbBackupSaver := agentbbolt.NewDatabaseBackupSaver(k)
+	runGroup.Add("dbBackupSaver", dbBackupSaver.Execute, dbBackupSaver.Interrupt)
 
 	// create the certificate pool
 	var rootPool *x509.CertPool
@@ -275,8 +314,21 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Add the log checkpoints to the rungroup, and run it once early, to try to get data into the logs.
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
-	go checkpointer.Once(ctx)
+	gowrapper.Go(ctx, slogger, func() {
+		checkpointer.Once(ctx)
+	})
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
+
+	watchdogController, err := watchdog.NewController(ctx, k, opts.ConfigFilePath)
+	if err != nil { // log any issues here but move on, watchdog is not critical path
+		slogger.Log(ctx, slog.LevelError,
+			"could not init watchdog controller",
+			"err", err,
+		)
+	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
+		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
+		runGroup.Add("watchdogController", watchdogController.Run, watchdogController.Interrupt)
+	}
 
 	// Create a channel for signals
 	sigChannel := make(chan os.Signal, 1)
@@ -285,10 +337,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// For now, remediation is not performed -- we only log the hardware change.
-	agent.DetectAndRemediateHardwareChange(ctx, k)
+	// For now, remediation is not performed -- we only log the hardware change. So we can
+	// perform this operation in the background to avoid slowing down launcher startup.
+	gowrapper.Go(ctx, slogger, func() {
+		agent.DetectAndRemediateHardwareChange(ctx, k)
+	})
 
-	powerEventWatcher, err := powereventwatcher.New(ctx, k, slogger)
+	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
+	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"could not init power event watcher",
@@ -317,56 +373,27 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 	}
 
-	// init osquery instance history
-	if err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
-		return fmt.Errorf("error initializing osquery instance history: %w", err)
+	// make sure keys exist -- we expect these keys to exist before rungroup starts
+	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
+		return fmt.Errorf("setting up agent keys: %w", err)
 	}
 
-	// create the osquery extension
-	extension, err := createExtensionRuntime(ctx, k, client)
-	if err != nil {
-		return fmt.Errorf("create extension with runtime: %w", err)
+	// init osquery instance history
+	if osqHistory, err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
+		return fmt.Errorf("error initializing osquery instance history: %w", err)
+	} else {
+		k.SetOsqueryHistory(osqHistory)
 	}
-	runGroup.Add("osqueryExtension", extension.Execute, extension.Shutdown)
+
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
-		osqueryruntime.WithKnapsack(k),
-		osqueryruntime.WithOsquerydBinary(k.OsquerydPath()),
-		osqueryruntime.WithRootDirectory(k.RootDirectory()),
-		osqueryruntime.WithOsqueryExtensionPlugins(table.LauncherTables(k)...),
-		osqueryruntime.WithSlogger(k.Slogger().With("component", "osquery_instance")),
-		osqueryruntime.WithOsqueryVerbose(k.OsqueryVerbose()),
-		osqueryruntime.WithOsqueryFlags(k.OsqueryFlags()),
-		osqueryruntime.WithStdout(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stdout",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelDebug),
-		)),
-		osqueryruntime.WithStderr(kolidelog.NewOsqueryLogAdapter(
-			k.Slogger().With(
-				"component", "osquery",
-				"osqlevel", "stderr",
-			),
-			k.RootDirectory(),
-			kolidelog.WithLevel(slog.LevelInfo),
-		)),
+		client,
+		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
-		osqueryruntime.WithUpdateDirectory(k.UpdateDirectory()),
-		osqueryruntime.WithUpdateChannel(k.UpdateChannel()),
-		osqueryruntime.WithConfigPluginFlag("kolide_grpc"),
-		osqueryruntime.WithLoggerPluginFlag("kolide_grpc"),
-		osqueryruntime.WithDistributedPluginFlag("kolide_grpc"),
-		osqueryruntime.WithOsqueryExtensionPlugins(
-			config.NewPlugin("kolide_grpc", extension.GenerateConfigs),
-			distributed.NewPlugin("kolide_grpc", extension.GetQueries, extension.WriteResults),
-			osquerylogger.NewPlugin("kolide_grpc", extension.LogString),
-		),
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
+	k.SetInstanceQuerier(osqueryRunner)
 
 	versionInfo := version.Version()
 	k.SystemSlogger().Log(ctx, slog.LevelInfo,
@@ -374,10 +401,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		"version", versionInfo.Version,
 		"build", versionInfo.Revision,
 	)
-
-	if traceExporter != nil {
-		traceExporter.SetOsqueryClient(osqueryRunner)
-	}
 
 	// Create the control service and services that depend on it
 	var runner *desktopRunner.DesktopUsersProcessesRunner
@@ -397,6 +420,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(serverDataSubsystemName, keyvalueconsumer.New(k.ServerProvidedDataStore()))
 		// agentFlagConsumer handles agent flags pushed from the control server
 		controlService.RegisterConsumer(agentFlagsSubsystemName, keyvalueconsumer.New(flagController))
+		// katcConfigConsumer handles updates to Kolide's custom ATC tables
+		controlService.RegisterConsumer(katcSubsystemName, keyvalueconsumer.NewConfigConsumer(k.KatcConfigStore()))
+		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
+		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
 
 		runner, err = desktopRunner.New(
 			k,
@@ -407,6 +434,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
+
+		execute, interrupt, err := agent.SetHardwareKeysRunner(ctx, k.Slogger(), k.ConfigStore(), runner)
+		if err != nil {
+			return fmt.Errorf("setting up hardware keys: %w", err)
+		}
+		runGroup.Add("hardwareKeys", execute, interrupt)
 
 		runGroup.Add("desktopRunner", runner.Execute, runner.Interrupt)
 		controlService.RegisterConsumer(desktopMenuSubsystemName, runner)
@@ -427,6 +460,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		actionsQueue.RegisterActor(uninstallconsumer.UninstallSubsystem, uninstallconsumer.New(k))
 		// register flare consumer
 		actionsQueue.RegisterActor(flareconsumer.FlareSubsystem, flareconsumer.New(k))
+		// register force full control data fetch consumer
+		actionsQueue.RegisterActor(control.ForceFullControlDataFetchAction, controlService)
 
 		// create notification consumer
 		notificationConsumer, err := notificationconsumer.NewNotifyConsumer(
@@ -441,14 +476,18 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		// register notifications consumer
 		actionsQueue.RegisterActor(notificationconsumer.NotificationSubsystem, notificationConsumer)
 
+		remoteRestartConsumer := remoterestartconsumer.New(k)
+		runGroup.Add("remoteRestart", remoteRestartConsumer.Execute, remoteRestartConsumer.Interrupt)
+		actionsQueue.RegisterActor(remoterestartconsumer.RemoteRestartActorType, remoteRestartConsumer)
+
 		// Set up our tracing instrumentation
 		authTokenConsumer := keyvalueconsumer.New(k.TokenStore())
 		if err := controlService.RegisterConsumer(authTokensSubsystemName, authTokenConsumer); err != nil {
 			return fmt.Errorf("failed to register auth token consumer: %w", err)
 		}
 
-		// begin log shipping and subsribe to token updates
-		// nil check incase it failed to create for some reason
+		// begin log shipping and subscribe to token updates
+		// nil check in case it failed to create for some reason
 		if logShipper != nil {
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 		}
@@ -469,6 +508,17 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			// information is made available from server_data (e.g. on a fresh install)
 			metadataWriter.Ping()
 		}
+
+		// Set up consumer to receive DT4A info from the control server in both current and legacy subsystem
+		dt4aInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.Dt4aInfoStore())
+		if err := controlService.RegisterConsumer(dt4aInfoSubsystemName, dt4aInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
+		}
+
+		//ztaInfoConsumer is the legacy consumer for zta
+		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, dt4aInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
+		}
 	}
 
 	runEECode := k.ControlServerURL() != "" || k.IAmBreakingEELicense()
@@ -479,6 +529,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		ls, err := localserver.New(
 			ctx,
 			k,
+			runner,
 		)
 
 		if err != nil {
@@ -497,8 +548,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	if k.Autoupdate() {
 		metadataClient := http.DefaultClient
 		metadataClient.Timeout = 30 * time.Second
+		metadataClient.Transport = otelhttp.NewTransport(metadataClient.Transport)
 		mirrorClient := http.DefaultClient
 		mirrorClient.Timeout = 8 * time.Minute // gives us extra time to avoid a timeout on download
+		mirrorClient.Transport = otelhttp.NewTransport(mirrorClient.Transport)
 		tufAutoupdater, err := tuf.NewTufAutoupdater(
 			ctx,
 			k,
@@ -514,6 +567,36 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runGroup.Add("tufAutoupdater", tufAutoupdater.Execute, tufAutoupdater.Interrupt)
 		if actionsQueue != nil {
 			actionsQueue.RegisterActor(tuf.AutoupdateSubsystemName, tufAutoupdater)
+		}
+
+		// in some cases, (e.g. rolling back a windows installation to a previous osquery version) it is possible that
+		// the installer leaves us in a situation where there is no osqueryd on disk.
+		// we can detect this and attempt to download the correct version into the TUF update library to run from that.
+		// This must be done as a blocking operation before the rungroups start, because the osquery runner will fail to
+		// launch and trigger a restart immediately
+		currentOsquerydBinaryPath := k.LatestOsquerydPath(ctx)
+		if _, err = os.Stat(currentOsquerydBinaryPath); os.IsNotExist(err) {
+			slogger.Log(ctx, slog.LevelInfo,
+				"detected missing osqueryd executable, will attempt to download",
+			)
+
+			startupSpan.AddEvent("osqueryd_startup_download_start")
+			// simulate control server request for immediate update, noting to bypass the initial delay window
+			actionReader := strings.NewReader(`{
+				"bypass_initial_delay": true,
+				"binaries_to_update": [
+					{ "name": "osqueryd" }
+				]
+			}`)
+
+			if err = tufAutoupdater.Do(actionReader); err != nil {
+				slogger.Log(ctx, slog.LevelError,
+					"failure triggering immediate osquery update",
+					"err", err,
+				)
+			}
+
+			startupSpan.AddEvent("osqueryd_startup_download_completed")
 		}
 	}
 
@@ -533,15 +616,62 @@ func writePidFile(path string) error {
 	return nil
 }
 
-// runOsqueryVersionCheck execs the osqueryd binary in the background when we're running
-// on darwin. Operating on our theory that some startup delay issues for osquery might
-// be due to the notarization check taking too long, we execute the binary here ahead
-// of time in the hopes of getting the check out of the way. This is expected to be called
-// from a goroutine, and thus does not return an error.
-func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydPath string) {
-	if runtime.GOOS != "darwin" {
-		return
+func initLauncherHistory(k types.Knapsack) {
+	// start counting uptime (want to reset on every run)
+	utcTimeNow := time.Now().UTC()
+	if err := k.LauncherHistoryStore().Set([]byte("process_start_time"), []byte(utcTimeNow.Format(time.RFC3339))); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error setting process start time",
+			"err", err,
+		)
 	}
+
+	// set first recorded version (do not want to reset on every run)
+	installVersion, err := k.LauncherHistoryStore().Get([]byte("first_recorded_version"))
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error getting first recorded version",
+			"err", err,
+		)
+
+		installVersion = nil
+	}
+
+	if installVersion == nil {
+		if err := k.LauncherHistoryStore().Set([]byte("first_recorded_version"), []byte(version.Version().Version)); err != nil {
+			k.Slogger().Log(context.Background(), slog.LevelError,
+				"error setting first recorded version",
+				"err", err,
+				"version", string(installVersion),
+			)
+		}
+	}
+
+	// set first recorded run time (do not want to reset on every run)
+	installDateTime, err := k.LauncherHistoryStore().Get([]byte("first_recorded_run_time"))
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"error getting first recorded run time",
+			"err", err,
+		)
+
+		installDateTime = nil
+	}
+
+	if installDateTime == nil {
+		if err := k.LauncherHistoryStore().Set([]byte("first_recorded_run_time"), []byte(utcTimeNow.Format(time.RFC3339))); err != nil {
+			k.Slogger().Log(context.Background(), slog.LevelError,
+				"error setting first recorded run time",
+				"err", err,
+			)
+		}
+	}
+}
+
+// runOsqueryVersionCheckAndAddToKnapsack execs the osqueryd binary in the background when we're running
+// on to check the version and save it in the Knapsack. This is expected to be called
+// from a goroutine, and thus does not return an error.
+func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.Logger, k types.Knapsack, osquerydPath string) {
 
 	slogger = slogger.With("component", "osquery-version-check")
 
@@ -560,27 +690,28 @@ func runOsqueryVersionCheck(ctx context.Context, slogger *slog.Logger, osquerydP
 	versionCtx, versionCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer versionCancel()
 
-	startTime := time.Now().UnixMilli()
-
 	osqErr := osq.RunVersion(versionCtx)
-	executionTimeMs := time.Now().UnixMilli() - startTime
-	outTrimmed := strings.TrimSpace(output.String())
+
+	// Output looks like `osquery version x.y.z`, so split on `version` and return the last part of the string
+	parts := strings.SplitAfter(strings.TrimSpace(output.String()), "version")
+	osquerydVersion := strings.TrimSpace(parts[len(parts)-1])
 
 	if osqErr != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"could not check osqueryd version",
-			"output", outTrimmed,
+			"output", osquerydVersion,
 			"err", err,
-			"execution_time_ms", executionTimeMs,
 			"osqueryd_path", osquerydPath,
 		)
 		return
 	}
 
+	// log the version to the knapsack
+	k.SetCurrentRunningOsqueryVersion(osquerydVersion)
+
 	slogger.Log(ctx, slog.LevelDebug,
 		"checked osqueryd version",
-		"osqueryd_version", outTrimmed,
-		"execution_time_ms", executionTimeMs,
+		"osqueryd_version", osquerydVersion,
 		"osqueryd_path", osquerydPath,
 	)
 }

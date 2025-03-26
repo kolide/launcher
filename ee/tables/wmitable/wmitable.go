@@ -10,10 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/ee/wmi"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -23,7 +26,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("namespace"),
@@ -36,11 +39,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_wmi"),
 	}
 
-	return table.NewPlugin("kolide_wmi", columns, t.generate)
-
+	return tablewrapper.New(flags, slogger, "kolide_wmi", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_wmi")
+	defer span.End()
+
 	var results []map[string]string
 
 	classes := tablehelpers.GetConstraints(queryContext, "class", tablehelpers.WithAllowedCharacters(allowedCharacters))
@@ -85,11 +90,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				ns = strings.ReplaceAll(ns, `\\`, `\`)
 
 				for _, whereClause := range whereClauses {
-					// Set a timeout in case wmi hangs
-					ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-					defer cancel()
-
-					wmiResults, err := wmi.Query(ctx, t.slogger, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
+					wmiResults, err := t.runQuery(ctx, class, properties, ns, whereClause)
 					if err != nil {
 						t.slogger.Log(ctx, slog.LevelInfo,
 							"wmi query failure",
@@ -113,7 +114,21 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	return results, nil
 }
 
+func (t *Table) runQuery(ctx context.Context, class string, properties []string, ns string, whereClause string) ([]map[string]interface{}, error) {
+	ctx, span := traces.StartSpan(ctx, "class", class)
+	defer span.End()
+
+	// Set a timeout in case wmi hangs
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	return wmi.Query(ctx, t.slogger, class, properties, wmi.ConnectUseMaxWait(), wmi.ConnectNamespace(ns), wmi.WithWhere(whereClause))
+}
+
 func (t *Table) flattenRowsFromWmi(ctx context.Context, dataQuery string, wmiResults []map[string]interface{}, wmiClass, wmiProperties, wmiNamespace, whereClause string) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
 		dataflatten.WithQuery(strings.Split(dataQuery, "/")),

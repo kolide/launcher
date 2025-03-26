@@ -3,9 +3,11 @@ package agentbbolt
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"go.etcd.io/bbolt"
 )
 
@@ -34,7 +36,10 @@ type bboltKeyValueStore struct {
 	bucketName string
 }
 
-func NewStore(slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+func NewStore(ctx context.Context, slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
+	_, span := traces.StartSpan(ctx, "bucket_name", bucketName)
+	defer span.End()
+
 	err := db.Update(func(tx *bbolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
 		if err != nil {
@@ -235,14 +240,14 @@ func (s *bboltKeyValueStore) Count() (int, error) {
 		return 0, NoDbError{}
 	}
 
-	var len int
+	var numKeys int
 	if err := s.db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(s.bucketName))
 		if b == nil {
 			return NewNoBucketError(s.bucketName)
 		}
 
-		len = b.Stats().KeyN
+		numKeys = b.Stats().KeyN
 		return nil
 	}); err != nil {
 		s.slogger.Log(context.TODO(), slog.LevelError,
@@ -252,14 +257,14 @@ func (s *bboltKeyValueStore) Count() (int, error) {
 		return 0, err
 	}
 
-	return len, nil
+	return numKeys, nil
 }
 
 // AppendValues utlizes bbolts NextSequence functionality to add ordered values
 // after generating the next autoincrementing key for each
 func (s *bboltKeyValueStore) AppendValues(values ...[]byte) error {
 	if s == nil || s.db == nil {
-		return fmt.Errorf("unable to append values into uninitialized bbolt db store")
+		return errors.New("unable to append values into uninitialized bbolt db store")
 	}
 
 	return s.db.Update(func(tx *bbolt.Tx) error {

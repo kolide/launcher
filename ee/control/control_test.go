@@ -23,7 +23,8 @@ import (
 
 type (
 	mockConsumer struct {
-		updates int
+		updates   int
+		updateErr error
 	}
 	mockSubscriber struct {
 		pings int
@@ -35,7 +36,7 @@ type (
 
 func (mc *mockConsumer) Update(io.Reader) error {
 	mc.updates++
-	return nil
+	return mc.updateErr
 }
 
 func (ms *mockSubscriber) Ping() {
@@ -53,15 +54,15 @@ func (ms *mockStore) Set(key, value []byte) error {
 
 type nopDataProvider struct{}
 
-func (dp nopDataProvider) GetConfig() (io.Reader, error) {
+func (dp nopDataProvider) GetConfig(_ context.Context) (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) GetSubsystemData(hash string) (io.Reader, error) {
+func (dp nopDataProvider) GetSubsystemData(_ context.Context, hash string) (io.Reader, error) {
 	return nil, nil
 }
 
-func (dp nopDataProvider) SendMessage(method string, params interface{}) error {
+func (dp nopDataProvider) SendMessage(_ context.Context, method string, params interface{}) error {
 	return nil
 }
 
@@ -184,7 +185,7 @@ func TestControlServiceUpdate(t *testing.T) {
 				cs.RegisterSubscriber(tt.subsystem, ss)
 			}
 
-			err = cs.update(tt.subsystem, nil)
+			err = cs.update(context.TODO(), tt.subsystem, nil)
 			require.NoError(t, err)
 
 			// Expect consumer to have gotten exactly one update
@@ -196,6 +197,91 @@ func TestControlServiceUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestControlServiceUpdateErr(t *testing.T) {
+	t.Parallel()
+
+	// Create mock consumer that returns error on update
+	errConsumer := &mockConsumer{
+		updateErr: errors.New("simulated update failure"),
+	}
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	// Set up test data with known hash
+	subsystems := map[string]string{"actions": "abc123"}
+	hashData := map[string]any{"abc123": "test-data"}
+	data, _ := NewControlTestClient(subsystems, hashData)
+
+	// Create control service and register error-producing consumer
+	store := &mockStore{keyValues: make(map[string]string)}
+	controlOpts := []Option{WithStore(store)}
+	cs := New(mockKnapsack, data, controlOpts...)
+	err := cs.RegisterConsumer("actions", errConsumer)
+	require.NoError(t, err)
+
+	// Trigger fetch which should cause update error
+	err = cs.Fetch(context.TODO())
+	require.NoError(t, err)
+
+	// Verify error consumer was called
+	assert.Equal(t, 1, errConsumer.updates)
+
+	// Verify hash was not recorded due to error
+	val, err := store.Get([]byte("actions"))
+	require.NoError(t, err)
+	assert.Empty(t, string(val))
+}
+
+func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
+	t.Parallel()
+
+	errConsumer := &mockConsumer{
+		updateErr: errors.New("simulated update failure"),
+	}
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	// First fetch data
+	subsystems := map[string]string{"actions": "abc123"}
+	hashData := map[string]any{"abc123": "test-data-1"}
+	data, _ := NewControlTestClient(subsystems, hashData)
+
+	store := &mockStore{keyValues: make(map[string]string)}
+	controlOpts := []Option{WithStore(store)}
+	cs := New(mockKnapsack, data, controlOpts...)
+
+	err := cs.RegisterConsumer("actions", errConsumer)
+	require.NoError(t, err)
+
+	// First fetch - should fail and not store hash
+	err = cs.Fetch(context.TODO())
+	require.NoError(t, err)
+	assert.Equal(t, 1, errConsumer.updates)
+
+	// Create new test client with updated hash
+	subsystems = map[string]string{"actions": "def456"}
+	hashData = map[string]any{"def456": "test-data-2"}
+	newData, _ := NewControlTestClient(subsystems, hashData)
+	cs.fetcher = newData
+
+	// Second fetch with new hash - should succeed
+	errConsumer.updateErr = nil
+	err = cs.Fetch(context.TODO())
+	require.NoError(t, err)
+	assert.Equal(t, 2, errConsumer.updates)
+
+	// Verify final hash was recorded
+	val, err := store.Get([]byte("actions"))
+	require.NoError(t, err)
+	assert.Equal(t, "def456", string(val))
 }
 
 func TestControlServiceFetch(t *testing.T) {
@@ -236,7 +322,7 @@ func TestControlServiceFetch(t *testing.T) {
 			mockKnapsack.On("ForceControlSubsystems").Return(false)
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-			data := &TestClient{tt.subsystems, tt.hashData}
+			data, _ := NewControlTestClient(tt.subsystems, tt.hashData)
 			controlOpts := []Option{}
 			cs := New(mockKnapsack, data, controlOpts...)
 			err := cs.RegisterConsumer(tt.subsystem, tt.c)
@@ -247,7 +333,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			// Repeat fetches to verify no changes
 			for i := 0; i < tt.fetches; i++ {
-				err = cs.Fetch()
+				err = cs.Fetch(context.TODO())
 				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
@@ -260,6 +346,53 @@ func TestControlServiceFetch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesMocks.NewKnapsack(t)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+	mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+	mockKnapsack.On("ForceControlSubsystems").Return(false)
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+	unknownSubsystemHash := "602a42f1"
+	subsystems := map[string]string{"desktop": "502a42f0", "unknown": unknownSubsystemHash}
+	hashData := map[string]any{"502a42f0": "status"}
+
+	// The test client will panic if it receives a request for the `unknown` subsystem hash,
+	// validating that we don't process data for the `unknown` subsystem.
+	data, _ := NewControlTestClient(subsystems, hashData)
+	controlOpts := []Option{}
+	cs := New(mockKnapsack, data, controlOpts...)
+
+	// Register consumer/subscriber for `desktop` subsystem only
+	desktopConsumer := &mockConsumer{}
+	err := cs.RegisterConsumer("desktop", desktopConsumer)
+	require.NoError(t, err)
+	desktopSubscriber := &mockSubscriber{}
+	cs.RegisterSubscriber("desktop", desktopSubscriber)
+
+	// Run fetch for the first time
+	require.NoError(t, cs.Fetch(context.TODO()))
+
+	// Expect desktop consumer to have gotten exactly one update
+	assert.Equal(t, 1, desktopConsumer.updates)
+
+	// Expect desktop subscriber to have gotten exactly one ping
+	assert.Equal(t, 1, desktopSubscriber.pings)
+
+	// Expect no requests to unknown hash
+	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
+
+	// Run fetch again. This time, data should be cached, so there should be no updates or pings.
+	require.NoError(t, cs.Fetch(context.TODO()))
+	assert.Equal(t, 1, desktopConsumer.updates)
+	assert.Equal(t, 1, desktopSubscriber.pings)
+
+	// Expect no requests to unknown hash
+	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
 }
 
 func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
@@ -336,7 +469,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 
 			// Make several instances of control service
 			for j := 0; j < tt.instances; j++ {
-				data := &TestClient{tt.subsystems, tt.hashData}
+				data, _ := NewControlTestClient(tt.subsystems, tt.hashData)
 				controlOpts := []Option{WithStore(store)}
 
 				mockKnapsack := typesMocks.NewKnapsack(t)
@@ -353,12 +486,77 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
-				err = cs.Fetch()
+				err = cs.Fetch(context.TODO())
 				require.NoError(t, err)
 			}
 
 			// Expect consumer to have gotten exactly one update
 			assert.Equal(t, tt.expectedUpdates, tt.c.updates)
+		})
+	}
+}
+
+func Test_knownSubsystem(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName   string
+		subsystemName  string
+		consumers      []string
+		subscribers    []string
+		subsystemKnown bool
+	}{
+		{
+			testCaseName:   "subsystem in consumers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"subsystem_to_query", "some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "a_third_subsystem"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem in subscribers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "subsystem_to_query"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem in consumers and subscribers",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"subsystem_to_query", "some_other_subsystem"},
+			subscribers:    []string{"some_other_subsystem", "subsystem_to_query"},
+			subsystemKnown: true,
+		},
+		{
+			testCaseName:   "subsystem is unknown",
+			subsystemName:  "subsystem_to_query",
+			consumers:      []string{"some_other_subsystem", "another_test_subsystem"},
+			subscribers:    []string{"some_other_subsystem"},
+			subsystemKnown: false,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			mockKnapsack := typesMocks.NewKnapsack(t)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ControlRequestInterval)
+			mockKnapsack.On("ControlRequestInterval").Return(60 * time.Second)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+
+			controlOpts := []Option{}
+			cs := New(mockKnapsack, nil, controlOpts...)
+
+			// Register known consumers and subscribers
+			for _, c := range tt.consumers {
+				require.NoError(t, cs.RegisterConsumer(c, &mockConsumer{}))
+			}
+			for _, s := range tt.subscribers {
+				cs.RegisterSubscriber(s, &mockSubscriber{})
+			}
+
+			known := cs.knownSubsystem(tt.subsystemName)
+			require.Equal(t, tt.subsystemKnown, known)
 		})
 	}
 }

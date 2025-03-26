@@ -13,8 +13,11 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -30,7 +33,7 @@ Example Query:
 	AS f JOIN kolide_spotlight ON spotlight.path = f.path
 	AND spotlight.query = "kMDItemKint = 'Agile Keychain'";
 */
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("query"),
 		table.TextColumn("path"),
@@ -40,10 +43,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_spotlight"),
 	}
 
-	return table.NewPlugin("kolide_spotlight", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_spotlight", columns, t.generate)
 }
 
 func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_spotlight")
+	defer span.End()
+
 	q, ok := queryContext.Constraints["query"]
 	if !ok || len(q.Constraints) == 0 {
 		return nil, errors.New("The spotlight table requires that you specify a constraint WHERE query =")
@@ -57,7 +63,7 @@ func (t *spotlightTable) generate(ctx context.Context, queryContext table.QueryC
 		query = []string{where}
 	}
 
-	out, err := tablehelpers.Exec(ctx, t.slogger, 120, allowedcmd.Mdfind, query, false)
+	out, err := tablehelpers.RunSimple(ctx, t.slogger, 120, allowedcmd.Mdfind, query)
 	if err != nil {
 		return nil, fmt.Errorf("call mdfind: %w", err)
 	}

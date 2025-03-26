@@ -2,13 +2,19 @@ package osquery_instance_history
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-func TablePlugin() *table.Plugin {
+func TablePlugin(k types.Knapsack, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
+		table.TextColumn("registration_id"),
+		table.TextColumn("instance_run_id"),
 		table.TextColumn("start_time"),
 		table.TextColumn("connect_time"),
 		table.TextColumn("exit_time"),
@@ -17,29 +23,22 @@ func TablePlugin() *table.Plugin {
 		table.TextColumn("version"),
 		table.TextColumn("errors"),
 	}
-	return table.NewPlugin("kolide_launcher_osquery_instance_history", columns, generate())
+	return tablewrapper.New(k, slogger, "kolide_launcher_osquery_instance_history", columns, generate(k))
 }
 
-func generate() table.GenerateFunc {
+func generate(k types.Knapsack) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		results := []map[string]string{}
+		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
+		defer span.End()
 
-		history, err := history.GetHistory()
-		if err != nil {
-			return nil, err
+		osqHistory := k.OsqueryHistory()
+		if osqHistory == nil {
+			return nil, errors.New("osquery history is unavailable")
 		}
 
-		for _, instance := range history {
-
-			results = append(results, map[string]string{
-				"start_time":   instance.StartTime,
-				"connect_time": instance.ConnectTime,
-				"exit_time":    instance.ExitTime,
-				"instance_id":  instance.InstanceId,
-				"version":      instance.Version,
-				"hostname":     instance.Hostname,
-				"errors":       instance.Error,
-			})
+		results, err := osqHistory.GetHistory()
+		if err != nil {
+			return nil, err
 		}
 
 		return results, nil

@@ -8,6 +8,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
@@ -28,26 +30,142 @@ type (
 
 	powerEventWatcher struct {
 		slogger                 *slog.Logger
-		knapsack                types.Knapsack
+		powerEventSubscriber    powerEventSubscriber
 		subscriptionHandle      uintptr
 		subscribeProcedure      *syscall.LazyProc
 		unsubscribeProcedure    *syscall.LazyProc
 		renderEventLogProcedure *syscall.LazyProc
 		interrupt               chan struct{}
-		interrupted             bool
+		interrupted             atomic.Bool
+	}
+
+	// powerEventSubscriber is an interface to be implemented by anything utilizing the power event updates.
+	// implementers are provided to New, and the interface methods below are called as described during relevant updates
+	powerEventSubscriber interface {
+		// OnPowerEvent will be called for the provided subscriber whenever any watched event is observed
+		OnPowerEvent(eventID int) error
+		// OnStartup will be called when the powerEventWatcher is initially set up, allowing subscribers
+		// to perform any setup behavior (e.g. cache clearing, state resetting)
+		OnStartup() error
+	}
+
+	// knapsackSleepStateUpdater implements the powerEventSubscriber interface and
+	// updates the knapsack.InModernStandby state based on the power events observed
+	knapsackSleepStateUpdater struct {
+		knapsack types.Knapsack
+		slogger  *slog.Logger
+	}
+
+	// InMemorySleepStateUpdater implements the powerEventSubscriber interface. When passed as
+	// the powerEventSubscriber, it will expose the last seen ModernStandby state for the caller
+	InMemorySleepStateUpdater struct {
+		sync.Mutex
+		slogger         *slog.Logger
+		inModernStandby bool
 	}
 )
 
 const (
 	eventIdEnteringModernStandby = 506
-	eventIdExitingModernStandby  = 507
+	EventIdExitingModernStandby  = 507
 	eventIdEnteringSleep         = 42
+	EventIdResumedFromSleep      = 107
 
 	operationSuccessfulMsg = "The operation completed successfully."
 )
 
+func NewKnapsackSleepStateUpdater(slogger *slog.Logger, k types.Knapsack) *knapsackSleepStateUpdater {
+	return &knapsackSleepStateUpdater{
+		knapsack: k,
+		slogger:  slogger,
+	}
+}
+
+func NewInMemorySleepStateUpdater(slogger *slog.Logger) *InMemorySleepStateUpdater {
+	return &InMemorySleepStateUpdater{
+		slogger: slogger,
+	}
+}
+
+func (ims *InMemorySleepStateUpdater) OnStartup() error {
+	ims.Lock()
+	defer ims.Unlock()
+	// this should essentially be a no-op for our inmemory store since it will default false
+	ims.inModernStandby = false
+	return nil
+}
+
+func (ims *InMemorySleepStateUpdater) InModernStandby() bool {
+	ims.Lock()
+	defer ims.Unlock()
+
+	return ims.inModernStandby
+}
+
+func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
+	ims.Lock()
+	defer ims.Unlock()
+
+	switch eventID {
+	case eventIdEnteringModernStandby, eventIdEnteringSleep:
+		ims.inModernStandby = true
+	case EventIdExitingModernStandby, EventIdResumedFromSleep:
+		ims.inModernStandby = false
+	default:
+		ims.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received unexpected event ID in log",
+			"event_id", eventID,
+		)
+	}
+
+	return nil
+}
+
+func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
+	switch eventID {
+	case eventIdEnteringModernStandby, eventIdEnteringSleep:
+		ks.slogger.Log(context.TODO(), slog.LevelDebug,
+			"system is sleeping",
+			"event_id", eventID,
+		)
+		if err := ks.knapsack.SetInModernStandby(true); err != nil {
+			ks.slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered error setting modern standby value",
+				"in_modern_standby", true,
+				"err", err,
+			)
+		}
+	case EventIdExitingModernStandby, EventIdResumedFromSleep:
+		ks.slogger.Log(context.TODO(), slog.LevelDebug,
+			"system is waking",
+			"event_id", eventID,
+		)
+		if err := ks.knapsack.SetInModernStandby(false); err != nil {
+			ks.slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered error setting modern standby value",
+				"in_modern_standby", false,
+				"err", err,
+			)
+		}
+	default:
+		ks.slogger.Log(context.TODO(), slog.LevelWarn,
+			"received unexpected event ID in log",
+			"event_id", eventID,
+		)
+	}
+
+	return nil
+}
+
+func (ks *knapsackSleepStateUpdater) OnStartup() error {
+	// Clear InModernStandby flag, in case it's cached. We may have missed wake/sleep events
+	// while launcher was not running, and we want to err on the side of assuming the device
+	// is awake.
+	return ks.knapsack.SetInModernStandby(false)
+}
+
 // New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
-func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEventWatcher, error) {
+func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*powerEventWatcher, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -55,7 +173,7 @@ func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEve
 
 	p := &powerEventWatcher{
 		slogger:                 slogger.With("component", "power_event_watcher"),
-		knapsack:                k,
+		powerEventSubscriber:    pes,
 		subscribeProcedure:      evtApi.NewProc("EvtSubscribe"),
 		unsubscribeProcedure:    evtApi.NewProc("EvtClose"),
 		renderEventLogProcedure: evtApi.NewProc("EvtRender"),
@@ -68,10 +186,11 @@ func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEve
 		return nil, fmt.Errorf("could not create pointer to channel path: %w", err)
 	}
 
-	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d)]]",
+	queryStr := fmt.Sprintf("*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=%d or EventID=%d or EventID=%d or EventID=%d)]]",
 		eventIdEnteringModernStandby,
-		eventIdExitingModernStandby,
+		EventIdExitingModernStandby,
 		eventIdEnteringSleep,
+		EventIdResumedFromSleep,
 	)
 	query, err := syscall.UTF16PtrFromString(queryStr)
 	if err != nil {
@@ -97,10 +216,13 @@ func New(ctx context.Context, k types.Knapsack, slogger *slog.Logger) (*powerEve
 	// Save the handle so that we can close it later
 	p.subscriptionHandle = subscriptionHandle
 
-	// Clear InModernStandby flag, in case it's cached. We may have missed wake/sleep events
-	// while launcher was not running, and we want to err on the side of assuming the device
-	// is awake.
-	k.SetInModernStandby(false)
+	if err := p.powerEventSubscriber.OnStartup(); err != nil {
+		// log any issues here but don't prevent creation of the watcher
+		slogger.Log(ctx, slog.LevelError,
+			"encountered error issuing subscriber OnStartup",
+			"err", err,
+		)
+	}
 
 	return p, nil
 }
@@ -113,11 +235,11 @@ func (p *powerEventWatcher) Execute() error {
 
 func (p *powerEventWatcher) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if p.interrupted {
+	if p.interrupted.Load() {
 		return
 	}
 
-	p.interrupted = true
+	p.interrupted.Store(true)
 
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)
@@ -195,34 +317,10 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		return ret
 	}
 
-	switch e.System.EventID {
-	case eventIdEnteringModernStandby, eventIdEnteringSleep:
-		p.slogger.Log(context.TODO(), slog.LevelDebug,
-			"system is sleeping",
-			"event_id", e.System.EventID,
-		)
-		if err := p.knapsack.SetInModernStandby(true); err != nil {
-			p.slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not enable osquery healthchecks on system sleep",
-				"err", err,
-			)
-		}
-	case eventIdExitingModernStandby:
-		p.slogger.Log(context.TODO(), slog.LevelDebug,
-			"system is waking",
-			"event_id", e.System.EventID,
-		)
-		if err := p.knapsack.SetInModernStandby(false); err != nil {
-			p.slogger.Log(context.TODO(), slog.LevelWarn,
-				"could not enable osquery healthchecks on system wake",
-				"err", err,
-			)
-		}
-	default:
+	if err := p.powerEventSubscriber.OnPowerEvent(e.System.EventID); err != nil {
 		p.slogger.Log(context.TODO(), slog.LevelWarn,
-			"received unexpected event ID in log",
-			"event_id", e.System.EventID,
-			"raw_event", string(utf8bytes),
+			"subscriber encountered error OnPowerEvent update",
+			"err", err,
 		)
 	}
 

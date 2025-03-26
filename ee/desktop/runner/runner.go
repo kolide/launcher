@@ -4,6 +4,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -17,10 +18,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -29,6 +32,8 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
+	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
@@ -99,7 +104,7 @@ type DesktopUsersProcessesRunner struct {
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
-	interrupted         bool
+	interrupted         atomic.Bool
 	// uidProcs is a map of uid to desktop process
 	uidProcs map[string]processRecord
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
@@ -118,9 +123,6 @@ type DesktopUsersProcessesRunner struct {
 	// usersFilesRoot is the launcher root dir with will be the parent dir
 	// for kolide desktop files on a per user basis
 	usersFilesRoot string
-	// processSpawningEnabled controls whether or not desktop user processes are automatically spawned
-	// This effectively represents whether or not the launcher desktop GUI is enabled or not
-	processSpawningEnabled bool
 	// knapsack is the almighty sack of knaps
 	knapsack types.Knapsack
 	// runnerServer is a local server that desktop processes call to monitor parent
@@ -155,17 +157,16 @@ func (pr processRecord) String() string {
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
 func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUsersProcessesRunnerOption) (*DesktopUsersProcessesRunner, error) {
 	runner := &DesktopUsersProcessesRunner{
-		interrupt:              make(chan struct{}),
-		uidProcs:               make(map[string]processRecord),
-		updateInterval:         k.DesktopUpdateInterval(),
-		menuRefreshInterval:    k.DesktopMenuRefreshInterval(),
-		procsWg:                &sync.WaitGroup{},
-		interruptTimeout:       time.Second * 5,
-		hostname:               k.KolideServerURL(),
-		usersFilesRoot:         agent.TempPath("kolide-desktop"),
-		processSpawningEnabled: k.DesktopEnabled(),
-		knapsack:               k,
-		cachedMenuData:         newMenuItemCache(),
+		interrupt:           make(chan struct{}),
+		uidProcs:            make(map[string]processRecord),
+		updateInterval:      k.DesktopUpdateInterval(),
+		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
+		procsWg:             &sync.WaitGroup{},
+		interruptTimeout:    time.Second * 5,
+		hostname:            k.KolideServerURL(),
+		usersFilesRoot:      agent.TempPath("kolide-desktop"),
+		knapsack:            k,
+		cachedMenuData:      newMenuItemCache(),
 	}
 
 	runner.slogger = k.Slogger().With("component", "desktop_runner")
@@ -187,14 +188,14 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	}
 
 	runner.runnerServer = rs
-	go func() {
+	gowrapper.Go(context.TODO(), runner.slogger, func() {
 		if err := runner.runnerServer.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			runner.slogger.Log(context.TODO(), slog.LevelError,
 				"running monitor server",
 				"err", err,
 			)
 		}
-	}()
+	})
 
 	if runtime.GOOS == "darwin" {
 		runner.osVersion, err = osversion()
@@ -251,11 +252,11 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 // It also signals the execute loop to exit, so new desktop processes cease to spawn.
 func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if r.interrupted {
+	if r.interrupted.Load() {
 		return
 	}
 
-	r.interrupted = true
+	r.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
 	r.interrupt <- struct{}{}
@@ -286,13 +287,81 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 	)
 }
 
+func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return presencedetection.DetectionFailedDurationValue, errors.New("no desktop processes running")
+	}
+
+	var lastErr error
+
+	for _, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath, client.WithTimeout(presencedetection.DetectionTimeout))
+
+		durationSinceLastDetection, err := client.DetectPresence(reason, interval)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		return durationSinceLastDetection, nil
+	}
+
+	return presencedetection.DetectionFailedDurationValue, fmt.Errorf("no desktop processes detected presence, last error: %w", lastErr)
+}
+
+func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return nil, errors.New("no desktop processes running")
+	}
+
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return nil, fmt.Errorf("no desktop process for uid: %s", uid)
+	}
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	keyBytes, err := client.CreateSecureEnclaveKey(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating secure enclave key: %w", err)
+	}
+
+	key, err := echelper.PublicB64DerToEcdsaKey(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("converting key bytes to ecdsa key: %w", err)
+	}
+
+	return key, nil
+}
+
+// VerifySecureEnclaveKey verifies that the public key exists in the secure enclave.
+// Returns:
+// true, nil if the key exists;
+// false, nil if the key does not exist;
+// false, error don't know if key exists because of some other error
+func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
+	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+		return false, errors.New("no desktop processes running")
+	}
+
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return false, fmt.Errorf("no desktop process for uid: %s", uid)
+	}
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	return client.VerifySecureEnclaveKey(ctx, pubKey)
+}
+
 // killDesktopProcesses kills any existing desktop processes
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	wgDone := make(chan struct{})
-	go func() {
+	gowrapper.Go(context.TODO(), r.slogger, func() {
 		defer close(wgDone)
 		r.procsWg.Wait()
-	}()
+	})
 
 	shutdownRequestCount := 0
 	for uid, proc := range r.uidProcs {
@@ -350,6 +419,55 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 	)
 }
 
+// killDesktopProcess kills the existing desktop process for the given uid
+func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) error {
+	proc, ok := r.uidProcs[uid]
+	if !ok {
+		return fmt.Errorf("could not find desktop proc for uid %s, cannot kill process", uid)
+	}
+
+	// unregistering client from runner server so server will not respond to its requests
+	r.runnerServer.DeRegisterClient(uid)
+
+	client := client.New(r.userServerAuthToken, proc.socketPath)
+	err := client.Shutdown(ctx)
+	if err == nil {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"shut down user desktop process",
+			"uid", uid,
+		)
+		delete(r.uidProcs, uid)
+		return nil
+	}
+
+	// We didn't successfully send a shutdown request -- check to see if it's because
+	// the process is already gone.
+	if !r.processExists(proc) {
+		delete(r.uidProcs, uid)
+		return nil
+	}
+
+	r.slogger.Log(ctx, slog.LevelWarn,
+		"failed to send shutdown command to user desktop process, killing process instead",
+		"uid", uid,
+		"pid", proc.Process.Pid,
+		"path", proc.path,
+		"err", err,
+	)
+
+	if err := proc.Process.Kill(); err != nil {
+		return fmt.Errorf("could not kill desktop process for uid %s with pid %d: %w", uid, proc.Process.Pid, err)
+	}
+
+	// Successfully killed process
+	r.slogger.Log(ctx, slog.LevelInfo,
+		"killed user desktop process",
+		"uid", uid,
+	)
+	delete(r.uidProcs, uid)
+	return nil
+}
+
 func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) error {
 	if r.knapsack.InModernStandby() {
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -358,23 +476,36 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("modern standby detected, skipping notification send")
 	}
 
+	if !r.knapsack.DesktopEnabled() {
+		return errors.New("desktop is not enabled, cannot send notification")
+	}
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
 
+	atLeastOneSuccess := false
 	errs := make([]error, 0)
-	for _, proc := range r.uidProcs {
+	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Notify(n); err != nil {
 			errs = append(errs, err)
+			continue
 		}
+
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"sent notification",
+			"uid", uid,
+		)
+		atLeastOneSuccess = true
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("errors sending notifications: %+v", errs)
+	// We just need to be able to notify one user successfully.
+	if atLeastOneSuccess {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("errors sending notifications: %+v", errs)
 }
 
 // Update handles control server updates for the desktop-menu subsystem
@@ -402,13 +533,39 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) FlagsChanged(flagKeys ...keys.FlagKey) {
-	if slices.Contains(flagKeys, keys.DesktopEnabled) {
-		r.processSpawningEnabled = r.knapsack.DesktopEnabled()
-		r.slogger.Log(context.TODO(), slog.LevelDebug,
-			"runner processSpawningEnabled set by control server",
-			"process_spawning_enabled", r.processSpawningEnabled,
-		)
+func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
+		return
+	}
+
+	r.slogger.Log(ctx, slog.LevelDebug,
+		"desktop enabled set by control server",
+		"desktop_enabled", r.knapsack.DesktopEnabled(),
+	)
+
+	if !r.knapsack.DesktopEnabled() {
+		// there is no way to "hide" the menu, so we will just kill any existing processes
+		// they will respawn in "silent" mode
+		r.killDesktopProcesses(ctx)
+		return
+	}
+
+	// DesktopEnabled() == true
+	// Tell any running desktop user processes that they should show the menu
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath)
+		if err := client.ShowDesktop(); err != nil {
+			r.slogger.Log(ctx, slog.LevelError,
+				"sending refresh command to user desktop process",
+				"uid", uid,
+				"pid", proc.Process.Pid,
+				"path", proc.socketPath,
+				"err", err,
+			)
+		}
 	}
 }
 
@@ -454,7 +611,6 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
-
 			r.slogger.Log(context.TODO(), slog.LevelError,
 				"sending refresh command to user desktop process",
 				"uid", uid,
@@ -552,12 +708,6 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
-	if !r.processSpawningEnabled {
-		// Desktop is disabled, kill any existing desktop user processes
-		r.killDesktopProcesses(context.Background())
-		return nil
-	}
-
 	executablePath, err := r.determineExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining executable path: %w", err)
@@ -620,13 +770,23 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	r.waitOnProcessAsync(uid, cmd.Process)
 
 	client := client.New(r.userServerAuthToken, socketPath)
-	if err := backoff.WaitFor(client.Ping, 10*time.Second, 1*time.Second); err != nil {
+
+	pingFunc := client.Ping
+
+	// if the desktop is enabled, we want to show the desktop
+	// just perform this instead of ping to verify the desktop is running
+	// and show it right away
+	if r.knapsack.DesktopEnabled() {
+		pingFunc = client.ShowDesktop
+	}
+
+	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
 		if err := cmd.Process.Kill(); err != nil {
 			r.slogger.Log(ctx, slog.LevelError,
-				"killing user desktop process after startup ping failed",
+				"killing user desktop process after startup ping / show desktop failed",
 				"uid", uid,
 				"pid", cmd.Process.Pid,
 				"path", cmd.Path,
@@ -686,7 +846,7 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 // The wait group is needed to prevent races.
 func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Process) {
 	r.procsWg.Add(1)
-	go func(username string, proc *os.Process) {
+	gowrapper.Go(context.TODO(), r.slogger.With("uid", uid, "pid", proc.Pid), func() {
 		defer r.procsWg.Done()
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
@@ -699,7 +859,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 				"state", state,
 			)
 		}
-	}(uid, proc)
+	})
 }
 
 // determineExecutablePath returns DesktopUsersProcessesRunner.executablePath if it is set,
@@ -849,6 +1009,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("DEBUG=%v", r.knapsack.Debug()),
 		// needed for windows to find various allowed commands
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
+		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
+		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
 		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}
 
@@ -862,20 +1024,71 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		return nil, fmt.Errorf("getting stdout pipe: %w", err)
 	}
 
-	go func() {
-		combined := io.MultiReader(stdErr, stdOut)
-		scanner := bufio.NewScanner(combined)
-
-		for scanner.Scan() {
-			r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
-				scanner.Text(),
-				"uid", uid,
-				"subprocess", "desktop",
-			)
-		}
-	}()
+	gowrapper.Go(context.TODO(), r.slogger, func() {
+		r.processLogs(uid, stdErr, stdOut)
+	})
 
 	return cmd, nil
+}
+
+// processLogs scans logs from the desktop process stdout/stderr, logs them,
+// and examines them to see if any action should be taken in response.
+func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadCloser, stdOut io.ReadCloser) {
+	combined := io.MultiReader(stdErr, stdOut)
+	scanner := bufio.NewScanner(combined)
+
+	for scanner.Scan() {
+		logLine := scanner.Text()
+
+		// First, log the incoming log.
+		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
+			logLine,
+			"uid", uid,
+			"subprocess", "desktop",
+		)
+
+		// Now, check log to see if we need to restart systray.
+		// Only perform the restart if the feature flag is enabled.
+		if !r.knapsack.SystrayRestartEnabled() {
+			continue
+		}
+
+		// We don't want to perform restarts when in modern standby.
+		if r.knapsack.InModernStandby() {
+			continue
+		}
+
+		// Check to see if the log line contains systrayNeedsRestartErr.
+		// systray is not able to self-recover from the systrayNeedsRestartErr,
+		// so if we see it even once, we should take action.
+		if !logIndicatesSystrayNeedsRestart(logLine) {
+			continue
+		}
+
+		// Kill the desktop process for the given uid to force it to restart systray.
+		r.slogger.Log(context.TODO(), slog.LevelInfo,
+			"noticed systray error -- shutting down and restarting desktop processes",
+			"systray_log", logLine,
+			"uid", uid,
+		)
+		if err := r.killDesktopProcess(context.Background(), uid); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelInfo,
+				"could not kill desktop process",
+				"err", err,
+				"uid", uid,
+			)
+			// Keep processing logs, since we couldn't kill the process
+			continue
+		}
+
+		// Successfully killed desktop process -- no need to keep processing logs.
+		break
+	}
+
+	r.slogger.Log(context.TODO(), slog.LevelDebug,
+		"ending log processing for desktop process",
+		"uid", uid,
+	)
 }
 
 func (r *DesktopUsersProcessesRunner) writeIconFile() {

@@ -4,52 +4,118 @@
 package tablehelpers
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestExec(t *testing.T) {
+func TestRun(t *testing.T) {
 	t.Parallel()
 
-	var tests = []struct {
-		name    string
-		timeout int
-		bin     allowedcmd.AllowedCommand
-		args    []string
-		err     bool
-		output  string
+	tests := []struct {
+		name           string
+		timeoutSeconds int
+		execCmd        allowedcmd.AllowedCommand
+		args           []string
+		wantStdout     bool
+		wantStderr     bool
+		opts           []ExecOps
+		assertion      assert.ErrorAssertionFunc
 	}{
 		{
-			name:   "output",
-			bin:    allowedcmd.Echo,
-			args:   []string{"hello"},
-			output: "hello\n",
+			name:           "happy path",
+			timeoutSeconds: 1,
+			execCmd:        allowedcmd.Echo,
+			args:           []string{"hi"},
+			wantStdout:     true,
+			wantStderr:     false,
+			assertion:      assert.NoError,
+		},
+		{
+			name:           "timeout",
+			timeoutSeconds: 0,
+			execCmd:        allowedcmd.Echo,
+			args:           []string{"hi"},
+			wantStdout:     false,
+			wantStderr:     false,
+			assertion:      assert.Error,
+		},
+		{
+			name:           "stderr",
+			timeoutSeconds: 1,
+			execCmd:        allowedcmd.Ps,
+			args:           []string{"-z"},
+			wantStdout:     false,
+			wantStderr:     true,
+			assertion:      assert.Error,
 		},
 	}
-
-	ctx := context.Background()
-	slogger := multislogger.NewNopLogger()
-
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.timeout == 0 {
-				tt.timeout = 30
-			}
-			output, err := Exec(ctx, slogger, tt.timeout, tt.bin, tt.args, false)
-			if tt.err {
-				assert.Error(t, err)
-				assert.Empty(t, output)
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			tt.assertion(t, Run(context.TODO(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.execCmd, tt.args, stdout, stderr))
+
+			if tt.wantStdout {
+				require.NotEmpty(t, stdout.String())
 			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, []byte(tt.output), output)
+				require.Empty(t, stdout.String())
 			}
+
+			if tt.wantStderr {
+				require.NotEmpty(t, stderr.String())
+			} else {
+				require.Empty(t, stderr.String())
+			}
+		})
+	}
+}
+
+func TestRunSimple(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		timeoutSeconds int
+		cmd            allowedcmd.AllowedCommand
+		args           []string
+		opts           []ExecOps
+		want           []byte
+		assertion      assert.ErrorAssertionFunc
+	}{
+		{
+			name:           "happy path",
+			timeoutSeconds: 1,
+			cmd:            allowedcmd.Echo,
+			args:           []string{"hi"},
+			want:           []byte("hi\n"),
+			assertion:      assert.NoError,
+		},
+		{
+			name:           "error",
+			timeoutSeconds: 1,
+			cmd:            allowedcmd.Ps,
+			args:           []string{"-z"},
+			want:           nil,
+			assertion:      assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := RunSimple(context.TODO(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.cmd, tt.args, tt.opts...)
+			tt.assertion(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

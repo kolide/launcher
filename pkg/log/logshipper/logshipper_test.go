@@ -39,6 +39,8 @@ func TestLogShipper(t *testing.T) {
 			knapsack := mocks.NewKnapsack(t)
 			knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 			knapsack.On("LogShippingLevel").Return("info").Times(5)
+			knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
+			knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
 			tokenStore := testKVStore(t, storage.TokenStore.String())
 			knapsack.On("TokenStore").Return(tokenStore)
@@ -132,6 +134,7 @@ func TestStop_Multiple(t *testing.T) {
 
 	serverDataStore := testKVStore(t, storage.ServerProvidedDataStore.String())
 	knapsack.On("ServerProvidedDataStore").Return(serverDataStore)
+	knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
 
 	endpoint := "https://someurl"
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
@@ -194,6 +197,7 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("LogShippingLevel").Return("debug")
 	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+	knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -216,4 +220,49 @@ func testKVStore(t *testing.T, name string) types.KVStore {
 
 	require.NoError(t, err)
 	return s
+}
+
+func TestUpdateLogShippingLevel(t *testing.T) {
+	t.Parallel()
+
+	knapsack := mocks.NewKnapsack(t)
+	tokenStore := testKVStore(t, storage.TokenStore.String())
+	authToken := ulid.New()
+
+	knapsack.On("TokenStore").Return(tokenStore)
+	tokenStore.Set(storage.ObservabilityIngestAuthTokenKey, []byte(authToken))
+
+	serverDataStore := testKVStore(t, storage.ServerProvidedDataStore.String())
+	knapsack.On("ServerProvidedDataStore").Return(serverDataStore)
+
+	endpoint := "https://someurl"
+	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
+	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
+	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+	knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
+	knapsack.On("LogShippingLevel").Return("warn").Once()
+
+	ls := New(knapsack, log.NewNopLogger())
+	// new immediately calls Ping -> updateLogShippingLevel, expect that we are initialized with correct log level
+	require.Equal(t, slog.LevelWarn, ls.slogLevel.Level())
+
+	knapsack.On("LogShippingLevel").Return("debug").Once()
+	ls.updateLogShippingLevel()
+	require.Equal(t, slog.LevelDebug, ls.slogLevel.Level())
+
+	knapsack.On("LogShippingLevel").Return("info").Once()
+	ls.updateLogShippingLevel()
+	require.Equal(t, slog.LevelInfo, ls.slogLevel.Level())
+
+	// we do expect the invalid attempt to be logged, so 2 LogShippingLevel calls are mocked
+	knapsack.On("LogShippingLevel").Return("wrongo").Twice()
+	ls.updateLogShippingLevel()
+	// we don't expect any changes from setting invalid level
+	require.Equal(t, slog.LevelInfo, ls.slogLevel.Level())
+
+	// now reattempt with a real value
+	knapsack.On("LogShippingLevel").Return("error").Once()
+	ls.updateLogShippingLevel()
+	require.Equal(t, slog.LevelError, ls.slogLevel.Level())
 }

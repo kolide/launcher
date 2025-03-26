@@ -23,13 +23,16 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type Status string
@@ -42,23 +45,6 @@ const (
 	Warning       Status = "Warning"       // Checkup is warning
 	Failing       Status = "Failing"       // Checkup is failing
 )
-
-func (s Status) Emoji() string {
-	switch s {
-	case Informational:
-		return " "
-	case Passing:
-		return "✅"
-	case Warning:
-		return "⚠️"
-	case Failing:
-		return "❌"
-	case Erroring:
-		return "❌"
-	default:
-		return "? "
-	}
-}
 
 func writeSummary(w io.Writer, s Status, name, msg string) {
 	fmt.Fprintf(w, "%s\t%s: %s\n", s.Emoji(), name, msg)
@@ -92,8 +78,8 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		targets targetBits
 	}{
 		{&Platform{}, doctorSupported | flareSupported | logSupported},
-		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
+		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
 		{&Processes{}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
@@ -105,11 +91,11 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&enrollSecretCheckup{k: k}, doctorSupported | flareSupported},
 		{&bboltdbCheckup{k: k}, flareSupported},
 		{&networkCheckup{}, doctorSupported | flareSupported},
-		{&installCheckup{}, flareSupported},
+		{&installCheckup{k: k}, flareSupported},
 		{&servicesCheckup{}, doctorSupported | flareSupported},
 		{&powerCheckup{}, flareSupported},
 		{&osqueryCheckup{k: k}, doctorSupported | flareSupported},
-		{&launcherFlags{}, doctorSupported | flareSupported},
+		{&launcherFlags{k: k}, doctorSupported | flareSupported},
 		{&gnomeExtensions{}, doctorSupported | flareSupported},
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
@@ -121,6 +107,8 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
 		{&uninstallHistoryCheckup{k: k}, flareSupported},
 		{&desktopMenu{k: k}, flareSupported},
+		{&coredumpCheckup{}, doctorSupported | flareSupported},
+		{&downloadDirectory{}, flareSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
@@ -228,16 +216,13 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	warningCheckups := []string{}
 
 	for _, c := range checkupsFor(k, doctorSupported) {
-		ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-		defer cancel()
-
-		doctorCheckup(ctx, c, w)
-
-		switch c.Status() {
+		switch runDoctorCheckup(ctx, c, w) {
 		case Warning:
 			warningCheckups = append(warningCheckups, c.Name())
 		case Failing, Erroring:
 			failingCheckups = append(failingCheckups, c.Name())
+		case Unknown, Informational, Passing:
+			// No need to print additional information about unknown, informational, or passing checkups
 		}
 	}
 
@@ -260,6 +245,15 @@ func RunDoctor(ctx context.Context, k types.Knapsack, w io.Writer) {
 	}
 }
 
+func runDoctorCheckup(ctx context.Context, c checkupInt, w io.Writer) Status {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	doctorCheckup(ctx, c, w)
+
+	return c.Status()
+}
+
 type runtimeEnvironmentType string
 
 const (
@@ -271,7 +265,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	flare := zip.NewWriter(flareStream)
 	combinedSummary := bytes.Buffer{}
 
-	close := func() error {
+	finalize := func() error {
 		closeFlares := func() error {
 			return errors.Join(flare.Close(), flareStream.Close())
 		}
@@ -292,18 +286,70 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 	// Note our runtime context.
 	writeSummary(&combinedSummary, Informational, "flare", fmt.Sprintf("running %s", runtimeEnvironment))
 	if err := writeFlareEnv(flare, runtimeEnvironment); err != nil {
-		return errors.Join(fmt.Errorf("writing flare environment: %w", err), close())
+		return errors.Join(fmt.Errorf("writing flare environment: %w", err), finalize())
 	}
 
 	for _, c := range checkupsFor(k, flareSupported) {
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
-			return errors.Join(fmt.Errorf("writing flare zip: %w", err), close())
+			return errors.Join(fmt.Errorf("writing flare zip: %w", err), finalize())
 		}
 	}
 
+	// note we do not check errors or do anything to complicate the normal flare process
+	// from the multiple installation check. this is not (at this time) an expected production complication
+	noteMultipleInstallations(flare)
+
 	// we could defer this close, but we want to return any errors
-	return close()
+	return finalize()
+}
+
+// noteMultipleInstallations checks for whether the results of running flare for this installation may be complicated
+// by multiple installations. This is less of an issue when the flare is run in situ, but should be noted because
+// we may need to pay closer attention to the results. When run standalone without a config argument passed, it would be
+// possible for flare to default to reading the directories for the wrong installation
+func noteMultipleInstallations(z *zip.Writer) {
+	defaultPath := strings.TrimSuffix(launcher.DefaultPath(launcher.BinDirectory), string(filepath.Separator))
+	pathParts := strings.Split(defaultPath, string(filepath.Separator))
+
+	if len(pathParts) < 3 {
+		return
+	}
+
+	if runtime.GOOS == "windows" { // strip the bin for windows
+		pathParts = pathParts[:len(pathParts)-1]
+	}
+
+	// now strip off the directory which should note the identifier. we are
+	// going to list everything in the parent directory and count kolide references
+	// to get an idea of the total potential installations
+	pathParts = pathParts[:len(pathParts)-1]
+
+	// now put the path back together
+	baseDir := strings.Join(pathParts, string(filepath.Separator))
+
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return
+	}
+
+	matchingDirs := make([]string, 0)
+	for _, e := range entries {
+		if strings.Contains(strings.ToLower(e.Name()), "kolide") {
+			matchingDirs = append(matchingDirs, e.Name())
+		}
+	}
+
+	if len(matchingDirs) <= 1 {
+		return // nothing to note, standard single installation
+	}
+
+	w, err := z.Create("MULTIPLE_LAUNCHER_INSTALLS_DETECTED")
+	if err != nil {
+		return
+	}
+
+	json.NewEncoder(w).Encode(matchingDirs)
 }
 
 func writeFlareEnv(z *zip.Writer, runtimeEnvironment runtimeEnvironmentType) error {

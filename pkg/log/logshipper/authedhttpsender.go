@@ -1,9 +1,11 @@
 package logshipper
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -22,7 +24,10 @@ func newAuthHttpSender() *authedHttpSender {
 }
 
 func (a *authedHttpSender) Send(r io.Reader) error {
-	req, err := http.NewRequest("POST", a.endpoint, r)
+	ctx, cancel := context.WithTimeout(context.Background(), a.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint, r)
 	if err != nil {
 		return err
 	}
@@ -41,7 +46,8 @@ func (a *authedHttpSender) Send(r io.Reader) error {
 			return fmt.Errorf("received non 200 http status code: %d, error reading body response body %w", resp.StatusCode, err)
 		}
 
-		return fmt.Errorf("received non 200 http status code: %d, response body: %s", resp.StatusCode, bodyData)
+		escapedBodyData := strings.ReplaceAll(strings.ReplaceAll(string(bodyData), "\n", ""), "\r", "") // remove any newlines
+		return fmt.Errorf("received non 200 http status code: %d, response body: %s", resp.StatusCode, escapedBodyData)
 	}
 	return nil
 }

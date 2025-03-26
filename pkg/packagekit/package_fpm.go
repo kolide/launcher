@@ -14,8 +14,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
-	"go.opencensus.io/trace"
 )
 
 type outputType string
@@ -75,8 +73,6 @@ func WithArch(arch string) FpmOpt {
 }
 
 func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ...FpmOpt) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.PackageRPM")
-	defer span.End()
 	logger := log.With(ctxlog.FromContext(ctx), "caller", "packagekit.PackageFPM")
 
 	f := fpmOptions{}
@@ -178,7 +174,7 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		return fmt.Errorf("copying output: %w", err)
 	}
 
-	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+	SetInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
 }

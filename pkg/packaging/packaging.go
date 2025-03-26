@@ -16,9 +16,8 @@ import (
 	"text/template"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/packagekit"
-
-	"go.opencensus.io/trace"
 )
 
 //go:embed assets/*
@@ -37,6 +36,8 @@ type PackageOptions struct {
 	OsqueryFlags      []string // Additional flags to pass to the runtime osquery instance
 	ContainerTool     string
 	LauncherVersion   string
+	LauncherPath      string
+	LauncherArmPath   string
 	ExtensionVersion  string
 	Hostname          string
 	Secret            string
@@ -50,6 +51,7 @@ type PackageOptions struct {
 	OmitSecret        bool
 	CertPins          string
 	RootPEM           string
+	BinRootDir        string
 	CacheDir          string
 	TufServerURL      string
 	MirrorURL         string
@@ -57,12 +59,6 @@ type PackageOptions struct {
 	MSIUI             bool
 	WixSkipCleanup    bool
 	DisableService    bool
-
-	// Normally we'd download the same version we bake into the
-	// autoupdate. But occasionally, it's handy to make a package
-	// with a different version.
-	LauncherDownloadVersionOverride string
-	OsqueryDownloadVersionOverride  string
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
 	AppleNotarizeAppPassword string   // app password for notarization service
@@ -96,7 +92,6 @@ func NewPackager() *PackageOptions {
 }
 
 func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, target Target) error {
-
 	p.target = target
 	p.packageWriter = packageWriter
 
@@ -128,6 +123,13 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		"root_directory":     p.canonicalizeRootDir(p.rootDir),
 		"osqueryd_path":      p.canonicalizePath(filepath.Join(p.binDir, "osqueryd")),
 		"enroll_secret_path": p.canonicalizePath(filepath.Join(p.confDir, "secret")),
+	}
+
+	// to avoid writing additional flags without a real need (newly introduced flags
+	// can cause issues with rolling back), we only set the identifier in the flags file
+	// if it is not the default value
+	if p.Identifier != launcher.DefaultLauncherIdentifier {
+		launcherMapFlags["identifier"] = p.Identifier
 	}
 
 	launcherBoolFlags := []string{}
@@ -215,20 +217,37 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 	// Install binaries into packageRoot
 	// TODO parallization
 	// TODO windows file extensions
-
-	if p.OsqueryDownloadVersionOverride == "" {
-		p.OsqueryDownloadVersionOverride = p.OsqueryVersion
-	}
-	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryDownloadVersionOverride); err != nil {
+	if err := p.getBinary(ctx, "osqueryd", p.target.PlatformBinaryName("osqueryd"), p.OsqueryVersion); err != nil {
 		return fmt.Errorf("fetching binary osqueryd: %w", err)
 	}
 
-	if p.LauncherDownloadVersionOverride == "" {
-		p.LauncherDownloadVersionOverride = p.LauncherVersion
+	launcherVersion := p.LauncherVersion
+	if p.LauncherPath != "" {
+		launcherVersion = p.LauncherPath
 	}
 
-	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), p.LauncherDownloadVersionOverride); err != nil {
+	if err := p.getBinary(ctx, "launcher", p.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
 		return fmt.Errorf("fetching binary launcher: %w", err)
+	}
+
+	// for windows, make a separate target for arm64
+	if p.target.Platform == Windows {
+		// make a copy of P
+		packageOptsCopy := *p
+		packageOptsCopy.target.Arch = Arm64
+
+		if err := packageOptsCopy.getBinary(ctx, "osqueryd", packageOptsCopy.target.PlatformBinaryName("osqueryd"), packageOptsCopy.OsqueryVersion); err != nil {
+			return fmt.Errorf("fetching binary osqueryd: %w", err)
+		}
+
+		launcherVersion := packageOptsCopy.LauncherVersion
+		if packageOptsCopy.LauncherArmPath != "" {
+			launcherVersion = packageOptsCopy.LauncherArmPath
+		}
+
+		if err := packageOptsCopy.getBinary(ctx, "launcher", packageOptsCopy.target.PlatformBinaryName("launcher"), launcherVersion); err != nil {
+			return fmt.Errorf("fetching binary launcher: %w", err)
+		}
 	}
 
 	// Some darwin specific bits
@@ -262,6 +281,9 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 			return fmt.Errorf("version detection: %w", err)
 		}
 	}
+
+	// Record the osquery version, now that we've downloaded it
+	p.setOsqueryVersionInCtx(ctx)
 
 	p.initOptions = &packagekit.InitOptions{
 		Name:        "launcher",
@@ -324,9 +346,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 //
 // TODO: add in file:// URLs
 func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName, binaryVersion string) error {
-	ctx, span := trace.StartSpan(ctx, fmt.Sprintf("packaging.getBinary.%s", symbolicName))
-	defer span.End()
-
 	var err error
 	var localPath string
 
@@ -359,7 +378,7 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 
 		// Create a symlink from <bin dir>/<binary> to the actual binary location within the app bundle
 		target := filepath.Join("..", appBundleName, "Contents", "MacOS", binaryName)
-		symlinkFile := filepath.Join(p.packageRoot, p.binDir, binaryName)
+		symlinkFile := p.fullPathToBareBinary(binaryName)
 		if err := os.Symlink(target, symlinkFile); err != nil {
 			return fmt.Errorf("could not create symlink after copying app bundle: %w", err)
 		}
@@ -367,20 +386,32 @@ func (p *PackageOptions) getBinary(ctx context.Context, symbolicName, binaryName
 		return nil
 	}
 
+	binPath := p.fullPathToBareBinary(binaryName)
+	if err := os.MkdirAll(filepath.Dir(binPath), fsutil.DirMode); err != nil {
+		return fmt.Errorf("could not create directory for binary %s: %w", binaryName, err)
+	}
+
 	// Not an app bundle -- just copy the binary.
 	if err := fsutil.CopyFile(
 		localPath,
-		filepath.Join(p.packageRoot, p.binDir, binaryName),
+		binPath,
 	); err != nil {
 		return fmt.Errorf("could not copy binary %s: %w", binaryName, err)
 	}
 	return nil
 }
 
-func (p *PackageOptions) makePackage(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "packaging.makePackage")
-	defer span.End()
+// fullPathToBareBinary returns the path to the binary (including arch only on Windows).
+// On macOS, this location is a symlink to inside the app bundle.
+func (p *PackageOptions) fullPathToBareBinary(binaryName string) string {
+	if p.target.Platform == Windows {
+		return filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), binaryName)
+	}
 
+	return filepath.Join(p.packageRoot, p.binDir, binaryName)
+}
+
+func (p *PackageOptions) makePackage(ctx context.Context) error {
 	// Linux packages used to be distributed named "launcher". We've
 	// moved to naming them "launcher-<identifier>". To provide a
 	// cleaner package replacement, we can flag this to the underlying
@@ -723,7 +754,7 @@ fi`
 func (p *PackageOptions) setupDirectories() error {
 	switch p.target.Platform {
 	case Linux, Darwin:
-		p.binDir = filepath.Join("/usr/local", p.Identifier, "bin")
+		p.binDir = filepath.Join(p.BinRootDir, p.Identifier, "bin")
 		p.confDir = filepath.Join("/etc", p.Identifier)
 		p.rootDir = filepath.Join("/var", p.Identifier, sanitizeHostname(p.Hostname))
 	case Windows:

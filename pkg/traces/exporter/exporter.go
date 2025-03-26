@@ -2,14 +2,15 @@ package exporter
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
@@ -33,18 +34,13 @@ var archAttributeMap = map[string]attribute.KeyValue{
 	"arm":   semconv.HostArchARM32,
 }
 
-var osqueryClientRecheckInterval = 30 * time.Second
-
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
+var enrollmentDetailsRecheckInterval = 5 * time.Second
 
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
 	providerLock              sync.Mutex
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
-	osqueryClient             querier
 	slogger                   *slog.Logger
 	attrs                     []attribute.KeyValue // resource attributes, identifying this device + installation
 	attrLock                  sync.RWMutex
@@ -57,7 +53,7 @@ type TraceExporter struct {
 	batchTimeout              time.Duration
 	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
-	interrupted               bool
+	interrupted               atomic.Bool
 }
 
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
@@ -111,13 +107,18 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 
 	t.addDeviceIdentifyingAttributes()
 
+	// Check if enrollment details are already available, add them immediately if so
+	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+	if hasRequiredEnrollmentDetails(enrollmentDetails) {
+		t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+	} else {
+		// Launch a goroutine to wait for enrollment details
+		gowrapper.Go(context.TODO(), t.slogger, func() {
+			t.addAttributesFromOsquery()
+		})
+	}
+
 	return t, nil
-}
-
-func (t *TraceExporter) SetOsqueryClient(client querier) {
-	t.osqueryClient = client
-
-	go t.addAttributesFromOsquery()
 }
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
@@ -164,64 +165,61 @@ func (t *TraceExporter) addDeviceIdentifyingAttributes() {
 	}
 }
 
-// addAttributesFromOsquery retrieves device and OS details from osquery and adds them
-// to our resource attributes. Since this is called on startup when the osquery client
-// may not be ready yet, we perform a few retries.
+// hasRequiredEnrollmentDetails checks if the provided enrollment details contain
+// all the required fields for adding trace attributes
+func hasRequiredEnrollmentDetails(details types.EnrollmentDetails) bool {
+	// Check that all required fields have values
+	return details.OsqueryVersion != "" &&
+		details.OSName != "" &&
+		details.OSVersion != "" &&
+		details.Hostname != ""
+}
+
+// addAttributesFromOsquery waits for enrollment details to be available
+// and then adds the relevant attributes
 func (t *TraceExporter) addAttributesFromOsquery() {
-	t.attrLock.Lock()
-	defer t.attrLock.Unlock()
-
-	osqueryInfoQuery := `
-	SELECT
-		osquery_info.version as osquery_version,
-		os_version.name as os_name,
-		os_version.version as os_version,
-		system_info.hostname
-	FROM
-		os_version,
-		system_info,
-		osquery_info;
-	`
-
-	// The osqueryd client may not have initialized yet, so retry for up to three minutes on error.
-	var resp []map[string]string
-	var err error
+	// Wait until enrollment details are available
 	retryTimeout := time.Now().Add(3 * time.Minute)
 	for {
 		if time.Now().After(retryTimeout) {
-			err = errors.New("could not get osquery details before timeout")
-			break
+			t.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not get enrollment details before timeout",
+			)
+			return
 		}
 
-		resp, err = t.osqueryClient.Query(osqueryInfoQuery)
-		if err == nil && len(resp) > 0 {
-			break
+		enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+		if hasRequiredEnrollmentDetails(enrollmentDetails) {
+			t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+			return
 		}
 
 		select {
 		case <-t.ctx.Done():
 			t.slogger.Log(context.TODO(), slog.LevelDebug,
-				"trace exporter interrupted while waiting to add osquery attributes",
+				"trace exporter interrupted while waiting for enrollment details",
 			)
 			return
-		case <-time.After(osqueryClientRecheckInterval):
+		case <-time.After(enrollmentDetailsRecheckInterval):
 			continue
 		}
 	}
+}
 
-	if err != nil || len(resp) == 0 {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"trace exporter could not fetch osquery attributes",
-			"err", err,
-		)
-		return
-	}
+func (t *TraceExporter) addAttributesFromEnrollmentDetails(details types.EnrollmentDetails) {
+	t.attrLock.Lock()
+	defer t.attrLock.Unlock()
 
+	// Add OS and system attributes from enrollment details
 	t.attrs = append(t.attrs,
-		attribute.String("launcher.osquery_version", resp[0]["osquery_version"]),
-		semconv.OSName(resp[0]["os_name"]),
-		semconv.OSVersion(resp[0]["os_version"]),
-		semconv.HostName(resp[0]["hostname"]),
+		attribute.String("launcher.osquery_version", details.OsqueryVersion),
+		semconv.OSName(details.OSName),
+		semconv.OSVersion(details.OSVersion),
+		semconv.HostName(details.Hostname),
+	)
+
+	t.slogger.Log(context.TODO(), slog.LevelDebug,
+		"added attributes from enrollment details",
 	)
 }
 
@@ -318,11 +316,11 @@ func (t *TraceExporter) Execute() error {
 
 func (t *TraceExporter) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if t.interrupted {
+	if t.interrupted.Load() {
 		return
 	}
 
-	t.interrupted = true
+	t.interrupted.Store(true)
 
 	if t.provider != nil {
 		t.provider.Shutdown(t.ctx)
@@ -351,7 +349,10 @@ func (t *TraceExporter) Ping() {
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which are ingest_url and export_traces.
-func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (t *TraceExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	needsNewProvider := false
 
 	// Handle export_traces toggle
@@ -363,7 +364,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.addAttributesFromOsquery()
 			t.enabled = true
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"enabling trace export",
 			)
 		} else if t.enabled && !t.knapsack.ExportTraces() {
@@ -372,7 +373,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 				t.provider.Shutdown(t.ctx)
 			}
 			t.enabled = false
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"disabling trace export",
 			)
 		}
@@ -383,7 +384,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.traceSamplingRate != t.knapsack.TraceSamplingRate() {
 			t.traceSamplingRate = t.knapsack.TraceSamplingRate()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating trace sampling rate",
 				"new_sampling_rate", t.traceSamplingRate,
 			)
@@ -395,7 +396,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.ingestUrl != t.knapsack.TraceIngestServerURL() {
 			t.ingestUrl = t.knapsack.TraceIngestServerURL()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating ingest server url",
 				"new_ingest_url", t.ingestUrl,
 			)
@@ -408,7 +409,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 			t.ingestClientAuthenticator.setDisableTLS(t.knapsack.DisableTraceIngestTLS())
 			t.disableIngestTLS = t.knapsack.DisableTraceIngestTLS()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating ingest server config",
 				"new_disable_trace_ingest_tls", t.disableIngestTLS,
 			)
@@ -420,7 +421,7 @@ func (t *TraceExporter) FlagsChanged(flagKeys ...keys.FlagKey) {
 		if t.batchTimeout != t.knapsack.TraceBatchTimeout() {
 			t.batchTimeout = t.knapsack.TraceBatchTimeout()
 			needsNewProvider = true
-			t.slogger.Log(context.TODO(), slog.LevelDebug,
+			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating trace batch timeout",
 				"new_batch_timeout", t.batchTimeout,
 			)

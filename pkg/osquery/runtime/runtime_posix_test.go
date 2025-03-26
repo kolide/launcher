@@ -5,16 +5,16 @@ package runtime
 
 import (
 	"fmt"
-	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,47 +38,65 @@ func hasPermissionsToRunTest() bool {
 // out how to suspend and resume a process on Windows via golang.
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
 
-	var logBytes threadsafebuffer.ThreadSafeBuffer
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryVerbose").Return(true).Maybe()
+	k.On("OsqueryFlags").Return([]string{}).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	slogger := multislogger.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	k.On("Slogger").Return(slogger.Logger)
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("Slogger").Return(slogger)
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
+	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
 
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
-		WithSlogger(slogger.Logger),
-		WithStartFunc(func(cmd *exec.Cmd) error {
-			err := cmd.Start()
-			if err != nil {
-				return fmt.Errorf("unexpected error starting command: %w", err)
-			}
-			// suspend the process right away
-			cmd.Process.Signal(syscall.SIGTSTP)
-			go func() {
-				// wait a while before resuming the process
-				time.Sleep(3 * time.Second)
-				cmd.Process.Signal(syscall.SIGCONT)
-			}()
-			return nil
-		}),
-	)
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
+
+	runner := New(k, mockServiceClient(t), s, WithStartFunc(func(cmd *exec.Cmd) error {
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("unexpected error starting command: %w", err)
+		}
+		// suspend the process right away
+		cmd.Process.Signal(syscall.SIGTSTP)
+		go func() {
+			// wait a while before resuming the process
+			time.Sleep(3 * time.Second)
+			cmd.Process.Signal(syscall.SIGCONT)
+		}()
+		return nil
+	}))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// ensure that we actually had to wait on the socket
 	require.Contains(t, logBytes.String(), "osquery extension socket not created yet")
-	require.NoError(t, runner.Shutdown())
+	waitShutdown(t, runner, logBytes)
 }
 
 // TestExtensionSocketPath tests that the launcher can start osqueryd with a custom extension socket path.
@@ -86,28 +104,50 @@ func TestOsquerySlowStart(t *testing.T) {
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory, rmRootDirectory, err := osqueryTempDir()
-	require.NoError(t, err)
-	defer rmRootDirectory()
+	rootDirectory := testRootDirectory(t)
+
+	logBytes, slogger := setUpTestSlogger()
 
 	k := typesMocks.NewKnapsack(t)
+	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("PinnedOsquerydVersion").Return("")
+	k.On("Slogger").Return(slogger)
+	k.On("RootDirectory").Return(rootDirectory).Maybe()
+	k.On("OsqueryVerbose").Return(true).Maybe()
+	k.On("OsqueryFlags").Return([]string{}).Maybe()
+	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
+	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
+	k.On("Transport").Return("jsonrpc").Maybe()
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
+	k.On("UpdateChannel").Return("stable").Maybe()
+	k.On("PinnedLauncherVersion").Return("").Maybe()
+	k.On("PinnedOsquerydVersion").Return("").Maybe()
+	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
+	setUpMockStores(t, k)
+	osqHistory := setupHistory(t, k)
+
+	s := settingsstoremock.NewSettingsStoreWriter(t)
+	s.On("WriteSettings").Return(nil)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
-	runner := New(
-		k,
-		WithKnapsack(k),
-		WithRootDirectory(rootDirectory),
-		WithExtensionSocketPath(extensionSocketPath),
-		WithOsquerydBinary(testOsqueryBinaryDirectory),
-	)
+
+	runner := New(k, mockServiceClient(t), s, WithExtensionSocketPath(extensionSocketPath))
+	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
-	waitHealthy(t, runner)
+	waitHealthy(t, runner, logBytes, osqHistory)
 
 	// wait for the launcher-provided extension to register
 	time.Sleep(2 * time.Second)
@@ -121,36 +161,5 @@ func TestExtensionSocketPath(t *testing.T) {
 	assert.Equal(t, int32(0), resp.Status.Code)
 	assert.Equal(t, "OK", resp.Status.Message)
 
-	require.NoError(t, runner.Shutdown())
-}
-
-// TestRestart tests that the launcher can restart the osqueryd process.
-// This test causes time outs on windows, so it is only run on non-windows platforms.
-// Should investigate why this is the case.
-func TestRestart(t *testing.T) {
-	t.Parallel()
-	runner, teardown := setupOsqueryInstanceForTests(t)
-	defer teardown()
-
-	previousStats := runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be set on latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be set on latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on last instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
-
-	previousStats = runner.instance.stats
-
-	require.NoError(t, runner.Restart())
-	waitHealthy(t, runner)
-
-	require.NotEmpty(t, runner.instance.stats.StartTime, "start time should be added to latest instance stats after restart")
-	require.NotEmpty(t, runner.instance.stats.ConnectTime, "connect time should be added to latest instance stats after restart")
-
-	require.NotEmpty(t, previousStats.ExitTime, "exit time should be set on instance stats when restarted")
-	require.NotEmpty(t, previousStats.Error, "stats instance should have an error on restart")
+	waitShutdown(t, runner, logBytes)
 }

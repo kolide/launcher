@@ -28,6 +28,7 @@ type logCollection struct {
 }
 
 type publishLogsResponse struct {
+	jsonRpcResponse
 	Message     string `json:"message"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -46,7 +47,7 @@ func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{
 	// For now this should be enough because we don't use the Agent LogType anywhere.
 	// A more robust fix should come from fixing https://github.com/kolide/launcher/issues/183
 	var typ logger.LogType
-	switch req.LogType {
+	switch req.LogType { //nolint:exhaustive // This code is old and not in use
 	case pb.LogCollection_STATUS:
 		typ = logger.LogTypeStatus
 	case pb.LogCollection_RESULT:
@@ -82,7 +83,7 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 	}
 
 	var typ pb.LogCollection_LogType
-	switch req.LogType {
+	switch req.LogType { //nolint:exhaustive // This code is old and not in use
 	case logger.LogTypeStatus:
 		typ = pb.LogCollection_STATUS
 	case logger.LogTypeString, logger.LogTypeSnapshot:
@@ -101,6 +102,9 @@ func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{
 func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.AgentApiResponse)
 	return publishLogsResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Message:     req.Message,
 		ErrorCode:   req.ErrorCode,
 		NodeInvalid: req.NodeInvalid,
@@ -110,9 +114,10 @@ func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (inte
 func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(publishLogsResponse)
 	resp := &pb.AgentApiResponse{
-		Message:     req.Message,
-		ErrorCode:   req.ErrorCode,
-		NodeInvalid: req.NodeInvalid,
+		Message:       req.Message,
+		ErrorCode:     req.ErrorCode,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -163,6 +168,11 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 		return "", "", false, err
 	}
 	resp := response.(publishLogsResponse)
+
+	if resp.DisableDevice {
+		return "", "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
 }
 

@@ -12,7 +12,11 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
+	_ "modernc.org/sqlite"
 )
 
 var profileDirs = map[string][]string{
@@ -21,7 +25,7 @@ var profileDirs = map[string][]string{
 }
 var profileDirsDefault = []string{".config/google-chrome", ".config/chromium", "snap/chromium/current/.config/chromium"}
 
-func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
+func ChromeLoginDataEmails(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	c := &ChromeLoginDataEmailsTable{
 		slogger: slogger.With("table", "kolide_chrome_login_data_emails"),
 	}
@@ -30,7 +34,7 @@ func ChromeLoginDataEmails(slogger *slog.Logger) *table.Plugin {
 		table.TextColumn("email"),
 		table.BigIntColumn("count"),
 	}
-	return table.NewPlugin("kolide_chrome_login_data_emails", columns, c.generate)
+	return tablewrapper.New(flags, slogger, "kolide_chrome_login_data_emails", columns, c.generate)
 }
 
 type ChromeLoginDataEmailsTable struct {
@@ -38,6 +42,9 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", file.path)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_chrome_login_data_emails tmp dir: %w", err)
@@ -49,7 +56,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 		return nil, fmt.Errorf("copying sqlite file to tmp dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite3", dst)
+	db, err := sql.Open("sqlite", dst)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
@@ -59,31 +66,47 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 	if err != nil {
 		return nil, fmt.Errorf("query rows from chrome login keychain db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			c.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			c.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 
 	// loop through all the sqlite rows and add them as osquery rows in the results map
 	for rows.Next() { // we initialize these variables for every row, that way we don't have data from the previous iteration
-		var username_value string
-		var username_count string
-		if err := rows.Scan(&username_value, &username_count); err != nil {
+		var usernameValue string
+		var usernameCount string
+		if err := rows.Scan(&usernameValue, &usernameCount); err != nil {
 			return nil, fmt.Errorf("scanning chrome login keychain db row: %w", err)
 		}
 		// append anything that could be an email
-		if !strings.Contains(username_value, "@") {
+		if !strings.Contains(usernameValue, "@") {
 			continue
 		}
 		results = append(results, map[string]string{
 			"username": file.user,
-			"email":    username_value,
-			"count":    username_count,
+			"email":    usernameValue,
+			"count":    usernameCount,
 		})
 	}
 	return results, nil
 }
 
 func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_chrome_login_data_emails")
+	defer span.End()
+
 	var results []map[string]string
 	osProfileDirs, ok := profileDirs[runtime.GOOS]
 	if !ok {

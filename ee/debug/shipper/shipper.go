@@ -23,6 +23,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -53,6 +54,7 @@ type shipper struct {
 	uploadRequestErr     error
 	uploadResponse       *http.Response
 	uploadRequestWg      *sync.WaitGroup
+	uploadRequestCancel  context.CancelFunc
 
 	// note is intended to help humans identify the object being shipped
 	note string
@@ -107,11 +109,14 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
 	s.uploadRequestStarted = true
 	s.uploadRequestWg.Add(1)
-	go func() {
+	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
 		defer s.uploadRequestWg.Done()
-		// will close the body in the close function
-		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
-	}()
+
+		// will cancel and close the request body in the close function
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		s.uploadRequestCancel = cancel
+		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
+	})
 
 	return s.writer.Write(p)
 }
@@ -126,6 +131,9 @@ func (s *shipper) Close() error {
 	if !s.uploadRequestStarted {
 		return nil
 	}
+
+	// write has been called -- make sure we call cancel at the end
+	defer s.uploadRequestCancel()
 
 	// wait for upload request to finish
 	s.uploadRequestWg.Wait()
@@ -148,12 +156,15 @@ func (s *shipper) Close() error {
 }
 
 func (s *shipper) signedUrl() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	body, err := launcherData(s.knapsack, s.note)
 	if err != nil {
 		return "", fmt.Errorf("creating launcher data: %w", err)
 	}
 
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
+	signedUrlRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
@@ -268,6 +279,17 @@ func enrollSecret(k types.Knapsack) string {
 		return k.EnrollSecret()
 	}
 
+	if k != nil && k.EnrollSecretPath() != "" {
+		secret, err := os.ReadFile(k.EnrollSecretPath())
+		if err != nil {
+			return ""
+		}
+
+		return string(secret)
+	}
+
+	// TODO this will need to respect the identifier when determining the secret file location for dual-launcher installations
+	// this will specifically be an issue when flare is triggered standalone (without config path specified)
 	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
 	if err != nil {
 		return ""

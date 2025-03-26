@@ -42,13 +42,21 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/groob/plist"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
+)
+
+const (
+	typeAllowedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+	maxDataTypesPerQuery  = 3
 )
 
 var knownDetailLevels = []string{
@@ -80,7 +88,7 @@ type Table struct {
 	tableName string
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("parentdatatype"),
 		table.TextColumn("datatype"),
@@ -92,46 +100,44 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		tableName: "kolide_system_profiler",
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_system_profiler")
+	defer span.End()
+
 	var results []map[string]string
 
-	requestedDatatypes := []string{}
+	requestedDatatypes := tablehelpers.GetConstraints(queryContext, "datatype",
+		tablehelpers.WithAllowedCharacters(typeAllowedCharacters),
+		tablehelpers.WithSlogger(t.slogger),
+	)
 
-	datatypeQ, ok := queryContext.Constraints["datatype"]
-	if !ok || len(datatypeQ.Constraints) == 0 {
-		return results, fmt.Errorf("The %s table requires that you specify a constraint for datatype", t.tableName)
+	if len(requestedDatatypes) == 0 {
+		return results, fmt.Errorf("the %s table requires that you specify a constraint for datatype", t.tableName)
 	}
 
-	for _, datatypeConstraint := range datatypeQ.Constraints {
-		dt := datatypeConstraint.Expression
-
-		// If the constraint is the magic "%", it's eqivlent to an `all` style
-		if dt == "%" {
-			requestedDatatypes = []string{}
-			break
-		}
-
-		requestedDatatypes = append(requestedDatatypes, dt)
+	// Check for maximum number of datatypes
+	if len(requestedDatatypes) > maxDataTypesPerQuery {
+		return results, fmt.Errorf("maximum of %d datatypes allowed per query", maxDataTypesPerQuery)
 	}
 
-	var detailLevel string
-	if q, ok := queryContext.Constraints["detaillevel"]; ok && len(q.Constraints) != 0 {
-		if len(q.Constraints) > 1 {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"received multiple detaillevel constraints, only using the first one",
-			)
-		}
+	// Get detaillevel constraints
+	detailLevel := ""
+	detailLevels := tablehelpers.GetConstraints(queryContext, "detaillevel",
+		tablehelpers.WithAllowedValues(knownDetailLevels),
+		tablehelpers.WithSlogger(t.slogger),
+	)
 
-		dl := q.Constraints[0].Expression
-		for _, known := range knownDetailLevels {
-			if known == dl {
-				detailLevel = dl
-			}
-		}
+	if len(detailLevels) > 0 {
+		detailLevel = detailLevels[0]
+	}
 
+	if len(detailLevels) > 1 {
+		t.slogger.Log(ctx, slog.LevelWarn,
+			"received multiple detaillevel constraints, only using the first one",
+		)
 	}
 
 	systemProfilerOutput, err := t.execSystemProfiler(ctx, detailLevel, requestedDatatypes)
@@ -152,6 +158,9 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel string, systemProfilerOutput []byte) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var results []map[string]string
 
 	flattenOpts := []dataflatten.FlattenOpts{
@@ -194,12 +203,13 @@ func (t *Table) getRowsFromOutput(ctx context.Context, dataQuery, detailLevel st
 }
 
 func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subcommands []string) ([]byte, error) {
-	timeout := 45 * time.Second
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	timeoutSeconds := 45
 	if detailLevel == "full" {
-		timeout = 5 * time.Minute
+		timeoutSeconds = 5 * 60
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -212,19 +222,12 @@ func (t *Table) execSystemProfiler(ctx context.Context, detailLevel string, subc
 
 	args = append(args, subcommands...)
 
-	cmd, err := allowedcmd.SystemProfiler(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating system_profiler command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
 	t.slogger.Log(ctx, slog.LevelDebug,
 		"calling system_profiler",
-		"args", cmd.Args,
+		"args", args,
 	)
 
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, timeoutSeconds, allowedcmd.SystemProfiler, args, &stdout, &stderr); err != nil {
 		return nil, fmt.Errorf("calling system_profiler. Got: %s: %w", stderr.String(), err)
 	}
 

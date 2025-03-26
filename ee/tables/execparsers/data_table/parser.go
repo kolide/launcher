@@ -2,7 +2,7 @@ package data_table
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 )
@@ -64,7 +64,7 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 		p.skipLines--
 
 		if !scanner.Scan() {
-			return results, fmt.Errorf("skipped past all lines of data")
+			return results, errors.New("skipped past all lines of data")
 		}
 	}
 
@@ -83,12 +83,12 @@ func (p parser) parseLines(reader io.Reader) ([]map[string]string, error) {
 		row := make(map[string]string)
 		fields := p.lineSplit(line, headerCount)
 		// It's possible we don't have the same number of fields to headers, so use
-		// min here to avoid a possible array out-of-bounds exception.
-		min := min(headerCount, len(fields))
+		// minimum here to avoid a possible array out-of-bounds exception.
+		minimum := min(headerCount, len(fields))
 
 		// For each header, add the corresponding line field to the result row.
 		// Duplicate headers overwrite the set value.
-		for i := 0; i < min; i++ {
+		for i := 0; i < minimum; i++ {
 			row[strings.TrimSpace(p.headers[i])] = strings.TrimSpace(fields[i])
 		}
 

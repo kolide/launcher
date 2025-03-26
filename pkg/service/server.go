@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/kolide/launcher/pkg/pb/launcher"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
@@ -92,6 +93,7 @@ func NewGRPCServer(endpoints Endpoints, logger log.Logger, options ...grpctransp
 }
 
 type grpcServer struct {
+	launcher.UnimplementedApiServer
 	enrollment grpctransport.Handler
 	config     grpctransport.Handler
 	queries    grpctransport.Handler

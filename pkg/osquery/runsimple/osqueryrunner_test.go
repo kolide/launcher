@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,11 +27,11 @@ func TestMain(m *testing.M) {
 		fmt.Println("Failed to make temp dir for test binaries")
 		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
-	defer os.RemoveAll(dir)
 
 	if err := downloadOsqueryInBinDir(dir); err != nil {
 		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
+		os.RemoveAll(dir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)        //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	testOsqueryBinary = filepath.Join(dir, "osqueryd")
@@ -40,7 +41,9 @@ func TestMain(m *testing.M) {
 
 	// Run the tests!
 	retCode := m.Run()
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
+
+	os.RemoveAll(dir) // explicit removal as defer will not run when os.Exit is called
+	os.Exit(retCode)  //nolint:forbidigo // Fine to use os.Exit in tests
 }
 
 func Test_OsqueryRunSqlNoIO(t *testing.T) {
@@ -147,7 +150,7 @@ func decodeJsonL(data io.Reader) ([]any, error) {
 		count += 1
 
 		if count > 50 {
-			return nil, fmt.Errorf("stuck in a loop. Count exceeds 50")
+			return nil, errors.New("stuck in a loop. Count exceeds 50")
 		}
 	}
 }
@@ -158,6 +161,10 @@ func downloadOsqueryInBinDir(binDirectory string) error {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
+	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
 	}
 
 	outputFile := filepath.Join(binDirectory, target.PlatformBinaryName("osqueryd"))

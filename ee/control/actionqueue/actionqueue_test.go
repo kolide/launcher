@@ -181,7 +181,6 @@ func TestActionQueue_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T
 	}
 	testActionsRaw, err := json.Marshal(actions)
 	require.NoError(t, err)
-	testActionsData := bytes.NewReader(testActionsRaw)
 
 	// Expect that the actor is called twice: once to unsuccessfully send the first action, and again to send the duplicate successfully
 	mockActor := mocks.NewActor(t)
@@ -194,7 +193,13 @@ func TestActionQueue_HandlesDuplicatesWhenFirstActionCouldNotBeSent(t *testing.T
 	// Call Do and assert our expectations about completed actions
 	actionqueue := New(mockKnapsack)
 	actionqueue.RegisterActor(testActorType, mockActor)
-	require.NoError(t, actionqueue.Update(testActionsData))
+	// First attempt fails
+	err = actionqueue.Update(bytes.NewReader(testActionsRaw))
+	require.Error(t, err)
+
+	// Second attempt succeeds
+	err = actionqueue.Update(bytes.NewReader(testActionsRaw))
+	require.NoError(t, err)
 }
 
 func TestCleanup(t *testing.T) {

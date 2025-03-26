@@ -5,10 +5,11 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -20,6 +21,7 @@ type dbusNotifier struct {
 	conn                *dbus.Conn
 	signal              chan *dbus.Signal
 	interrupt           chan struct{}
+	interrupted         atomic.Bool
 	sentNotificationIds map[uint32]bool
 	lock                sync.RWMutex
 }
@@ -54,7 +56,7 @@ func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *dbusNotifier
 	}
 }
 
-func (d *dbusNotifier) Listen() error {
+func (d *dbusNotifier) Execute() error {
 	if d.conn != nil {
 		if err := d.conn.AddMatchSignal(
 			dbus.WithMatchObjectPath(notificationServiceObj),
@@ -75,7 +77,11 @@ func (d *dbusNotifier) Listen() error {
 
 	for {
 		select {
-		case signal := <-d.signal:
+		case signal, open := <-d.signal:
+			if !open {
+				return errors.New("dbus signal channel closed, cannot proceed")
+			}
+
 			if signal == nil || signal.Name != signalActionInvoked {
 				continue
 			}
@@ -94,9 +100,7 @@ func (d *dbusNotifier) Listen() error {
 			actionUri := signal.Body[1].(string)
 
 			for _, browserLauncher := range browserLaunchers {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-				cmd, err := browserLauncher(ctx, actionUri)
+				cmd, err := browserLauncher(context.TODO(), actionUri)
 				if err != nil {
 					d.slogger.Log(context.TODO(), slog.LevelWarn,
 						"couldn't create command to start process",
@@ -124,6 +128,11 @@ func (d *dbusNotifier) Listen() error {
 }
 
 func (d *dbusNotifier) Interrupt(err error) {
+	if d.interrupted.Load() {
+		return
+	}
+	d.interrupted.Store(true)
+
 	d.interrupt <- struct{}{}
 
 	d.conn.RemoveSignal(d.signal)
@@ -132,6 +141,9 @@ func (d *dbusNotifier) Interrupt(err error) {
 		dbus.WithMatchInterface(notificationServiceInterface),
 	)
 }
+
+// just make compiler happy, this is only needed on darwin
+func (d *dbusNotifier) Listen() {}
 
 func (d *dbusNotifier) SendNotification(n Notification) error {
 	if err := d.sendNotificationViaDbus(n); err == nil {

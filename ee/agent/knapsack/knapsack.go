@@ -9,13 +9,19 @@ import (
 
 	"log/slog"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.etcd.io/bbolt"
 )
+
+// Package-level runID variable
+var runID string
+
+// Package-level enrollmentDetails variable
+var enrollmentDetails *types.EnrollmentDetails
 
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
@@ -36,9 +42,10 @@ type knapsack struct {
 
 	slogger, systemSlogger *multislogger.MultiSlogger
 
+	querier types.InstanceQuerier
+
+	osqHistory types.OsqueryHistorian
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
-	// Some potential future additions include:
-	// Querier
 }
 
 func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB, slogger, systemSlogger *multislogger.MultiSlogger) *knapsack {
@@ -60,6 +67,16 @@ func New(stores map[storage.Store]types.KVStore, flags types.Flags, db *bbolt.DB
 	return k
 }
 
+// GetRunID returns the current launcher run ID -- if it's not yet set, it will generate and set it
+func (k *knapsack) GetRunID() string {
+	if runID == "" {
+		runID = ulid.New()
+		k.slogger.Logger = k.slogger.Logger.With("run_id", runID)
+		k.systemSlogger.Logger = k.systemSlogger.Logger.With("run_id", runID)
+	}
+	return runID
+}
+
 // Logging interface methods
 func (k *knapsack) Slogger() *slog.Logger {
 	return k.slogger.Logger
@@ -74,6 +91,25 @@ func (k *knapsack) AddSlogHandler(handler ...slog.Handler) {
 	k.systemSlogger.AddHandler(handler...)
 }
 
+// Osquery instance querier
+func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
+	k.querier = q
+}
+
+// RegistrationTracker interface methods
+func (k *knapsack) RegistrationIDs() []string {
+	return []string{types.DefaultRegistrationID}
+}
+
+// InstanceStatuses returns the current status of each osquery instance.
+// It performs a healthcheck against each existing instance.
+func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {
+	if k.querier == nil {
+		return nil
+	}
+	return k.querier.InstanceStatuses()
+}
+
 // BboltDB interface methods
 func (k *knapsack) BboltDB() *bbolt.DB {
 	return k.db
@@ -86,6 +122,10 @@ func (k *knapsack) Stores() map[storage.Store]types.KVStore {
 
 func (k *knapsack) AgentFlagsStore() types.KVStore {
 	return k.getKVStore(storage.AgentFlagsStore)
+}
+
+func (k *knapsack) KatcConfigStore() types.KVStore {
+	return k.getKVStore(storage.KatcConfigStore)
 }
 
 func (k *knapsack) AutoupdateErrorsStore() types.KVStore {
@@ -136,6 +176,21 @@ func (k *knapsack) TokenStore() types.KVStore {
 	return k.getKVStore(storage.TokenStore)
 }
 
+func (k *knapsack) LauncherHistoryStore() types.KVStore {
+	return k.getKVStore(storage.LauncherHistoryStore)
+}
+
+func (k *knapsack) Dt4aInfoStore() types.KVStore {
+	return k.getKVStore(storage.Dt4aInfoStore)
+}
+
+func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
+	return k.flags.SetLauncherWatchdogEnabled(enabled)
+}
+func (k *knapsack) LauncherWatchdogEnabled() bool {
+	return k.flags.LauncherWatchdogEnabled()
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil
@@ -149,9 +204,9 @@ func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 func (k *knapsack) LatestOsquerydPath(ctx context.Context) string {
 	latestBin, err := tuf.CheckOutLatest(ctx, "osqueryd", k.RootDirectory(), k.UpdateDirectory(), k.PinnedOsquerydVersion(), k.UpdateChannel(), k.Slogger())
 	if err != nil {
-		return autoupdate.FindNewest(ctx, k.OsquerydPath())
+		return k.OsquerydPath()
 	}
-
+	k.SetCurrentRunningOsqueryVersion(latestBin.Version)
 	return latestBin.Path
 }
 
@@ -191,4 +246,33 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	}
 
 	return types.Enrolled, nil
+}
+
+func (k *knapsack) SetEnrollmentDetails(newDetails types.EnrollmentDetails) {
+	k.Slogger().Log(context.Background(), slog.LevelDebug,
+		"updating enrollment details",
+		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
+		"new_details", fmt.Sprintf("%+v", newDetails),
+	)
+	enrollmentDetails = &newDetails
+}
+
+func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
+	if enrollmentDetails == nil {
+		return types.EnrollmentDetails{}
+	}
+
+	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
+	osqueryVersion := k.CurrentRunningOsqueryVersion()
+	enrollmentDetails.OsqueryVersion = osqueryVersion
+
+	return *enrollmentDetails
+}
+
+func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
+	return k.osqHistory
+}
+
+func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
+	k.osqHistory = osqHistory
 }

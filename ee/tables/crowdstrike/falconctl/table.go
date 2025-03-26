@@ -10,10 +10,13 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -38,7 +41,7 @@ var (
 	defaultOption = strings.Join(allowedOptions, " ")
 )
 
-type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, bool, ...tablehelpers.ExecOps) ([]byte, error)
+type execFunc func(context.Context, *slog.Logger, int, allowedcmd.AllowedCommand, []string, ...tablehelpers.ExecOps) ([]byte, error)
 
 type falconctlOptionsTable struct {
 	slogger   *slog.Logger
@@ -46,7 +49,7 @@ type falconctlOptionsTable struct {
 	execFunc  execFunc
 }
 
-func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
+func NewFalconctlOptionTable(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns(
 		table.TextColumn("options"),
 	)
@@ -54,13 +57,16 @@ func NewFalconctlOptionTable(slogger *slog.Logger) *table.Plugin {
 	t := &falconctlOptionsTable{
 		slogger:   slogger.With("table", "kolide_falconctl_options"),
 		tableName: "kolide_falconctl_options",
-		execFunc:  tablehelpers.Exec,
+		execFunc:  tablehelpers.RunSimple,
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *falconctlOptionsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	// Note that we don't use tablehelpers.AllowedValues here, because that would disallow us from
@@ -92,7 +98,7 @@ OUTER:
 		// then the list of options to fetch. Set the command line thusly.
 		args := append([]string{"-g"}, options...)
 
-		output, err := t.execFunc(ctx, t.slogger, 30, allowedcmd.Falconctl, args, false)
+		output, err := t.execFunc(ctx, t.slogger, 30, allowedcmd.Falconctl, args)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"exec failed",

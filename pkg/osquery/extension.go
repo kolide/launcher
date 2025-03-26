@@ -1,27 +1,23 @@
 package osquery
 
 import (
-	"bytes"
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
@@ -30,20 +26,30 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// settingsStoreWriter writes to our startup settings store
+type settingsStoreWriter interface {
+	WriteSettings() error
+}
+
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey             string
-	Opts                ExtensionOpts
-	knapsack            types.Knapsack
-	serviceClient       service.KolideService
-	enrollMutex         sync.Mutex
-	done                chan struct{}
-	interrupted         bool
-	slogger             *slog.Logger
-	logPublicationState *logPublicationState
+	NodeKey                       string
+	Opts                          ExtensionOpts
+	registrationId                string
+	knapsack                      types.Knapsack
+	serviceClient                 service.KolideService
+	settingsWriter                settingsStoreWriter
+	enrollMutex                   *sync.Mutex
+	done                          chan struct{}
+	interrupted                   atomic.Bool
+	slogger                       *slog.Logger
+	logPublicationState           *logPublicationState
+	lastRequestQueriesTimestamp   *atomic.Int64
+	distributedForwardingInterval *atomic.Int64 // how frequently to forward RequestQueries requests to the cloud, in seconds
+	forwardAllDistributedUntil    *atomic.Int64 // allows for accelerated distributed requests until given timestamp
 }
 
 const (
@@ -53,12 +59,6 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
-	// DB keys for the rsa keys
-	privateKeyKey = "privateKey"
-
-	// Old things to delete
-	xPublicKeyKey      = "publicKey"
-	xKeyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -71,6 +71,29 @@ const (
 	// Default maximum number of logs to buffer before purging oldest logs
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
+
+	// How frequently osquery should check for distributed queries to run.
+	// We set this to 5 seconds, which is more frequent than we think the
+	// server can comfortably handle, so we only forward these requests
+	// to the cloud once every 60 seconds.
+	osqueryDistributedInterval = 5
+)
+
+var (
+	// Osquery configuration options that we set during the osquery instance's startup period.
+	// These are the override, non-standard values.
+	startupOsqueryConfigOptions = map[string]any{
+		"verbose":              true, // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": osqueryDistributedInterval,
+	}
+
+	// Osquery configuration options that we set after the osquery instance has been up and running
+	// for at least 10 minutes. These are the "normal" values. We continue to override the distributed
+	// interval to 5 seconds.
+	postStartupOsqueryConfigOptions = map[string]any{
+		"verbose":              false,
+		"distributed_interval": osqueryDistributedInterval,
+	}
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -81,19 +104,12 @@ type ExtensionOpts struct {
 	// LoggingInterval is the interval at which logs should be flushed to
 	// the server.
 	LoggingInterval time.Duration
-	// Clock is the clock that should be used for time based operations. By
-	// default it will be a normal realtime clock, but a mock clock can be
-	// passed with clock.NewMockClock() for testing purposes.
-	Clock clock.Clock
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
 	// RunDifferentialQueriesImmediately allows the client to execute a new query the first time it sees it,
 	// bypassing the scheduler.
 	RunDifferentialQueriesImmediately bool
-	// skipHardwareKeysSetup is a flag to indicate if we should skip setting up hardware keys.
-	// This is useful for testing environments where we don't have required hardware.
-	skipHardwareKeysSetup bool
 }
 
 type iterationTerminatedError struct{}
@@ -105,11 +121,11 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	slogger := k.Slogger().With("component", "osquery_extension")
+	slogger := k.Slogger().With("component", "osquery_extension", "registration_id", registrationId)
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -119,25 +135,13 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		opts.LoggingInterval = defaultLoggingInterval
 	}
 
-	if opts.Clock == nil {
-		opts.Clock = clock.DefaultClock{}
-	}
-
 	if opts.MaxBufferedLogs == 0 {
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
 
 	configStore := k.ConfigStore()
 
-	if err := SetupLauncherKeys(configStore); err != nil {
-		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
-	}
-
-	if err := agent.SetupKeys(ctx, slogger, configStore, opts.skipHardwareKeysSetup); err != nil {
-		return nil, fmt.Errorf("setting up agent keys: %w", err)
-	}
-
-	nodekey, err := NodeKey(configStore)
+	nodekey, err := NodeKey(configStore, registrationId)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
@@ -154,20 +158,38 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		)
 	}
 
-	return &Extension{
-		slogger:             slogger,
-		serviceClient:       client,
-		knapsack:            k,
-		NodeKey:             nodekey,
-		Opts:                opts,
-		done:                make(chan struct{}),
-		logPublicationState: NewLogPublicationState(opts.MaxBytesPerBatch),
-	}, nil
+	initialTimestamp := &atomic.Int64{}
+	initialTimestamp.Store(0)
+
+	distributedForwardingInterval := &atomic.Int64{}
+	distributedForwardingInterval.Store(int64(k.DistributedForwardingInterval().Seconds()))
+
+	forwardAllDistributedUntil := &atomic.Int64{}
+	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
+
+	e := &Extension{
+		slogger:                       slogger,
+		serviceClient:                 client,
+		settingsWriter:                settingsWriter,
+		registrationId:                registrationId,
+		knapsack:                      k,
+		NodeKey:                       nodekey,
+		Opts:                          opts,
+		enrollMutex:                   &sync.Mutex{},
+		done:                          make(chan struct{}),
+		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
+		lastRequestQueriesTimestamp:   initialTimestamp,
+		distributedForwardingInterval: distributedForwardingInterval,
+		forwardAllDistributedUntil:    forwardAllDistributedUntil,
+	}
+	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
+
+	return e, nil
 }
 
 func (e *Extension) Execute() error {
 	// Process logs until shutdown
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
+	ticker := time.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {
 		e.writeAndPurgeLogs()
@@ -179,7 +201,7 @@ func (e *Extension) Execute() error {
 				"osquery extension received shutdown request",
 			)
 			return nil
-		case <-ticker.Chan():
+		case <-ticker.C:
 			// Resume loop
 		}
 	}
@@ -189,114 +211,39 @@ func (e *Extension) Execute() error {
 // with this extension.
 func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if e.interrupted {
+	if e.interrupted.Load() {
 		return
 	}
-	e.interrupted = true
+	e.interrupted.Store(true)
 
+	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which is DistributedForwardingInterval.
+func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	for _, flagKey := range flagKeys {
+		if flagKey == keys.DistributedForwardingInterval {
+			e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
+			// That's the only flag we care about -- we can break here
+			break
+		}
+	}
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.knapsack.ConfigStore())
-}
-
-// SetupLauncherKeys configures the various keys used for communication.
-//
-// There are 3 keys:
-// 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
-// 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
-// 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
-func SetupLauncherKeys(configStore types.KVStore) error {
-	// Soon-to-be-deprecated RSA keys
-	if err := ensureRsaKey(configStore); err != nil {
-		return fmt.Errorf("ensuring rsa key: %w", err)
-	}
-
-	// Remove things we don't keep in the bucket any more
-	for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
-		if err := configStore.Delete([]byte(k)); err != nil {
-			return fmt.Errorf("deleting %s: %w", k, err)
-		}
-	}
-
-	return nil
-}
-
-// ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
-func ensureRsaKey(configStore types.GetterSetter) error {
-	// If it exists, we're good
-	_, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil
-	}
-
-	// Create a random key
-	key, err := rsaRandomKey()
-	if err != nil {
-		return fmt.Errorf("generating private key: %w", err)
-	}
-
-	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("marshalling private key: %w", err)
-	}
-
-	if err := configStore.Set([]byte(privateKeyKey), keyDer); err != nil {
-		return fmt.Errorf("storing private key: %w", err)
-	}
-
-	return nil
-}
-
-// PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
-func PrivateRSAKeyFromDB(configStore types.Getter) (*rsa.PrivateKey, error) {
-	privateKey, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil, fmt.Errorf("error reading private key info from db: %w", err)
-	}
-
-	key, err := x509.ParsePKCS8PrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
-	}
-
-	rsakey, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Private key is not an rsa key")
-	}
-
-	return rsakey, nil
-}
-
-// PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicRSAKeyFromDB(configStore types.Getter) (string, string, error) {
-	privateKey, err := PrivateRSAKeyFromDB(configStore)
-	if err != nil {
-		return "", "", fmt.Errorf("reading private key: %w", err)
-	}
-
-	fingerprint, err := rsaFingerprint(privateKey)
-	if err != nil {
-		return "", "", fmt.Errorf("generating fingerprint: %w", err)
-	}
-
-	var publicKey bytes.Buffer
-	if err := RsaPrivateKeyToPem(privateKey, &publicKey); err != nil {
-		return "", "", fmt.Errorf("marshalling pub: %w", err)
-	}
-
-	return publicKey.String(), fingerprint, nil
+	return IdentifierFromDB(e.knapsack.ConfigStore(), e.registrationId)
 }
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
-func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
+func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
 	var identifier string
-	uuidBytes, _ := configStore.Get([]byte(uuidKey))
+	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	gotID, err := uuid.ParseBytes(uuidBytes)
 
 	// Use existing UUID
@@ -313,7 +260,7 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 	identifier = gotID.String()
 
 	// Save new UUID
-	err = configStore.Set([]byte(uuidKey), []byte(identifier))
+	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(identifier))
 	if err != nil {
 		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
@@ -322,8 +269,8 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 }
 
 // NodeKey returns the device node key from the storage layer
-func NodeKey(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(nodeKeyKey))
+func NodeKey(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -335,8 +282,8 @@ func NodeKey(getter types.Getter) (string, error) {
 }
 
 // Config returns the device config from the storage layer
-func Config(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(configKey))
+func Config(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -384,7 +331,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.knapsack.ConfigStore())
+	key, err := NodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if err != nil {
 		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
@@ -414,48 +361,47 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
-	// We used to see the enrollment details fail, but now that we're running as an exec,
-	// it seems less likely. Try a couple times, but backoff fast.
-	var enrollDetails service.EnrollmentDetails
-	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		e.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment details, no osqueryd path, this is probably CI",
-		)
-		span.AddEvent("skipping_enrollment_details")
-	} else {
-		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(ctx, osqPath)
-			if err != nil {
-				e.slogger.Log(ctx, slog.LevelDebug,
-					"getEnrollDetails failed in backoff",
-					"err", err,
-				)
-			}
-			return err
-		}, 30*time.Second, 5*time.Second); err != nil {
-			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return "", true, fmt.Errorf("query enrollment details: %w", err)
-			}
+	var enrollDetails types.EnrollmentDetails
 
-			e.slogger.Log(ctx, slog.LevelError,
-				"failed to get enrollment details with retries, moving on",
-				"err", err,
-			)
-			traces.SetError(span, fmt.Errorf("query enrollment details: %w", err))
-		} else {
-			span.AddEvent("got_enrollment_details")
+	if err := backoff.WaitFor(func() error {
+		details := e.knapsack.GetEnrollmentDetails()
+		if details.OSVersion == "" || details.Hostname == "" {
+			return fmt.Errorf("incomplete enrollment details (missing hostname or os version): %+v", details)
 		}
+		enrollDetails = details
+		span.AddEvent("got_complete_enrollment_details")
+		return nil
+	}, 60*time.Second, 5*time.Second); err != nil {
+		e.slogger.Log(ctx, slog.LevelWarn,
+			"could not fetch enrollment details before timeout",
+			"err", err,
+		)
+		span.AddEvent("enrollment_details_timeout")
+		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
+		enrollDetails = e.knapsack.GetEnrollmentDetails()
 	}
+
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
-	if isNodeInvalidErr(err) {
+
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", true, fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		err := fmt.Errorf("transport error in enrollment: %w", err)
-		traces.SetError(span, err)
-		return "", true, err
+
+	case err != nil:
+		return "", true, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
+
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
@@ -466,7 +412,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	// Save newly acquired node key if successful
-	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
+	err = e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(keyString))
 	if err != nil {
 		return "", true, fmt.Errorf("saving node key: %w", err)
 	}
@@ -482,7 +428,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 }
 
 func (e *Extension) enrolled() bool {
-	return e.NodeKey != ""
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	return nodeKey != ""
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the
@@ -492,7 +443,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
+	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -508,7 +459,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -519,30 +470,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		}
 		config = string(confBytes)
 	} else {
-		// Store good config
-		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
-
-		// open the start up settings writer just to trigger a write of the config,
-		// then we can immediately close it
-		startupSettingsWriter, err := startupsettings.OpenWriter(ctx, e.knapsack)
-		if err != nil {
+		// Store good config in both the knapsack and our settings store
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config)); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
-				"could not get startup settings writer",
+				"writing config to config store",
 				"err", err,
 			)
-		} else {
-			defer startupSettingsWriter.Close()
-
-			if err := startupSettingsWriter.WriteSettings(); err != nil {
-				e.slogger.Log(ctx, slog.LevelError,
-					"writing startup settings",
-					"err", err,
-				)
-			}
 		}
-		// TODO log or record metrics when caching config fails? We
-		// would probably like to return the config and not an error in
-		// this case.
+		if err := e.settingsWriter.WriteSettings(); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"writing config to startup settings",
+				"err", err,
+			)
+		}
 	}
 
 	return map[string]string{"config": config}, nil
@@ -553,11 +493,27 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
-	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		return "", fmt.Errorf("transport error retrieving config: %w", err)
+
+	case err != nil:
+		return "", fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -583,24 +539,30 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
-	osqueryVerbose := true
-	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
-		// Only log the state change once -- RequestConfig happens every 5 mins
-		if uptimeMins <= 15 {
-			e.slogger.Log(ctx, slog.LevelDebug,
-				"osquery has been up for more than 10 minutes, turning off verbose logging",
-				"uptime_mins", uptimeMins,
-			)
+	configOptsToSet := startupOsqueryConfigOptions
+	osqHistory := e.knapsack.OsqueryHistory()
+	if osqHistory != nil {
+		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(e.registrationId); err == nil && uptimeMins >= 10 {
+			// Only log the state change once -- RequestConfig happens every 5 mins
+			if uptimeMins <= 15 {
+				e.slogger.Log(ctx, slog.LevelDebug,
+					"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
+					"uptime_mins", uptimeMins,
+				)
+			}
+			configOptsToSet = postStartupOsqueryConfigOptions
 		}
-		osqueryVerbose = false
 	}
-	config = e.setVerbose(config, osqueryVerbose)
+
+	config = e.setOsqueryOptions(config, configOptsToSet)
 
 	return config, nil
 }
 
-// setVerbose modifies the given config to add the `verbose` option.
-func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
+// setOsqueryOptions modifies the given config to add the given options in `optsToSet`.
+// The values in `optsToSet` will override any existing and conflicting option values
+// within `config`.
+func (e *Extension) setOsqueryOptions(config string, optsToSet map[string]any) string {
 	var cfg map[string]any
 
 	if config != "" {
@@ -628,7 +590,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 		opts = make(map[string]any)
 	}
 
-	opts["verbose"] = osqueryVerbose
+	for k, v := range optsToSet {
+		opts[k] = v
+	}
+
 	cfg["options"] = opts
 
 	cfgBytes, err := json.Marshal(cfg)
@@ -665,9 +630,10 @@ func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) 
 		return s.ResultLogsStore(), nil
 	case logger.LogTypeStatus:
 		return s.StatusLogsStore(), nil
+	case logger.LogTypeHealth, logger.LogTypeInit:
+		return nil, fmt.Errorf("storing log type %v is unsupported", typ)
 	default:
 		return nil, fmt.Errorf("unknown log type: %v", typ)
-
 	}
 }
 
@@ -790,7 +756,21 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
+
+	if errors.Is(err, service.ErrDeviceDisabled{}) {
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
+	}
+
 	invalid = invalid || isNodeInvalidErr(err)
 	if !invalid && err == nil {
 		// publication was successful- update logPublicationState and move on
@@ -889,7 +869,32 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	return e.getQueriesWithReenroll(ctx, true)
+	// Check to see whether we should forward this request --
+	// 1. Check to see if we currently want to forward all distributed query requests to the cloud.
+	// 2. Check to see if we forwarded a request to the cloud within the last minute.
+	now := time.Now().Unix()
+	if now >= e.forwardAllDistributedUntil.Load() && now < e.lastRequestQueriesTimestamp.Load()+e.distributedForwardingInterval.Load() {
+		// Return an empty result to osquery.
+		return &distributed.GetQueriesResult{}, nil
+	}
+
+	// We haven't requested queries from the cloud within the last minute --
+	// forward this request.
+	e.lastRequestQueriesTimestamp.Store(now)
+
+	queries, err := e.getQueriesWithReenroll(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the cloud wants us to accelerate distributed requests by forwarding
+	// all requests to the cloud for the next `queries.AccelerateSeconds` seconds.
+	if queries.AccelerateSeconds > 0 {
+		// Store the timestamp when the acceleration ends
+		e.forwardAllDistributedUntil.Store(time.Now().Unix() + int64(queries.AccelerateSeconds))
+	}
+
+	return queries, nil
 }
 
 // Helper to allow for a single attempt at re-enrollment
@@ -897,12 +902,29 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
-	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
+	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
+
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return nil, fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
+
+	case err != nil:
 		return nil, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -944,11 +966,27 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
-	if isNodeInvalidErr(err) {
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		return fmt.Errorf("transport error writing results: %w", err)
+
+	case err != nil:
+		return fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {

@@ -9,14 +9,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -27,7 +31,7 @@ type GsettingsMetadata struct {
 
 // Metadata returns a table plugin for querying metadata about specific keys in
 // specific schemas
-func Metadata(slogger *slog.Logger) *table.Plugin {
+func Metadata(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		// TODO: maybe need to add 'path' for relocatable schemas..
 		table.TextColumn("schema"),
@@ -41,10 +45,13 @@ func Metadata(slogger *slog.Logger) *table.Plugin {
 		cmdRunner: execGsettingsCommand,
 	}
 
-	return table.NewPlugin("kolide_gsettings_metadata", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_gsettings_metadata", columns, t.generate)
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_gsettings_metadata")
+	defer span.End()
+
 	var results []map[string]string
 
 	schemas := tablehelpers.GetConstraints(queryContext, "schema", tablehelpers.WithAllowedCharacters(allowedCharacters))
@@ -84,6 +91,9 @@ type keyDescription struct {
 }
 
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
+	ctx, span := traces.StartSpan(ctx, "schema", schema)
+	defer span.End()
+
 	var descriptions []keyDescription
 
 	dir, err := agent.MkdirTemp(fmt.Sprintf("osq-gsettings-metadata-%s", schema))
@@ -119,6 +129,9 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 }
 
 func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string) ([]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var keys []string
 	output := new(bytes.Buffer)
 
@@ -151,6 +164,9 @@ func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string)
 // single key, namely a 'description' string/paragraph and an explanation of its
 // type
 func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir string) (keyDescription, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	desc := keyDescription{Key: key}
 
 	d, err := t.getDescription(ctx, schema, key, tmpdir)
@@ -169,6 +185,9 @@ func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir
 }
 
 func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmpdir string) (string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	output := new(bytes.Buffer)
 
 	err := t.cmdRunner(ctx, []string{"describe", schema, key}, tmpdir, output)
@@ -184,6 +203,9 @@ func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmp
 // GVariant type from 'GVariant code' to golang-ish type descriptions is handled
 // by convertType
 func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir string) (string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	output := new(bytes.Buffer)
 
 	err := t.cmdRunner(ctx, []string{"range", schema, key}, tmpdir, output)
@@ -219,21 +241,12 @@ func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir str
 
 // execGsettingsCommand should be called with a tmpdir that will be cleaned up.
 func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	command := args[0]
-	cmd, err := allowedcmd.Gsettings(ctx, args...)
-	if err != nil {
-		return fmt.Errorf("creating gsettings command: %w", err)
-	}
-
-	cmd.Dir = tmpdir
-	cmd.Stderr = new(bytes.Buffer)
-	cmd.Stdout = output
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("running gsettings %s: %w", command, err)
+	if err := tablehelpers.Run(ctx, multislogger.NewNopLogger(), 3, allowedcmd.Gsettings, args, output, io.Discard, tablehelpers.WithDir(tmpdir)); err != nil {
+		return fmt.Errorf("execing gsettings: %s: %w", command, err)
 	}
 
 	return nil

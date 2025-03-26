@@ -7,9 +7,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -24,7 +27,7 @@ func WithKVSeparator(separator string) ExecTableOpt {
 	}
 }
 
-func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
+func TablePluginExec(flags types.Flags, slogger *slog.Logger, tableName string, dataSourceType DataSourceType, cmdGen allowedcmd.AllowedCommand, execArgs []string, opts ...ExecTableOpt) *table.Plugin {
 	columns := Columns()
 
 	t := &Table{
@@ -41,13 +44,16 @@ func TablePluginExec(slogger *slog.Logger, tableName string, dataSourceType Data
 
 	t.flattenBytesFunc = dataSourceType.FlattenBytesFunc(t.keyValueSeparator)
 
-	return table.NewPlugin(t.tableName, columns, t.generateExec)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generateExec)
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
-	execBytes, err := tablehelpers.Exec(ctx, t.slogger, 50, t.cmdGen, t.execArgs, false)
+	execBytes, err := tablehelpers.RunSimple(ctx, t.slogger, 50, t.cmdGen, t.execArgs)
 	if err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {

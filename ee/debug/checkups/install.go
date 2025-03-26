@@ -5,15 +5,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
+
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type installCheckup struct {
+	k types.Knapsack
 }
 
 func (i *installCheckup) Name() string {
-	return "Package Install Logs"
+	return "Package Install"
 }
 
 func (i *installCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
@@ -22,6 +24,10 @@ func (i *installCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	if err := gatherInstallationLogs(extraZip); err != nil {
 		return fmt.Errorf("gathering installation logs: %w", err)
+	}
+
+	if err := gatherInstallerInfo(extraZip, i.k.Identifier()); err != nil {
+		return fmt.Errorf("gathering installer info: %w", err)
 	}
 
 	return nil
@@ -49,20 +55,5 @@ func gatherInstallationLogs(z *zip.Writer) error {
 		return nil
 	}
 
-	out, err := z.Create("macos-var-log-install.log")
-	if err != nil {
-		return fmt.Errorf("creating macos-var-log-install.log in zip: %w", err)
-	}
-
-	installLog, err := os.Open("/var/log/install.log")
-	if err != nil {
-		return fmt.Errorf("opening /var/log/install.log: %w", err)
-	}
-	defer installLog.Close()
-
-	if _, err := io.Copy(out, installLog); err != nil {
-		return fmt.Errorf("writing /var/log/install.log contents to zip: %w", err)
-	}
-
-	return nil
+	return addFileToZip(z, "/var/log/install.log")
 }

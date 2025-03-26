@@ -12,7 +12,11 @@ import (
 
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
+	_ "modernc.org/sqlite"
 )
 
 var onepasswordDataFiles = map[string][]string{
@@ -24,7 +28,7 @@ var onepasswordDataFiles = map[string][]string{
 	},
 }
 
-func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
+func OnePasswordAccounts(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("user_email"),
@@ -39,7 +43,7 @@ func OnePasswordAccounts(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", "kolide_onepassword_accounts"),
 	}
 
-	return table.NewPlugin("kolide_onepassword_accounts", columns, o.generate)
+	return tablewrapper.New(flags, slogger, "kolide_onepassword_accounts", columns, o.generate)
 }
 
 type onePasswordAccountsTable struct {
@@ -49,6 +53,9 @@ type onePasswordAccountsTable struct {
 // generate the onepassword account info results given the path to a
 // onepassword sqlite DB
 func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo userFileInfo) ([]map[string]string, error) {
+	_, span := traces.StartSpan(ctx, "path", fileInfo.path)
+	defer span.End()
+
 	dir, err := agent.MkdirTemp("kolide_onepassword_accounts")
 	if err != nil {
 		return nil, fmt.Errorf("creating kolide_onepassword_accounts tmp dir: %w", err)
@@ -60,7 +67,7 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 		return nil, fmt.Errorf("copying sqlite db to tmp dir: %w", err)
 	}
 
-	db, err := sql.Open("sqlite3", dst)
+	db, err := sql.Open("sqlite", dst)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to sqlite db: %w", err)
 	}
@@ -70,7 +77,20 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 	if err != nil {
 		return nil, fmt.Errorf("query rows from onepassword account configuration db: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			o.slogger.Log(ctx, slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	var results []map[string]string
 	for rows.Next() {
@@ -92,6 +112,9 @@ func (o *onePasswordAccountsTable) generateForPath(ctx context.Context, fileInfo
 }
 
 func (o *onePasswordAccountsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_onepassword_accounts")
+	defer span.End()
+
 	var results []map[string]string
 	osDataFiles, ok := onepasswordDataFiles[runtime.GOOS]
 	if !ok {

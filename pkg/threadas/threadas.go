@@ -21,10 +21,14 @@
 package threadas
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"syscall"
 	"time"
+
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 const (
@@ -75,7 +79,7 @@ func ThreadAs(fn func() error, timeout time.Duration, uid uint32, gid uint32) er
 	// sequence starting the child and our listener.
 	errChan := make(chan error, 1)
 
-	go func() {
+	gowrapper.GoWithRecoveryAction(context.TODO(), slog.Default(), func() {
 		// Calling LockOSThread, without a subsequent Unlock,
 		// will cause the thread to terminate when the
 		// goroutine does. This seems simpler than resetting
@@ -95,7 +99,9 @@ func ThreadAs(fn func() error, timeout time.Duration, uid uint32, gid uint32) er
 		}
 
 		errChan <- fn()
-	}()
+	}, func(r any) {
+		errChan <- fmt.Errorf("thread permissions handler panic: %v", r)
+	})
 
 	select {
 	case err := <-errChan:

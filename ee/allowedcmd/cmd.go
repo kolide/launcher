@@ -4,23 +4,68 @@ package allowedcmd
 // We mostly use hardcoded (known, safe) paths to executables, but make an exception
 // to allow for looking up executable locations when it's not possible to know these
 // locations in advance -- e.g. on NixOS, we cannot know the specific store path ahead
-// of time.
+// of time. All usage of exec.Cmd in launcher should use this package.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/kolide/launcher/pkg/traces"
 )
 
-type AllowedCommand func(ctx context.Context, arg ...string) (*exec.Cmd, error)
+type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
 
-func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *exec.Cmd {
-	return exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
+type TracedCmd struct {
+	Ctx context.Context // nolint:containedctx // This is an approved usage of context for short lived cmd
+	*exec.Cmd
 }
 
-func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*exec.Cmd, error) {
+// Start overrides the Start method to add tracing before executing the command.
+func (t *TracedCmd) Start() error {
+	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	defer span.End()
+
+	return t.Cmd.Start() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
+}
+
+// Run overrides the Run method to add tracing before running the command.
+func (t *TracedCmd) Run() error {
+	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	defer span.End()
+
+	return t.Cmd.Run() //nolint:forbidigo // This is our approved usage of t.Cmd.Run()
+}
+
+// Output overrides the Output method to add tracing before capturing output.
+func (t *TracedCmd) Output() ([]byte, error) {
+	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	defer span.End()
+
+	return t.Cmd.Output() //nolint:forbidigo // This is our approved usage of t.Cmd.Output()
+}
+
+// CombinedOutput overrides the CombinedOutput method to add tracing before capturing combined output.
+func (t *TracedCmd) CombinedOutput() ([]byte, error) {
+	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	defer span.End()
+
+	return t.Cmd.CombinedOutput() //nolint:forbidigo // This is our approved usage of t.Cmd.CombinedOutput()
+}
+
+func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+	return &TracedCmd{
+		Ctx: ctx,
+		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...), //nolint:forbidigo // This is our approved usage of exec.CommandContext
+	}
+}
+
+var ErrCommandNotFound = errors.New("command not found")
+
+func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*TracedCmd, error) {
 	knownPath = filepath.Clean(knownPath)
 
 	if _, err := os.Stat(knownPath); err == nil {
@@ -31,7 +76,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 	// We expect to know the exact location for allowlisted commands on all
 	// OSes except for a few Linux distros.
 	if !allowSearchPath() {
-		return nil, fmt.Errorf("not found: %s", knownPath)
+		return nil, fmt.Errorf("%w: %s", ErrCommandNotFound, knownPath)
 	}
 
 	cmdName := filepath.Base(knownPath)
@@ -39,7 +84,7 @@ func validatedCommand(ctx context.Context, knownPath string, arg ...string) (*ex
 		return newCmd(ctx, foundPath, arg...), nil
 	}
 
-	return nil, fmt.Errorf("%s not found at %s and could not be located elsewhere", cmdName, knownPath)
+	return nil, fmt.Errorf("%w: not found at %s and could not be located elsewhere", ErrCommandNotFound, knownPath)
 }
 
 func allowSearchPath() bool {

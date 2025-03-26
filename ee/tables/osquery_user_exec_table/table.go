@@ -22,7 +22,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -38,7 +41,7 @@ type Table struct {
 }
 
 func TablePlugin(
-	slogger *slog.Logger, tablename string, osqueryd string,
+	flags types.Flags, slogger *slog.Logger, tablename string, osqueryd string,
 	osqueryQuery string, columns []table.ColumnDefinition,
 ) *table.Plugin {
 	columns = append(columns, table.TextColumn("user"))
@@ -50,10 +53,13 @@ func TablePlugin(
 		tablename: tablename,
 	}
 
-	return table.NewPlugin(t.tablename, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tablename, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tablename)
+	defer span.End()
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "user",

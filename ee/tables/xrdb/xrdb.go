@@ -13,14 +13,15 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"strconv"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -34,7 +35,7 @@ type XRDBSettings struct {
 	getBytes execer
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("key"),
 		table.TextColumn("value"),
@@ -47,10 +48,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		getBytes: execXRDB,
 	}
 
-	return table.NewPlugin("kolide_xrdb", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_xrdb", columns, t.generate)
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_xrdb")
+	defer span.End()
+
 	var results []map[string]string
 
 	users := tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithAllowedCharacters(allowedUsernameCharacters))
@@ -86,43 +90,15 @@ func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryCon
 // execXRDB writes the output of running 'xrdb' command into the
 // supplied bytes buffer
 func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	u, err := user.Lookup(username)
 	if err != nil {
 		return fmt.Errorf("finding user by username '%s': %w", username, err)
 	}
 
-	cmd, err := allowedcmd.Xrdb(ctx, "-display", displayNum, "-global", "-query")
-	if err != nil {
-		return fmt.Errorf("creating xrdb command: %w", err)
-	}
-
-	// set the HOME cmd so that xrdb is exec'd properly as the new user.
-	cmd.Env = append(cmd.Env, fmt.Sprintf("HOME=%s", u.HomeDir))
-
-	// Check if the supplied UID is that of the current user
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("checking current user uid: %w", err)
-	}
-
-	if u.Uid != currentUser.Uid {
-		uid, err := strconv.ParseInt(u.Uid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting uid from string to int: %w", err)
-		}
-		gid, err := strconv.ParseInt(u.Gid, 10, 32)
-		if err != nil {
-			return fmt.Errorf("converting gid from string to int: %w", err)
-		}
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{
-			Uid: uint32(uid),
-			Gid: uint32(gid),
-		}
-	}
+	var stderr bytes.Buffer
 
 	dir, err := agent.MkdirTemp("osq-xrdb")
 	if err != nil {
@@ -133,12 +109,14 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 	if err := os.Chmod(dir, 0755); err != nil {
 		return fmt.Errorf("chmod: %w", err)
 	}
-	cmd.Dir = dir
-	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
-	cmd.Stdout = buf
 
-	if err := cmd.Run(); err != nil {
+	args := []string{"-display", displayNum, "-global", "-query"}
+	// set the HOME cmd so that xrdb is exec'd properly as the new user.
+	if err := tablehelpers.Run(ctx, multislogger.NewNopLogger(), 45, allowedcmd.Xrdb, args, buf, &stderr,
+		tablehelpers.WithUid(u.Uid),
+		tablehelpers.WithAppendEnv("HOME", u.HomeDir),
+		tablehelpers.WithDir(dir),
+	); err != nil {
 		return fmt.Errorf("running xrdb, err is: %s: %w", stderr.String(), err)
 	}
 
@@ -146,6 +124,9 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 }
 
 func (t *XRDBSettings) parse(ctx context.Context, display, username string, input io.Reader) []map[string]string {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var results []map[string]string
 
 	scanner := bufio.NewScanner(input)

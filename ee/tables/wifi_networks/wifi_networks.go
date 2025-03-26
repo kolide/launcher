@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,9 +15,13 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -40,7 +45,7 @@ type Table struct {
 	getBytes execer
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := dataflattentable.Columns()
 
 	t := &Table{
@@ -48,10 +53,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		getBytes: execPwsh(slogger),
 	}
 
-	return table.NewPlugin("kolide_wifi_networks", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_wifi_networks", columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_wifi_networks")
+	defer span.End()
+
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var results []map[string]string
@@ -70,10 +78,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
-		// MS requires interfaces to complete network scans in <4 seconds, but
-		// that appears not to be consistent
-		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
-		defer cancel()
+		ctx, span := traces.StartSpan(ctx)
+		defer span.End()
 
 		// write the c# code to a file, so the powershell script can load it
 		// from there. This works around a size limit on args passed to
@@ -90,16 +96,9 @@ func execPwsh(slogger *slog.Logger) execer {
 		}
 
 		args := append([]string{"-NoProfile", "-NonInteractive"}, string(pwshScript))
-		cmd, err := allowedcmd.Powershell(ctx, args...)
-		if err != nil {
-			return fmt.Errorf("creating powershell command: %w", err)
-		}
-		cmd.Dir = dir
 		var stderr bytes.Buffer
-		cmd.Stdout = buf
-		cmd.Stderr = &stderr
 
-		err = cmd.Run()
+		err = tablehelpers.Run(ctx, slogger, 45, allowedcmd.Powershell, args, buf, &stderr, tablehelpers.WithDir(dir))
 		errOutput := stderr.String()
 		// sometimes the powershell script logs errors to stderr, but returns a
 		// successful execution code.
@@ -112,7 +111,7 @@ func execPwsh(slogger *slog.Logger) execer {
 			)
 
 			if err == nil {
-				err = fmt.Errorf("exec succeeded, but emitted to stderr")
+				err = errors.New("exec succeeded, but emitted to stderr")
 			}
 			return fmt.Errorf("execing powershell, got: %s: %w", errOutput, err)
 		}

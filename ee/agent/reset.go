@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/traces"
@@ -56,10 +58,18 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	k.Slogger().Log(ctx, slog.LevelDebug, "checking to see if database should be reset...")
-
 	serialChanged := false
 	hardwareUUIDChanged := false
+	munemoChanged := false
+
+	defer func() {
+		k.Slogger().Log(ctx, slog.LevelDebug, "finished check to see if database should be reset...",
+			"serial", serialChanged,
+			"hardware_uuid", hardwareUUIDChanged,
+			"munemo", munemoChanged,
+		)
+	}()
+
 	currentSerial, currentHardwareUUID, err := currentSerialAndHardwareUUID(ctx, k)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current serial and hardware UUID", "err", err)
@@ -68,7 +78,6 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		hardwareUUIDChanged = valueChanged(ctx, k, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
-	munemoChanged := false
 	currentTenantMunemo, err := currentMunemo(k)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelWarn, "could not get current munemo", "err", err)
@@ -77,16 +86,16 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	}
 
 	if serialChanged || hardwareUUIDChanged || munemoChanged {
-		k.Slogger().Log(ctx, slog.LevelWarn, "detected new hardware or enrollment",
-			"serial_changed", serialChanged,
-			"hardware_uuid_changed", hardwareUUIDChanged,
-			"tenant_munemo_changed", munemoChanged,
-		)
-
 		// In the future, we can proceed with backing up and resetting the database.
 		// For now, we are only logging that we detected the change until we have a dependable
 		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
 		/*
+			k.Slogger().Log(ctx, slog.LevelWarn, "resetting the database",
+				"serial_changed", serialChanged,
+				"hardware_uuid_changed", hardwareUUIDChanged,
+				"tenant_munemo_changed", munemoChanged,
+			)
+
 			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
 				k.Slogger().Log(ctx, slog.LevelError, "failed to reset database", "err", err)
 			}
@@ -282,10 +291,20 @@ func currentMunemo(k types.Knapsack) (string, error) {
 // as a record of the current state of this database before reset. It appends this record
 // to previous records if they exist, and returns the collection ready for storage.
 func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetReason string) ([]byte, error) { // nolint:unused
-	nodeKey, err := k.ConfigStore().Get([]byte("nodeKey"))
-	if err != nil {
-		k.Slogger().Log(ctx, slog.LevelWarn, "could not get node key from store", "err", err)
+	nodeKeys := make([]string, 0)
+	for _, registrationId := range k.RegistrationIDs() {
+		nodeKey, err := k.ConfigStore().Get(storage.KeyByIdentifier([]byte("nodeKey"), storage.IdentifierTypeRegistration, []byte(registrationId)))
+		if err != nil {
+			k.Slogger().Log(ctx, slog.LevelWarn,
+				"could not get node key from store",
+				"registration_id", registrationId,
+				"err", err,
+			)
+			continue
+		}
+		nodeKeys = append(nodeKeys, string(nodeKey))
 	}
+	nodeKey := strings.Join(nodeKeys, ",")
 
 	localPubKey, err := getLocalPubKey(k)
 	if err != nil {
@@ -323,7 +342,7 @@ func prepareDatabaseResetRecords(ctx context.Context, k types.Knapsack, resetRea
 	}
 
 	dataToStore := dbResetRecord{
-		NodeKey:        string(nodeKey),
+		NodeKey:        nodeKey,
 		PubKeys:        [][]byte{localPubKey},
 		Serial:         string(serial),
 		HardwareUUID:   string(hardwareUuid),

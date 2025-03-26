@@ -15,12 +15,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -32,7 +34,7 @@ type Table struct {
 	execCC    allowedcmd.AllowedCommand
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	columns := dataflattentable.Columns(
 		table.TextColumn("username"),
@@ -44,10 +46,13 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		execCC:    allowedcmd.Pwpolicy,
 	}
 
-	return table.NewPlugin(t.tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	defer span.End()
+
 	var results []map[string]string
 
 	for _, pwpolicyUsername := range tablehelpers.GetConstraints(queryContext, "username", tablehelpers.WithDefaults("")) {
@@ -93,25 +98,18 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) execPwpolicy(ctx context.Context, args []string) ([]byte, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd, err := t.execCC(ctx, args...)
-	if err != nil {
-		return nil, fmt.Errorf("creating command: %w", err)
-	}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
 	t.slogger.Log(ctx, slog.LevelDebug,
 		"calling pwpolicy",
-		"args", cmd.Args,
+		"args", args,
 	)
 
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, 30, t.execCC, args, &stdout, &stderr); err != nil {
 		return nil, fmt.Errorf("calling pwpolicy. Got: %s: %w", stderr.String(), err)
 	}
 

@@ -4,11 +4,14 @@
 package tuf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // executableLocation returns the path to the executable in `updateDirectory`.
@@ -22,7 +25,10 @@ func executableLocation(updateDirectory string, binary autoupdatableBinary) stri
 //
 // Windows does not have executable bits, so we omit those. And
 // instead check the file extension.
-func checkExecutablePermissions(potentialBinary string) error {
+func checkExecutablePermissions(ctx context.Context, potentialBinary string) error {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if potentialBinary == "" {
 		return errors.New("empty string isn't executable")
 	}

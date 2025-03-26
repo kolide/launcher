@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/rsa"
 	"crypto/tls"
 	_ "embed"
 	"errors"
@@ -15,18 +14,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/krypto"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
 
 // Special Kolide Ports
-var portList = []int{
+var PortList = []int{
 	12519,
 	40978,
 	52115,
@@ -50,12 +49,8 @@ type localServer struct {
 	kolideServer string
 	cancel       context.CancelFunc
 
-	myKey                 *rsa.PrivateKey
-	myLocalDbSigner       crypto.Signer
-	myLocalHardwareSigner crypto.Signer
-
-	serverKey   *rsa.PublicKey
-	serverEcKey *ecdsa.PublicKey
+	myLocalDbSigner crypto.Signer
+	serverEcKey     *ecdsa.PublicKey
 }
 
 const (
@@ -63,17 +58,20 @@ const (
 	defaultRateBurst = 10
 )
 
-func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
+type presenceDetector interface {
+	DetectPresence(reason string, interval time.Duration) (time.Duration, error)
+}
+
+func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetector) (*localServer, error) {
 	_, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	ls := &localServer{
-		slogger:               k.Slogger().With("component", "localserver"),
-		knapsack:              k,
-		limiter:               rate.NewLimiter(defaultRateLimit, defaultRateBurst),
-		kolideServer:          k.KolideServerURL(),
-		myLocalDbSigner:       agent.LocalDbKeys(),
-		myLocalHardwareSigner: agent.HardwareKeys(),
+		slogger:         k.Slogger().With("component", "localserver"),
+		knapsack:        k,
+		limiter:         rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		kolideServer:    k.KolideServerURL(),
+		myLocalDbSigner: agent.LocalDbKeys(),
 	}
 
 	// TODO: As there may be things that adjust the keys during runtime, we need to persist that across
@@ -82,14 +80,15 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 		return nil, err
 	}
 
-	// Consider polling this on an interval, so we get updates.
-	privateKey, err := osquery.PrivateRSAKeyFromDB(k.ConfigStore())
+	munemo, err := getMunemoFromEnrollSecret(k)
 	if err != nil {
-		return nil, fmt.Errorf("fetching private key: %w", err)
+		ls.slogger.Log(ctx, slog.LevelError,
+			"getting munemo from enroll secret, not fatal, continuing",
+			"err", err,
+		)
 	}
-	ls.myKey = privateKey
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, ls.myLocalHardwareSigner, *ls.serverEcKey)
+	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
@@ -111,6 +110,23 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// /v0/cmd left for transition period
 	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
+	trustedDt4aKeys, err := dt4aKeys()
+	if err != nil {
+		return nil, fmt.Errorf("loading dt4a keys %w", err)
+	}
+
+	dt4aAuthMiddleware := &dt4aAuthMiddleware{
+		counterPartyKeys: trustedDt4aKeys,
+		slogger:          k.Slogger().With("component", "dt4a_auth_middleware"),
+	}
+
+	// In the future, we will want to make this authenticated; for now, it is not authenticated.
+	// TODO: make this authenticated or remove
+	mux.Handle("/zta", ls.requestDt4aInfoHandler())
+
+	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
+	mux.Handle("/v3/accelerate", dt4aAuthMiddleware.Wrap(ls.requestDt4aAccelerationHandler()))
+
 	// uncomment to test without going through middleware
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'
@@ -119,11 +135,19 @@ func New(ctx context.Context, k types.Knapsack) (*localServer, error) {
 	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
 	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	// curl localhost:40978/id
+	// mux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
-		Handler: otelhttp.NewHandler(ls.requestLoggingHandler(ls.preflightCorsHandler(ls.rateLimitHandler(mux))), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-			return r.URL.Path
-		})),
+		Handler: otelhttp.NewHandler(
+			ls.requestLoggingHandler(
+				ls.preflightCorsHandler(
+					ls.rateLimitHandler(
+						mux,
+					),
+				)), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.URL.Path
+			})),
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
@@ -141,11 +165,10 @@ func (ls *localServer) SetQuerier(querier Querier) {
 }
 
 func (ls *localServer) LoadDefaultKeyIfNotSet() error {
-	if ls.serverKey != nil {
+	if ls.serverEcKey != nil {
 		return nil
 	}
 
-	serverRsaCertPem := k2RsaServerCert
 	serverEccCertPem := k2EccServerCert
 
 	ctx := context.TODO()
@@ -157,14 +180,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 			"using developer certificates",
 		)
 
-		serverRsaCertPem = localhostRsaServerCert
 		serverEccCertPem = localhostEccServerCert
 	case strings.HasSuffix(ls.kolideServer, ".herokuapp.com"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using review app certificates",
 		)
 
-		serverRsaCertPem = reviewRsaServerCert
 		serverEccCertPem = reviewEccServerCert
 	default:
 		ls.slogger.Log(ctx, slogLevel,
@@ -172,22 +193,12 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 		)
 	}
 
-	serverKeyRaw, err := krypto.KeyFromPem([]byte(serverRsaCertPem))
-	if err != nil {
-		return fmt.Errorf("parsing default public key: %w", err)
-	}
-
-	serverKey, ok := serverKeyRaw.(*rsa.PublicKey)
-	if !ok {
-		return errors.New("public key not an rsa public key")
-	}
-
-	ls.serverKey = serverKey
-
-	ls.serverEcKey, err = echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
+	serverEcKey, err := echelper.PublicPemToEcdsaKey([]byte(serverEccCertPem))
 	if err != nil {
 		return fmt.Errorf("parsing default server ec key: %w", err)
 	}
+
+	ls.serverEcKey = serverEcKey
 
 	return nil
 }
@@ -234,7 +245,7 @@ func (ls *localServer) Start() error {
 	var ctx context.Context
 	ctx, ls.cancel = context.WithCancel(context.Background())
 
-	go func() {
+	gowrapper.Go(ctx, ls.slogger, func() {
 		var lastRun time.Time
 
 		ticker := time.NewTicker(pollInterval)
@@ -259,14 +270,14 @@ func (ls *localServer) Start() error {
 				}
 			}
 		}
-	}()
+	})
 
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
 	}
 
-	if ls.tlsCerts != nil && len(ls.tlsCerts) > 0 {
+	if len(ls.tlsCerts) > 0 {
 		ls.slogger.Log(ctx, slog.LevelDebug,
 			"using TLS",
 		)
@@ -324,7 +335,7 @@ func (ls *localServer) Interrupt(_ error) {
 func (ls *localServer) startListener() (net.Listener, error) {
 	ctx := context.TODO()
 
-	for _, p := range portList {
+	for _, p := range PortList {
 		ls.slogger.Log(ctx, slog.LevelDebug,
 			"trying port",
 			"port", p,
@@ -364,6 +375,9 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Headers",
 			"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
+		// We need this for device trust to work in newer versions of Chrome with experimental features toggled on
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
 		// Some modern chrome and derivatives use Access-Control-Allow-Private-Network
 		// https://developer.chrome.com/blog/private-network-access-preflight/
 		// Though it's unclear if this is still needed, see https://developer.chrome.com/blog/private-network-access-update/
@@ -392,4 +406,36 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// getMunemoFromEnrollSecret extracts the munemo from the enroll secret
+func getMunemoFromEnrollSecret(k types.Knapsack) (string, error) {
+	enrollSecret, err := k.ReadEnrollSecret()
+	if err != nil {
+		return "", err
+	}
+
+	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
+	}
+
+	org, ok := claims["organization"]
+	if !ok {
+		return "", errors.New("no organization claim")
+	}
+
+	// convert org to string
+	munemo, ok := org.(string)
+	if !ok {
+		return "", errors.New("organization claim not a string")
+	}
+
+	return munemo, nil
 }

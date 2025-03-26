@@ -3,6 +3,7 @@ package wix
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
@@ -161,6 +163,15 @@ func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts .
 // Cleanup removes temp directories. Meant to be called in a defer.
 func (wo *wixTool) Cleanup() {
 	if wo.skipCleanup {
+		// if the wix_skip_cleanup flag is set, we don't want to clean up the temp directories
+		// this is useful when debugging wix generation
+		// print the directories that would be cleaned up so they can be easily found
+		// and inspected
+		fmt.Print("skipping cleanup of temp directories\n")
+		for _, d := range wo.cleanDirs {
+			fmt.Printf("skipping cleanup of %s\n", d)
+		}
+
 		return
 	}
 
@@ -223,19 +234,93 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	}
 	defer heatWrite.Close()
 
+	type archSpecificBinDir string
+
+	const (
+		none  archSpecificBinDir = ""
+		amd64 archSpecificBinDir = "amd64"
+		arm64 archSpecificBinDir = "arm64"
+	)
+	currentArchSpecificBinDir := none
+
+	baseSvcName := wo.services[0].serviceInstall.Id
+
 	lines := strings.Split(string(heatContent), "\n")
 	for _, line := range lines {
+
+		if currentArchSpecificBinDir != none && strings.Contains(line, "</Directory>") {
+			// were in a arch specific bin dir that we want to remove, don't write closing tag
+			currentArchSpecificBinDir = none
+			continue
+		}
+
+		// the directory tag will look like "<Directory Id="xxxx"...>"
+		// so we just check for the first part of the string
+		if strings.Contains(line, "<Directory") {
+			if strings.Contains(line, string(amd64)) {
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
+				currentArchSpecificBinDir = amd64
+				continue
+			}
+
+			if strings.Contains(line, string(arm64)) {
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
+				currentArchSpecificBinDir = arm64
+				continue
+			}
+		}
+
 		heatWrite.WriteString(line)
 		heatWrite.WriteString("\n")
+
 		for _, service := range wo.services {
+
 			isMatch, err := service.Match(line)
 			if err != nil {
 				return fmt.Errorf("match error: %w", err)
 			}
+
 			if isMatch {
+				if currentArchSpecificBinDir == none {
+					return errors.New("service found, but not in a bin directory")
+				}
+
+				// make sure elements are not duplicated in any service
+				serviceId := fmt.Sprintf("%s%s", baseSvcName, ulid.New())
+				service.serviceControl.Id = serviceId
+				service.serviceInstall.Id = serviceId
+				service.serviceInstall.ServiceConfig.Id = serviceId
+
+				// unfortunately, the UtilServiceConfig uses the name of the launcher service as a primary key
+				// since we have multiple services with the same name, we can't have multiple UtilServiceConfigs
+				// so we are skipping it for arm64 since it's a much smaller portion of our user base. The correct
+				// UtilServiceConfig will set when launcher starts up.
+				if currentArchSpecificBinDir == arm64 {
+					service.serviceInstall.UtilServiceConfig = nil
+				}
+
+				// create a condition based on architecture
+				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				heatWrite.WriteString("\n")
+
 				if err := service.Xml(heatWrite); err != nil {
 					return fmt.Errorf("adding service: %w", err)
 				}
+
+				continue
+			}
+
+			if strings.Contains(line, "osqueryd.exe") {
+				if currentArchSpecificBinDir == none {
+					return errors.New("osqueryd.exe found, but not in a bin directory")
+				}
+
+				// create a condition based on architecture
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				heatWrite.WriteString("\n")
 			}
 		}
 	}
@@ -261,19 +346,6 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 
 	if err := os.MkdirAll(dataFilesPath, fsutil.DirMode); err != nil {
 		return fmt.Errorf("create base data dir error for wix harvest: %w", err)
-	}
-
-	// touch these known file names before harvest to ensure they're cleaned up on uninstall
-	dataFilenames := []string{"launcher.db", "metadata.json", "kv.sqlite"}
-
-	for _, fname := range dataFilenames {
-		newPath := filepath.Join(dataFilesPath, fname)
-		newFile, err := os.Create(newPath)
-		if err != nil {
-			return err
-		}
-
-		newFile.Close()
 	}
 
 	_, err = wo.execOut(ctx,

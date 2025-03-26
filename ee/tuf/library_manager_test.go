@@ -209,7 +209,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
-			require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+			require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
@@ -446,7 +446,7 @@ func TestTidyLibrary(t *testing.T) {
 		expectedRemovedVersions   []string
 	}{
 		{
-			testCaseName: "more than 3 versions, currently running executable is within 3 newest",
+			testCaseName: "more than 2 versions, currently running executable is within 2 newest",
 			existingVersions: map[string]bool{
 				"1.0.3":  true,
 				"1.0.1":  true,
@@ -458,15 +458,15 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"1.0.3",
 				"1.0.1",
-				"1.0.0",
 			},
 			expectedRemovedVersions: []string{
+				"1.0.0",
 				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, currently running executable is not within 3 newest",
+			testCaseName: "more than 2 versions, currently running executable is not within 2 newest",
 			existingVersions: map[string]bool{
 				"2.0.3":   true,
 				"2.0.1":   true,
@@ -477,16 +477,16 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.12.10",
 			expectedPreservedVersions: []string{
 				"2.0.3",
-				"2.0.1",
 				"1.12.10",
 			},
 			expectedRemovedVersions: []string{
+				"2.0.1",
 				"2.0.0",
 				"1.13.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, currently running executable is not in update directory",
+			testCaseName: "more than 2 versions, currently running executable is not in update directory",
 			existingVersions: map[string]bool{
 				"0.20.3": true,
 				"0.19.1": true,
@@ -497,16 +497,16 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.12.10",
 			expectedPreservedVersions: []string{
 				"0.20.3",
-				"0.19.1",
 			},
 			expectedRemovedVersions: []string{
+				"0.19.1",
 				"0.17.0",
 				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes invalid semver",
+			testCaseName: "more than 2 versions, includes invalid semver",
 			existingVersions: map[string]bool{
 				"5.8.0":        true,
 				"5.7.1":        true,
@@ -519,16 +519,16 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"5.8.0",
 				"5.7.1",
-				"5.6.2",
 			},
 			expectedRemovedVersions: []string{
 				"not_a_semver",
+				"5.6.2",
 				"5.5.5",
 				"5.2.0",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes invalid executable within 3 newest",
+			testCaseName: "more than 2 versions, includes invalid executable within 2 newest",
 			existingVersions: map[string]bool{
 				"1.0.3":  true,
 				"1.0.1":  false,
@@ -540,15 +540,15 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"1.0.3",
 				"1.0.0",
-				"0.13.6",
 			},
 			expectedRemovedVersions: []string{
 				"1.0.1",
+				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes dev versions",
+			testCaseName: "more than 2 versions, includes dev versions",
 			existingVersions: map[string]bool{
 				"1.0.3":             true,
 				"1.0.3-9-g9c4a5ee":  true,
@@ -559,24 +559,22 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.0.1-13-deadbeef",
 			expectedPreservedVersions: []string{
 				"1.0.3",
-				"1.0.3-9-g9c4a5ee",
 				"1.0.1-13-deadbeef",
 			},
 			expectedRemovedVersions: []string{
+				"1.0.3-9-g9c4a5ee",
 				"1.0.1",
 				"1.0.0",
 			},
 		},
 		{
-			testCaseName: "fewer than 3 versions",
+			testCaseName: "fewer than 2 versions",
 			existingVersions: map[string]bool{
 				"1.0.3": true,
-				"1.0.1": true,
 			},
-			currentlyRunningVersion: "1.0.1",
+			currentlyRunningVersion: "1.0.3",
 			expectedPreservedVersions: []string{
 				"1.0.3",
-				"1.0.1",
 			},
 			expectedRemovedVersions: []string{},
 		},
@@ -681,11 +679,11 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect
@@ -721,11 +719,11 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm we don't have any invalid versions

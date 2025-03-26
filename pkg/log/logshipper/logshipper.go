@@ -19,7 +19,9 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/sendbuffer"
+	"github.com/kolide/launcher/pkg/traces"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -74,7 +76,10 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 	return ls
 }
 
-func (ls *LogShipper) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (ls *LogShipper) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	_, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// TODO: only make updates that are relevant to flag key changes
 	// calling ping does more work than needed
 	ls.Ping()
@@ -114,9 +119,10 @@ func (ls *LogShipper) Ping() {
 	}
 
 	ls.isShippingStarted = true
-	go func() {
+	gowrapper.Go(context.TODO(), ls.knapsack.Slogger(), func() {
 		ls.startShippingChan <- struct{}{}
-	}()
+	})
+
 }
 
 func (ls *LogShipper) Run() error {
@@ -193,6 +199,7 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 	versionInfo := version.Version()
 	deviceInfo["launcher_version"] = versionInfo.Version
 	deviceInfo["os"] = runtime.GOOS
+	deviceInfo["osquery_version"] = ls.knapsack.CurrentRunningOsqueryVersion()
 
 	ls.shippingLogger = log.With(ls.shippingLogger, "launcher_version", versionInfo.Version)
 
@@ -268,7 +275,7 @@ func (ls *LogShipper) updateSenderAuthToken() error {
 	}
 
 	if len(token) == 0 {
-		return fmt.Errorf("no token found")
+		return errors.New("no token found")
 	}
 
 	ls.sender.authtoken = string(token)
@@ -306,7 +313,7 @@ func (ls *LogShipper) updateLogShippingLevel() {
 		ls.slogLevel.Set(slog.LevelWarn)
 	case "error":
 		ls.slogLevel.Set(slog.LevelError)
-	case "default":
+	default:
 		ls.knapsack.Slogger().Log(context.TODO(), slog.LevelError,
 			"unrecognized flag value for log shipping level",
 			"flag_value", ls.knapsack.LogShippingLevel(),

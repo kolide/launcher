@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -23,9 +21,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 
 	defaultMockKnapsack := func() types.Knapsack {
 		m := mocks.NewKnapsack(t)
-		m.On("ConfigStore").Return(storageci.NewStore(t, slogger, storage.ConfigStore.String()))
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(slogger)
+		m.On("ReadEnrollSecret").Return("enroll_secret", nil)
 		return m
 	}
 
@@ -47,10 +45,11 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 			expectedInterval: 250 * time.Millisecond,
 			mockKnapsack: func() types.Knapsack {
 				m := mocks.NewKnapsack(t)
-				m.On("ConfigStore").Return(storageci.NewStore(t, slogger, storage.ConfigStore.String()))
 				m.On("KolideServerURL").Return("localhost")
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
+				m.On("SetDistributedForwardingIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(slogger)
+				m.On("ReadEnrollSecret").Return("enroll_secret", nil)
 				return m
 			},
 		},

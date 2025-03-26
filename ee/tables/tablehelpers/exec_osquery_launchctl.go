@@ -11,23 +11,24 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/traces"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.
 func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username string, osqueryPath string, query string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
-	defer cancel()
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
 
 	targetUser, err := user.Lookup(username)
 	if err != nil {
 		return nil, fmt.Errorf("looking up username %s: %w", username, err)
 	}
 
-	cmd, err := allowedcmd.Launchctl(ctx,
+	args := []string{
 		"asuser",
 		targetUser.Uid,
 		osqueryPath,
@@ -39,9 +40,6 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 		"-S",
 		"--json",
 		query,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating launchctl command: %w", err)
 	}
 
 	dir, err := agent.MkdirTemp("osq-launchctl")
@@ -54,20 +52,18 @@ func ExecOsqueryLaunchctl(ctx context.Context, timeoutSeconds int, username stri
 		return nil, fmt.Errorf("chmod: %w", err)
 	}
 
-	cmd.Dir = dir
-
-	stdout, stderr := new(bytes.Buffer), new(bytes.Buffer)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-
-	if err := cmd.Run(); err != nil {
+	var stdout, stderr bytes.Buffer
+	if err := Run(ctx, multislogger.NewNopLogger(), timeoutSeconds, allowedcmd.Launchctl, args, &stdout, &stderr, WithDir(dir)); err != nil {
 		return nil, fmt.Errorf("running osquery. Got: '%s': %w", stderr.String(), err)
 	}
 
 	return stdout.Bytes(), nil
-
 }
 
 func ExecOsqueryLaunchctlParsed(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, username string, osqueryPath string, query string) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	outBytes, err := ExecOsqueryLaunchctl(ctx, timeoutSeconds, username, osqueryPath, query)
 	if err != nil {
 		return nil, err

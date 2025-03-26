@@ -49,7 +49,7 @@ func TestUserServer_authMiddleware(t *testing.T) {
 			var logBytes bytes.Buffer
 			server, _ := testServer(t, validAuthHeader, testSocketPath(t), &logBytes)
 
-			req, err := http.NewRequest("GET", "https://127.0.0.1:8080", nil)
+			req, err := http.NewRequest("GET", "https://127.0.0.1:8080", nil) //nolint:noctx // We don't care about this in tests
 			require.NoError(t, err)
 
 			if tt.authHeader != "" {
@@ -92,7 +92,7 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 				<-shutdownChan
 			}()
 
-			req, err := http.NewRequest("", "", nil)
+			req, err := http.NewRequest("", "", nil) //nolint:noctx // We don't care about this in tests
 			require.NoError(t, err)
 
 			handler := http.HandlerFunc(server.shutdownHandler)
@@ -121,7 +121,7 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 		Level:     slog.LevelDebug,
 	}))
 
-	server, err := New(slogger, authHeader, socketPath, shutdownChan, nil)
+	server, err := New(slogger, authHeader, socketPath, shutdownChan, make(chan<- struct{}), nil)
 	require.NoError(t, err)
 	return server, shutdownChan
 }

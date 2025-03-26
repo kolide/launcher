@@ -6,7 +6,7 @@ We used to do this with gnumake rules, but as we added windows
 compatibility, we found make too limiting. Moving this into go allows
 us to write cleaner cross-platform code.
 */
-package make
+package make //nolint:predeclared
 
 import (
 	"bytes"
@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,8 +27,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
-	"go.opencensus.io/trace"
 )
 
 type Builder struct {
@@ -235,9 +232,6 @@ func (b *Builder) goVersionCompatible(logger log.Logger) error {
 }
 
 func (b *Builder) DepsGo(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "make.DepsGo")
-	defer span.End()
-
 	logger := ctxlog.FromContext(ctx)
 
 	level.Debug(logger).Log(
@@ -268,9 +262,6 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 	return func(ctx context.Context) error {
 		output := b.PlatformBinaryName(appName)
-
-		ctx, span := trace.StartSpan(ctx, fmt.Sprintf("make.BuildCmd.%s", appName))
-		defer span.End()
 
 		logger := ctxlog.FromContext(ctx)
 
@@ -308,6 +299,12 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, "-H windowsgui")
 		}
 
+		if b.os == "darwin" {
+			// Suppress warnings like "ld: warning: ignoring duplicate libraries: '-lobjc'"
+			// See: https://github.com/golang/go/issues/67799
+			ldFlags = append(ldFlags, "-extldflags=-Wl,-no_warn_duplicate_libraries")
+		}
+
 		if b.stampVersion {
 			v, err := b.getVersion(ctx)
 			if err != nil {
@@ -341,9 +338,6 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.buildUser=%s (%s)"`, usr.Name, usr.Username))
 			ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/kit/version.goVersion=%s"`, runtime.Version()))
 		}
-
-		// Set the build time for autoupdate.FindNewest
-		ldFlags = append(ldFlags, fmt.Sprintf(`-X "github.com/kolide/launcher/pkg/autoupdate.defaultBuildTimestamp=%s"`, strconv.FormatInt(time.Now().Unix(), 10)))
 
 		if len(ldFlags) != 0 {
 			baseArgs = append(baseArgs, fmt.Sprintf("--ldflags=%s", strings.Join(ldFlags, " ")))

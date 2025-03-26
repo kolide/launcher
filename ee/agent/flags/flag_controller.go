@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/exp/maps"
 )
 
@@ -65,13 +66,16 @@ func (fc *FlagController) getControlServerValue(key keys.FlagKey) []byte {
 
 // setControlServerValue stores a control-server-provided value in the agent flags store.
 func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) error {
+	ctx, span := traces.StartSpan(context.TODO(), "key", key.String())
+	defer span.End()
+
 	if fc == nil || fc.agentFlagsStore == nil {
 		return errors.New("agentFlagsStore is nil")
 	}
 
 	err := fc.agentFlagsStore.Set([]byte(key), value)
 	if err != nil {
-		fc.slogger.Log(context.TODO(), slog.LevelDebug,
+		fc.slogger.Log(ctx, slog.LevelDebug,
 			"failed to set control server key",
 			"key", key,
 			"err", err,
@@ -79,7 +83,7 @@ func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) 
 		return err
 	}
 
-	fc.notifyObservers(key)
+	fc.notifyObservers(ctx, key)
 
 	return nil
 }
@@ -87,6 +91,9 @@ func (fc *FlagController) setControlServerValue(key keys.FlagKey, value []byte) 
 // Update bulk replaces agent flags and stores them.
 // Observers will be notified of changed flags and deleted flags.
 func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
+	ctx, span := traces.StartSpan(context.Background())
+	defer span.End()
+
 	// Attempt to bulk replace the store with the key-values
 	deletedKeys, err := fc.agentFlagsStore.Update(kvPairs)
 
@@ -97,7 +104,7 @@ func (fc *FlagController) Update(kvPairs map[string]string) ([]string, error) {
 	changedKeys := append(updatedKeys, deletedKeys...)
 
 	// Now observers can be notified these keys have possibly changed
-	fc.notifyObservers(keys.ToFlagKeys(changedKeys)...)
+	fc.notifyObservers(ctx, keys.ToFlagKeys(changedKeys)...)
 
 	return changedKeys, err
 }
@@ -109,29 +116,56 @@ func (fc *FlagController) RegisterChangeObserver(observer types.FlagsChangeObser
 	fc.observers[observer] = append(fc.observers[observer], flagKeys...)
 }
 
+func (fc *FlagController) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
+	fc.observersMutex.Lock()
+	defer fc.observersMutex.Unlock()
+
+	if _, ok := fc.observers[observer]; !ok {
+		// Nothing to do
+		return
+	}
+
+	delete(fc.observers, observer)
+}
+
 // notifyObservers informs all observers of the keys that they have changed.
-func (fc *FlagController) notifyObservers(flagKeys ...keys.FlagKey) {
+func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	fc.observersMutex.RLock()
-	defer fc.observersMutex.RUnlock()
+	span.AddEvent("observers_lock_acquired")
+	defer func() {
+		fc.observersMutex.RUnlock()
+		span.AddEvent("observers_lock_released")
+	}()
 
 	for observer, observedKeys := range fc.observers {
 		changedKeys := keys.Intersection(observedKeys, flagKeys)
 
 		if len(changedKeys) > 0 {
-			observer.FlagsChanged(changedKeys...)
+			observer.FlagsChanged(ctx, changedKeys...)
 		}
 	}
 }
 
-func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration, value any) {
+func (fc *FlagController) overrideFlag(ctx context.Context, key keys.FlagKey, duration time.Duration, value any) {
+	ctx, span := traces.StartSpan(ctx, "key", key.String())
+	defer span.End()
+
 	// Always notify observers when overrides start, so they know to refresh.
 	// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-	defer fc.notifyObservers(key)
+	defer fc.notifyObservers(ctx, key)
 
 	fc.overrideMutex.Lock()
-	defer fc.overrideMutex.Unlock()
+	span.AddEvent("override_lock_acquired")
 
-	fc.slogger.Log(context.TODO(), slog.LevelInfo,
+	defer func() {
+		fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_released")
+	}()
+
+	fc.slogger.Log(ctx, slog.LevelInfo,
 		"overriding flag",
 		"key", key,
 		"value", value,
@@ -146,12 +180,20 @@ func (fc *FlagController) overrideFlag(key keys.FlagKey, duration time.Duration,
 	}
 
 	overrideExpired := func(key keys.FlagKey) {
+		ctx, span := traces.StartSpan(context.TODO(), "key", key.String())
+		defer span.End()
+
 		// Always notify observers when overrides expire, so they know to refresh.
 		// Defering this before defering unlocking the mutex so that notifications occur outside of the critical section.
-		defer fc.notifyObservers(key)
+		defer fc.notifyObservers(ctx, key)
 
 		fc.overrideMutex.Lock()
-		defer fc.overrideMutex.Unlock()
+		span.AddEvent("override_lock_acquired")
+
+		defer func() {
+			fc.overrideMutex.Unlock()
+			span.AddEvent("override_lock_released")
+		}()
 
 		// Deleting the override implictly allows the next value to take precedence
 		delete(fc.overrides, key)
@@ -294,7 +336,10 @@ func (fc *FlagController) SetControlRequestInterval(interval time.Duration) erro
 	return fc.setControlServerValue(keys.ControlRequestInterval, durationToBytes(interval))
 }
 func (fc *FlagController) SetControlRequestIntervalOverride(value time.Duration, duration time.Duration) {
-	fc.overrideFlag(keys.ControlRequestInterval, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.ControlRequestInterval, duration, value)
 }
 func (fc *FlagController) ControlRequestInterval() time.Duration {
 	fc.overrideMutex.RLock()
@@ -306,6 +351,15 @@ func (fc *FlagController) ControlRequestInterval() time.Duration {
 		WithMin(5*time.Second),
 		WithMax(10*time.Minute),
 	).get(fc.getControlServerValue(keys.ControlRequestInterval))
+}
+
+func (fc *FlagController) SetAllowOverlyBroadDt4aAcceleration(enabled bool) error {
+	return fc.setControlServerValue(keys.AllowOverlyBroadDt4aAcceleration, boolToBytes(enabled))
+}
+func (fc *FlagController) AllowOverlyBroadDt4aAcceleration() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.AllowOverlyBroadDt4aAcceleration))
 }
 
 func (fc *FlagController) SetDisableControlTLS(disabled bool) error {
@@ -360,6 +414,27 @@ func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
 }
 
+func (fc *FlagController) SetDistributedForwardingInterval(interval time.Duration) error {
+	return fc.setControlServerValue(keys.DistributedForwardingInterval, durationToBytes(interval))
+}
+func (fc *FlagController) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.DistributedForwardingInterval, duration, value)
+}
+func (fc *FlagController) DistributedForwardingInterval() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return NewDurationFlagValue(fc.slogger, keys.DistributedForwardingInterval,
+		WithOverride(fc.overrides[keys.DistributedForwardingInterval]),
+		WithDefault(1*time.Minute),
+		WithMin(5*time.Second),
+		WithMax(5*time.Minute),
+	).get(fc.getControlServerValue(keys.DistributedForwardingInterval))
+}
+
 func (fc *FlagController) SetWatchdogEnabled(enable bool) error {
 	return fc.setControlServerValue(keys.WatchdogEnabled, boolToBytes(enable))
 }
@@ -404,20 +479,12 @@ func (fc *FlagController) OsqueryFlags() []string {
 	return fc.cmdLineOpts.OsqueryFlags
 }
 
-func (fc *FlagController) OsqueryTlsConfigEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsConfigEndpoint
+func (fc *FlagController) CurrentRunningOsqueryVersion() string {
+	return NewStringFlagValue(WithDefaultString("")).get(fc.getControlServerValue(keys.CurrentRunningOsqueryVersion))
 }
-func (fc *FlagController) OsqueryTlsEnrollEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsEnrollEndpoint
-}
-func (fc *FlagController) OsqueryTlsLoggerEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsLoggerEndpoint
-}
-func (fc *FlagController) OsqueryTlsDistributedReadEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsDistributedReadEndpoint
-}
-func (fc *FlagController) OsqueryTlsDistributedWriteEndpoint() string {
-	return fc.cmdLineOpts.OsqueryTlsDistributedWriteEndpoint
+
+func (fc *FlagController) SetCurrentRunningOsqueryVersion(osqueryversion string) error {
+	return fc.setControlServerValue(keys.CurrentRunningOsqueryVersion, []byte(osqueryversion))
 }
 
 func (fc *FlagController) SetAutoupdate(enabled bool) error {
@@ -522,7 +589,10 @@ func (fc *FlagController) SetExportTraces(enabled bool) error {
 	return fc.setControlServerValue(keys.ExportTraces, boolToBytes(enabled))
 }
 func (fc *FlagController) SetExportTracesOverride(value bool, duration time.Duration) {
-	fc.overrideFlag(keys.ExportTraces, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.ExportTraces, duration, value)
 }
 func (fc *FlagController) ExportTraces() bool {
 	return NewBoolFlagValue(
@@ -531,11 +601,34 @@ func (fc *FlagController) ExportTraces() bool {
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
 
+func (fc *FlagController) SetLauncherWatchdogEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.LauncherWatchdogEnabled, boolToBytes(enabled))
+}
+
+func (fc *FlagController) LauncherWatchdogEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.LauncherWatchdogEnabled))
+}
+
+func (fc *FlagController) SetSystrayRestartEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.SystrayRestartEnabled, boolToBytes(enabled))
+}
+
+func (fc *FlagController) SystrayRestartEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.SystrayRestartEnabled))
+}
+
 func (fc *FlagController) SetTraceSamplingRate(rate float64) error {
 	return fc.setControlServerValue(keys.TraceSamplingRate, float64ToBytes(rate))
 }
 func (fc *FlagController) SetTraceSamplingRateOverride(value float64, duration time.Duration) {
-	fc.overrideFlag(keys.TraceSamplingRate, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.TraceSamplingRate, duration, value)
 }
 func (fc *FlagController) TraceSamplingRate() float64 {
 	return NewFloat64FlagValue(fc.slogger, keys.LoggingInterval,
@@ -571,7 +664,10 @@ func (fc *FlagController) SetLogShippingLevel(level string) error {
 	return fc.setControlServerValue(keys.LogShippingLevel, []byte(level))
 }
 func (fc *FlagController) SetLogShippingLevelOverride(value string, duration time.Duration) {
-	fc.overrideFlag(keys.LogShippingLevel, duration, value)
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.LogShippingLevel, duration, value)
 }
 func (fc *FlagController) LogShippingLevel() string {
 	fc.overrideMutex.RLock()
@@ -636,4 +732,27 @@ func (fc *FlagController) LocalDevelopmentPath() string {
 	return NewStringFlagValue(
 		WithDefaultString(fc.cmdLineOpts.LocalDevelopmentPath),
 	).get(nil)
+}
+
+func (fc *FlagController) Identifier() string {
+	identifier := NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.Identifier),
+	).get(nil)
+
+	if strings.TrimSpace(identifier) == "" {
+		identifier = launcher.DefaultLauncherIdentifier
+	}
+
+	return identifier
+}
+
+func (fc *FlagController) SetTableGenerateTimeout(interval time.Duration) error {
+	return fc.setControlServerValue(keys.TableGenerateTimeout, durationToBytes(interval))
+}
+func (fc *FlagController) TableGenerateTimeout() time.Duration {
+	return NewDurationFlagValue(fc.slogger, keys.TableGenerateTimeout,
+		WithDefault(4*time.Minute),
+		WithMin(30*time.Second),
+		WithMax(10*time.Minute),
+	).get(fc.getControlServerValue(keys.TableGenerateTimeout))
 }

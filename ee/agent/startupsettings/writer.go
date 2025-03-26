@@ -10,6 +10,7 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/storage"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/traces"
@@ -51,6 +52,17 @@ func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsW
 	return s, nil
 }
 
+// Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
+// the katc_config subsystem.
+func (s *startupSettingsWriter) Ping() {
+	if err := s.WriteSettings(); err != nil {
+		s.knapsack.Slogger().Log(context.TODO(), slog.LevelWarn,
+			"could not write updated settings",
+			"err", err,
+		)
+	}
+}
+
 // WriteSettings updates the flags with their values from the agent flag data store.
 func (s *startupSettingsWriter) WriteSettings() error {
 	updatedFlags := make(map[string]string)
@@ -59,14 +71,27 @@ func (s *startupSettingsWriter) WriteSettings() error {
 	}
 	updatedFlags["use_tuf_autoupdater"] = "enabled" // Hardcode for backwards compatibility circa v1.5.3
 
-	atcConfig, err := s.extractAutoTableConstructionConfig()
-	if err != nil {
-		s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
-			"extracting auto_table_construction config",
-			"err", err,
-		)
-	} else {
-		updatedFlags["auto_table_construction"] = atcConfig
+	for _, registrationId := range s.knapsack.RegistrationIDs() {
+		atcConfig, err := s.extractAutoTableConstructionConfig(registrationId)
+		if err != nil {
+			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+				"extracting auto_table_construction config",
+				"err", err,
+			)
+		} else {
+			atcConfigKey := storage.KeyByIdentifier([]byte("auto_table_construction"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			updatedFlags[string(atcConfigKey)] = atcConfig
+		}
+
+		if katcConfig, err := s.extractKATCConstructionConfig(registrationId); err != nil {
+			s.knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+				"extracting katc_config",
+				"err", err,
+			)
+		} else {
+			katcConfigKey := storage.KeyByIdentifier([]byte("katc_config"), storage.IdentifierTypeRegistration, []byte(registrationId))
+			updatedFlags[string(katcConfigKey)] = katcConfig
+		}
 	}
 
 	if _, err := s.kvStore.Update(updatedFlags); err != nil {
@@ -79,9 +104,12 @@ func (s *startupSettingsWriter) WriteSettings() error {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface. When a flag
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
-func (s *startupSettingsWriter) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (s *startupSettingsWriter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if err := s.WriteSettings(); err != nil {
-		s.knapsack.Slogger().Log(context.Background(), slog.LevelError,
+		s.knapsack.Slogger().Log(ctx, slog.LevelError,
 			"writing startup settings after flag change",
 			"err", err,
 		)
@@ -92,8 +120,8 @@ func (s *startupSettingsWriter) Close() error {
 	return s.kvStore.Close()
 }
 
-func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, error) {
-	osqConfig, err := s.knapsack.ConfigStore().Get([]byte("config"))
+func (s *startupSettingsWriter) extractAutoTableConstructionConfig(registrationId string) (string, error) {
+	osqConfig, err := s.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte("config"), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("could not get osquery config from store: %w", err)
 	}
@@ -115,6 +143,26 @@ func (s *startupSettingsWriter) extractAutoTableConstructionConfig() (string, er
 	atcJson, err := json.Marshal(configUnmarshalled)
 	if err != nil {
 		return "", fmt.Errorf("could not marshal auto_table_construction: %w", err)
+	}
+
+	return string(atcJson), nil
+}
+
+func (s *startupSettingsWriter) extractKATCConstructionConfig(registrationId string) (string, error) {
+	kolideCfg := make(map[string]string)
+	if err := s.knapsack.KatcConfigStore().ForEach(func(k []byte, v []byte) error {
+		key, _, identifier := storage.SplitKey(k)
+		if string(identifier) == registrationId {
+			kolideCfg[string(key)] = string(v)
+		}
+		return nil
+	}); err != nil {
+		return "", fmt.Errorf("could not get Kolide ATC config from store: %w", err)
+	}
+
+	atcJson, err := json.Marshal(kolideCfg)
+	if err != nil {
+		return "", fmt.Errorf("could not marshal katc_config: %w", err)
 	}
 
 	return string(atcJson), nil

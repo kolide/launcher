@@ -10,10 +10,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/exp/slices"
 )
+
+const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
 
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
@@ -26,6 +30,8 @@ type ControlService struct {
 	requestTicker        *time.Ticker
 	fetcher              dataProvider
 	fetchMutex           sync.Mutex
+	fetchFull            bool
+	fetchFullMutex       sync.Mutex
 	store                types.GetterSetter
 	lastFetched          map[string]string
 	consumers            map[string]consumer
@@ -47,9 +53,9 @@ type subscriber interface {
 // dataProvider is an interface for something that can retrieve control data. Authentication, HTTP,
 // file system access, etc. lives below this abstraction layer.
 type dataProvider interface {
-	GetConfig() (io.Reader, error)
-	GetSubsystemData(hash string) (io.Reader, error)
-	SendMessage(method string, params interface{}) error
+	GetConfig(ctx context.Context) (io.Reader, error)
+	GetSubsystemData(ctx context.Context, hash string) (io.Reader, error)
+	SendMessage(ctx context.Context, method string, params interface{}) error
 }
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
@@ -95,7 +101,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 	startUpMessageSuccess := false
 
 	for {
-		fetchErr := cs.Fetch()
+		fetchErr := cs.Fetch(context.TODO())
 		switch {
 		case fetchErr != nil:
 			cs.slogger.Log(ctx, slog.LevelWarn,
@@ -103,7 +109,7 @@ func (cs *ControlService) Start(ctx context.Context) {
 				"err", fetchErr,
 			)
 		case !startUpMessageSuccess:
-			if err := cs.SendMessage("startup", nil); err != nil {
+			if err := cs.SendMessage("startup", cs.startupData(ctx)); err != nil {
 				cs.slogger.Log(ctx, slog.LevelWarn,
 					"failed to send startup message on control server start",
 					"err", err,
@@ -124,6 +130,61 @@ func (cs *ControlService) Start(ctx context.Context) {
 	}
 }
 
+// startupData retrieves data to be reported to the control server on launcher startup.
+func (cs *ControlService) startupData(ctx context.Context) map[string]string {
+	data := map[string]string{
+		"launcher_version": version.Version().Version,
+		"run_id":           cs.knapsack.GetRunID(),
+	}
+
+	if enrollStatus, err := cs.knapsack.CurrentEnrollmentStatus(); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get enrollment status for startup message",
+			"err", err,
+		)
+	} else {
+		data["current_enrollment_status"] = string(enrollStatus)
+	}
+
+	if deviceId, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get device ID for startup message",
+			"err", err,
+		)
+	} else {
+		data["device_id"] = string(deviceId)
+	}
+
+	if munemo, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get munemo for startup message",
+			"err", err,
+		)
+	} else {
+		data["munemo"] = string(munemo)
+	}
+
+	if orgId, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get organization ID for startup message",
+			"err", err,
+		)
+	} else {
+		data["organization_id"] = string(orgId)
+	}
+
+	if serialNumber, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get serial number for startup message",
+			"err", err,
+		)
+	} else {
+		data["serial_number"] = string(serialNumber)
+	}
+
+	return data
+}
+
 func (cs *ControlService) Interrupt(_ error) {
 	cs.Stop()
 }
@@ -138,13 +199,19 @@ func (cs *ControlService) Stop() {
 	}
 }
 
-func (cs *ControlService) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
-		cs.requestIntervalChanged(cs.knapsack.ControlRequestInterval())
+		cs.requestIntervalChanged(ctx, cs.knapsack.ControlRequestInterval())
 	}
 }
 
-func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
+func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterval time.Duration) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	currentRequestInterval := cs.readRequestInterval()
 	if newInterval == currentRequestInterval {
 		return
@@ -153,22 +220,22 @@ func (cs *ControlService) requestIntervalChanged(newInterval time.Duration) {
 	// Perform a fetch now, to retrieve data faster in case this change
 	// was triggered by localserver or the user clicking on the menu bar app
 	// instead of by a control server change.
-	if err := cs.Fetch(); err != nil {
+	if err := cs.Fetch(ctx); err != nil {
 		// if we got an error, log it and move on
-		cs.slogger.Log(context.TODO(), slog.LevelWarn,
+		cs.slogger.Log(ctx, slog.LevelWarn,
 			"failed to fetch data from control server. Not fatal, moving on",
 			"err", err,
 		)
 	}
 
 	if newInterval < currentRequestInterval {
-		cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		cs.slogger.Log(ctx, slog.LevelDebug,
 			"accelerating control service request interval",
 			"new_interval", newInterval.String(),
 			"old_interval", currentRequestInterval.String(),
 		)
 	} else {
-		cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		cs.slogger.Log(ctx, slog.LevelDebug,
 			"resetting control service request interval after acceleration",
 			"new_interval", newInterval.String(),
 			"old_interval", currentRequestInterval.String(),
@@ -193,7 +260,10 @@ func (cs *ControlService) readRequestInterval() time.Duration {
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
-func (cs *ControlService) Fetch() error {
+func (cs *ControlService) Fetch(ctx context.Context) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	// Do not block in the case where:
 	// 1. `Start` called `Fetch` on an interval
 	// 2. The control service received an updated `ControlRequestInterval` from the server
@@ -204,10 +274,14 @@ func (cs *ControlService) Fetch() error {
 	if !cs.fetchMutex.TryLock() {
 		return errors.New("fetch is currently executing elsewhere")
 	}
-	defer cs.fetchMutex.Unlock()
+	span.AddEvent("fetch_lock_acquired")
+	defer func() {
+		cs.fetchMutex.Unlock()
+		span.AddEvent("fetch_lock_released")
+	}()
 
 	// Empty hash means get the map of subsystems & hashes
-	data, err := cs.fetcher.GetConfig()
+	data, err := cs.fetcher.GetConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("getting subsystems map: %w", err)
 	}
@@ -221,7 +295,22 @@ func (cs *ControlService) Fetch() error {
 		return fmt.Errorf("decoding subsystems map: %w", err)
 	}
 
+	fetchFull := false
+	cs.fetchFullMutex.Lock()
+	span.AddEvent("fetch_full_lock_acquired")
+	if cs.fetchFull {
+		fetchFull = true     // fetch all subsystems during this Fetch
+		cs.fetchFull = false // reset for next Fetch
+	}
+	cs.fetchFullMutex.Unlock()
+	span.AddEvent("fetch_full_lock_released")
+
 	for subsystem, hash := range subsystems {
+		if !cs.knownSubsystem(subsystem) {
+			// Ignore unknown subsystems.
+			continue
+		}
+
 		lastHash, ok := cs.lastFetched[subsystem]
 		if !ok && cs.store != nil {
 			// Try to get the stored hash. If we can't get it, no worries, it means we don't have a last hash value,
@@ -231,14 +320,14 @@ func (cs *ControlService) Fetch() error {
 			}
 		}
 
-		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() {
+		if hash == lastHash && !cs.knapsack.ForceControlSubsystems() && !fetchFull {
 			// The last fetched update is still fresh
 			// Nothing to do, skip to the next subsystem
 			continue
 		}
 
-		if err := cs.fetchAndUpdate(subsystem, hash); err != nil {
-			cs.slogger.Log(context.TODO(), slog.LevelDebug,
+		if err := cs.fetchAndUpdate(ctx, subsystem, hash); err != nil {
+			cs.slogger.Log(ctx, slog.LevelDebug,
 				"failed to fetch object. skipping...",
 				"subsystem", subsystem,
 				"err", err,
@@ -251,9 +340,13 @@ func (cs *ControlService) Fetch() error {
 }
 
 // Fetches latest subsystem data, and notifies observers of updates.
-func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
+func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash string) error {
+	ctx, span := traces.StartSpan(ctx, "subsystem", subsystem)
+	defer span.End()
+
 	slogger := cs.slogger.With("subsystem", subsystem)
-	data, err := cs.fetcher.GetSubsystemData(hash)
+
+	data, err := cs.fetcher.GetSubsystemData(ctx, hash)
 	if err != nil {
 		return fmt.Errorf("failed to get control data: %w", err)
 	}
@@ -263,14 +356,13 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 	}
 
 	// Consumer and subscriber(s) notified now
-	if err := cs.update(subsystem, data); err != nil {
-		// Although we failed to update, the payload may be bad and there's no
-		// sense in repeatedly attempting to apply a bad update.
-		// A new update will have a new hash, so continue and remember this hash.
-		slogger.Log(context.TODO(), slog.LevelError,
+	if err := cs.update(ctx, subsystem, data); err != nil {
+		// Returning the error so we don't store the hash and we can try again next time
+		slogger.Log(ctx, slog.LevelError,
 			"failed to update consumers and subscribers",
 			"err", err,
 		)
+		return err
 	}
 
 	// Remember the hash of the last fetched version of this subsystem's data
@@ -283,13 +375,26 @@ func (cs *ControlService) fetchAndUpdate(subsystem, hash string) error {
 
 	// Store the hash so we can persist the last fetched data across launcher restarts
 	if err := cs.store.Set([]byte(subsystem), []byte(hash)); err != nil {
-		slogger.Log(context.TODO(), slog.LevelError,
+		slogger.Log(ctx, slog.LevelError,
 			"failed to store last fetched control data",
 			"err", err,
 		)
 	}
 
 	return nil
+}
+
+// knownSubsystem checks our registered consumers and subscribers to see if the given
+// subsystem is one that has been registered with the control service.
+func (cs *ControlService) knownSubsystem(subsystem string) bool {
+	if _, subsystemFromConsumer := cs.consumers[subsystem]; subsystemFromConsumer {
+		return true
+	}
+	if _, subsystemFromSubscriber := cs.subscribers[subsystem]; subsystemFromSubscriber {
+		return true
+	}
+
+	return false
 }
 
 // Registers a consumer for ingesting subsystem updates
@@ -307,11 +412,14 @@ func (cs *ControlService) RegisterSubscriber(subsystem string, subscriber subscr
 }
 
 func (cs *ControlService) SendMessage(method string, params interface{}) error {
-	return cs.fetcher.SendMessage(method, params)
+	return cs.fetcher.SendMessage(context.TODO(), method, params)
 }
 
 // Updates all registered consumers and subscribers of subsystem updates
-func (cs *ControlService) update(subsystem string, reader io.Reader) error {
+func (cs *ControlService) update(ctx context.Context, subsystem string, reader io.Reader) error {
+	_, span := traces.StartSpan(ctx, "subsystem", subsystem)
+	defer span.End()
+
 	// First, send to consumer, if any
 	if consumer, ok := cs.consumers[subsystem]; ok {
 		if err := consumer.Update(reader); err != nil {
@@ -325,5 +433,30 @@ func (cs *ControlService) update(subsystem string, reader io.Reader) error {
 		subscriber.Ping()
 	}
 
+	return nil
+}
+
+// Do handles the force_full_control_data_fetch action.
+func (cs *ControlService) Do(data io.Reader) error {
+	ctx, span := traces.StartSpan(context.TODO(), "action", ForceFullControlDataFetchAction)
+	defer span.End()
+
+	cs.slogger.Log(ctx, slog.LevelDebug,
+		"received request to perform full fetch of all subsystems",
+	)
+
+	// We receive this request in the middle of a `Fetch`, so we can't call
+	// `Fetch` again immediately. Instead, set `fetchFull` so that the next
+	// call to `Fetch` will fetch all subsystems.
+	span.AddEvent("fetch_full_lock_acquired")
+	cs.fetchFullMutex.Lock()
+
+	defer func() {
+		cs.fetchFullMutex.Unlock()
+		span.AddEvent("fetch_full_lock_released")
+	}()
+	cs.fetchFull = true
+
+	// Treat this action as best-effort: try to do it once, no need to retry.
 	return nil
 }

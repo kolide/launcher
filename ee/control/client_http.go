@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"encoding/base64"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/pkg/traces"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // HTTPClient handles retrieving control data via HTTP
@@ -36,6 +39,8 @@ const (
 	HeaderKey        = "X-Kolide-Key"
 	HeaderSignature2 = "X-Kolide-Signature2"
 	HeaderKey2       = "X-Kolide-Key2"
+
+	defaultRequestTimeout = 30 * time.Second
 )
 
 type configResponse struct {
@@ -58,11 +63,16 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 		opt(c)
 	}
 
+	c.client.Transport = otelhttp.NewTransport(c.client.Transport)
+
 	return c, nil
 }
 
-func (c *HTTPClient) GetConfig() (io.Reader, error) {
-	challengeReq, err := http.NewRequest(http.MethodGet, c.url("/api/agent/config").String(), nil)
+func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
+	challengeReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
@@ -72,7 +82,7 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
 
-	configReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/config").String(), nil)
+	configReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/config").String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create config request: %w", err)
 	}
@@ -130,12 +140,15 @@ func (c *HTTPClient) GetConfig() (io.Reader, error) {
 	return reader, nil
 }
 
-func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
+func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if c.token == "" {
 		return nil, errors.New("token is nil, cannot request subsystem data")
 	}
 
-	dataReq, err := http.NewRequest(http.MethodGet, c.url(fmt.Sprintf("/api/agent/object/%s", hash)).String(), nil)
+	dataReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url(fmt.Sprintf("/api/agent/object/%s", hash)).String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create subsystem data request: %w", err)
 	}
@@ -154,7 +167,10 @@ func (c *HTTPClient) GetSubsystemData(hash string) (io.Reader, error) {
 }
 
 // SendMessage sends a message to the server using JSON-RPC format
-func (c *HTTPClient) SendMessage(method string, params interface{}) error {
+func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	if c.token == "" {
 		return errors.New("token is nil, cannot send message to server")
 	}
@@ -179,7 +195,7 @@ func (c *HTTPClient) SendMessage(method string, params interface{}) error {
 		return fmt.Errorf("message size %d exceeds maximum size %d", len(body), maxMessageSize)
 	}
 
-	dataReq, err := http.NewRequest(http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
+	dataReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/api/agent/message").String(), bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("could not create server message: %w", err)
 	}
@@ -196,6 +212,14 @@ func (c *HTTPClient) SendMessage(method string, params interface{}) error {
 
 // TODO: this should probably just return a io.Reader
 func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
+	req, span := traces.StartHttpRequestSpan(req)
+	defer span.End()
+
+	// Ensure we set a timeout on the request
+	ctx, cancel := context.WithTimeout(req.Context(), defaultRequestTimeout)
+	defer cancel()
+	req = req.WithContext(ctx)
+
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)
 

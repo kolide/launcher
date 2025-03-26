@@ -6,7 +6,10 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -15,7 +18,7 @@ type KeyInfoTable struct {
 	kIdentifer *keyidentifier.KeyIdentifier
 }
 
-func KeyInfo(slogger *slog.Logger) *table.Plugin {
+func KeyInfo(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
@@ -41,10 +44,13 @@ func KeyInfo(slogger *slog.Logger) *table.Plugin {
 		kIdentifer: kIdentifer,
 	}
 
-	return table.NewPlugin("kolide_keyinfo", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_keyinfo", columns, t.generate)
 }
 
 func (t *KeyInfoTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_keyinfo")
+	defer span.End()
+
 	var results []map[string]string
 
 	q, ok := queryContext.Constraints["path"]

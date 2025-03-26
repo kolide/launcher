@@ -15,8 +15,9 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/tuf"
-	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/execwrapper"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -49,6 +50,14 @@ func runMain() int {
 		"version", version.Version().Version,
 		"revision", version.Version().Revision,
 	)
+
+	// Set an os environmental variable that we can use to track launcher versions across
+	// various bits of updated binaries
+	if chain := os.Getenv("KOLIDE_LAUNCHER_VERSION_CHAIN"); chain == "" {
+		os.Setenv("KOLIDE_LAUNCHER_VERSION_CHAIN", version.Version().Version)
+	} else {
+		os.Setenv("KOLIDE_LAUNCHER_VERSION_CHAIN", fmt.Sprintf("%s:%s", chain, version.Version().Version))
+	}
 
 	// create initial logger. As this is prior to options parsing,
 	// use the environment to determine verbosity.  It will be
@@ -145,25 +154,46 @@ func runMain() int {
 	ctx = ctxlog.NewContext(ctx, logger)
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
-		if !tuf.IsLauncherReloadNeededErr(err) {
+		// launcher exited due to error that does not require further handling -- return now so we can exit
+		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}
-		level.Debug(logger).Log("msg", "runLauncher exited to run newer version of launcher", "err", err.Error())
-		if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+
+		// Autoupdate asked for a restart to run the newly-downloaded version of launcher -- run that newer version
+		if tuf.IsLauncherReloadNeededErr(err) {
+			level.Debug(logger).Log("msg", "runLauncher exited to load newer version of launcher after autoupdate", "err", err.Error())
+			if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+				return 1
+			}
+		}
+
+		// A remote restart was requested -- run this version of launcher again.
+		// We need a full exec of our current executable, rather than just calling runLauncher again.
+		// This ensures we don't run into issues where artifacts of our previous runLauncher call
+		// stick around (for example, the signal listener panicking on send to closed channel).
+		currentExecutable, err := os.Executable()
+		if err != nil {
+			level.Debug(logger).Log("msg", "could not get current executable to perform remote restart", "err", err.Error())
+			return 1
+		}
+		if err := execwrapper.Exec(ctx, currentExecutable, os.Args, os.Environ()); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"error execing launcher after remote restart was requested",
+				"binary", currentExecutable,
+				"err", err,
+			)
 			return 1
 		}
 	}
+
+	// launcher exited without error -- nothing to do here
 	return 0
 }
 
 func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 	var run func(*multislogger.MultiSlogger, []string) error
 	switch os.Args[1] {
-	case "socket":
-		run = runSocket
-	case "query":
-		run = runQuery
 	case "doctor":
 		run = runDoctor
 	case "flare":
@@ -184,8 +214,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runDownloadOsquery
 	case "uninstall":
 		run = runUninstall
-	case "secure-enclave":
-		run = runSecureEnclave
+	case "watchdog": // note: this is currently only implemented for windows
+		run = watchdog.RunWatchdogTask
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
@@ -203,19 +233,10 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 	newerBinary, err := latestLauncherPath(ctx, slogger)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"could not check out latest launcher, will fall back to old autoupdate library",
+			"could not check out latest launcher",
 			"err", err,
 		)
-
-		// Fall back to legacy autoupdate library
-		newerBinary, err = autoupdate.FindNewestSelf(ctx)
-		if err != nil {
-			slogger.Log(ctx, slog.LevelError,
-				"could not check out latest launcher from legacy autoupdate library",
-				"err", err,
-			)
-			return nil
-		}
+		return nil
 	}
 
 	if newerBinary == "" {

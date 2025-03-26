@@ -47,7 +47,7 @@ func (p *parser) parseDumpstate(reader io.Reader) (any, error) {
 			continue
 		}
 
-		return nil, fmt.Errorf("no device name(s) given in remotectl dumpstate output")
+		return nil, errors.New("no device name(s) given in remotectl dumpstate output")
 	}
 
 	return results, nil
@@ -117,6 +117,15 @@ func (p *parser) parseDevice() (map[string]interface{}, error) {
 			continue
 		}
 
+		if strings.HasPrefix(strings.TrimSpace(p.lastReadLine), "Identity:") {
+			identity, err := p.parseKeyValList()
+			if err != nil {
+				return nil, err
+			}
+
+			deviceResults["Identity"] = identity
+		}
+
 		if p.isDeviceDelimiter() {
 			return deviceResults, nil
 		}
@@ -156,6 +165,17 @@ func (p *parser) parseDictionary() (map[string]interface{}, error) {
 			}
 
 			dictionaryResults["Features"] = propertyFeatures
+			continue
+		}
+
+		// Check to see if this entry is an encrypted oids map. This uses the same format as `Features``.
+		if strings.HasPrefix(p.lastReadLine, "EncryptedRemoteXPCPopulatedOIDs") {
+			propertyOIDs, err := p.parseFeatures()
+			if err != nil {
+				return nil, err
+			}
+
+			dictionaryResults["EncryptedRemoteXPCPopulatedOIDs"] = propertyOIDs
 			continue
 		}
 
@@ -271,6 +291,31 @@ func (p *parser) parseObjectArray() ([]map[string]interface{}, bool, error) {
 
 	eof = true
 	return arrayResults, eof, nil
+}
+
+// parseKeyValList parses a list of key val pairs separated by a colon.
+func (p *parser) parseKeyValList() (map[string]interface{}, error) {
+	listResults := make(map[string]interface{}, 0)
+	startingIndentationLevel := p.getCurrentIndentationLevel()
+
+	for p.scanner.Scan() {
+		p.lastReadLine = p.scanner.Text()
+
+		currentIndentationLevel := p.getCurrentIndentationLevel()
+
+		if currentIndentationLevel <= startingIndentationLevel {
+			return listResults, nil
+		}
+
+		k, v, err := extractTopLevelKeyValue(p.lastReadLine)
+		if err != nil {
+			return nil, err
+		}
+
+		listResults[k] = v
+	}
+
+	return listResults, nil
 }
 
 func (p *parser) getCurrentIndentationLevel() int {

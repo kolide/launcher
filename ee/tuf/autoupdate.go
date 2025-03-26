@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -62,7 +63,8 @@ const AutoupdateSubsystemName = "autoupdate"
 
 type (
 	controlServerAutoupdateRequest struct {
-		BinariesToUpdate []binaryToUpdate `json:"binaries_to_update"`
+		BinariesToUpdate   []binaryToUpdate `json:"binaries_to_update"`
+		BypassInitialDelay bool             `json:"bypass_initial_delay,omitempty"`
 	}
 
 	// In the future, we may allow for setting a particular version here as well
@@ -94,18 +96,18 @@ type TufAutoupdater struct {
 	initialDelayEnd        time.Time
 	updateLock             *sync.Mutex
 	interrupt              chan struct{}
-	interrupted            bool
+	interrupted            atomic.Bool
 	signalRestart          chan error
 	slogger                *slog.Logger
-	restartFuncs           map[autoupdatableBinary]func() error
+	restartFuncs           map[autoupdatableBinary]func(context.Context) error
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
 
-func WithOsqueryRestart(restart func() error) TufAutoupdaterOption {
+func WithOsqueryRestart(restart func(context.Context) error) TufAutoupdaterOption {
 	return func(ta *TufAutoupdater) {
 		if ta.restartFuncs == nil {
-			ta.restartFuncs = make(map[autoupdatableBinary]func() error)
+			ta.restartFuncs = make(map[autoupdatableBinary]func(context.Context) error)
 		}
 		ta.restartFuncs[binaryOsqueryd] = restart
 	}
@@ -135,7 +137,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		osquerier:              osquerier,
 		osquerierRetryInterval: 30 * time.Second,
 		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
-		restartFuncs:           make(map[autoupdatableBinary]func() error),
+		restartFuncs:           make(map[autoupdatableBinary]func(context.Context) error),
 	}
 
 	for _, opt := range opts {
@@ -224,9 +226,18 @@ func (ta *TufAutoupdater) Execute() (err error) {
 			"received external interrupt during initial delay, stopping",
 		)
 		return nil
+	case signalRestartErr := <-ta.signalRestart:
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received interrupt to restart launcher after update during initial delay, stopping",
+		)
+		return signalRestartErr
 	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
 		break
 	}
+
+	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		"exiting initial delay",
+	)
 
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
@@ -238,11 +249,18 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	defer cleanupTicker.Stop()
 
 	for {
-		if err := ta.checkForUpdate(binaries); err != nil {
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"checking for updates",
+		)
+		if err := ta.checkForUpdate(context.TODO(), binaries); err != nil {
 			ta.storeError(err)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
 				"err", err,
+			)
+		} else {
+			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+				"completed check for update",
 			)
 		}
 
@@ -267,10 +285,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ta.interrupted {
+	if ta.interrupted.Load() {
 		return
 	}
-	ta.interrupted = true
+	ta.interrupted.Store(true)
 
 	ta.interrupt <- struct{}{}
 }
@@ -278,23 +296,26 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
 // requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
-	if time.Now().Before(ta.initialDelayEnd) {
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	var updateRequest controlServerAutoupdateRequest
+	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
+		ta.slogger.Log(ctx, slog.LevelWarn,
+			"received update request in unexpected format from control server, discarding",
+			"err", err,
+		)
+		// We don't return an error because we don't want the actionqueue to retry this request
+		return nil
+	}
+
+	if time.Now().Before(ta.initialDelayEnd) && !updateRequest.BypassInitialDelay {
+		ta.slogger.Log(ctx, slog.LevelWarn,
 			"received update request during initial delay, discarding",
 			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
 		)
 		// We don't return an error because there's no need for the actionqueue to retry this request --
 		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
-		return nil
-	}
-
-	var updateRequest controlServerAutoupdateRequest
-	if err := json.NewDecoder(data).Decode(&updateRequest); err != nil {
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"received update request in unexpected format from control server, discarding",
-			"err", err,
-		)
-		// We don't return an error because we don't want the actionqueue to retry this request
 		return nil
 	}
 
@@ -304,27 +325,27 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 			binariesToUpdate = append(binariesToUpdate, val)
 			continue
 		}
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+		ta.slogger.Log(ctx, slog.LevelWarn,
 			"received request from control server autoupdate unknown binary, ignoring",
 			"unknown_binary", b.Name,
 		)
 	}
 
 	if len(binariesToUpdate) == 0 {
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+		ta.slogger.Log(ctx, slog.LevelDebug,
 			"received request from control server to check for update now, but no valid binaries specified in request",
 		)
 		return nil
 	}
 
-	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+	ta.slogger.Log(ctx, slog.LevelInfo,
 		"received request from control server to check for update now",
 		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 	)
 
-	if err := ta.checkForUpdate(binariesToUpdate); err != nil {
+	if err := ta.checkForUpdate(ctx, binariesToUpdate); err != nil {
 		ta.storeError(err)
-		ta.slogger.Log(context.TODO(), slog.LevelError,
+		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update per control server request",
 			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 			"err", err,
@@ -333,7 +354,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		return fmt.Errorf("could not check for update: %w", err)
 	}
 
-	ta.slogger.Log(context.TODO(), slog.LevelInfo,
+	ta.slogger.Log(ctx, slog.LevelInfo,
 		"successfully checked for update per control server request",
 		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 	)
@@ -343,12 +364,15 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 
 // FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
 // to respond to changes to autoupdate-related settings.
-func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
+func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := traces.StartSpan(ctx)
+	defer span.End()
+
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
 
 	// Check to see if update channel has changed
 	if ta.updateChannel != ta.knapsack.UpdateChannel() {
-		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		ta.slogger.Log(ctx, slog.LevelInfo,
 			"control server sent down new update channel value",
 			"new_channel", ta.knapsack.UpdateChannel(),
 			"old_channel", ta.updateChannel,
@@ -361,7 +385,7 @@ func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
 	for binary, currentPinnedVersion := range ta.pinnedVersions {
 		newPinnedVersion := ta.pinnedVersionGetters[binary]()
 		if currentPinnedVersion != newPinnedVersion {
-			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			ta.slogger.Log(ctx, slog.LevelInfo,
 				"control server sent down new pinned version for binary",
 				"binary", binary,
 				"new_pinned_version", newPinnedVersion,
@@ -380,16 +404,24 @@ func (ta *TufAutoupdater) FlagsChanged(flagKeys ...keys.FlagKey) {
 	}
 
 	// At least one binary requires a recheck -- perform that now
-	if err := ta.checkForUpdate(binariesToCheckForUpdate); err != nil {
+	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate); err != nil {
 		ta.storeError(err)
-		ta.slogger.Log(context.TODO(), slog.LevelError,
+		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
 			"update_channel", ta.updateChannel,
 			"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
 			"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
 			"err", err,
 		)
+		return
 	}
+
+	ta.slogger.Log(ctx, slog.LevelInfo,
+		"checked for update after autoupdate setting changed",
+		"update_channel", ta.updateChannel,
+		"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
+		"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
+	)
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
@@ -422,6 +454,15 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
+		// first verify that the osqueryd binary exists. if it doesn't, there's no reason to wait
+		// for initialization below
+		if ta.knapsack != nil {
+			latestOsqdPath := ta.knapsack.LatestOsquerydPath(context.TODO())
+			if _, statErr := os.Stat(latestOsqdPath); os.IsNotExist(statErr) {
+				return "", fmt.Errorf("finding current running version: osqueryd binary does not exist at `%s`", latestOsqdPath)
+			}
+		}
+
 		// The osqueryd client may not have initialized yet, so retry the version
 		// check a couple times before giving up
 		osquerydVersionCheckRetries := 5
@@ -446,7 +487,10 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
-func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) error {
+func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary) error {
+	ctx, span := traces.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
+	defer span.End()
+
 	ta.updateLock.Lock()
 	defer ta.updateLock.Unlock()
 
@@ -454,7 +498,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 	// launcher while sleeping, so skipping the check is our safest option to keep launcher running
 	// and functional.
 	if ta.knapsack.InModernStandby() {
-		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+		ta.slogger.Log(ctx, slog.LevelInfo,
 			"skipping autoupdate while in modern standby",
 		)
 		return nil
@@ -493,7 +537,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 		}
 
 		if downloadedUpdateVersion != "" {
-			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			ta.slogger.Log(ctx, slog.LevelInfo,
 				"update downloaded",
 				"binary", binary,
 				"binary_version", downloadedUpdateVersion,
@@ -512,7 +556,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 	if updatedVersion, ok := updatesDownloaded[binaryLauncher]; ok {
 		// Only reload if we're not using a localdev path
 		if ta.knapsack.LocalDevelopmentPath() == "" {
-			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			ta.slogger.Log(ctx, slog.LevelInfo,
 				"launcher updated -- exiting to load new version",
 				"new_binary_version", updatedVersion,
 			)
@@ -528,8 +572,8 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 		}
 
 		if restart, ok := ta.restartFuncs[binary]; ok {
-			if err := restart(); err != nil {
-				ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			if err := restart(ctx); err != nil {
+				ta.slogger.Log(ctx, slog.LevelWarn,
 					"failed to restart binary after update",
 					"binary", binary,
 					"new_binary_version", newBinaryVersion,
@@ -538,7 +582,7 @@ func (ta *TufAutoupdater) checkForUpdate(binariesToCheck []autoupdatableBinary) 
 				continue
 			}
 
-			ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			ta.slogger.Log(ctx, slog.LevelInfo,
 				"restarted binary after update",
 				"binary", binary,
 				"new_binary_version", newBinaryVersion,

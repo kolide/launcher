@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -20,6 +19,7 @@ type queriesRequest struct {
 }
 
 type queryCollectionResponse struct {
+	jsonRpcResponse
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -75,6 +75,9 @@ func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interfac
 		queries.Queries[query.Id] = query.Query
 	}
 	return queryCollectionResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		Queries:     queries,
 		NodeInvalid: req.NodeInvalid,
 	}, nil
@@ -92,8 +95,9 @@ func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interfac
 		)
 	}
 	resp := &pb.QueryCollection{
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
+		Queries:       queries,
+		NodeInvalid:   req.NodeInvalid,
+		DisableDevice: req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -143,6 +147,11 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 		return nil, false, err
 	}
 	resp := response.(queryCollectionResponse)
+
+	if resp.DisableDevice {
+		return nil, false, ErrDeviceDisabled{}
+	}
+
 	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 
@@ -158,17 +167,21 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
+
+		message := "success"
 		if err != nil {
-			mw.knapsack.Slogger().Log(ctx, slog.LevelError,
-				"failure",
-				"method", "RequestQueries",
-				"uuid", uuid,
-				"res", string(resJSON),
-				"reauth", reauth,
-				"err", err,
-				"took", time.Since(begin),
-			)
+			message = "failure"
 		}
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here
+			message,
+			"method", "RequestQueries",
+			"uuid", uuid,
+			"res", string(resJSON),
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
 	}(time.Now())
 
 	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)

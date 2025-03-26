@@ -48,6 +48,9 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/image/tiff"
@@ -55,14 +58,14 @@ import (
 
 var crcTable = crc64.MakeTable(crc64.ECMA)
 
-func UserAvatar(slogger *slog.Logger) *table.Plugin {
+func UserAvatar(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("username"),
 		table.TextColumn("thumbnail"),
 		table.TextColumn("hash"),
 	}
 	t := &userAvatarTable{slogger: slogger.With("table", "kolide_user_avatars")}
-	return table.NewPlugin("kolide_user_avatars", columns, t.generateAvatars)
+	return tablewrapper.New(flags, slogger, "kolide_user_avatars", columns, t.generateAvatars)
 }
 
 type userAvatarTable struct {
@@ -70,6 +73,9 @@ type userAvatarTable struct {
 }
 
 func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_user_avatars")
+	defer span.End()
+
 	// use the username from the query context if provide, otherwise default to user created users
 	var usernames []string
 	q, ok := queryContext.Constraints["username"]
@@ -96,11 +102,8 @@ func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext tabl
 			continue
 		}
 
-		var base64Buf bytes.Buffer
-		encoder := base64.NewEncoder(base64.StdEncoding, &base64Buf)
-		defer encoder.Close()
-		thumbnail := resize.Thumbnail(150, 150, image, resize.Lanczos3)
-		if err := png.Encode(encoder, thumbnail); err != nil {
+		base64Buf, err := encodeThumbnail(image)
+		if err != nil {
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"error encoding resized user avatar to png",
 				"err", err,
@@ -139,4 +142,17 @@ func getUserAvatar(username string) (image.Image, uint64, error) {
 	}
 	hash := crc64.Checksum(goBytes, crcTable)
 	return image, hash, nil
+}
+
+func encodeThumbnail(image image.Image) (*bytes.Buffer, error) {
+	var base64Buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &base64Buf)
+	defer encoder.Close()
+
+	thumbnail := resize.Thumbnail(150, 150, image, resize.Lanczos3)
+	if err := png.Encode(encoder, thumbnail); err != nil {
+		return nil, fmt.Errorf("encoding png: %w", err)
+	}
+
+	return &base64Buf, nil
 }

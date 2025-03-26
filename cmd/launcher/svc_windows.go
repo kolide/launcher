@@ -16,7 +16,6 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/locallogger"
@@ -27,11 +26,21 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
-// TODO This should be inherited from some setting
-const serviceName = "launcher"
+const (
+	serviceName                        = "launcher" // TODO This should be inherited from some setting
+	serviceShutdownTimeoutMilliseconds = 20000      // 20 seconds
+)
 
 // runWindowsSvc starts launcher as a windows service. This will
 // probably not behave correctly if you start it from the command line.
+// This method is responsible for calling svc.Run, which eventually translates into the
+// Execute function below. Each device has a global ServicesPipeTimeout value (typically at
+// 30-45 seconds but depends on the configuration of the device). We have that many seconds
+// to get from here to the point in Execute where we return a service status of Running before
+// service control manager will consider the start attempt to have timed out, cancel it,
+// and proceed without attempting restart.
+// Wherever possible, we should keep any connections or timely operations out of this method,
+// and ensure they are added late enough in Execute to avoid hitting this timeout.
 func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) error {
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"service start requested",
@@ -50,8 +59,8 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	localSlogger := multislogger.New()
 	logger := log.NewNopLogger()
 
-	// Create a local logger. This logs to a known path, and aims to help diagnostics
 	if opts.RootDirectory != "" {
+		// Create a local logger. This logs to a known path, and aims to help diagnostics
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = ll
 
@@ -65,23 +74,6 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		// also write system logs to localSloggerHandler
 		systemSlogger.AddHandler(localSloggerHandler)
 	}
-
-	// Use the FindNewest mechanism to delete old
-	// updates. We do this here, as windows will pick up
-	// the update in main, which does not delete.  Note
-	// that this will likely produce non-fatal errors when
-	// it tries to delete the running one.
-	go func() {
-		time.Sleep(15 * time.Second)
-		_ = autoupdate.FindNewest(
-			context.TODO(),
-			os.Args[0],
-			autoupdate.DeleteOldUpdates(),
-		)
-	}()
-
-	// Confirm that service configuration is up-to-date
-	checkServiceConfiguration(systemSlogger.Logger, opts)
 
 	systemSlogger.Log(context.TODO(), slog.LevelInfo,
 		"launching service",
@@ -180,12 +172,19 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 	w.systemSlogger.Log(ctx, slog.LevelInfo,
 		"windows service starting",
 	)
+	// after this point windows service control manager will know that we've successfully started,
+	// it is safe to begin longer running operations
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+
+	// Confirm that service configuration is up-to-date
+	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
+		checkServiceConfiguration(w.slogger.Logger, w.opts)
+	})
 
 	ctx = ctxlog.NewContext(ctx, w.logger)
 	runLauncherResults := make(chan struct{})
 
-	gowrapper.Go(ctx, w.systemSlogger.Logger, func() {
+	gowrapper.GoWithRecoveryAction(ctx, w.systemSlogger.Logger, func() {
 		err := runLauncher(ctx, cancel, w.slogger, w.systemSlogger, w.opts)
 		if err != nil {
 			w.systemSlogger.Log(ctx, slog.LevelInfo,
@@ -223,11 +222,29 @@ func (w *winSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"shutdown request received",
 				)
-				changes <- svc.Status{State: svc.StopPending}
+				// launcher's rungroup can take up to 15 seconds to shut down. We want to give it
+				// the full 15+ seconds if possible, to allow it to gracefully shut down
+				// and to allow deferred calls in runLauncher (e.g. db.Close) to run.
+				// Documentation indicates we are allowed to take approximately 20 seconds
+				// to respond to svc.Shutdown, so we wait up to that amount of time.
+				// See: https://learn.microsoft.com/en-us/windows/win32/services/service-control-handler-function
+				changes <- svc.Status{State: svc.StopPending, WaitHint: serviceShutdownTimeoutMilliseconds}
 				cancel()
-				time.Sleep(2 * time.Second) // give rungroups enough time to shut down
+				select {
+				case <-runLauncherResults:
+					w.systemSlogger.Log(ctx, slog.LevelInfo,
+						"runLauncher successfully returned after shutdown call",
+					)
+				case <-time.After(serviceShutdownTimeoutMilliseconds * time.Millisecond):
+					w.systemSlogger.Log(ctx, slog.LevelWarn,
+						"runLauncher did not return within timeout after calling cancel",
+						"timeout_ms", serviceShutdownTimeoutMilliseconds,
+					)
+				}
 				changes <- svc.Status{State: svc.Stopped, Accepts: cmdsAccepted}
 				return ssec, errno
+			case svc.Pause, svc.Continue, svc.ParamChange, svc.NetBindAdd, svc.NetBindRemove, svc.NetBindEnable, svc.NetBindDisable, svc.DeviceEvent, svc.HardwareProfileChange, svc.PowerEvent, svc.SessionChange, svc.PreShutdown:
+				fallthrough
 			default:
 				w.systemSlogger.Log(ctx, slog.LevelInfo,
 					"unexpected change request",

@@ -5,6 +5,7 @@ package notify
 
 import (
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/kolide/toast"
 )
@@ -12,6 +13,7 @@ import (
 type windowsNotifier struct {
 	iconFilepath string
 	interrupt    chan struct{}
+	interrupted  atomic.Bool
 }
 
 func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
@@ -23,12 +25,20 @@ func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
 
 // Listen doesn't do anything on Windows -- the `launch` variable in the notification XML
 // automatically handles opening URLs for us.
-func (w *windowsNotifier) Listen() error {
+func (w *windowsNotifier) Execute() error {
 	<-w.interrupt
 	return nil
 }
 
+// just make compiler happy, this is only needed on darwin
+func (w *windowsNotifier) Listen() {}
+
 func (w *windowsNotifier) Interrupt(err error) {
+	if w.interrupted.Load() {
+		return
+	}
+	w.interrupted.Store(true)
+
 	w.interrupt <- struct{}{}
 }
 

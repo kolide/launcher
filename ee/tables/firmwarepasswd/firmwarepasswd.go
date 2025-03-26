@@ -14,10 +14,13 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -26,7 +29,7 @@ type Table struct {
 	parser  *OutputParser
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.IntegerColumn("option_roms_allowed"),
 		table.IntegerColumn("password_enabled"),
@@ -35,7 +38,7 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 
 	t := New(slogger.With("table", "kolide_firmwarepasswd"))
 
-	return table.NewPlugin("kolide_firmwarepasswd", columns, t.generate)
+	return tablewrapper.New(flags, slogger, "kolide_firmwarepasswd", columns, t.generate)
 
 }
 
@@ -67,6 +70,9 @@ func New(slogger *slog.Logger) *Table {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_firmwarepasswd")
+	defer span.End()
+
 	result := make(map[string]string)
 
 	for _, mode := range []string{"-check", "-mode"} {
@@ -91,13 +97,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output *bytes.Buffer) error {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-
-	cmd, err := allowedcmd.Firmwarepasswd(ctx, subcommand)
-	if err != nil {
-		return fmt.Errorf("creating command: %w", err)
-	}
+	ctx, span := traces.StartSpan(ctx, "subcommand", subcommand)
+	defer span.End()
 
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")
 	if err != nil {
@@ -109,14 +110,9 @@ func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output
 		return fmt.Errorf("chmod: %w", err)
 	}
 
-	cmd.Dir = dir
-
 	stderr := new(bytes.Buffer)
-	cmd.Stderr = stderr
 
-	cmd.Stdout = output
-
-	if err := cmd.Run(); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, 1, allowedcmd.Firmwarepasswd, []string{subcommand}, output, stderr, tablehelpers.WithDir(dir)); err != nil {
 		t.slogger.Log(ctx, slog.LevelDebug,
 			"error running firmwarepasswd",
 			"stderr", strings.TrimSpace(stderr.String()),

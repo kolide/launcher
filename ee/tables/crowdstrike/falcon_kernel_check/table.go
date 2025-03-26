@@ -9,8 +9,11 @@ import (
 	"log/slog"
 	"regexp"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -18,7 +21,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("kernel"),
 		table.IntegerColumn("supported"),
@@ -31,11 +34,14 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 		slogger: slogger.With("table", tableName),
 	}
 
-	return table.NewPlugin(tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	output, err := tablehelpers.Exec(ctx, t.slogger, 5, allowedcmd.FalconKernelCheck, []string{}, false)
+	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_falcon_kernel_check")
+	defer span.End()
+
+	output, err := tablehelpers.RunSimple(ctx, t.slogger, 5, allowedcmd.FalconKernelCheck, []string{})
 	if err != nil {
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"exec failed",

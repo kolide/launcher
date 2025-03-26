@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInstance_Connected(t *testing.T) { // nolint:paralleltest
+func TestInstance_Connected(t *testing.T) {
+	t.Parallel()
 	// have to declare this up here to use later in comparison
 	queryError := errors.New("some query error")
 
@@ -49,16 +50,18 @@ func TestInstance_Connected(t *testing.T) { // nolint:paralleltest
 			wantErrReturn: ExpectedAtLeastOneRowError{},
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, InitHistory(setupStorage(t)))
+			t.Parallel()
+			_, err := InitHistory(setupStorage(t))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			i := &Instance{}
+			i := &instance{}
 			querier := &mocks.Querier{}
 			querier.On("Query", "select instance_id, version from osquery_info order by start_time limit 1").Return(tt.querierReturn()).Once()
 
-			err := i.Connected(querier)
+			err = i.Connected(querier)
 			assert.Equal(t, tt.wantInstanceId, i.InstanceId)
 			assert.Equal(t, tt.wantVersion, i.Version)
 			assert.ErrorIs(t, tt.wantErrReturn, err)
@@ -73,7 +76,8 @@ func TestInstance_Connected(t *testing.T) { // nolint:paralleltest
 	}
 }
 
-func TestInstance_Exited(t *testing.T) { // nolint:paralleltest
+func TestInstance_Exited(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		exitError error
 	}
@@ -93,18 +97,20 @@ func TestInstance_Exited(t *testing.T) { // nolint:paralleltest
 			wantErr: "some error",
 		},
 	}
-	for _, tt := range tests { // nolint:paralleltest
+	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, InitHistory(setupStorage(t)))
+			t.Parallel()
+			_, err := InitHistory(setupStorage(t))
+			require.NoError(t, err, "expected to be able to initialize history without error")
 
-			i := &Instance{}
+			i := &instance{}
 			i.Exited(tt.args.exitError)
 
 			assert.Equal(t, tt.wantErr, i.Error)
 
 			// make sure exit time was set
-			_, err := time.Parse(time.RFC3339, i.ExitTime)
+			_, err = time.Parse(time.RFC3339, i.ExitTime)
 			assert.NoError(t, err, "expect exit time to be set")
 		})
 	}

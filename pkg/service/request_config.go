@@ -19,6 +19,7 @@ type configRequest struct {
 }
 
 type configResponse struct {
+	jsonRpcResponse
 	ConfigJSONBlob string `json:"config"`
 	NodeInvalid    bool   `json:"node_invalid"`
 	ErrorCode      string `json:"error_code,omitempty"`
@@ -54,6 +55,9 @@ func encodeGRPCConfigRequest(_ context.Context, request interface{}) (interface{
 func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.ConfigResponse)
 	return configResponse{
+		jsonRpcResponse: jsonRpcResponse{
+			DisableDevice: req.DisableDevice,
+		},
 		ConfigJSONBlob: req.ConfigJsonBlob,
 		NodeInvalid:    req.NodeInvalid,
 	}, nil
@@ -64,6 +68,7 @@ func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface
 	resp := &pb.ConfigResponse{
 		ConfigJsonBlob: req.ConfigJSONBlob,
 		NodeInvalid:    req.NodeInvalid,
+		DisableDevice:  req.DisableDevice,
 	}
 	return encodeResponse(resp, req.Err)
 }
@@ -120,6 +125,11 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, b
 		return "", false, err
 	}
 	resp := response.(configResponse)
+
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
+	}
+
 	return resp.ConfigJSONBlob, resp.NodeInvalid, resp.Err
 }
 

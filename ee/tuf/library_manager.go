@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -69,7 +70,11 @@ func updatesDirectory(binary autoupdatableBinary, baseUpdateDirectory string) st
 // Available determines if the given target is already available in the update library.
 func (ulm *updateLibraryManager) Available(binary autoupdatableBinary, targetFilename string) bool {
 	executablePath, _ := pathToTargetVersionExecutable(binary, targetFilename, ulm.baseDir)
-	return CheckExecutable(context.TODO(), executablePath, "--version") == nil
+	// First, check if the file even exists, before we do a full executable check
+	if _, err := os.Stat(executablePath); err != nil && errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return CheckExecutable(context.TODO(), ulm.slogger, executablePath, "--version") == nil
 }
 
 // pathToTargetVersionExecutable returns the path to the executable for the desired target,
@@ -103,7 +108,7 @@ func (ulm *updateLibraryManager) AddToLibrary(binary autoupdatableBinary, curren
 		}
 		dirToRemove := filepath.Dir(stagedUpdatePath)
 		if err := backoff.WaitFor(func() error {
-			return os.RemoveAll(dirToRemove)
+			return os.RemoveAll(dirToRemove) //revive:disable-line -- incorrectly flags `defer: return in a defer function has no effect`
 		}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
 			ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not remove temp staging directory",
@@ -132,9 +137,22 @@ func (ulm *updateLibraryManager) stageAndVerifyUpdate(binary autoupdatableBinary
 	}
 	stagedUpdatePath := filepath.Join(stagingDir, targetFilename)
 
+	// Ensure we set a timeout on our request to download the binary
+	timeout := ulm.mirrorClient.Timeout
+	if timeout == 0 {
+		// Set a high-but-reasonable default
+		timeout = 8 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	// Request download from mirror
 	downloadPath := path.Join("/", "kolide", string(binary), runtime.GOOS, PlatformArch(), targetFilename)
-	resp, err := ulm.mirrorClient.Get(ulm.mirrorUrl + downloadPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ulm.mirrorUrl+downloadPath, nil)
+	if err != nil {
+		return stagedUpdatePath, fmt.Errorf("creating request to download target %s: %w", targetFilename, err)
+	}
+	resp, err := ulm.mirrorClient.Do(req)
 	if err != nil {
 		return stagedUpdatePath, fmt.Errorf("could not make request to download target %s: %w", targetFilename, err)
 	}
@@ -198,7 +216,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 		// In case of error, clean up the staged version and its directory
 		if _, err := os.Stat(stagedVersionedDirectory); err == nil || !os.IsNotExist(err) {
 			if err := backoff.WaitFor(func() error {
-				return os.RemoveAll(stagedVersionedDirectory)
+				return os.RemoveAll(stagedVersionedDirectory) //revive:disable-line -- incorrectly flags `defer: return in a defer function has no effect`
 			}, 500*time.Millisecond, 100*time.Millisecond); err != nil {
 				ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 					"could not remove staged update",
@@ -227,7 +245,7 @@ func (ulm *updateLibraryManager) moveVerifiedUpdate(binary autoupdatableBinary, 
 	// Validate the executable -- the executable check will occasionally time out, especially on Windows,
 	// and we aren't in a rush here, so we retry a couple times.
 	if err := backoff.WaitFor(func() error {
-		return CheckExecutable(context.TODO(), executableLocation(stagedVersionedDirectory, binary), "--version")
+		return CheckExecutable(context.TODO(), ulm.slogger, executableLocation(stagedVersionedDirectory, binary), "--version")
 	}, 45*time.Second, 15*time.Second); err != nil {
 		return fmt.Errorf("could not verify executable after retries: %w", err)
 	}
@@ -360,16 +378,18 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 	if currentVersion == "" {
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"cannot tidy update library without knowing current running version",
+			"binary", binary,
 		)
 		return
 	}
 
-	const numberOfVersionsToKeep = 3
+	const numberOfVersionsToKeep = 2
 
-	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), binary, ulm.baseDir)
+	versionsInLibrary, invalidVersionsInLibrary, err := sortedVersionsInLibrary(context.Background(), ulm.slogger, binary, ulm.baseDir)
 	if err != nil {
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not get versions in library to tidy update library",
+			"binary", binary,
 			"err", err,
 		)
 		return
@@ -379,12 +399,17 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 		ulm.slogger.Log(context.TODO(), slog.LevelWarn,
 			"updates library contains invalid version",
 			"library_path", invalidVersion,
+			"binary", binary,
 			"err", err,
 		)
 		ulm.removeUpdate(binary, invalidVersion)
 	}
 
 	if len(versionsInLibrary) <= numberOfVersionsToKeep {
+		ulm.slogger.Log(context.TODO(), slog.LevelInfo,
+			"no need to tidy library",
+			"binary", binary,
+		)
 		return
 	}
 
@@ -405,12 +430,17 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 
 		nonCurrentlyRunningVersionsKept += 1
 	}
+
+	ulm.slogger.Log(context.TODO(), slog.LevelInfo,
+		"tidied update library",
+		"binary", binary,
+	)
 }
 
 // sortedVersionsInLibrary looks through the update library for the given binary to validate and sort all
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
-func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
+func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -425,13 +455,27 @@ func sortedVersionsInLibrary(ctx context.Context, binary autoupdatableBinary, ba
 		rawVersion := filepath.Base(rawVersionWithPath)
 		v, err := semver.NewVersion(rawVersion)
 		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"detected invalid binary version while parsing raw version",
+				"raw_version", rawVersion,
+				"binary", binary,
+				"err", err,
+			)
+
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
 		}
 
 		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
-		if err := CheckExecutable(ctx, executableLocation(versionDir, binary), "--version"); err != nil {
+		if err := CheckExecutable(ctx, slogger, executableLocation(versionDir, binary), "--version"); err != nil {
 			traces.SetError(span, err)
+			slogger.Log(ctx, slog.LevelWarn,
+				"detected invalid binary version while checking executable",
+				"version_dir", versionDir,
+				"binary", binary,
+				"err", err,
+			)
+
 			invalidVersions = append(invalidVersions, rawVersion)
 			continue
 		}

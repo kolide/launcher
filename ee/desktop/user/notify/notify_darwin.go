@@ -20,11 +20,13 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync/atomic"
 	"unsafe"
 )
 
 type macNotifier struct {
-	interrupt chan struct{}
+	interrupt   chan struct{}
+	interrupted atomic.Bool
 }
 
 func NewDesktopNotifier(_ *slog.Logger, _ string) *macNotifier {
@@ -33,17 +35,25 @@ func NewDesktopNotifier(_ *slog.Logger, _ string) *macNotifier {
 	}
 }
 
-func (m *macNotifier) Listen() error {
-	if isBundle() {
-		C.runNotificationListenerApp()
-	}
-
+func (m *macNotifier) Execute() error {
 	<-m.interrupt
 	return nil
 }
 
 func (m *macNotifier) Interrupt(err error) {
+	if m.interrupted.Load() {
+		return
+	}
+
+	m.interrupted.Store(true)
+
 	m.interrupt <- struct{}{}
+}
+
+func (m *macNotifier) Listen() {
+	if isBundle() {
+		C.runNotificationListenerApp()
+	}
 }
 
 func (m *macNotifier) SendNotification(n Notification) error {

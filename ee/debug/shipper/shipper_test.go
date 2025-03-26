@@ -32,6 +32,8 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
+				k.On("EnrollSecretPath").Return("")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			assertion:            assert.NoError,
@@ -45,6 +47,8 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
+				k.On("EnrollSecretPath").Return("")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			assertion:            assert.NoError,
@@ -57,10 +61,11 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			name: "happy path with signing keys and enroll secret",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				configStore := inmemory.NewStore()
-				agent.SetupKeys(context.TODO(), multislogger.NewNopLogger(), configStore, true)
+				agent.SetupKeys(context.TODO(), multislogger.NewNopLogger(), configStore)
 
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("Slogger").Return(multislogger.NewNopLogger())
 				return k
 			},
 			expectSignatureHeaders: true,

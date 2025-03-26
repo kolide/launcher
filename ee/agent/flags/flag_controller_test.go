@@ -128,16 +128,6 @@ func TestControllerStringFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.Transport()
 				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsConfigEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsEnrollEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsLoggerEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsDistributedReadEndpoint()
-				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryTlsDistributedWriteEndpoint()
-				assert.Equal(t, expectedValue, value)
 			}
 
 			assertGettersValues("")
@@ -272,7 +262,7 @@ func TestControllerNotify(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", []keys.FlagKey{keys.ControlRequestInterval})
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 
@@ -310,9 +300,10 @@ func TestControllerUpdate(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", mock.MatchedBy(func(k []keys.FlagKey) bool {
-				return assert.ElementsMatch(t, k, keys.ToFlagKeys(tt.changedKeys))
-			}))
+			matchKey := mock.MatchedBy(func(k keys.FlagKey) bool {
+				return assert.Contains(t, keys.ToFlagKeys(tt.changedKeys), k)
+			})
+			mockObserver.On("FlagsChanged", mock.Anything, matchKey, matchKey)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ToFlagKeys(tt.changedKeys)...)
 
@@ -351,7 +342,7 @@ func TestControllerOverride(t *testing.T) {
 			assert.NotNil(t, fc)
 
 			mockObserver := mocks.NewFlagsChangeObserver(t)
-			mockObserver.On("FlagsChanged", []keys.FlagKey{keys.ControlRequestInterval})
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval)
 
 			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
 
@@ -366,6 +357,57 @@ func TestControllerOverride(t *testing.T) {
 
 			time.Sleep(tt.duration * 2)
 			assert.Equal(t, tt.valueToSet, fc.ControlRequestInterval())
+		})
+	}
+}
+
+func TestDeregisterChangeObserver(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		valueToSet time.Duration
+		interval   time.Duration
+		duration   time.Duration
+	}{
+		{
+			name:       "happy path",
+			valueToSet: 8 * time.Second, // cannot be below 5 seconds for control request interval
+			interval:   6 * time.Second, // cannot be below 5 seconds for control request interval
+			duration:   100 * time.Millisecond,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			store, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AgentFlagsStore.String())
+			require.NoError(t, err)
+			fc := NewFlagController(multislogger.NewNopLogger(), store)
+			assert.NotNil(t, fc)
+
+			// Create a change observer and register it
+			mockObserver := mocks.NewFlagsChangeObserver(t)
+			mockObserver.On("FlagsChanged", mock.Anything, keys.ControlRequestInterval).Once()
+			fc.RegisterChangeObserver(mockObserver, keys.ControlRequestInterval)
+
+			// Set the control request interval -- the mock observer will have `FlagsChanged` called
+			err = fc.SetControlRequestInterval(tt.valueToSet)
+			require.NoError(t, err)
+
+			value := fc.ControlRequestInterval()
+			assert.Equal(t, tt.valueToSet, value)
+
+			// Now, deregister the change observer
+			fc.DeregisterChangeObserver(mockObserver)
+			require.NotContains(t, fc.observers, mockObserver)
+
+			// Set the control request interval again -- the mock observer will NOT have `FlagsChanged` called
+			fc.SetControlRequestIntervalOverride(tt.interval, tt.duration)
+			assert.Equal(t, tt.interval, fc.ControlRequestInterval())
+
+			mockObserver.AssertExpectations(t)
 		})
 	}
 }

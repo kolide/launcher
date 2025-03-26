@@ -42,7 +42,7 @@ func TestClient_GetAndShutdown(t *testing.T) {
 
 			socketPath := testSocketPath(t)
 			shutdownChan := make(chan struct{})
-			server, err := server.New(multislogger.NewNopLogger(), validAuthToken, socketPath, shutdownChan, nil)
+			server, err := server.New(multislogger.NewNopLogger(), validAuthToken, socketPath, shutdownChan, make(chan<- struct{}), nil)
 			require.NoError(t, err)
 
 			go func() {
