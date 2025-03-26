@@ -56,7 +56,7 @@ func BenchmarkWindowsUpdatesTable(b *testing.B) {
 
 	updatesTable := TablePlugin(UpdatesTable, mockFlags, slogger)
 
-	for b.Loop() {
+	for range b.N {
 		// Confirm we can call the table successfully
 		response := updatesTable.Call(context.TODO(), map[string]string{
 			"action":  "generate",
@@ -76,7 +76,7 @@ func BenchmarkWindowsHistoryTable(b *testing.B) {
 
 	historyTable := TablePlugin(HistoryTable, mockFlags, slogger)
 
-	for b.Loop() {
+	for range b.N {
 		// Confirm we can call the table successfully
 		response := historyTable.Call(context.TODO(), map[string]string{
 			"action":  "generate",

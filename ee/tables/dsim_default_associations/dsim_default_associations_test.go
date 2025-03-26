@@ -23,7 +23,7 @@ func BenchmarkDsimDefaultAssocations(b *testing.B) {
 
 	dsimDefaultAssociationsTable := TablePlugin(mockFlags, slogger)
 
-	for b.Loop() {
+	for range b.N {
 		// Confirm we can call the table successfully
 		response := dsimDefaultAssociationsTable.Call(context.TODO(), map[string]string{
 			"action":  "generate",

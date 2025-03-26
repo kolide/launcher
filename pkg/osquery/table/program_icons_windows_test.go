@@ -20,7 +20,7 @@ func BenchmarkProgramIcons(b *testing.B) {
 
 	programIconsTable := ProgramIcons(mockFlags, slogger)
 
-	for b.Loop() {
+	for range b.N {
 		// Confirm we can call the table successfully
 		response := programIconsTable.Call(context.TODO(), map[string]string{
 			"action":  "generate",
