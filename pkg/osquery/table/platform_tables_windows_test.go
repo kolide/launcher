@@ -252,6 +252,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	runtime.GC() // get up-to-date statistics
 	var statsBeforeAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsBeforeAllTestCases)
+	heapTotalBeforeAllTestCases := heapTotal(&statsBeforeAllTestCases)
 
 	for _, tt := range []struct {
 		testCaseName string
@@ -316,8 +317,10 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			runtime.GC() // get up-to-date statistics
 			var statsAfter runtime.MemStats
 			runtime.ReadMemStats(&statsAfter)
+			heapTotalAfter := heapTotal(&statsAfter)
 
-			fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfter)-heapTotal(&statsBefore))
+			fmt.Printf("HeapTotal diff: %d\n", heapTotalAfter-heapTotal(&statsBefore))
+			fmt.Printf("HeapTotal cumulative diff: %d\n", heapTotalAfter-heapTotalBeforeAllTestCases)
 			fmt.Printf("Alloc diff: %d\n", statsAfter.Alloc-statsBefore.Alloc)
 			fmt.Printf("Sys diff: %d\n", statsAfter.Sys-statsBefore.Sys)
 			fmt.Printf("Live objects diff: %d\n", (statsAfter.Mallocs-statsAfter.Frees)-(statsBefore.Mallocs-statsBefore.Frees))
@@ -336,7 +339,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	runtime.ReadMemStats(&statsAfterAllTestCases)
 
 	fmt.Println("Cumulative:")
-	fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfterAllTestCases)-heapTotal(&statsBeforeAllTestCases))
+	fmt.Printf("HeapTotal diff: %d\n", heapTotal(&statsAfterAllTestCases)-heapTotalBeforeAllTestCases)
 	fmt.Printf("Alloc diff: %d\n", statsAfterAllTestCases.Alloc-statsBeforeAllTestCases.Alloc)
 	fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
 	fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
