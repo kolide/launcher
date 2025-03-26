@@ -249,6 +249,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	require.NoError(t, err)
 
 	// Collect memstats before
+	runtime.GC() // get up-to-date statistics
 	var statsBeforeAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsBeforeAllTestCases)
 
@@ -301,6 +302,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			// Collect memstats before
+			runtime.GC() // get up-to-date statistics
 			var statsBefore runtime.MemStats
 			runtime.ReadMemStats(&statsBefore)
 
@@ -311,6 +313,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			time.Sleep(5 * time.Second)
 
 			// Collect memstats after
+			runtime.GC() // get up-to-date statistics
 			var statsAfter runtime.MemStats
 			runtime.ReadMemStats(&statsAfter)
 
@@ -318,6 +321,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			fmt.Printf("Sys diff: %d\n", statsAfter.Sys-statsBefore.Sys)
 			fmt.Printf("Live objects diff: %d\n", (statsAfter.Mallocs-statsAfter.Frees)-(statsBefore.Mallocs-statsBefore.Frees))
 			fmt.Printf("HeapAlloc diff: %d\n", statsAfter.HeapAlloc-statsBefore.HeapAlloc)
+			fmt.Printf("HeapIdle diff: %d\n", statsAfter.HeapIdle-statsBefore.HeapIdle)
 			fmt.Printf("HeapInuse diff: %d\n", statsAfter.HeapInuse-statsBefore.HeapInuse)
 			fmt.Printf("HeapObjects diff: %d\n", statsAfter.HeapObjects-statsBefore.HeapObjects)
 		})
@@ -326,6 +330,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	time.Sleep(5 * time.Second)
 
 	// Collect memstats after
+	runtime.GC() // get up-to-date statistics
 	var statsAfterAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsAfterAllTestCases)
 
@@ -333,6 +338,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	fmt.Printf("Sys diff: %d\n", statsAfterAllTestCases.Sys-statsBeforeAllTestCases.Sys)
 	fmt.Printf("Live objects diff: %d\n", (statsAfterAllTestCases.Mallocs-statsAfterAllTestCases.Frees)-(statsBeforeAllTestCases.Mallocs-statsBeforeAllTestCases.Frees))
 	fmt.Printf("HeapAlloc diff: %d\n", statsAfterAllTestCases.HeapAlloc-statsBeforeAllTestCases.HeapAlloc)
+	fmt.Printf("HeapIdle diff: %d\n", statsAfterAllTestCases.HeapIdle-statsBeforeAllTestCases.HeapIdle)
 	fmt.Printf("HeapInuse diff: %d\n", statsAfterAllTestCases.HeapInuse-statsBeforeAllTestCases.HeapInuse)
 	fmt.Printf("HeapObjects diff: %d\n", statsAfterAllTestCases.HeapObjects-statsBeforeAllTestCases.HeapObjects)
 }
