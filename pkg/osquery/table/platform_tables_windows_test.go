@@ -19,7 +19,6 @@ import (
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tables/wmitable"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -153,27 +152,44 @@ func BenchmarkWmiTable(b *testing.B) {
 
 	wmiTable := wmitable.TablePlugin(mockFlags, slogger)
 
-	queryContext := table.QueryContext{
-		Constraints: map[string]table.ConstraintList{
-			"class": {
-				Constraints: []table.Constraint{
-					{
-						Operator:   table.OperatorEquals,
-						Expression: "SoftwareLicensingProduct",
-					},
-				},
+	/*
+		type queryContextJSON struct {
+			Constraints []constraintListJSON `json:"constraints"`
+		}
+
+		type constraintListJSON struct {
+			Name     string          `json:"name"`
+			Affinity string          `json:"affinity"`
+			List     json.RawMessage `json:"list"`
+		}
+	*/
+	classConstraint := map[string]string{
+		"op":   "2", // table.OperatorEquals
+		"expr": "SoftwareLicensingProduct",
+	}
+	classConstraintRaw, err := json.Marshal(classConstraint)
+	require.NoError(b, err)
+	propertiesConstraint := map[string]string{
+		"op":   "2", // equals
+		"expr": "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
+	}
+	propertiesConstraintRaw, err := json.Marshal(propertiesConstraint)
+	require.NoError(b, err)
+	constraintsMap := map[string]any{
+		"constraints": []map[string]any{
+			{
+				"name":     "class",
+				"affinity": "TEXT",
+				"list":     classConstraintRaw,
 			},
-			"properties": {
-				Constraints: []table.Constraint{
-					{
-						Operator:   table.OperatorEquals,
-						Expression: "name,licensefamily,id,licensestatus,licensestatusreason,genuinestatus,partialproductkey,productkeyid",
-					},
-				},
+			{
+				"name":     "properties",
+				"affinity": "TEXT",
+				"list":     propertiesConstraintRaw,
 			},
 		},
 	}
-	queryContextStr, err := json.Marshal(queryContext)
+	queryContextStr, err := json.Marshal(constraintsMap)
 	require.NoError(b, err)
 
 	for range b.N {
