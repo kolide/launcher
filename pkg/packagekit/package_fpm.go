@@ -130,16 +130,22 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		fpmCommand = append(fpmCommand, "--before-remove", filepath.Join("/pkgscripts", "prerm"))
 	}
 
-	dockerArgs := []string{
-		"run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgsrc", po.Root),
-		"-v", fmt.Sprintf("%s:/pkgscripts", po.Scripts),
-		"-v", fmt.Sprintf("%s:/out", outputPathDir),
-		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
-		"kolide/fpm:latest",
+	mountSuffix := ""
+	if po.ContainerTool == "podman" {
+		// private volume, necessary to avoid permission issues when building rootlessly
+		mountSuffix = ":Z"
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", append(dockerArgs, fpmCommand...)...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
+	args := []string{
+		"run", "--rm",
+		"-v", fmt.Sprintf("%s:/pkgsrc%s", po.Root, mountSuffix),
+		"-v", fmt.Sprintf("%s:/pkgscripts%s", po.Scripts, mountSuffix),
+		"-v", fmt.Sprintf("%s:/out%s", outputPathDir, mountSuffix),
+		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
+		"docker.io/kolide/fpm:latest",
+	}
+
+	cmd := exec.CommandContext(ctx, po.ContainerTool, append(args, fpmCommand...)...) //nolint:forbidigo // Fine to use exec.CommandContext outside of launcher proper
 
 	stderr := new(bytes.Buffer)
 	stdout := new(bytes.Buffer)
