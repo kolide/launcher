@@ -265,6 +265,57 @@ func TestKolideWindowsUpdatesUsage(t *testing.T) { //nolint:paralleltest
 	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryAfterAllTestCases, nonGoMemoryAfterAllTestCases)
 }
 
+func TestHistoryKolideWindowsUpdatesUsage(t *testing.T) { //nolint:paralleltest
+	// Set up table dependencies
+	mockFlags := typesmocks.NewFlags(t)
+	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	slogger := multislogger.NewNopLogger()
+
+	kolideTable := windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, mockFlags, slogger)
+
+	// Collect memstats before
+	var statsBeforeAllTestCases runtime.MemStats
+	runtime.ReadMemStats(&statsBeforeAllTestCases)
+	goMemoryBeforeAllTestCases := goMemoryUsage(&statsBeforeAllTestCases)
+	nonGoMemoryBeforeAllTestCases := nonGoMemoryUsage(t, &statsBeforeAllTestCases)
+
+	fmt.Println("Starting point")
+	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryBeforeAllTestCases, nonGoMemoryBeforeAllTestCases)
+
+	for i := 0; i < 50; i++ {
+		callTable(t, kolideTable, "{}")
+	}
+
+	time.Sleep(5 * time.Second)
+
+	// Collect memstats at midpoint
+	var midpointStats runtime.MemStats
+	runtime.ReadMemStats(&midpointStats)
+
+	goMemoryMidpoint := goMemoryUsage(&midpointStats)
+	nonGoMemoryMidpoint := nonGoMemoryUsage(t, &midpointStats)
+
+	fmt.Println("Midpoint point")
+	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryMidpoint, nonGoMemoryMidpoint)
+
+	for i := 0; i < 50; i++ {
+		callTable(t, kolideTable, "{}")
+	}
+
+	time.Sleep(5 * time.Second)
+
+	// Collect memstats after
+	var statsAfterAllTestCases runtime.MemStats
+	runtime.ReadMemStats(&statsAfterAllTestCases)
+
+	goMemoryAfterAllTestCases := goMemoryUsage(&statsAfterAllTestCases)
+	nonGoMemoryAfterAllTestCases := nonGoMemoryUsage(t, &statsAfterAllTestCases)
+
+	fmt.Println("Stopping point")
+	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryAfterAllTestCases, nonGoMemoryAfterAllTestCases)
+}
+
 func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	// Set up table dependencies
 	mockFlags := typesmocks.NewFlags(t)
