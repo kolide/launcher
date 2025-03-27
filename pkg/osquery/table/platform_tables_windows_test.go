@@ -283,27 +283,23 @@ func TestHistoryKolideWindowsUpdatesUsage(t *testing.T) { //nolint:paralleltest
 	fmt.Println("Starting point")
 	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryBeforeAllTestCases, nonGoMemoryBeforeAllTestCases)
 
-	for i := 0; i < 50; i++ {
-		callTable(t, kolideTable, "{}")
+	for i := 0; i < 4; i++ {
+		for i := 0; i < 25; i++ {
+			callTable(t, kolideTable, "{}")
+		}
+
+		time.Sleep(5 * time.Second)
+
+		// Collect memstats after batch
+		var afterBatchStats runtime.MemStats
+		runtime.ReadMemStats(&afterBatchStats)
+
+		goMemoryAfterBatch := goMemoryUsage(&afterBatchStats)
+		nonGoMemoryAfterBatch := nonGoMemoryUsage(t, &afterBatchStats)
+
+		fmt.Println("After batch:")
+		fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryAfterBatch, nonGoMemoryAfterBatch)
 	}
-
-	time.Sleep(5 * time.Second)
-
-	// Collect memstats at midpoint
-	var midpointStats runtime.MemStats
-	runtime.ReadMemStats(&midpointStats)
-
-	goMemoryMidpoint := goMemoryUsage(&midpointStats)
-	nonGoMemoryMidpoint := nonGoMemoryUsage(t, &midpointStats)
-
-	fmt.Println("Midpoint point")
-	fmt.Printf("Go memory: %d\tNon-go memory: %d\n", goMemoryMidpoint, nonGoMemoryMidpoint)
-
-	for i := 0; i < 50; i++ {
-		callTable(t, kolideTable, "{}")
-	}
-
-	time.Sleep(5 * time.Second)
 
 	// Collect memstats after
 	var statsAfterAllTestCases runtime.MemStats
