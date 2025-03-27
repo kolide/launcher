@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 package table
 
 import (
@@ -18,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/dsim_default_associations"
 	"github.com/kolide/launcher/ee/tables/execparsers/dsregcmd"
+	"github.com/kolide/launcher/ee/tables/firefox_preferences"
 	"github.com/kolide/launcher/ee/tables/secedit"
 	"github.com/kolide/launcher/ee/tables/wifi_networks"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
@@ -254,7 +252,6 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	// Collect memstats before
 	var statsBeforeAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsBeforeAllTestCases)
-	heapTotalBeforeAllTestCases := heapTotal(&statsBeforeAllTestCases)
 	goMemoryBeforeAllTestCases := goMemoryUsage(&statsBeforeAllTestCases)
 	nonGoMemoryBeforeAllTestCases := nonGoMemoryUsage(t, &statsBeforeAllTestCases)
 
@@ -263,6 +260,7 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 		kolideTable  *table.Plugin
 		queryContext string
 	}{
+		// Windows tables
 		{
 			testCaseName: "kolide_program_icons",
 			kolideTable:  ProgramIcons(mockFlags, slogger),
@@ -303,12 +301,56 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 			kolideTable:  dataflattentable.NewExecAndParseTable(mockFlags, slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),
 			queryContext: "{}",
 		},
+		// Tables for all platforms
+		{
+			testCaseName: "kolide_chrome_login_data_emails",
+			kolideTable:  ChromeLoginDataEmails(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_chrome_user_profiles",
+			kolideTable:  ChromeUserProfiles(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_onepassword_accounts",
+			kolideTable:  OnePasswordAccounts(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_slack_config",
+			kolideTable:  SlackConfig(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_ssh_keys",
+			kolideTable:  SshKeys(mockFlags, slogger),
+			queryContext: "{}",
+		},
+		{
+			testCaseName: "kolide_firefox_preferences",
+			kolideTable:  firefox_preferences.TablePlugin(mockFlags, slogger),
+			queryContext: "{}",
+		},
 	} {
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			for i := 0; i < 20; i++ {
 				callTable(t, tt.kolideTable, tt.queryContext)
 			}
+
+			time.Sleep(5 * time.Second)
+
+			// Collect memstats after
+			var statsAfter runtime.MemStats
+			runtime.ReadMemStats(&statsAfter)
+
+			goMemoryAfter := goMemoryUsage(&statsAfter)
+			nonGoMemoryAfter := nonGoMemoryUsage(t, &statsAfter)
+
+			fmt.Printf("Memory after calling %s\n", tt.testCaseName)
+			fmt.Printf("Go memory: %d (diff: %d)\n", goMemoryAfter, goMemoryAfter-goMemoryBeforeAllTestCases)
+			fmt.Printf("Non-go memory %d (diff: %d)\n", nonGoMemoryAfter, nonGoMemoryAfter-nonGoMemoryBeforeAllTestCases)
 		})
 	}
 
@@ -318,12 +360,9 @@ func TestMemoryUsage(t *testing.T) { //nolint:paralleltest
 	var statsAfterAllTestCases runtime.MemStats
 	runtime.ReadMemStats(&statsAfterAllTestCases)
 
-	heapTotalAfterAllTestCases := heapTotal(&statsAfterAllTestCases)
 	goMemoryAfterAllTestCases := goMemoryUsage(&statsAfterAllTestCases)
 	nonGoMemoryAfterAllTestCases := nonGoMemoryUsage(t, &statsAfterAllTestCases)
 
-	fmt.Println("Heap total:")
-	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", heapTotalBeforeAllTestCases, heapTotalAfterAllTestCases, heapTotalAfterAllTestCases-heapTotalBeforeAllTestCases)
 	fmt.Println("Go memory:")
 	fmt.Printf("Before: %d\tAfter: %d\tDiff: %d\n", goMemoryBeforeAllTestCases, goMemoryAfterAllTestCases, goMemoryAfterAllTestCases-goMemoryBeforeAllTestCases)
 	fmt.Println("Non-go memory:")
@@ -379,7 +418,7 @@ func goMemoryUsage(m *runtime.MemStats) uint64 {
 	return m.Sys - m.HeapReleased
 }
 
-func TestMemoryUsageWithMemprofile(t *testing.T) { //nolint:paralleltest
+func TestAMemoryUsageWithMemprofile(t *testing.T) { //nolint:paralleltest
 	// Set up table dependencies
 	mockFlags := typesmocks.NewFlags(t)
 	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
