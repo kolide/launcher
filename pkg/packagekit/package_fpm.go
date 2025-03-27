@@ -130,11 +130,17 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 		fpmCommand = append(fpmCommand, "--before-remove", filepath.Join("/pkgscripts", "prerm"))
 	}
 
+	mountSuffix := ""
+	if po.ContainerTool == "podman" {
+		// private volume, necessary to avoid permission issues when building rootlessly
+		mountSuffix = ":Z"
+	}
+
 	args := []string{
 		"run", "--rm",
-		"-v", fmt.Sprintf("%s:/pkgsrc:Z", po.Root),
-		"-v", fmt.Sprintf("%s:/pkgscripts:Z", po.Scripts),
-		"-v", fmt.Sprintf("%s:/out:Z", outputPathDir),
+		"-v", fmt.Sprintf("%s:/pkgsrc%s", po.Root, mountSuffix),
+		"-v", fmt.Sprintf("%s:/pkgscripts%s", po.Scripts, mountSuffix),
+		"-v", fmt.Sprintf("%s:/out%s", outputPathDir, mountSuffix),
 		"--entrypoint", "", // override this, to ensure more compatibility with the plain command line
 		"docker.io/kolide/fpm:latest",
 	}
