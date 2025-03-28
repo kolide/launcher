@@ -27,4 +27,5 @@ func Test_checkPerformance(t *testing.T) {
 	require.Greater(t, perfStats.MemInfo.MemPercent, float32(0.0), "expected mem percent to be set")
 	require.Greater(t, perfStats.MemInfo.HeapTotal, uint64(0), "expected heap total to be set")
 	require.Greater(t, perfStats.MemInfo.GoMemUsage, uint64(0), "expected go mem usage to be set")
+	require.Greater(t, perfStats.MemInfo.NonGoMemUsage, uint64(0), "expected non go mem usage to be set")
 }

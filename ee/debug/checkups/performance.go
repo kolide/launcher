@@ -2,6 +2,7 @@ package checkups
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -9,27 +10,42 @@ import (
 )
 
 type perfCheckup struct {
-	data map[string]any
+	data    map[string]any
+	summary string
 }
 
 func (p *perfCheckup) Name() string {
 	return "Performance"
 }
 
-func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
+func (p *perfCheckup) Run(ctx context.Context, flareWriter io.Writer) error {
 	p.data = make(map[string]any)
-	stats, err := performance.GetStats(ctx)
+	stats, err := performance.CurrentProcessStats(ctx)
 	if err != nil {
 		return fmt.Errorf("gathering performance stats: %w", err)
 	}
 
+	p.summary = fmt.Sprintf(
+		"process %d is using %.2f%% CPU,%d VMS and %d RSS (%.2f%% memory)",
+		stats.Pid,
+		stats.CPUPercent,
+		stats.MemInfo.VMS,
+		stats.MemInfo.RSS,
+		stats.MemInfo.MemPercent,
+	)
+
 	p.data["stats"] = stats
 
-	return nil
+	if flareWriter == io.Discard {
+		return nil
+	}
+
+	jsonWriter := json.NewEncoder(flareWriter)
+	return jsonWriter.Encode(stats)
 }
 
 func (p *perfCheckup) ExtraFileName() string {
-	return ""
+	return "performance.json"
 }
 
 func (p *perfCheckup) Status() Status {
@@ -37,7 +53,7 @@ func (p *perfCheckup) Status() Status {
 }
 
 func (p *perfCheckup) Summary() string {
-	return ""
+	return p.summary
 }
 
 func (p *perfCheckup) Data() any {
