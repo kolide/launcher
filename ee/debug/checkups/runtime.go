@@ -117,7 +117,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	// cpu profile is really meant to run over a period of time, capturing background information. But,
 	// We're not really setup for that right now. So this is a quick capture, of what's happening in background
 	// threads. Better would be to have a goroutine writing this into a temp buffer somewhere.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(5 * time.Second)
 
 	return nil
 }
