@@ -25,7 +25,7 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	}
 
 	p.summary = fmt.Sprintf(
-		"process %d is using %.2f%% CPU, RSS: %.2f MB (%.2f%% memory). Note CPU will be higher while running doctor/flare.",
+		"process %d is using %.2f%% CPU, RSS: %.2f MB (%.2f%% memory)",
 		stats.Pid,
 		stats.CPUPercent,
 		bytesToMB(stats.MemInfo.RSS),

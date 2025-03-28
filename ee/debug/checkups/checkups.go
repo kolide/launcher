@@ -109,7 +109,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&desktopMenu{k: k}, flareSupported},
 		{&coredumpCheckup{}, doctorSupported | flareSupported},
 		{&downloadDirectory{}, flareSupported},
-		{&perfCheckup{}, doctorSupported | flareSupported | logSupported},
+		{&perfCheckup{}, flareSupported | logSupported},
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
