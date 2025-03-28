@@ -2,7 +2,6 @@ package checkups
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -18,7 +17,7 @@ func (p *perfCheckup) Name() string {
 	return "Performance"
 }
 
-func (p *perfCheckup) Run(ctx context.Context, flareWriter io.Writer) error {
+func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	p.data = make(map[string]any)
 	stats, err := performance.CurrentProcessStats(ctx)
 	if err != nil {
@@ -35,12 +34,7 @@ func (p *perfCheckup) Run(ctx context.Context, flareWriter io.Writer) error {
 
 	p.data["stats"] = stats
 
-	if flareWriter == io.Discard {
-		return nil
-	}
-
-	jsonWriter := json.NewEncoder(flareWriter)
-	return jsonWriter.Encode(stats)
+	return nil
 }
 
 func (p *perfCheckup) ExtraFileName() string {
