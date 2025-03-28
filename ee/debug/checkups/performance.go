@@ -26,11 +26,10 @@ func (p *perfCheckup) Run(ctx context.Context, flareWriter io.Writer) error {
 	}
 
 	p.summary = fmt.Sprintf(
-		"process %d is using %.2f%% CPU,%d VMS and %d RSS (%.2f%% memory)",
+		"process %d is using %.2f%% CPU, RSS: %.2f MB (%.2f%% memory). Note CPU will be higher while running doctor/flare.",
 		stats.Pid,
 		stats.CPUPercent,
-		stats.MemInfo.VMS,
-		stats.MemInfo.RSS,
+		bytesToMB(stats.MemInfo.RSS),
 		stats.MemInfo.MemPercent,
 	)
 
@@ -58,4 +57,8 @@ func (p *perfCheckup) Summary() string {
 
 func (p *perfCheckup) Data() any {
 	return p.data
+}
+
+func bytesToMB(bytes uint64) float64 {
+	return float64(bytes) / (1024 * 1024)
 }
