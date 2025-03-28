@@ -6,8 +6,11 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -22,6 +25,14 @@ import (
 	"github.com/scjalliance/comshim"
 )
 
+// QueryResults is the data returned by execing `launcher.exe query-windowsupdates`.
+type QueryResults struct {
+	RawResults      []byte `json:"raw_results"`
+	Locale          string `json:"locale"`
+	IsDefaultLocale int    `json:"is_default_locale"`
+	Err             error  `json:"err"`
+}
+
 type tableMode int
 
 const (
@@ -33,6 +44,7 @@ type Table struct {
 	slogger   *slog.Logger
 	queryFunc queryFuncType
 	name      string
+	mode      tableMode
 }
 
 func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table.Plugin {
@@ -42,7 +54,9 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 		table.IntegerColumn("is_default"),
 	)
 
-	t := &Table{}
+	t := &Table{
+		mode: mode,
+	}
 
 	switch mode {
 	case UpdatesTable:
@@ -55,7 +69,7 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 
 	t.slogger = slogger.With("name", t.name)
 
-	return tablewrapper.New(flags, slogger, t.name, columns, t.generate)
+	return tablewrapper.New(flags, slogger, t.name, columns, t.generateWithLauncherExec)
 }
 
 func queryUpdates(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) {
@@ -68,6 +82,93 @@ func queryHistory(searcher *windowsupdate.IUpdateSearcher) (interface{}, error) 
 
 type queryFuncType func(*windowsupdate.IUpdateSearcher) (interface{}, error)
 
+// generateWithLauncherExec replaces the previous `generate` function. It shells out
+// to launcher's new `query-windowsupdates` subcommand, which performs the actual query
+// and writes JSON to stdout for this generate function to consume. We do this because
+// we suspect a memory leak when calling `IUpdateSearcher.Search` -- if we call this function
+// in a new launcher process, then the memory will be released when that process terminates.
+// It's not an ideal long-term solution, but we are hoping it helps with memory issues in the
+// short term as we track down the issue in go-ole. Note that we only suspect memory leak
+// issues in the `Search` function and not in `QueryHistoryAll` -- but to be safe and for ease
+// of implementation, we are moving both to launcher execs.
+func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
+	defer span.End()
+
+	launcherPath, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("getting path to launcher: %w", err)
+	}
+	if !strings.HasSuffix(launcherPath, "launcher.exe") {
+		return nil, errors.New("cannot run generate for non-launcher executable (is this running in a test context?)")
+	}
+
+	var results []map[string]string
+
+	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
+		args := []string{
+			"query-windowsupdates",
+			"-locale", locale,
+			"-table_mode", strconv.Itoa(int(t.mode)),
+		}
+		cmd := exec.CommandContext(ctx, launcherPath, args...) //nolint:forbidigo // We can exec the current executable safely
+		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"error running launcher query-windowsupdates",
+				"err", err,
+				"out", string(out),
+			)
+			continue
+		}
+
+		var res QueryResults
+		if err := json.Unmarshal(out, &res); err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"error unmarshalling results of running launcher query-windowsupdates",
+				"err", err,
+				"out", string(out),
+			)
+			continue
+		}
+
+		if res.Err != nil {
+			t.slogger.Log(ctx, slog.LevelWarn,
+				"launcher query-windowsupdates contained error",
+				"err", res.Err,
+			)
+			continue
+		}
+
+		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+			flattenOpts := []dataflatten.FlattenOpts{
+				dataflatten.WithSlogger(t.slogger),
+				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+			}
+
+			flatData, err := dataflatten.Json(res.RawResults, flattenOpts...)
+			if err != nil {
+				t.slogger.Log(ctx, slog.LevelInfo,
+					"flatten failed",
+					"err", err,
+				)
+				continue
+			}
+
+			rowData := map[string]string{
+				"locale":     res.Locale,
+				"is_default": strconv.Itoa(res.IsDefaultLocale),
+			}
+
+			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+		}
+	}
+
+	return results, nil
+}
+
+//nolint:unused
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
@@ -92,6 +193,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 }
 
+//nolint:unused
 func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
@@ -132,6 +234,7 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 	return results, nil
 }
 
+//nolint:unused
 func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]dataflatten.Row, error) {
 	flattenOpts := []dataflatten.FlattenOpts{
 		dataflatten.WithSlogger(t.slogger),
@@ -148,6 +251,7 @@ func (t *Table) flattenOutput(dataQuery string, searchResults interface{}) ([]da
 	return dataflatten.Json(jsonBytes, flattenOpts...)
 }
 
+//nolint:unused
 func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, error) {
 	isDefaultLocale := 0
 
