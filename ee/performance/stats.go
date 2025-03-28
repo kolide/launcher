@@ -107,7 +107,8 @@ func goMemUsage(ms *runtime.MemStats) uint64 {
 	return ms.Sys - ms.HeapReleased
 }
 
-// looking at inuse memory from OS perspective
+// nonGoMemUsage is looking at all inuse memory allocated from the OS perspective minus the go memory
+// accounted for by go's runtime. this can indicate outside usage (e.g. CGO or other external allocations)
 func nonGoMemUsage(memInfo *process.MemoryInfoStat, ms *runtime.MemStats) uint64 {
 	return memInfo.RSS - goMemUsage(ms)
 }
