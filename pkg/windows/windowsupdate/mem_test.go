@@ -29,22 +29,29 @@ func TestMemory(t *testing.T) {
 	fmt.Println("before Search")
 	takeAndPrintMemoryUsageSnapshot(t)
 
-	searchResultDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(searcher.disp, "Search", "Type='Software'"))
+	searchVariant, err := oleutil.CallMethod(searcher.disp, "Search", "Type='Software'")
 	require.NoError(t, err)
 
-	fmt.Println("after Search, before converting to result")
+	fmt.Println("after Search")
+	takeAndPrintMemoryUsageSnapshot(t)
+
+	searchResultDisp, err := oleconv.ToIDispatchErr(searchVariant, err)
+	require.NoError(t, err)
+
+	fmt.Println("converted to IDispatch")
 	takeAndPrintMemoryUsageSnapshot(t)
 
 	_, err = toISearchResult(searchResultDisp)
 	require.NoError(t, err)
 
-	fmt.Println("converted to result")
+	fmt.Println("converted to ISearchResult")
 	takeAndPrintMemoryUsageSnapshot(t)
 
 	searcher.disp.Release()
 	session.disp.Release()
+	require.NoError(t, searchVariant.Clear())
 
-	fmt.Println("after releasing searcher and session")
+	fmt.Println("after releasing searcher and session + clearing search variant")
 	takeAndPrintMemoryUsageSnapshot(t)
 }
 
