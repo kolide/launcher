@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/pkg/windows/oleconv"
 	"github.com/scjalliance/comshim"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/stretchr/testify/require"
@@ -24,7 +26,16 @@ func TestMemory(t *testing.T) {
 	searcher, err := session.CreateUpdateSearcher()
 	require.NoError(t, err)
 
-	_, err = searcher.Search("Type='Software'")
+	fmt.Println("before Search")
+	takeAndPrintMemoryUsageSnapshot(t)
+
+	searchResultDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(searcher.disp, "Search", "Type='Software'"))
+	require.NoError(t, err)
+
+	fmt.Println("after Search, before converting to result")
+	takeAndPrintMemoryUsageSnapshot(t)
+
+	_, err = toISearchResult(searchResultDisp)
 	require.NoError(t, err)
 
 	fmt.Println("done")
