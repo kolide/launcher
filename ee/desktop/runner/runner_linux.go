@@ -240,7 +240,7 @@ func (r *DesktopUsersProcessesRunner) displayFromDisplayServerProcess(ctx contex
 		}
 		uidMatch := false
 		for _, procUid := range uids {
-			if procUid == uid {
+			if procUid == uint32(uid) {
 				uidMatch = true
 				break
 			}
