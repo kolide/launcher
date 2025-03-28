@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/pkg/windows/oleconv"
@@ -53,6 +54,8 @@ func TestMemory(t *testing.T) {
 	searcher.disp.Release()
 	session.disp.Release()
 	require.NoError(t, searchVariant.Clear())
+
+	time.Sleep(10 * time.Second)
 
 	fmt.Println("after releasing searcher and session + clearing search variant")
 	takeAndPrintMemoryUsageSnapshot(t)
