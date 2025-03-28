@@ -38,7 +38,7 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 }
 
 func (p *perfCheckup) ExtraFileName() string {
-	return "performance.json"
+	return ""
 }
 
 func (p *perfCheckup) Status() Status {
