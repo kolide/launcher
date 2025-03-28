@@ -38,7 +38,13 @@ func TestMemory(t *testing.T) {
 	_, err = toISearchResult(searchResultDisp)
 	require.NoError(t, err)
 
-	fmt.Println("done")
+	fmt.Println("converted to result")
+	takeAndPrintMemoryUsageSnapshot(t)
+
+	searcher.disp.Release()
+	session.disp.Release()
+
+	fmt.Println("after releasing searcher and session")
 	takeAndPrintMemoryUsageSnapshot(t)
 }
 
