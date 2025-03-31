@@ -102,6 +102,7 @@ func gatherPprofMemory(z *zip.Writer) error {
 	return nil
 
 }
+
 func gatherPprofCpu(z *zip.Writer) error {
 	out, err := z.Create("cpuprofile")
 	if err != nil {
@@ -123,7 +124,11 @@ func gatherPprofCpu(z *zip.Writer) error {
 		close(done)
 	}()
 
-	// Wait for profiling to complete before returning
-	<-done
-	return nil
+	// Wait for profiling to complete with a timeout
+	select {
+	case <-done:
+		return nil
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("timed out waiting for CPU profile")
+	}
 }
