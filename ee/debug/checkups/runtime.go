@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"runtime"
@@ -129,6 +130,6 @@ func gatherPprofCpu(z *zip.Writer) error {
 	case <-done:
 		return nil
 	case <-time.After(10 * time.Second):
-		return fmt.Errorf("timed out waiting for CPU profile")
+		return errors.New("timeout waiting for CPU profile to complete")
 	}
 }
