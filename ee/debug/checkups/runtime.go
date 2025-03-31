@@ -102,7 +102,6 @@ func gatherPprofMemory(z *zip.Writer) error {
 	return nil
 
 }
-
 func gatherPprofCpu(z *zip.Writer) error {
 	out, err := z.Create("cpuprofile")
 	if err != nil {
@@ -112,12 +111,19 @@ func gatherPprofCpu(z *zip.Writer) error {
 	if err := pprof.StartCPUProfile(out); err != nil {
 		return fmt.Errorf("starting CPU profile: %w", err)
 	}
-	defer pprof.StopCPUProfile()
 
-	// cpu profile is really meant to run over a period of time, capturing background information. But,
-	// We're not really setup for that right now. So this is a quick capture, of what's happening in background
-	// threads. Better would be to have a goroutine writing this into a temp buffer somewhere.
-	time.Sleep(5 * time.Second)
+	// Use a channel to wait for the profiling to complete
+	done := make(chan struct{})
 
+	// Move the sleep and StopCPUProfile into a goroutine
+	go func() {
+		// cpu profile is really meant to run over a period of time, capturing background information
+		time.Sleep(5 * time.Second)
+		pprof.StopCPUProfile()
+		close(done)
+	}()
+
+	// Wait for profiling to complete before returning
+	<-done
 	return nil
 }
