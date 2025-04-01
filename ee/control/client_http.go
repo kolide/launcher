@@ -135,8 +135,8 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) error {
 	hardwareKeys := agent.HardwareKeys()
 
-	if hardwareKeys == nil {
-		return errors.New("hardware keys are nil")
+	if agent.HardwareKeys() == nil || hardwareKeys.Public() == nil {
+		return errors.New("nil hardware keys")
 	}
 
 	key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
