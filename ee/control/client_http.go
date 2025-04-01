@@ -138,6 +138,8 @@ func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) e
 		c.slogger.Log(req.Context(), slog.LevelDebug,
 			"hardware key signing not supported on darwin",
 		)
+
+		return nil
 	}
 
 	hardwareKeys := agent.HardwareKeys()
