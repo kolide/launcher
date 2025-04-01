@@ -129,6 +129,9 @@ func extractLeveldbQueryTargets(query string) map[string]struct{} {
 	allowedKeyMap := make(map[string]struct{})
 
 	for _, allowedKey := range strings.Split(query, ",") {
+		if len(allowedKey) == 0 {
+			continue
+		}
 		allowedKeyMap[allowedKey] = struct{}{}
 	}
 
