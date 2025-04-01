@@ -23,7 +23,9 @@ func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClien
 	if k.DisableControlTLS() {
 		clientOpts = append(clientOpts, control.WithDisableTLS())
 	}
-	client, err := control.NewControlHTTPClient(k.ControlServerURL(), http.DefaultClient, clientOpts...)
+
+	logger := k.Slogger().With("component", "control_http_client")
+	client, err := control.NewControlHTTPClient(k.ControlServerURL(), http.DefaultClient, logger, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating control http client: %w", err)
 	}
@@ -31,7 +33,7 @@ func createHTTPClient(ctx context.Context, k types.Knapsack) (*control.HTTPClien
 	return client, nil
 }
 
-func createControlService(ctx context.Context, store types.GetterSetter, k types.Knapsack) (*control.ControlService, error) {
+func createControlService(ctx context.Context, k types.Knapsack) (*control.ControlService, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
