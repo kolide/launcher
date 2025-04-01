@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/kolide/launcher/pkg/traces"
@@ -14,14 +15,16 @@ import (
 
 // leveldbData is the dataFunc for plain LevelDB databases without additional encoding
 // or nesting. IndexedDB databases leveraging LevelDB should use `indexeddbLeveldbData`
-// instead. Since leveldbData assumes a key-value store without nesting, the `query` is
-// ignored here. All key-value pairs in the database are returned.
-func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, _ string, queryContext table.QueryContext) ([]sourceData, error) {
+// instead. If set, the query is a comma-separated allowlist of keys to return; if empty,
+// all keys are returned.
+func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
 	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.
 	pathConstraintsFromQuery := getPathConstraint(queryContext)
+
+	allowedKeyMap := extractLeveldbQueryTargets(query)
 
 	results := make([]sourceData, 0)
 	for _, sourcePath := range sourcePaths {
@@ -43,7 +46,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 				continue
 			}
 
-			rowsFromDb, err := queryLeveldb(ctx, dbPath)
+			rowsFromDb, err := queryLeveldb(ctx, dbPath, allowedKeyMap)
 			if err != nil {
 				return nil, fmt.Errorf("querying leveldb at %s: %w", dbPath, err)
 			}
@@ -57,7 +60,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 	return results, nil
 }
 
-func queryLeveldb(ctx context.Context, path string) ([]map[string][]byte, error) {
+func queryLeveldb(ctx context.Context, path string, allowedKeyMap map[string]struct{}) ([]map[string][]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -81,8 +84,15 @@ func queryLeveldb(ctx context.Context, path string) ([]map[string][]byte, error)
 	rowsFromDb := make([]map[string][]byte, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
+		k := iter.Key()
+		if len(allowedKeyMap) > 0 {
+			if _, ok := allowedKeyMap[string(k)]; !ok {
+				// Key is not allowlisted -- skip it
+				continue
+			}
+		}
 		rowsFromDb = append(rowsFromDb, map[string][]byte{
-			"key":   iter.Key(),
+			"key":   k,
 			"value": iter.Value(),
 		})
 	}
@@ -92,4 +102,14 @@ func queryLeveldb(ctx context.Context, path string) ([]map[string][]byte, error)
 	}
 
 	return rowsFromDb, nil
+}
+
+func extractLeveldbQueryTargets(query string) map[string]struct{} {
+	allowedKeyMap := make(map[string]struct{})
+
+	for _, allowedKey := range strings.Split(query, ",") {
+		allowedKeyMap[allowedKey] = struct{}{}
+	}
+
+	return allowedKeyMap
 }

@@ -293,6 +293,7 @@ func TestQueryLevelDB(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Construct table
+	sourceQuery := strings.Join([]string{expectedKey}, ",")
 	cfg := katcTableConfig{
 		Columns: []string{"key", "value"},
 		katcTableDefinition: katcTableDefinition{
@@ -301,7 +302,7 @@ func TestQueryLevelDB(t *testing.T) {
 				dataFunc: leveldbData,
 			},
 			SourcePaths:       &[]string{filepath.Join("some", "incorrect", "path")},
-			SourceQuery:       nil,
+			SourceQuery:       &sourceQuery,
 			RowTransformSteps: &[]rowTransformStep{},
 		},
 		Overlays: []katcTableConfigOverlay{
