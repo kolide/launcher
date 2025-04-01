@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -133,6 +134,12 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 }
 
 func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) error {
+	if runtime.GOOS == "darwin" {
+		c.slogger.Log(req.Context(), slog.LevelDebug,
+			"hardware key signing not supported on darwin",
+		)
+	}
+
 	hardwareKeys := agent.HardwareKeys()
 
 	if agent.HardwareKeys() == nil || hardwareKeys.Public() == nil {
