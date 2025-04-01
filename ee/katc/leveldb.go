@@ -105,16 +105,21 @@ func queryLeveldb(ctx context.Context, path string, allowedKeyMap map[string]str
 	rowsFromDb := make([]map[string][]byte, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
-		k := iter.Key()
+		// We have to copy over the key/value to prevent their data from
+		// being overwritten on subsequent iterations.
+		k := make([]byte, len(iter.Key()))
+		copy(k, iter.Key())
 		if len(allowedKeyMap) > 0 {
 			if _, ok := allowedKeyMap[string(k)]; !ok {
 				// Key is not allowlisted -- skip it
 				continue
 			}
 		}
+		v := make([]byte, len(iter.Value()))
+		copy(v, iter.Value())
 		rowsFromDb = append(rowsFromDb, map[string][]byte{
 			"key":   k,
-			"value": iter.Value(),
+			"value": v,
 		})
 	}
 	iter.Release()
