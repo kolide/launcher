@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -29,6 +30,7 @@ type HTTPClient struct {
 	insecure   bool
 	disableTLS bool
 	token      string
+	slogger    *slog.Logger
 }
 
 const (
@@ -48,7 +50,7 @@ type configResponse struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
@@ -57,6 +59,7 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 		baseURL: baseURL,
 		client:  client,
 		addr:    addr,
+		slogger: logger,
 	}
 
 	for _, opt := range opts {
@@ -106,21 +109,11 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 	configReq.Header.Set(HeaderKey, string(key1))
 	configReq.Header.Set(HeaderSignature, sig1)
 
-	// Calculate second signature if available
-	hardwareKeys := agent.HardwareKeys()
-
-	// hardware signing is not implemented for darwin
-	if runtime.GOOS != "darwin" && hardwareKeys.Public() != nil {
-		key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
-		if err != nil {
-			return nil, fmt.Errorf("could not get key header from hardware keys: %w", err)
-		}
-		sig2, err := signatureHeaderValue(hardwareKeys, challenge)
-		if err != nil {
-			return nil, fmt.Errorf("could not get signature header from hardware keys: %w", err)
-		}
-		configReq.Header.Set(HeaderKey2, string(key2))
-		configReq.Header.Set(HeaderSignature2, sig2)
+	if err := c.setHardwareKeyHeader(configReq, challenge); err != nil {
+		c.slogger.Log(ctx, slog.LevelWarn,
+			"failed to set hardware key header, not fatal moving on",
+			"err", err,
+		)
 	}
 
 	configAndAuthKeyRaw, err := c.do(configReq)
@@ -138,6 +131,36 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 
 	reader := bytes.NewReader(cfgResp.Config)
 	return reader, nil
+}
+
+func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) error {
+	if runtime.GOOS == "darwin" {
+		c.slogger.Log(req.Context(), slog.LevelDebug,
+			"hardware key signing not supported on darwin",
+		)
+
+		return nil
+	}
+
+	hardwareKeys := agent.HardwareKeys()
+
+	if agent.HardwareKeys() == nil || hardwareKeys.Public() == nil {
+		return errors.New("nil hardware keys")
+	}
+
+	key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
+	if err != nil {
+		return fmt.Errorf("could not get key header from hardware keys: %w", err)
+	}
+
+	sig2, err := signatureHeaderValue(hardwareKeys, challenge)
+	if err != nil {
+		return fmt.Errorf("could not get signature header from hardware keys: %w", err)
+	}
+
+	req.Header.Set(HeaderKey2, string(key2))
+	req.Header.Set(HeaderSignature2, sig2)
+	return nil
 }
 
 func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
