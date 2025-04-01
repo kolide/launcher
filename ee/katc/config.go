@@ -151,6 +151,20 @@ func ConstructKATCTables(config map[string]string, flags types.Flags, slogger *s
 		}
 
 		t, columns := newKatcTable(tableName, cfg, slogger)
+
+		// Validate that the columns are valid for this table type -- only checked
+		// for LevelDB tables currently
+		if t.sourceType.name == leveldbSourceType {
+			if err := validateLeveldbTableColumns(columns); err != nil {
+				slogger.Log(context.TODO(), slog.LevelWarn,
+					"invalid columns for leveldb table",
+					"table_name", tableName,
+					"err", err,
+				)
+				continue
+			}
+		}
+
 		plugins = append(plugins, tablewrapper.New(flags, slogger, tableName, columns, t.generate))
 	}
 

@@ -13,6 +13,27 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
+const (
+	keyColumnName   = "key"
+	valueColumnName = "value"
+)
+
+var leveldbExpectedColumns = map[string]struct{}{
+	keyColumnName:   {},
+	valueColumnName: {},
+	pathColumnName:  {},
+}
+
+func validateLeveldbTableColumns(columns []table.ColumnDefinition) error {
+	for _, c := range columns {
+		if _, ok := leveldbExpectedColumns[c.Name]; !ok {
+			return fmt.Errorf("unsupported column %s for leveldb table", c.Name)
+		}
+	}
+
+	return nil
+}
+
 // leveldbData is the dataFunc for plain LevelDB databases without additional encoding
 // or nesting. IndexedDB databases leveraging LevelDB should use `indexeddbLeveldbData`
 // instead. If set, the query is a comma-separated allowlist of keys to return; if empty,
