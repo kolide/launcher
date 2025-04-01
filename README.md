@@ -14,4 +14,3 @@ Most of the documentation for how our agent works can be found online at https:/
 
 There is some additional, mostly legacy, documentation on GitHub in the
 [`docs`](./docs/README.md) subdirectory of the repository.
-
