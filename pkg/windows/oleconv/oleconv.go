@@ -6,6 +6,7 @@
 package oleconv
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,6 +52,11 @@ func ToInt64Err(result *ole.VARIANT, err error) (int64, error) {
 	}
 
 	value, ok := valueRaw.(int64)
+
+	if err := result.Clear(); err != nil {
+		return 0, errors.New("clearing int64")
+	}
+
 	return value, okToErr(ok, "int64")
 }
 
@@ -65,6 +71,11 @@ func ToInt32Err(result *ole.VARIANT, err error) (int32, error) {
 		return 0, nil
 	}
 	value, ok := valueRaw.(int32)
+
+	if err := result.Clear(); err != nil {
+		return 0, errors.New("clearing int32")
+	}
+
 	return value, okToErr(ok, "int32")
 }
 
@@ -80,6 +91,11 @@ func ToUint32Err(result *ole.VARIANT, err error) (uint32, error) {
 	}
 
 	value, ok := valueRaw.(uint32)
+
+	if err := result.Clear(); err != nil {
+		return 0, errors.New("clearing uint32")
+	}
+
 	return value, okToErr(ok, "uint32")
 
 }
@@ -96,6 +112,11 @@ func ToFloat64Err(result *ole.VARIANT, err error) (float64, error) {
 	}
 
 	value, ok := valueRaw.(float64)
+
+	if err := result.Clear(); err != nil {
+		return 0, errors.New("clearing float64")
+	}
+
 	return value, okToErr(ok, "float64")
 }
 
@@ -111,6 +132,11 @@ func ToFloat32Err(result *ole.VARIANT, err error) (float32, error) {
 	}
 
 	value, ok := valueRaw.(float32)
+
+	if err := result.Clear(); err != nil {
+		return 0, errors.New("clearing float32")
+	}
+
 	return value, okToErr(ok, "float32")
 }
 
@@ -126,6 +152,11 @@ func ToStringErr(result *ole.VARIANT, err error) (string, error) {
 	}
 
 	value, ok := valueRaw.(string)
+
+	if err := result.Clear(); err != nil {
+		return "", errors.New("clearing string")
+	}
+
 	return value, okToErr(ok, "string")
 }
 
@@ -141,6 +172,11 @@ func ToBoolErr(result *ole.VARIANT, err error) (bool, error) {
 	}
 
 	value, ok := valueRaw.(bool)
+
+	if err := result.Clear(); err != nil {
+		return false, errors.New("clearing bool")
+	}
+
 	return value, okToErr(ok, "bool")
 }
 
@@ -156,5 +192,10 @@ func ToTimeErr(result *ole.VARIANT, err error) (*time.Time, error) {
 	}
 
 	value, ok := valueRaw.(time.Time)
+
+	if err := result.Clear(); err != nil {
+		return nil, errors.New("clearing time")
+	}
+
 	return &value, okToErr(ok, "time")
 }
