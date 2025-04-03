@@ -13,42 +13,45 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_requestZtaInfoHandler(t *testing.T) {
+func Test_requestDt4aInfoHandler(t *testing.T) {
 	t.Parallel()
 
-	// Set up our ZTA store with some test data in it
+	// Set up our dt4a store with some test data in it
 	slogger := multislogger.NewNopLogger()
-	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
 	require.NoError(t, err)
-	testZtaInfo, err := json.Marshal(map[string]string{
+	testDt4aInfo, err := json.Marshal(map[string]string{
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
-	k.On("ZtaInfoStore").Return(ztaInfoStore)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
-	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 	// Make sure response was successful and contains the data we expect
 	require.Equal(t, http.StatusOK, responseRecorder.Code)
 	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
-	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+	require.Equal(t, testDt4aInfo, responseRecorder.Body.Bytes())
 
 	k.AssertExpectations(t)
 }
@@ -56,7 +59,7 @@ func Test_requestZtaInfoHandler(t *testing.T) {
 func acceptableOrigin(t *testing.T) string {
 	// Just grab the first origin available in our allowlist
 	acceptableOrigin := ""
-	for k := range allowlistedZtaOriginsLookup {
+	for k := range allowlistedDt4aOriginsLookup {
 		acceptableOrigin = k
 		break
 	}
@@ -68,120 +71,124 @@ func acceptableOrigin(t *testing.T) string {
 	return acceptableOrigin
 }
 
-func Test_requestZtaInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T) {
+func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T) {
 	t.Parallel()
 
-	// Set up our ZTA store with some test data in it
+	// Set up our dt4a store with some test data in it
 	slogger := multislogger.NewNopLogger()
-	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
 	require.NoError(t, err)
-	testZtaInfo, err := json.Marshal(map[string]string{
+	testDt4aInfo, err := json.Marshal(map[string]string{
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
-	k.On("ZtaInfoStore").Return(ztaInfoStore)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", fmt.Sprintf("%sexample.com", safariWebExtensionScheme))
 	responseRecorder := httptest.NewRecorder()
-	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 	// Make sure response was successful and contains the data we expect
 	require.Equal(t, http.StatusOK, responseRecorder.Code)
 	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
-	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+	require.Equal(t, testDt4aInfo, responseRecorder.Body.Bytes())
 
 	k.AssertExpectations(t)
 }
 
-func Test_requestZtaInfoHandler_allowsMissingOrigin(t *testing.T) {
+func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	t.Parallel()
 
-	// Set up our ZTA store with some test data in it
+	// Set up our dt4a store with some test data in it
 	slogger := multislogger.NewNopLogger()
-	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
 	require.NoError(t, err)
-	testZtaInfo, err := json.Marshal(map[string]string{
+	testDt4aInfo, err := json.Marshal(map[string]string{
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
-	k.On("ZtaInfoStore").Return(ztaInfoStore)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	responseRecorder := httptest.NewRecorder()
-	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 	// Make sure response was successful and contains the data we expect
 	require.Equal(t, http.StatusOK, responseRecorder.Code)
 	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
-	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+	require.Equal(t, testDt4aInfo, responseRecorder.Body.Bytes())
 
 	k.AssertExpectations(t)
 }
 
-func Test_requestZtaInfoHandler_allowsEmptyOrigin(t *testing.T) {
+func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	t.Parallel()
 
-	// Set up our ZTA store with some test data in it
+	// Set up our dt4a store with some test data in it
 	slogger := multislogger.NewNopLogger()
-	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
 	require.NoError(t, err)
-	testZtaInfo, err := json.Marshal(map[string]string{
+	testDt4aInfo, err := json.Marshal(map[string]string{
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, ztaInfoStore.Set(localserverZtaInfoKey, testZtaInfo))
+	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
-	k.On("ZtaInfoStore").Return(ztaInfoStore)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", "")
 	responseRecorder := httptest.NewRecorder()
-	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 	// Make sure response was successful and contains the data we expect
 	require.Equal(t, http.StatusOK, responseRecorder.Code)
 	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
-	require.Equal(t, testZtaInfo, responseRecorder.Body.Bytes())
+	require.Equal(t, testDt4aInfo, responseRecorder.Body.Bytes())
 
 	k.AssertExpectations(t)
 }
 
-func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
+func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 	t.Parallel()
-
-	reqOrigin := acceptableOrigin(t)
 
 	for _, tt := range []struct {
 		testCaseName           string
@@ -190,34 +197,6 @@ func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 		requestBody            io.Reader
 		expectedResponseStatus int
 	}{
-		{
-			testCaseName:           http.MethodPost,
-			httpMethod:             http.MethodPost,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodPut,
-			httpMethod:             http.MethodPut,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodPatch,
-			httpMethod:             http.MethodPatch,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
-		{
-			testCaseName:           http.MethodDelete,
-			httpMethod:             http.MethodDelete,
-			requestOrigin:          reqOrigin,
-			requestBody:            http.NoBody,
-			expectedResponseStatus: http.StatusMethodNotAllowed,
-		},
 		{
 			testCaseName:           "disallowed origin",
 			httpMethod:             http.MethodGet,
@@ -235,16 +214,18 @@ func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 			k := typesmocks.NewKnapsack(t)
 			k.On("KolideServerURL").Return("localserver")
 			k.On("Slogger").Return(slogger)
+			k.On("AllowOverlyBroadDt4aAcceleration").Maybe().Return(false)
+			k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 			// Set up localserver
 			ls, err := New(context.TODO(), k, nil)
 			require.NoError(t, err)
 
 			// Make a request to our handler
-			request := httptest.NewRequest(tt.httpMethod, "/zta", tt.requestBody)
+			request := httptest.NewRequest(tt.httpMethod, "/dt4a", tt.requestBody)
 			request.Header.Set("origin", tt.requestOrigin)
 			responseRecorder := httptest.NewRecorder()
-			ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+			ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 			// Make sure we got back an expected response status code (4xx-level)
 			require.Equal(t, tt.expectedResponseStatus, responseRecorder.Code)
@@ -254,32 +235,63 @@ func Test_requestZtaInfoHandler_badRequest(t *testing.T) {
 	}
 }
 
-func Test_requestZtaInfoHandler_noDataAvailable(t *testing.T) {
+func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	t.Parallel()
 
-	// Set up our ZTA store, but do not store any data in it under the `localserverZtaInfoKey` key
+	// Set up our dt4a store, but do not store any data in it under the `localserverDt4aInfoKey` key
 	slogger := multislogger.NewNopLogger()
-	ztaInfoStore, err := storageci.NewStore(t, slogger, storage.ZtaInfoStore.String())
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
 	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(slogger)
-	k.On("ZtaInfoStore").Return(ztaInfoStore)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
 
 	// Make a request to our handler
-	request := httptest.NewRequest(http.MethodGet, "/zta", nil)
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
 	responseRecorder := httptest.NewRecorder()
-	ls.requestZtaInfoHandler().ServeHTTP(responseRecorder, request)
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
 	// Make sure response was a 404
 	require.Equal(t, http.StatusNotFound, responseRecorder.Code)
+
+	k.AssertExpectations(t)
+}
+
+func Test_requestDt4aAccelerationHandler(t *testing.T) {
+	t.Parallel()
+
+	// Set up localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	// Validate that we accelerate control requests
+	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
+	// Validate that we accelerate osquery distributed requests
+	k.On("SetDistributedForwardingIntervalOverride", mock.Anything, mock.Anything).Return()
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("origin", acceptableOrigin(t))
+	responseRecorder := httptest.NewRecorder()
+	ls.requestDt4aAccelerationHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was successful and contains the data we expect
+	require.Equal(t, http.StatusNoContent, responseRecorder.Code)
 
 	k.AssertExpectations(t)
 }

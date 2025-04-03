@@ -20,7 +20,7 @@ ifneq ($(OS), Windows_NT)
 endif
 
 
-all: build
+all: deps build
 build: build_launcher
 
 .pre-build: ${BUILD_DIR}
@@ -226,7 +226,7 @@ deps: deps-go generate
 
 .PHONY: generate
 generate: deps-go
-	go generate ./pkg/packagekit/... ./pkg/packaging/... ./ee/tables/... ./pkg/augeas/...
+	go generate ./pkg/packagekit/... ./pkg/packaging/... ./ee/tables/... ./pkg/augeas/... ./ee/tuf/...
 
 .PHONY: proto
 proto:

@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 type Processes struct {

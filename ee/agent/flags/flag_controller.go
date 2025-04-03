@@ -116,6 +116,18 @@ func (fc *FlagController) RegisterChangeObserver(observer types.FlagsChangeObser
 	fc.observers[observer] = append(fc.observers[observer], flagKeys...)
 }
 
+func (fc *FlagController) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
+	fc.observersMutex.Lock()
+	defer fc.observersMutex.Unlock()
+
+	if _, ok := fc.observers[observer]; !ok {
+		// Nothing to do
+		return
+	}
+
+	delete(fc.observers, observer)
+}
+
 // notifyObservers informs all observers of the keys that they have changed.
 func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := traces.StartSpan(ctx)
@@ -341,6 +353,15 @@ func (fc *FlagController) ControlRequestInterval() time.Duration {
 	).get(fc.getControlServerValue(keys.ControlRequestInterval))
 }
 
+func (fc *FlagController) SetAllowOverlyBroadDt4aAcceleration(enabled bool) error {
+	return fc.setControlServerValue(keys.AllowOverlyBroadDt4aAcceleration, boolToBytes(enabled))
+}
+func (fc *FlagController) AllowOverlyBroadDt4aAcceleration() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.AllowOverlyBroadDt4aAcceleration))
+}
+
 func (fc *FlagController) SetDisableControlTLS(disabled bool) error {
 	return fc.setControlServerValue(keys.DisableControlTLS, boolToBytes(disabled))
 }
@@ -391,6 +412,27 @@ func (fc *FlagController) SetOsqueryVerbose(verbose bool) error {
 }
 func (fc *FlagController) OsqueryVerbose() bool {
 	return NewBoolFlagValue(WithDefaultBool(fc.cmdLineOpts.OsqueryVerbose)).get(fc.getControlServerValue(keys.OsqueryVerbose))
+}
+
+func (fc *FlagController) SetDistributedForwardingInterval(interval time.Duration) error {
+	return fc.setControlServerValue(keys.DistributedForwardingInterval, durationToBytes(interval))
+}
+func (fc *FlagController) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
+	ctx, span := traces.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.DistributedForwardingInterval, duration, value)
+}
+func (fc *FlagController) DistributedForwardingInterval() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
+	return NewDurationFlagValue(fc.slogger, keys.DistributedForwardingInterval,
+		WithOverride(fc.overrides[keys.DistributedForwardingInterval]),
+		WithDefault(1*time.Minute),
+		WithMin(5*time.Second),
+		WithMax(5*time.Minute),
+	).get(fc.getControlServerValue(keys.DistributedForwardingInterval))
 }
 
 func (fc *FlagController) SetWatchdogEnabled(enable bool) error {

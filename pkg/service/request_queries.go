@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
@@ -168,17 +167,21 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
+
+		message := "success"
 		if err != nil {
-			mw.knapsack.Slogger().Log(ctx, slog.LevelError,
-				"failure",
-				"method", "RequestQueries",
-				"uuid", uuid,
-				"res", string(resJSON),
-				"reauth", reauth,
-				"err", err,
-				"took", time.Since(begin),
-			)
+			message = "failure"
 		}
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here
+			message,
+			"method", "RequestQueries",
+			"uuid", uuid,
+			"res", string(resJSON),
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
 	}(time.Now())
 
 	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)

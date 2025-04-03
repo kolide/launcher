@@ -67,6 +67,9 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -129,6 +132,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 

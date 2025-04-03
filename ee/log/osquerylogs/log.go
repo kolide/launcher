@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
@@ -214,7 +214,7 @@ func getIntStat(getFunc func() (int64, error)) string {
 // getSliceStat is a small wrapper around gopsutil/process functions
 // to return the stat if available, or an error message if not, so
 // that either way the info will be captured in the log.
-func getSliceStat(getFunc func() ([]int32, error)) string {
+func getSliceStat(getFunc func() ([]uint32, error)) string {
 	stat, err := getFunc()
 	if err != nil {
 		return fmt.Sprintf("could not get stat: %v", err)

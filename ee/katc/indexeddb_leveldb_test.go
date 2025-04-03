@@ -48,7 +48,7 @@ func Test_extractQueryTargets(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			dbName, objStoreName, err := extractQueryTargets(tt.query)
+			dbName, objStoreName, err := extractIndexeddbQueryTargets(tt.query)
 
 			if tt.expectErr {
 				require.Error(t, err)

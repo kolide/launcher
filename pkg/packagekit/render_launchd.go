@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/groob/plist"
-
-	"go.opencensus.io/trace"
 )
 
 // Note: I wanted to just include the InitOptions struct here, but it
@@ -27,9 +25,6 @@ type launchdOptions struct {
 }
 
 func RenderLaunchd(ctx context.Context, w io.Writer, initOptions *InitOptions) error {
-	_, span := trace.StartSpan(ctx, "packagekit.RenderLaunchd")
-	defer span.End()
-
 	if initOptions.Identifier == "" {
 		return errors.New("identifier must not be empty")
 	}

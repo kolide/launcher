@@ -27,8 +27,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
-
-	"go.opencensus.io/trace"
 )
 
 type Builder struct {
@@ -234,9 +232,6 @@ func (b *Builder) goVersionCompatible(logger log.Logger) error {
 }
 
 func (b *Builder) DepsGo(ctx context.Context) error {
-	ctx, span := trace.StartSpan(ctx, "make.DepsGo")
-	defer span.End()
-
 	logger := ctxlog.FromContext(ctx)
 
 	level.Debug(logger).Log(
@@ -267,9 +262,6 @@ func (b *Builder) DepsGo(ctx context.Context) error {
 func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 	return func(ctx context.Context) error {
 		output := b.PlatformBinaryName(appName)
-
-		ctx, span := trace.StartSpan(ctx, fmt.Sprintf("make.BuildCmd.%s", appName))
-		defer span.End()
 
 		logger := ctxlog.FromContext(ctx)
 
