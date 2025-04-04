@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package rundisclaimed
+package allowedcmd
 
 /*
 #cgo CFLAGS: -mmacosx-version-min=10.14 -Wall -Werror
@@ -215,5 +215,5 @@ func Run(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 }
 
 func validatedCmd(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
-    
+
 }

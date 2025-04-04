@@ -1,7 +1,7 @@
 //go:build !darwin
 // +build !darwin
 
-package rundisclaimed
+package allowedcmd
 
 import (
 	"errors"
