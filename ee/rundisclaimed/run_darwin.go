@@ -24,7 +24,6 @@ int responsibility_spawnattrs_setdisclaim(posix_spawnattr_t attrs, int disclaim)
 
 int spawn_disclaimed(const char *path, char *const argv[], char *const envp[], char **stdout, char **stderr) {
     posix_spawnattr_t attrs;
-    // _posix_spawn_posix_cred_info credinfo;
     int err = posix_spawnattr_init(&attrs);
     if (err != 0) {
         const char *errmsg = strerror(err);
@@ -137,13 +136,17 @@ import "C"
 
 import (
 	"bytes"
-	"log/slog"
 	"unsafe"
+
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-// TODO need to incorporate timeout
-// cmd="/opt/homebrew/bin/brew"
-func Run(slogger *slog.Logger, cmd string, args []string, envs []string) (*bytes.Buffer, error) {
+func Run(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
+
+    // if _, err := os.Stdout.Write(cmdOutput); err != nil {
+	// 	return fmt.Errorf("writing results: %w", err)
+	// }
+
 	command := C.CString(cmd)
 	defer C.free(unsafe.Pointer(command))
 
@@ -209,4 +212,8 @@ func Run(slogger *slog.Logger, cmd string, args []string, envs []string) (*bytes
 
 	// combine them ourselves
 	return bytes.NewBufferString(goOut + goErr), nil
+}
+
+func validatedCmd(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
+    
 }

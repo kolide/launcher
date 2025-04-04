@@ -18,7 +18,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
-	"github.com/kolide/launcher/ee/rundisclaimed"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
@@ -77,27 +76,23 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		// Brew can take a while to load the first time the command is ran, so leaving 60 seconds for the timeout here.
 		var output bytes.Buffer
 
+		targetCmd := allowedcmd.Brew
+		cmdArgs := []string{"outdated", "--json"}
+
+		// override cmd and args for darwin because we must run disclaimed
 		if runtime.GOOS == "darwin" {
-			output, err := rundisclaimed.Run(t.slogger, cmd.Path, cmd.Args, []string{"HOMEBREW_NO_AUTO_UPDATE=1"})
-			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo,
-					"failure querying user brew installed packages",
-					"err", err,
-					"target_uid", uid,
-					"output", output.String(),
-				)
-				continue
-			}
-		} else {
-			if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &output, tablehelpers.WithUid(uid)); err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo,
-					"failure querying user brew installed packages",
-					"err", err,
-					"target_uid", uid,
-					"output", output.String(),
-				)
-				continue
-			}
+			targetCmd = allowedcmd.Launcher
+			cmdArgs = []string{"rundisclaimed", "brew"}
+		}
+
+		if err := tablehelpers.Run(ctx, t.slogger, 60, targetCmd, cmdArgs, &output, &output, tablehelpers.WithUid(uid)); err != nil {
+			t.slogger.Log(ctx, slog.LevelInfo,
+				"failure querying user brew installed packages",
+				"err", err,
+				"target_uid", uid,
+				"output", output.String(),
+			)
+			continue
 		}
 
 		flattenOpts := []dataflatten.FlattenOpts{
