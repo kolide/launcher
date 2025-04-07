@@ -124,7 +124,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		munki.MunkiReport(k, slogger),
 		dataflattentable.TablePluginExec(k, slogger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
-		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode", "--getloggingmode", "--getloggingopt"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw_apps", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--listapps"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
