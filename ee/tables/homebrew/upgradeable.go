@@ -82,6 +82,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		// override cmd and args for darwin because we must run disclaimed
 		if runtime.GOOS == "darwin" {
 			targetCmd = allowedcmd.Launcher
+			// rundisclaimed will handle populating the outdated --json args
+			// based on the brew subcommand here
 			cmdArgs = []string{"rundisclaimed", "brew"}
 		}
 
@@ -102,7 +104,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
 		if err != nil {
-			t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
+			t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err, "output", output.String()) // TODO zack remove output
 			continue
 		}
 

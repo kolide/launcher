@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
@@ -45,18 +46,17 @@ func runMain() int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// todo get rid of all this
-	// currentExecutable, _ := os.Executable()
-	// cmdOutput, cmdErr := rundisclaimed.Run(systemSlogger, []string{})
-	// end todo
+	// these systemslogger logs will go to stderr, which will dirty the results of our
+	// rundisclaimed operations. the only log we would see before running the subcommand
+	// should be "launcher starting up", so override here with a no-op logger
+	if len(os.Args) > 1 && os.Args[1] == "rundisclaimed" {
+		systemSlogger = multislogger.New()
+	}
 
 	systemSlogger.Log(ctx, slog.LevelInfo,
 		"launcher starting up",
 		"version", version.Version().Version,
 		"revision", version.Version().Revision,
-		// "current_executable", currentExecutable,
-		// "cmd_output", cmdOutput,
-		// "cmd_err", cmdErr,
 	)
 
 	// Set an os environmental variable that we can use to track launcher versions across
@@ -226,6 +226,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = watchdog.RunWatchdogTask
 	case "query-windowsupdates":
 		run = runQueryWindowsUpdates
+	case "rundisclaimed":
+		run = allowedcmd.RunDisclaimed
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}

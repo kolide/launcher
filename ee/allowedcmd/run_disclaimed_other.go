@@ -9,6 +9,6 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-func Run(_ *multislogger.MultiSlogger, args []string) error {
+func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	return errors.New("run disclaimed is only implemented for macOS")
 }
