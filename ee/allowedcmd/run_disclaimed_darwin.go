@@ -22,7 +22,7 @@ package allowedcmd
 // of how this works
 int responsibility_spawnattrs_setdisclaim(posix_spawnattr_t attrs, int disclaim);
 
-int spawn_disclaimed(const char *path, char *const argv[], char *const envp[], char **stdout, char **stderr) {
+int spawn_disclaimed(const char *path, char *const argv[], char *const envp[]) {
     posix_spawnattr_t attrs;
     int err = posix_spawnattr_init(&attrs);
     if (err != 0) {
@@ -36,72 +36,19 @@ int spawn_disclaimed(const char *path, char *const argv[], char *const envp[], c
         return err;
     }
 
-    // set up the stdout/stderr redirects
-    int pipefd_out[2];
-    int pipefd_err[2];
-    if (pipe(pipefd_out) || pipe(pipefd_err)) {
-        posix_spawnattr_destroy(&attrs);
-        return -1;
-    }
-
-    posix_spawn_file_actions_t file_actions;
-    posix_spawn_file_actions_init(&file_actions);
-    posix_spawn_file_actions_adddup2(&file_actions, pipefd_out[1], STDOUT_FILENO);
-    posix_spawn_file_actions_adddup2(&file_actions, pipefd_err[1], STDERR_FILENO);
-    posix_spawn_file_actions_addclose(&file_actions, pipefd_out[0]);
-    posix_spawn_file_actions_addclose(&file_actions, pipefd_err[0]);
-    posix_spawn_file_actions_addclose(&file_actions, pipefd_out[1]);
-    posix_spawn_file_actions_addclose(&file_actions, pipefd_err[1]);
-
     pid_t pid;
-    err = posix_spawn(&pid, path, &file_actions, &attrs, argv, envp);
+	// passing NULL for file_actions- we want this to take the default actions of
+	// spitting output as is to stderr/stdout
+    err = posix_spawn(&pid, path, NULL, &attrs, argv, envp);
     posix_spawnattr_destroy(&attrs);
-    posix_spawn_file_actions_destroy(&file_actions);
-    close(pipefd_out[1]);  // Close write ends of pipes in parent
-    close(pipefd_err[1]);
-
     if (err != 0) {
-        close(pipefd_out[0]); // close read ends
-        close(pipefd_err[0]);
         return err;
-    }
-
-    char buffer[1024];
-    size_t out_size = 0, err_size = 0;
-
-    // Read stdout
-    FILE *out_fp = fdopen(pipefd_out[0], "r");
-    if (out_fp) {
-        while (fgets(buffer, sizeof(buffer), out_fp)) {
-            size_t len = strlen(buffer);
-            *stdout = realloc(*stdout, out_size + len + 1);
-            memcpy(*stdout + out_size, buffer, len + 1);
-            out_size += len;
-        }
-        fclose(out_fp);
-    }
-
-    // Read stderr
-    FILE *err_fp = fdopen(pipefd_err[0], "r");
-    if (err_fp) {
-        while (fgets(buffer, sizeof(buffer), err_fp)) {
-            size_t len = strlen(buffer);
-            *stderr = realloc(*stderr, err_size + len + 1);
-            memcpy(*stderr + err_size, buffer, len + 1);
-            err_size += len;
-        }
-        fclose(err_fp);
     }
 
     int status;
     if (waitpid(pid, &status, 0) == -1) {
-        close(pipefd_out[0]);  // close read ends
-        close(pipefd_err[0]);
         return -1;
     }
-
-   close(pipefd_out[0]);  // close read ends
-   close(pipefd_err[0]);
 
    // WIFEXITED will return non-zero if the child process terminated normally
    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
@@ -113,7 +60,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/user"
 	"unsafe"
 
@@ -160,20 +106,9 @@ func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 		}
 	}()
 
-	var output, stderr *C.char
-
-	C.spawn_disclaimed(cmdPath, &cargs[0], &cenvs[0], &output, &stderr)
-
-	goOut := C.GoString(output)
-	goErr := C.GoString(stderr)
-
-	C.free(unsafe.Pointer(output))
-	C.free(unsafe.Pointer(stderr))
-
-	goBytes := []byte(goOut + goErr)
-
-	if _, err := os.Stdout.Write(goBytes); err != nil {
-		return fmt.Errorf("writing results to stdout: %w", err)
+	ret := C.spawn_disclaimed(cmdPath, &cargs[0], &cenvs[0])
+	if int(ret) != 0 {
+		return fmt.Errorf("spawn_disclaimed returned error code %d", int(ret))
 	}
 
 	return nil
