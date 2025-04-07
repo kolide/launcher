@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -992,6 +993,10 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 	// Default to generic Error
 	errorType := "Error"
 
+	// Track if we've found a message
+	messageFound := false
+	fileNameFound := false
+
 	// Process error subtags until we reach errorTagEnd or EOF
 	for {
 		// Read the subtag, handling EOF gracefully
@@ -1063,23 +1068,82 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 		}
 
 		// Map the subtag to a property name and store the value
+		valueStr := string(value)
 		switch subtag {
 		case errorTagMessage:
-			errorObj["message"] = string(value)
+			errorObj["message"] = valueStr
+			messageFound = true
+
+			// Try to determine error type from message if not already set
+			if errorType == "Error" {
+				if strings.Contains(valueStr, "eval") || strings.Contains(valueStr, "Eval") {
+					errorType = "EvalError"
+				} else if strings.Contains(valueStr, "range") || strings.Contains(valueStr, "Range") {
+					errorType = "RangeError"
+				} else if strings.Contains(valueStr, "reference") || strings.Contains(valueStr, "Reference") {
+					errorType = "ReferenceError"
+				} else if strings.Contains(valueStr, "syntax") || strings.Contains(valueStr, "Syntax") {
+					errorType = "SyntaxError"
+				} else if strings.Contains(valueStr, "type") || strings.Contains(valueStr, "Type") {
+					errorType = "TypeError"
+				} else if strings.Contains(valueStr, "URI") || strings.Contains(valueStr, "uri") {
+					errorType = "URIError"
+				}
+			}
 		case errorTagStack:
-			errorObj["stack"] = string(value)
+			errorObj["stack"] = valueStr
+
+			// Extract file name and line number from stack if possible
+			if !fileNameFound {
+				// Look for patterns like "at filename:line:column"
+				fileLineMatches := regexp.MustCompile(`at\s+([^:]+):(\d+):(\d+)`).FindStringSubmatch(valueStr)
+				if len(fileLineMatches) >= 4 {
+					errorObj["fileName"] = fileLineMatches[1]
+					errorObj["lineNumber"] = fileLineMatches[2]
+					errorObj["columnNumber"] = fileLineMatches[3]
+					fileNameFound = true
+				}
+			}
 		case errorTagCause:
-			errorObj["cause"] = string(value)
+			errorObj["cause"] = valueStr
 		case errorTagIsError:
-			errorObj["isError"] = string(value)
+			errorObj["isError"] = valueStr
 		default:
-			// For unknown subtags, use a generic property name
-			errorObj[fmt.Sprintf("property_%c", subtag)] = string(value)
-			slogger.Log(ctx, slog.LevelWarn,
-				"unknown error subtag encountered",
-				"subtag", fmt.Sprintf("%c", subtag),
-				"value", string(value),
-			)
+			// For unknown subtags, check if it might be a file path
+			propertyName := fmt.Sprintf("property_%c", subtag)
+			if strings.HasPrefix(valueStr, "file://") || strings.HasPrefix(valueStr, "/") {
+				errorObj["fileName"] = valueStr
+				fileNameFound = true
+			} else if !messageFound && len(valueStr) > 0 && !strings.Contains(valueStr, "\n") {
+				// If we haven't found a message and this looks like it could be one, use it
+				errorObj["message"] = valueStr
+				messageFound = true
+
+				// Try to determine error type from this potential message
+				if errorType == "Error" {
+					if strings.Contains(valueStr, "eval") || strings.Contains(valueStr, "Eval") {
+						errorType = "EvalError"
+					} else if strings.Contains(valueStr, "range") || strings.Contains(valueStr, "Range") {
+						errorType = "RangeError"
+					} else if strings.Contains(valueStr, "reference") || strings.Contains(valueStr, "Reference") {
+						errorType = "ReferenceError"
+					} else if strings.Contains(valueStr, "syntax") || strings.Contains(valueStr, "Syntax") {
+						errorType = "SyntaxError"
+					} else if strings.Contains(valueStr, "type") || strings.Contains(valueStr, "Type") {
+						errorType = "TypeError"
+					} else if strings.Contains(valueStr, "URI") || strings.Contains(valueStr, "uri") {
+						errorType = "URIError"
+					}
+				}
+			} else {
+				// For truly unknown properties, store with a generic name
+				errorObj[propertyName] = valueStr
+				slogger.Log(ctx, slog.LevelWarn,
+					"unknown error subtag encountered",
+					"subtag", fmt.Sprintf("%c", subtag),
+					"value", valueStr,
+				)
+			}
 		}
 	}
 

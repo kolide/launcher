@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kolide/launcher/pkg/traces"
@@ -226,7 +227,7 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 	case tagDataViewObj:
 		return nil, errors.New("parsing not implemented for data view object")
 	case tagErrorObj:
-		return nil, errors.New("parsing not implemented for error object")
+		return deserializeError(srcReader)
 	case tagResizableArrayBufferObj:
 		return nil, errors.New("parsing not implemented for resizable array buffer object")
 	case tagGrowableSharedArrayBufferObj:
@@ -765,6 +766,127 @@ func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return resultObj, nil
+}
+
+// Firefox error tag constants
+const (
+	// Error prototype tags - these are used in Firefox to identify the error type
+	firefoxErrorTagError          uint32 = 1 // Generic Error
+	firefoxErrorTagEvalError      uint32 = 2 // EvalError
+	firefoxErrorTagRangeError     uint32 = 3 // RangeError
+	firefoxErrorTagReferenceError uint32 = 4 // ReferenceError
+	firefoxErrorTagSyntaxError    uint32 = 5 // SyntaxError
+	firefoxErrorTagTypeError      uint32 = 6 // TypeError
+	firefoxErrorTagURIError       uint32 = 7 // URIError
+	firefoxErrorTagInternalError  uint32 = 8 // InternalError (Mozilla-specific)
+	firefoxErrorTagAggregateError uint32 = 9 // AggregateError (ES2021)
+)
+
+// deserializeError handles the upcoming Error object in srcReader.
+func deserializeError(srcReader *bytes.Reader) ([]byte, error) {
+	// Create a map to hold the error properties
+	errorObj := make(map[string]string)
+
+	// Default error properties
+	errorObj["type"] = "Error"
+	errorObj["name"] = "Error"
+	errorObj["message"] = ""
+
+	// Read all properties of the error object
+	messageFound := false
+	for {
+		propTag, propData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading property in error object: %w", err)
+		}
+
+		if propTag == tagEndOfKeys {
+			// End of error object
+			break
+		}
+
+		if propTag == tagString {
+			// It's a string key, read it
+			keyBytes, err := deserializeString(propData, srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("deserializing property name: %w", err)
+			}
+			keyStr := string(keyBytes)
+
+			// Read the value
+			valTag, valData, err := nextPair(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading value for property '%s': %w", keyStr, err)
+			}
+
+			// Process the property
+			valBytes, err := deserializeNext(valTag, valData, srcReader)
+			if err != nil || valBytes == nil {
+				continue
+			}
+
+			valStr := string(valBytes)
+
+			// Handle known properties
+			if keyStr == "name" {
+				errorObj["name"] = valStr
+				errorObj["type"] = valStr
+			} else if keyStr == "message" {
+				errorObj["message"] = valStr
+				messageFound = true
+			} else if strings.HasPrefix(keyStr, "file://") {
+				// This is the file path with line number as value
+				errorObj["fileName"] = keyStr
+				errorObj["lineNumber"] = valStr
+			} else if !messageFound && !strings.Contains(keyStr, ":") && len(keyStr) > 0 {
+				// If we haven't found a message yet and this key looks like it might be a message,
+				// use it as the message
+				errorObj["message"] = keyStr
+
+				// Try to determine the error type from the message
+				if strings.Contains(keyStr, "eval") || strings.Contains(keyStr, "Eval") {
+					errorObj["type"] = "EvalError"
+					errorObj["name"] = "EvalError"
+				} else if strings.Contains(keyStr, "range") || strings.Contains(keyStr, "Range") {
+					errorObj["type"] = "RangeError"
+					errorObj["name"] = "RangeError"
+				} else if strings.Contains(keyStr, "reference") || strings.Contains(keyStr, "Reference") {
+					errorObj["type"] = "ReferenceError"
+					errorObj["name"] = "ReferenceError"
+				} else if strings.Contains(keyStr, "syntax") || strings.Contains(keyStr, "Syntax") {
+					errorObj["type"] = "SyntaxError"
+					errorObj["name"] = "SyntaxError"
+				} else if strings.Contains(keyStr, "type") || strings.Contains(keyStr, "Type") {
+					errorObj["type"] = "TypeError"
+					errorObj["name"] = "TypeError"
+				} else if strings.Contains(keyStr, "URI") || strings.Contains(keyStr, "uri") {
+					errorObj["type"] = "URIError"
+					errorObj["name"] = "URIError"
+				}
+			}
+		} else {
+			// It's not a string key, skip it and its value
+			valTag, valData, err := nextPair(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading value for non-string property: %w", err)
+			}
+
+			// Skip the value
+			_, err = deserializeNext(valTag, valData, srcReader)
+			if err != nil {
+				// Just continue if there's an error
+				continue
+			}
+		}
+	}
+
+	// Serialize the error object to JSON
+	resultBytes, err := json.Marshal(errorObj)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling error object: %w", err)
+	}
+
+	return resultBytes, nil
 }
 
 func bitMask(n uint32) uint32 {
