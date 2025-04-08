@@ -23,6 +23,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		m := mocks.NewKnapsack(t)
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(slogger)
+		m.On("ReadEnrollSecret").Return("enroll_secret", nil)
 		return m
 	}
 
@@ -46,7 +47,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m := mocks.NewKnapsack(t)
 				m.On("KolideServerURL").Return("localhost")
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
+				m.On("SetDistributedForwardingIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(slogger)
+				m.On("ReadEnrollSecret").Return("enroll_secret", nil)
 				return m
 			},
 		},

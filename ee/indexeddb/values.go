@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -20,44 +21,52 @@ import (
 
 // See: https://github.com/v8/v8/blob/master/src/objects/value-serializer.cc
 const (
-	// header token
-	tokenVersion byte = 0xff
-	// booleans
-	tokenTrue     byte = 0x54 // T
-	tokenFalse    byte = 0x46 // F
-	tokenTrueObj  byte = 0x79 // y
-	tokenFalseObj byte = 0x78 // x
-	// numbers
-	tokenInt32     byte = 0x49 // I
-	tokenUint32    byte = 0x55 // U
-	tokenDouble    byte = 0x4e // N
-	tokenNumberObj byte = 0x6e // n
-	// strings -- string (S) and string object (s) don't appear to be used
-	tokenAsciiStr byte = 0x22 // "
-	tokenUtf16Str byte = 0x63 // c
-	// regex
-	tokenRegexp byte = 0x52 // R
-	// dates
-	tokenDate byte = 0x44 // D
-	// types: object
-	tokenObjectBegin byte = 0x6f // o
-	tokenObjectEnd   byte = 0x7b // {
-	// types: map
-	tokenMapBegin byte = 0x3b // ;
-	tokenMapEnd   byte = 0x3a // :
-	// types: set
-	tokenSetBegin byte = 0x27 // '
-	tokenSetEnd   byte = 0x2c // ,
-	// types: array
-	tokenBeginSparseArray byte = 0x61 // a
-	tokenEndSparseArray   byte = 0x40 // @
-	tokenBeginDenseArray  byte = 0x41 // A
-	tokenEndDenseArray    byte = 0x24 // $
-	// misc
-	tokenPadding           byte = 0x00
-	tokenVerifyObjectCount byte = 0x3f // ?
-	tokenUndefined         byte = 0x5f // _
-	tokenNull              byte = 0x30
+	tokenVersion             byte = 0xff // in header
+	tokenPadding             byte = 0x00
+	tokenVerifyObjectCount   byte = 0x3f // ?
+	tokenTheHole             byte = 0x2d // -
+	tokenUndefined           byte = 0x5f // _
+	tokenNull                byte = 0x30
+	tokenTrue                byte = 0x54 // T
+	tokenFalse               byte = 0x46 // F
+	tokenInt32               byte = 0x49 // I
+	tokenUint32              byte = 0x55 // U
+	tokenDouble              byte = 0x4e // N
+	tokenBigInt              byte = 0x5a // Z
+	tokenUtf8Str             byte = 0x53 // S
+	tokenAsciiStr            byte = 0x22 // "
+	tokenUtf16Str            byte = 0x63 // c
+	tokenObjReference        byte = 0x5e // ^
+	tokenObjectBegin         byte = 0x6f // o
+	tokenObjectEnd           byte = 0x7b // {
+	tokenBeginSparseArray    byte = 0x61 // a
+	tokenEndSparseArray      byte = 0x40 // @
+	tokenBeginDenseArray     byte = 0x41 // A
+	tokenEndDenseArray       byte = 0x24 // $
+	tokenDate                byte = 0x44 // D
+	tokenTrueObj             byte = 0x79 // y
+	tokenFalseObj            byte = 0x78 // x
+	tokenNumberObj           byte = 0x6e // n
+	tokenBigIntObj           byte = 0x7a // z
+	tokenStringObj           byte = 0x73 // s
+	tokenRegexp              byte = 0x52 // R
+	tokenMapBegin            byte = 0x3b // ;
+	tokenMapEnd              byte = 0x3a // :
+	tokenSetBegin            byte = 0x27 // '
+	tokenSetEnd              byte = 0x2c // ,
+	tokenArrayBuffer         byte = 0x42 // B
+	tokenArrayBufferTransfer byte = 0x74 // t
+	tokenArrayBufferView     byte = 0x56 // V
+	tokenSharedArrayBuffer   byte = 0x75 // u
+	tokenWasmModuleTransfer  byte = 0x77 // w
+	tokenHostObj             byte = 0x5c // /
+	tokenWasmMemoryTransfer  byte = 0x6d // m
+	tokenError               byte = 0x72 // r
+
+	// The name of these consts is a guess based on the context where I've seen 0x03 and 0x01 pop up.
+	// They may signal something besides array termination.
+	tokenPossiblyArrayTermination0x03 byte = 0x03
+	tokenPossiblyArrayTermination0x01 byte = 0x01
 )
 
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
@@ -226,10 +235,12 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		switch nextToken {
 		case tokenObjectBegin:
 			return deserializeNestedObject(ctx, slogger, srcReader)
-		case tokenAsciiStr:
+		case tokenUtf8Str, tokenAsciiStr:
 			return deserializeAsciiStr(srcReader)
 		case tokenUtf16Str:
 			return deserializeUtf16Str(srcReader)
+		case tokenStringObj:
+			return deserializeStringObject(srcReader)
 		case tokenRegexp:
 			return deserializeRegexp(srcReader)
 		case tokenTrue, tokenTrueObj:
@@ -250,6 +261,8 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("decoding double: %w", err)
 			}
 			return []byte(strconv.FormatFloat(d, 'f', -1, 64)), nil
+		case tokenBigInt, tokenBigIntObj:
+			return deserializeBigInt(srcReader)
 		case tokenDate:
 			var d float64
 			if err := binary.Read(srcReader, binary.NativeEndian, &d); err != nil {
@@ -265,7 +278,7 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			return deserializeMap(ctx, slogger, srcReader)
 		case tokenSetBegin:
 			return deserializeSet(ctx, slogger, srcReader)
-		case tokenPadding, tokenVerifyObjectCount:
+		case tokenPadding, tokenVerifyObjectCount, tokenTheHole:
 			// We don't care about these types -- we want to try reading again
 			var err error
 			nextToken, err = nextNonPaddingByte(srcReader)
@@ -273,6 +286,29 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 				return nil, fmt.Errorf("reading next non-padding byte after padding byte: %w", err)
 			}
 			continue
+		case tokenArrayBuffer:
+			return deserializeArrayBuffer(ctx, slogger, srcReader)
+		case tokenObjReference:
+			// This is a reference to an already-deserialized object. For now, we don't
+			// really care which one -- we just want to continue parsing. Get its ID and
+			// return that.
+			objectId, err := binary.ReadUvarint(srcReader)
+			if err != nil {
+				return nil, fmt.Errorf("reading id of object: %w", err)
+			}
+			return []byte(fmt.Sprintf("object id %d", objectId)), nil
+		case tokenArrayBufferView:
+			return deserializePresumablyEmptyArrayBufferView(srcReader)
+		case tokenArrayBufferTransfer:
+			return nil, errors.New("deserialization not implemented for array buffer transfers")
+		case tokenSharedArrayBuffer:
+			return nil, errors.New("deserialization not implemented for shared ArrayBuffer")
+		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
+			return nil, errors.New("deserialization not implemented for wasm transfers")
+		case tokenError:
+			return nil, errors.New("deserialization not implemented for error")
+		case tokenHostObj:
+			return nil, errors.New("deserialization not implemented for host object")
 		default:
 			slogger.Log(ctx, slog.LevelWarn,
 				"unknown token type, will attempt to keep reading",
@@ -285,6 +321,40 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 			}
 		}
 	}
+}
+
+// deserializeBigInt deserializes exactly as much of the upcoming BigInt as necessary
+// to get to the next value. We do not actually convert the raw digits to a string,
+// since that is proving to be a lot of work -- we just return a placeholder string.
+// We can revisit this decision once we determine we actually care about any BigInt values.
+func deserializeBigInt(srcReader *bytes.Reader) ([]byte, error) {
+	// First up -- read the bitfield. It's a uint32.
+	bitfield, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading bitfield for BigInt: %w", err)
+	}
+
+	// Use the bitfield to determine a) the sign for this bigint and b) the number of bytes
+	// used to store this bigint. The sign is the last bit, and the length is the remainder.
+	isNegative := bitfield & 1
+	bigIntLen := bitfield & ((1 << 32) - 1)
+	numBytesToRead := bigIntLen / 2
+
+	// Read the next bigIntLenInBytes bytes
+	bigIntRawBytes := make([]byte, numBytesToRead)
+	for i := 0; i < int(numBytesToRead); i++ {
+		b, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d for BigInt: %w", i, numBytesToRead, err)
+		}
+		bigIntRawBytes[i] = b
+	}
+
+	// Return a placeholder string
+	if isNegative > 0 {
+		return []byte("-?n"), nil
+	}
+	return []byte("?n"), nil
 }
 
 // deserializeSparseArray deserializes the next sparse array from the srcReader.
@@ -326,7 +396,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 			_, _ = srcReader.ReadByte()
 			// The array has ended -- return.
 			reachedEndOfArray = true
-		case 0x01, 0x03:
+		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
@@ -342,22 +412,11 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 		if err != nil {
 			return nil, fmt.Errorf("reading next byte: %w", err)
 		}
-		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array: %w", err)
-			}
-			arrItems[i] = string(obj) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array: %w", err)
-			}
-			arrItems[i] = string(str) // cast to string so it's readable when marshalled again below
-		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s`", nextByte, string(nextByte))
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
 		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
 	}
 
 	arrBytes, err := json.Marshal(arrItems)
@@ -381,42 +440,47 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	// Read from srcReader until we've filled the array to the correct size.
-	arrItems := make([]any, 0)
+	arrItems := make([]any, arrayLen)
+	for i := 0; i < int(arrayLen); i++ {
+		// Read next token to see if the array is completed
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading next byte: %w", err)
+		}
+		// Array item! Unread the byte
+		arrayItem, err := deserializeNext(ctx, slogger, nextByte, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("decoding next item in dense array: %w", err)
+		}
+		arrItems[i] = string(arrayItem) // cast to string so it's readable when marshalled again below
+	}
+
+	// At the end of the array we have some padding and additional data -- consume
+	// that data
 	reachedEndOfArray := false
 	for {
 		if reachedEndOfArray {
 			break
 		}
 
-		// Read item at index
 		nextByte, err := srcReader.ReadByte()
 		if err != nil {
-			return nil, fmt.Errorf("reading next byte: %w", err)
+			return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
 		}
+
 		switch nextByte {
-		case tokenObjectBegin:
-			obj, err := deserializeNestedObject(ctx, slogger, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding object in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(obj)) // cast to string so it's readable when marshalled again below
-		case tokenAsciiStr:
-			str, err := deserializeAsciiStr(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("decoding string in array of length %d: %w", arrayLen, err)
-			}
-			arrItems = append(arrItems, string(str)) // cast to string so it's readable when marshalled again below
 		case tokenEndDenseArray:
 			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
 			_, _ = srcReader.ReadByte()
 			_, _ = srcReader.ReadByte()
 			reachedEndOfArray = true
-		case 0x01, 0x03:
+			continue
+		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
 			// This occurs immediately before tokenEndSparseArray -- not sure why. We can ignore it.
 			continue
 		default:
-			return nil, fmt.Errorf("unimplemented array item type 0x%02x / `%s` in array of length %d", nextByte, string(nextByte), arrayLen)
+			return nil, fmt.Errorf("unexpected byte at end of dense array %02x / `%s`", nextByte, string(nextByte))
 		}
 	}
 
@@ -426,6 +490,234 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 	}
 
 	return arrBytes, nil
+}
+
+// Represent values from enum class ArrayBufferViewTag
+const (
+	arrayBufferViewTagInt8Array         byte = 0x62 // b
+	arrayBufferViewTagUint8Array        byte = 0x42 // B
+	arrayBufferViewTagUint8ClampedArray byte = 0x43 // C
+	arrayBufferViewTagInt16Array        byte = 0x77 // w
+	arrayBufferViewTagUint16Array       byte = 0x57 // W
+	arrayBufferViewTagInt32Array        byte = 0x64 // d
+	arrayBufferViewTagUint32Array       byte = 0x44 // D
+	arrayBufferViewTagFloat32Array      byte = 0x66 // f
+	arrayBufferViewTagFloat64Array      byte = 0x46 // F
+	arrayBufferViewTagBigInt64Array     byte = 0x71 // q
+	arrayBufferViewTagBigUint64Array    byte = 0x51 // Q
+	arrayBufferViewTagDataView          byte = 0x3f // ?
+)
+
+func deserializeArrayBuffer(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	// Next up is the raw length of the array buffer -- read that, then read in the raw data
+	arrayBufLen, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading uvarint as ArrayBuffer length: %w", err)
+	}
+	rawArrayBufferData := make([]byte, arrayBufLen)
+	for i := 0; i < int(arrayBufLen); i++ {
+		nextByte, err := srcReader.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in ArrayBuffer: %w", i, arrayBufLen, err)
+		}
+		rawArrayBufferData[i] = nextByte
+	}
+
+	// After the ArrayBuffer may come the view -- check for that next
+	nextByte, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("peeking byte after ArrayBuffer: %w", err)
+	}
+	if nextByte != tokenArrayBufferView {
+		// Not a view next -- the ArrayBuffer is standalone. Unread the byte and return the raw data.
+		if err := srcReader.UnreadByte(); err != nil {
+			return nil, fmt.Errorf("unreading byte after peeking ahead post-ArrayBuffer: %w", err)
+		}
+
+		return rawArrayBufferData, nil
+	}
+
+	// Now the view! The view effectively "consumes" the ArrayBuffer that came before it
+	// by telling us how to interpret the raw data. The next values to read the subtag
+	// ArrayBufferViewTag, then two uint32s: the byte offset and the byte length.
+	arrayBufferViewTag, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading array buffer view tag: %w", err)
+	}
+	byteOffset, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte offset for ArrayBuffer view: %w", err)
+	}
+	byteLength, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
+	}
+
+	// Handle the only non-TypedArray case
+	if arrayBufferViewTag == arrayBufferViewTagDataView {
+		// We're not implementing data views right now -- return the raw data
+		slogger.Log(ctx, slog.LevelWarn,
+			"data view parsing not implemented for array buffer view, returning raw data instead",
+		)
+		return rawArrayBufferData, nil
+	}
+
+	// Handle auto-length TypedArrays. This is the only case where byteLength does not match len(rawArrayBufferData).
+	if byteLength == math.MaxUint64 {
+		// We're not implementing auto-length TypedArrays right now -- return the raw data.
+		slogger.Log(ctx, slog.LevelWarn,
+			"parsing not implemented for auto-length TypedArrays, returning raw data instead",
+		)
+		return rawArrayBufferData, nil
+	}
+
+	// Create reader to re-interpret TypedArray data
+	typedArrayReader := bytes.NewReader(rawArrayBufferData)
+
+	// Read through padding, if any
+	for i := 0; i < int(byteOffset); i++ {
+		if _, err := typedArrayReader.ReadByte(); err != nil {
+			return nil, fmt.Errorf("reading byte %d of %d in padding: %w", i, byteOffset, err)
+		}
+	}
+
+	// Reinterpret TypedArray data as appropriate type
+	var result any
+	switch arrayBufferViewTag {
+	case arrayBufferViewTagInt8Array, arrayBufferViewTagUint8Array, arrayBufferViewTagUint8ClampedArray:
+		result, err = readUint8Array(typedArrayReader)
+	case arrayBufferViewTagInt16Array, arrayBufferViewTagUint16Array:
+		result, err = readUint16Array(typedArrayReader)
+	case arrayBufferViewTagInt32Array, arrayBufferViewTagUint32Array:
+		result, err = readUint32Array(typedArrayReader)
+	case arrayBufferViewTagFloat32Array:
+		result, err = readFloat32Array(typedArrayReader)
+	case arrayBufferViewTagBigInt64Array, arrayBufferViewTagBigUint64Array:
+		result, err = readUint64Array(typedArrayReader)
+	case arrayBufferViewTagFloat64Array:
+		result, err = readFloat64Array(typedArrayReader)
+	default:
+		return nil, fmt.Errorf("unsupported TypedArray type %s", string(arrayBufferViewTag))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading TypedArray of type %d: %w", arrayBufferViewTag, err)
+	}
+
+	arrBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling TypedArray of type %s: %w", string(arrayBufferViewTag), err)
+	}
+
+	return arrBytes, nil
+}
+
+// readUint8Array is suitable for reading TypedArrays: Uint8Array, Int8Array, Uint8ClampedArray
+func readUint8Array(typedArrayReader *bytes.Reader) ([]uint8, error) {
+	// rawArrayLength is the same as actual array length for uint8
+	arrayLen := typedArrayReader.Len()
+	result := make([]uint8, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint8 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint16Array is suitable for reading TypedArrays: Uint16Array, Int16Array
+func readUint16Array(typedArrayReader *bytes.Reader) ([]uint16, error) {
+	arrayLen := typedArrayReader.Len() / 2
+	result := make([]uint16, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint16 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint32Array is suitable for reading TypedArrays: Uint32Array, Int32Array
+func readUint32Array(typedArrayReader *bytes.Reader) ([]uint32, error) {
+	arrayLen := typedArrayReader.Len() / 4
+	result := make([]uint32, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint32 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readFloat32Array is suitable for reading TypedArrays: Float32Array
+func readFloat32Array(typedArrayReader *bytes.Reader) ([]float32, error) {
+	arrayLen := typedArrayReader.Len() / 4
+	result := make([]float32, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading float32 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readUint64Array is suitable for reading TypedArrays: BigUint64Array, BigInt64Array
+func readUint64Array(typedArrayReader *bytes.Reader) ([]uint64, error) {
+	arrayLen := typedArrayReader.Len() / 8
+	result := make([]uint64, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading uint64 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// readFloat64Array is suitable for reading TypedArrays: Float64Array
+func readFloat64Array(typedArrayReader *bytes.Reader) ([]float64, error) {
+	arrayLen := typedArrayReader.Len() / 8
+	result := make([]float64, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		if err := binary.Read(typedArrayReader, binary.NativeEndian, &result[i]); err != nil {
+			return nil, fmt.Errorf("reading float64 at index %d in TypedArray: %w", i, err)
+		}
+	}
+	return result, nil
+}
+
+// deserializePresumablyEmptyArrayBufferView handles the case where we have an array buffer view
+// with no data in it. Array buffer views typically always follow an ArrayBuffer, and they consume
+// that data. However, when there is no data, sometimes they appear standalone. In that case,
+// we confirm that the view is standalone, and return an empty array.
+func deserializePresumablyEmptyArrayBufferView(srcReader *bytes.Reader) ([]byte, error) {
+	// An array buffer view starts with its subtag (indicating type), byte offset,
+	// and byte length. We only really care about the byte length here, since
+	// we are expecting a totally empty array.
+	if _, err := srcReader.ReadByte(); err != nil {
+		return nil, fmt.Errorf("reading array buffer view tag: %w", err)
+	}
+	if _, err := binary.ReadUvarint(srcReader); err != nil {
+		return nil, fmt.Errorf("reading byte offset for ArrayBuffer view: %w", err)
+	}
+	byteLength, err := binary.ReadUvarint(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading byte length for ArrayBuffer view: %w", err)
+	}
+
+	// Check to make sure the length is 0, like we expect
+	if byteLength != 0 {
+		return nil, fmt.Errorf("found standalone array buffer view with length %d despite no preceding data", byteLength)
+	}
+
+	// Next, we typically see an 0x03, which we interpret as an array termination byte.
+	nextByte, err := srcReader.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("reading next byte at end of dense array: %w", err)
+	}
+	if nextByte != tokenPossiblyArrayTermination0x03 {
+		return nil, fmt.Errorf("unexpected byte at end of standalone array buffer view: %02x / `%s`", nextByte, string(nextByte))
+	}
+
+	return []byte("[]"), nil
 }
 
 func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
@@ -571,6 +863,23 @@ func deserializeUtf16Str(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return decoded, nil
+}
+
+// deserializeStringObject handles the upcoming String in srcReader.
+func deserializeStringObject(srcReader *bytes.Reader) ([]byte, error) {
+	stringTypeToken, err := nextNonPaddingByte(srcReader)
+	if err != nil {
+		return nil, fmt.Errorf("reading token to determine encoding for String: %w", err)
+	}
+
+	switch stringTypeToken {
+	case tokenAsciiStr, tokenUtf8Str:
+		return deserializeAsciiStr(srcReader)
+	case tokenUtf16Str:
+		return deserializeUtf16Str(srcReader)
+	default:
+		return nil, fmt.Errorf("unknown token for String %02x / `%s`", stringTypeToken, string(stringTypeToken))
+	}
 }
 
 // Please note that these values are NOT identical to the ones used by Firefox -- global

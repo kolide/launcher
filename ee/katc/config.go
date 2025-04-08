@@ -33,6 +33,7 @@ type sourceData struct {
 const (
 	sqliteSourceType           = "sqlite"
 	indexeddbLeveldbSourceType = "indexeddb_leveldb"
+	leveldbSourceType          = "leveldb"
 )
 
 func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
@@ -50,6 +51,10 @@ func (kst *katcSourceType) UnmarshalJSON(data []byte) error {
 	case indexeddbLeveldbSourceType:
 		kst.name = indexeddbLeveldbSourceType
 		kst.dataFunc = indexeddbLeveldbData
+		return nil
+	case leveldbSourceType:
+		kst.name = leveldbSourceType
+		kst.dataFunc = leveldbData
 		return nil
 	default:
 		return fmt.Errorf("unknown table type %s", s)
@@ -73,6 +78,7 @@ type rowTransformStep struct {
 
 const (
 	snappyDecodeTransformStep       = "snappy"
+	hexDecodeTransformStep          = "hex"
 	deserializeFirefoxTransformStep = "deserialize_firefox"
 	deserializeChromeTransformStep  = "deserialize_chrome"
 	camelToSnakeTransformStep       = "camel_to_snake"
@@ -89,6 +95,10 @@ func (r *rowTransformStep) UnmarshalJSON(data []byte) error {
 	case snappyDecodeTransformStep:
 		r.name = snappyDecodeTransformStep
 		r.transformFunc = snappyDecode
+		return nil
+	case hexDecodeTransformStep:
+		r.name = hexDecodeTransformStep
+		r.transformFunc = hexDecode
 		return nil
 	case deserializeFirefoxTransformStep:
 		r.name = deserializeFirefoxTransformStep
@@ -146,6 +156,20 @@ func ConstructKATCTables(config map[string]string, flags types.Flags, slogger *s
 		}
 
 		t, columns := newKatcTable(tableName, cfg, slogger)
+
+		// Validate that the columns are valid for this table type -- only checked
+		// for LevelDB tables currently
+		if t.sourceType.name == leveldbSourceType {
+			if err := validateLeveldbTableColumns(columns); err != nil {
+				slogger.Log(context.TODO(), slog.LevelWarn,
+					"invalid columns for leveldb table",
+					"table_name", tableName,
+					"err", err,
+				)
+				continue
+			}
+		}
+
 		plugins = append(plugins, tablewrapper.New(flags, slogger, tableName, columns, t.generate))
 	}
 

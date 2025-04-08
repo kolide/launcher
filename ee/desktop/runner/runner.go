@@ -40,7 +40,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )

@@ -37,7 +37,7 @@ import (
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -142,6 +142,9 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	setupHistory(t, k)
 
@@ -191,6 +194,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -238,6 +244,9 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -354,6 +363,9 @@ func TestPing(t *testing.T) {
 	osqHistory := setupHistory(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 
 	// Start the runner
 	runner := New(k, mockServiceClient(t), s)
@@ -600,6 +612,9 @@ func TestSimplePath(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -647,6 +662,9 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
@@ -727,6 +745,9 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
@@ -802,6 +823,9 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -849,6 +873,9 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -1018,6 +1045,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	osqHistory = setupHistory(t, k)
 

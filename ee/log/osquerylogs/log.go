@@ -7,13 +7,14 @@ import (
 	"log/slog"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
@@ -213,7 +214,7 @@ func getIntStat(getFunc func() (int64, error)) string {
 // getSliceStat is a small wrapper around gopsutil/process functions
 // to return the stat if available, or an error message if not, so
 // that either way the info will be captured in the log.
-func getSliceStat(getFunc func() ([]int32, error)) string {
+func getSliceStat(getFunc func() ([]uint32, error)) string {
 	stat, err := getFunc()
 	if err != nil {
 		return fmt.Sprintf("could not get stat: %v", err)
@@ -239,6 +240,16 @@ func (l *OsqueryLogAdapter) logInfoAboutProcessHoldingLockfile(ctx context.Conte
 	}
 
 	lockFilePath := strings.TrimSpace(matches[0][1]) // We want the group, not the full match
+	if runtime.GOOS == "windows" {
+		// for some reason the last separator in the path that we see from the logs is a forward slash even on windows.
+		// this causes it to fail to match the open files we check later. so if we see that suffix on windows,
+		// just flip that part of the path to correctly match the open file paths we'll check against
+		lockSuffix := "/LOCK"
+		if strings.HasSuffix(lockFilePath, lockSuffix) {
+			lockFilePath = lockFilePath[:len(lockFilePath)-len(lockSuffix)] + "\\LOCK"
+		}
+	}
+
 	infoToLog := []any{
 		"lockfile_path", lockFilePath,
 	}

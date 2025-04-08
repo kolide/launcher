@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -29,6 +30,7 @@ type HTTPClient struct {
 	insecure   bool
 	disableTLS bool
 	token      string
+	slogger    *slog.Logger
 }
 
 const (
@@ -39,6 +41,8 @@ const (
 	HeaderKey        = "X-Kolide-Key"
 	HeaderSignature2 = "X-Kolide-Signature2"
 	HeaderKey2       = "X-Kolide-Key2"
+
+	defaultRequestTimeout = 30 * time.Second
 )
 
 type configResponse struct {
@@ -46,7 +50,7 @@ type configResponse struct {
 	Config json.RawMessage `json:"config"`
 }
 
-func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOption) (*HTTPClient, error) {
+func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger, opts ...HTTPClientOption) (*HTTPClient, error) {
 	baseURL, err := url.Parse(fmt.Sprintf("https://%s", addr))
 	if err != nil {
 		return nil, fmt.Errorf("parsing URL: %w", err)
@@ -55,6 +59,7 @@ func NewControlHTTPClient(addr string, client *http.Client, opts ...HTTPClientOp
 		baseURL: baseURL,
 		client:  client,
 		addr:    addr,
+		slogger: logger,
 	}
 
 	for _, opt := range opts {
@@ -75,7 +80,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 		return nil, fmt.Errorf("could not create challenge request: %w", err)
 	}
 
-	challenge, err := c.do(ctx, challengeReq)
+	challenge, err := c.do(challengeReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make challenge request: %w", err)
 	}
@@ -104,24 +109,14 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 	configReq.Header.Set(HeaderKey, string(key1))
 	configReq.Header.Set(HeaderSignature, sig1)
 
-	// Calculate second signature if available
-	hardwareKeys := agent.HardwareKeys()
-
-	// hardware signing is not implemented for darwin
-	if runtime.GOOS != "darwin" && hardwareKeys.Public() != nil {
-		key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
-		if err != nil {
-			return nil, fmt.Errorf("could not get key header from hardware keys: %w", err)
-		}
-		sig2, err := signatureHeaderValue(hardwareKeys, challenge)
-		if err != nil {
-			return nil, fmt.Errorf("could not get signature header from hardware keys: %w", err)
-		}
-		configReq.Header.Set(HeaderKey2, string(key2))
-		configReq.Header.Set(HeaderSignature2, sig2)
+	if err := c.setHardwareKeyHeader(configReq, challenge); err != nil {
+		c.slogger.Log(ctx, slog.LevelWarn,
+			"failed to set hardware key header, not fatal moving on",
+			"err", err,
+		)
 	}
 
-	configAndAuthKeyRaw, err := c.do(ctx, configReq)
+	configAndAuthKeyRaw, err := c.do(configReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make config request: %w", err)
 	}
@@ -136,6 +131,36 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 
 	reader := bytes.NewReader(cfgResp.Config)
 	return reader, nil
+}
+
+func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) error {
+	if runtime.GOOS == "darwin" {
+		c.slogger.Log(req.Context(), slog.LevelDebug,
+			"hardware key signing not supported on darwin",
+		)
+
+		return nil
+	}
+
+	hardwareKeys := agent.HardwareKeys()
+
+	if agent.HardwareKeys() == nil || hardwareKeys.Public() == nil {
+		return errors.New("nil hardware keys")
+	}
+
+	key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
+	if err != nil {
+		return fmt.Errorf("could not get key header from hardware keys: %w", err)
+	}
+
+	sig2, err := signatureHeaderValue(hardwareKeys, challenge)
+	if err != nil {
+		return fmt.Errorf("could not get signature header from hardware keys: %w", err)
+	}
+
+	req.Header.Set(HeaderKey2, string(key2))
+	req.Header.Set(HeaderSignature2, sig2)
+	return nil
 }
 
 func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
@@ -155,7 +180,7 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 	dataReq.Header.Set("Content-Type", "application/json")
 	dataReq.Header.Set("Accept", "application/json")
 
-	dataRaw, err := c.do(ctx, dataReq)
+	dataRaw, err := c.do(dataReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not make subsystem data request: %w", err)
 	}
@@ -204,14 +229,19 @@ func (c *HTTPClient) SendMessage(ctx context.Context, method string, params inte
 
 	// we don't care about the response here, just want to know
 	// if there was an error sending our request
-	_, err = c.do(ctx, dataReq)
+	_, err = c.do(dataReq)
 	return err
 }
 
 // TODO: this should probably just return a io.Reader
-func (c *HTTPClient) do(ctx context.Context, req *http.Request) ([]byte, error) {
-	_, span := traces.StartSpan(ctx)
+func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
+	req, span := traces.StartHttpRequestSpan(req)
 	defer span.End()
+
+	// Ensure we set a timeout on the request
+	ctx, cancel := context.WithTimeout(req.Context(), defaultRequestTimeout)
+	defer cancel()
+	req = req.WithContext(ctx)
 
 	// We always need to include the API version in the headers
 	req.Header.Set(HeaderApiVersion, ApiVersion)

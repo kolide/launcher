@@ -20,8 +20,8 @@ import (
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/shirou/gopsutil/v3/net"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 const (
@@ -240,7 +240,7 @@ func (r *DesktopUsersProcessesRunner) displayFromDisplayServerProcess(ctx contex
 		}
 		uidMatch := false
 		for _, procUid := range uids {
-			if procUid == uid {
+			if procUid == uint32(uid) {
 				uidMatch = true
 				break
 			}

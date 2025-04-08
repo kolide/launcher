@@ -216,6 +216,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runUninstall
 	case "watchdog": // note: this is currently only implemented for windows
 		run = watchdog.RunWatchdogTask
+	case "query-windowsupdates":
+		run = runQueryWindowsUpdates
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}

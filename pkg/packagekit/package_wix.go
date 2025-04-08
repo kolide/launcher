@@ -21,8 +21,6 @@ import (
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"go.opencensus.io/trace"
 )
 
 // We need to use variables to stub various parts of the wix
@@ -46,9 +44,6 @@ var assets embed.FS
 var signtoolVersionRegex = regexp.MustCompile(`^(.+)\/x64\/signtool\.exe$`)
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
-	defer span.End()
-
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}

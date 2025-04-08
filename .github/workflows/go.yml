@@ -12,6 +12,8 @@ on:
 
 
 jobs:
+  # Our non-containerized launcher builds -- macOS and Windows. Linux is handled separately
+  # below to preserve Ubuntu 20.04 support.
   build:
     name: launcher
     runs-on: ${{ matrix.os }}
@@ -19,7 +21,6 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - ubuntu-22.04
           - macos-13
           - windows-latest
     steps:
@@ -59,10 +60,6 @@ jobs:
     - name: Get dependencies
       run: make deps
 
-    - name: Set up zig
-      if: ${{ contains(matrix.os, 'ubuntu') }}
-      uses: goto-bus-stop/setup-zig@v2
-
     - name: Build
       run: make -j2 github-build
 
@@ -86,16 +83,88 @@ jobs:
         key: ${{ runner.os }}-${{ github.run_id }}
         enableCrossOsArchive: true
 
+  # Our containerized launcher build -- we need to build launcher on Ubuntu 20.04
+  # in order to continue to support that platform, but that GH runner has been EOL'ed --
+  # so we have a separate build here in an ubuntu:20.04 container instead.
+  build_linux:
+    name: launcher (linux)
+    runs-on: ubuntu-22.04
+    container: ubuntu:20.04 # Required to support launcher on Ubuntu 20.04
+    steps:
+    # zstd is needed so we can restore cache later -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+    - name: Install build dependencies
+      run: |
+        apt-get -y update
+        apt-get -y install build-essential ca-certificates openssl git zstd
+        update-ca-certificates
+
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+    
+    - name: Ignore dubious ownership
+      run: git config --global --add safe.directory /__w/launcher/launcher
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: './go.mod'
+        check-latest: true
+        cache: false
+      id: go
+
+    - id: go-cache-paths
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - name: Go Build Cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+    - name: Go Mod Cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+
+    - name: Get dependencies
+      run: make deps
+
+    - name: Set up zig
+      uses: goto-bus-stop/setup-zig@v2
+
+    - name: Build
+      run: make -j2 github-build
+
+    - name: Cache build output
+      uses: actions/cache@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
   # this job captures the version of launcher on one of the runners then that version is
   # compared to the version of all other runners during exec testing. This is to ensure
-  # that the version of launcher is the same across all runners.
+  # that the version of launcher is the same across all runners. We run this job in a container
+  # to confirm launcher support on ubuntu 20.04, since runners no longer support ubuntu 20.04.
   version_baseline:
     name: Version Baseline
     runs-on: ubuntu-22.04
-    needs: build
+    container: ubuntu:20.04
+    needs: build_linux
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
+    # Needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604
+    - name: Install zstd
+      run: |
+        apt-get -y update
+        apt-get -y install zstd
     - name: cache restore build output
       uses: actions/cache/restore@v4
       with:
@@ -111,7 +180,9 @@ jobs:
 
   launcher_test:
     name: test
-    needs: build # a desktop runner test requires a build to exist
+    needs:
+      - build # a desktop runner test requires a build to exist
+      - build_linux
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -186,7 +257,9 @@ jobs:
           - macos-15
           - windows-2019
           - windows-2022
-    needs: version_baseline
+    needs:
+      - version_baseline # version_baseline implies build_linux
+      - build # need the other builds too
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v4
@@ -219,6 +292,82 @@ jobs:
       working-directory: build
       run: ./launcher doctor
 
+  container_exec_testing:
+    name: Exec Test Containers
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+          - ubuntu:20.04
+          #- centos:7 # Unsupported by actions/cache/restore GLIBC Issues
+          - centos:8
+          - debian:11
+          - debian:10
+    needs:
+      - version_baseline # version_baseline implies build_linux
+      - build # need the other builds too
+    steps:
+
+    - name: OS Info
+      run: |
+        echo uname:
+        uname -a
+
+        for f in /etc/*release; do echo -e "\n\n$f:"; cat "$f" || true; done
+
+    # zstd is needed so we can restore cache -- see https://github.com/actions/cache/issues/1455#issuecomment-2328358604;
+    # ca-certificates and openssl are needed to download osquery.
+    - name: Install dependencies
+      run: |
+        if grep NAME /etc/os-release | grep -q centos; then
+          echo CentOS detected
+
+          sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/CentOS-*.repo
+          sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/CentOS-*.repo
+
+          dnf install -y zstd
+        elif command -v apt-get > /dev/null; then
+          echo apt-get detected
+
+          apt-get -y update
+          apt-get -y install zstd ca-certificates openssl
+          update-ca-certificates
+        fi
+
+    - name: cache restore build output
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - name: Launcher Version
+      working-directory: build
+      shell: bash
+      run: |
+        ./launcher --version
+        thisVersion=$(./launcher --version 2>/dev/null | grep "version" | awk '{print $4}')
+        baseVersion="${{ needs.version_baseline.outputs.version }}"
+        if [[ "$thisVersion" != "$baseVersion" ]]; then
+          printf "launcher version %s does not match baseline version %s" "$thisVersion" "$baseVersion"
+          exit 1
+        fi
+
+    - name: Download Osquery
+      working-directory: build
+      run: ./launcher download-osquery --directory .
+
+    - name: Osquery Version
+      working-directory: build
+      run: ./osqueryd --version
+
+    - name: Launcher Doctor
+      working-directory: build
+      run: ./launcher doctor
 
   # If the prior exec tests suceeded, this grabs the cached things, and moves them to artifacts. We ought
   # be able to do this entirely on ubuntu, so let's try!
@@ -233,7 +382,9 @@ jobs:
           - Linux
           - macOS
           - Windows
-    needs: exec_testing
+    needs:
+      - exec_testing
+      - container_exec_testing
     steps:
     - name: cache restore build output
       uses: actions/cache/restore@v4
@@ -248,7 +399,6 @@ jobs:
         name: ${{ matrix.artifactos }}-build
         path: build/
         if-no-files-found: error
-
 
   package_builder_test:
     name: package_builder
@@ -322,6 +472,8 @@ jobs:
       - run: true
     needs:
       - build
+      - build_linux
       - launcher_test
       - package_builder_test
       - exec_testing
+      - container_exec_testing

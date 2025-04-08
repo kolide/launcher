@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // runAndLogPs runs ps filtering on the given PID, and logs the output.

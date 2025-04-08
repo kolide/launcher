@@ -37,7 +37,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 	defer span.End()
 
 	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.
-	tempDbCopyLocation, err := copyIndexeddb(ctx, dbLocation)
+	tempDbCopyLocation, err := CopyLeveldb(ctx, dbLocation)
 	if err != nil {
 		if tempDbCopyLocation != "" {
 			_ = os.RemoveAll(tempDbCopyLocation)
@@ -49,20 +49,9 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 
 	objs := make([]map[string][]byte, 0)
 
-	opts := &opt.Options{
-		Comparer:               indexeddbComparer,
-		DisableSeeksCompaction: true,               // no need to perform compaction
-		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
-	}
-	db, dbOpenErr := leveldb.OpenFile(tempDbCopyLocation, opts)
-	if dbOpenErr != nil {
-		// Perform recover in case we missed something while copying
-		var dbRecoverErr error
-		db, dbRecoverErr = leveldb.RecoverFile(tempDbCopyLocation, opts)
-		if dbRecoverErr != nil {
-			return nil, fmt.Errorf("opening db: `%+v`; recovering db: %w", dbOpenErr, dbRecoverErr)
-		}
-		span.AddEvent("db_recovered")
+	db, err := OpenLeveldb(tempDbCopyLocation)
+	if err != nil {
+		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
 	defer db.Close()
 	span.AddEvent("db_opened")
@@ -133,7 +122,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 	return objs, nil
 }
 
-func copyIndexeddb(ctx context.Context, sourceDb string) (string, error) {
+func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
@@ -191,4 +180,23 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	}
 
 	return nil
+}
+
+func OpenLeveldb(dbLocation string) (*leveldb.DB, error) {
+	opts := &opt.Options{
+		Comparer:               indexeddbComparer,
+		DisableSeeksCompaction: true,               // no need to perform compaction
+		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
+	}
+	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
+	if dbOpenErr != nil {
+		// Perform recover in case we missed something while copying
+		var dbRecoverErr error
+		db, dbRecoverErr = leveldb.RecoverFile(dbLocation, opts)
+		if dbRecoverErr != nil {
+			return nil, fmt.Errorf("opening db: `%+v`; recovering db: %w", dbOpenErr, dbRecoverErr)
+		}
+	}
+
+	return db, nil
 }

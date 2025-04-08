@@ -10,6 +10,8 @@ import (
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
+	// Deregisters an existing observer
+	DeregisterChangeObserver(observer FlagsChangeObserver)
 
 	// KolideServerURL is the URL of the management server to connect to.
 	SetKolideServerURL(url string) error
@@ -88,6 +90,12 @@ type Flags interface {
 	SetControlRequestIntervalOverride(value time.Duration, duration time.Duration)
 	ControlRequestInterval() time.Duration
 
+	// AllowOverlyBroadDt4aAcceleration enables acceleration via /v3/dt4a localserver endpoint. It is a test flag
+	// for development use; it should ultimately be replaced by a call to a new /v3 endpoint that only
+	// performs acceleration.
+	SetAllowOverlyBroadDt4aAcceleration(enable bool) error
+	AllowOverlyBroadDt4aAcceleration() bool
+
 	// DisableControlTLS disables TLS transport with the control server.
 	SetDisableControlTLS(disabled bool) error
 	DisableControlTLS() bool
@@ -117,6 +125,12 @@ type Flags interface {
 	// OsqueryVerbose puts osquery into verbose mode.
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
+
+	// DistributedForwardingInterval indicates the rate at which we forward osquery distributed requests
+	// to the cloud
+	SetDistributedForwardingInterval(interval time.Duration) error
+	SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration)
+	DistributedForwardingInterval() time.Duration
 
 	// WatchdogEnabled enables the osquery watchdog
 	SetWatchdogEnabled(enable bool) error

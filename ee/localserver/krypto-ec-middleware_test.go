@@ -19,11 +19,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
@@ -48,6 +50,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			name: "with presence detection call back",
 			cmdReqHeaders: map[string][]string{
 				kolidePresenceDetectionIntervalHeaderKey: {"0s"},
+				kolideMunemoHeaderKey:                    {"test-munemo"},
 			},
 			cmdReqCallbackHeaders: map[string][]string{
 				kolideSessionIdHeaderKey: {koldieSessionId},
@@ -205,7 +208,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					}
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
@@ -317,6 +320,21 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 				k.timestampValidityRange = -1
 			},
 		},
+		{
+			name: "munemo mismatch",
+			challenge: func() string {
+				challenge, _ := mustGenerateChallenge(t, remoteServerPrivateKey, []byte(ulid.New()), []byte(ulid.New()), mustMarshal(t, v2CmdRequestType{
+					Headers: map[string][]string{
+						kolideMunemoHeaderKey: {"wrong-munemo"},
+					},
+				}))
+				return challenge
+			},
+			loggedErr: "munemo mismatch",
+			middlewareOpt: func(k *kryptoEcMiddleware) {
+				k.timestampValidityRange = -1
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -340,7 +358,7 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector)
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
 						tt.middlewareOpt(kryptoEcMiddleware)
 					}
@@ -472,7 +490,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector)
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -589,4 +607,78 @@ func mustExtractJsonProperty[T any](t *testing.T, jsonData []byte, property stri
 	require.NoError(t, json.Unmarshal(value, &extractedValue))
 
 	return extractedValue
+}
+
+func TestMunemoCheck(t *testing.T) {
+	t.Parallel()
+
+	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {"test-munemo"}}
+
+	tests := []struct {
+		name                      string
+		headers                   map[string][]string
+		tokenClaims               jwt.MapClaims
+		expectMunemoExtractionErr bool
+		expectMiddleWareCheckErr  bool
+	}{
+		{
+			name:        "matching munemo",
+			headers:     validTestHeader,
+			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+		},
+		{
+			name:        "no munemo header",
+			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+		},
+		{
+			name:                      "no token claims",
+			headers:                   validTestHeader,
+			expectMunemoExtractionErr: true,
+		},
+		{
+			name:                      "token claim not string",
+			headers:                   validTestHeader,
+			tokenClaims:               jwt.MapClaims{"organization": 1},
+			expectMunemoExtractionErr: true,
+		},
+		{
+			name:        "empty org claim",
+			headers:     validTestHeader,
+			tokenClaims: jwt.MapClaims{"organization": ""},
+		},
+		{
+			name:                     "header and munemo dont match",
+			headers:                  map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
+			tokenClaims:              jwt.MapClaims{"organization": "test-munemo"},
+			expectMiddleWareCheckErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.tokenClaims).SignedString([]byte("test"))
+			require.NoError(t, err)
+
+			k := typesmocks.NewKnapsack(t)
+			k.On("ReadEnrollSecret").Return(token, nil)
+
+			munemo, err := getMunemoFromEnrollSecret(k)
+			if tt.expectMunemoExtractionErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
+			err = e.checkMunemo(tt.headers)
+			if tt.expectMiddleWareCheckErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

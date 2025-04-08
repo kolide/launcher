@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/uninstall"
@@ -35,17 +36,20 @@ type settingsStoreWriter interface {
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey             string
-	Opts                ExtensionOpts
-	registrationId      string
-	knapsack            types.Knapsack
-	serviceClient       service.KolideService
-	settingsWriter      settingsStoreWriter
-	enrollMutex         sync.Mutex
-	done                chan struct{}
-	interrupted         atomic.Bool
-	slogger             *slog.Logger
-	logPublicationState *logPublicationState
+	NodeKey                       string
+	Opts                          ExtensionOpts
+	registrationId                string
+	knapsack                      types.Knapsack
+	serviceClient                 service.KolideService
+	settingsWriter                settingsStoreWriter
+	enrollMutex                   *sync.Mutex
+	done                          chan struct{}
+	interrupted                   atomic.Bool
+	slogger                       *slog.Logger
+	logPublicationState           *logPublicationState
+	lastRequestQueriesTimestamp   *atomic.Int64
+	distributedForwardingInterval *atomic.Int64 // how frequently to forward RequestQueries requests to the cloud, in seconds
+	forwardAllDistributedUntil    *atomic.Int64 // allows for accelerated distributed requests until given timestamp
 }
 
 const (
@@ -68,26 +72,27 @@ const (
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
 
-	// How frequently osquery should check for distributed queries to run during
-	// osquery instance startup -- an accelerated interval, where the unit is seconds.
-	// This shorter interval should hopefully help launcher begin to process stale,
-	// slow-running queries as quickly as possible after device startup.
-	startupDistributedInterval = 5
+	// How frequently osquery should check for distributed queries to run.
+	// We set this to 5 seconds, which is more frequent than we think the
+	// server can comfortably handle, so we only forward these requests
+	// to the cloud once every 60 seconds.
+	osqueryDistributedInterval = 5
 )
 
 var (
 	// Osquery configuration options that we set during the osquery instance's startup period.
 	// These are the override, non-standard values.
 	startupOsqueryConfigOptions = map[string]any{
-		"verbose":              true,                       // receive as many osquery logs as we can, in case we need to troubleshoot an issue
-		"distributed_interval": startupDistributedInterval, // request distributed queries more frequently, so stale checks run ASAP
+		"verbose":              true, // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": osqueryDistributedInterval,
 	}
 
 	// Osquery configuration options that we set after the osquery instance has been up and running
-	// for at least 10 minutes. These are the "normal" values. We don't set the distributed interval
-	// here so that the cloud can set it instead.
+	// for at least 10 minutes. These are the "normal" values. We continue to override the distributed
+	// interval to 5 seconds.
 	postStartupOsqueryConfigOptions = map[string]any{
-		"verbose": false,
+		"verbose":              false,
+		"distributed_interval": osqueryDistributedInterval,
 	}
 )
 
@@ -153,17 +158,33 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		)
 	}
 
-	return &Extension{
-		slogger:             slogger,
-		serviceClient:       client,
-		settingsWriter:      settingsWriter,
-		registrationId:      registrationId,
-		knapsack:            k,
-		NodeKey:             nodekey,
-		Opts:                opts,
-		done:                make(chan struct{}),
-		logPublicationState: NewLogPublicationState(opts.MaxBytesPerBatch),
-	}, nil
+	initialTimestamp := &atomic.Int64{}
+	initialTimestamp.Store(0)
+
+	distributedForwardingInterval := &atomic.Int64{}
+	distributedForwardingInterval.Store(int64(k.DistributedForwardingInterval().Seconds()))
+
+	forwardAllDistributedUntil := &atomic.Int64{}
+	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
+
+	e := &Extension{
+		slogger:                       slogger,
+		serviceClient:                 client,
+		settingsWriter:                settingsWriter,
+		registrationId:                registrationId,
+		knapsack:                      k,
+		NodeKey:                       nodekey,
+		Opts:                          opts,
+		enrollMutex:                   &sync.Mutex{},
+		done:                          make(chan struct{}),
+		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
+		lastRequestQueriesTimestamp:   initialTimestamp,
+		distributedForwardingInterval: distributedForwardingInterval,
+		forwardAllDistributedUntil:    forwardAllDistributedUntil,
+	}
+	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
+
+	return e, nil
 }
 
 func (e *Extension) Execute() error {
@@ -195,7 +216,20 @@ func (e *Extension) Shutdown(_ error) {
 	}
 	e.interrupted.Store(true)
 
+	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which is DistributedForwardingInterval.
+func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	for _, flagKey := range flagKeys {
+		if flagKey == keys.DistributedForwardingInterval {
+			e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
+			// That's the only flag we care about -- we can break here
+			break
+		}
+	}
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
@@ -835,7 +869,32 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
 
-	return e.getQueriesWithReenroll(ctx, true)
+	// Check to see whether we should forward this request --
+	// 1. Check to see if we currently want to forward all distributed query requests to the cloud.
+	// 2. Check to see if we forwarded a request to the cloud within the last minute.
+	now := time.Now().Unix()
+	if now >= e.forwardAllDistributedUntil.Load() && now < e.lastRequestQueriesTimestamp.Load()+e.distributedForwardingInterval.Load() {
+		// Return an empty result to osquery.
+		return &distributed.GetQueriesResult{}, nil
+	}
+
+	// We haven't requested queries from the cloud within the last minute --
+	// forward this request.
+	e.lastRequestQueriesTimestamp.Store(now)
+
+	queries, err := e.getQueriesWithReenroll(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the cloud wants us to accelerate distributed requests by forwarding
+	// all requests to the cloud for the next `queries.AccelerateSeconds` seconds.
+	if queries.AccelerateSeconds > 0 {
+		// Store the timestamp when the acceleration ends
+		e.forwardAllDistributedUntil.Store(time.Now().Unix() + int64(queries.AccelerateSeconds))
+	}
+
+	return queries, nil
 }
 
 // Helper to allow for a single attempt at re-enrollment

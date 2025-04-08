@@ -15,17 +15,12 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/kolide/launcher/pkg/packagekit/applenotarization"
-
-	"go.opencensus.io/trace"
 )
 
 //go:embed assets/distribution.dist
 var distributionTemplate []byte
 
 func PackagePkg(ctx context.Context, w io.Writer, po *PackageOptions, arch string) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.PackagePkg")
-	defer span.End()
-
 	if err := isDirectory(po.Root); err != nil {
 		return err
 	}
@@ -72,9 +67,6 @@ func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
 		return nil
 	}
 
-	ctx, span := trace.StartSpan(ctx, "packagekit.runNotarize")
-	defer span.End()
-
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runNotarize")
 
 	bundleid := fmt.Sprintf("com.%s.launcher", po.Identifier)
@@ -97,9 +89,6 @@ func runNotarize(ctx context.Context, file string, po *PackageOptions) error {
 // runPkbuild produces a flat pkg file. It uses the directories
 // specified in PackageOptions, and then execs pkgbuild
 func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.runPkbuild")
-	defer span.End()
-
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runPkbuild")
 
 	// Run analyze to generate our component plist
@@ -164,9 +153,6 @@ func runPkbuild(ctx context.Context, outputPath string, po *PackageOptions) erro
 //
 // See https://github.com/kolide/launcher/issues/407 and associated links
 func runProductbuild(ctx context.Context, flatPkgPath, distributionPkgPath string, arch string, po *PackageOptions) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.runProductbuild")
-	defer span.End()
-
 	logger := log.With(ctxlog.FromContext(ctx), "method", "packagekit.runProductbuild")
 
 	// Create a distribution file so that we can set the title and the minimum OS version

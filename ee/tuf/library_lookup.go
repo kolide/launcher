@@ -261,9 +261,13 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if err := CheckExecutable(ctx, targetPath, "--version"); err != nil {
+	if _, err := os.Stat(targetPath); err != nil && errors.Is(err, os.ErrNotExist) {
 		traces.SetError(span, err)
-		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, targetPath, err)
+		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version or not yet downloaded", targetVersion, targetName, targetPath)
+	}
+	if err := CheckExecutable(ctx, slogger, targetPath, "--version"); err != nil {
+		traces.SetError(span, err)
+		return nil, fmt.Errorf("version %s from target %s at %s is corrupted: %w", targetVersion, targetName, targetPath, err)
 	}
 
 	return &BinaryUpdateInfo{

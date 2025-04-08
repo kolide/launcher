@@ -74,7 +74,8 @@ const (
 	desktopMenuSubsystemName = "kolide_desktop_menu"
 	authTokensSubsystemName  = "auth_tokens"
 	katcSubsystemName        = "katc_config" // Kolide ATC
-	ztaInfoSubsystemName     = "zta_info"
+	ztaInfoSubsystemName     = "zta_info"    // legacy name for dt4aInfo subsystem
+	dt4aInfoSubsystemName    = "dt4a_info"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -176,7 +177,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// unimplemented on windows, though empirically it seems to
 	// work.
 	agentbbolt.UseBackupDbIfNeeded(rootDirectory, slogger)
-	boltOptions := &bbolt.Options{Timeout: time.Duration(30) * time.Second}
+	boltOptions := &bbolt.Options{
+		Timeout:      time.Duration(30) * time.Second,
+		FreelistType: bbolt.FreelistMapType,
+	}
 	db, err := bbolt.Open(agentbbolt.LauncherDbLocation(rootDirectory), 0600, boltOptions)
 	if err != nil {
 		return fmt.Errorf("open launcher db: %w", err)
@@ -406,7 +410,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"control server URL not set, will not create control service",
 		)
 	} else {
-		controlService, err := createControlService(ctx, k.ControlStore(), k)
+		controlService, err := createControlService(ctx, k)
 		if err != nil {
 			return fmt.Errorf("failed to setup control service: %w", err)
 		}
@@ -505,10 +509,15 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			metadataWriter.Ping()
 		}
 
-		// Set up consumer to receive ZTA info from the control server
-		ztaInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.ZtaInfoStore())
-		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, ztaInfoConsumer); err != nil {
-			return fmt.Errorf("failed to register ZTA info consumer: %w", err)
+		// Set up consumer to receive DT4A info from the control server in both current and legacy subsystem
+		dt4aInfoConsumer := keyvalueconsumer.NewConfigConsumer(k.Dt4aInfoStore())
+		if err := controlService.RegisterConsumer(dt4aInfoSubsystemName, dt4aInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
+		}
+
+		//ztaInfoConsumer is the legacy consumer for zta
+		if err := controlService.RegisterConsumer(ztaInfoSubsystemName, dt4aInfoConsumer); err != nil {
+			return fmt.Errorf("failed to register dt4a info consumer: %w", err)
 		}
 	}
 
