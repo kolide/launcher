@@ -44,6 +44,36 @@ func (_m *SecureEnclaveClient) CreateSecureEnclaveKey(ctx context.Context, uid s
 	return r0, r1
 }
 
+// SignWithSecureEnclave provides a mock function with given fields: ctx, uid, pubKey, data
+func (_m *SecureEnclaveClient) SignWithSecureEnclave(ctx context.Context, uid string, pubKey *ecdsa.PublicKey, data []byte) ([]byte, error) {
+	ret := _m.Called(ctx, uid, pubKey, data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SignWithSecureEnclave")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *ecdsa.PublicKey, []byte) ([]byte, error)); ok {
+		return rf(ctx, uid, pubKey, data)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *ecdsa.PublicKey, []byte) []byte); ok {
+		r0 = rf(ctx, uid, pubKey, data)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *ecdsa.PublicKey, []byte) error); ok {
+		r1 = rf(ctx, uid, pubKey, data)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // VerifySecureEnclaveKey provides a mock function with given fields: ctx, uid, pubKey
 func (_m *SecureEnclaveClient) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
 	ret := _m.Called(ctx, uid, pubKey)

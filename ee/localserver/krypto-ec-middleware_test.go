@@ -126,6 +126,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, challengeData, opened.ChallengeData)
 
+				opened = removeKolideTags(opened)
 				headers := mustExtractJsonProperty[map[string][]string](t, opened.ResponseData, "headers")
 
 				// assume that if we have presence detection header, this is the presence detection callback
@@ -245,6 +246,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					require.NoError(t, err)
 					require.Equal(t, challengeData, opened.ChallengeData)
 
+					opened = removeKolideTags(opened)
+
 					require.Equal(t, mustExtractJsonProperty[string](t, responseBody, "body"), mustExtractJsonProperty[string](t, opened.ResponseData, "body"),
 						"returned response body should match the expected response body",
 					)
@@ -260,6 +263,13 @@ func TestKryptoEcMiddleware(t *testing.T) {
 			}
 		})
 	}
+}
+
+func removeKolideTags(i *challenge.InnerResponse) *challenge.InnerResponse {
+	// trim off the "kolide:" prefix and ":kolide" suffix
+	i.ResponseData = []byte(strings.Trim(string(i.ResponseData), "kolide"))
+	i.ResponseData = []byte(strings.Trim(string(i.ResponseData), ":"))
+	return i
 }
 
 func TestKryptoEcMiddlewareErrors(t *testing.T) {
