@@ -35,8 +35,7 @@ int spawn_disclaimed(const char *path, char *const argv[], char *const envp[]) {
     }
 
     pid_t pid;
-	// passing NULL for file_actions- we want this to take the default actions of
-	// spitting output as is to stderr/stdout
+    // passing NULL for file_actions, we capture stderr/out from running this as subcommand
     err = posix_spawn(&pid, path, NULL, &attrs, argv, envp);
     posix_spawnattr_destroy(&attrs);
     if (err != 0) {
@@ -48,8 +47,8 @@ int spawn_disclaimed(const char *path, char *const argv[], char *const envp[]) {
         return -1;
     }
 
-   // WIFEXITED will return non-zero if the child process terminated normally
-   return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    // WIFEXITED will return non-zero if the child process terminated normally
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 */
 import "C"
