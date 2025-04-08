@@ -104,7 +104,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 		flattened, err := dataflatten.Json(output.Bytes(), flattenOpts...)
 		if err != nil {
-			t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err, "output", output.String()) // TODO zack remove output
+			t.slogger.Log(ctx, slog.LevelInfo, "failure flattening output", "err", err)
 			continue
 		}
 

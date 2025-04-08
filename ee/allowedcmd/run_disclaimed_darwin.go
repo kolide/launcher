@@ -18,8 +18,6 @@ package allowedcmd
 #include <string.h>
 #include <unistd.h>
 
-// see https://www.qt.io/blog/the-curious-case-of-the-responsible-process for a wonderful writeup
-// of how this works
 int responsibility_spawnattrs_setdisclaim(posix_spawnattr_t attrs, int disclaim);
 
 int spawn_disclaimed(const char *path, char *const argv[], char *const envp[]) {
