@@ -310,6 +310,11 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		p.Title = fmt.Sprintf("Launcher agent for %s", p.Identifier)
 	}
 
+	if p.ContainerTool == "" {
+		p.ContainerTool = "docker"
+	}
+
+
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
