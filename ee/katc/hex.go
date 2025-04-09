@@ -1,6 +1,7 @@
 package katc
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -25,7 +26,8 @@ func hexDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[
 			return nil, fmt.Errorf("decoding data for key %s: %w", k, err)
 		}
 
-		decodedRow[k] = decodedBytes
+		// Strip out null bytes
+		decodedRow[k] = bytes.ReplaceAll(decodedBytes, []byte("\u0000"), []byte(""))
 	}
 
 	return decodedRow, nil
