@@ -82,9 +82,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		// override cmd and args for darwin because we must run disclaimed
 		if runtime.GOOS == "darwin" {
 			targetCmd = allowedcmd.Launcher
-			// rundisclaimed will handle populating the outdated --json args
-			// based on the brew subcommand here
-			cmdArgs = []string{"rundisclaimed", "brew"}
+			cmdArgs = []string{"rundisclaimed", "brew", "outdated", "--json"}
 		}
 
 		if err := tablehelpers.Run(ctx, t.slogger, 60, targetCmd, cmdArgs, &output, &output, tablehelpers.WithUid(uid)); err != nil {

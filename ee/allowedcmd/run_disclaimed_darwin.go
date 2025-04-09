@@ -112,21 +112,23 @@ func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 }
 
 func commandToDisclaim(ctx context.Context, args []string) (*TracedCmd, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("rundisclaimed expects 1 subcommand, received args of length %d", len(args))
+	if len(args) < 1 {
+		return nil, errors.New("rundisclaimed expects at least 1 subcommand")
 	}
 
 	subcommand := args[0]
+	cmdArgs := args[1:]
 	switch subcommand {
 	case "brew":
-		return generateBrewCommand(ctx)
+		return generateBrewCommand(ctx, cmdArgs)
 	default:
 		return nil, errors.New("unsupported command for rundisclaimed")
 	}
 }
 
-func generateBrewCommand(ctx context.Context) (*TracedCmd, error) {
-	cmd, err := Brew(ctx, "outdated", "--json")
+func generateBrewCommand(ctx context.Context, args []string) (*TracedCmd, error) {
+	// todo should we add allowlisting for args?
+	cmd, err := Brew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
