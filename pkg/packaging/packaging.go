@@ -314,7 +314,6 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 		p.ContainerTool = "docker"
 	}
 
-
 	p.packagekitops = &packagekit.PackageOptions{
 		Name:                     "launcher",
 		Identifier:               p.Identifier,
