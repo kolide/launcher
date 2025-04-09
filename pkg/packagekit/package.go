@@ -12,6 +12,8 @@ type PackageOptions struct {
 	VersionNum int    // package version in numeric format. used to create comparable windows registry keys
 	FlagFile   string // Path to the flagfile for configuration
 
+	ContainerTool string // name of container tool to build within (docker, podman)
+
 	DisableService bool // Whether to install a system service in a disabled state
 
 	AppleNotarizeAccountId   string   // The 10 character apple account id
