@@ -18,47 +18,42 @@ import (
 
 func runCompactDb(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	var (
-		flagset          = flag.NewFlagSet("launcher compactdb", flag.ExitOnError)
+		flagset = flag.NewFlagSet("launcher compactdb", flag.ExitOnError)
+		// Flags specific to this subcommand
 		flDbFileName     = flagset.String("db", "launcher.db", "The launcher.db or launcher.db.bak file to be compacted")
-		flRootDirectory  = flagset.String("root_directory", launcher.DefaultRootDirectoryPath, "The location of the database to be compacted")
 		flCompactDbMaxTx = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
-		flDebug          = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
-		_                = flagset.String(
-			"config",
-			"",
-			"launcher flags configuration file",
-		)
+		// Flags shared by runLauncher/other subcommands, to be parsed by launcher.ParseOptions
+		flRootDirectory  = flagset.String("root_directory", "", "The location of the local database, pidfiles, etc.")
+		flConfigFilePath = flagset.String("config", "", "config file to parse options from (optional)")
 	)
-
-	ffOpts := []ff.Option{
-		ff.WithConfigFileFlag("config"),
-		ff.WithConfigFileParser(ff.PlainParser),
-		ff.WithIgnoreUndefined(true),
-		ff.WithEnvVarNoPrefix(),
-	}
-
 	flagset.Usage = commandUsage(flagset, "launcher compactdb")
-	if err := ff.Parse(flagset, args, ffOpts...); err != nil {
+	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	if *flRootDirectory == "" {
-		return errors.New("no root directory specified")
+	launcherOptions := make([]string, 0)
+	if *flRootDirectory != "" {
+		launcherOptions = append(launcherOptions, "-root_directory", *flRootDirectory)
+	}
+	if *flConfigFilePath != "" {
+		launcherOptions = append(launcherOptions, "-config", *flConfigFilePath)
 	}
 
-	// relevel
-	slogLevel := slog.LevelInfo
-	if *flDebug {
-		slogLevel = slog.LevelDebug
+	opts, err := launcher.ParseOptions("compactdb", launcherOptions)
+	if err != nil {
+		return fmt.Errorf("parsing launcher options: %w", err)
+	}
+	if opts.RootDirectory == "" {
+		return errors.New("no root directory specified")
 	}
 
 	// Add handler to write to stdout
 	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     slogLevel,
+		Level:     slog.LevelDebug,
 		AddSource: true,
 	}))
 
-	boltPath := filepath.Join(*flRootDirectory, "launcher.db")
+	boltPath := filepath.Join(opts.RootDirectory, "launcher.db")
 	if *flDbFileName != "" {
 		// Check to make sure this is a launcher.db or launcher.db.bak file
 		givenFile := filepath.Base(*flDbFileName)
@@ -66,7 +61,7 @@ func runCompactDb(systemMultiSlogger *multislogger.MultiSlogger, args []string) 
 			return fmt.Errorf("invalid db file given, must be launcher.db or a backup: %s", *flDbFileName)
 		}
 
-		boltPath = filepath.Join(*flRootDirectory, givenFile)
+		boltPath = filepath.Join(opts.RootDirectory, givenFile)
 
 		// If a directory was provided, make sure it matches the root directory
 		if givenFile != *flDbFileName && boltPath != *flDbFileName {
