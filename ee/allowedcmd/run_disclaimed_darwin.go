@@ -156,7 +156,6 @@ func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
 }
 
 func generateBrewCommand(ctx context.Context, args []string) (*TracedCmd, error) {
-	// todo should we add allowlisting for args?
 	cmd, err := Brew(ctx, args...)
 	if err != nil {
 		return nil, err
