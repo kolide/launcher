@@ -100,11 +100,9 @@ func TestProc(t *testing.T) {
 			errContainsStr:  "error waiting for osquery to create socket",
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			var rootDir string
 			if tt.useShortRootDir {
 				rootDir = testRootDirectory(t)
