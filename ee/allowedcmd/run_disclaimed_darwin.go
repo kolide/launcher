@@ -63,6 +63,11 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
+type allowedCmdGenerator struct {
+	allowedOpts map[string]struct{}
+	generate    func(ctx context.Context, args []string) (*TracedCmd, error)
+}
+
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	ctx := context.Background()
 	cmd, err := commandToDisclaim(ctx, args)
@@ -118,12 +123,36 @@ func commandToDisclaim(ctx context.Context, args []string) (*TracedCmd, error) {
 
 	subcommand := args[0]
 	cmdArgs := args[1:]
-	switch subcommand {
-	case "brew":
-		return generateBrewCommand(ctx, cmdArgs)
-	default:
-		return nil, errors.New("unsupported command for rundisclaimed")
+	generator, err := getCmdGenerator(subcommand)
+	if err != nil {
+		return nil, fmt.Errorf("validating command: %w", err)
 	}
+
+	for _, arg := range cmdArgs {
+		if _, ok := generator.allowedOpts[arg]; !ok {
+			return nil, fmt.Errorf("invalid argument provided for '%s' command: '%s'", subcommand, arg)
+		}
+	}
+
+	return generator.generate(ctx, cmdArgs)
+}
+
+func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
+	allowedCmdGenerators := map[string]allowedCmdGenerator{
+		"brew": {
+			allowedOpts: map[string]struct{}{
+				"outdated": {},
+				"--json":   {},
+			},
+			generate: generateBrewCommand,
+		},
+	}
+
+	if generator, ok := allowedCmdGenerators[cmd]; ok {
+		return &generator, nil
+	}
+
+	return nil, fmt.Errorf("unsupported command '%s' for rundisclaimed", cmd)
 }
 
 func generateBrewCommand(ctx context.Context, args []string) (*TracedCmd, error) {
