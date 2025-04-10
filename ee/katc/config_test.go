@@ -37,6 +37,20 @@ func TestConstructKATCTables(t *testing.T) {
 			expectedPluginCount: 1,
 		},
 		{
+			testCaseName: "other_sqlite",
+			katcConfig: map[string]string{
+				"kolide_other_sqlite_test": `{
+					"source_type": "sqlite",
+					"columns": ["data"],
+					"source_paths": ["/some/path/to/db.sqlite"],
+					"source_query": "SELECT QUOTE(value) FROM data;",
+					"row_transform_steps": ["hex"],
+					"overlays": []
+				}`,
+			},
+			expectedPluginCount: 1,
+		},
+		{
 			testCaseName: "indexeddb_leveldb",
 			katcConfig: map[string]string{
 				"kolide_indexeddb_leveldb_test": `{
