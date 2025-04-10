@@ -85,10 +85,14 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		// Transfer stdin, stdout, and stderr to the new process
 		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
 	})
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
+
+	knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+		"created osquery process",
+		"pid", proc.Pid,
+	)
 
 	// while developing for windows it was found that it will sometimes take osquery a while
 	// to create the socket, so we wait for it to exist before continuing
@@ -101,7 +105,11 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
-	extensionServer, err := loadExtensions(socketPath, osqPlugins...)
+	knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+		"osquery socket file created",
+	)
+
+	extensionServer, err := loadExtensions(knapsack.Slogger(), socketPath, osqPlugins...)
 	if err != nil {
 		err = fmt.Errorf("error loading extensions: %w", err)
 
@@ -142,11 +150,15 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 	return flags
 }
 
-func loadExtensions(socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
+func loadExtensions(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
 	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
 	}
+
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"created osquery client",
+	)
 
 	extensionManagerServer, err := osquery.NewExtensionManagerServer(
 		extensionName,
@@ -154,16 +166,27 @@ func loadExtensions(socketPath string, plugins ...osquery.OsqueryPlugin) (*osque
 		osquery.ServerTimeout(10*time.Second),
 		osquery.WithClient(client),
 	)
-
 	if err != nil {
 		return extensionManagerServer, fmt.Errorf("error creating extension manager server: %w", err)
 	}
 
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"created osquery extension server",
+	)
+
 	extensionManagerServer.RegisterPlugin(plugins...)
+
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"registered plugins with server",
+	)
 
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
 	}
+
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"started osquery extension server",
+	)
 
 	return extensionManagerServer, nil
 }
