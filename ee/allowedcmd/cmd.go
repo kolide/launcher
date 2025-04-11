@@ -110,3 +110,20 @@ func IsNixOS() bool {
 	checkedIsNixOS = true
 	return isNixOS
 }
+
+func Launcher(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	// get our currently running path, we will skip autoupdate lookups
+	selfPath, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("getting path to launcher: %w", err)
+	}
+
+	validatedCmd, err := validatedCommand(ctx, selfPath, arg...)
+	if err != nil {
+		return nil, fmt.Errorf("generating validated command for self: %w", err)
+	}
+
+	validatedCmd.Env = append(validatedCmd.Environ(), "LAUNCHER_SKIP_UPDATES=TRUE")
+
+	return validatedCmd, nil
+}

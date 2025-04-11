@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
+	"github.com/kolide/launcher/ee/disclaim"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
@@ -218,6 +219,8 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = watchdog.RunWatchdogTask
 	case "query-windowsupdates":
 		run = runQueryWindowsUpdates
+	case "rundisclaimed":
+		run = disclaim.RunDisclaimed
 	default:
 		return fmt.Errorf("unknown subcommand %s", os.Args[1])
 	}
