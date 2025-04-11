@@ -74,7 +74,7 @@ func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd 
 
 	span.SetAttributes(attribute.String("exec.path", cmd.Path))
 	span.SetAttributes(attribute.String("exec.binary", filepath.Base(cmd.Path)))
-	span.SetAttributes(attribute.StringSlice("exec.args", args))
+	span.SetAttributes(attribute.StringSlice("exec.args", cmd.Args))
 
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -82,7 +82,7 @@ func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd 
 	slogger.Log(ctx, slog.LevelDebug,
 		"execing",
 		"cmd", cmd.String(),
-		"args", args,
+		"args", cmd.Args,
 		"timeout", timeoutSeconds,
 	)
 

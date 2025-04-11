@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -77,16 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-		targetCmd := allowedcmd.Brew
-		cmdArgs := []string{"outdated", "--json"}
-
-		// override cmd and args for darwin because we must run disclaimed
-		if runtime.GOOS == "darwin" {
-			targetCmd = allowedcmd.Launcher
-			cmdArgs = []string{"rundisclaimed", "brew", "outdated", "--json"}
-		}
-
-		if err := tablehelpers.Run(ctx, t.slogger, 60, targetCmd, cmdArgs, &output, &stderr, tablehelpers.WithUid(uid)); err != nil {
+		if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &stderr, tablehelpers.WithUid(uid), tablehelpers.Disclaimed("brew")); err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"failure querying user brew installed packages",
 				"err", err,
