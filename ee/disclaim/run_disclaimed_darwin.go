@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package allowedcmd
+package disclaim
 
 /*
 #cgo CFLAGS: -mmacosx-version-min=10.14 -Wall -Werror
@@ -60,12 +60,13 @@ import (
 	"os/user"
 	"unsafe"
 
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 type allowedCmdGenerator struct {
 	allowedOpts map[string]struct{}
-	generate    func(ctx context.Context, args []string) (*TracedCmd, error)
+	generate    func(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error)
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
@@ -116,7 +117,7 @@ func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	return nil
 }
 
-func commandToDisclaim(ctx context.Context, args []string) (*TracedCmd, error) {
+func commandToDisclaim(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error) {
 	if len(args) < 1 {
 		return nil, errors.New("rundisclaimed expects at least 1 subcommand")
 	}
@@ -155,8 +156,8 @@ func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
 	return nil, fmt.Errorf("unsupported command '%s' for rundisclaimed", cmd)
 }
 
-func generateBrewCommand(ctx context.Context, args []string) (*TracedCmd, error) {
-	cmd, err := Brew(ctx, args...)
+func generateBrewCommand(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error) {
+	cmd, err := allowedcmd.Brew(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

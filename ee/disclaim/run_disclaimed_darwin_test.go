@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package allowedcmd
+package disclaim
 
 import (
 	"testing"
