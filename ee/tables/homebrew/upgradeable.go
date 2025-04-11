@@ -76,7 +76,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-		if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &stderr, tablehelpers.WithUid(uid), tablehelpers.Disclaimed("brew")); err != nil {
+		if err := tablehelpers.Run(ctx, t.slogger, 60, allowedcmd.Brew, []string{"outdated", "--json"}, &output, &stderr, tablehelpers.WithUid(uid), tablehelpers.Disclaimed(ctx, "brew")); err != nil {
 			t.slogger.Log(ctx, slog.LevelInfo,
 				"failure querying user brew installed packages",
 				"err", err,

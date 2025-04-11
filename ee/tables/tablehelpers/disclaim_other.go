@@ -4,11 +4,12 @@
 package tablehelpers
 
 import (
+	"context"
 	"os/exec"
 )
 
 // Disclaimed is a no-op for everything but darwin
-func Disclaimed(disclaimCmdName string) ExecOps {
+func Disclaimed(_ context.Context, _ string) ExecOps {
 	return func(cmd *exec.Cmd) error {
 		return nil
 	}

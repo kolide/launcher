@@ -14,9 +14,9 @@ import (
 
 // Disclaimed (darwin only) replaces the cmd path and args for use via
 // our rundisclaimed subcommand
-func Disclaimed(disclaimCmdName string) ExecOps {
+func Disclaimed(ctx context.Context, disclaimCmdName string) ExecOps {
 	return func(cmd *exec.Cmd) error {
-		launcherCmd, err := allowedcmd.Launcher(context.TODO(), "rundisclaimed", disclaimCmdName)
+		launcherCmd, err := allowedcmd.Launcher(ctx, "rundisclaimed", disclaimCmdName)
 		if err != nil {
 			return fmt.Errorf("generating launcher command for disclaim: %w", err)
 		}
