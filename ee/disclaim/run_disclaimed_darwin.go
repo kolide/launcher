@@ -69,6 +69,16 @@ type allowedCmdGenerator struct {
 	generate    func(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error)
 }
 
+var allowedCmdGenerators = map[string]allowedCmdGenerator{
+	"brew": {
+		allowedOpts: map[string]struct{}{
+			"outdated": {},
+			"--json":   {},
+		},
+		generate: generateBrewCommand,
+	},
+}
+
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	ctx := context.Background()
 	cmd, err := commandToDisclaim(ctx, args)
@@ -139,16 +149,6 @@ func commandToDisclaim(ctx context.Context, args []string) (*allowedcmd.TracedCm
 }
 
 func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
-	allowedCmdGenerators := map[string]allowedCmdGenerator{
-		"brew": {
-			allowedOpts: map[string]struct{}{
-				"outdated": {},
-				"--json":   {},
-			},
-			generate: generateBrewCommand,
-		},
-	}
-
 	if generator, ok := allowedCmdGenerators[cmd]; ok {
 		return &generator, nil
 	}
