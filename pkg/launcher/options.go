@@ -107,8 +107,6 @@ type Options struct {
 	InsecureTLS bool
 	// InsecureTransport disables TLS in the transport layer.
 	InsecureTransport bool
-	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
-	CompactDbMaxTx int64
 	// IAmBreakingEELicence disables the EE licence check before running the local server
 	IAmBreakingEELicense bool
 	// DelayStart allows for delaying launcher startup for a configurable amount of time
@@ -219,7 +217,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
 		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
 		flOsqueryFlags                    ArrayFlags // set below with flagset.Var
-		flCompactDbMaxTx                  = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		flConfigFilePath                  = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces                    = flagset.Bool("export_traces", false, "Whether to export traces")
 		flTraceSamplingRate               = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
@@ -259,6 +256,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.String("logger_tls_endpoint", "", "DEPRECATED")
 		_ = flagset.String("distributed_tls_read_endpoint", "", "DEPRECATED")
 		_ = flagset.String("distributed_tls_write_endpoint", "", "DEPRECATED")
+		_ = flagset.Int64("compactdb-max-tx", 65536, "DEPRECATED") // moved to new flagset inside compactdb command
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -377,7 +375,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		AutoupdateInterval:              *flAutoupdateInterval,
 		AutoupdateInitialDelay:          *flAutoupdateInitialDelay,
 		CertPins:                        certPins,
-		CompactDbMaxTx:                  *flCompactDbMaxTx,
 		ConfigFilePath:                  *flConfigFilePath,
 		Control:                         false,
 		ControlServerURL:                controlServerURL,
