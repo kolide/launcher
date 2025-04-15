@@ -89,6 +89,11 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	ctx := context.Background()
 	cmd, err := commandToDisclaim(ctx, args)
+	// this command is used to generate table data, do not error if the target binary is not found
+	if err != nil && errors.Is(err, allowedcmd.ErrCommandNotFound) {
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("gathering subcommand: %w", err)
 	}
