@@ -66,7 +66,7 @@ import (
 
 type allowedCmdGenerator struct {
 	allowedOpts map[string]struct{}
-	generate    func(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error)
+	generate    func(ctx context.Context, args ...string) (*allowedcmd.TracedCmd, error)
 }
 
 var allowedCmdGenerators = map[string]allowedCmdGenerator{
@@ -77,11 +77,23 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: generateBrewCommand,
 	},
+	"falconctl": {
+		allowedOpts: map[string]struct{}{
+			"stats": {},
+			"-p":    {},
+		},
+		generate: allowedcmd.Falconctl,
+	},
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	ctx := context.Background()
 	cmd, err := commandToDisclaim(ctx, args)
+	// this command is used to generate table data, do not error if the target binary is not found
+	if err != nil && errors.Is(err, allowedcmd.ErrCommandNotFound) {
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("gathering subcommand: %w", err)
 	}
@@ -145,7 +157,7 @@ func commandToDisclaim(ctx context.Context, args []string) (*allowedcmd.TracedCm
 		}
 	}
 
-	return generator.generate(ctx, cmdArgs)
+	return generator.generate(ctx, cmdArgs...)
 }
 
 func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
@@ -156,7 +168,7 @@ func getCmdGenerator(cmd string) (*allowedCmdGenerator, error) {
 	return nil, fmt.Errorf("unsupported command '%s' for rundisclaimed", cmd)
 }
 
-func generateBrewCommand(ctx context.Context, args []string) (*allowedcmd.TracedCmd, error) {
+func generateBrewCommand(ctx context.Context, args ...string) (*allowedcmd.TracedCmd, error) {
 	cmd, err := allowedcmd.Brew(ctx, args...)
 	if err != nil {
 		return nil, err
