@@ -124,11 +124,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// TODO: make this authenticated or remove
 	mux.Handle("/zta", ls.requestDt4aInfoHandler())
 
-	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(
-		ls.dt4aRegistrationMiddleware(
-			ls.requestDt4aInfoHandler(),
-		)),
-	)
+	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
 
 	mux.Handle("/v3/accelerate", dt4aAuthMiddleware.Wrap(ls.requestDt4aAccelerationHandler()))
 

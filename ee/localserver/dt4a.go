@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -11,7 +12,9 @@ import (
 )
 
 var (
-	localserverDt4aInfoKey = []byte("localserver_zta_info")
+	// legacyDt4aInfoKey is the key that was used to store dt4a info that was not tied to dt4a IDs
+	// can be removed when unauthed /zta endpoint is removed
+	legacyDt4aInfoKey = []byte("localserver_zta_info")
 )
 
 const (
@@ -48,7 +51,13 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		ls.accelerate(r.Context())
 	}
 
-	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
+	// fall back on legacy key if no dt4a IDs are present in the request
+	storeKey := legacyDt4aInfoKey
+	if r.Header.Get(dt4aAccountUuidHeaderKey) != "" && r.Header.Get(dt4aUserUuidHeaderKey) != "" {
+		storeKey = fmt.Appendf(nil, "%s/%s", r.Header.Get(dt4aAccountUuidHeaderKey), r.Header.Get(dt4aUserUuidHeaderKey))
+	}
+
+	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(storeKey)
 	if err != nil {
 		traces.SetError(span, err)
 		ls.slogger.Log(r.Context(), slog.LevelError,
