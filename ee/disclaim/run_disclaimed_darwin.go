@@ -84,6 +84,12 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: allowedcmd.Falconctl,
 	},
+	"carbonblack_repcli": {
+		allowedOpts: map[string]struct{}{
+			"status": {},
+		},
+		generate: allowedcmd.Repcli,
+	},
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
