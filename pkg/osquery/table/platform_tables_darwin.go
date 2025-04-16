@@ -108,7 +108,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_diskutil_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"list", "-plist"}),
 		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_falconctl_stats", dataflattentable.PlistType, allowedcmd.Falconctl, []string{"stats", "-p"}),
+			"kolide_falconctl_stats", dataflattentable.PlistType, allowedcmd.Launcher, []string{"rundisclaimed", "falconctl", "stats", "-p"}),
 		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_apfs_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),
 		dataflattentable.TablePluginExec(k, slogger,
