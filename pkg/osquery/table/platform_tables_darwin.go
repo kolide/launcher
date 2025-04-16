@@ -128,7 +128,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw_apps", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--listapps"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "carbonblack_repcli", "status"}),
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
 	}
