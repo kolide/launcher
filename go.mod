@@ -28,13 +28,13 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.3.6
-	golang.org/x/crypto v0.35.0
+	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 	golang.org/x/image v0.18.0
-	golang.org/x/net v0.36.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.12.0
 	golang.org/x/sys v0.31.0
-	golang.org/x/text v0.22.0
+	golang.org/x/text v0.23.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.58.3
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
