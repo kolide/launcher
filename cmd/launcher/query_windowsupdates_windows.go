@@ -36,7 +36,7 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 		RawResults:      rawResults,
 		Locale:          locale,
 		IsDefaultLocale: isDefaultLocale,
-		Err:             searchErr,
+		ErrStr:          searchErr.Error(),
 	}
 
 	queryResultsBytes, err := json.Marshal(queryResults)

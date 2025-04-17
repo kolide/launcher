@@ -30,7 +30,7 @@ type QueryResults struct {
 	RawResults      []byte `json:"raw_results"`
 	Locale          string `json:"locale"`
 	IsDefaultLocale int    `json:"is_default_locale"`
-	Err             error  `json:"err"`
+	ErrStr          string `json:"err_string"`
 }
 
 type tableMode int
@@ -133,10 +133,10 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 			continue
 		}
 
-		if res.Err != nil {
+		if res.ErrStr != "" {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"launcher query-windowsupdates contained error",
-				"err", res.Err,
+				"err", res.ErrStr,
 			)
 			continue
 		}
