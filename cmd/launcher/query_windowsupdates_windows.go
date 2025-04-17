@@ -31,12 +31,14 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	rawResults, locale, isDefaultLocale, err := searchLocale(*flLocale, *flTableMode)
+	rawResults, locale, isDefaultLocale, searchErr := searchLocale(*flLocale, *flTableMode)
 	queryResults := &windowsupdatetable.QueryResults{
 		RawResults:      rawResults,
 		Locale:          locale,
 		IsDefaultLocale: isDefaultLocale,
-		Err:             err,
+	}
+	if searchErr != nil {
+		queryResults.ErrStr = searchErr.Error()
 	}
 
 	queryResultsBytes, err := json.Marshal(queryResults)
@@ -122,5 +124,5 @@ func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, er
 		return nil, locale, isDefaultLocale, fmt.Errorf("new searcher: %w", err)
 	}
 
-	return searcher, locale, isDefaultLocale, err
+	return searcher, locale, isDefaultLocale, nil
 }
