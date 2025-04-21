@@ -78,7 +78,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, legacyDt4aInfo))
-	require.NoError(t, dt4aInfoStore.Set(fmt.Appendf(nil, "%s/%s", dt4aAccountId, dt4aUserId), testDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set([]byte(dt4aAccountId), testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)

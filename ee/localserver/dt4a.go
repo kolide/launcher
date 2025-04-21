@@ -2,7 +2,6 @@ package localserver
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -51,31 +50,41 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		ls.accelerate(r.Context())
 	}
 
-	// fall back on legacy key if no dt4a IDs are present in the request
-	storeKey := legacyDt4aInfoKey
-	if r.Header.Get(dt4aAccountUuidHeaderKey) != "" && r.Header.Get(dt4aUserUuidHeaderKey) != "" {
-		storeKey = fmt.Appendf(nil, "%s/%s", r.Header.Get(dt4aAccountUuidHeaderKey), r.Header.Get(dt4aUserUuidHeaderKey))
+	if r.Header.Get(dt4aAccountUuidHeaderKey) != "" {
+		dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get([]byte(r.Header.Get(dt4aAccountUuidHeaderKey)))
+		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelWarn,
+				"could not retrieve dt4a info from store using dt4a account uuid",
+				"err", err,
+			)
+		}
+
+		if len(dt4aInfo) > 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(dt4aInfo)
+			return
+		}
 	}
 
-	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(storeKey)
+	// did not get info using account uuid, so we will try to get it using the legacy key
+	info, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
 	if err != nil {
-		traces.SetError(span, err)
-		ls.slogger.Log(r.Context(), slog.LevelError,
-			"could not retrieve dt4a info from store",
+		ls.slogger.Log(r.Context(), slog.LevelWarn,
+			"could not retrieve dt4a info from store using legacy dt4a key",
 			"err", err,
 		)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// No data stored yet
-	if len(dt4aInfo) == 0 {
+
+	if len(info) <= 0 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(dt4aInfo)
+	w.Write(info)
 }
 
 func (ls *localServer) requestDt4aAccelerationHandler() http.Handler {
