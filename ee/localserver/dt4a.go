@@ -66,8 +66,8 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		}
 	}
 
-	// did not get info using account uuid, so we will try to get it using the legacy key
-	info, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
+	// did not get dt4aInfo using account uuid, so we will try to get it using the legacy key
+	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
 	if err != nil {
 		ls.slogger.Log(r.Context(), slog.LevelWarn,
 			"could not retrieve dt4a info from store using legacy dt4a key",
@@ -78,13 +78,13 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		return
 	}
 
-	if len(info) <= 0 {
+	if len(dt4aInfo) <= 0 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(info)
+	w.Write(dt4aInfo)
 }
 
 func (ls *localServer) requestDt4aAccelerationHandler() http.Handler {
