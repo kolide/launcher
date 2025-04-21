@@ -78,6 +78,7 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		return
 	}
 
+	// No data stored yet
 	if len(dt4aInfo) == 0 {
 		w.WriteHeader(http.StatusNotFound)
 		return
