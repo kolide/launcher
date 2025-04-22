@@ -50,27 +50,36 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		ls.accelerate(r.Context())
 	}
 
-	if r.Header.Get(dt4aAccountUuidHeaderKey) != "" {
-		dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get([]byte(r.Header.Get(dt4aAccountUuidHeaderKey)))
+	// this should be removed when we drop unauthed endpoint
+	if r.Header.Get(dt4aAccountUuidHeaderKey) == "" {
+		// This is a legacy request to the unauthed endpoint that does not include the dt4a account uuid header.
+		// We will return the dt4a info stored under the legacy key.
+		dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
 		if err != nil {
 			ls.slogger.Log(r.Context(), slog.LevelWarn,
-				"could not retrieve dt4a info from store using dt4a account uuid",
+				"could not retrieve dt4a info from store using legacy dt4a key",
 				"err", err,
 			)
-		}
 
-		if len(dt4aInfo) > 0 {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(dt4aInfo)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		if len(dt4aInfo) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(dt4aInfo)
+		return
 	}
 
-	// did not get dt4aInfo using account uuid, so we will try to get it using the legacy key
-	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
+	// dt4aAccountUuid is set, so we will try to get the dt4a info using the account uuid
+	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get([]byte(r.Header.Get(dt4aAccountUuidHeaderKey)))
 	if err != nil {
 		ls.slogger.Log(r.Context(), slog.LevelWarn,
-			"could not retrieve dt4a info from store using legacy dt4a key",
+			"could not retrieve dt4a info from store using dt4a account uuid",
 			"err", err,
 		)
 
@@ -78,7 +87,6 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		return
 	}
 
-	// No data stored yet
 	if len(dt4aInfo) == 0 {
 		w.WriteHeader(http.StatusNotFound)
 		return
