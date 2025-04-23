@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -91,6 +92,12 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 
 	ps.MemInfo.GoMemUsage = goMemUsage(&memStats)
 	ps.MemInfo.HeapTotal = heapTotal(&memStats)
+
+	// Record stats
+	traces.GoMemoryUsageGauge.Record(ctx, int64(ps.MemInfo.GoMemUsage))
+	traces.NonGoMemoryUsageGauge.Record(ctx, int64(ps.MemInfo.NonGoMemUsage))
+	traces.MemoryPercentGauge.Record(ctx, int64(ps.MemInfo.MemPercent))
+	traces.CpuPercentGauge.Record(ctx, int64(ps.CPUPercent))
 
 	return ps, nil
 }

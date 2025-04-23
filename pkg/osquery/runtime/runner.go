@@ -114,6 +114,7 @@ func (r *Runner) runInstance(registrationId string) error {
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"osquery instance exited",
 		)
+		traces.OsqueryRestartCounter.Add(ctx, 1)
 
 		select {
 		case <-r.shutdown:

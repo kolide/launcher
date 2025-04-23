@@ -16,8 +16,10 @@ import (
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
@@ -38,6 +40,7 @@ var enrollmentDetailsRecheckInterval = 5 * time.Second
 
 type TraceExporter struct {
 	provider                  *sdktrace.TracerProvider
+	meterProvider             *sdkmetric.MeterProvider
 	providerLock              sync.Mutex
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
@@ -191,6 +194,17 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 		enrollmentDetails := t.knapsack.GetEnrollmentDetails()
 		if hasRequiredEnrollmentDetails(enrollmentDetails) {
 			t.addAttributesFromEnrollmentDetails(enrollmentDetails)
+
+			if t.enabled {
+				t.setNewGlobalProvider(true)
+				t.slogger.Log(context.TODO(), slog.LevelDebug,
+					"successfully replaced global tracer provider after adding attributes from osquery",
+				)
+				t.setNewMeterGlobalProvider()
+				t.slogger.Log(context.TODO(), slog.LevelDebug,
+					"successfully replaced global meter provider after adding attributes from osquery",
+				)
+			}
 			return
 		}
 
@@ -229,22 +243,6 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.providerLock.Lock()
 	defer t.providerLock.Unlock()
 
-	t.attrLock.RLock()
-	defer t.attrLock.RUnlock()
-
-	defaultResource := resource.Default()
-	r, err := resource.Merge(
-		defaultResource,
-		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
-	)
-	if err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not merge resource",
-			"err", err,
-		)
-		r = resource.Default()
-	}
-
 	// Sample root spans based on t.traceSamplingRate, then sample child spans based on the
 	// decision made for their parent: if parent is sampled, then children should be as well;
 	// otherwise, do not sample child spans.
@@ -252,7 +250,7 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 
 	newProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(t.bufSpanProcessor),
-		sdktrace.WithResource(r),
+		sdktrace.WithResource(t.buildResource()),
 		sdktrace.WithSampler(parentBasedSampler),
 	)
 
@@ -301,12 +299,64 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.ingestUrl = t.knapsack.TraceIngestServerURL()
 }
 
+func (t *TraceExporter) buildResource() *resource.Resource {
+	t.attrLock.RLock()
+	defer t.attrLock.RUnlock()
+
+	defaultResource := resource.Default()
+	r, err := resource.Merge(
+		defaultResource,
+		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
+	)
+	if err != nil {
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not merge resource",
+			"err", err,
+		)
+		r = resource.Default()
+	}
+
+	return r
+}
+
+func (t *TraceExporter) setNewMeterGlobalProvider() {
+	t.providerLock.Lock()
+	defer t.providerLock.Unlock()
+
+	traceClientOpts := []otlpmetricgrpc.Option{
+		otlpmetricgrpc.WithEndpoint(t.knapsack.TraceIngestServerURL()),
+		otlpmetricgrpc.WithDialOption(grpc.WithPerRPCCredentials(t.ingestClientAuthenticator)),
+	}
+	if t.disableIngestTLS {
+		traceClientOpts = append(traceClientOpts, otlpmetricgrpc.WithInsecure())
+	}
+
+	metricsExporter, err := otlpmetricgrpc.New(context.TODO(), traceClientOpts...)
+	if err != nil {
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not create metrics gRPC exporter",
+			"err", err,
+		)
+		return
+	}
+
+	t.meterProvider = sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(t.buildResource()),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricsExporter)),
+	)
+	otel.SetMeterProvider(t.meterProvider)
+}
+
 // Execute begins exporting traces, if exporting is enabled.
 func (t *TraceExporter) Execute() error {
 	if t.enabled {
 		t.setNewGlobalProvider(true)
 		t.slogger.Log(context.TODO(), slog.LevelDebug,
-			"successfully replaced global provider after adding more attributes",
+			"successfully replaced global tracer provider on startup",
+		)
+		t.setNewMeterGlobalProvider()
+		t.slogger.Log(context.TODO(), slog.LevelDebug,
+			"successfully replaced global meter provider on startup",
 		)
 	}
 
@@ -322,8 +372,14 @@ func (t *TraceExporter) Interrupt(_ error) {
 
 	t.interrupted.Store(true)
 
+	traces.LauncherRestartCounter.Add(t.ctx, 1)
+
 	if t.provider != nil {
 		t.provider.Shutdown(t.ctx)
+	}
+
+	if t.meterProvider != nil {
+		t.meterProvider.Shutdown(t.ctx)
 	}
 
 	t.cancel()
