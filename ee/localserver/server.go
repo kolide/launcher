@@ -102,13 +102,13 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v0/cmd", ls.rateLimitHandler(ecKryptoMiddleware.Wrap(ecAuthedMux)))
 
 	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
+	mux.Handle("/v1/cmd", ls.rateLimitHandler(ecKryptoMiddleware.Wrap(ecAuthedMux)))
 
 	trustedDt4aKeys, err := dt4aKeys()
 	if err != nil {
@@ -143,9 +143,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		Handler: otelhttp.NewHandler(
 			ls.requestLoggingHandler(
 				ls.preflightCorsHandler(
-					ls.rateLimitHandler(
-						mux,
-					),
+					mux,
 				)), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 				return r.URL.Path
 			})),
