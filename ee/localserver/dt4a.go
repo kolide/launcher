@@ -95,3 +95,9 @@ func (ls *localServer) accelerate(ctx context.Context) {
 		"duration", accelerateDuration.String(),
 	)
 }
+
+func (ls *localServer) requestDt4aHealthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
+	})
+}
