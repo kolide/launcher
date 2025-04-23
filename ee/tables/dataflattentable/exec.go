@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -48,7 +48,7 @@ func TablePluginExec(flags types.Flags, slogger *slog.Logger, tableName string, 
 }
 
 func (t *Table) generateExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.tableName)
 	defer span.End()
 
 	var results []map[string]string

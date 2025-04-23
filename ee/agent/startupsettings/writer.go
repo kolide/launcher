@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // startupSettingsWriter records agent flags and their current values,
@@ -27,7 +27,7 @@ type startupSettingsWriter struct {
 // OpenWriter returns a new startup settings writer, creating and initializing
 // the database if necessary.
 func OpenWriter(ctx context.Context, knapsack types.Knapsack) (*startupSettingsWriter, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	store, err := agentsqlite.OpenRW(ctx, knapsack.RootDirectory(), agentsqlite.StartupSettingsStore)
@@ -105,7 +105,7 @@ func (s *startupSettingsWriter) WriteSettings() error {
 // that the startup database is registered for has a new value, the startup database
 // stores that updated value.
 func (s *startupSettingsWriter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if err := s.WriteSettings(); err != nil {

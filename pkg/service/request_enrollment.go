@@ -12,7 +12,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type enrollmentRequest struct {
@@ -157,7 +157,7 @@ const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
 func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)

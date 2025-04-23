@@ -6,7 +6,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -34,7 +34,7 @@ func boolToString(in bool) string {
 
 func generateLauncherAutoupdateConfigTable(flags types.Flags) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		_, span := traces.StartSpan(ctx, "table_name", launcherAutoupdateConfigTableName)
+		_, span := observability.StartSpan(ctx, "table_name", launcherAutoupdateConfigTableName)
 		defer span.End()
 
 		return []map[string]string{

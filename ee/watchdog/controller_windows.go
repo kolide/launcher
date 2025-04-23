@@ -21,7 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/sys/windows"
 )
 
@@ -61,7 +61,7 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 }
 
 func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if slices.Contains(flagKeys, keys.LauncherWatchdogEnabled) {

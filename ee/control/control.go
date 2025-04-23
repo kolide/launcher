@@ -13,7 +13,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/exp/slices"
 )
 
@@ -200,7 +200,7 @@ func (cs *ControlService) Stop() {
 }
 
 func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if slices.Contains(flagKeys, keys.ControlRequestInterval) {
@@ -209,7 +209,7 @@ func (cs *ControlService) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 }
 
 func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterval time.Duration) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	currentRequestInterval := cs.readRequestInterval()
@@ -261,7 +261,7 @@ func (cs *ControlService) readRequestInterval() time.Duration {
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
 func (cs *ControlService) Fetch(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Do not block in the case where:
@@ -341,7 +341,7 @@ func (cs *ControlService) Fetch(ctx context.Context) error {
 
 // Fetches latest subsystem data, and notifies observers of updates.
 func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash string) error {
-	ctx, span := traces.StartSpan(ctx, "subsystem", subsystem)
+	ctx, span := observability.StartSpan(ctx, "subsystem", subsystem)
 	defer span.End()
 
 	slogger := cs.slogger.With("subsystem", subsystem)
@@ -417,7 +417,7 @@ func (cs *ControlService) SendMessage(method string, params interface{}) error {
 
 // Updates all registered consumers and subscribers of subsystem updates
 func (cs *ControlService) update(ctx context.Context, subsystem string, reader io.Reader) error {
-	_, span := traces.StartSpan(ctx, "subsystem", subsystem)
+	_, span := observability.StartSpan(ctx, "subsystem", subsystem)
 	defer span.End()
 
 	// First, send to consumer, if any
@@ -438,7 +438,7 @@ func (cs *ControlService) update(ctx context.Context, subsystem string, reader i
 
 // Do handles the force_full_control_data_fetch action.
 func (cs *ControlService) Do(data io.Reader) error {
-	ctx, span := traces.StartSpan(context.TODO(), "action", ForceFullControlDataFetchAction)
+	ctx, span := observability.StartSpan(context.TODO(), "action", ForceFullControlDataFetchAction)
 	defer span.End()
 
 	cs.slogger.Log(ctx, slog.LevelDebug,

@@ -19,7 +19,7 @@ import (
 	"syscall"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
 )
@@ -33,7 +33,7 @@ const (
 var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	currentUser, err := user.Current()

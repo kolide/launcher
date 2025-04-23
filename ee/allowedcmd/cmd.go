@@ -14,7 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
@@ -26,7 +26,7 @@ type TracedCmd struct {
 
 // Start overrides the Start method to add tracing before executing the command.
 func (t *TracedCmd) Start() error {
-	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	_, span := observability.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
 	return t.Cmd.Start() //nolint:forbidigo // This is our approved usage of t.Cmd.Start()
@@ -34,7 +34,7 @@ func (t *TracedCmd) Start() error {
 
 // Run overrides the Run method to add tracing before running the command.
 func (t *TracedCmd) Run() error {
-	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	_, span := observability.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
 	return t.Cmd.Run() //nolint:forbidigo // This is our approved usage of t.Cmd.Run()
@@ -42,7 +42,7 @@ func (t *TracedCmd) Run() error {
 
 // Output overrides the Output method to add tracing before capturing output.
 func (t *TracedCmd) Output() ([]byte, error) {
-	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	_, span := observability.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
 	return t.Cmd.Output() //nolint:forbidigo // This is our approved usage of t.Cmd.Output()
@@ -50,7 +50,7 @@ func (t *TracedCmd) Output() ([]byte, error) {
 
 // CombinedOutput overrides the CombinedOutput method to add tracing before capturing combined output.
 func (t *TracedCmd) CombinedOutput() ([]byte, error) {
-	_, span := traces.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
+	_, span := observability.StartSpan(t.Ctx, "path", t.Cmd.Path, "args", fmt.Sprintf("%+v", t.Cmd.Args))
 	defer span.End()
 
 	return t.Cmd.CombinedOutput() //nolint:forbidigo // This is our approved usage of t.Cmd.CombinedOutput()

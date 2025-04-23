@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -35,13 +35,13 @@ func WithAppendEnv(key, value string) ExecOps {
 }
 
 // RunSimple is a wrapper over allowedcmd.AllowedCommand.
-// It enforces a timeout, logs, traces, and returns the stdout as a byte slice.
+// It enforces a timeout, logs, observability. and returns the stdout as a byte slice.
 // It discards stderr.
 //
 // This is not suitable for high performance work -- it allocates new buffers each time
 // Use Run() for more control over the stdout and stderr streams.
 func RunSimple(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, cmd allowedcmd.AllowedCommand, args []string, opts ...ExecOps) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var stdout bytes.Buffer
@@ -52,10 +52,10 @@ func RunSimple(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, cm
 	return stdout.Bytes(), nil
 }
 
-// Run is a wrapper over allowedcmd.AllowedCommand. It enforces a timeout, logs, traces.
+// Run is a wrapper over allowedcmd.AllowedCommand. It enforces a timeout, logs, observability.
 // Use RunSimple() for a simpler interface.
 func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd allowedcmd.AllowedCommand, args []string, stdout io.Writer, stderr io.Writer, opts ...ExecOps) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
@@ -93,10 +93,10 @@ func Run(ctx context.Context, slogger *slog.Logger, timeoutSeconds int, execCmd 
 		return fmt.Errorf("could not find %s to run: %w", cmd.Path, err)
 	case ctx.Err() != nil:
 		// ctx.Err() should only be set if the context is canceled or done
-		traces.SetError(span, ctx.Err())
+		observability.SetError(span, ctx.Err())
 		return fmt.Errorf("context canceled during exec '%s': %w", cmd.String(), ctx.Err())
 	default:
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return fmt.Errorf("exec '%s': %w", cmd.String(), err)
 	}
 }

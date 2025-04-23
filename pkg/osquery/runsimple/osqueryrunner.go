@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // osqueryProcess is a very simple osquery runtime manager. It's designed to start and stop osquery. It has
@@ -74,7 +74,7 @@ func NewOsqueryProcess(osquerydPath string, opts ...osqueryProcessOpt) (*osquery
 // trailing semicolon, but it's real weird about line breaks, an may return as multiline json output. It
 // is the responsibility of the caller to get the details right.
 func (p osqueryProcess) RunSql(ctx context.Context, sql []byte) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	args := []string{
