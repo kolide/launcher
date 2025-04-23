@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/indexeddb"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -353,6 +354,73 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQueryLevelDB(t *testing.T) {
+	t.Parallel()
+
+	// Create a level db to query
+	tempDir := t.TempDir()
+	db, err := indexeddb.OpenLeveldb(tempDir)
+	require.NoError(t, err)
+
+	// Add some data
+	expectedKey := "some-key"
+	expectedValue := "some-value"
+	require.NoError(t, db.Put([]byte(expectedKey), []byte(expectedValue), &opt.WriteOptions{}))
+	require.NoError(t, db.Close())
+
+	// Construct table
+	sourceQuery := strings.Join([]string{expectedKey}, ",")
+	cfg := katcTableConfig{
+		Columns: []string{"key", "value"},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     leveldbSourceType,
+				dataFunc: leveldbData,
+			},
+			SourcePaths:       &[]string{filepath.Join("some", "incorrect", "path")},
+			SourceQuery:       &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{},
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{tempDir},
+				},
+			},
+		},
+	}
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+	// Make a query context restricting the source to our exact source indexeddb database
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{
+						Operator:   table.OperatorEquals,
+						Expression: tempDir,
+					},
+				},
+			},
+		},
+	}
+
+	// At long last: run a query
+	results, err := testTable.generate(context.TODO(), queryContext)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(results))
+	require.Contains(t, results[0], "key")
+	require.Equal(t, expectedKey, results[0]["key"])
+	require.Contains(t, results[0], "value")
+	require.Equal(t, expectedValue, results[0]["value"])
+	require.Contains(t, results[0], "path")
+	require.Equal(t, tempDir, results[0]["path"])
 }
 
 func Test_checkSourcePathConstraints(t *testing.T) {

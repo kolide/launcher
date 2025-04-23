@@ -248,13 +248,88 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 	return types.Enrolled, nil
 }
 
+// SetEnrollmentDetails updates the enrollment details, merging with existing details
 func (k *knapsack) SetEnrollmentDetails(newDetails types.EnrollmentDetails) {
+	// Get current details or empty struct if nil
+	// capture old values for logging
+	var oldDetails types.EnrollmentDetails
+	if enrollmentDetails != nil {
+		oldDetails = *enrollmentDetails
+	}
+
+	// Merge the new details with existing ones
+	mergedDetails := mergeEnrollmentDetails(oldDetails, newDetails)
+
+	// Log old and merged details - simpler approach
 	k.Slogger().Log(context.Background(), slog.LevelDebug,
 		"updating enrollment details",
-		"old_details", fmt.Sprintf("%+v", enrollmentDetails),
-		"new_details", fmt.Sprintf("%+v", newDetails),
+		"old_details", fmt.Sprintf("%+v", oldDetails),
+		"new_details", fmt.Sprintf("%+v", mergedDetails),
 	)
-	enrollmentDetails = &newDetails
+
+	// Update the global enrollment details
+	enrollmentDetails = &mergedDetails
+}
+
+// mergeEnrollmentDetails combines old and new details, only updating non-empty fields
+func mergeEnrollmentDetails(oldDetails, newDetails types.EnrollmentDetails) types.EnrollmentDetails {
+	// Start with existing details
+	mergedDetails := oldDetails
+
+	// Only update fields that are not empty
+	if newDetails.OSPlatform != "" {
+		mergedDetails.OSPlatform = newDetails.OSPlatform
+	}
+	if newDetails.OSPlatformLike != "" {
+		mergedDetails.OSPlatformLike = newDetails.OSPlatformLike
+	}
+	if newDetails.OSVersion != "" {
+		mergedDetails.OSVersion = newDetails.OSVersion
+	}
+	if newDetails.OSBuildID != "" {
+		mergedDetails.OSBuildID = newDetails.OSBuildID
+	}
+	if newDetails.Hostname != "" {
+		mergedDetails.Hostname = newDetails.Hostname
+	}
+	if newDetails.HardwareSerial != "" {
+		mergedDetails.HardwareSerial = newDetails.HardwareSerial
+	}
+	if newDetails.HardwareModel != "" {
+		mergedDetails.HardwareModel = newDetails.HardwareModel
+	}
+	if newDetails.HardwareVendor != "" {
+		mergedDetails.HardwareVendor = newDetails.HardwareVendor
+	}
+	if newDetails.HardwareUUID != "" {
+		mergedDetails.HardwareUUID = newDetails.HardwareUUID
+	}
+	if newDetails.OsqueryVersion != "" {
+		mergedDetails.OsqueryVersion = newDetails.OsqueryVersion
+	}
+	if newDetails.LauncherVersion != "" {
+		mergedDetails.LauncherVersion = newDetails.LauncherVersion
+	}
+	if newDetails.GOOS != "" {
+		mergedDetails.GOOS = newDetails.GOOS
+	}
+	if newDetails.GOARCH != "" {
+		mergedDetails.GOARCH = newDetails.GOARCH
+	}
+	if newDetails.LauncherLocalKey != "" {
+		mergedDetails.LauncherLocalKey = newDetails.LauncherLocalKey
+	}
+	if newDetails.LauncherHardwareKey != "" {
+		mergedDetails.LauncherHardwareKey = newDetails.LauncherHardwareKey
+	}
+	if newDetails.LauncherHardwareKeySource != "" {
+		mergedDetails.LauncherHardwareKeySource = newDetails.LauncherHardwareKeySource
+	}
+	if newDetails.OSName != "" {
+		mergedDetails.OSName = newDetails.OSName
+	}
+
+	return mergedDetails
 }
 
 func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {

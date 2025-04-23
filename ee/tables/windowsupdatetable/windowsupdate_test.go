@@ -4,43 +4,63 @@
 package windowsupdatetable
 
 import (
-	"context"
+	"encoding/json"
+	"errors"
 	"testing"
-	"time"
 
-	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTable(t *testing.T) {
+func Test_MarshalUnmarshalQueryResults(t *testing.T) {
 	t.Parallel()
 
-	var tests = []struct {
-		name      string
-		queryFunc queryFuncType
+	for _, tt := range []struct {
+		testCaseName string
+		results      QueryResults
 	}{
-		{name: "updates", queryFunc: queryUpdates},
-		{name: "history", queryFunc: queryHistory},
-	}
+		{
+			testCaseName: "successful query",
+			results: QueryResults{
+				RawResults:      []byte("some query results"),
+				Locale:          "_default",
+				IsDefaultLocale: 1,
+				ErrStr:          "",
+			},
+		},
+		{
+			testCaseName: "empty results, no error",
+			results: QueryResults{
+				RawResults:      []byte{},
+				Locale:          "_default",
+				IsDefaultLocale: 1,
+				ErrStr:          "",
+			},
+		},
 
-	for _, tt := range tests {
+		{
+			testCaseName: "error",
+			results: QueryResults{
+				ErrStr: errors.New("test error").Error(),
+			},
+		},
+	} {
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			table := Table{
-				slogger:   multislogger.NewNopLogger(),
-				queryFunc: tt.queryFunc,
-			}
+			// We should be able to marshal the results
+			rawQueryResults, err := json.Marshal(tt.results)
+			require.NoError(t, err)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-			defer cancel()
+			// We should be able to unmarshal the marshalled results
+			var unmarshalledResults QueryResults
+			require.NoError(t, json.Unmarshal(rawQueryResults, &unmarshalledResults))
 
-			// ci doesn;t return data, but we can, at least, check that the underlying API doesn't error.
-			_, err := table.generate(ctx, tablehelpers.MockQueryContext(nil))
-			require.NoError(t, err, "generate")
+			// The data should be identical
+			require.Equal(t, tt.results.RawResults, unmarshalledResults.RawResults)
+			require.Equal(t, tt.results.Locale, unmarshalledResults.Locale)
+			require.Equal(t, tt.results.IsDefaultLocale, unmarshalledResults.IsDefaultLocale)
+			require.Equal(t, tt.results.ErrStr, unmarshalledResults.ErrStr)
 		})
 	}
-
 }

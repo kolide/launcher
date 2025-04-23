@@ -243,7 +243,6 @@ func getArgsAndResponse() (map[string]string, *Options) {
 	opts := &Options{
 		AutoupdateInitialDelay:          1 * time.Hour,
 		AutoupdateInterval:              48 * time.Hour,
-		CompactDbMaxTx:                  int64(65536),
 		Control:                         false,
 		ControlServerURL:                "",
 		ControlRequestInterval:          60 * time.Second,

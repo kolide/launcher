@@ -100,11 +100,9 @@ func TestProc(t *testing.T) {
 			errContainsStr:  "error waiting for osquery to create socket",
 		},
 	}
-	for _, tt := range tests {
+	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			var rootDir string
 			if tt.useShortRootDir {
 				rootDir = testRootDirectory(t)
@@ -204,15 +202,27 @@ func downloadOsquery(dir string) error {
 // The default t.TempDir is too long of a path, creating too long of an osquery
 // extension socket, on posix systems.
 func testRootDirectory(t *testing.T) string {
-	ulid := ulid.New()
-	rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
-	require.NoError(t, os.Mkdir(rootDir, 0700))
+	for i := 0; i < 100; i++ {
+		ulid := ulid.New()
+		rootDir := filepath.Join(os.TempDir(), ulid[len(ulid)-4:])
 
-	t.Cleanup(func() {
-		if err := os.RemoveAll(rootDir); err != nil {
-			t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+		// Make sure root dir doesn't already exist
+		if _, err := os.Stat(rootDir); err == nil {
+			// Root dir exists, try again
+			continue
 		}
-	})
 
-	return rootDir
+		require.NoError(t, os.Mkdir(rootDir, 0700))
+		t.Cleanup(func() {
+			if err := os.RemoveAll(rootDir); err != nil {
+				t.Errorf("testRootDirectory RemoveAll cleanup: %v", err)
+			}
+		})
+
+		return rootDir
+	}
+
+	t.Error("failed to make new unique root directory in tmp")
+	t.FailNow()
+	return ""
 }
