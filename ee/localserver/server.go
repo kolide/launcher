@@ -401,7 +401,8 @@ func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http
 		if !l.Allow() {
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			ls.slogger.Log(r.Context(), slog.LevelError,
-				"over rate limit", "path", r.URL.Path,
+				"over rate limit",
+				"path", r.URL.Path,
 			)
 			return
 		}
