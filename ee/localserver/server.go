@@ -39,23 +39,23 @@ type Querier interface {
 }
 
 type localServer struct {
-	slogger      *slog.Logger
-	knapsack     types.Knapsack
-	srv          *http.Server
-	identifiers  identifiers
-	limiter      *rate.Limiter
-	tlsCerts     []tls.Certificate
-	querier      Querier
-	kolideServer string
-	cancel       context.CancelFunc
+	slogger                *slog.Logger
+	knapsack               types.Knapsack
+	srv                    *http.Server
+	identifiers            identifiers
+	ecLimiter, dt4aLimiter *rate.Limiter
+	tlsCerts               []tls.Certificate
+	querier                Querier
+	kolideServer           string
+	cancel                 context.CancelFunc
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
 }
 
 const (
-	defaultRateLimit = 100
-	defaultRateBurst = 200
+	defaultRateLimit = 1000
+	defaultRateBurst = 2000
 )
 
 type presenceDetector interface {
@@ -69,7 +69,8 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	ls := &localServer{
 		slogger:         k.Slogger().With("component", "localserver"),
 		knapsack:        k,
-		limiter:         rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		ecLimiter:       rate.NewLimiter(defaultRateLimit, defaultRateBurst),
+		dt4aLimiter:     rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:    k.KolideServerURL(),
 		myLocalDbSigner: agent.LocalDbKeys(),
 	}
@@ -100,15 +101,10 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	ecAuthedMux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	ecAuthedMux.Handle("/scheduledquery.png", ls.requestScheduledQueryHandler())
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ls.rateLimitHandler(ecKryptoMiddleware.Wrap(ecAuthedMux)))
-
-	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
-	// after making it through the kryptoEcMiddleware
-	// by using v1, k2 can call endpoints without fear of panicing local server
-	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ls.rateLimitHandler(ecKryptoMiddleware.Wrap(ecAuthedMux)))
+	dt4aMux := http.NewServeMux()
+	dt4aMux.Handle("/dt4a", ls.requestDt4aInfoHandler())
+	dt4aMux.Handle("/accelerate", ls.requestDt4aAccelerationHandler())
+	dt4aMux.Handle("/health", ls.requestDt4aHealthHandler())
 
 	trustedDt4aKeys, err := dt4aKeys()
 	if err != nil {
@@ -120,30 +116,39 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		slogger:          k.Slogger().With("component", "dt4a_auth_middleware"),
 	}
 
+	rootMux := http.NewServeMux()
+	rootMux.HandleFunc("/", http.NotFound)
+
 	// In the future, we will want to make this authenticated; for now, it is not authenticated.
 	// TODO: make this authenticated or remove
-	mux.Handle("/zta", ls.requestDt4aInfoHandler())
+	rootMux.Handle("/zta", ls.rateLimitHandler(ls.dt4aLimiter, ls.requestDt4aInfoHandler()))
 
-	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
-	mux.Handle("/v3/accelerate", dt4aAuthMiddleware.Wrap(ls.requestDt4aAccelerationHandler()))
-	mux.Handle("/v3/health", dt4aAuthMiddleware.Wrap(ls.requestDt4aHealthHandler()))
+	// authed dt4a endpoints
+	rootMux.Handle("/v3/", ls.rateLimitHandler(ls.dt4aLimiter, dt4aAuthMiddleware.Wrap(dt4aMux)))
+
+	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
+	// after making it through the kryptoEcMiddleware
+	// by using v1, k2 can call endpoints without fear of panicing local server
+	// /v0/cmd left for transition period
+	rootMux.Handle("/v1/cmd", ls.rateLimitHandler(ls.ecLimiter, ecKryptoMiddleware.Wrap(ecAuthedMux)))
+	rootMux.Handle("/v0/cmd", ls.rateLimitHandler(ls.ecLimiter, ecKryptoMiddleware.Wrap(ecAuthedMux)))
 
 	// uncomment to test without going through middleware
 	// for example:
 	// curl localhost:40978/query --data '{"query":"select * from kolide_launcher_info"}'
-	// mux.Handle("/query", ls.requestQueryHandler())
+	// rootMux.Handle("/query", ls.requestQueryHandler())
 	// curl localhost:40978/scheduledquery --data '{"name":"pack:kolide_device_updaters:agentprocesses-all:snapshot"}'
-	// mux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
+	// rootMux.Handle("/scheduledquery", ls.requestScheduledQueryHandler())
 	// curl localhost:40978/acceleratecontrol  --data '{"interval":"250ms", "duration":"1s"}'
-	// mux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
+	// rootMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
 	// curl localhost:40978/id
-	// mux.Handle("/id", ls.requestIdHandler())
+	// rootMux.Handle("/id", ls.requestIdHandler())
 
 	srv := &http.Server{
 		Handler: otelhttp.NewHandler(
 			ls.requestLoggingHandler(
 				ls.preflightCorsHandler(
-					mux,
+					rootMux,
 				)), "localserver", otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
 				return r.URL.Path
 			})),
@@ -391,18 +396,15 @@ func (ls *localServer) preflightCorsHandler(next http.Handler) http.Handler {
 	})
 }
 
-func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
+func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !ls.limiter.Allow() {
+		if !l.Allow() {
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-
 			ls.slogger.Log(r.Context(), slog.LevelError,
-				"over rate limit",
+				"over rate limit", "path", r.URL.Path,
 			)
-
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }
