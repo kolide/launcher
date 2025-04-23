@@ -68,7 +68,7 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 	t := &TelemetryExporter{
 		providerLock:              sync.Mutex{},
 		knapsack:                  k,
-		slogger:                   k.Slogger().With("component", "trace_exporter"),
+		slogger:                   k.Slogger().With("component", "telemetry_exporter"),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableTraceIngestTLS()),
 		ingestAuthToken:           string(currentToken),
@@ -102,7 +102,7 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 
 	// Set our own error handler to avoid otel printing errors
 	otel.SetErrorHandler(newErrorHandler(
-		k.Slogger().With("component", "trace_exporter"),
+		k.Slogger().With("component", "telemetry_exporter"),
 	))
 
 	t.addDeviceIdentifyingAttributes()
