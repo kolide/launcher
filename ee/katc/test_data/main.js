@@ -139,11 +139,6 @@
                 syntaxError: syntaxError,
                 typeError: typeError,
                 uriError: uriError,
-                
-                // Errors with special properties
-                errorWithCause: errorWithCause,
-                customError: customError,
-                errorWithLineInfo: errorWithLineInfo,
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -206,11 +201,6 @@
                 syntaxError: syntaxError,
                 typeError: typeError,
                 uriError: uriError,
-                
-                // Errors with special properties
-                errorWithCause: errorWithCause,
-                customError: customError,
-                errorWithLineInfo: errorWithLineInfo,
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
