@@ -1001,7 +1001,7 @@ const (
 //
 // * errorTagEnd (0x00): indicating the end of the error object
 func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Create a map to hold the error properties
