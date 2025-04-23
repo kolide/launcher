@@ -51,8 +51,6 @@ type localServer struct {
 
 	myLocalDbSigner crypto.Signer
 	serverEcKey     *ecdsa.PublicKey
-
-	tenantMunemo string
 }
 
 const (
@@ -82,7 +80,15 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		return nil, err
 	}
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector)
+	munemo, err := getMunemoFromEnrollSecret(k)
+	if err != nil {
+		ls.slogger.Log(ctx, slog.LevelError,
+			"getting munemo from enroll secret, not fatal, continuing",
+			"err", err,
+		)
+	}
+
+	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
@@ -96,13 +102,13 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
+	mux.Handle("/v0/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	// /v1/cmd was added after fixing a bug where local server would panic when an endpoint was not found
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ls.munemoCheckHandler(ecAuthedMux)))
+	mux.Handle("/v1/cmd", ecKryptoMiddleware.Wrap(ecAuthedMux))
 
 	trustedDt4aKeys, err := dt4aKeys()
 	if err != nil {
@@ -402,71 +408,15 @@ func (ls *localServer) rateLimitHandler(next http.Handler) http.Handler {
 	})
 }
 
-// munemoCheckHandler returns an http error if the request's X-Kolide-Munemo header does not match the organization in the enroll secret
-// if either the header or the enroll secret are missing, the request is allowed through
-func (ls *localServer) munemoCheckHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		munemoHeaderValue := r.Header.Get("X-Kolide-Munemo")
-		if munemoHeaderValue == "" {
-			ls.slogger.Log(r.Context(), slog.LevelDebug,
-				"munemo header is empty, continuing",
-			)
-
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		localServerMunemo, err := ls.getMunemoFromEnrollSecret()
-		if err != nil {
-			ls.slogger.Log(r.Context(), slog.LevelError,
-				"getting munemo from enroll secret, continuing",
-				"err", err,
-			)
-
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if localServerMunemo == "" {
-			ls.slogger.Log(r.Context(), slog.LevelDebug,
-				"munemo in enroll secret is empty, continuing",
-				"header", munemoHeaderValue,
-			)
-
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if munemoHeaderValue == localServerMunemo {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		ls.slogger.Log(r.Context(), slog.LevelDebug,
-			"munemo in request does not match munemo in enroll secret",
-			"header", munemoHeaderValue,
-			"enroll_secret", localServerMunemo,
-		)
-
-		http.Error(w, "munemo in request does not match munemo in enroll secret", http.StatusUnauthorized)
-		return
-	})
-}
-
-// getMunemoFromEnrollSecret extracts the munemo from the enroll or returns already
-// extracted cached value
-func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
-	if ls.tenantMunemo != "" {
-		return ls.tenantMunemo, nil
-	}
-
-	rawToken, err := ls.knapsack.ReadEnrollSecret()
+// getMunemoFromEnrollSecret extracts the munemo from the enroll secret
+func getMunemoFromEnrollSecret(k types.Knapsack) (string, error) {
+	enrollSecret, err := k.ReadEnrollSecret()
 	if err != nil {
 		return "", err
 	}
 
 	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
-	token, _, err := new(jwt.Parser).ParseUnverified(rawToken, jwt.MapClaims{})
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
 	if err != nil {
 		return "", err
 	}
@@ -486,8 +436,6 @@ func (ls *localServer) getMunemoFromEnrollSecret() (string, error) {
 	if !ok {
 		return "", errors.New("organization claim not a string")
 	}
-
-	ls.tenantMunemo = munemo
 
 	return munemo, nil
 }

@@ -42,7 +42,12 @@ func sqliteData(ctx context.Context, slogger *slog.Logger, sourcePaths []string,
 
 			rowsFromDb, err := querySqliteDb(ctx, slogger, sqliteDb, query)
 			if err != nil {
-				return nil, fmt.Errorf("querying %s: %w", sqliteDb, err)
+				slogger.Log(ctx, slog.LevelWarn,
+					"could not query sqlite database at path",
+					"sqlite_db_path", sqliteDb,
+					"err", err,
+				)
+				continue
 			}
 			results = append(results, sourceData{
 				path: sqliteDb,

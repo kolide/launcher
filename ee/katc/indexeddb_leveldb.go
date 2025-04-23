@@ -32,7 +32,7 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 		}
 
 		// Extract database and table from query
-		dbName, objectStoreName, err := extractQueryTargets(query)
+		dbName, objectStoreName, err := extractIndexeddbQueryTargets(query)
 		if err != nil {
 			return nil, fmt.Errorf("getting db and object store names: %w", err)
 		}
@@ -63,10 +63,10 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 	return results, nil
 }
 
-// extractQueryTargets retrieves the targets of the query (the database name and the object store name)
+// extractIndexeddbQueryTargets retrieves the targets of the query (the database name and the object store name)
 // from the query. IndexedDB is a NoSQL database, so we expect to retrieve all rows from the given
 // object store within the given database name.
-func extractQueryTargets(query string) (string, string, error) {
+func extractIndexeddbQueryTargets(query string) (string, string, error) {
 	parts := strings.Split(query, ".")
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("unable to extract query targets from query: expected `<db name>.<obj store name>`, got `%s`", query)

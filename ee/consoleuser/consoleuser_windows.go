@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/kolide/launcher/pkg/traces"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
