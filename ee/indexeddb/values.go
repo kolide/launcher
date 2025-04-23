@@ -146,6 +146,9 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 
 	for {
 		// Parse the next property in this object.
+
+		// First, we'll want the object property name. Typically, we'll get " (denoting a string),
+		// then the length of the string, then the string itself.
 		objPropertyStart, err := nextNonPaddingByte(srcReader)
 		if err != nil {
 			return obj, fmt.Errorf("reading object property: %w", err)
@@ -983,6 +986,20 @@ const (
 )
 
 // deserializeError handles the upcoming Error object in srcReader.
+// The data takes the following form:
+// * Error prototype tag (indicating the error type: Error, TypeError, etc.)
+// * Error properties as subtags:
+//   - errorTagMessage (0x01): followed by the error message string
+//   - errorTagStack (0x02): followed by the stack trace string
+//   - errorTagLineNumber (0x03): followed by the line number
+//   - errorTagColumnNumber (0x04): followed by the column number
+//   - errorTagScriptId (0x05): followed by the script ID
+//   - errorTagSourceURL (0x06): followed by the source URL
+//   - errorTagEvalOrigin (0x07): followed by the eval origin
+//   - errorTagCause (0x08): followed by the error cause
+//   - errorTagName (0x09): followed by the error name
+//
+// * errorTagEnd (0x00): indicating the end of the error object
 func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	ctx, span := traces.StartSpan(ctx)
 	defer span.End()
