@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/indexeddb"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -39,7 +39,7 @@ func validateLeveldbTableColumns(columns []table.ColumnDefinition) error {
 // instead. If set, the query is a comma-separated allowlist of keys to return; if empty,
 // all keys are returned.
 func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.
@@ -82,7 +82,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 }
 
 func queryLeveldb(ctx context.Context, path string, allowedKeyMap map[string]struct{}) ([]map[string][]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.

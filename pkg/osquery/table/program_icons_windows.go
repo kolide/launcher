@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -39,7 +39,7 @@ func ProgramIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_program_icons")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icons")
 	defer span.End()
 
 	var results []map[string]string
@@ -51,7 +51,7 @@ func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) 
 }
 
 func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var uninstallerIcons []map[string]string
@@ -86,7 +86,7 @@ func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
 }
 
 func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path string) (string, string, string, error) {
-	_, span := traces.StartSpan(ctx, "display_data_path", path)
+	_, span := observability.StartSpan(ctx, "display_data_path", path)
 	defer span.End()
 
 	key, err := registry.OpenKey(key, path, registry.READ)
@@ -114,7 +114,7 @@ func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path strin
 }
 
 func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var installerIcons []map[string]string
@@ -148,7 +148,7 @@ func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
 }
 
 func getRegistryKeyProductData(ctx context.Context, key registry.Key, path string) (string, string, error) {
-	_, span := traces.StartSpan(ctx, "product_data_path", path)
+	_, span := observability.StartSpan(ctx, "product_data_path", path)
 	defer span.End()
 
 	key, err := registry.OpenKey(key, path, registry.READ)
@@ -175,7 +175,7 @@ func getRegistryKeyProductData(ctx context.Context, key registry.Key, path strin
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
 // the exe like 'OneDriveSetup.exe,-101'
 func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
-	_, span := traces.StartSpan(ctx, "icon_path", fullPath)
+	_, span := observability.StartSpan(ctx, "icon_path", fullPath)
 	defer span.End()
 
 	var programIcon icon

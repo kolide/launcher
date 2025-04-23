@@ -14,10 +14,10 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
@@ -122,7 +122,7 @@ func (e iterationTerminatedError) Error() string {
 // implementation. The background routines should be started by calling
 // Start().
 func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	slogger := k.Slogger().With("component", "osquery_extension", "registration_id", registrationId)
@@ -307,7 +307,7 @@ func isNodeInvalidErr(err error) bool {
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	e.slogger.Log(ctx, slog.LevelInfo,
@@ -333,7 +333,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	// Look up a node key cached in the local store
 	key, err := NodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
+		observability.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
 
@@ -407,7 +407,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			err = errors.New("no further error")
 		}
 		err = fmt.Errorf("enrollment invalid: %w", err)
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return "", true, err
 	}
 
@@ -866,7 +866,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Check to see whether we should forward this request --
@@ -899,7 +899,7 @@ func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
@@ -955,7 +955,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 // WriteResults will publish results of the executed distributed queries back
 // to the server.
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	return e.writeResultsWithReenroll(ctx, results, true)
@@ -963,7 +963,7 @@ func (e *Extension) WriteResults(ctx context.Context, results []distributed.Resu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments

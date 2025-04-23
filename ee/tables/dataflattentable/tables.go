@@ -12,9 +12,9 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/table"
 )
@@ -132,7 +132,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, dataSourceType DataSou
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.tableName)
 	defer span.End()
 
 	var results []map[string]string
@@ -210,7 +210,7 @@ func (t *Table) generateRawData(ctx context.Context, rawdata string, dataQuery s
 }
 
 func (t *Table) generatePath(ctx context.Context, filePath string, dataQuery string, flattenOpts ...dataflatten.FlattenOpts) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "path", filePath)
+	ctx, span := observability.StartSpan(ctx, "path", filePath)
 	defer span.End()
 
 	data, err := t.flattenFileFunc(filePath, flattenOpts...)

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
@@ -73,7 +73,7 @@ const (
 // DeserializeChrome deserializes a JS object that has been stored by Chrome
 // in IndexedDB LevelDB-backed databases.
 func DeserializeChrome(ctx context.Context, slogger *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	data, ok := row["data"]
@@ -139,7 +139,7 @@ func readHeader(srcReader *bytes.Reader) (uint64, error) {
 
 // deserializeObject deserializes the next object from the srcReader.
 func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) (map[string][]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	obj := make(map[string][]byte)
@@ -441,7 +441,7 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 // deserializeDenseArray deserializes the next dense array from the srcReader.
 // Dense arrays are arrays of items that are NOT paired with indices, as in sparse arrays.
 func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// After an array start, the next byte will be the length of the array.
@@ -732,7 +732,7 @@ func deserializePresumablyEmptyArrayBufferView(srcReader *bytes.Reader) ([]byte,
 }
 
 func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	nestedObj, err := deserializeObject(ctx, slogger, srcReader)

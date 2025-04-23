@@ -6,9 +6,9 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/efi"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -30,7 +30,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_secureboot")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_secureboot")
 	defer span.End()
 
 	sb, err := efi.ReadSecureBoot()

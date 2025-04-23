@@ -12,8 +12,8 @@ import (
 	"strconv"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -62,7 +62,7 @@ type slackTeamsFile map[string]struct {
 }
 
 func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	_, span := traces.StartSpan(ctx, "path", file.path)
+	_, span := observability.StartSpan(ctx, "path", file.path)
 	defer span.End()
 
 	var results []map[string]string
@@ -89,7 +89,7 @@ func (t *SlackConfigTable) generateForPath(ctx context.Context, file userFileInf
 }
 
 func (t *SlackConfigTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_slack_config")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_slack_config")
 	defer span.End()
 
 	var results []map[string]string

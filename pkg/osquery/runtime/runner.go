@@ -11,8 +11,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -144,7 +144,7 @@ func (r *Runner) runInstance(registrationId string) error {
 // launchInstanceWithRetries repeatedly tries to create and launch a new osquery instance.
 // It will retry until it succeeds, or until the runner is shut down.
 func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId string) (*OsqueryInstance, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	for {
@@ -216,7 +216,7 @@ func (r *Runner) Interrupt(_ error) {
 // Shutdown instructs the runner to permanently stop the running instance (no
 // restart will be attempted).
 func (r *Runner) Shutdown() error {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	if r.interrupted.Load() {
@@ -236,7 +236,7 @@ func (r *Runner) Shutdown() error {
 
 // triggerShutdownForInstances asks all instances in `r.instances` to shut down.
 func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	r.instanceLock.Lock()
@@ -267,7 +267,7 @@ func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
 // that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb,
 // and watchdog_utilization_limit_percent.
 func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	r.slogger.Log(ctx, slog.LevelDebug,
@@ -286,7 +286,7 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 // Ping satisfies the control.subscriber interface -- the runner subscribes to changes to
 // the katc_config subsystem.
 func (r *Runner) Ping() {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	r.instanceLock.Lock()
@@ -325,7 +325,7 @@ func (r *Runner) Ping() {
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
 func (r *Runner) Restart(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	r.slogger.Log(ctx, slog.LevelDebug,

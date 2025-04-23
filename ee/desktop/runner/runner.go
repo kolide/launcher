@@ -33,11 +33,11 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -354,7 +354,7 @@ func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context
 
 // killDesktopProcesses kills any existing desktop processes
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	wgDone := make(chan struct{})
@@ -534,7 +534,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 }
 
 func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
@@ -736,7 +736,7 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 }
 
 func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string, executablePath string) error {
-	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	// make sure any existing user desktop processes stop being
@@ -745,23 +745,23 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 
 	socketPath, err := r.setupSocketPath(uid)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("getting socket path: %w", err))
+		observability.SetError(span, fmt.Errorf("getting socket path: %w", err))
 		return fmt.Errorf("getting socket path: %w", err)
 	}
 
 	cmd, err := r.desktopCommand(executablePath, uid, socketPath, r.menuPath())
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("creating desktop command: %w", err))
+		observability.SetError(span, fmt.Errorf("creating desktop command: %w", err))
 		return fmt.Errorf("creating desktop command: %w", err)
 	}
 
 	if err := r.runAsUser(ctx, uid, cmd); err != nil {
-		traces.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
+		observability.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
 		return fmt.Errorf("running desktop command as user: %w", err)
 	}
 	// Extra nil check to ensure we can access cmd.Process.Pid safely later
 	if cmd.Process == nil {
-		traces.SetError(span, fmt.Errorf("starting desktop command: %w", err))
+		observability.SetError(span, fmt.Errorf("starting desktop command: %w", err))
 		return fmt.Errorf("starting desktop command: %w", err)
 	}
 
@@ -794,7 +794,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 			)
 		}
 
-		traces.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
+		observability.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
 
 		return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
 	}
@@ -808,7 +808,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 	span.AddEvent("desktop_started")
 
 	if err := r.addProcessTrackingRecordForUser(uid, socketPath, cmd.Process); err != nil {
-		traces.SetError(span, fmt.Errorf("adding process to internal tracking state: %w", err))
+		observability.SetError(span, fmt.Errorf("adding process to internal tracking state: %w", err))
 		return fmt.Errorf("adding process to internal tracking state: %w", err)
 	}
 

@@ -18,10 +18,10 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -57,7 +57,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_wifi_networks")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_wifi_networks")
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -78,7 +78,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 func execPwsh(slogger *slog.Logger) execer {
 	return func(ctx context.Context, buf *bytes.Buffer) error {
-		ctx, span := traces.StartSpan(ctx)
+		ctx, span := observability.StartSpan(ctx)
 		defer span.End()
 
 		// write the c# code to a file, so the powershell script can load it

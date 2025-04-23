@@ -11,8 +11,8 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/observability/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -59,7 +59,7 @@ type TraceExporter struct {
 // NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
 func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TraceExporter, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
@@ -301,7 +301,7 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.ingestUrl = t.knapsack.TraceIngestServerURL()
 }
 
-// Execute begins exporting traces, if exporting is enabled.
+// Execute begins exporting observability. if exporting is enabled.
 func (t *TraceExporter) Execute() error {
 	if t.enabled {
 		t.setNewGlobalProvider(true)
@@ -350,7 +350,7 @@ func (t *TraceExporter) Ping() {
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which are ingest_url and export_traces.
 func (t *TraceExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	needsNewProvider := false

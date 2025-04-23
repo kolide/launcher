@@ -43,6 +43,8 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/observability/exporter"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
@@ -60,8 +62,6 @@ import (
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/kolide/launcher/pkg/traces/exporter"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
@@ -83,7 +83,7 @@ const (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	initialTraceBuffer := exporter.NewInitialTraceBuffer()
-	ctx, startupSpan := traces.StartSpan(ctx)
+	ctx, startupSpan := observability.StartSpan(ctx)
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 

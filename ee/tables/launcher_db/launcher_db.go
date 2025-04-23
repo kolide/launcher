@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,7 +24,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger, tableName string, iter
 
 func generateServerDataTable(tableName string, iterator types.Iterator) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		ctx, span := traces.StartSpan(ctx, "table_name", tableName)
+		ctx, span := observability.StartSpan(ctx, "table_name", tableName)
 		defer span.End()
 
 		return dbKeyValueRows(ctx, tableName, iterator)
@@ -32,7 +32,7 @@ func generateServerDataTable(tableName string, iterator types.Iterator) table.Ge
 }
 
 func dbKeyValueRows(ctx context.Context, tableName string, iterator types.Iterator) ([]map[string]string, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	results := make([]map[string]string, 0)

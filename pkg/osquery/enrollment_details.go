@@ -15,10 +15,10 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/pkg/errors"
 )
 
@@ -55,7 +55,7 @@ func getRuntimeEnrollDetails() service.EnrollmentDetails {
 // getOsqEnrollDetails queries osquery for enrollment details and populates the EnrollmentDetails struct.
 // It's expected that the caller has initially populated the struct with runtimeEnrollDetails by calling getRuntimeEnrollDetails.
 func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *service.EnrollmentDetails) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// To facilitate manual testing around missing enrollment details,
@@ -151,7 +151,7 @@ func getOsqEnrollDetails(ctx context.Context, osquerydPath string, details *serv
 
 // CollectAndSetEnrollmentDetails collects enrollment details from osquery and sets them in the knapsack.
 func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k types.Knapsack, collectTimeout time.Duration, collectRetryInterval time.Duration) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Get the runtime details
@@ -181,7 +181,7 @@ func CollectAndSetEnrollmentDetails(ctx context.Context, slogger *slog.Logger, k
 		}
 		return err
 	}, collectTimeout, collectRetryInterval); err != nil {
-		traces.SetError(span, fmt.Errorf("enrollment details collection failed: %w", err))
+		observability.SetError(span, fmt.Errorf("enrollment details collection failed: %w", err))
 		slogger.Log(ctx, slog.LevelWarn,
 			"could not fetch osqueryd enrollment details before timeout",
 			"osqueryd_path", latestOsquerydPath,

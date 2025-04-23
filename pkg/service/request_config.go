@@ -10,8 +10,8 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
+	"github.com/kolide/launcher/ee/observability"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type configRequest struct {
@@ -114,7 +114,7 @@ func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 
 // RequestConfig implements KolideService.RequestConfig.
 func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)

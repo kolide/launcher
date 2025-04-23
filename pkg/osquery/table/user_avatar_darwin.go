@@ -49,8 +49,8 @@ import (
 	"unsafe"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/image/tiff"
@@ -73,7 +73,7 @@ type userAvatarTable struct {
 }
 
 func (t *userAvatarTable) generateAvatars(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_user_avatars")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_user_avatars")
 	defer span.End()
 
 	// use the username from the query context if provide, otherwise default to user created users

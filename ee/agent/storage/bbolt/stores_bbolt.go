@@ -7,13 +7,13 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"go.etcd.io/bbolt"
 )
 
 // MakeStores creates all the KVStores used by launcher
 func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[storage.Store]types.KVStore, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	stores := make(map[storage.Store]types.KVStore)

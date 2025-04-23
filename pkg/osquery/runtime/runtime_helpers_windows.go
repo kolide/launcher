@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/pkg/errors"
 )
 
@@ -22,7 +22,7 @@ func setpgid() *syscall.SysProcAttr {
 }
 
 func killProcessGroup(origCmd *exec.Cmd) error {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -31,7 +31,7 @@ func killProcessGroup(origCmd *exec.Cmd) error {
 	// some discussion here https://github.com/golang/dep/pull/857
 	cmd, err := allowedcmd.Taskkill(ctx, "/F", "/T", "/PID", fmt.Sprint(origCmd.Process.Pid))
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("creating command: %w", err))
+		observability.SetError(span, fmt.Errorf("creating command: %w", err))
 		return fmt.Errorf("creating command: %w", err)
 	}
 
@@ -39,17 +39,17 @@ func killProcessGroup(origCmd *exec.Cmd) error {
 	if err != nil {
 		if len(out) > 0 {
 			err = fmt.Errorf("running taskkill: output: %s, err: %w", string(out), err)
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			return err
 		}
 
 		if ctx.Err() != nil {
 			err = fmt.Errorf("running taskkill: context err: %v, err: %w", ctx.Err(), err)
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			return err
 		}
 
-		traces.SetError(span, fmt.Errorf("running taskkill: %w", err))
+		observability.SetError(span, fmt.Errorf("running taskkill: %w", err))
 		return fmt.Errorf("running taskkill: err: %w", err)
 	}
 

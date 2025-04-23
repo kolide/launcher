@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 var (
@@ -24,7 +24,7 @@ func (ls *localServer) requestDt4aInfoHandler() http.Handler {
 }
 
 func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	// This check is superfluous with the check in the middleware -- but we still have one
@@ -50,7 +50,7 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 
 	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
 	if err != nil {
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		ls.slogger.Log(r.Context(), slog.LevelError,
 			"could not retrieve dt4a info from store",
 			"err", err,
@@ -74,7 +74,7 @@ func (ls *localServer) requestDt4aAccelerationHandler() http.Handler {
 }
 
 func (ls *localServer) requestDt4aAccelerationHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	ls.accelerate(r.Context())
@@ -94,4 +94,10 @@ func (ls *localServer) accelerate(ctx context.Context) {
 		"interval", accelerateInterval.String(),
 		"duration", accelerateDuration.String(),
 	)
+}
+
+func (ls *localServer) requestDt4aHealthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("OK"))
+	})
 }

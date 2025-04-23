@@ -12,8 +12,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/keyidentifier"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -59,7 +59,7 @@ func SshKeys(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *SshKeysTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_ssh_keys")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_ssh_keys")
 	defer span.End()
 
 	var results []map[string]string

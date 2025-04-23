@@ -1,4 +1,4 @@
-package traces
+package observability
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	instrumentationPkg        = "github.com/kolide/launcher/pkg/traces"
+	instrumentationPkg        = "github.com/kolide/launcher/ee/observability"
 	defaultSpanName           = "launcher/unknown"
 	defaultAttributeNamespace = "unknown"
 )

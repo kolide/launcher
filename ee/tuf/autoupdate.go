@@ -25,7 +25,7 @@ import (
 	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
@@ -115,7 +115,7 @@ func WithOsqueryRestart(restart func(context.Context) error) TufAutoupdaterOptio
 
 func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
 	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	ta := &TufAutoupdater{
@@ -169,7 +169,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 // initMetadataClient sets up a TUF client with our validated root metadata, prepared to fetch updates
 // from our TUF server.
 func initMetadataClient(ctx context.Context, rootDirectory, metadataUrl string, metadataHttpClient *http.Client) (*client.Client, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Set up the local TUF directory for our TUF client
@@ -296,7 +296,7 @@ func (ta *TufAutoupdater) Interrupt(_ error) {
 // Do satisfies the actionqueue.actor interface; it allows the control server to send
 // requests down to autoupdate immediately.
 func (ta *TufAutoupdater) Do(data io.Reader) error {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	var updateRequest controlServerAutoupdateRequest
@@ -365,7 +365,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 // FlagsChanged satisfies the FlagsChangeObserver interface, allowing the autoupdater
 // to respond to changes to autoupdate-related settings.
 func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
@@ -488,7 +488,7 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
 func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary) error {
-	ctx, span := traces.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
+	ctx, span := observability.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
 	defer span.End()
 
 	ta.updateLock.Lock()
@@ -636,7 +636,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 // findTarget selects the appropriate target from `targets` for the given binary, using the pinned version (if set)
 // and otherwise selecting the correct release for the given channel.
 func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, pinnedVersion string, channel string, slogger *slog.Logger) (string, data.TargetFileMeta, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if pinnedVersion != "" {
@@ -660,7 +660,7 @@ func findTarget(ctx context.Context, binary autoupdatableBinary, targets data.Ta
 
 // findTargetByVersion selects the appropriate target from `targets` for the given binary and version.
 func findTargetByVersion(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, binaryVersion string) (string, data.TargetFileMeta, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	targetNameForVersion := path.Join(string(binary), runtime.GOOS, PlatformArch(), fmt.Sprintf("%s-%s.tar.gz", binary, binaryVersion))
@@ -679,7 +679,7 @@ func findTargetByVersion(ctx context.Context, binary autoupdatableBinary, target
 // has been published for the given channel. If it has, it returns the target for that release
 // and its associated metadata.
 func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) (string, data.TargetFileMeta, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// First, find the target that the channel release file is pointing to

@@ -6,7 +6,6 @@ import (
 	_ "embed"
 )
 
-
 //go:embed kolide-debug.ico
 var KolideDebugIco []byte
 
@@ -138,4 +137,3 @@ var MenubarTriangleExclamationMonochromeIco []byte
 
 //go:embed menubar-triangle-exclamation-monochrome.png
 var MenubarTriangleExclamationMonochromePng []byte
-

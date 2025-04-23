@@ -11,7 +11,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 	"golang.org/x/sync/semaphore"
 )
@@ -78,7 +78,7 @@ func newWrappedTable(flags types.Flags, slogger *slog.Logger, name string, gen t
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which is just `TableGenerateTimeout`
 func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if !slices.Contains(flagKeys, keys.TableGenerateTimeout) {
@@ -102,7 +102,7 @@ func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagK
 // generate wraps `wt.gen`, ensuring the function is traced and that it does not run for longer
 // than `wt.genTimeout`.
 func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", wt.name, "table_generate_timeout", wt.genTimeout.String())
+	ctx, span := observability.StartSpan(ctx, "table_name", wt.name, "table_generate_timeout", wt.genTimeout.String())
 	defer span.End()
 
 	// Get the current timeout value -- this value can change per the control server

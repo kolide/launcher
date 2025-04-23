@@ -12,12 +12,12 @@ import (
 	"syscall"
 
 	"github.com/kolide/launcher/ee/consoleuser"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/systray"
 )
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"go.etcd.io/bbolt"
 )
 
@@ -37,7 +37,7 @@ type bboltKeyValueStore struct {
 }
 
 func NewStore(ctx context.Context, slogger *slog.Logger, db *bbolt.DB, bucketName string) (*bboltKeyValueStore, error) {
-	_, span := traces.StartSpan(ctx, "bucket_name", bucketName)
+	_, span := observability.StartSpan(ctx, "bucket_name", bucketName)
 	defer span.End()
 
 	err := db.Update(func(tx *bbolt.Tx) error {
