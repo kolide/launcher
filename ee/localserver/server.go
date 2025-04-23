@@ -54,8 +54,8 @@ type localServer struct {
 }
 
 const (
-	defaultRateLimit = 5
-	defaultRateBurst = 10
+	defaultRateLimit = 100
+	defaultRateBurst = 200
 )
 
 type presenceDetector interface {
@@ -126,6 +126,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	mux.Handle("/v3/dt4a", dt4aAuthMiddleware.Wrap(ls.requestDt4aInfoHandler()))
 	mux.Handle("/v3/accelerate", dt4aAuthMiddleware.Wrap(ls.requestDt4aAccelerationHandler()))
+	mux.Handle("/v3/health", dt4aAuthMiddleware.Wrap(ls.requestDt4aHealthHandler()))
 
 	// uncomment to test without going through middleware
 	// for example:
