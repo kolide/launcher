@@ -56,14 +56,6 @@
         const typeError = new TypeError("This is a type error message");
         const uriError = new URIError("This is a URI error message");
 
-        // Create an error with a cause (for testing errorTagCause)
-        const errorWithCause = new Error("Error with a cause");
-        errorWithCause.cause = new Error("This is the cause");
-
-        // Create an error with custom properties
-        const customError = new Error("Custom error message");
-        customError.customProperty = "Custom property value";
-
         // Create an error that will have line/column information
         let errorWithLineInfo;
         try {
