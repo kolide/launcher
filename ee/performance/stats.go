@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -91,6 +92,12 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 
 	ps.MemInfo.GoMemUsage = goMemUsage(&memStats)
 	ps.MemInfo.HeapTotal = heapTotal(&memStats)
+
+	// Record stats
+	observability.GoMemoryUsageGauge.Record(ctx, int64(ps.MemInfo.GoMemUsage))
+	observability.NonGoMemoryUsageGauge.Record(ctx, int64(ps.MemInfo.NonGoMemUsage))
+	observability.MemoryPercentGauge.Record(ctx, int64(ps.MemInfo.MemPercent))
+	observability.CpuPercentGauge.Record(ctx, int64(ps.CPUPercent))
 
 	return ps, nil
 }
