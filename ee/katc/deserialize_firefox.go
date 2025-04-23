@@ -791,66 +791,7 @@ func deserializeError(srcReader *bytes.Reader) ([]byte, error) {
 			break
 		}
 
-		if propTag == tagString {
-			// It's a string key, read it
-			keyBytes, err := deserializeString(propData, srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("deserializing property name: %w", err)
-			}
-			keyStr := string(keyBytes)
-
-			// Read the value
-			valTag, valData, err := nextPair(srcReader)
-			if err != nil {
-				return nil, fmt.Errorf("reading value for property '%s': %w", keyStr, err)
-			}
-
-			// Process the property
-			valBytes, err := deserializeNext(valTag, valData, srcReader)
-			if err != nil || valBytes == nil {
-				continue
-			}
-
-			valStr := string(valBytes)
-
-			// Handle known properties
-			if keyStr == "name" {
-				errorObj["name"] = valStr
-				errorObj["type"] = valStr
-			} else if keyStr == "message" {
-				errorObj["message"] = valStr
-				messageFound = true
-			} else if strings.HasPrefix(keyStr, "file://") {
-				// This is the file path with line number as value
-				errorObj["fileName"] = keyStr
-				errorObj["lineNumber"] = valStr
-			} else if !messageFound && !strings.Contains(keyStr, ":") && len(keyStr) > 0 {
-				// If we haven't found a message yet and this key looks like it might be a message,
-				// use it as the message
-				errorObj["message"] = keyStr
-
-				// Try to determine the error type from the message
-				if strings.Contains(keyStr, "eval") || strings.Contains(keyStr, "Eval") {
-					errorObj["type"] = "EvalError"
-					errorObj["name"] = "EvalError"
-				} else if strings.Contains(keyStr, "range") || strings.Contains(keyStr, "Range") {
-					errorObj["type"] = "RangeError"
-					errorObj["name"] = "RangeError"
-				} else if strings.Contains(keyStr, "reference") || strings.Contains(keyStr, "Reference") {
-					errorObj["type"] = "ReferenceError"
-					errorObj["name"] = "ReferenceError"
-				} else if strings.Contains(keyStr, "syntax") || strings.Contains(keyStr, "Syntax") {
-					errorObj["type"] = "SyntaxError"
-					errorObj["name"] = "SyntaxError"
-				} else if strings.Contains(keyStr, "type") || strings.Contains(keyStr, "Type") {
-					errorObj["type"] = "TypeError"
-					errorObj["name"] = "TypeError"
-				} else if strings.Contains(keyStr, "URI") || strings.Contains(keyStr, "uri") {
-					errorObj["type"] = "URIError"
-					errorObj["name"] = "URIError"
-				}
-			}
-		} else {
+		if propTag != tagString {
 			// It's not a string key, skip it and its value
 			valTag, valData, err := nextPair(srcReader)
 			if err != nil {
@@ -858,10 +799,73 @@ func deserializeError(srcReader *bytes.Reader) ([]byte, error) {
 			}
 
 			// Skip the value
-			_, err = deserializeNext(valTag, valData, srcReader)
-			if err != nil {
+			if _, err := deserializeNext(valTag, valData, srcReader); err != nil {
 				// Just continue if there's an error
 				continue
+			}
+		}
+
+		// It's a string key, read it
+		keyBytes, err := deserializeString(propData, srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("deserializing property name: %w", err)
+		}
+		keyStr := string(keyBytes)
+
+		// Read the value
+		valTag, valData, err := nextPair(srcReader)
+		if err != nil {
+			return nil, fmt.Errorf("reading value for property '%s': %w", keyStr, err)
+		}
+
+		// Process the property
+		valBytes, err := deserializeNext(valTag, valData, srcReader)
+		if err != nil || valBytes == nil {
+			continue
+		}
+
+		valStr := string(valBytes)
+
+		// Handle known properties
+		if keyStr == "name" {
+			errorObj["name"] = valStr
+			errorObj["type"] = valStr
+		} else if keyStr == "message" {
+			errorObj["message"] = valStr
+			messageFound = true
+		} else if strings.HasPrefix(keyStr, "file://") {
+			// This is the file path with line number as value
+			errorObj["fileName"] = keyStr
+			errorObj["lineNumber"] = valStr
+		} else if !messageFound && !strings.Contains(keyStr, ":") && len(keyStr) > 0 {
+			// If we haven't found a message yet and this key looks like it might be a message,
+			// use it as the message. Examples of such keys:
+			// - "Cannot read property 'foo' of undefined"
+			// - "Invalid argument"
+			// - "Unexpected token in JSON"
+			// We avoid strings with colons as they're likely file paths or other metadata
+			errorObj["message"] = keyStr
+
+			loweredKeyStr := strings.ToLower(keyStr)
+			// Try to determine the error type from the message
+			if strings.Contains(loweredKeyStr, "eval") {
+				errorObj["type"] = "EvalError"
+				errorObj["name"] = "EvalError"
+			} else if strings.Contains(loweredKeyStr, "range") {
+				errorObj["type"] = "RangeError"
+				errorObj["name"] = "RangeError"
+			} else if strings.Contains(loweredKeyStr, "reference") {
+				errorObj["type"] = "ReferenceError"
+				errorObj["name"] = "ReferenceError"
+			} else if strings.Contains(loweredKeyStr, "syntax") {
+				errorObj["type"] = "SyntaxError"
+				errorObj["name"] = "SyntaxError"
+			} else if strings.Contains(loweredKeyStr, "type") {
+				errorObj["type"] = "TypeError"
+				errorObj["name"] = "TypeError"
+			} else if strings.Contains(loweredKeyStr, "uri") {
+				errorObj["type"] = "URIError"
+				errorObj["name"] = "URIError"
 			}
 		}
 	}
