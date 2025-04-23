@@ -8,8 +8,8 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -18,7 +18,7 @@ const (
 )
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", tableName)
 	defer span.End()
 
 	paths := tablehelpers.GetConstraints(queryContext, "path", tablehelpers.WithAllowedCharacters(allowedCharacters))

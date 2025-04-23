@@ -13,8 +13,8 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -42,7 +42,7 @@ type ChromeLoginDataEmailsTable struct {
 }
 
 func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file userFileInfo) ([]map[string]string, error) {
-	_, span := traces.StartSpan(ctx, "path", file.path)
+	_, span := observability.StartSpan(ctx, "path", file.path)
 	defer span.End()
 
 	dir, err := agent.MkdirTemp("kolide_chrome_login_data_emails")
@@ -104,7 +104,7 @@ func (c *ChromeLoginDataEmailsTable) generateForPath(ctx context.Context, file u
 }
 
 func (c *ChromeLoginDataEmailsTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_chrome_login_data_emails")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_chrome_login_data_emails")
 	defer span.End()
 
 	var results []map[string]string

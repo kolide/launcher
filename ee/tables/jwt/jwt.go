@@ -14,10 +14,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -62,7 +62,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_jwt")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_jwt")
 	defer span.End()
 
 	var results []map[string]string

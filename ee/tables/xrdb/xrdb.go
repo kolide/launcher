@@ -18,10 +18,10 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -52,7 +52,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_xrdb")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_xrdb")
 	defer span.End()
 
 	var results []map[string]string
@@ -90,7 +90,7 @@ func (t *XRDBSettings) generate(ctx context.Context, queryContext table.QueryCon
 // execXRDB writes the output of running 'xrdb' command into the
 // supplied bytes buffer
 func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffer) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	u, err := user.Lookup(username)
@@ -124,7 +124,7 @@ func execXRDB(ctx context.Context, displayNum, username string, buf *bytes.Buffe
 }
 
 func (t *XRDBSettings) parse(ctx context.Context, display, username string, input io.Reader) []map[string]string {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var results []map[string]string

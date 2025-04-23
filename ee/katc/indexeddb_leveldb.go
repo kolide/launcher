@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/indexeddb"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -17,7 +17,7 @@ import (
 // and object store specified in `query`, which it expects to be in the format
 // `<db name>.<object store name>`.
 func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string, query string, queryContext table.QueryContext) ([]sourceData, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Pull out path constraints from the query against the KATC table, to avoid querying more leveldb files than we need to.

@@ -17,10 +17,10 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -49,7 +49,7 @@ func Metadata(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *GsettingsMetadata) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_gsettings_metadata")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_gsettings_metadata")
 	defer span.End()
 
 	var results []map[string]string
@@ -91,7 +91,7 @@ type keyDescription struct {
 }
 
 func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, schema string) ([]keyDescription, error) {
-	ctx, span := traces.StartSpan(ctx, "schema", schema)
+	ctx, span := observability.StartSpan(ctx, "schema", schema)
 	defer span.End()
 
 	var descriptions []keyDescription
@@ -129,7 +129,7 @@ func (t *GsettingsMetadata) gsettingsDescribeForSchema(ctx context.Context, sche
 }
 
 func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string) ([]string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var keys []string
@@ -164,7 +164,7 @@ func (t *GsettingsMetadata) listKeys(ctx context.Context, schema, tmpdir string)
 // single key, namely a 'description' string/paragraph and an explanation of its
 // type
 func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir string) (keyDescription, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	desc := keyDescription{Key: key}
@@ -185,7 +185,7 @@ func (t *GsettingsMetadata) describeKey(ctx context.Context, schema, key, tmpdir
 }
 
 func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmpdir string) (string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	output := new(bytes.Buffer)
@@ -203,7 +203,7 @@ func (t *GsettingsMetadata) getDescription(ctx context.Context, schema, key, tmp
 // GVariant type from 'GVariant code' to golang-ish type descriptions is handled
 // by convertType
 func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir string) (string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	output := new(bytes.Buffer)
@@ -241,7 +241,7 @@ func (t *GsettingsMetadata) getType(ctx context.Context, schema, key, tmpdir str
 
 // execGsettingsCommand should be called with a tmpdir that will be cleaned up.
 func execGsettingsCommand(ctx context.Context, args []string, tmpdir string, output *bytes.Buffer) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	command := args[0]

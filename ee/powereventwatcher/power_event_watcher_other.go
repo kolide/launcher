@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type noOpPowerEventWatcher struct {
@@ -24,7 +24,7 @@ func NewKnapsackSleepStateUpdater(_ *slog.Logger, _ types.Knapsack) *noOpKnapsac
 }
 
 func New(ctx context.Context, _ *slog.Logger, _ *noOpKnapsackSleepStateUpdater) (*noOpPowerEventWatcher, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	return &noOpPowerEventWatcher{

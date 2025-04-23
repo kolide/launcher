@@ -4,11 +4,11 @@ import (
 	"context"
 	"os/user"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 func CurrentUsers(ctx context.Context) ([]*user.User, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	currentUids, err := CurrentUids(ctx)

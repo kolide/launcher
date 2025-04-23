@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	explorerProcs, err := explorerProcesses(ctx)
@@ -48,7 +48,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
-	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	explorerProcs, err := explorerProcesses(ctx)
@@ -73,7 +73,7 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 // explorerProcesses returns a list of explorer processes whose
 // filepath base is "explorer.exe".
 func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	var explorerProcs []*process.Process
@@ -98,7 +98,7 @@ func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
 }
 
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	username, err := proc.UsernameWithContext(ctx)

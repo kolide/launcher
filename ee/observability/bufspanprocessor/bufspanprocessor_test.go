@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/traces/bufspanprocessor/mocks"
+	"github.com/kolide/launcher/ee/observability/bufspanprocessor/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"

@@ -9,13 +9,13 @@ import (
 	"os/exec"
 	"os/user"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/sys/unix"
 )
 
 // For notifications to work, we must run in the user context with launchctl asuser.
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	_, span := traces.StartSpan(ctx, "uid", uid)
+	_, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	// Ensure that we handle a non-root current user appropriately

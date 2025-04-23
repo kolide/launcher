@@ -19,7 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 )
@@ -63,7 +63,7 @@ type presenceDetector interface {
 }
 
 func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetector) (*localServer, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	ls := &localServer{

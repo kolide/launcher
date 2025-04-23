@@ -4,7 +4,7 @@ import (
 	"runtime"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
+	"github.com/kolide/launcher/ee/observability/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

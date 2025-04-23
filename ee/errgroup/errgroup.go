@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -146,7 +146,7 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		// Wait for errgroup to exit
 		<-l.doneCtx.Done()
 
-		ctx, span := traces.StartSpan(ctx, "goroutine_name", goroutineName)
+		ctx, span := observability.StartSpan(ctx, "goroutine_name", goroutineName)
 		defer span.End()
 
 		slogger.Log(ctx, slog.LevelInfo,
@@ -179,7 +179,7 @@ func (l *LoggedErrgroup) Shutdown() {
 }
 
 func (l *LoggedErrgroup) Wait(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	errChan := make(chan error)

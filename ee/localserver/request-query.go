@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -19,7 +19,7 @@ func (ls *localServer) requestQueryHandler() http.Handler {
 }
 
 func (ls *localServer) requestQueryHanlderFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {
@@ -61,7 +61,7 @@ func (ls *localServer) requestScheduledQueryHandler() http.Handler {
 // requestScheduledQueryHandlerFunc uses the name field in the request body to look up
 // an existing osquery scheduled query execute it, returning the results.
 func (ls *localServer) requestScheduledQueryHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	// The driver behind this is that the JS bridge has to use GET requests passing the query (in a nacl box) as a URL parameter.
@@ -135,7 +135,7 @@ func sendClientError(w http.ResponseWriter, span trace.Span, err error) {
 	w.WriteHeader(http.StatusBadRequest)
 	w.Write([]byte(err.Error()))
 
-	traces.SetError(span, err)
+	observability.SetError(span, err)
 }
 
 func queryWithRetries(querier Querier, query string) ([]map[string]string, error) {

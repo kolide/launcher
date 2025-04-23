@@ -21,11 +21,11 @@ import (
 	"github.com/kolide/launcher/ee/errgroup"
 	"github.com/kolide/launcher/ee/gowrapper"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/table"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go"
 	"github.com/osquery/osquery-go/plugin/config"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -127,7 +127,7 @@ type OsqueryInstance struct {
 // being managed by the current instantiation of this OsqueryInstance is
 // healthy. If the instance is healthy, it returns nil.
 func (i *OsqueryInstance) Healthy() error {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	if !i.instanceStarted() {
@@ -191,7 +191,7 @@ func (i *OsqueryInstance) Healthy() error {
 }
 
 func (i *OsqueryInstance) Query(query string) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	if i.extensionManagerClient == nil {
@@ -200,11 +200,11 @@ func (i *OsqueryInstance) Query(query string) ([]map[string]string, error) {
 
 	resp, err := i.extensionManagerClient.QueryContext(ctx, query)
 	if err != nil {
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return nil, fmt.Errorf("could not query the extension manager client: %w", err)
 	}
 	if resp.Status.Code != int32(0) {
-		traces.SetError(span, errors.New(resp.Status.Message))
+		observability.SetError(span, errors.New(resp.Status.Message))
 		return nil, errors.New(resp.Status.Message)
 	}
 
@@ -282,7 +282,7 @@ func (i *OsqueryInstance) Exited() <-chan struct{} {
 // manager server, to add new KATC tables or update existing KATC tables' configurations
 // without restarting the entire instance.
 func (i *OsqueryInstance) ReloadKatcExtension(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if !i.instanceStarted() {
@@ -322,7 +322,7 @@ func (i *OsqueryInstance) instanceStarted() bool {
 // startKatcExtensionManagerServer starts a new extension manager server that provides
 // access to the KATC tables.
 func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, client *osquery.ExtensionManagerClient) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	katcTables := table.KolideCustomAtcTables(i.knapsack, i.registrationId, i.knapsack.Slogger().With("component", "katc_tables"))
@@ -337,7 +337,7 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 			"unable to create KATC extension manager server",
 			"err", err,
 		)
-		traces.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		observability.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
 		return fmt.Errorf("could not create KATC extension server: %w", err)
 	}
 	return nil
@@ -346,12 +346,12 @@ func (i *OsqueryInstance) startKatcExtensionManagerServer(ctx context.Context, c
 // Launch starts the osquery instance and its components. It will run until one of its
 // components becomes unhealthy, or until it is asked to shutdown via `BeginShutdown`.
 func (i *OsqueryInstance) Launch() error {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	// Create SaaS extension immediately
 	if err := i.startKolideSaasExtension(ctx); err != nil {
-		traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension: %w", err))
+		observability.SetError(span, fmt.Errorf("could not create Kolide SaaS extension: %w", err))
 		return fmt.Errorf("creating Kolide SaaS extension: %w", err)
 	}
 
@@ -359,7 +359,7 @@ func (i *OsqueryInstance) Launch() error {
 	// required osquery artifact files.
 	paths, err := calculateOsqueryPaths(i.knapsack.RootDirectory(), i.registrationId, i.runId, i.opts)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
+		observability.SetError(span, fmt.Errorf("could not calculate osquery file paths: %w", err))
 		return fmt.Errorf("could not calculate osquery file paths: %w", err)
 	}
 	i.paths = paths
@@ -418,12 +418,12 @@ func (i *OsqueryInstance) Launch() error {
 	// Populate augeas lenses, if requested
 	if i.opts.augeasLensFunc != nil {
 		if err := os.MkdirAll(i.paths.augeasPath, 0755); err != nil {
-			traces.SetError(span, fmt.Errorf("making augeas lenses directory: %w", err))
+			observability.SetError(span, fmt.Errorf("making augeas lenses directory: %w", err))
 			return fmt.Errorf("making augeas lenses directory: %w", err)
 		}
 
 		if err := i.opts.augeasLensFunc(i.paths.augeasPath); err != nil {
-			traces.SetError(span, fmt.Errorf("setting up augeas lenses: %w", err))
+			observability.SetError(span, fmt.Errorf("setting up augeas lenses: %w", err))
 			return fmt.Errorf("setting up augeas lenses: %w", err)
 		}
 	}
@@ -438,7 +438,7 @@ func (i *OsqueryInstance) Launch() error {
 	// the *exec.Cmd instance that will run osqueryd.
 	i.cmd, err = i.createOsquerydCommand(currentOsquerydBinaryPath)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
+		observability.SetError(span, fmt.Errorf("couldn't create osqueryd command: %w", err))
 		return fmt.Errorf("couldn't create osqueryd command: %w", err)
 	}
 
@@ -504,7 +504,7 @@ func (i *OsqueryInstance) Launch() error {
 	// needs for config/log/etc.
 	i.extensionManagerClient, err = i.StartOsqueryClient()
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
+		observability.SetError(span, fmt.Errorf("could not create an extension client: %w", err))
 		return fmt.Errorf("could not create an extension client: %w", err)
 	}
 	span.AddEvent("extension_client_created")
@@ -522,7 +522,7 @@ func (i *OsqueryInstance) Launch() error {
 			"unable to create Kolide SaaS extension server, stopping",
 			"err", err,
 		)
-		traces.SetError(span, fmt.Errorf("could not create Kolide SaaS extension server: %w", err))
+		observability.SetError(span, fmt.Errorf("could not create Kolide SaaS extension server: %w", err))
 		return fmt.Errorf("could not create Kolide SaaS extension server: %w", err)
 	}
 	span.AddEvent("extension_server_created")
@@ -534,7 +534,7 @@ func (i *OsqueryInstance) Launch() error {
 			"unable to create KATC extension server, stopping",
 			"err", err,
 		)
-		traces.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
+		observability.SetError(span, fmt.Errorf("could not create KATC extension server: %w", err))
 		return fmt.Errorf("could not create KATC extension server: %w", err)
 	}
 
@@ -568,7 +568,7 @@ func (i *OsqueryInstance) Launch() error {
 // startOsquerydProcess starts the osquery instance's `cmd` and waits for the osqueryd process
 // to create a socket file, indicating it's started up successfully.
 func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	i.slogger.Log(ctx, slog.LevelInfo,
@@ -590,7 +590,7 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 			"fatal error starting osquery -- could not exec.",
 			msgPairs...,
 		)
-		traces.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
+		observability.SetError(span, fmt.Errorf("fatal error starting osqueryd process: %w", err))
 		return fmt.Errorf("fatal error starting osqueryd process: %w", err)
 	}
 
@@ -614,7 +614,7 @@ func (i *OsqueryInstance) startOsquerydProcess(ctx context.Context) error {
 		}
 		return err
 	}, osqueryStartupTimeout, osqueryStartupRecheckInterval); err != nil {
-		traces.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err))
+		observability.SetError(span, fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err))
 		return fmt.Errorf("timeout waiting for osqueryd to create socket at %s: %w", i.paths.extensionSocketPath, err)
 	}
 
@@ -662,7 +662,7 @@ func (i *OsqueryInstance) healthcheckWithRetries(ctx context.Context, maxHealthC
 // startKolideSaasExtension creates the Kolide SaaS extension, which provides configuration,
 // distributed queries, and a log destination for the osquery process.
 func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// create the osquery extension

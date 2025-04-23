@@ -27,8 +27,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 const (
@@ -190,7 +190,7 @@ func (ser *secureEnclaveRunner) Sign(rand io.Reader, digest []byte, opts crypto.
 }
 
 func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecdsa.PublicKey, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	ser.uidPubKeyMapMux.Lock()
@@ -226,7 +226,7 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 		// got err, cannot determine if key is valid
 		if err != nil {
-			traces.SetError(span, fmt.Errorf("verifying existing key: %w", err))
+			observability.SetError(span, fmt.Errorf("verifying existing key: %w", err))
 			span.AddEvent("verifying_existing_key_for_console_user_failed")
 			return nil, fmt.Errorf("verifying existing key: %w", err)
 		}
@@ -250,7 +250,7 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 		)
 
 		if err := ser.save(); err != nil {
-			traces.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
+			observability.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
 			ser.slogger.Log(ctx, slog.LevelError,
 				"error saving secure enclave signer after key deletion",
 				"err", err,
@@ -264,7 +264,7 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	key, err := ser.secureEnclaveClient.CreateSecureEnclaveKey(ctx, cu.Uid)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("creating key: %w", err))
+		observability.SetError(span, fmt.Errorf("creating key: %w", err))
 		return nil, fmt.Errorf("creating key: %w", err)
 	}
 
@@ -282,7 +282,7 @@ func (ser *secureEnclaveRunner) currentConsoleUserKey(ctx context.Context) (*ecd
 
 	if err := ser.save(); err != nil {
 		delete(ser.uidPubKeyMap, cu.Uid)
-		traces.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
+		observability.SetError(span, fmt.Errorf("saving secure enclave signer: %w", err))
 		return nil, fmt.Errorf("saving secure enclave signer: %w", err)
 	}
 
@@ -353,17 +353,17 @@ func (noConsoleUsersError) Error() string {
 }
 
 func firstConsoleUser(ctx context.Context) (*user.User, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	c, err := consoleuser.CurrentUsers(ctx)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("getting current users: %w", err))
+		observability.SetError(span, fmt.Errorf("getting current users: %w", err))
 		return nil, fmt.Errorf("getting current users: %w", err)
 	}
 
 	if len(c) == 0 {
-		traces.SetError(span, errors.New("no console users found"))
+		observability.SetError(span, errors.New("no console users found"))
 		return nil, noConsoleUsersError{}
 	}
 

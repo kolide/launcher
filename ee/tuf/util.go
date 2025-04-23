@@ -11,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // CheckExecutable tests whether something is an executable. It
 // examines permissions, mode, and tries to exec it directly.
 func CheckExecutable(ctx context.Context, slogger *slog.Logger, potentialBinary string, args ...string) error {
-	ctx, span := traces.StartSpan(ctx, "binary_path", potentialBinary)
+	ctx, span := observability.StartSpan(ctx, "binary_path", potentialBinary)
 	defer span.End()
 
 	slogger = slogger.With("subcomponent", "CheckExecutable", "binary_path", potentialBinary, "args", fmt.Sprintf("%+v", args))
@@ -78,7 +78,7 @@ func CheckExecutable(ctx context.Context, slogger *slog.Logger, potentialBinary 
 
 // runExecutableCheck runs a single exec against the given binary and returns the result.
 func runExecutableCheck(ctx context.Context, potentialBinary string, args ...string) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

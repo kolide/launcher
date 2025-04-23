@@ -10,10 +10,10 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"go.etcd.io/bbolt"
 )
@@ -25,7 +25,7 @@ func LauncherDbInfo(flags types.Flags, slogger *slog.Logger, db *bbolt.DB) *tabl
 
 func generateLauncherDbInfo(db *bbolt.DB) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_db_info")
+		_, span := observability.StartSpan(ctx, "table_name", "kolide_launcher_db_info")
 		defer span.End()
 
 		stats, err := agent.GetStats(db)

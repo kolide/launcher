@@ -1,4 +1,4 @@
-package traces
+package observability
 
 import (
 	"testing"

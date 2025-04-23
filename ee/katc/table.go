@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -107,7 +107,7 @@ func filtersMatch(filters map[string]string) bool {
 
 // generate handles queries against a KATC table.
 func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", k.tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", k.tableName)
 	defer span.End()
 
 	if k.sourceType.dataFunc == nil {

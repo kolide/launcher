@@ -11,8 +11,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
 )
@@ -34,7 +34,7 @@ type autoupdateConfig struct {
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	slogger = slogger.With("component", "tuf_library_lookup")
@@ -80,7 +80,7 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 // pinned version and update channel. This accounts for e.g. the control server sending down
 // a particular value for the update channel, overriding the config file.
 func getUpdateSettingsFromStartupSettings(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, rootDirectory string) (string, string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	r, err := startupsettings.OpenReader(ctx, slogger, rootDirectory)
@@ -205,7 +205,7 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 // as its version.
 func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
 	updateDirectory string, pinnedVersion string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx, "binary", string(binary))
+	ctx, span := observability.StartSpan(ctx, "binary", string(binary))
 	defer span.End()
 	slogger = slogger.With("binary", string(binary), "update_channel", channel, "pinned_version", pinnedVersion)
 
@@ -237,7 +237,7 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 // findExecutable looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
 func findExecutable(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, pinnedVersion string, channel string, baseUpdateDirectory string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
@@ -262,11 +262,11 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
 	if _, err := os.Stat(targetPath); err != nil && errors.Is(err, os.ErrNotExist) {
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version or not yet downloaded", targetVersion, targetName, targetPath)
 	}
 	if err := CheckExecutable(ctx, slogger, targetPath, "--version"); err != nil {
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return nil, fmt.Errorf("version %s from target %s at %s is corrupted: %w", targetVersion, targetName, targetPath, err)
 	}
 
@@ -279,7 +279,7 @@ func findExecutable(ctx context.Context, binary autoupdatableBinary, tufReposito
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
 func mostRecentVersion(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Pull all available versions from library

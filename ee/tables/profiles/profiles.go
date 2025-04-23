@@ -22,10 +22,10 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -62,7 +62,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.tableName)
 	defer span.End()
 
 	var results []map[string]string
@@ -96,7 +96,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) generateProfile(ctx context.Context, command string, profileType string, user string, dataQuery string) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// apple documents `-output stdout-xml` as sending the

@@ -22,9 +22,9 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -166,7 +166,7 @@ func sendCallback(slogger *slog.Logger, req *http.Request, data *callbackDataStr
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r, span := traces.StartHttpRequestSpan(r)
+		r, span := observability.StartHttpRequestSpan(r)
 
 		defer span.End()
 
@@ -176,7 +176,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		challengeBox, err := extractChallenge(r)
 		if err != nil {
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"failed to extract box from request",
 				"err", err,
@@ -189,7 +189,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		if err := challengeBox.Verify(e.counterParty); err != nil {
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			e.slogger.Log(r.Context(), slog.LevelDebug,
 				"unable to verify signature",
 				"err", err,
@@ -203,7 +203,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 		// timestamp issues.
 		var cmdReq v2CmdRequestType
 		if err := json.Unmarshal(challengeBox.RequestData(), &cmdReq); err != nil {
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			e.slogger.Log(r.Context(), slog.LevelError,
 				"unable to unmarshal cmd request",
 				"err", err,
@@ -292,7 +292,7 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 
 		response, err := e.bufferedHttpResponseToKryptoResponse(challengeBox, bhr)
 		if err != nil {
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			e.slogger.Log(r.Context(), slog.LevelError,
 				"error creating krypto response",
 				"err", err,
@@ -649,7 +649,7 @@ func (e *kryptoEcMiddleware) kryptoResponse(box *challenge.OuterChallenge, data 
 // checkOrigin checks the origin of the request against a list of allowed origins.
 // If no allowlist is provided, all origins are allowed.
 func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []string) error {
-	r, span := traces.StartHttpRequestSpan(r)
+	r, span := observability.StartHttpRequestSpan(r)
 	defer span.End()
 
 	// Check if the origin is in the allowed list. See https://github.com/kolide/k2/issues/9634
@@ -679,7 +679,7 @@ func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []strin
 	}
 
 	span.SetAttributes(attribute.String("origin", origin))
-	traces.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
+	observability.SetError(span, fmt.Errorf("origin %s is not allowed", origin))
 	e.slogger.Log(r.Context(), slog.LevelError,
 		"origin is not allowed",
 		"allowlist", allowedOrigins,
@@ -693,7 +693,7 @@ func (e *kryptoEcMiddleware) checkOrigin(r *http.Request, allowedOrigins []strin
 // This prevents people from saving a challenge and then reusing it a bunch.
 // However, it will fail if the clocks are too far out of sync.
 func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *challenge.OuterChallenge) error {
-	r, span := traces.StartHttpRequestSpan(r)
+	r, span := observability.StartHttpRequestSpan(r)
 	defer span.End()
 
 	// Check the timestamp, this prevents people from saving a challenge and then
@@ -701,7 +701,7 @@ func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *chall
 	timestampDelta := time.Now().Unix() - challengeBox.Timestamp()
 	if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
 		span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
-		traces.SetError(span, errors.New("timestamp is out of range"))
+		observability.SetError(span, errors.New("timestamp is out of range"))
 		e.slogger.Log(r.Context(), slog.LevelError,
 			"timestamp is out of range",
 			"delta", timestampDelta,

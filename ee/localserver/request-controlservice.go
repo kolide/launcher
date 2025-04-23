@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 func (ls *localServer) requestAccelerateControlHandler() http.Handler {
@@ -15,7 +15,7 @@ func (ls *localServer) requestAccelerateControlHandler() http.Handler {
 }
 
 func (ls *localServer) requestAccelerateControlFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	if r.Body == nil {

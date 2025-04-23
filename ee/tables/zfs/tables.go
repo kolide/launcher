@@ -14,9 +14,9 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/pkg/errors"
 )
@@ -59,7 +59,7 @@ func ZpoolPropertiesPlugin(flags types.Flags, slogger *slog.Logger) *table.Plugi
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.tableName)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.tableName)
 	defer span.End()
 
 	// Generate ZFS commands.

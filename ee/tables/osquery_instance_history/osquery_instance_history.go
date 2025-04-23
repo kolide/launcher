@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -28,7 +28,7 @@ func TablePlugin(k types.Knapsack, slogger *slog.Logger) *table.Plugin {
 
 func generate(k types.Knapsack) table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		_, span := traces.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
+		_, span := observability.StartSpan(ctx, "table_name", "kolide_launcher_osquery_instance_history")
 		defer span.End()
 
 		osqHistory := k.OsqueryHistory()

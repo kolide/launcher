@@ -15,7 +15,7 @@ import (
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -33,7 +33,7 @@ var indexeddbComparer = newChromeComparer()
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
 func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
-	ctx, span := traces.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
+	ctx, span := observability.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
 	defer span.End()
 
 	// If Chrome is open, we won't be able to open the db. So, copy it to a temporary location first.
@@ -123,7 +123,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 }
 
 func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	dbCopyLocation, err := agent.MkdirTemp(filepath.Base(sourceDb))
@@ -156,7 +156,7 @@ func CopyLeveldb(ctx context.Context, sourceDb string) (string, error) {
 }
 
 func copyFile(ctx context.Context, src string, dest string) error {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	srcFh, err := os.Open(src)

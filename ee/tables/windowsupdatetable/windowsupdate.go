@@ -16,10 +16,10 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
 	"github.com/scjalliance/comshim"
@@ -92,7 +92,7 @@ type queryFuncType func(*windowsupdate.IUpdateSearcher) (interface{}, error)
 // issues in the `Search` function and not in `QueryHistoryAll` -- but to be safe and for ease
 // of implementation, we are moving both to launcher execs.
 func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
 
 	launcherPath, err := os.Executable()
@@ -170,7 +170,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 
 //nolint:unused
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", t.name)
+	ctx, span := observability.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
 
 	var results []map[string]string
@@ -195,7 +195,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 
 //nolint:unused
 func (t *Table) searchLocale(ctx context.Context, locale string, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	comshim.Add(1)

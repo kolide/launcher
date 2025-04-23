@@ -18,8 +18,8 @@ import (
 
 	"github.com/kolide/krypto/pkg/tpm"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type (
@@ -223,7 +223,7 @@ func clearKeyData(slogger *slog.Logger, deleter types.Deleter) {
 }
 
 func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	tr.mux.Lock()
@@ -237,7 +237,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 	priData, pubData, err := fetchKeyData(tr.store)
 	if err != nil {
 		thisErr := fmt.Errorf("fetching key data for data store: %w", err)
-		traces.SetError(span, thisErr)
+		observability.SetError(span, thisErr)
 		return thisErr
 	}
 
@@ -259,7 +259,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 			}
 
 			thisErr := fmt.Errorf("creating key: %w", err)
-			traces.SetError(span, thisErr)
+			observability.SetError(span, thisErr)
 
 			clearKeyData(tr.slogger, tr.store)
 			return thisErr
@@ -267,7 +267,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 
 		if err := storeKeyData(tr.store, priData, pubData); err != nil {
 			thisErr := fmt.Errorf("storing key data: %w", err)
-			traces.SetError(span, thisErr)
+			observability.SetError(span, thisErr)
 
 			clearKeyData(tr.slogger, tr.store)
 			return thisErr
@@ -282,7 +282,7 @@ func (tr *tpmRunner) loadOrCreateKeys(ctx context.Context) error {
 	k, err := tr.signerCreator.New(priData, pubData)
 	if err != nil {
 		thisErr := fmt.Errorf("creating tpm signer: %w", err)
-		traces.SetError(span, thisErr)
+		observability.SetError(span, thisErr)
 		return thisErr
 	}
 

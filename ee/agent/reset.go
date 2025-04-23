@@ -15,8 +15,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
-	"github.com/kolide/launcher/pkg/traces"
 )
 
 type dbResetRecord struct {
@@ -55,7 +55,7 @@ func (use UninitializedStorageError) Error() string {
 // has changed, it logs the change. In the future, it will take a backup of the database, and
 // then clear all data from it.
 func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	serialChanged := false
