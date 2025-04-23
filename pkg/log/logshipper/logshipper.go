@@ -20,8 +20,8 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/sendbuffer"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/sendbuffer"
 	slogmulti "github.com/samber/slog-multi"
 )
 

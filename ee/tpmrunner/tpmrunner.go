@@ -18,8 +18,8 @@ import (
 
 	"github.com/kolide/krypto/pkg/tpm"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/backoff"
 )
 
 type (

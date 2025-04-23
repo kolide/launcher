@@ -15,8 +15,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 )
 
 type dbResetRecord struct {

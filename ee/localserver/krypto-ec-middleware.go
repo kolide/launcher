@@ -22,9 +22,9 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/otel/attribute"
 )
 

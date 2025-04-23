@@ -11,8 +11,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
 )

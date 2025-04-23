@@ -19,9 +19,9 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/sys/windows"
 )
 

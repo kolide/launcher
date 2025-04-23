@@ -11,8 +11,8 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 	"github.com/kolide/launcher/ee/observability"
+	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type enrollmentRequest struct {

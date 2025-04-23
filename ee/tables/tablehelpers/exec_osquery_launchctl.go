@@ -14,8 +14,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 // ExecOsqueryLaunchctl runs osquery under launchctl, in a user context.

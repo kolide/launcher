@@ -11,8 +11,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/service"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
 

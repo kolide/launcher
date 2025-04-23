@@ -10,8 +10,8 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 	"github.com/kolide/launcher/ee/observability"
+	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type configRequest struct {

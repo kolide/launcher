@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )

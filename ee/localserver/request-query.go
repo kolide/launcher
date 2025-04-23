@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"go.opentelemetry.io/otel/trace"
 )
