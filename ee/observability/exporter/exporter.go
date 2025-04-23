@@ -37,7 +37,7 @@ var archAttributeMap = map[string]attribute.KeyValue{
 var enrollmentDetailsRecheckInterval = 5 * time.Second
 
 type TelemetryExporter struct {
-	provider                  *sdktrace.TracerProvider
+	tracerProvider            *sdktrace.TracerProvider
 	providerLock              sync.Mutex
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
@@ -82,7 +82,7 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 	}
 
 	if initialTraceBuffer != nil {
-		t.provider = initialTraceBuffer.provider
+		t.tracerProvider = initialTraceBuffer.provider
 		t.bufSpanProcessor = initialTraceBuffer.bufSpanProcessor
 		t.attrs = initialTraceBuffer.attrs
 	} else {
@@ -259,14 +259,14 @@ func (t *TelemetryExporter) setNewGlobalProvider(rebuildExporter bool) {
 	otel.SetTracerProvider(newProvider)
 	osquerygotraces.SetTracerProvider(newProvider)
 
-	if t.provider != nil {
+	if t.tracerProvider != nil {
 		// shutdown still gets called even though the span processor is unregistered
 		// leaving this in because it just feel correct
-		t.provider.UnregisterSpanProcessor(t.bufSpanProcessor)
-		t.provider.Shutdown(t.ctx)
+		t.tracerProvider.UnregisterSpanProcessor(t.bufSpanProcessor)
+		t.tracerProvider.Shutdown(t.ctx)
 	}
 
-	t.provider = newProvider
+	t.tracerProvider = newProvider
 
 	if !rebuildExporter {
 		return
@@ -322,8 +322,8 @@ func (t *TelemetryExporter) Interrupt(_ error) {
 
 	t.interrupted.Store(true)
 
-	if t.provider != nil {
-		t.provider.Shutdown(t.ctx)
+	if t.tracerProvider != nil {
+		t.tracerProvider.Shutdown(t.ctx)
 	}
 
 	t.cancel()
@@ -369,8 +369,8 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 			)
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
-			if t.provider != nil {
-				t.provider.Shutdown(t.ctx)
+			if t.tracerProvider != nil {
+				t.tracerProvider.Shutdown(t.ctx)
 			}
 			t.enabled = false
 			t.slogger.Log(ctx, slog.LevelDebug,

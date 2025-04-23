@@ -66,7 +66,7 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 	// Confirm we set a provider
 	telemetryExporter.providerLock.Lock()
 	defer telemetryExporter.providerLock.Unlock()
-	require.NotNil(t, telemetryExporter.provider, "expected provider to be created")
+	require.NotNil(t, telemetryExporter.tracerProvider, "expected provider to be created")
 
 	mockKnapsack.AssertExpectations(t)
 }
@@ -90,7 +90,7 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
-	require.Nil(t, telemetryExporter.provider, "expected disabled exporter to not create a provider but one was created")
+	require.Nil(t, telemetryExporter.tracerProvider, "expected disabled exporter to not create a provider but one was created")
 
 	// Confirm we added basic attributes
 	require.Equal(t, 3, len(telemetryExporter.attrs))
@@ -384,7 +384,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			if tt.shouldReplaceProvider {
 				mockKnapsack.AssertExpectations(t)
 				require.Greater(t, len(traceExporter.attrs), 0)
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
 			}
 		})
 	}
@@ -453,9 +453,9 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newTraceSamplingRate, traceExporter.traceSamplingRate, "trace sampling rate value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
 			}
 		})
 	}
@@ -521,9 +521,9 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newObservabilityIngestServerURL, traceExporter.ingestUrl, "ingest url value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
 			}
 		})
 	}
@@ -595,9 +595,9 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			require.Equal(t, tt.newDisableTraceIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
 			}
 		})
 	}
@@ -667,9 +667,9 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
 			}
 		})
 	}
