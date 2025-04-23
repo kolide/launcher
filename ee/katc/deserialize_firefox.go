@@ -768,20 +768,6 @@ func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
 	return resultObj, nil
 }
 
-// Firefox error tag constants
-const (
-	// Error prototype tags - these are used in Firefox to identify the error type
-	firefoxErrorTagError          uint32 = 1 // Generic Error
-	firefoxErrorTagEvalError      uint32 = 2 // EvalError
-	firefoxErrorTagRangeError     uint32 = 3 // RangeError
-	firefoxErrorTagReferenceError uint32 = 4 // ReferenceError
-	firefoxErrorTagSyntaxError    uint32 = 5 // SyntaxError
-	firefoxErrorTagTypeError      uint32 = 6 // TypeError
-	firefoxErrorTagURIError       uint32 = 7 // URIError
-	firefoxErrorTagInternalError  uint32 = 8 // InternalError (Mozilla-specific)
-	firefoxErrorTagAggregateError uint32 = 9 // AggregateError (ES2021)
-)
-
 // deserializeError handles the upcoming Error object in srcReader.
 func deserializeError(srcReader *bytes.Reader) ([]byte, error) {
 	// Create a map to hold the error properties
