@@ -805,7 +805,8 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 				)
 				// If we hit EOF, just return what we have so far
 				if errors.Is(err, io.EOF) {
-					slog.Warn("reached EOF while deserializing property name, returning partial error object")
+					slogger.Log(ctx, slog.LevelWarn,
+						"reached EOF while deserializing property name, returning partial error object")
 					break
 				}
 				return nil, fmt.Errorf("deserializing property name: %w", err)
