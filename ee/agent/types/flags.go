@@ -197,7 +197,7 @@ type Flags interface {
 	SetExportTracesOverride(value bool, duration time.Duration)
 	ExportTraces() bool
 
-	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of observability.should be sampled.
+	// TraceSamplingRate is a number between 0.0 and 1.0 that indicates what fraction of traces should be sampled.
 	SetTraceSamplingRate(rate float64) error
 	SetTraceSamplingRateOverride(value float64, duration time.Duration)
 	TraceSamplingRate() float64

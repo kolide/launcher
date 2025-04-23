@@ -56,7 +56,7 @@ type TraceExporter struct {
 	interrupted               atomic.Bool
 }
 
-// NewTraceExporter sets up our observability.to be exported via OTLP over HTTP.
+// NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
 func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TraceExporter, error) {
 	ctx, span := observability.StartSpan(ctx)
