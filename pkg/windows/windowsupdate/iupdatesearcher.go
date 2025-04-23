@@ -53,6 +53,16 @@ func toIUpdateSearcher(updateSearcherDisp *ole.IDispatch) (*IUpdateSearcher, err
 	return iUpdateSearcher, nil
 }
 
+func (iUpdateSearcher *IUpdateSearcher) PutOnline(online bool) error {
+	updatedOnline, err := oleconv.ToBoolErr(oleutil.PutProperty(iUpdateSearcher.disp, "Online", online))
+	if err != nil {
+		return fmt.Errorf("updating Online to %v: %w", online, err)
+	}
+
+	iUpdateSearcher.Online = updatedOnline
+	return nil
+}
+
 // Search performs a synchronous search for updates. The search uses the search options that are currently configured.
 // https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search
 func (iUpdateSearcher *IUpdateSearcher) Search(criteria string) (*ISearchResult, error) {

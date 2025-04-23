@@ -25,6 +25,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		secedit.TablePlugin(k, slogger),
 		wifi_networks.TablePlugin(k, slogger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesTable, k, slogger),
+		windowsupdatetable.TablePlugin(windowsupdatetable.UpdatesOfflineTable, k, slogger),
 		windowsupdatetable.TablePlugin(windowsupdatetable.HistoryTable, k, slogger),
 		wmitable.TablePlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_dsregcmd", dsregcmd.Parser, allowedcmd.Dsregcmd, []string{`/status`}),

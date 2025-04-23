@@ -38,6 +38,7 @@ type tableMode int
 const (
 	UpdatesTable tableMode = iota
 	HistoryTable
+	UpdatesOfflineTable
 )
 
 type Table struct {
@@ -62,6 +63,9 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 	case UpdatesTable:
 		t.queryFunc = queryUpdates
 		t.name = "kolide_windows_updates"
+	case UpdatesOfflineTable:
+		t.queryFunc = queryUpdates
+		t.name = "kolide_windows_updates_offline"
 	case HistoryTable:
 		t.queryFunc = queryHistory
 		t.name = "kolide_windows_update_history"

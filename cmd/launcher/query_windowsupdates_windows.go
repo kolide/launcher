@@ -24,7 +24,7 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 	var (
 		flagset     = flag.NewFlagSet("query-windowsupdates", flag.ExitOnError)
 		flLocale    = flagset.String("locale", "_default", "search locale")
-		flTableMode = flagset.Int("table_mode", int(windowsupdatetable.UpdatesTable), fmt.Sprintf("updates table (%d); history table (%d)", windowsupdatetable.UpdatesTable, windowsupdatetable.HistoryTable))
+		flTableMode = flagset.Int("table_mode", int(windowsupdatetable.UpdatesTable), fmt.Sprintf("updates table (%d); history table (%d); offline updates (%d)", windowsupdatetable.UpdatesTable, windowsupdatetable.HistoryTable, windowsupdatetable.UpdatesOfflineTable))
 	)
 
 	if err := ff.Parse(flagset, args); err != nil {
@@ -67,6 +67,11 @@ func searchLocale(locale string, tableMode int) ([]byte, string, int, error) {
 		searchResults, err = searcher.Search("Type='Software'")
 	} else if tableMode == int(windowsupdatetable.HistoryTable) {
 		searchResults, err = searcher.QueryHistoryAll()
+	} else if tableMode == int(windowsupdatetable.UpdatesOfflineTable) {
+		searchResults, err = searcher.Search("Type='Software'")
+		if err := searcher.PutOnline(false); err != nil {
+			return nil, "", 0, fmt.Errorf("updating search to offline: %w", err)
+		}
 	} else {
 		return nil, "", 0, fmt.Errorf("unsupported table mode %d", tableMode)
 	}
