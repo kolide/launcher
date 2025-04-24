@@ -109,6 +109,43 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	k.AssertExpectations(t)
 }
 
+func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
+	t.Parallel()
+
+	dt4aAccountId, dt4aUserId := ulid.New(), ulid.New()
+
+	// Set up our dt4a store with some test data in it
+	slogger := multislogger.NewNopLogger()
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
+	require.NoError(t, err)
+
+	// Set up the rest of our localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(slogger)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request.Header.Set("origin", acceptableOrigin(t))
+	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
+	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
+
+	responseRecorder := httptest.NewRecorder()
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was a 204 when no data was available
+	require.Equal(t, http.StatusNoContent, responseRecorder.Code)
+
+	k.AssertExpectations(t)
+}
+
 func acceptableOrigin(t *testing.T) string {
 	// Just grab the first origin available in our allowlist
 	acceptableOrigin := ""
@@ -314,8 +351,8 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
-	// Make sure response was a 404
-	require.Equal(t, http.StatusNotFound, responseRecorder.Code)
+	// Make sure response was a 204 when no data was available
+	require.Equal(t, http.StatusNoContent, responseRecorder.Code)
 
 	k.AssertExpectations(t)
 }
