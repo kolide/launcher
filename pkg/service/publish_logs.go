@@ -10,8 +10,6 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/osquery/osquery-go/plugin/logger"
-
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type contextKey string
@@ -35,34 +33,6 @@ type publishLogsResponse struct {
 	Err         error  `json:"err,omitempty"`
 }
 
-func decodeGRPCLogCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.LogCollection)
-	logs := make([]string, 0, len(req.Logs))
-	for _, log := range req.Logs {
-		logs = append(logs, log.Data)
-	}
-
-	// Note: The conversion here is lossy because the osquery-go logType has more
-	// enum values than kolide_agent.
-	// For now this should be enough because we don't use the Agent LogType anywhere.
-	// A more robust fix should come from fixing https://github.com/kolide/launcher/issues/183
-	var typ logger.LogType
-	switch req.LogType { //nolint:exhaustive // This code is old and not in use
-	case pb.LogCollection_STATUS:
-		typ = logger.LogTypeStatus
-	case pb.LogCollection_RESULT:
-		typ = logger.LogTypeSnapshot
-	default:
-		return logCollection{}, fmt.Errorf("unsupported log type %d", req.LogType)
-	}
-
-	return logCollection{
-		NodeKey: req.NodeKey,
-		LogType: typ,
-		Logs:    logs,
-	}, nil
-}
-
 func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (interface{}, error) {
 	var req logCollection
 
@@ -74,54 +44,6 @@ func decodeJSONRPCLogCollection(_ context.Context, msg json.RawMessage) (interfa
 	}
 	return req, nil
 }
-
-func encodeGRPCLogCollection(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(logCollection)
-	logs := make([]*pb.LogCollection_Log, 0, len(req.Logs))
-	for _, log := range req.Logs {
-		logs = append(logs, &pb.LogCollection_Log{Data: log})
-	}
-
-	var typ pb.LogCollection_LogType
-	switch req.LogType { //nolint:exhaustive // This code is old and not in use
-	case logger.LogTypeStatus:
-		typ = pb.LogCollection_STATUS
-	case logger.LogTypeString, logger.LogTypeSnapshot:
-		typ = pb.LogCollection_RESULT
-	default:
-		typ = pb.LogCollection_AGENT
-	}
-
-	return &pb.LogCollection{
-		NodeKey: req.NodeKey,
-		LogType: typ,
-		Logs:    logs,
-	}, nil
-}
-
-func decodeGRPCPublishLogsResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.AgentApiResponse)
-	return publishLogsResponse{
-		jsonRpcResponse: jsonRpcResponse{
-			DisableDevice: req.DisableDevice,
-		},
-		Message:     req.Message,
-		ErrorCode:   req.ErrorCode,
-		NodeInvalid: req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCPublishLogsResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(publishLogsResponse)
-	resp := &pb.AgentApiResponse{
-		Message:       req.Message,
-		ErrorCode:     req.ErrorCode,
-		NodeInvalid:   req.NodeInvalid,
-		DisableDevice: req.DisableDevice,
-	}
-	return encodeResponse(resp, req.Err)
-}
-
 func encodeJSONRPCPublishLogsResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
 	res, ok := obj.(publishLogsResponse)
 	if !ok {
@@ -174,14 +96,6 @@ func (e Endpoints) PublishLogs(ctx context.Context, nodeKey string, logType logg
 	}
 
 	return resp.Message, resp.ErrorCode, resp.NodeInvalid, resp.Err
-}
-
-func (s *grpcServer) PublishLogs(ctx context.Context, req *pb.LogCollection) (*pb.AgentApiResponse, error) {
-	_, rep, err := s.logs.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return rep.(*pb.AgentApiResponse), nil
 }
 
 func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (message, errcode string, reauth bool, err error) {

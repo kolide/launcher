@@ -10,7 +10,6 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/ee/observability"
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
@@ -39,13 +38,6 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	return result, nil
 }
 
-func decodeGRPCQueriesRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.AgentApiRequest)
-	return queriesRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
 func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
 	var req queriesRequest
 
@@ -56,50 +48,6 @@ func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interf
 		}
 	}
 	return req, nil
-}
-
-func encodeGRPCQueriesRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(queriesRequest)
-	return &pb.AgentApiRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
-func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.QueryCollection)
-	queries := distributed.GetQueriesResult{
-		Queries:   map[string]string{},
-		Discovery: map[string]string{},
-	}
-	for _, query := range req.Queries {
-		queries.Queries[query.Id] = query.Query
-	}
-	return queryCollectionResponse{
-		jsonRpcResponse: jsonRpcResponse{
-			DisableDevice: req.DisableDevice,
-		},
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(queryCollectionResponse)
-	queries := make([]*pb.QueryCollection_Query, 0, len(req.Queries.Queries))
-	for id, query := range req.Queries.Queries {
-		queries = append(queries,
-			&pb.QueryCollection_Query{
-				Id:    id,
-				Query: query,
-			},
-		)
-	}
-	resp := &pb.QueryCollection{
-		Queries:       queries,
-		NodeInvalid:   req.NodeInvalid,
-		DisableDevice: req.DisableDevice,
-	}
-	return encodeResponse(resp, req.Err)
 }
 
 func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
@@ -153,14 +101,6 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 	}
 
 	return &resp.Queries, resp.NodeInvalid, resp.Err
-}
-
-func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
-	_, rep, err := s.queries.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return rep.(*pb.QueryCollection), nil
 }
 
 func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
