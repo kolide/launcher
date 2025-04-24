@@ -115,6 +115,8 @@ func (r *Runner) runInstance(registrationId string) error {
 			"osquery instance exited",
 		)
 
+		observability.OsqueryRestartCounter.Add(ctx, 1)
+
 		select {
 		case <-r.shutdown:
 			// Intentional shutdown of runner -- exit worker
