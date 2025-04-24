@@ -322,6 +322,10 @@ func (t *TelemetryExporter) Interrupt(_ error) {
 
 	t.interrupted.Store(true)
 
+	// Record launcher shutdown -- we do this here (rather than in e.g. rungroup shutdown) to ensure
+	// we will write this metric before we complete `Interrupt`
+	observability.LauncherRestartCounter.Add(t.ctx, 1)
+
 	if t.tracerProvider != nil {
 		t.tracerProvider.Shutdown(t.ctx)
 	}
