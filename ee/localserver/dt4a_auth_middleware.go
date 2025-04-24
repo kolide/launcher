@@ -143,7 +143,7 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		if bhr.code < 200 || bhr.code >= 300 {
 			// hacky sleep here so that it's likely a response form another launcher
 			// on a different port will return with success faster than this failure
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), requestTrustChain.counterPartyPubEncryptionKey)
