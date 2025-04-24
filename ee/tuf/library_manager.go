@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/theupdateframework/go-tuf/data"
 	tufutil "github.com/theupdateframework/go-tuf/util"
 )
@@ -441,7 +441,7 @@ func (ulm *updateLibraryManager) TidyLibrary(binary autoupdatableBinary, current
 // available versions. It returns a sorted list of the valid versions, a list of invalid versions, and
 // an error only when unable to glob for versions.
 func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory string) ([]string, []string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	rawVersionsInLibrary, err := filepath.Glob(filepath.Join(updatesDirectory(binary, baseUpdateDirectory), "*"))
@@ -468,7 +468,7 @@ func sortedVersionsInLibrary(ctx context.Context, slogger *slog.Logger, binary a
 
 		versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), rawVersion)
 		if err := CheckExecutable(ctx, slogger, executableLocation(versionDir, binary), "--version"); err != nil {
-			traces.SetError(span, err)
+			observability.SetError(span, err)
 			slogger.Log(ctx, slog.LevelWarn,
 				"detected invalid binary version while checking executable",
 				"version_dir", versionDir,

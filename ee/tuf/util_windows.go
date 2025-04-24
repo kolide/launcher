@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // executableLocation returns the path to the executable in `updateDirectory`.
@@ -26,7 +26,7 @@ func executableLocation(updateDirectory string, binary autoupdatableBinary) stri
 // Windows does not have executable bits, so we omit those. And
 // instead check the file extension.
 func checkExecutablePermissions(ctx context.Context, potentialBinary string) error {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if potentialBinary == "" {

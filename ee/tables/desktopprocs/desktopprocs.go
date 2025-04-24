@@ -7,8 +7,8 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -24,7 +24,7 @@ func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 
 func generate() table.GenerateFunc {
 	return func(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-		_, span := traces.StartSpan(ctx, "table_name", "kolide_desktop_procs")
+		_, span := observability.StartSpan(ctx, "table_name", "kolide_desktop_procs")
 		defer span.End()
 
 		results := []map[string]string{}

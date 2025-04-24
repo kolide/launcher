@@ -11,8 +11,8 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/kolide/launcher/pkg/traces/bufspanprocessor"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/observability/bufspanprocessor"
 	osquerygotraces "github.com/osquery/osquery-go/traces"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -36,8 +36,8 @@ var archAttributeMap = map[string]attribute.KeyValue{
 
 var enrollmentDetailsRecheckInterval = 5 * time.Second
 
-type TraceExporter struct {
-	provider                  *sdktrace.TracerProvider
+type TelemetryExporter struct {
+	tracerProvider            *sdktrace.TracerProvider
 	providerLock              sync.Mutex
 	bufSpanProcessor          *bufspanprocessor.BufSpanProcessor
 	knapsack                  types.Knapsack
@@ -56,19 +56,19 @@ type TraceExporter struct {
 	interrupted               atomic.Bool
 }
 
-// NewTraceExporter sets up our traces to be exported via OTLP over HTTP.
+// NewTelemetryExporter sets up our telemetry (traces and soon metrics) to be exported via OTLP over HTTP.
 // On interrupt, the provider will be shut down.
-func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TraceExporter, error) {
-	ctx, span := traces.StartSpan(ctx)
+func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer *InitialTraceBuffer) (*TelemetryExporter, error) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	currentToken, _ := k.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	ctx, cancel := context.WithCancel(ctx)
 
-	t := &TraceExporter{
+	t := &TelemetryExporter{
 		providerLock:              sync.Mutex{},
 		knapsack:                  k,
-		slogger:                   k.Slogger().With("component", "trace_exporter"),
+		slogger:                   k.Slogger().With("component", "telemetry_exporter"),
 		attrLock:                  sync.RWMutex{},
 		ingestClientAuthenticator: newClientAuthenticator(string(currentToken), k.DisableTraceIngestTLS()),
 		ingestAuthToken:           string(currentToken),
@@ -82,7 +82,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 	}
 
 	if initialTraceBuffer != nil {
-		t.provider = initialTraceBuffer.provider
+		t.tracerProvider = initialTraceBuffer.provider
 		t.bufSpanProcessor = initialTraceBuffer.bufSpanProcessor
 		t.attrs = initialTraceBuffer.attrs
 	} else {
@@ -102,7 +102,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 
 	// Set our own error handler to avoid otel printing errors
 	otel.SetErrorHandler(newErrorHandler(
-		k.Slogger().With("component", "trace_exporter"),
+		k.Slogger().With("component", "telemetry_exporter"),
 	))
 
 	t.addDeviceIdentifyingAttributes()
@@ -123,7 +123,7 @@ func NewTraceExporter(ctx context.Context, k types.Knapsack, initialTraceBuffer 
 
 // addDeviceIdentifyingAttributes gets device identifiers from the server-provided
 // data and adds them to our resource attributes.
-func (t *TraceExporter) addDeviceIdentifyingAttributes() {
+func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 	t.attrLock.Lock()
 	defer t.attrLock.Unlock()
 
@@ -177,7 +177,7 @@ func hasRequiredEnrollmentDetails(details types.EnrollmentDetails) bool {
 
 // addAttributesFromOsquery waits for enrollment details to be available
 // and then adds the relevant attributes
-func (t *TraceExporter) addAttributesFromOsquery() {
+func (t *TelemetryExporter) addAttributesFromOsquery() {
 	// Wait until enrollment details are available
 	retryTimeout := time.Now().Add(3 * time.Minute)
 	for {
@@ -206,7 +206,7 @@ func (t *TraceExporter) addAttributesFromOsquery() {
 	}
 }
 
-func (t *TraceExporter) addAttributesFromEnrollmentDetails(details types.EnrollmentDetails) {
+func (t *TelemetryExporter) addAttributesFromEnrollmentDetails(details types.EnrollmentDetails) {
 	t.attrLock.Lock()
 	defer t.attrLock.Unlock()
 
@@ -225,7 +225,7 @@ func (t *TraceExporter) addAttributesFromEnrollmentDetails(details types.Enrollm
 
 // setNewGlobalProvider creates and sets a new global provider with the currently-available
 // attributes. If a provider was previously set, it will be shut down.
-func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
+func (t *TelemetryExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.providerLock.Lock()
 	defer t.providerLock.Unlock()
 
@@ -259,14 +259,14 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	otel.SetTracerProvider(newProvider)
 	osquerygotraces.SetTracerProvider(newProvider)
 
-	if t.provider != nil {
+	if t.tracerProvider != nil {
 		// shutdown still gets called even though the span processor is unregistered
 		// leaving this in because it just feel correct
-		t.provider.UnregisterSpanProcessor(t.bufSpanProcessor)
-		t.provider.Shutdown(t.ctx)
+		t.tracerProvider.UnregisterSpanProcessor(t.bufSpanProcessor)
+		t.tracerProvider.Shutdown(t.ctx)
 	}
 
-	t.provider = newProvider
+	t.tracerProvider = newProvider
 
 	if !rebuildExporter {
 		return
@@ -301,8 +301,8 @@ func (t *TraceExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.ingestUrl = t.knapsack.TraceIngestServerURL()
 }
 
-// Execute begins exporting traces, if exporting is enabled.
-func (t *TraceExporter) Execute() error {
+// Execute begins exporting observability. if exporting is enabled.
+func (t *TelemetryExporter) Execute() error {
 	if t.enabled {
 		t.setNewGlobalProvider(true)
 		t.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -314,7 +314,7 @@ func (t *TraceExporter) Execute() error {
 	return nil
 }
 
-func (t *TraceExporter) Interrupt(_ error) {
+func (t *TelemetryExporter) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
 	if t.interrupted.Load() {
 		return
@@ -322,8 +322,8 @@ func (t *TraceExporter) Interrupt(_ error) {
 
 	t.interrupted.Store(true)
 
-	if t.provider != nil {
-		t.provider.Shutdown(t.ctx)
+	if t.tracerProvider != nil {
+		t.tracerProvider.Shutdown(t.ctx)
 	}
 
 	t.cancel()
@@ -331,7 +331,7 @@ func (t *TraceExporter) Interrupt(_ error) {
 
 // Update satisfies control.subscriber interface -- looks at changes to the `observability_ingest` subsystem,
 // which amounts to a new bearer auth token being provided.
-func (t *TraceExporter) Ping() {
+func (t *TelemetryExporter) Ping() {
 	newToken, err := t.knapsack.TokenStore().Get(storage.ObservabilityIngestAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -349,8 +349,8 @@ func (t *TraceExporter) Ping() {
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
 // that we care about, which are ingest_url and export_traces.
-func (t *TraceExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	ctx, span := traces.StartSpan(ctx)
+func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	needsNewProvider := false
@@ -369,8 +369,8 @@ func (t *TraceExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagK
 			)
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
-			if t.provider != nil {
-				t.provider.Shutdown(t.ctx)
+			if t.tracerProvider != nil {
+				t.tracerProvider.Shutdown(t.ctx)
 			}
 			t.enabled = false
 			t.slogger.Log(ctx, slog.LevelDebug,

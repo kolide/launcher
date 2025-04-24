@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/version"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 // single instance of them running in a given root directory. As such,
 // this writes a single file, cleans up any old ones.
 func RecordLauncherVersion(ctx context.Context, rootDir string) error {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	verFile := makeFilePath(rootDir, version.Version().Version)

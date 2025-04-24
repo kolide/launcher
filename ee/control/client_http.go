@@ -18,7 +18,7 @@ import (
 
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -72,7 +72,7 @@ func NewControlHTTPClient(addr string, client *http.Client, logger *slog.Logger,
 }
 
 func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	challengeReq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/api/agent/config").String(), nil)
@@ -164,7 +164,7 @@ func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) e
 }
 
 func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Reader, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if c.token == "" {
@@ -191,7 +191,7 @@ func (c *HTTPClient) GetSubsystemData(ctx context.Context, hash string) (io.Read
 
 // SendMessage sends a message to the server using JSON-RPC format
 func (c *HTTPClient) SendMessage(ctx context.Context, method string, params interface{}) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	if c.token == "" {
@@ -235,7 +235,7 @@ func (c *HTTPClient) SendMessage(ctx context.Context, method string, params inte
 
 // TODO: this should probably just return a io.Reader
 func (c *HTTPClient) do(req *http.Request) ([]byte, error) {
-	req, span := traces.StartHttpRequestSpan(req)
+	req, span := observability.StartHttpRequestSpan(req)
 	defer span.End()
 
 	// Ensure we set a timeout on the request

@@ -20,8 +20,8 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/sendbuffer"
-	"github.com/kolide/launcher/pkg/traces"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -77,7 +77,7 @@ func New(k types.Knapsack, baseLogger log.Logger) *LogShipper {
 }
 
 func (ls *LogShipper) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// TODO: only make updates that are relevant to flag key changes

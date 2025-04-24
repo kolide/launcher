@@ -10,7 +10,7 @@ import (
 
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type (
@@ -74,7 +74,7 @@ func (ls *localServer) requestIdHandler() http.Handler {
 }
 
 func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	r, span := traces.StartHttpRequestSpan(r, "path", r.URL.Path)
+	r, span := observability.StartHttpRequestSpan(r, "path", r.URL.Path)
 	defer span.End()
 
 	enrollmentStatus, _ := ls.knapsack.CurrentEnrollmentStatus()
@@ -93,7 +93,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 
 	jsonBytes, err := json.Marshal(response)
 	if err != nil {
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		ls.slogger.Log(r.Context(), slog.LevelError,
 			"marshaling json",
 			"err", err,

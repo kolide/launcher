@@ -18,10 +18,10 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -44,7 +44,7 @@ func RecommendedUpdates(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_macos_recommended_updates")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_macos_recommended_updates")
 	defer span.End()
 
 	var results []map[string]string
@@ -82,7 +82,7 @@ func updateKeyValueFound(index C.uint, key, value *C.char) {
 }
 
 func getUpdates(ctx context.Context) map[string]interface{} {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	results := make(map[string]interface{})

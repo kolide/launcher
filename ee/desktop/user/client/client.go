@@ -15,8 +15,8 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
-	"github.com/kolide/launcher/pkg/traces"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -65,28 +65,28 @@ func New(authToken, socketPath string, opts ...clientOption) client {
 }
 
 func (c *client) Shutdown(ctx context.Context) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	return c.getWithContext(ctx, "shutdown")
 }
 
 func (c *client) Ping() error {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	return c.getWithContext(ctx, "ping")
 }
 
 func (c *client) Refresh() error {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	return c.getWithContext(ctx, "refresh")
 }
 
 func (c *client) ShowDesktop() error {
-	ctx, span := traces.StartSpan(context.TODO())
+	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
 	return c.getWithContext(ctx, "show")
@@ -135,7 +135,7 @@ func (c *client) DetectPresence(reason string, interval time.Duration) (time.Dur
 }
 
 func (c *client) CreateSecureEnclaveKey(ctx context.Context) ([]byte, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://unix/secure_enclave_key", http.NoBody)
@@ -172,7 +172,7 @@ func (c *client) CreateSecureEnclaveKey(ctx context.Context) ([]byte, error) {
 // false, nil if the key does not exist;
 // false, error don't know if key exists because of some other error
 func (c *client) VerifySecureEnclaveKey(ctx context.Context, key *ecdsa.PublicKey) (bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	b64, err := echelper.PublicEcdsaToB64Der(key)
@@ -253,7 +253,7 @@ func (c *client) get(path string) error {
 }
 
 func (c *client) getWithContext(ctx context.Context, path string) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	timeout := c.base.Timeout

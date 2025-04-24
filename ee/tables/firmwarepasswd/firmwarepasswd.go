@@ -18,9 +18,9 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -70,7 +70,7 @@ func New(slogger *slog.Logger) *Table {
 }
 
 func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_firmwarepasswd")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_firmwarepasswd")
 	defer span.End()
 
 	result := make(map[string]string)
@@ -97,7 +97,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 }
 
 func (t *Table) runFirmwarepasswd(ctx context.Context, subcommand string, output *bytes.Buffer) error {
-	ctx, span := traces.StartSpan(ctx, "subcommand", subcommand)
+	ctx, span := observability.StartSpan(ctx, "subcommand", subcommand)
 	defer span.End()
 
 	dir, err := agent.MkdirTemp("osq-firmwarepasswd")

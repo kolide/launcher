@@ -11,8 +11,8 @@ import (
 	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/table"
 	_ "modernc.org/sqlite"
 )
@@ -37,7 +37,7 @@ type GDriveSyncHistory struct {
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([]map[string]string, error) {
-	_, span := traces.StartSpan(ctx, "path", path)
+	_, span := observability.StartSpan(ctx, "path", path)
 	defer span.End()
 
 	dir, err := agent.MkdirTemp("kolide_gdrive_sync_history")
@@ -103,7 +103,7 @@ func (g *GDriveSyncHistory) generateForPath(ctx context.Context, path string) ([
 // GDriveSyncHistoryGenerate will be called whenever the table is queried. It should return
 // a full table scan.
 func (g *GDriveSyncHistory) generate(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
-	ctx, span := traces.StartSpan(ctx, "table_name", "kolide_gdrive_sync_history")
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_gdrive_sync_history")
 	defer span.End()
 
 	files, err := findFileInUserDirs("Library/Application Support/Google/Drive/user_default/snapshot.db", g.slogger)

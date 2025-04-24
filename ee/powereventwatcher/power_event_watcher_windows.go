@@ -14,7 +14,7 @@ import (
 	"unsafe"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"golang.org/x/text/encoding/unicode"
 )
 
@@ -166,7 +166,7 @@ func (ks *knapsackSleepStateUpdater) OnStartup() error {
 
 // New sets up a subscription to relevant power events with a callback to `onPowerEvent`.
 func New(ctx context.Context, slogger *slog.Logger, pes powerEventSubscriber) (*powerEventWatcher, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	evtApi := syscall.NewLazyDLL("wevtapi.dll")

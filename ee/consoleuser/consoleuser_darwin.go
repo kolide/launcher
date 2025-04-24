@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // example scutil output
@@ -92,7 +92,7 @@ const (
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	cmd, err := allowedcmd.Scutil(ctx)

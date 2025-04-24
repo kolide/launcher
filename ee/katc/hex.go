@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 // hexDecode is a dataProcessingStep that decodes data that is hex-encoded.
 func hexDecode(ctx context.Context, _ *slog.Logger, row map[string][]byte) (map[string][]byte, error) {
-	_, span := traces.StartSpan(ctx)
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	decodedRow := make(map[string][]byte)

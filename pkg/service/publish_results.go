@@ -10,8 +10,8 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
+	"github.com/kolide/launcher/ee/observability"
 	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
@@ -164,7 +164,7 @@ func MakePublishResultsEndpoint(svc KolideService) endpoint.Endpoint {
 
 // PublishResults implements KolideService.PublishResults
 func (e Endpoints) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)

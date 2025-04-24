@@ -43,6 +43,8 @@ import (
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/localserver"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/observability/exporter"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
@@ -60,8 +62,6 @@ import (
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/kolide/launcher/pkg/traces/exporter"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"go.etcd.io/bbolt"
@@ -83,7 +83,7 @@ const (
 // enabled, the finalizers will trigger various restarts.
 func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSlogger *multislogger.MultiSlogger, opts *launcher.Options) error {
 	initialTraceBuffer := exporter.NewInitialTraceBuffer()
-	ctx, startupSpan := traces.StartSpan(ctx)
+	ctx, startupSpan := observability.StartSpan(ctx)
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 
@@ -238,7 +238,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
-	var traceExporter *exporter.TraceExporter
+	var telemetryExporter *exporter.TelemetryExporter
 	if k.ControlServerURL() != "" {
 		startupSpan.AddEvent("log_shipper_init_start")
 
@@ -260,14 +260,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k, initialTraceBuffer)
+		telemetryExporter, err = exporter.NewTelemetryExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
-				"could not set up trace exporter",
+				"could not set up telemetry exporter",
 				"err", err,
 			)
 		} else {
-			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
+			runGroup.Add("telemetryExporter", telemetryExporter.Execute, telemetryExporter.Interrupt)
 		}
 
 		startupSpan.AddEvent("log_shipper_init_completed")
@@ -492,8 +492,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 		}
 
-		if traceExporter != nil {
-			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
+		if telemetryExporter != nil {
+			controlService.RegisterSubscriber(authTokensSubsystemName, telemetryExporter)
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
