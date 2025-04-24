@@ -359,6 +359,8 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 		}
 	}
 	t.meterProvider = newMeterProvider
+
+	observability.ReinitializeMetrics()
 }
 
 // Execute begins exporting telemetry if exporting is enabled.
