@@ -357,13 +357,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	var client service.KolideService
 	{
 		switch k.Transport() {
-		case "grpc":
-			grpcConn, err := service.DialGRPC(k, rootPool)
-			if err != nil {
-				return fmt.Errorf("dialing grpc server: %w", err)
-			}
-			defer grpcConn.Close()
-			client = service.NewGRPCClient(k, grpcConn)
 		case "jsonrpc":
 			client = service.NewJSONRPCClient(k, rootPool)
 		case "osquery":

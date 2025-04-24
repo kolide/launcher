@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 
 	"github.com/kolide/launcher/ee/observability"
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type configRequest struct {
@@ -26,13 +25,6 @@ type configResponse struct {
 	Err            error  `json:"err,omitempty"`
 }
 
-func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.AgentApiRequest)
-	return configRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
 func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
 	var req configRequest
 
@@ -43,34 +35,6 @@ func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interfa
 		}
 	}
 	return req, nil
-}
-
-func encodeGRPCConfigRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(configRequest)
-	return &pb.AgentApiRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
-func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.ConfigResponse)
-	return configResponse{
-		jsonRpcResponse: jsonRpcResponse{
-			DisableDevice: req.DisableDevice,
-		},
-		ConfigJSONBlob: req.ConfigJsonBlob,
-		NodeInvalid:    req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(configResponse)
-	resp := &pb.ConfigResponse{
-		ConfigJsonBlob: req.ConfigJSONBlob,
-		NodeInvalid:    req.NodeInvalid,
-		DisableDevice:  req.DisableDevice,
-	}
-	return encodeResponse(resp, req.Err)
 }
 
 func encodeJSONRPCConfigResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
@@ -131,14 +95,6 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, b
 	}
 
 	return resp.ConfigJSONBlob, resp.NodeInvalid, resp.Err
-}
-
-func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest) (*pb.ConfigResponse, error) {
-	_, rep, err := s.config.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return rep.(*pb.ConfigResponse), nil
 }
 
 func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
