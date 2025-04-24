@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 const (
@@ -59,7 +59,7 @@ type dt4aResponse struct {
 
 func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r, span := traces.StartHttpRequestSpan(r)
+		r, span := observability.StartHttpRequestSpan(r)
 		defer span.End()
 
 		// Validate origin. We expect to either have the origin set to an allowlisted value, or to be
