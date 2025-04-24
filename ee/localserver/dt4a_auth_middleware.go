@@ -132,7 +132,8 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			URL: &url.URL{
 				Scheme: r.URL.Scheme,
 				Host:   r.Host,
-				Path:   r.URL.Path,
+				// remove version the as it only designates the auth version
+				Path: strings.TrimPrefix(r.URL.Path, "/v3"),
 			},
 		}
 
