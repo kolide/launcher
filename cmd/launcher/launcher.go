@@ -238,7 +238,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Need to set up the log shipper so that we can get the logger early
 	// and pass it to the various systems.
 	var logShipper *logshipper.LogShipper
-	var traceExporter *exporter.TraceExporter
+	var telemetryExporter *exporter.TelemetryExporter
 	if k.ControlServerURL() != "" {
 		startupSpan.AddEvent("log_shipper_init_start")
 
@@ -260,14 +260,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetTraceSamplingRateOverride(1.0, initialDebugDuration)
 		k.SetExportTracesOverride(true, initialDebugDuration)
 
-		traceExporter, err = exporter.NewTraceExporter(ctx, k, initialTraceBuffer)
+		telemetryExporter, err = exporter.NewTelemetryExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
 			slogger.Log(ctx, slog.LevelDebug,
-				"could not set up trace exporter",
+				"could not set up telemetry exporter",
 				"err", err,
 			)
 		} else {
-			runGroup.Add("traceExporter", traceExporter.Execute, traceExporter.Interrupt)
+			runGroup.Add("telemetryExporter", telemetryExporter.Execute, telemetryExporter.Interrupt)
 		}
 
 		startupSpan.AddEvent("log_shipper_init_completed")
@@ -492,8 +492,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, logShipper)
 		}
 
-		if traceExporter != nil {
-			controlService.RegisterSubscriber(authTokensSubsystemName, traceExporter)
+		if telemetryExporter != nil {
+			controlService.RegisterSubscriber(authTokensSubsystemName, telemetryExporter)
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
