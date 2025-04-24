@@ -277,7 +277,12 @@ func (t *TelemetryExporter) setNewGlobalTracerProvider(launcherResource *resourc
 		// shutdown still gets called even though the span processor is unregistered
 		// leaving this in because it just feel correct
 		t.tracerProvider.UnregisterSpanProcessor(t.bufSpanProcessor)
-		t.tracerProvider.Shutdown(t.ctx)
+		if err := t.tracerProvider.Shutdown(t.ctx); err != nil {
+			t.slogger.Log(t.ctx, slog.LevelWarn,
+				"could not shut down old tracer provider to replace it",
+				"err", err,
+			)
+		}
 	}
 
 	t.tracerProvider = newProvider
@@ -346,7 +351,12 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 
 	// Shut down and replace old meter provider with new one
 	if t.meterProvider != nil {
-		t.meterProvider.Shutdown(context.TODO())
+		if err := t.meterProvider.Shutdown(context.TODO()); err != nil {
+			t.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not shut down old meter provider to replace it",
+				"err", err,
+			)
+		}
 	}
 	t.meterProvider = newMeterProvider
 }
@@ -383,11 +393,21 @@ func (t *TelemetryExporter) Interrupt(_ error) {
 	time.Sleep(1 * time.Second)
 
 	if t.tracerProvider != nil {
-		t.tracerProvider.Shutdown(interruptCtx)
+		if err := t.tracerProvider.Shutdown(interruptCtx); err != nil {
+			t.slogger.Log(interruptCtx, slog.LevelWarn,
+				"could not shut down tracer provider on interrupt",
+				"err", err,
+			)
+		}
 	}
 
 	if t.meterProvider != nil {
-		t.meterProvider.Shutdown(interruptCtx)
+		if err := t.meterProvider.Shutdown(interruptCtx); err != nil {
+			t.slogger.Log(interruptCtx, slog.LevelWarn,
+				"could not shut down meter provider on interrupt",
+				"err", err,
+			)
+		}
 	}
 
 	t.cancel()
@@ -434,10 +454,20 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 		} else if t.enabled && !t.knapsack.ExportTraces() {
 			// Newly disabled
 			if t.tracerProvider != nil {
-				t.tracerProvider.Shutdown(t.ctx)
+				if err := t.tracerProvider.Shutdown(context.TODO()); err != nil {
+					t.slogger.Log(ctx, slog.LevelWarn,
+						"could not shut down tracer provider on trace disable",
+						"err", err,
+					)
+				}
 			}
 			if t.meterProvider != nil {
-				t.meterProvider.Shutdown(context.TODO())
+				if err := t.meterProvider.Shutdown(context.TODO()); err != nil {
+					t.slogger.Log(ctx, slog.LevelWarn,
+						"could not shut down meter provider on trace disable",
+						"err", err,
+					)
+				}
 			}
 			t.enabled = false
 			t.slogger.Log(ctx, slog.LevelDebug,
