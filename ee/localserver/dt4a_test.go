@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -28,7 +29,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -45,6 +46,58 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	// Make a request to our handler
 	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
 	request.Header.Set("origin", acceptableOrigin(t))
+	responseRecorder := httptest.NewRecorder()
+	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
+
+	// Make sure response was successful and contains the data we expect
+	require.Equal(t, http.StatusOK, responseRecorder.Code)
+	require.Equal(t, "application/json", responseRecorder.Header().Get("Content-Type"))
+	require.Equal(t, testDt4aInfo, responseRecorder.Body.Bytes())
+
+	k.AssertExpectations(t)
+}
+
+func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
+	t.Parallel()
+
+	dt4aAccountId, dt4aUserId := ulid.New(), ulid.New()
+
+	// Set up our dt4a store with some test data in it
+	slogger := multislogger.NewNopLogger()
+	dt4aInfoStore, err := storageci.NewStore(t, slogger, storage.Dt4aInfoStore.String())
+	require.NoError(t, err)
+
+	legacyDt4aInfo, err := json.Marshal(map[string]string{
+		"legacy_test_data": "legacy_test_value",
+	})
+	require.NoError(t, err)
+
+	testDt4aInfo, err := json.Marshal(map[string]string{
+		"some_test_data": "some_test_value",
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, legacyDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set([]byte(dt4aAccountId), testDt4aInfo))
+
+	// Set up the rest of our localserver dependencies
+	k := typesmocks.NewKnapsack(t)
+	k.On("KolideServerURL").Return("localserver")
+	k.On("Slogger").Return(slogger)
+	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
+	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
+	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+
+	// Set up localserver
+	ls, err := New(context.TODO(), k, nil)
+	require.NoError(t, err)
+
+	// Make a request to our handler
+	request := httptest.NewRequest(http.MethodGet, "/dt4a", nil)
+	request.Header.Set("origin", acceptableOrigin(t))
+	request.Header.Set(dt4aAccountUuidHeaderKey, dt4aAccountId)
+	request.Header.Set(dt4aUserUuidHeaderKey, dt4aUserId)
+
 	responseRecorder := httptest.NewRecorder()
 	ls.requestDt4aInfoHandler().ServeHTTP(responseRecorder, request)
 
@@ -82,7 +135,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -121,7 +174,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -159,7 +212,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 		"some_test_data": "some_test_value",
 	})
 	require.NoError(t, err)
-	require.NoError(t, dt4aInfoStore.Set(localserverDt4aInfoKey, testDt4aInfo))
+	require.NoError(t, dt4aInfoStore.Set(legacyDt4aInfoKey, testDt4aInfo))
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
