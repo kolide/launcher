@@ -387,12 +387,6 @@ func (t *TelemetryExporter) Interrupt(_ error) {
 	}
 
 	if t.meterProvider != nil {
-		if err := t.meterProvider.ForceFlush(interruptCtx); err != nil {
-			t.slogger.Log(interruptCtx, slog.LevelWarn,
-				"could not flush metrics before shutdown",
-				"err", err,
-			)
-		}
 		t.meterProvider.Shutdown(interruptCtx)
 	}
 
