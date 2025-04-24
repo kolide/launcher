@@ -228,12 +228,6 @@ deps: deps-go generate
 generate: deps-go
 	go generate ./pkg/packagekit/... ./pkg/packaging/... ./ee/tables/... ./pkg/augeas/... ./ee/tuf/...
 
-.PHONY: proto
-proto:
-	@(cd pkg/pb/launcher; go generate)
-	@(cd pkg/pb/querytarget; go generate)
-	@echo "Generated code from proto definitions."
-
 test: generate
 	go test -cover -coverprofile=coverage.out -race ./...
 

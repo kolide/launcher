@@ -10,8 +10,6 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type healthcheckRequest struct{}
@@ -21,30 +19,8 @@ type healthcheckResponse struct {
 	Err       error  `json:"err,omitempty"`
 }
 
-func decodeGRPCHealthCheckRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	return healthcheckRequest{}, nil
-}
-
 func decodeJSONRPCHealthCheckRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
 	return healthcheckRequest{}, nil
-}
-
-func encodeGRPCHealcheckRequest(_ context.Context, request interface{}) (interface{}, error) {
-	return &pb.AgentApiRequest{}, nil
-}
-
-func decodeGRPCHealthCheckResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	resp := grpcReq.(*pb.HealthCheckResponse)
-	return healthcheckResponse{
-		Status: int32(resp.GetStatus()),
-	}, nil
-}
-
-func encodeGRPCHealthcheckResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(healthcheckResponse)
-	return &pb.HealthCheckResponse{
-		Status: pb.HealthCheckResponse_ServingStatus(req.Status),
-	}, nil
 }
 
 func encodeJSONRPCHealthcheckResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
@@ -94,14 +70,6 @@ func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 	}
 	resp := response.(healthcheckResponse)
 	return resp.Status, resp.Err
-}
-
-func (s *grpcServer) CheckHealth(ctx context.Context, req *pb.AgentApiRequest) (*pb.HealthCheckResponse, error) {
-	_, rep, err := s.health.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("check health: %w", err)
-	}
-	return rep.(*pb.HealthCheckResponse), nil
 }
 
 func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
