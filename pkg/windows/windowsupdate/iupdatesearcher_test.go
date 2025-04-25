@@ -16,6 +16,9 @@ func BenchmarkOnlineSearch(b *testing.B) {
 	searcher, err := session.CreateUpdateSearcher()
 	require.NoError(b, err)
 
+	// Make sure Online property is set as expected
+	require.True(b, searcher.Online)
+
 	// Call search repeatedly
 	for range b.N {
 		results, err := searcher.Search("Type='Software'")
@@ -36,6 +39,9 @@ func BenchmarkOfflineSearch(b *testing.B) {
 	// Make sure search happens offline
 	require.NoError(b, searcher.PutOnline(false))
 
+	// Make sure Online property is set as expected
+	require.False(b, searcher.Online)
+
 	// Call search repeatedly
 	for range b.N {
 		results, err := searcher.Search("Type='Software'")
@@ -53,6 +59,9 @@ func BenchmarkComboSearch(b *testing.B) {
 	searcher, err := session.CreateUpdateSearcher()
 	require.NoError(b, err)
 
+	// Make sure Online property is set as expected
+	require.True(b, searcher.Online)
+
 	// Make one online request
 	results, err := searcher.Search("Type='Software'")
 	require.NoError(b, err)
@@ -61,6 +70,9 @@ func BenchmarkComboSearch(b *testing.B) {
 
 	// Now, update searcher to be offline
 	require.NoError(b, searcher.PutOnline(false))
+
+	// Make sure Online property is updated as expected
+	require.False(b, searcher.Online)
 
 	// Call search repeatedly
 	for range b.N {
