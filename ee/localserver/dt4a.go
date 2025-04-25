@@ -11,7 +11,9 @@ import (
 )
 
 var (
-	localserverDt4aInfoKey = []byte("localserver_zta_info")
+	// legacyDt4aInfoKey is the key that was used to store dt4a info that was not tied to dt4a IDs
+	// can be removed when unauthed /zta endpoint is removed
+	legacyDt4aInfoKey = []byte("localserver_zta_info")
 )
 
 const (
@@ -48,20 +50,46 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		ls.accelerate(r.Context())
 	}
 
-	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(localserverDt4aInfoKey)
+	// this should be removed when we drop unauthed endpoint
+	if r.Header.Get(dt4aAccountUuidHeaderKey) == "" {
+		// This is a legacy request to the unauthed endpoint that does not include the dt4a account uuid header.
+		// We will return the dt4a info stored under the legacy key.
+		dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
+		if err != nil {
+			ls.slogger.Log(r.Context(), slog.LevelWarn,
+				"could not retrieve dt4a info from store using legacy dt4a key",
+				"err", err,
+			)
+
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if len(dt4aInfo) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(dt4aInfo)
+		return
+	}
+
+	// dt4aAccountUuid is set, so we will try to get the dt4a info using the account uuid
+	dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get([]byte(r.Header.Get(dt4aAccountUuidHeaderKey)))
 	if err != nil {
 		observability.SetError(span, err)
 		ls.slogger.Log(r.Context(), slog.LevelError,
-			"could not retrieve dt4a info from store",
+			"could not retrieve dt4a info from store using dt4a account uuid",
 			"err", err,
 		)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// No data stored yet
+
 	if len(dt4aInfo) == 0 {
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
