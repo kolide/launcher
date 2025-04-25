@@ -68,7 +68,16 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			// Construct table
 			sourceQuery := fmt.Sprintf("SELECT data FROM object_data JOIN object_store ON (object_data.object_store_id = object_store.id) WHERE object_store.name=\"%s\";", tt.objStoreName)
 			cfg := katcTableConfig{
-				Columns: []string{"uuid", "name", "version"},
+				Columns: []string{
+					"uuid", "name", "version", "preferences", "flags", "aliases",
+					"linkedIds", "anotherSparseArray", "someDetails", "noDetails",
+					"numArray", "email", "someTimestamp", "someDate", "someMap",
+					"someComplexMap", "someSet", "someRegex", "someStringObject",
+					"someNumberObject", "someDouble", "someBoolean", "someTypedArray",
+					"someArrayBuffer", "anotherTypedArray", "yetAnotherTypedArray",
+					"basicError", "evalError", "rangeError", "referenceError",
+					"syntaxError", "typeError", "uriError", "errorWithCause",
+				},
 				katcTableDefinition: katcTableDefinition{
 					SourceType: &katcSourceType{
 						name:     sqliteSourceType,
@@ -121,13 +130,43 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			// We should have the expected number of results in the row
 			require.Equal(t, tt.expectedRows, len(results), "unexpected number of rows returned")
 
-			// Make sure we have the expected number of columns
+			// In the TestQueryFirefoxIndexedDB function, add these require statements inside the for loop that checks columns
 			for i := 0; i < tt.expectedRows; i += 1 {
 				require.Contains(t, results[i], pathColumnName, "missing source column")
 				require.Equal(t, indexeddbDest, results[i][pathColumnName])
 				require.Contains(t, results[i], "uuid", "expected uuid column missing")
 				require.Contains(t, results[i], "name", "expected name column missing")
 				require.Contains(t, results[i], "version", "expected version column missing")
+				require.Contains(t, results[i], "preferences", "expected preferences column missing")
+				require.Contains(t, results[i], "flags", "expected flags column missing")
+				require.Contains(t, results[i], "aliases", "expected aliases column missing")
+				require.Contains(t, results[i], "linkedIds", "expected linkedIds column missing")
+				require.Contains(t, results[i], "anotherSparseArray", "expected anotherSparseArray column missing")
+				require.Contains(t, results[i], "someDetails", "expected someDetails column missing")
+				require.Contains(t, results[i], "noDetails", "expected noDetails column missing")
+				require.Contains(t, results[i], "numArray", "expected numArray column missing")
+				require.Contains(t, results[i], "email", "expected email column missing")
+				require.Contains(t, results[i], "someTimestamp", "expected someTimestamp column missing")
+				require.Contains(t, results[i], "someDate", "expected someDate column missing")
+				require.Contains(t, results[i], "someMap", "expected someMap column missing")
+				require.Contains(t, results[i], "someComplexMap", "expected someComplexMap column missing")
+				require.Contains(t, results[i], "someRegex", "expected someRegex column missing")
+				require.Contains(t, results[i], "someStringObject", "expected someStringObject column missing")
+				require.Contains(t, results[i], "someNumberObject", "expected someNumberObject column missing")
+				require.Contains(t, results[i], "someDouble", "expected someDouble column missing")
+				require.Contains(t, results[i], "someBoolean", "expected someBoolean column missing")
+				require.Contains(t, results[i], "someTypedArray", "expected someTypedArray column missing")
+				require.Contains(t, results[i], "someArrayBuffer", "expected someArrayBuffer column missing")
+				require.Contains(t, results[i], "anotherTypedArray", "expected anotherTypedArray column missing")
+				require.Contains(t, results[i], "yetAnotherTypedArray", "expected yetAnotherTypedArray column missing")
+				require.Contains(t, results[i], "basicError", "expected basicError column missing")
+				require.Contains(t, results[i], "evalError", "expected evalError column missing")
+				require.Contains(t, results[i], "rangeError", "expected rangeError column missing")
+				require.Contains(t, results[i], "referenceError", "expected referenceError column missing")
+				require.Contains(t, results[i], "syntaxError", "expected syntaxError column missing")
+				require.Contains(t, results[i], "typeError", "expected typeError column missing")
+				require.Contains(t, results[i], "uriError", "expected uriError column missing")
+				require.Contains(t, results[i], "errorWithCause", "expected errorWithCause column missing")
 			}
 		})
 	}
@@ -217,7 +256,16 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			// Construct table
 			sourceQuery := fmt.Sprintf("%s.%s", tt.dbName, tt.objStoreName)
 			cfg := katcTableConfig{
-				Columns: []string{"uuid", "name", "version"},
+				Columns: []string{
+					"uuid", "name", "version", "preferences", "flags", "aliases",
+					"linkedIds", "anotherSparseArray", "someDetails", "noDetails",
+					"numArray", "email", "someTimestamp", "someDate", "someMap",
+					"someComplexMap", "someSet", "someRegex", "someStringObject",
+					"someNumberObject", "someDouble", "someBoolean", "someTypedArray",
+					"someArrayBuffer", "anotherTypedArray", "yetAnotherTypedArray",
+					"basicError", "evalError", "rangeError", "referenceError",
+					"syntaxError", "typeError", "uriError", "errorWithCause",
+				},
 				katcTableDefinition: katcTableDefinition{
 					SourceType: &katcSourceType{
 						name:     indexeddbLeveldbSourceType,
@@ -273,6 +321,36 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 				require.Contains(t, results[i], "uuid", "expected uuid column missing")
 				require.Contains(t, results[i], "name", "expected name column missing")
 				require.Contains(t, results[i], "version", "expected version column missing")
+				require.Contains(t, results[i], "preferences", "expected preferences column missing")
+				require.Contains(t, results[i], "flags", "expected flags column missing")
+				require.Contains(t, results[i], "aliases", "expected aliases column missing")
+				require.Contains(t, results[i], "linkedIds", "expected linkedIds column missing")
+				require.Contains(t, results[i], "anotherSparseArray", "expected anotherSparseArray column missing")
+				require.Contains(t, results[i], "someDetails", "expected someDetails column missing")
+				require.Contains(t, results[i], "noDetails", "expected noDetails column missing")
+				require.Contains(t, results[i], "numArray", "expected numArray column missing")
+				require.Contains(t, results[i], "email", "expected email column missing")
+				require.Contains(t, results[i], "someTimestamp", "expected someTimestamp column missing")
+				require.Contains(t, results[i], "someDate", "expected someDate column missing")
+				require.Contains(t, results[i], "someMap", "expected someMap column missing")
+				require.Contains(t, results[i], "someComplexMap", "expected someComplexMap column missing")
+				require.Contains(t, results[i], "someRegex", "expected someRegex column missing")
+				require.Contains(t, results[i], "someStringObject", "expected someStringObject column missing")
+				require.Contains(t, results[i], "someNumberObject", "expected someNumberObject column missing")
+				require.Contains(t, results[i], "someDouble", "expected someDouble column missing")
+				require.Contains(t, results[i], "someBoolean", "expected someBoolean column missing")
+				require.Contains(t, results[i], "someTypedArray", "expected someTypedArray column missing")
+				require.Contains(t, results[i], "someArrayBuffer", "expected someArrayBuffer column missing")
+				require.Contains(t, results[i], "anotherTypedArray", "expected anotherTypedArray column missing")
+				require.Contains(t, results[i], "yetAnotherTypedArray", "expected yetAnotherTypedArray column missing")
+				require.Contains(t, results[i], "basicError", "expected basicError column missing")
+				require.Contains(t, results[i], "evalError", "expected evalError column missing")
+				require.Contains(t, results[i], "rangeError", "expected rangeError column missing")
+				require.Contains(t, results[i], "referenceError", "expected referenceError column missing")
+				require.Contains(t, results[i], "syntaxError", "expected syntaxError column missing")
+				require.Contains(t, results[i], "typeError", "expected typeError column missing")
+				require.Contains(t, results[i], "uriError", "expected uriError column missing")
+				require.Contains(t, results[i], "errorWithCause", "expected errorWithCause column missing")
 			}
 		})
 	}

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kolide/launcher/ee/observability"
@@ -97,7 +98,7 @@ func deserializeFirefox(ctx context.Context, slogger *slog.Logger, row map[strin
 	}
 
 	// Read all entries in our object
-	resultObj, err := deserializeObject(srcReader)
+	resultObj, err := deserializeObject(ctx, slogger, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading top-level object: %w", err)
 	}
@@ -125,7 +126,7 @@ func nextPair(srcReader *bytes.Reader) (uint32, uint32, error) {
 }
 
 // deserializeObject deserializes the next object from `srcReader`.
-func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
+func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) (map[string][]byte, error) {
 	resultObj := make(map[string][]byte, 0)
 
 	for {
@@ -154,7 +155,7 @@ func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading next pair for value in object: %w", err)
 		}
-		valDeserialized, err := deserializeNext(valTag, valData, srcReader)
+		valDeserialized, err := deserializeNext(ctx, slogger, valTag, valData, srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("deserializing value for key `%s`: %w", nextKeyStr, err)
 		}
@@ -167,7 +168,7 @@ func deserializeObject(srcReader *bytes.Reader) (map[string][]byte, error) {
 // deserializeNext deserializes the item with the given tag `itemTag` and its associated data.
 // Depending on the type indicated by `itemTag`, it may read additional data from `srcReader`
 // to complete deserializing the item.
-func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) ([]byte, error) {
+func deserializeNext(ctx context.Context, slogger *slog.Logger, itemTag uint32, itemData uint32, srcReader *bytes.Reader) ([]byte, error) {
 	switch itemTag {
 	case tagInt32:
 		return []byte(strconv.Itoa(int(itemData))), nil
@@ -205,13 +206,13 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 	case tagRegexpObject:
 		return deserializeRegexp(itemData, srcReader)
 	case tagObjectObject:
-		return deserializeNestedObject(srcReader)
+		return deserializeNestedObject(ctx, slogger, srcReader)
 	case tagArrayObject:
-		return deserializeArray(itemData, srcReader)
+		return deserializeArray(ctx, slogger, itemData, srcReader)
 	case tagMapObject:
-		return deserializeMap(srcReader)
+		return deserializeMap(ctx, slogger, srcReader)
 	case tagSetObject:
-		return deserializeSet(srcReader)
+		return deserializeSet(ctx, slogger, srcReader)
 	case tagNull, tagUndefined:
 		return nil, nil
 	case tagArrayBufferObj:
@@ -226,7 +227,7 @@ func deserializeNext(itemTag uint32, itemData uint32, srcReader *bytes.Reader) (
 	case tagDataViewObj:
 		return nil, errors.New("parsing not implemented for data view object")
 	case tagErrorObj:
-		return nil, errors.New("parsing not implemented for error object")
+		return deserializeError(ctx, slogger, srcReader)
 	case tagResizableArrayBufferObj:
 		return nil, errors.New("parsing not implemented for resizable array buffer object")
 	case tagGrowableSharedArrayBufferObj:
@@ -408,7 +409,7 @@ func deserializeRegexp(regexpData uint32, srcReader *bytes.Reader) ([]byte, erro
 	return regexFull, nil
 }
 
-func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, error) {
+func deserializeArray(ctx context.Context, slogger *slog.Logger, arrayLength uint32, srcReader *bytes.Reader) ([]byte, error) {
 	resultArr := make([]any, arrayLength)
 
 	for {
@@ -427,7 +428,7 @@ func deserializeArray(arrayLength uint32, srcReader *bytes.Reader) ([]byte, erro
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
-		arrayItem, err := deserializeNext(itemTag, itemData, srcReader)
+		arrayItem, err := deserializeNext(ctx, slogger, itemTag, itemData, srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("reading item at index %d in array: %w", idx, err)
 		}
@@ -658,8 +659,8 @@ func byteLengthToTypedArrayLength(arrayType uint32, byteLength uint64) (uint64, 
 	return byteLength / elemSize, nil
 }
 
-func deserializeNestedObject(srcReader *bytes.Reader) ([]byte, error) {
-	nestedObj, err := deserializeObject(srcReader)
+func deserializeNestedObject(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	nestedObj, err := deserializeObject(ctx, slogger, srcReader)
 	if err != nil {
 		return nil, fmt.Errorf("deserializing nested object: %w", err)
 	}
@@ -689,7 +690,7 @@ func deserializeNestedObject(srcReader *bytes.Reader) ([]byte, error) {
 // <tagEndOfKeys, 0> (signals end of value1)
 // ...continue for other key-val pairs...
 // <tagEndOfKeys, 0> (signals end of Map)
-func deserializeMap(srcReader *bytes.Reader) ([]byte, error) {
+func deserializeMap(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	mapObject := make(map[string]string)
 
 	for {
@@ -709,13 +710,13 @@ func deserializeMap(srcReader *bytes.Reader) ([]byte, error) {
 		}
 
 		// Now process all fields for key obj until we hit tagEndOfKeys
-		keyBytes, err := deserializeNext(keyTag, keyData, srcReader)
+		keyBytes, err := deserializeNext(ctx, slogger, keyTag, keyData, srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("deserializing key in map: %w", err)
 		}
 
 		// Now process all fields for val obj until we hit tagEndOfKeys
-		valBytes, err := deserializeNext(valTag, valData, srcReader)
+		valBytes, err := deserializeNext(ctx, slogger, valTag, valData, srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("deserializing value in map for key `%s`: %w", string(keyBytes), err)
 		}
@@ -734,7 +735,7 @@ func deserializeMap(srcReader *bytes.Reader) ([]byte, error) {
 }
 
 // deserializeSet is similar to deserializeMap, just without the keys.
-func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
+func deserializeSet(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
 	setObject := make(map[string]struct{})
 
 	for {
@@ -749,7 +750,7 @@ func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
 		}
 
 		// Now process all fields for key obj until we hit tagEndOfKeys
-		keyBytes, err := deserializeNext(keyTag, keyData, srcReader)
+		keyBytes, err := deserializeNext(ctx, slogger, keyTag, keyData, srcReader)
 		if err != nil {
 			return nil, fmt.Errorf("deserializing key in map: %w", err)
 		}
@@ -765,6 +766,155 @@ func deserializeSet(srcReader *bytes.Reader) ([]byte, error) {
 	}
 
 	return resultObj, nil
+}
+
+// deserializeError handles the upcoming Error object in srcReader.
+func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	// Create a map to hold the error properties
+	errorObj := make(map[string]string)
+
+	// Default error properties
+	errorObj["type"] = "Error"
+	errorObj["name"] = "Error"
+	errorObj["message"] = ""
+
+	// Read all properties of the error object
+	messageFound := false
+	for {
+		propTag, propData, err := nextPair(srcReader)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"error reading property in error object",
+				"error", err,
+			)
+			return nil, fmt.Errorf("reading property in error object: %w", err)
+		}
+
+		if propTag == tagEndOfKeys {
+			// End of error object
+			break
+		}
+
+		if propTag == tagString {
+			// It's a string key, read it
+			keyBytes, err := deserializeString(propData, srcReader)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error deserializing property name",
+					"error", err,
+				)
+				// If we hit EOF, just return what we have so far
+				if errors.Is(err, io.EOF) {
+					slogger.Log(ctx, slog.LevelWarn,
+						"reached EOF while deserializing property name, returning partial error object")
+					break
+				}
+				return nil, fmt.Errorf("deserializing property name: %w", err)
+			}
+			keyStr := string(keyBytes)
+
+			// Read the value
+			valTag, valData, err := nextPair(srcReader)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error reading value for property",
+					"property", keyStr,
+					"error", err,
+				)
+				return nil, fmt.Errorf("reading value for property '%s': %w", keyStr, err)
+			}
+
+			// Process the property
+			valBytes, err := deserializeNext(ctx, slogger, valTag, valData, srcReader)
+			if err != nil || valBytes == nil {
+				if err != nil {
+					slogger.Log(ctx, slog.LevelWarn,
+						"error deserializing property value",
+						"property", keyStr,
+						"error", err,
+					)
+				}
+				continue
+			}
+
+			valStr := string(valBytes)
+
+			// Handle known properties
+			if keyStr == "name" {
+				errorObj["name"] = valStr
+				errorObj["type"] = valStr
+			} else if keyStr == "message" {
+				errorObj["message"] = valStr
+				messageFound = true
+			} else if strings.HasPrefix(keyStr, "file://") {
+				// This is the file path with line number as value
+				errorObj["fileName"] = keyStr
+				errorObj["lineNumber"] = valStr
+			} else if !messageFound && !strings.Contains(keyStr, ":") && len(keyStr) > 0 {
+				// If we haven't found a message yet and this key looks like it might be a message,
+				// use it as the message. Examples of such keys:
+				// - "Cannot read property 'foo' of undefined"
+				// - "Invalid argument"
+				// - "Unexpected token in JSON"
+				// We avoid strings with colons as they're likely file paths or other metadata
+				errorObj["message"] = keyStr
+
+				loweredKeyStr := strings.ToLower(keyStr)
+				// Try to determine the error type from the message
+				if strings.Contains(loweredKeyStr, "eval") {
+					errorObj["type"] = "EvalError"
+					errorObj["name"] = "EvalError"
+				} else if strings.Contains(loweredKeyStr, "range") {
+					errorObj["type"] = "RangeError"
+					errorObj["name"] = "RangeError"
+				} else if strings.Contains(loweredKeyStr, "reference") {
+					errorObj["type"] = "ReferenceError"
+					errorObj["name"] = "ReferenceError"
+				} else if strings.Contains(loweredKeyStr, "syntax") {
+					errorObj["type"] = "SyntaxError"
+					errorObj["name"] = "SyntaxError"
+				} else if strings.Contains(loweredKeyStr, "type") {
+					errorObj["type"] = "TypeError"
+					errorObj["name"] = "TypeError"
+				} else if strings.Contains(loweredKeyStr, "uri") {
+					errorObj["type"] = "URIError"
+					errorObj["name"] = "URIError"
+				}
+			}
+		}
+
+		// It's not a string key, skip it and its value
+		valTag, valData, err := nextPair(srcReader)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"error reading value for non-string property",
+				"error", err,
+			)
+			return nil, fmt.Errorf("reading value for non-string property: %w", err)
+		}
+
+		// Skip the value
+		if _, err := deserializeNext(ctx, slogger, valTag, valData, srcReader); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"error deserializing value for non-string property",
+				"error", err,
+			)
+			continue
+		}
+
+	}
+
+	// Serialize the error object to JSON
+	resultBytes, err := json.Marshal(errorObj)
+	if err != nil {
+		slogger.Log(ctx, slog.LevelWarn,
+			"error marshalling error object",
+			"error", err,
+		)
+		return nil, fmt.Errorf("marshalling error object: %w", err)
+	}
+
+	return resultBytes, nil
 }
 
 func bitMask(n uint32) uint32 {
