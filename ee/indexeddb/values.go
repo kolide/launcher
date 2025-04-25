@@ -983,6 +983,8 @@ const (
 
 	// Additional tags we've observed in practice
 	errorTagIsError byte = 0x72 // Is error flag (114 decimal = 0x72 hex)
+
+	genericErrorType = "Error"
 )
 
 // deserializeError handles the upcoming Error object in srcReader.
@@ -1008,7 +1010,7 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 	errorObj := make(map[string]string)
 
 	// Default to generic Error
-	errorType := "Error"
+	errorType := genericErrorType
 
 	// Track if we've found a message
 	messageFound := false
@@ -1090,23 +1092,7 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 		case errorTagMessage:
 			errorObj["message"] = valueStr
 			messageFound = true
-
-			// Try to determine error type from message if not already set
-			if errorType == "Error" {
-				if strings.Contains(valueStr, "eval") || strings.Contains(valueStr, "Eval") {
-					errorType = "EvalError"
-				} else if strings.Contains(valueStr, "range") || strings.Contains(valueStr, "Range") {
-					errorType = "RangeError"
-				} else if strings.Contains(valueStr, "reference") || strings.Contains(valueStr, "Reference") {
-					errorType = "ReferenceError"
-				} else if strings.Contains(valueStr, "syntax") || strings.Contains(valueStr, "Syntax") {
-					errorType = "SyntaxError"
-				} else if strings.Contains(valueStr, "type") || strings.Contains(valueStr, "Type") {
-					errorType = "TypeError"
-				} else if strings.Contains(valueStr, "URI") || strings.Contains(valueStr, "uri") {
-					errorType = "URIError"
-				}
-			}
+			errorType = determineErrorTypeFromMessage(valueStr, errorType)
 		case errorTagStack:
 			errorObj["stack"] = valueStr
 
@@ -1135,23 +1121,7 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 				// If we haven't found a message and this looks like it could be one, use it
 				errorObj["message"] = valueStr
 				messageFound = true
-
-				// Try to determine error type from this potential message
-				if errorType == "Error" {
-					if strings.Contains(valueStr, "eval") || strings.Contains(valueStr, "Eval") {
-						errorType = "EvalError"
-					} else if strings.Contains(valueStr, "range") || strings.Contains(valueStr, "Range") {
-						errorType = "RangeError"
-					} else if strings.Contains(valueStr, "reference") || strings.Contains(valueStr, "Reference") {
-						errorType = "ReferenceError"
-					} else if strings.Contains(valueStr, "syntax") || strings.Contains(valueStr, "Syntax") {
-						errorType = "SyntaxError"
-					} else if strings.Contains(valueStr, "type") || strings.Contains(valueStr, "Type") {
-						errorType = "TypeError"
-					} else if strings.Contains(valueStr, "URI") || strings.Contains(valueStr, "uri") {
-						errorType = "URIError"
-					}
-				}
+				errorType = determineErrorTypeFromMessage(valueStr, errorType)
 			} else {
 				// For truly unknown properties, store with a generic name
 				errorObj[propertyName] = valueStr
@@ -1180,4 +1150,31 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 	}
 
 	return resultBytes, nil
+}
+
+// determineErrorTypeFromMessage tries to infer the specific error type from a message string
+// when the error type is still the generic "Error"
+func determineErrorTypeFromMessage(message string, currentType string) string {
+	// Only try to determine a more specific type if we currently have the generic Error
+	if currentType != genericErrorType {
+		return currentType
+	}
+
+	loweredMessage := strings.ToLower(message)
+
+	if strings.Contains(loweredMessage, "eval") {
+		return "EvalError"
+	} else if strings.Contains(loweredMessage, "range") {
+		return "RangeError"
+	} else if strings.Contains(loweredMessage, "reference") {
+		return "ReferenceError"
+	} else if strings.Contains(loweredMessage, "syntax") {
+		return "SyntaxError"
+	} else if strings.Contains(loweredMessage, "type") {
+		return "TypeError"
+	} else if strings.Contains(loweredMessage, "uri") {
+		return "URIError"
+	}
+
+	return currentType
 }
