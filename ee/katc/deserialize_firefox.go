@@ -895,6 +895,10 @@ func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *byte
 
 		// Skip the value
 		if _, err := deserializeNext(ctx, slogger, valTag, valData, srcReader); err != nil {
+			slogger.Log(ctx, slog.LevelWarn,
+				"error deserializing value for non-string property",
+				"error", err,
+			)
 			continue
 		}
 
