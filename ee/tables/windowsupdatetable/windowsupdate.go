@@ -30,6 +30,7 @@ type QueryResults struct {
 	RawResults      []byte `json:"raw_results"`
 	Locale          string `json:"locale"`
 	IsDefaultLocale int    `json:"is_default_locale"`
+	IsOnline        int    `json:"is_online"`
 	ErrStr          string `json:"err_string"`
 }
 
@@ -154,7 +155,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 				rowData := map[string]string{
 					"locale":     res.Locale,
 					"is_default": strconv.Itoa(res.IsDefaultLocale),
-					"online":     online,
+					"online":     strconv.Itoa(res.IsOnline),
 				}
 
 				results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)

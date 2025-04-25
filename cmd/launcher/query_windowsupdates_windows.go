@@ -32,11 +32,12 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	rawResults, locale, isDefaultLocale, searchErr := searchLocale(*flLocale, *flTableMode, *flOnline)
+	rawResults, locale, isDefaultLocale, isOnline, searchErr := searchLocale(*flLocale, *flTableMode, *flOnline)
 	queryResults := &windowsupdatetable.QueryResults{
 		RawResults:      rawResults,
 		Locale:          locale,
 		IsDefaultLocale: isDefaultLocale,
+		IsOnline:        isOnline,
 	}
 	if searchErr != nil {
 		queryResults.ErrStr = searchErr.Error()
@@ -54,20 +55,20 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 	return nil
 }
 
-func searchLocale(locale string, tableMode int, online int) ([]byte, string, int, error) {
+func searchLocale(locale string, tableMode int, online int) ([]byte, string, int, int, error) {
 	comshim.Add(1)
 	defer comshim.Done()
 
 	searcher, setLocale, isDefaultLocale, err := getSearcher(locale)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("new searcher: %w", err)
+		return nil, "", 0, 0, fmt.Errorf("new searcher: %w", err)
 	}
 
 	// Update Online value if needed
 	searchOnline := online > 0
 	if searcher.Online != searchOnline {
 		if err := searcher.PutOnline(searchOnline); err != nil {
-			return nil, "", 0, fmt.Errorf("updating searcher's Online to %v: %w", searchOnline, err)
+			return nil, "", 0, 0, fmt.Errorf("updating searcher's Online to %v: %w", searchOnline, err)
 		}
 	}
 
@@ -77,21 +78,26 @@ func searchLocale(locale string, tableMode int, online int) ([]byte, string, int
 	} else if tableMode == int(windowsupdatetable.HistoryTable) {
 		searchResults, err = searcher.QueryHistoryAll()
 	} else {
-		return nil, "", 0, fmt.Errorf("unsupported table mode %d", tableMode)
+		return nil, "", 0, 0, fmt.Errorf("unsupported table mode %d", tableMode)
 	}
 
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("querying: %w", err)
+		return nil, "", 0, 0, fmt.Errorf("querying: %w", err)
 	}
 
 	// dataflatten won't parse the raw searchResults. As a workaround,
 	// we marshal to json. This is a deficiency in dataflatten.
 	jsonBytes, err := json.Marshal(searchResults)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("json: %w", err)
+		return nil, "", 0, 0, fmt.Errorf("json: %w", err)
 	}
 
-	return jsonBytes, setLocale, isDefaultLocale, nil
+	isOnline := 0
+	if searcher.Online {
+		isOnline = 1
+	}
+
+	return jsonBytes, setLocale, isDefaultLocale, isOnline, nil
 }
 
 func getSearcher(locale string) (*windowsupdate.IUpdateSearcher, string, int, error) {
