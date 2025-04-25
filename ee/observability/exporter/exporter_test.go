@@ -24,7 +24,7 @@ import (
 // NB - Tests that result in calls to `setNewGlobalProvider` should not be run in parallel
 // to avoid race condition complaints.
 
-func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
+func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	mockKnapsack := typesmocks.NewKnapsack(t)
 
 	tokenStore := testTokenStore(t)
@@ -52,26 +52,26 @@ func TestNewTraceExporter(t *testing.T) { //nolint:paralleltest
 		Hostname:       "Test-Hostname2",
 	})
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
 	time.Sleep(500 * time.Millisecond)
 
 	// We expect a total of 12 attributes: 3 initial attributes, 5 from the ServerProvidedDataStore, and 4 from osquery
-	traceExporter.attrLock.RLock()
-	defer traceExporter.attrLock.RUnlock()
-	require.Equal(t, 12, len(traceExporter.attrs))
+	telemetryExporter.attrLock.RLock()
+	defer telemetryExporter.attrLock.RUnlock()
+	require.Equal(t, 12, len(telemetryExporter.attrs))
 
 	// Confirm we set a provider
-	traceExporter.providerLock.Lock()
-	defer traceExporter.providerLock.Unlock()
-	require.NotNil(t, traceExporter.provider, "expected provider to be created")
+	telemetryExporter.providerLock.Lock()
+	defer telemetryExporter.providerLock.Unlock()
+	require.NotNil(t, telemetryExporter.tracerProvider, "expected tracer provider to be created")
 
 	mockKnapsack.AssertExpectations(t)
 }
 
-func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
+func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 	t.Parallel()
 
 	tokenStore := testTokenStore(t)
@@ -86,15 +86,16 @@ func TestNewTraceExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, nil)
+	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, nil)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
-	require.Nil(t, traceExporter.provider, "expected disabled exporter to not create a provider but one was created")
+	require.Nil(t, telemetryExporter.tracerProvider, "expected disabled exporter to not create a tracer provider but one was created")
+	require.Nil(t, telemetryExporter.meterProvider, "expected disabled exporter to not create a meter provider but one was created")
 
 	// Confirm we added basic attributes
-	require.Equal(t, 3, len(traceExporter.attrs))
-	for _, actualAttr := range traceExporter.attrs {
+	require.Equal(t, 3, len(telemetryExporter.attrs))
+	for _, actualAttr := range telemetryExporter.attrs {
 		switch actualAttr.Key {
 		case "service.name":
 			require.Equal(t, applicationName, actualAttr.Value.AsString())
@@ -123,20 +124,20 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	traceExporter, err := NewTraceExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
-	go traceExporter.Execute()
+	go telemetryExporter.Execute()
 	time.Sleep(3 * time.Second)
-	traceExporter.Interrupt(errors.New("test error"))
+	telemetryExporter.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
 	interruptComplete := make(chan struct{})
 	expectedInterrupts := 3
 	for i := 0; i < expectedInterrupts; i += 1 {
 		go func() {
-			traceExporter.Interrupt(nil)
+			telemetryExporter.Interrupt(nil)
 			interruptComplete <- struct{}{}
 		}()
 	}
@@ -180,7 +181,7 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	expectedSerialNumber := "abcd"
 	s.Set([]byte("serial_number"), []byte(expectedSerialNumber))
 
-	traceExporter := &TraceExporter{
+	traceExporter := &TelemetryExporter{
 		knapsack:                  mockKnapsack,
 		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
@@ -231,7 +232,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 		Hostname:       expectedHostname,
 	})
 
-	traceExporter := &TraceExporter{
+	traceExporter := &TelemetryExporter{
 		knapsack:                  mockKnapsack,
 		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
@@ -276,7 +277,7 @@ func TestPing(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("TokenStore").Return(s)
 
-	traceExporter := &TraceExporter{
+	traceExporter := &TelemetryExporter{
 		knapsack:                  mockKnapsack,
 		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 		slogger:                   multislogger.NewNopLogger(),
@@ -361,7 +362,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			traceExporter := &TraceExporter{
+			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				slogger:                   multislogger.NewNopLogger(),
@@ -384,7 +385,8 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			if tt.shouldReplaceProvider {
 				mockKnapsack.AssertExpectations(t)
 				require.Greater(t, len(traceExporter.attrs), 0)
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
 			}
 		})
 	}
@@ -432,7 +434,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			traceExporter := &TraceExporter{
+			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				slogger:                   multislogger.NewNopLogger(),
@@ -453,9 +455,11 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newTraceSamplingRate, traceExporter.traceSamplingRate, "trace sampling rate value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
+				require.Nil(t, traceExporter.meterProvider)
 			}
 		})
 	}
@@ -500,7 +504,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("TraceIngestServerURL").Return(tt.newObservabilityIngestServerURL)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			traceExporter := &TraceExporter{
+			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				slogger:                   multislogger.NewNopLogger(),
@@ -521,9 +525,11 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newObservabilityIngestServerURL, traceExporter.ingestUrl, "ingest url value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
+				require.Nil(t, traceExporter.meterProvider)
 			}
 		})
 	}
@@ -573,7 +579,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			traceExporter := &TraceExporter{
+			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				slogger:                   multislogger.NewNopLogger(),
@@ -595,9 +601,11 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			require.Equal(t, tt.newDisableTraceIngestTLS, clientAuthenticator.disableTLS, "ingest TLS value not updated for client authenticator")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
+				require.Nil(t, traceExporter.meterProvider)
 			}
 		})
 	}
@@ -645,7 +653,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			traceExporter := &TraceExporter{
+			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
 				slogger:                   multislogger.NewNopLogger(),
@@ -667,9 +675,11 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 
 			if tt.shouldReplaceProvider {
-				require.NotNil(t, traceExporter.provider)
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
 			} else {
-				require.Nil(t, traceExporter.provider)
+				require.Nil(t, traceExporter.tracerProvider)
+				require.Nil(t, traceExporter.meterProvider)
 			}
 		})
 	}

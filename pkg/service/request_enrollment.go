@@ -12,7 +12,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
 )
 
 type enrollmentRequest struct {
@@ -29,33 +28,6 @@ type enrollmentResponse struct {
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
 	Err         error  `json:"err,omitempty"`
-}
-
-func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.EnrollmentRequest)
-	pbEnrollDetails := req.GetEnrollmentDetails()
-	var enrollDetails EnrollmentDetails
-	if pbEnrollDetails != nil {
-		enrollDetails = EnrollmentDetails{
-			OSVersion:       pbEnrollDetails.OsVersion,
-			OSBuildID:       pbEnrollDetails.OsBuild,
-			OSPlatform:      pbEnrollDetails.OsPlatform,
-			Hostname:        pbEnrollDetails.Hostname,
-			HardwareVendor:  pbEnrollDetails.HardwareVendor,
-			HardwareModel:   pbEnrollDetails.HardwareModel,
-			HardwareSerial:  pbEnrollDetails.HardwareSerial,
-			OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
-			LauncherVersion: pbEnrollDetails.LauncherVersion,
-			OSName:          pbEnrollDetails.OsName,
-			OSPlatformLike:  pbEnrollDetails.OsPlatformLike,
-			HardwareUUID:    pbEnrollDetails.HardwareUuid,
-		}
-	}
-	return enrollmentRequest{
-		EnrollSecret:      req.EnrollSecret,
-		HostIdentifier:    req.HostIdentifier,
-		EnrollmentDetails: enrollDetails,
-	}, nil
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
@@ -97,49 +69,6 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.R
 	return encodeJSONResponse(b, nil)
 }
 
-func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(enrollmentRequest)
-	enrollDetails := &pb.EnrollmentDetails{
-		OsVersion:       req.EnrollmentDetails.OSVersion,
-		OsBuild:         req.EnrollmentDetails.OSBuildID,
-		OsPlatform:      req.EnrollmentDetails.OSPlatform,
-		Hostname:        req.EnrollmentDetails.Hostname,
-		HardwareVendor:  req.EnrollmentDetails.HardwareVendor,
-		HardwareModel:   req.EnrollmentDetails.HardwareModel,
-		HardwareSerial:  req.EnrollmentDetails.HardwareSerial,
-		OsqueryVersion:  req.EnrollmentDetails.OsqueryVersion,
-		LauncherVersion: req.EnrollmentDetails.LauncherVersion,
-		OsName:          req.EnrollmentDetails.OSName,
-		OsPlatformLike:  req.EnrollmentDetails.OSPlatformLike,
-	}
-	return &pb.EnrollmentRequest{
-		EnrollSecret:      req.EnrollSecret,
-		HostIdentifier:    req.HostIdentifier,
-		EnrollmentDetails: enrollDetails,
-	}, nil
-}
-
-func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.EnrollmentResponse)
-	return enrollmentResponse{
-		jsonRpcResponse: jsonRpcResponse{
-			DisableDevice: req.DisableDevice,
-		},
-		NodeKey:     req.NodeKey,
-		NodeInvalid: req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(enrollmentResponse)
-	resp := &pb.EnrollmentResponse{
-		NodeKey:       req.NodeKey,
-		NodeInvalid:   req.NodeInvalid,
-		DisableDevice: req.DisableDevice,
-	}
-	return encodeResponse(resp, req.Err)
-}
-
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
@@ -176,14 +105,6 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 	}
 
 	return resp.NodeKey, resp.NodeInvalid, resp.Err
-}
-
-func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
-	_, rep, err := s.enrollment.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return rep.(*pb.EnrollmentResponse), nil
 }
 
 func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, err error) {

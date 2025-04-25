@@ -21,6 +21,11 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
+const (
+	testAccountId = "some_account"
+	testUserId    = "some_user"
+)
+
 func Test_Dt4aAuthMiddleware(t *testing.T) {
 	rootTrustedEcKey := mustGenEcdsaKey(t)
 
@@ -35,6 +40,14 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	returnData := []byte("Congrats!, you got the data back!")
 
 	handler := dt4aMiddleware.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, r.Header.Get(dt4aAccountUuidHeaderKey), testAccountId,
+			"should have account uuid header set",
+		)
+
+		require.Equal(t, r.Header.Get(dt4aUserUuidHeaderKey), testUserId,
+			"should have user uuid header set",
+		)
+
 		w.Write(returnData)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -300,6 +313,14 @@ func Test_ValidateCertChain(t *testing.T) {
 		require.Equal(t, chain.counterPartyPubEncryptionKey, pubEncryptionKey,
 			"counter party pub encryption key should get set in validate",
 		)
+
+		require.Equal(t, testAccountId, chain.accountUuid,
+			"account uuid should be set in validate",
+		)
+
+		require.Equal(t, testUserId, chain.userUuid,
+			"user uuid should be set in validate",
+		)
 	})
 }
 
@@ -336,10 +357,10 @@ func newChain(counterPartyPubEncryptionKey *[32]byte, ecdsaKeys ...*ecdsa.Privat
 		}
 
 		thisPayload := payload{
-			AccountUuid:    "some_account",
+			AccountUuid:    testAccountId,
 			DateTimeSigned: time.Now().Unix(),
 			PublicKey:      *childKey,
-			UserUuid:       "some_user",
+			UserUuid:       testUserId,
 			ExpirationDate: time.Now().Add(1 * time.Hour).Unix(),
 			Version:        1,
 		}
