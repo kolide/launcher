@@ -59,6 +59,10 @@ func (iUpdateSearcher *IUpdateSearcher) PutOnline(online bool) error {
 		return fmt.Errorf("updating Online to %v: %w", online, err)
 	}
 
+	if updatedOnline != online {
+		return fmt.Errorf("attempted to update online property to %v, but received back %v", online, updatedOnline)
+	}
+
 	iUpdateSearcher.Online = updatedOnline
 	return nil
 }
