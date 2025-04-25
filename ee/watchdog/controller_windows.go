@@ -100,26 +100,11 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 
 	// don't bother processing further unless watchdog is enabled.
 	// note that this means if you manually install watchdog via CLI, logs
-	// will not be published unless you have the corresponding feature flag enabled
-	if !wc.knapsack.LauncherWatchdogEnabled() {
-		return
-	}
-
+	// will not be published unless you have the corresponding feature flag enabled.
 	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
 	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
 	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
-	watchdogTaskIsInstalled, err := watchdogTaskExists(wc.knapsack.Identifier())
-	if err != nil {
-		wc.slogger.Log(ctx, slog.LevelWarn,
-			"encountered error checking if watchdog task exists",
-			"err", err,
-		)
-
-		return
-	}
-
-	// no need to parse logs if task is not installed
-	if !watchdogTaskIsInstalled {
+	if !wc.knapsack.LauncherWatchdogEnabled() {
 		return
 	}
 
@@ -616,7 +601,7 @@ func RemoveWatchdogTask(identifier string) error {
 
 // watchdogTaskExists connects with the scheduler service to determine whether
 // a watchdog task for the given identifier is installed on the device
-func watchdogTaskExists(identifier string) (bool, error) {
+func watchdogTaskExists(identifier string) (bool, error) { // nolint:unused
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
 	}
