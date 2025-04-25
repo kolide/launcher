@@ -24,14 +24,15 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 	var (
 		flagset     = flag.NewFlagSet("query-windowsupdates", flag.ExitOnError)
 		flLocale    = flagset.String("locale", "_default", "search locale")
-		flTableMode = flagset.Int("table_mode", int(windowsupdatetable.UpdatesTable), fmt.Sprintf("updates table (%d); history table (%d); offline updates (%d)", windowsupdatetable.UpdatesTable, windowsupdatetable.HistoryTable, windowsupdatetable.UpdatesOfflineTable))
+		flTableMode = flagset.Int("table_mode", int(windowsupdatetable.UpdatesTable), fmt.Sprintf("updates table (%d); history table (%d)", windowsupdatetable.UpdatesTable, windowsupdatetable.HistoryTable))
+		flOnline    = flagset.Int("online", 1, "search for updates online")
 	)
 
 	if err := ff.Parse(flagset, args); err != nil {
 		return fmt.Errorf("parsing flags: %w", err)
 	}
 
-	rawResults, locale, isDefaultLocale, searchErr := searchLocale(*flLocale, *flTableMode)
+	rawResults, locale, isDefaultLocale, searchErr := searchLocale(*flLocale, *flTableMode, *flOnline)
 	queryResults := &windowsupdatetable.QueryResults{
 		RawResults:      rawResults,
 		Locale:          locale,
@@ -53,7 +54,7 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 	return nil
 }
 
-func searchLocale(locale string, tableMode int) ([]byte, string, int, error) {
+func searchLocale(locale string, tableMode int, online int) ([]byte, string, int, error) {
 	comshim.Add(1)
 	defer comshim.Done()
 
@@ -62,16 +63,19 @@ func searchLocale(locale string, tableMode int) ([]byte, string, int, error) {
 		return nil, "", 0, fmt.Errorf("new searcher: %w", err)
 	}
 
+	// Update Online value if needed
+	searchOnline := online > 0
+	if searcher.Online != searchOnline {
+		if err := searcher.PutOnline(searchOnline); err != nil {
+			return nil, "", 0, fmt.Errorf("updating searcher's Online to %v: %w", searchOnline, err)
+		}
+	}
+
 	var searchResults interface{}
 	if tableMode == int(windowsupdatetable.UpdatesTable) {
 		searchResults, err = searcher.Search("Type='Software'")
 	} else if tableMode == int(windowsupdatetable.HistoryTable) {
 		searchResults, err = searcher.QueryHistoryAll()
-	} else if tableMode == int(windowsupdatetable.UpdatesOfflineTable) {
-		searchResults, err = searcher.Search("Type='Software'")
-		if err := searcher.PutOnline(false); err != nil {
-			return nil, "", 0, fmt.Errorf("updating search to offline: %w", err)
-		}
 	} else {
 		return nil, "", 0, fmt.Errorf("unsupported table mode %d", tableMode)
 	}

@@ -38,7 +38,6 @@ type tableMode int
 const (
 	UpdatesTable tableMode = iota
 	HistoryTable
-	UpdatesOfflineTable
 )
 
 type Table struct {
@@ -53,6 +52,7 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
 		table.IntegerColumn("is_default"),
+		table.IntegerColumn("online"),
 	)
 
 	t := &Table{
@@ -63,9 +63,6 @@ func TablePlugin(mode tableMode, flags types.Flags, slogger *slog.Logger) *table
 	case UpdatesTable:
 		t.queryFunc = queryUpdates
 		t.name = "kolide_windows_updates"
-	case UpdatesOfflineTable:
-		t.queryFunc = queryUpdates
-		t.name = "kolide_windows_updates_offline"
 	case HistoryTable:
 		t.queryFunc = queryHistory
 		t.name = "kolide_windows_update_history"
@@ -109,72 +106,77 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 
 	var results []map[string]string
 
-	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
-		out, err := t.callQueryWindowsUpdatesSubcommand(ctx, locale, launcherPath)
-		if err != nil {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"error running launcher query-windowsupdates",
-				"err", err,
-				"out", string(out),
-			)
-			continue
-		}
-
-		var res QueryResults
-		if err := json.Unmarshal(out, &res); err != nil {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"error unmarshalling results of running launcher query-windowsupdates",
-				"err", err,
-				"out", string(out),
-			)
-			continue
-		}
-
-		if res.ErrStr != "" {
-			t.slogger.Log(ctx, slog.LevelWarn,
-				"launcher query-windowsupdates contained error",
-				"err", res.ErrStr,
-			)
-			continue
-		}
-
-		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
-			flattenOpts := []dataflatten.FlattenOpts{
-				dataflatten.WithSlogger(t.slogger),
-				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
-			}
-
-			flatData, err := dataflatten.Json(res.RawResults, flattenOpts...)
+	for _, online := range tablehelpers.GetConstraints(queryContext, "online", tablehelpers.WithDefaults("1")) {
+		for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
+			out, err := t.callQueryWindowsUpdatesSubcommand(ctx, launcherPath, locale, online)
 			if err != nil {
-				t.slogger.Log(ctx, slog.LevelInfo,
-					"flatten failed",
+				t.slogger.Log(ctx, slog.LevelWarn,
+					"error running launcher query-windowsupdates",
 					"err", err,
+					"out", string(out),
 				)
 				continue
 			}
 
-			rowData := map[string]string{
-				"locale":     res.Locale,
-				"is_default": strconv.Itoa(res.IsDefaultLocale),
+			var res QueryResults
+			if err := json.Unmarshal(out, &res); err != nil {
+				t.slogger.Log(ctx, slog.LevelWarn,
+					"error unmarshalling results of running launcher query-windowsupdates",
+					"err", err,
+					"out", string(out),
+				)
+				continue
 			}
 
-			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			if res.ErrStr != "" {
+				t.slogger.Log(ctx, slog.LevelWarn,
+					"launcher query-windowsupdates contained error",
+					"err", res.ErrStr,
+				)
+				continue
+			}
+
+			for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
+				flattenOpts := []dataflatten.FlattenOpts{
+					dataflatten.WithSlogger(t.slogger),
+					dataflatten.WithQuery(strings.Split(dataQuery, "/")),
+				}
+
+				flatData, err := dataflatten.Json(res.RawResults, flattenOpts...)
+				if err != nil {
+					t.slogger.Log(ctx, slog.LevelInfo,
+						"flatten failed",
+						"err", err,
+					)
+					continue
+				}
+
+				rowData := map[string]string{
+					"locale":     res.Locale,
+					"is_default": strconv.Itoa(res.IsDefaultLocale),
+					"online":     online,
+				}
+
+				results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
+			}
 		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) callQueryWindowsUpdatesSubcommand(ctx context.Context, locale string, launcherPath string) ([]byte, error) {
+func (t *Table) callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string, locale string, online string) ([]byte, error) {
 	// Collect timing data so we can determine whether offline searches really are faster
-	ctx, span := observability.StartSpan(ctx, "table_mode", int(t.mode), "locale", locale)
+	ctx, span := observability.StartSpan(ctx, "online", online, "locale", locale)
 	defer span.End()
 
 	args := []string{
 		"query-windowsupdates",
 		"-locale", locale,
 		"-table_mode", strconv.Itoa(int(t.mode)),
+		"-online", online,
 	}
+
 	cmd := exec.CommandContext(ctx, launcherPath, args...) //nolint:forbidigo // We can exec the current executable safely
 	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 	return cmd.CombinedOutput()
