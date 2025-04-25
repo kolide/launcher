@@ -110,14 +110,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 	var results []map[string]string
 
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults("_default")) {
-		args := []string{
-			"query-windowsupdates",
-			"-locale", locale,
-			"-table_mode", strconv.Itoa(int(t.mode)),
-		}
-		cmd := exec.CommandContext(ctx, launcherPath, args...) //nolint:forbidigo // We can exec the current executable safely
-		cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
-		out, err := cmd.CombinedOutput()
+		out, err := t.callQueryWindowsUpdatesSubcommand(ctx, locale, launcherPath)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"error running launcher query-windowsupdates",
@@ -170,6 +163,21 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 	}
 
 	return results, nil
+}
+
+func (t *Table) callQueryWindowsUpdatesSubcommand(ctx context.Context, locale string, launcherPath string) ([]byte, error) {
+	// Collect timing data so we can determine whether offline searches really are faster
+	ctx, span := observability.StartSpan(ctx, "table_mode", int(t.mode), "locale", locale)
+	defer span.End()
+
+	args := []string{
+		"query-windowsupdates",
+		"-locale", locale,
+		"-table_mode", strconv.Itoa(int(t.mode)),
+	}
+	cmd := exec.CommandContext(ctx, launcherPath, args...) //nolint:forbidigo // We can exec the current executable safely
+	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+	return cmd.CombinedOutput()
 }
 
 //nolint:unused
