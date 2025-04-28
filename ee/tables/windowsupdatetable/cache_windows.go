@@ -63,6 +63,10 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 					"error caching windows update data",
 					"err", err,
 				)
+			} else {
+				w.slogger.Log(ctx, slog.LevelDebug,
+					"successfully cached windows updates data",
+				)
 			}
 			w.queryCancel()
 		case <-w.interrupt:
