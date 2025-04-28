@@ -19,4 +19,5 @@ type Stores interface {
 	TokenStore() KVStore
 	LauncherHistoryStore() KVStore
 	Dt4aInfoStore() KVStore
+	WindowsUpdatesCacheStore() KVStore
 }
