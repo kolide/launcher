@@ -51,12 +51,12 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 	cacheTicker := time.NewTicker(w.cacheInterval)
 	defer cacheTicker.Stop()
 
-	var ctx context.Context
 	for {
 		select {
 		case <-cacheTicker.C:
 			// Since this query happens in the background and will not block auth, we can use
 			// a much longer timeout than we use for our tables.
+			var ctx context.Context
 			ctx, w.queryCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 			if err := w.queryAndStoreData(ctx); err != nil {
 				w.slogger.Log(ctx, slog.LevelWarn,
