@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -306,7 +307,17 @@ func deserializeNext(ctx context.Context, slogger *slog.Logger, nextToken byte, 
 		case tokenWasmMemoryTransfer, tokenWasmModuleTransfer:
 			return nil, errors.New("deserialization not implemented for wasm transfers")
 		case tokenError:
-			return nil, errors.New("deserialization not implemented for error")
+			// Try to deserialize the error, but handle any errors gracefully
+			errorBytes, err := deserializeError(ctx, slogger, srcReader)
+			if err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"error deserializing error object, returning placeholder",
+					"error", err,
+				)
+				// Return a placeholder error object instead of failing
+				return []byte(`{"name":"Error","message":"Failed to deserialize error"}`), nil
+			}
+			return errorBytes, nil
 		case tokenHostObj:
 			return nil, errors.New("deserialization not implemented for host object")
 		default:
@@ -951,4 +962,219 @@ func deserializeRegexp(srcReader *bytes.Reader) ([]byte, error) {
 	regexFull = append(regexFull, flags...)
 
 	return regexFull, nil
+}
+
+// ErrorTagType values - used to identify different parts of an Error object
+// These values come directly from the V8 source code's ErrorTag enum
+const (
+	// Error prototype tags
+	errorTagEvalErrorPrototype      byte = 'E' // The error is an EvalError
+	errorTagRangeErrorPrototype     byte = 'R' // The error is a RangeError
+	errorTagReferenceErrorPrototype byte = 'F' // The error is a ReferenceError
+	errorTagSyntaxErrorPrototype    byte = 'S' // The error is a SyntaxError
+	errorTagTypeErrorPrototype      byte = 'T' // The error is a TypeError
+	errorTagUriErrorPrototype       byte = 'U' // The error is a URIError
+
+	// Error property tags
+	errorTagMessage byte = 'm' // Followed by message: string
+	errorTagCause   byte = 'c' // Followed by a JS object: cause
+	errorTagStack   byte = 's' // Followed by stack: string
+	errorTagEnd     byte = '.' // The end of this error information
+
+	// Additional tags we've observed in practice
+	errorTagIsError byte = 0x72 // Is error flag (114 decimal = 0x72 hex)
+
+	genericErrorType = "Error"
+)
+
+// deserializeError handles the upcoming Error object in srcReader.
+// The data takes the following form:
+// * Error prototype tag (indicating the error type: Error, TypeError, etc.)
+// * Error properties as subtags:
+//   - errorTagMessage (0x01): followed by the error message string
+//   - errorTagStack (0x02): followed by the stack trace string
+//   - errorTagLineNumber (0x03): followed by the line number
+//   - errorTagColumnNumber (0x04): followed by the column number
+//   - errorTagScriptId (0x05): followed by the script ID
+//   - errorTagSourceURL (0x06): followed by the source URL
+//   - errorTagEvalOrigin (0x07): followed by the eval origin
+//   - errorTagCause (0x08): followed by the error cause
+//   - errorTagName (0x09): followed by the error name
+//
+// * errorTagEnd (0x00): indicating the end of the error object
+func deserializeError(ctx context.Context, slogger *slog.Logger, srcReader *bytes.Reader) ([]byte, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	// Create a map to hold the error properties
+	errorObj := make(map[string]string)
+
+	// Default to generic Error
+	errorType := genericErrorType
+
+	// Track if we've found a message
+	messageFound := false
+	fileNameFound := false
+
+	// Process error subtags until we reach errorTagEnd or EOF
+	for {
+		// Read the subtag, handling EOF gracefully
+		subtag, err := srcReader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				// If we hit EOF, just return what we have so far
+				slogger.Log(ctx, slog.LevelWarn,
+					"reached EOF while reading error subtag, returning partial error object",
+				)
+				break
+			}
+			return nil, fmt.Errorf("reading error subtag: %w", err)
+		}
+
+		// If we've reached the end of the error object, break
+		if subtag == errorTagEnd {
+			break
+		}
+
+		// Handle error prototype tags (these don't have values, they just indicate the error type)
+		switch subtag {
+		case errorTagEvalErrorPrototype:
+			errorType = "EvalError"
+			continue
+		case errorTagRangeErrorPrototype:
+			errorType = "RangeError"
+			continue
+		case errorTagReferenceErrorPrototype:
+			errorType = "ReferenceError"
+			continue
+		case errorTagSyntaxErrorPrototype:
+			errorType = "SyntaxError"
+			continue
+		case errorTagTypeErrorPrototype:
+			errorType = "TypeError"
+			continue
+		case errorTagUriErrorPrototype:
+			errorType = "URIError"
+			continue
+		}
+
+		// For other tags, read the value token
+		valueToken, err := srcReader.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				// If we hit EOF, just return what we have so far
+				slogger.Log(ctx, slog.LevelWarn,
+					"reached EOF while reading token for error subtag, returning partial error object",
+					"subtag", subtag,
+				)
+				break
+			}
+			return nil, fmt.Errorf("reading token for error subtag %c: %w", subtag, err)
+		}
+
+		// Try to deserialize the value, handling errors gracefully
+		value, err := deserializeNext(ctx, slogger, valueToken, srcReader)
+		if err != nil {
+			// If we encounter an error during deserialization, log it and continue
+			slogger.Log(ctx, slog.LevelWarn,
+				"error deserializing value for error subtag, continuing",
+				"subtag", fmt.Sprintf("%c", subtag),
+				"token", fmt.Sprintf("%02x", valueToken),
+				"error", err,
+			)
+			errorObj[fmt.Sprintf("property_%c", subtag)] = "[Error deserializing value]"
+			continue
+		}
+
+		// Map the subtag to a property name and store the value
+		valueStr := string(value)
+		switch subtag {
+		case errorTagMessage:
+			errorObj["message"] = valueStr
+			messageFound = true
+			errorType = determineErrorTypeFromMessage(valueStr, errorType)
+		case errorTagStack:
+			errorObj["stack"] = valueStr
+
+			// Extract file name and line number from stack if possible
+			if !fileNameFound {
+				// Look for patterns like "at filename:line:column"
+				fileLineMatches := regexp.MustCompile(`at\s+([^:]+):(\d+):(\d+)`).FindStringSubmatch(valueStr)
+				if len(fileLineMatches) >= 4 {
+					errorObj["fileName"] = fileLineMatches[1]
+					errorObj["lineNumber"] = fileLineMatches[2]
+					errorObj["columnNumber"] = fileLineMatches[3]
+					fileNameFound = true
+				}
+			}
+		case errorTagCause:
+			errorObj["cause"] = valueStr
+		case errorTagIsError:
+			errorObj["isError"] = valueStr
+		default:
+			// For unknown subtags, check if it might be a file path
+			propertyName := fmt.Sprintf("property_%c", subtag)
+			if strings.HasPrefix(valueStr, "file://") || strings.HasPrefix(valueStr, "/") {
+				errorObj["fileName"] = valueStr
+				fileNameFound = true
+			} else if !messageFound && len(valueStr) > 0 && !strings.Contains(valueStr, "\n") {
+				// If we haven't found a message and this looks like it could be one, use it
+				errorObj["message"] = valueStr
+				messageFound = true
+				errorType = determineErrorTypeFromMessage(valueStr, errorType)
+			} else {
+				// For truly unknown properties, store with a generic name
+				errorObj[propertyName] = valueStr
+				slogger.Log(ctx, slog.LevelWarn,
+					"unknown error subtag encountered",
+					"subtag", fmt.Sprintf("%c", subtag),
+					"value", valueStr,
+				)
+			}
+		}
+	}
+
+	// Set the error type and name
+	errorObj["type"] = errorType
+	errorObj["name"] = errorType
+
+	// Ensure we have at least a message
+	if _, hasMessage := errorObj["message"]; !hasMessage {
+		errorObj["message"] = ""
+	}
+
+	// Serialize the error object to JSON
+	resultBytes, err := json.Marshal(errorObj)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling error object: %w", err)
+	}
+
+	return resultBytes, nil
+}
+
+// determineErrorTypeFromMessage tries to infer the specific error type from a message string
+// when the error type is still the generic "Error"
+func determineErrorTypeFromMessage(message string, currentType string) string {
+	// Only try to determine a more specific type if we currently have the generic Error
+	if currentType != genericErrorType {
+		return currentType
+	}
+
+	loweredMessage := strings.ToLower(message)
+
+	if strings.Contains(loweredMessage, "eval") {
+		return "EvalError"
+	} else if strings.Contains(loweredMessage, "range") {
+		return "RangeError"
+	} else if strings.Contains(loweredMessage, "reference") {
+		return "ReferenceError"
+	} else if strings.Contains(loweredMessage, "syntax") {
+		return "SyntaxError"
+	} else if strings.Contains(loweredMessage, "type") {
+		return "TypeError"
+	} else if strings.Contains(loweredMessage, "uri") {
+		return "URIError"
+	}
+
+	return currentType
 }

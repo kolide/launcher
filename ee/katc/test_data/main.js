@@ -47,6 +47,24 @@
         const lengthTrackingArr = new Float32Array(lengthTrackingArrBuf);
         lengthTrackingArrBuf.resize(12); // will also resize lengthTrackingArr
 
+        // Create various error objects for testing all standard JavaScript error types
+        const basicError = new Error("This is a basic error message");
+        const evalError = new EvalError("This is an eval error message");
+        const rangeError = new RangeError("This is a range error message");
+        const referenceError = new ReferenceError("This is a reference error message");
+        const syntaxError = new SyntaxError("This is a syntax error message");
+        const typeError = new TypeError("This is a type error message");
+        const uriError = new URIError("This is a URI error message");
+
+        // Create an error that will have line/column information
+        let errorWithLineInfo;
+        try {
+            // This will throw a ReferenceError with line/column information
+            nonExistentVariable.someMethod();
+        } catch (e) {
+            errorWithLineInfo = e;
+        }
+
         // Shove some data in the object store. We want at least a couple items,
         // and a variety of data structures to really test our deserialization.
         const storeData = [
@@ -105,6 +123,14 @@
                 someArrayBuffer: unsignedIntArr.buffer, // ArrayBuffer object
                 anotherTypedArray: floatArr, // TypedArray, Float64Array (covers float types)
                 yetAnotherTypedArray: withOffsetArr, // TypedArray, Uint16Array with byte offset
+                // Standard error types
+                basicError: basicError,
+                evalError: evalError,
+                rangeError: rangeError,
+                referenceError: referenceError,
+                syntaxError: syntaxError,
+                typeError: typeError,
+                uriError: uriError,
             },
             {
                 uuid: "03b3e669-3e7a-482c-83b2-8a800b9f804f",
@@ -159,6 +185,14 @@
                 someArrayBuffer: signedIntArr.buffer, // ArrayBuffer object
                 anotherTypedArray: clampedUintArr, // TypedArray, Uint8ClampedArray (covers clamped types)
                 yetAnotherTypedArray: lengthTrackingArr, // TypedArray, Float32Array with length tracking
+                // Standard error types
+                basicError: basicError,
+                evalError: evalError,
+                rangeError: rangeError,
+                referenceError: referenceError,
+                syntaxError: syntaxError,
+                typeError: typeError,
+                uriError: uriError,
             },
         ];
         objectStore.transaction.oncomplete = (event) => {
