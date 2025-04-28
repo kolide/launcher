@@ -34,6 +34,8 @@ func CachedWindowsUpdatesTablePlugin(flags types.Flags, slogger *slog.Logger, ca
 	columns := dataflattentable.Columns(
 		table.TextColumn("locale"),
 		table.IntegerColumn("is_default"),
+		table.IntegerColumn("is_cached"),
+		table.IntegerColumn("age"),
 	)
 
 	t := &CachedWindowsUpdatesTable{
@@ -88,6 +90,8 @@ func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, 
 			continue
 		}
 
+		resultsAgeInSecondsStr := strconv.Itoa(int(time.Now().Unix() - res.QueryTime.Unix()))
+
 		for _, dataQuery := range tablehelpers.GetConstraints(queryContext, "query", tablehelpers.WithDefaults("*")) {
 			flattenOpts := []dataflatten.FlattenOpts{
 				dataflatten.WithSlogger(c.slogger),
@@ -106,6 +110,8 @@ func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, 
 			rowData := map[string]string{
 				"locale":     res.Results.Locale,
 				"is_default": strconv.Itoa(res.Results.IsDefaultLocale),
+				"is_cached":  "1",
+				"age":        resultsAgeInSecondsStr,
 			}
 
 			results = append(results, dataflattentable.ToMap(flatData, dataQuery, rowData)...)
