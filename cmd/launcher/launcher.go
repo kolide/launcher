@@ -46,6 +46,7 @@ import (
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/observability/exporter"
 	"github.com/kolide/launcher/ee/powereventwatcher"
+	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/ee/watchdog"
 	"github.com/kolide/launcher/pkg/augeas"
@@ -353,6 +354,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	} else {
 		runGroup.Add("powerEventWatcher", powerEventWatcher.Execute, powerEventWatcher.Interrupt)
 	}
+
+	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k.WindowsUpdatesCacheStore(), 1*time.Hour, slogger)
+	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
 	var client service.KolideService
 	{

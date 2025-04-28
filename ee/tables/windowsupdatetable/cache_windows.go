@@ -42,7 +42,7 @@ func NewWindowsUpdatesCacher(cacheStore types.GetterSetter, cacheInterval time.D
 	return &windowsUpdatesCacher{
 		cacheStore:    cacheStore,
 		cacheInterval: cacheInterval,
-		slogger:       slogger,
+		slogger:       slogger.With("component", "windows_updates_cacher"),
 		interrupt:     make(chan struct{}, 1),
 	}
 }
