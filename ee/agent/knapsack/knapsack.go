@@ -184,6 +184,10 @@ func (k *knapsack) Dt4aInfoStore() types.KVStore {
 	return k.getKVStore(storage.Dt4aInfoStore)
 }
 
+func (k *knapsack) WindowsUpdatesCacheStore() types.KVStore {
+	return k.getKVStore(storage.WindowsUpdatesCacheStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
 	return k.flags.SetLauncherWatchdogEnabled(enabled)
 }
