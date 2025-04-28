@@ -43,7 +43,7 @@ func NewWindowsUpdatesCacher(cacheStore types.GetterSetter, cacheInterval time.D
 		cacheStore:    cacheStore,
 		cacheInterval: cacheInterval,
 		slogger:       slogger.With("component", "windows_updates_cacher"),
-		interrupt:     make(chan struct{}, 1),
+		interrupt:     make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
 	}
 }
 
