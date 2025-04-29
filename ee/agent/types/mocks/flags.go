@@ -1574,6 +1574,24 @@ func (_m *Flags) SetUpdateDirectory(directory string) error {
 	return r0
 }
 
+// SetUseCachedDataForScheduledQueries provides a mock function with given fields: enabled
+func (_m *Flags) SetUseCachedDataForScheduledQueries(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUseCachedDataForScheduledQueries")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetWatchdogDelaySec provides a mock function with given fields: sec
 func (_m *Flags) SetWatchdogDelaySec(sec int) error {
 	ret := _m.Called(sec)
@@ -1803,6 +1821,24 @@ func (_m *Flags) UpdateDirectory() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// UseCachedDataForScheduledQueries provides a mock function with no fields
+func (_m *Flags) UseCachedDataForScheduledQueries() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for UseCachedDataForScheduledQueries")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

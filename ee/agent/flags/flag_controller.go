@@ -758,3 +758,12 @@ func (fc *FlagController) TableGenerateTimeout() time.Duration {
 		WithMax(10*time.Minute),
 	).get(fc.getControlServerValue(keys.TableGenerateTimeout))
 }
+
+func (fc *FlagController) SetUseCachedDataForScheduledQueries(enabled bool) error {
+	return fc.setControlServerValue(keys.UseCachedDataForScheduledQueries, boolToBytes(enabled))
+}
+func (fc *FlagController) UseCachedDataForScheduledQueries() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.UseCachedDataForScheduledQueries))
+}
