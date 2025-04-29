@@ -22,10 +22,10 @@ type FlagController struct {
 	slogger         *slog.Logger
 	cmdLineOpts     *launcher.Options
 	agentFlagsStore types.KVStore
-	overrideMutex   sync.RWMutex
+	overrideMutex   *sync.RWMutex
 	overrides       map[keys.FlagKey]*Override
 	observers       map[types.FlagsChangeObserver][]keys.FlagKey
-	observersMutex  sync.RWMutex
+	observersMutex  *sync.RWMutex
 }
 
 func NewFlagController(slogger *slog.Logger, agentFlagsStore types.KVStore, opts ...Option) *FlagController {
@@ -34,7 +34,9 @@ func NewFlagController(slogger *slog.Logger, agentFlagsStore types.KVStore, opts
 		cmdLineOpts:     &launcher.Options{},
 		agentFlagsStore: agentFlagsStore,
 		observers:       make(map[types.FlagsChangeObserver][]keys.FlagKey),
+		observersMutex:  &sync.RWMutex{},
 		overrides:       make(map[keys.FlagKey]*Override),
+		overrideMutex:   &sync.RWMutex{},
 	}
 
 	for _, opt := range opts {
