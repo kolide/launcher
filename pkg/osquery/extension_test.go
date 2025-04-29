@@ -70,6 +70,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	osqHistory, err := history.InitHistory(store)
 	require.NoError(t, err)
 	m.On("OsqueryHistory").Return(osqHistory).Maybe()
+	m.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	return m
 }
