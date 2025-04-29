@@ -13,7 +13,7 @@ const (
 
 	// Custom units
 	unitRestart = "{restart}"
-	unitTimeout = "{timeout}"
+	unitFailure = "{failure}"
 
 	// Define our meter names and descriptions. All meter names should have "launcher." prepended.
 	goMemoryUsageGaugeName                       = "launcher.memory.golang"
@@ -28,8 +28,8 @@ const (
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
 	osqueryRestartCounterDescription             = "The number of osquery instance restarts"
-	windowsUpdatesQueryTimeoutCounterName        = "launcher.windowsupdates.query.timeout"
-	windowsUpdatesQueryTimeoutCounterDescription = "The number of timeouts when querying the Windows Update Agent API"
+	windowsUpdatesQueryFailureCounterName        = "launcher.windowsupdates.query.failed"
+	windowsUpdatesQueryFailureCounterDescription = "The number of failures when querying the Windows Update Agent API"
 )
 
 var (
@@ -42,7 +42,7 @@ var (
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
 	OsqueryRestartCounter             metric.Int64Counter
-	WindowsUpdatesQueryTimeoutCounter metric.Int64Counter
+	WindowsUpdatesQueryFailureCounter metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -76,9 +76,9 @@ func ReinitializeMetrics() {
 	OsqueryRestartCounter = int64CounterOrNoop(osqueryRestartCounterName,
 		metric.WithDescription(osqueryRestartCounterDescription),
 		metric.WithUnit(unitRestart))
-	WindowsUpdatesQueryTimeoutCounter = int64CounterOrNoop(windowsUpdatesQueryTimeoutCounterName,
-		metric.WithDescription(windowsUpdatesQueryTimeoutCounterDescription),
-		metric.WithUnit(unitTimeout))
+	WindowsUpdatesQueryFailureCounter = int64CounterOrNoop(windowsUpdatesQueryFailureCounterName,
+		metric.WithDescription(windowsUpdatesQueryFailureCounterDescription),
+		metric.WithUnit(unitFailure))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create

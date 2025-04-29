@@ -63,10 +63,8 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 					"error caching windows update data",
 					"err", err,
 				)
-				// If this was a timeout error, increment our counter tracking query timeouts
-				if errors.Is(err, context.DeadlineExceeded) {
-					observability.WindowsUpdatesQueryTimeoutCounter.Add(ctx, 1)
-				}
+				// Increment our counter tracking query failures/timeouts
+				observability.WindowsUpdatesQueryFailureCounter.Add(ctx, 1)
 			} else {
 				w.slogger.Log(ctx, slog.LevelDebug,
 					"successfully cached windows updates data",
