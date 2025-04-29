@@ -13,20 +13,23 @@ const (
 
 	// Custom units
 	unitRestart = "{restart}"
+	unitTimeout = "{timeout}"
 
 	// Define our meter names and descriptions. All meter names should have "launcher." prepended.
-	goMemoryUsageGaugeName            = "launcher.memory.golang"
-	goMemoryUsageGaugeDescription     = "Go runtime memory usage"
-	nonGoMemoryUsageGaugeName         = "launcher.memory.non_golang"
-	nonGoMemoryUsageGaugeDescription  = "Non-Go memory usage"
-	memoryPercentGaugeName            = "launcher.memory.percent"
-	memoryPercentGaugeDescription     = "Process memory percent"
-	cpuPercentGaugeName               = "launcher.cpu.percent"
-	cpuPercentGaugeDescription        = "Process CPU percent"
-	launcherRestartCounterName        = "launcher.restart"
-	launcherRestartCounterDescription = "The number of launcher restarts"
-	osqueryRestartCounterName         = "launcher.osquery.restart"
-	osqueryRestartCounterDescription  = "The number of osquery instance restarts"
+	goMemoryUsageGaugeName                       = "launcher.memory.golang"
+	goMemoryUsageGaugeDescription                = "Go runtime memory usage"
+	nonGoMemoryUsageGaugeName                    = "launcher.memory.non_golang"
+	nonGoMemoryUsageGaugeDescription             = "Non-Go memory usage"
+	memoryPercentGaugeName                       = "launcher.memory.percent"
+	memoryPercentGaugeDescription                = "Process memory percent"
+	cpuPercentGaugeName                          = "launcher.cpu.percent"
+	cpuPercentGaugeDescription                   = "Process CPU percent"
+	launcherRestartCounterName                   = "launcher.restart"
+	launcherRestartCounterDescription            = "The number of launcher restarts"
+	osqueryRestartCounterName                    = "launcher.osquery.restart"
+	osqueryRestartCounterDescription             = "The number of osquery instance restarts"
+	windowsUpdatesQueryTimeoutCounterName        = "launcher.windowsupdates.query.timeout"
+	windowsUpdatesQueryTimeoutCounterDescription = "The number of timeouts when querying the Windows Update Agent API"
 )
 
 var (
@@ -37,8 +40,9 @@ var (
 	CpuPercentGauge       metric.Int64Gauge
 
 	// Counters
-	LauncherRestartCounter metric.Int64Counter
-	OsqueryRestartCounter  metric.Int64Counter
+	LauncherRestartCounter            metric.Int64Counter
+	OsqueryRestartCounter             metric.Int64Counter
+	WindowsUpdatesQueryTimeoutCounter metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -72,6 +76,9 @@ func ReinitializeMetrics() {
 	OsqueryRestartCounter = int64CounterOrNoop(osqueryRestartCounterName,
 		metric.WithDescription(osqueryRestartCounterDescription),
 		metric.WithUnit(unitRestart))
+	WindowsUpdatesQueryTimeoutCounter = int64CounterOrNoop(windowsUpdatesQueryTimeoutCounterName,
+		metric.WithDescription(windowsUpdatesQueryTimeoutCounterDescription),
+		metric.WithUnit(unitTimeout))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create
