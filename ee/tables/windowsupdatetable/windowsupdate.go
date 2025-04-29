@@ -146,7 +146,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 
 // callQueryWindowsUpdatesSubcommand performs the required query by execing `launcher.exe query-windowsupdates`;
 // it unmarshals the results into the expected format. We perform the exec to handle a memory leak in the Search
-// function.
+// function. If a timeout has been set on `ctx`, it will be respected by the underlying exec.
 func callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string, locale string, mode tableMode) (*QueryResults, error) {
 	ctx, span := observability.StartSpan(ctx, "locale", locale, "table_mode", int(mode))
 	defer span.End()

@@ -59,10 +59,12 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 			var ctx context.Context
 			ctx, w.queryCancel = context.WithTimeout(context.Background(), 10*time.Minute)
 			if err := w.queryAndStoreData(ctx); err != nil {
-				w.slogger.Log(ctx, slog.LevelWarn,
+				w.slogger.Log(ctx, slog.LevelError,
 					"error caching windows update data",
 					"err", err,
 				)
+				// Increment our counter tracking query failures/timeouts
+				observability.WindowsUpdatesQueryFailureCounter.Add(ctx, 1)
 			} else {
 				w.slogger.Log(ctx, slog.LevelDebug,
 					"successfully cached windows updates data",
@@ -91,6 +93,9 @@ func (w *windowsUpdatesCacher) Interrupt(_ error) {
 	w.interrupt <- struct{}{}
 }
 
+// queryAndStoreData will query the Windows Update Agent API via the `launcher query-windowsupdates`
+// subcommand. If desired, a timeout can be created for the `ctx` arg; it will be respected by the
+// exec to `launcher query-windowsupdates`.
 func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()

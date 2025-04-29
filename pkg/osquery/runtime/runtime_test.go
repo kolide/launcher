@@ -360,6 +360,7 @@ func TestPing(t *testing.T) {
 	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 	osqHistory := setupHistory(t, k)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -1076,6 +1077,7 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
+	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 }
 
 func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {

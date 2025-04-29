@@ -451,6 +451,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("ServerProvidedDataStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AgentFlagsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("AutoupdateErrorsStore").Return(inmemory.NewStore()).Maybe()
+	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
