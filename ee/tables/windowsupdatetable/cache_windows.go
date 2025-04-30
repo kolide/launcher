@@ -55,7 +55,7 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 		// Since this query happens in the background and will not block auth, we can use
 		// a much longer timeout than we use for our tables.
 		var ctx context.Context
-		ctx, w.queryCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+		ctx, w.queryCancel = context.WithTimeout(context.Background(), 20*time.Minute)
 		if err := w.queryAndStoreData(ctx); err != nil {
 			w.slogger.Log(ctx, slog.LevelError,
 				"error caching windows update data",
