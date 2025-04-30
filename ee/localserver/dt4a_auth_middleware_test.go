@@ -130,6 +130,7 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 	t.Run("handles valid chain", func(t *testing.T) {
 		t.Parallel()
 
+		// create a valid chain of keys
 		validKeys := make([]*ecdsa.PrivateKey, 4)
 		validKeys[0] = rootTrustedEcKey
 
@@ -148,33 +149,145 @@ func Test_Dt4aAuthMiddleware(t *testing.T) {
 
 		b64 := base64.URLEncoding.EncodeToString(chainMarshalled)
 
-		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil))
-		require.Equal(t, http.StatusOK, rr.Code,
-			"should return ok when chain is valid",
-		)
+		t.Run("allows missing origin", func(t *testing.T) {
+			t.Parallel()
 
-		bodyBytes, err := io.ReadAll(rr.Body)
-		require.NoError(t, err)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil))
+			require.Equal(t, http.StatusOK, rr.Code,
+				"should return ok when chain is valid",
+			)
 
-		var z dt4aResponse
-		require.NoError(t, json.Unmarshal(bodyBytes, &z))
+			bodyBytes, err := io.ReadAll(rr.Body)
+			require.NoError(t, err)
 
-		dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
-		require.NoError(t, err)
+			var z dt4aResponse
+			require.NoError(t, json.Unmarshal(bodyBytes, &z))
 
-		x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
-		require.NoError(t, err)
+			dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
+			require.NoError(t, err)
 
-		x25519 := new([32]byte)
-		copy(x25519[:], x25519Decoded)
+			x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
+			require.NoError(t, err)
 
-		opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
-		require.NoError(t, err)
+			x25519 := new([32]byte)
+			copy(x25519[:], x25519Decoded)
 
-		require.Equal(t, returnData, opened,
-			"should be able to open NaCl box and get data",
-		)
+			opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
+			require.NoError(t, err)
+
+			require.Equal(t, returnData, opened,
+				"should be able to open NaCl box and get data",
+			)
+		})
+
+		t.Run("allows safari web extensions origin", func(t *testing.T) {
+			t.Parallel()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil)
+
+			req.Header.Set("origin", fmt.Sprintf("%sexample.com", safariWebExtensionScheme))
+
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code,
+				"should return ok when chain is valid",
+			)
+
+			bodyBytes, err := io.ReadAll(rr.Body)
+			require.NoError(t, err)
+
+			var z dt4aResponse
+			require.NoError(t, json.Unmarshal(bodyBytes, &z))
+
+			dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
+			require.NoError(t, err)
+
+			x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
+			require.NoError(t, err)
+
+			x25519 := new([32]byte)
+			copy(x25519[:], x25519Decoded)
+
+			opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
+			require.NoError(t, err)
+
+			require.Equal(t, returnData, opened,
+				"should be able to open NaCl box and get data",
+			)
+		})
+
+		t.Run("allows empty origin", func(t *testing.T) {
+			t.Parallel()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil)
+
+			req.Header.Set("origin", "")
+
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code,
+				"should return ok when chain is valid",
+			)
+
+			bodyBytes, err := io.ReadAll(rr.Body)
+			require.NoError(t, err)
+
+			var z dt4aResponse
+			require.NoError(t, json.Unmarshal(bodyBytes, &z))
+
+			dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
+			require.NoError(t, err)
+
+			x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
+			require.NoError(t, err)
+
+			x25519 := new([32]byte)
+			copy(x25519[:], x25519Decoded)
+
+			opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
+			require.NoError(t, err)
+
+			require.Equal(t, returnData, opened,
+				"should be able to open NaCl box and get data",
+			)
+		})
+
+		t.Run("allows valid origin", func(t *testing.T) {
+			t.Parallel()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/?payload=%s", b64), nil)
+
+			req.Header.Set("origin", acceptableOrigin(t))
+
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code,
+				"should return ok when chain is valid",
+			)
+
+			bodyBytes, err := io.ReadAll(rr.Body)
+			require.NoError(t, err)
+
+			var z dt4aResponse
+			require.NoError(t, json.Unmarshal(bodyBytes, &z))
+
+			dataDecoded, err := base64.URLEncoding.DecodeString(z.Data)
+			require.NoError(t, err)
+
+			x25519Decoded, err := base64.URLEncoding.DecodeString(z.PubKey)
+			require.NoError(t, err)
+
+			x25519 := new([32]byte)
+			copy(x25519[:], x25519Decoded)
+
+			opened, err := echelper.OpenNaCl(dataDecoded, x25519, callerPrivKey)
+			require.NoError(t, err)
+
+			require.Equal(t, returnData, opened,
+				"should be able to open NaCl box and get data",
+			)
+		})
 	})
 }
 
@@ -428,4 +541,19 @@ func toJWK(key any, kid string) (*jwk, error) {
 	default:
 		return nil, errors.New("unsupported key type")
 	}
+}
+
+func acceptableOrigin(t *testing.T) string {
+	// Just grab the first origin available in our allowlist
+	acceptableOrigin := ""
+	for k := range allowlistedDt4aOriginsLookup {
+		acceptableOrigin = k
+		break
+	}
+	if acceptableOrigin == "" {
+		t.Error("no acceptable origins found")
+		t.FailNow()
+	}
+
+	return acceptableOrigin
 }
