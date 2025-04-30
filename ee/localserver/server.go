@@ -119,10 +119,6 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	rootMux := http.NewServeMux()
 	rootMux.HandleFunc("/", http.NotFound)
 
-	// In the future, we will want to make this authenticated; for now, it is not authenticated.
-	// TODO: make this authenticated or remove
-	rootMux.Handle("/zta", ls.rateLimitHandler(ls.dt4aLimiter, ls.requestDt4aInfoHandler()))
-
 	// authed dt4a endpoints
 	rootMux.Handle("/v3/", ls.rateLimitHandler(ls.dt4aLimiter, dt4aAuthMiddleware.Wrap(dt4aMux)))
 
