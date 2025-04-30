@@ -58,10 +58,10 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	// Wait a few seconds to allow the osquery queries to go through
 	time.Sleep(500 * time.Millisecond)
 
-	// We expect a total of 12 attributes: 3 initial attributes, 5 from the ServerProvidedDataStore, and 4 from osquery
+	// We expect a total of 13 attributes: 4 initial attributes, 5 from the ServerProvidedDataStore, and 4 from osquery
 	telemetryExporter.attrLock.RLock()
 	defer telemetryExporter.attrLock.RUnlock()
-	require.Equal(t, 12, len(telemetryExporter.attrs))
+	require.Equal(t, 13, len(telemetryExporter.attrs))
 
 	// Confirm we set a provider
 	telemetryExporter.providerLock.Lock()
@@ -94,7 +94,7 @@ func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 	require.Nil(t, telemetryExporter.meterProvider, "expected disabled exporter to not create a meter provider but one was created")
 
 	// Confirm we added basic attributes
-	require.Equal(t, 3, len(telemetryExporter.attrs))
+	require.Equal(t, 4, len(telemetryExporter.attrs))
 	for _, actualAttr := range telemetryExporter.attrs {
 		switch actualAttr.Key {
 		case "service.name":
@@ -103,6 +103,8 @@ func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 			require.Equal(t, version.Version().Version, actualAttr.Value.AsString())
 		case "host.arch":
 			require.Equal(t, runtime.GOARCH, actualAttr.Value.AsString())
+		case "launcher.goos":
+			require.Equal(t, runtime.GOOS, actualAttr.Value.AsString())
 		default:
 			t.Fatalf("unexpected attr %s", actualAttr.Key)
 		}

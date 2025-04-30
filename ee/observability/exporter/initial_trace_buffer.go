@@ -55,6 +55,7 @@ func initialAttrs() []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(applicationName),
 		semconv.ServiceVersion(version.Version().Version),
+		attribute.String("launcher.goos", runtime.GOOS),
 	}
 
 	if archAttr, ok := archAttributeMap[runtime.GOARCH]; ok {
