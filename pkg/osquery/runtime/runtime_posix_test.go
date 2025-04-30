@@ -70,6 +70,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
+	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 
@@ -135,6 +136,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
+	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 

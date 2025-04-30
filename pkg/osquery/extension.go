@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -555,6 +556,13 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	config = e.setOsqueryOptions(config, configOptsToSet)
+
+	// If this feature flag is set, we want to use cached data for scheduled queries that might otherwise
+	// time out. We achieve this by updating the config to point to the tables holding the cached data.
+	if e.knapsack.UseCachedDataForScheduledQueries() {
+		// The kolide_windows_updates table is currently the only table we use this feature for.
+		config = strings.ReplaceAll(config, "kolide_windows_updates", "kolide_windows_updates_cached")
+	}
 
 	return config, nil
 }

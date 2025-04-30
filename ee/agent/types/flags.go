@@ -248,4 +248,10 @@ type Flags interface {
 	// TableGenerateTimeout is the maximum time a Kolide extension table is permitted to take
 	SetTableGenerateTimeout(interval time.Duration) error
 	TableGenerateTimeout() time.Duration
+
+	// UseCachedDataForScheduledQueries controls whether launcher uses cached data for scheduled queries.
+	// Currently, we do this only for the kolide_windows_updates table, since that table can time out when
+	// querying for fresh data.
+	SetUseCachedDataForScheduledQueries(enabled bool) error
+	UseCachedDataForScheduledQueries() bool
 }
