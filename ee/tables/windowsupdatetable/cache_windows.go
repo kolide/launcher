@@ -52,25 +52,27 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 	defer cacheTicker.Stop()
 
 	for {
+		// Since this query happens in the background and will not block auth, we can use
+		// a much longer timeout than we use for our tables.
+		var ctx context.Context
+		ctx, w.queryCancel = context.WithTimeout(context.Background(), 10*time.Minute)
+		if err := w.queryAndStoreData(ctx); err != nil {
+			w.slogger.Log(ctx, slog.LevelError,
+				"error caching windows update data",
+				"err", err,
+			)
+			// Increment our counter tracking query failures/timeouts
+			observability.WindowsUpdatesQueryFailureCounter.Add(ctx, 1)
+		} else {
+			w.slogger.Log(ctx, slog.LevelDebug,
+				"successfully cached windows updates data",
+			)
+		}
+		w.queryCancel()
+
 		select {
 		case <-cacheTicker.C:
-			// Since this query happens in the background and will not block auth, we can use
-			// a much longer timeout than we use for our tables.
-			var ctx context.Context
-			ctx, w.queryCancel = context.WithTimeout(context.Background(), 10*time.Minute)
-			if err := w.queryAndStoreData(ctx); err != nil {
-				w.slogger.Log(ctx, slog.LevelError,
-					"error caching windows update data",
-					"err", err,
-				)
-				// Increment our counter tracking query failures/timeouts
-				observability.WindowsUpdatesQueryFailureCounter.Add(ctx, 1)
-			} else {
-				w.slogger.Log(ctx, slog.LevelDebug,
-					"successfully cached windows updates data",
-				)
-			}
-			w.queryCancel()
+			continue
 		case <-w.interrupt:
 			return nil
 		}
