@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package nixenv
+package mapxml
 
 import (
 	"bufio"
@@ -25,5 +25,5 @@ func New() *parser {
 // Parse implements the parser interface
 // It takes a reader containing XML data from nix-env and returns a structured representation
 func (p *parser) Parse(reader io.Reader) (any, error) {
-	return p.parseNixXml(reader)
+	return p.parseXml(reader)
 }
