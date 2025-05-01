@@ -139,6 +139,7 @@ func TestParse(t *testing.T) {
 
 // TestNewParser ensures that the New function returns a properly initialized parser
 func TestNewParser(t *testing.T) {
+	t.Parallel()
 	p := New()
 	assert.NotNil(t, p, "New should return a non-nil parser")
 	assert.Nil(t, p.scanner, "New parser should have nil scanner")
@@ -147,5 +148,6 @@ func TestNewParser(t *testing.T) {
 
 // TestParserSingleton ensures that the Parser singleton is properly initialized
 func TestParserSingleton(t *testing.T) {
+	t.Parallel()
 	assert.NotNil(t, Parser, "Parser singleton should be non-nil")
 }
