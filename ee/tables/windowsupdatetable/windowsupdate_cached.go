@@ -20,11 +20,8 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
-const (
-	cachedDataTTL = 6 * time.Hour
-)
-
 type CachedWindowsUpdatesTable struct {
+	flags      types.Flags
 	slogger    *slog.Logger
 	cacheStore types.Getter
 	name       string
@@ -39,6 +36,7 @@ func CachedWindowsUpdatesTablePlugin(flags types.Flags, slogger *slog.Logger, ca
 	)
 
 	t := &CachedWindowsUpdatesTable{
+		flags:      flags,
 		slogger:    slogger.With("name", "kolide_windows_updates_cached"),
 		cacheStore: cacheStore,
 		name:       "kolide_windows_updates_cached",
@@ -81,7 +79,7 @@ func (c *CachedWindowsUpdatesTable) generateFromCachedData(ctx context.Context, 
 			continue
 		}
 
-		if res.QueryTime.Add(cachedDataTTL).Before(time.Now()) {
+		if res.QueryTime.Add(c.flags.CachedQueryResultsTTL()).Before(time.Now()) {
 			c.slogger.Log(ctx, slog.LevelWarn,
 				"cached data is expired, not using",
 				"locale", locale,
