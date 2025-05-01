@@ -145,6 +145,7 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 			"query_start_time", queryStartTime.String(),
 			"query_timeout", genTimeout.String(),
 		)
+		observability.TablewrapperTimeoutCounter.Add(ctx, 1)
 		return nil, fmt.Errorf("querying %s timed out after %s (queried columns: %v)", wt.name, genTimeout.String(), queriedColumns)
 	}
 }
