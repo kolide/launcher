@@ -88,6 +88,24 @@ func (_m *Flags) AutoupdateInterval() time.Duration {
 	return r0
 }
 
+// CachedQueryResultsTTL provides a mock function with no fields
+func (_m *Flags) CachedQueryResultsTTL() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CachedQueryResultsTTL")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // CertPins provides a mock function with no fields
 func (_m *Flags) CertPins() [][]byte {
 	ret := _m.Called()
@@ -912,6 +930,24 @@ func (_m *Flags) SetAutoupdateInterval(interval time.Duration) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
 		r0 = rf(interval)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetCachedQueryResultsTTL provides a mock function with given fields: ttl
+func (_m *Flags) SetCachedQueryResultsTTL(ttl time.Duration) error {
+	ret := _m.Called(ttl)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetCachedQueryResultsTTL")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(ttl)
 	} else {
 		r0 = ret.Error(0)
 	}

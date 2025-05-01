@@ -254,4 +254,8 @@ type Flags interface {
 	// querying for fresh data.
 	SetUseCachedDataForScheduledQueries(enabled bool) error
 	UseCachedDataForScheduledQueries() bool
+
+	// CachedQueryResultsTTL indicates how long cached query results are valid.
+	SetCachedQueryResultsTTL(ttl time.Duration) error
+	CachedQueryResultsTTL() time.Duration
 }

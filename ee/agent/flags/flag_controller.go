@@ -767,3 +767,14 @@ func (fc *FlagController) UseCachedDataForScheduledQueries() bool {
 		WithDefaultBool(false),
 	).get(fc.getControlServerValue(keys.UseCachedDataForScheduledQueries))
 }
+
+func (fc *FlagController) SetCachedQueryResultsTTL(ttl time.Duration) error {
+	return fc.setControlServerValue(keys.CachedQueryResultsTTL, durationToBytes(ttl))
+}
+func (fc *FlagController) CachedQueryResultsTTL() time.Duration {
+	return NewDurationFlagValue(fc.slogger, keys.CachedQueryResultsTTL,
+		WithDefault(6*time.Hour),
+		WithMin(90*time.Minute),
+		WithMax(72*time.Hour),
+	).get(fc.getControlServerValue(keys.CachedQueryResultsTTL))
+}
