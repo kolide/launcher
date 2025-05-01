@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="0" maxComparedVersion="2.49.0" name="git-2.49.0" outputName="" pname="git" system="aarch64-darwin" version="2.49.0" versionDiff="=">
+    <output name="out" />
+  </item>
+  <item attrPath="1" maxComparedVersion="3.2.1" name="python-3.2.1" outputName="" pname="python" system="aarch64-darwin" version="3.2.1" versionDiff="=">
+    <output name="out" />
+  </item>
+  <item attrPath="2" maxComparedVersion="1.14.3" name="go-1.14.3" outputName="" pname="go" system="aarch64-darwin" version="1.14.3" versionDiff="=">
+    <output name="out" />
+  </item>
+</items>
