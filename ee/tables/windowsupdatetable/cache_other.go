@@ -16,7 +16,7 @@ type noOpWindowsUpdatesCacher struct {
 	interrupted atomic.Bool
 }
 
-func NewWindowsUpdatesCacher(_ types.GetterSetter, _ time.Duration, _ *slog.Logger) *noOpWindowsUpdatesCacher {
+func NewWindowsUpdatesCacher(_ types.Flags, _ types.GetterSetter, _ time.Duration, _ *slog.Logger) *noOpWindowsUpdatesCacher {
 	return &noOpWindowsUpdatesCacher{
 		interrupt: make(chan struct{}),
 	}

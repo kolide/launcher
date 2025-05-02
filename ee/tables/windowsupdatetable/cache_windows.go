@@ -10,10 +10,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
 )
@@ -22,8 +25,10 @@ type (
 	// windowsUpdatesCacher queries for fresh Windows updates data every `cacheInterval`,
 	// and stores it in the `cacheStore`.
 	windowsUpdatesCacher struct {
+		flags         types.Flags
 		cacheStore    types.GetterSetter
 		cacheInterval time.Duration
+		cacheLock     *sync.Mutex
 		queryCancel   context.CancelFunc
 		slogger       *slog.Logger
 		interrupt     chan struct{}
@@ -38,13 +43,18 @@ type (
 	}
 )
 
-func NewWindowsUpdatesCacher(cacheStore types.GetterSetter, cacheInterval time.Duration, slogger *slog.Logger) *windowsUpdatesCacher {
-	return &windowsUpdatesCacher{
+func NewWindowsUpdatesCacher(flags types.Flags, cacheStore types.GetterSetter, cacheInterval time.Duration, slogger *slog.Logger) *windowsUpdatesCacher {
+	w := &windowsUpdatesCacher{
+		flags:         flags,
 		cacheStore:    cacheStore,
 		cacheInterval: cacheInterval,
+		cacheLock:     &sync.Mutex{},
 		slogger:       slogger.With("component", "windows_updates_cacher"),
 		interrupt:     make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
 	}
+	flags.RegisterChangeObserver(w, keys.InModernStandby)
+
+	return w
 }
 
 func (w *windowsUpdatesCacher) Execute() (err error) {
@@ -52,23 +62,19 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 	defer cacheTicker.Stop()
 
 	for {
-		// Since this query happens in the background and will not block auth, we can use
-		// a much longer timeout than we use for our tables.
-		var ctx context.Context
-		ctx, w.queryCancel = context.WithTimeout(context.Background(), 20*time.Minute)
-		if err := w.queryAndStoreData(ctx); err != nil {
-			w.slogger.Log(ctx, slog.LevelError,
+
+		if err := w.queryAndStoreData(context.TODO()); err != nil {
+			w.slogger.Log(context.TODO(), slog.LevelError,
 				"error caching windows update data",
 				"err", err,
 			)
 			// Increment our counter tracking query failures/timeouts
-			observability.WindowsUpdatesQueryFailureCounter.Add(ctx, 1)
+			observability.WindowsUpdatesQueryFailureCounter.Add(context.TODO(), 1)
 		} else {
-			w.slogger.Log(ctx, slog.LevelDebug,
+			w.slogger.Log(context.TODO(), slog.LevelDebug,
 				"successfully cached windows updates data",
 			)
 		}
-		w.queryCancel()
 
 		select {
 		case <-cacheTicker.C:
@@ -95,12 +101,46 @@ func (w *windowsUpdatesCacher) Interrupt(_ error) {
 	w.interrupt <- struct{}{}
 }
 
+// FlagsChanged satisfies the types.FlagsChangeObserver interface. The cacher subscribes to changes to
+// InModernStandby.
+func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	// If we've exited modern standby, kick off a query-and-cache attempt. We do this in a goroutine
+	// to avoid blocking notifying other observers of changed flags.
+	if slices.Contains(flagKeys, keys.InModernStandby) && !w.flags.InModernStandby() {
+		go func() {
+			if err := w.queryAndStoreData(ctx); err != nil {
+				w.slogger.Log(ctx, slog.LevelError,
+					"error caching windows update data after exiting modern standby",
+					"err", err,
+				)
+			} else {
+				w.slogger.Log(ctx, slog.LevelDebug,
+					"successfully cached windows updates data after exiting modern standby",
+				)
+			}
+		}()
+	}
+}
+
 // queryAndStoreData will query the Windows Update Agent API via the `launcher query-windowsupdates`
 // subcommand. If desired, a timeout can be created for the `ctx` arg; it will be respected by the
 // exec to `launcher query-windowsupdates`.
 func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	w.cacheLock.Lock()
+	defer w.cacheLock.Unlock()
+	span.AddEvent("cache_lock_acquired")
+
+	// Since this query happens in the background and will not block auth, we can use
+	// a much longer timeout than we use for our tables. We queryCancel on windowsUpdateCacher
+	// so that we can `Interrupt` ongoing query attempts on launcher shutdown if needed.
+	ctx, w.queryCancel = context.WithTimeout(ctx, 20*time.Minute)
+	defer w.queryCancel()
 
 	launcherPath, err := os.Executable()
 	if err != nil {
