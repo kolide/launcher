@@ -14,6 +14,7 @@ import (
 	appicons "github.com/kolide/launcher/ee/tables/app-icons"
 	"github.com/kolide/launcher/ee/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
 	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
 	"github.com/kolide/launcher/ee/tables/execparsers/repcli"
 	"github.com/kolide/launcher/ee/tables/execparsers/socketfilterfw"
@@ -122,7 +123,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		systemprofiler.TablePlugin(k, slogger),
 		munki.ManagedInstalls(k, slogger),
 		munki.MunkiReport(k, slogger),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_nix_upgradeable", dataflattentable.XmlType, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_nix_upgradeable", mapxml.Parser, allowedcmd.NixEnv, []string{"--query", "--installed", "-c", "--xml"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_remotectl", remotectl.Parser, allowedcmd.Remotectl, []string{`dumpstate`}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--getglobalstate", "--getblockall", "--getallowsigned", "--getstealthmode"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_socketfilterfw_apps", socketfilterfw.Parser, allowedcmd.Socketfilterfw, []string{"--listapps"}, dataflattentable.WithIncludeStderr()),
