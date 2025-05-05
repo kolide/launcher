@@ -21,7 +21,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testFlags := typesmocks.NewFlags(t)
 	testFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 
-	cacher := NewWindowsUpdatesCacher(typesmocks.NewFlags(t), testStore, 1*time.Minute, slogger)
+	cacher := NewWindowsUpdatesCacher(testFlags, testStore, 1*time.Minute, slogger)
 
 	// Start and then interrupt
 	go cacher.Execute()
