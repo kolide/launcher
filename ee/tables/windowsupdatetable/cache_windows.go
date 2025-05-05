@@ -18,6 +18,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 )
 
@@ -117,19 +118,20 @@ func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...key
 	// If we've exited modern standby, kick off a query-and-cache attempt. We do this in a goroutine
 	// to avoid blocking notifying other observers of changed flags.
 	if slices.Contains(flagKeys, keys.InModernStandby) && !w.flags.InModernStandby() {
-		go func() {
+		gowrapper.Go(ctx, w.slogger, func() {
 			if err := w.queryAndStoreData(ctx); err != nil {
 				observability.SetError(span, err)
 				w.slogger.Log(ctx, slog.LevelError,
 					"error caching windows update data after exiting modern standby",
 					"err", err,
 				)
-			} else {
-				w.slogger.Log(ctx, slog.LevelDebug,
-					"successfully cached windows updates data after exiting modern standby",
-				)
+				return
 			}
-		}()
+
+			w.slogger.Log(ctx, slog.LevelDebug,
+				"successfully cached windows updates data after exiting modern standby",
+			)
+		})
 	}
 }
 
