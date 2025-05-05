@@ -355,7 +355,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		runGroup.Add("powerEventWatcher", powerEventWatcher.Execute, powerEventWatcher.Interrupt)
 	}
 
-	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k.WindowsUpdatesCacheStore(), 1*time.Hour, slogger)
+	windowsUpdatesCacher := windowsupdatetable.NewWindowsUpdatesCacher(k, k.WindowsUpdatesCacheStore(), 1*time.Hour, slogger)
 	runGroup.Add("windowsUpdatesCacher", windowsUpdatesCacher.Execute, windowsUpdatesCacher.Interrupt)
 
 	var client service.KolideService
