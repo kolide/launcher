@@ -20,6 +20,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	require.NoError(t, err)
 	testFlags := typesmocks.NewFlags(t)
 	testFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	testFlags.On("InModernStandby").Maybe().Return(false)
 
 	cacher := NewWindowsUpdatesCacher(testFlags, testStore, 1*time.Minute, slogger)
 
