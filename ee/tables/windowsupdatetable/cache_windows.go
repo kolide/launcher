@@ -149,7 +149,7 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	}
 
 	// Since this query happens in the background and will not block auth, we can use
-	// a much longer timeout than we use for our tables. We queryCancel on windowsUpdateCacher
+	// a much longer timeout than we use for our tables. We set queryCancel on windowsUpdateCacher
 	// so that we can `Interrupt` ongoing query attempts on launcher shutdown if needed.
 	ctx, w.queryCancel = context.WithTimeout(ctx, 20*time.Minute)
 	defer w.queryCancel()
