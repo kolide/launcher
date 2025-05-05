@@ -6,6 +6,7 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -145,7 +146,9 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 
 	// Make sure that the rungroup was not interrupted while waiting for cache lock
 	if w.interrupted.Load() {
-		return nil
+		err := errors.New("interrupted while waiting for cache lock, will not proceed with querying")
+		observability.SetError(span, err)
+		return err
 	}
 
 	// Since this query happens in the background and will not block auth, we can use
