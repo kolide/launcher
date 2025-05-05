@@ -119,6 +119,12 @@ func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...key
 	// to avoid blocking notifying other observers of changed flags.
 	if slices.Contains(flagKeys, keys.InModernStandby) && !w.flags.InModernStandby() {
 		gowrapper.Go(ctx, w.slogger, func() {
+			// Wait slightly, to make sure we've successfully exited modern standby -- sometimes
+			// modern standby status flaps.
+			time.Sleep(15 * time.Second)
+			if w.flags.InModernStandby() {
+				return
+			}
 			if err := w.queryAndStoreData(ctx); err != nil {
 				observability.SetError(span, err)
 				w.slogger.Log(ctx, slog.LevelError,
