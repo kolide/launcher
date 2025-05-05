@@ -6,7 +6,6 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -112,6 +111,7 @@ func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...key
 	if slices.Contains(flagKeys, keys.InModernStandby) && !w.flags.InModernStandby() {
 		go func() {
 			if err := w.queryAndStoreData(ctx); err != nil {
+				observability.SetError(span, err)
 				w.slogger.Log(ctx, slog.LevelError,
 					"error caching windows update data after exiting modern standby",
 					"err", err,
@@ -144,16 +144,22 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 
 	launcherPath, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("getting path to launcher: %w", err)
+		err = fmt.Errorf("getting path to launcher: %w", err)
+		observability.SetError(span, err)
+		return err
 	}
 	if !strings.HasSuffix(launcherPath, "launcher.exe") {
-		return errors.New("cannot run generate for non-launcher executable (is this running in a test context?)")
+		err = fmt.Errorf("cannot run generate for non-launcher executable %s (is this running in a test context?)", launcherPath)
+		observability.SetError(span, err)
+		return err
 	}
 
 	queryTime := time.Now()
 	res, err := callQueryWindowsUpdatesSubcommand(ctx, launcherPath, defaultLocale, UpdatesTable)
 	if err != nil {
-		return fmt.Errorf("running query windows updates subcommand: %w", err)
+		err = fmt.Errorf("running query windows updates subcommand: %w", err)
+		observability.SetError(span, err)
+		return err
 	}
 
 	rawResultsToStore, err := json.Marshal(&cachedQueryResults{
@@ -161,11 +167,15 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 		Results:   res,
 	})
 	if err != nil {
-		return fmt.Errorf("marshalling results to store: %w", err)
+		err = fmt.Errorf("marshalling results to store: %w", err)
+		observability.SetError(span, err)
+		return err
 	}
 
 	if err := w.cacheStore.Set([]byte(defaultLocale), rawResultsToStore); err != nil {
-		return fmt.Errorf("setting query results in store: %w", err)
+		err = fmt.Errorf("setting query results in store: %w", err)
+		observability.SetError(span, err)
+		return err
 	}
 
 	return nil
