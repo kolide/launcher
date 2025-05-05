@@ -61,18 +61,25 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 	defer cacheTicker.Stop()
 
 	for {
-
-		if err := w.queryAndStoreData(context.TODO()); err != nil {
-			w.slogger.Log(context.TODO(), slog.LevelError,
-				"error caching windows update data",
-				"err", err,
-			)
-			// Increment our counter tracking query failures/timeouts
-			observability.WindowsUpdatesQueryFailureCounter.Add(context.TODO(), 1)
-		} else {
+		if w.flags.InModernStandby() {
+			// We subscribe to changes in `keys.InModernStandby`, so we'll instead make a cache attempt
+			// as soon as we exit modern standby.
 			w.slogger.Log(context.TODO(), slog.LevelDebug,
-				"successfully cached windows updates data",
+				"skipping caching while in modern standby",
 			)
+		} else {
+			if err := w.queryAndStoreData(context.TODO()); err != nil {
+				w.slogger.Log(context.TODO(), slog.LevelError,
+					"error caching windows update data",
+					"err", err,
+				)
+				// Increment our counter tracking query failures/timeouts
+				observability.WindowsUpdatesQueryFailureCounter.Add(context.TODO(), 1)
+			} else {
+				w.slogger.Log(context.TODO(), slog.LevelDebug,
+					"successfully cached windows updates data",
+				)
+			}
 		}
 
 		select {
