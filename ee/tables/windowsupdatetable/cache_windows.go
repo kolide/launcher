@@ -143,6 +143,11 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	defer w.cacheLock.Unlock()
 	span.AddEvent("cache_lock_acquired")
 
+	// Make sure that the rungroup was not interrupted while waiting for cache lock
+	if w.interrupted.Load() {
+		return nil
+	}
+
 	// Since this query happens in the background and will not block auth, we can use
 	// a much longer timeout than we use for our tables. We queryCancel on windowsUpdateCacher
 	// so that we can `Interrupt` ongoing query attempts on launcher shutdown if needed.
