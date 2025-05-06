@@ -120,8 +120,8 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 
 	ta := &TufAutoupdater{
 		knapsack:      k,
-		interrupt:     make(chan struct{}, 1),
-		signalRestart: make(chan error, 1),
+		interrupt:     make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
+		signalRestart: make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
 		store:         k.AutoupdateErrorsStore(),
 		updateChannel: k.UpdateChannel(),
 		pinnedVersions: map[autoupdatableBinary]string{
