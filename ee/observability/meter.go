@@ -32,6 +32,8 @@ const (
 	windowsUpdatesQueryFailureCounterDescription = "The number of failures when querying the Windows Update Agent API"
 	tablewrapperTimeoutCounterName               = "launcher.tablewrapper.timeout"
 	tablewrapperTimeoutCounterDescription        = "The number of timeouts when querying a Kolide extension table"
+	autoupdateFailureCounterName                 = "launcher.autoupdate.failed"
+	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
 )
 
 var (
@@ -46,6 +48,7 @@ var (
 	OsqueryRestartCounter             metric.Int64Counter
 	WindowsUpdatesQueryFailureCounter metric.Int64Counter
 	TablewrapperTimeoutCounter        metric.Int64Counter
+	AutoupdateFailureCounter          metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -84,8 +87,10 @@ func ReinitializeMetrics() {
 		metric.WithUnit(unitFailure))
 	TablewrapperTimeoutCounter = int64CounterOrNoop(tablewrapperTimeoutCounterName,
 		metric.WithDescription(tablewrapperTimeoutCounterDescription),
-		metric.WithUnit(unitFailure),
-	)
+		metric.WithUnit(unitFailure))
+	AutoupdateFailureCounter = int64CounterOrNoop(autoupdateFailureCounterName,
+		metric.WithDescription(autoupdateFailureCounterDescription),
+		metric.WithUnit(unitFailure))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create

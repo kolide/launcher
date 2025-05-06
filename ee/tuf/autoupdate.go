@@ -253,6 +253,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 			"checking for updates",
 		)
 		if err := ta.checkForUpdate(context.TODO(), binaries); err != nil {
+			observability.AutoupdateFailureCounter.Add(context.TODO(), 1)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
 				"err", err,
@@ -341,6 +342,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 	)
 
 	if err := ta.checkForUpdate(ctx, binariesToUpdate); err != nil {
+		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update per control server request",
 			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
@@ -401,6 +403,7 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 
 	// At least one binary requires a recheck -- perform that now
 	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate); err != nil {
+		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
 			"update_channel", ta.updateChannel,
