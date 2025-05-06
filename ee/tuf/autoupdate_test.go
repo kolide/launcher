@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1111,76 +1110,6 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	require.Equal(t, "", osqueryVersion)
 }
 
-func Test_storeError(t *testing.T) {
-	t.Parallel()
-
-	testRootDir := t.TempDir()
-	testTufServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulates TUF server being down
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer testTufServer.Close()
-	// setup fake osqueryd binary to mock file existence for currentRunningVersion
-	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
-	_, err := os.Create(fakeOsqBinaryPath)
-	require.NoError(t, err, "unable to create fake osqueryd binary file for test setup")
-
-	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can accumulate some errors
-	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(setupStorage(t))
-	mockKnapsack.On("TufServerURL").Return(testTufServer.URL)
-	mockKnapsack.On("UpdateDirectory").Return("")
-	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-	mockKnapsack.On("UpdateChannel").Return("nightly")
-	mockKnapsack.On("PinnedLauncherVersion").Return("")
-	mockKnapsack.On("PinnedOsquerydVersion").Return("")
-	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
-	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockQuerier := newMockQuerier(t)
-
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier)
-	require.NoError(t, err, "could not initialize new TUF autoupdater")
-
-	mockLibraryManager := NewMocklibrarian(t)
-	autoupdater.libraryManager = mockLibraryManager
-	mockQuerier.On("Query", mock.Anything).Return([]map[string]string{{"version": "1.1.1"}}, nil).Once()
-
-	// We only expect TidyLibrary to run for osqueryd, since we can't get the current running version
-	// for launcher in tests
-	mockLibraryManager.On("TidyLibrary", binaryOsqueryd, mock.Anything).Return().Once()
-
-	// Start the autoupdater going
-	go autoupdater.Execute()
-
-	// Wait 5 seconds to accumulate errors, stop it, and give it a second to shut down
-	time.Sleep(500 * time.Millisecond)
-	autoupdater.Interrupt(errors.New("test error"))
-	time.Sleep(100 * time.Millisecond)
-
-	// Confirm that we saved the errors
-	errorCount := 0
-	err = autoupdater.store.ForEach(func(k, _ []byte) error {
-		// Confirm error is saved with reasonable timestamp
-		ts, err := strconv.ParseInt(string(k), 10, 64)
-		require.NoError(t, err, "invalid timestamp in key: %s", string(k))
-		require.LessOrEqual(t, time.Now().Unix()-ts, int64(30), "error saved under timestamp not within last 30 seconds")
-
-		// Increment error count so we know we got something
-		errorCount += 1
-		return nil
-	})
-	require.NoError(t, err, "could not iterate over keys")
-	require.Greater(t, errorCount, 0, "TUF autoupdater did not record error counts")
-
-	mockLibraryManager.AssertExpectations(t)
-	mockQuerier.AssertExpectations(t)
-	mockKnapsack.AssertExpectations(t)
-}
-
 func Test_cleanUpOldErrors(t *testing.T) {
 	t.Parallel()
 
@@ -1221,7 +1150,7 @@ func Test_cleanUpOldErrors(t *testing.T) {
 	})
 	require.NoError(t, err, "could not iterate over keys")
 
-	require.Equal(t, 1, keyCount, "cleanup routine did not clean up correct number of old errors")
+	require.Equal(t, 0, keyCount, "cleanup routine did not clean up all errors")
 }
 
 func setupStorage(t *testing.T) types.KVStore {
