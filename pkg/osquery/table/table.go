@@ -38,7 +38,6 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 		LauncherAutoupdateConfigTable(slogger, k),
 		osquery_instance_history.TablePlugin(k, slogger),
 		tufinfo.TufReleaseVersionTable(slogger, k),
-		launcher_db.TablePlugin(k, slogger, "kolide_tuf_autoupdater_errors", k.AutoupdateErrorsStore()),
 		desktopprocs.TablePlugin(k, slogger),
 	}
 }

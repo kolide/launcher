@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -243,17 +242,17 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.tidyLibrary()
 
+	// Delete contents of error store -- we don't need it anymore. It will be removed in a future release.
+	go ta.cleanUpOldErrors()
+
 	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
 	defer checkTicker.Stop()
-	cleanupTicker := time.NewTicker(12 * time.Hour)
-	defer cleanupTicker.Stop()
 
 	for {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
 			"checking for updates",
 		)
 		if err := ta.checkForUpdate(context.TODO(), binaries); err != nil {
-			ta.storeError(err)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
 				"err", err,
@@ -277,8 +276,6 @@ func (ta *TufAutoupdater) Execute() (err error) {
 			return signalRestartErr
 		case <-checkTicker.C:
 			continue
-		case <-cleanupTicker.C:
-			ta.cleanUpOldErrors()
 		}
 	}
 }
@@ -344,7 +341,6 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 	)
 
 	if err := ta.checkForUpdate(ctx, binariesToUpdate); err != nil {
-		ta.storeError(err)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update per control server request",
 			"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
@@ -405,7 +401,6 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 
 	// At least one binary requires a recheck -- perform that now
 	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate); err != nil {
-		ta.storeError(err)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
 			"update_channel", ta.updateChannel,
@@ -727,53 +722,18 @@ func PlatformArch() string {
 	return runtime.GOARCH
 }
 
-// storeError saves errors that occur during the periodic check for updates, so that they
-// can be queryable via the `kolide_tuf_autoupdater_errors` table.
-func (ta *TufAutoupdater) storeError(autoupdateErr error) {
-	timestamp := strconv.Itoa(int(time.Now().Unix()))
-	if err := ta.store.Set([]byte(timestamp), []byte(autoupdateErr.Error())); err != nil {
-		ta.slogger.Log(context.TODO(), slog.LevelError,
-			"could not store autoupdater error",
-			"err", err,
-		)
-	}
-}
-
-// cleanUpOldErrors removes all errors from our store that are more than a week old,
-// so we only keep the most recent/salient errors.
+// cleanUpOldErrors removes all errors from the store in preparation for removing the store
+// in the future.
 func (ta *TufAutoupdater) cleanUpOldErrors() {
-	// We want to delete all errors more than 1 week old
-	errorTtl := 7 * 24 * time.Hour
-
-	// Read through all keys in bucket to determine which ones are old enough to be deleted
-	keysToDelete := make([][]byte, 0)
-	if err := ta.store.ForEach(func(k, _ []byte) error {
-		// Key is a timestamp
-		ts, err := strconv.ParseInt(string(k), 10, 64)
-		if err != nil {
-			// Delete the corrupted key
-			keysToDelete = append(keysToDelete, k)
-			return nil
-		}
-
-		errorTimestamp := time.Unix(ts, 0)
-		if errorTimestamp.Add(errorTtl).Before(time.Now()) {
-			keysToDelete = append(keysToDelete, k)
-		}
-
-		return nil
-	}); err != nil {
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not iterate over bucket items to determine which are expired",
-			"err", err,
-		)
-	}
-
-	// Delete all old keys
-	if err := ta.store.Delete(keysToDelete...); err != nil {
+	// We want to delete all errors
+	if err := ta.store.DeleteAll(); err != nil {
 		ta.slogger.Log(context.TODO(), slog.LevelWarn,
 			"could not delete old autoupdater errors from bucket",
 			"err", err,
+		)
+	} else {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"deleted autoupdater error store contents",
 		)
 	}
 }
