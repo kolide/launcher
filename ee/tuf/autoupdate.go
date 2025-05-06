@@ -265,10 +265,6 @@ func (ta *TufAutoupdater) Execute() (err error) {
 		}
 
 		select {
-		case <-checkTicker.C:
-			continue
-		case <-cleanupTicker.C:
-			ta.cleanUpOldErrors()
 		case <-ta.interrupt:
 			ta.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received external interrupt, stopping",
@@ -279,6 +275,10 @@ func (ta *TufAutoupdater) Execute() (err error) {
 				"received interrupt to restart launcher after update, stopping",
 			)
 			return signalRestartErr
+		case <-checkTicker.C:
+			continue
+		case <-cleanupTicker.C:
+			ta.cleanUpOldErrors()
 		}
 	}
 }
