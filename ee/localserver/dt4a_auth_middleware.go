@@ -146,6 +146,8 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 			time.Sleep(100 * time.Millisecond)
 		}
 
+		// even if the downstream hander did not write a body, we still create a nacl box & dt4a response
+		// this allows a caller to know it's at least talking to valid agent
 		box, pubKey, err := echelper.SealNaCl(bhr.Bytes(), requestTrustChain.counterPartyPubEncryptionKey)
 		if err != nil {
 			d.slogger.Log(r.Context(), slog.LevelError,
@@ -171,6 +173,11 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 
 			w.WriteHeader(http.StatusInternalServerError)
 			return
+		}
+
+		// if a downstream handler has set a code, set it here
+		if bhr.code != 0 {
+			w.WriteHeader(bhr.code)
 		}
 
 		w.Header().Set("Content-Type", "application/octet-stream")
