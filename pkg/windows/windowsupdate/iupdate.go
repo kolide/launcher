@@ -1,6 +1,7 @@
 package windowsupdate
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-ole/go-ole"
@@ -23,10 +24,10 @@ type IUpdate struct {
 	Deadline                        *time.Time
 	DeltaCompressedContentAvailable bool
 	DeltaCompressedContentPreferred bool
-	DeploymentAction                int32 // enum https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/ne-wuapi-deploymentaction
+	DeploymentAction                int32 // enum https://docs.microsoft.com/en-us/windows/win32/api/wuapi/ne-wuapi-deploymentaction
 	Description                     string
 	DownloadContents                []*IUpdateDownloadContent
-	DownloadPriority                int32 // enum https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/ne-wuapi-downloadpriority
+	DownloadPriority                int32 // enum https://docs.microsoft.com/en-us/windows/win32/api/wuapi/ne-wuapi-downloadpriority
 	EulaAccepted                    bool
 	EulaText                        string
 	HandlerID                       string
@@ -66,19 +67,19 @@ type IUpdate struct {
 func toIUpdates(updatesDisp *ole.IDispatch) ([]*IUpdate, error) {
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting property Count as int32: %w", err)
 	}
 
 	updates := make([]*IUpdate, count)
 	for i := 0; i < int(count); i++ {
 		updateDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updatesDisp, "Item", i))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting property Item at index %d of %d as IDispatch: %w", i, count, err)
 		}
 
 		update, err := toIUpdate(updateDisp)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("converting Item IDispatch at index %d of %d to IUpdate: %w", i, count, err)
 		}
 
 		updates[i] = update
@@ -95,23 +96,23 @@ func toIUpdatesIdentities(updatesDisp *ole.IDispatch) ([]*IUpdateIdentity, error
 
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updatesDisp, "Count"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting property Count as int32: %w", err)
 	}
 
 	identities := make([]*IUpdateIdentity, count)
 	for i := 0; i < int(count); i++ {
 		updateDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updatesDisp, "Item", i))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting property Item at index %d of %d as IDispatch: %w", i, count, err)
 		}
 
 		identityDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateDisp, "Identity"))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getting property Identity at index %d of %d as IDispatch: %w", i, count, err)
 		}
 		if identityDisp != nil {
 			if identities[i], err = toIUpdateIdentity(identityDisp); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("converting Identity IDispatch at index %d of %d to IUpdateIdentity: %w", i, count, err)
 			}
 		}
 	}
