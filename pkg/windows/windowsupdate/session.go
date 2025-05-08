@@ -62,7 +62,7 @@ func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
 }
 
 // CreateUpdateSearcher returns an IUpdateSearcher interface for this session.
-// https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
+// https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
 func (iUpdateSession *IUpdateSession) CreateUpdateSearcher() (*IUpdateSearcher, error) {
 	updateSearcherDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(iUpdateSession.disp, "CreateUpdateSearcher"))
 	if err != nil {

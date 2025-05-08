@@ -9,7 +9,7 @@ import (
 )
 
 // ICategory represents the category to which an update belongs.
-// https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/nn-wuapi-icategory
+// https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-icategory
 type ICategory struct {
 	disp        *ole.IDispatch
 	CategoryID  string
