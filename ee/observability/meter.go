@@ -24,6 +24,8 @@ const (
 	memoryPercentGaugeDescription                = "Process memory percent"
 	cpuPercentGaugeName                          = "launcher.cpu.percent"
 	cpuPercentGaugeDescription                   = "Process CPU percent"
+	checkupScoreGaugeName                        = "launcher.checkup.score"
+	checkupScoreGaugeDescription                 = "Computed checkup score"
 	launcherRestartCounterName                   = "launcher.restart"
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
@@ -34,6 +36,8 @@ const (
 	tablewrapperTimeoutCounterDescription        = "The number of timeouts when querying a Kolide extension table"
 	autoupdateFailureCounterName                 = "launcher.autoupdate.failed"
 	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
+	checkupErrorCounterName                      = "launcher.checkup.error"
+	checkupErrorCounterDescription               = "The number of errors when running checkups"
 )
 
 var (
@@ -42,6 +46,7 @@ var (
 	NonGoMemoryUsageGauge metric.Int64Gauge
 	MemoryPercentGauge    metric.Int64Gauge
 	CpuPercentGauge       metric.Int64Gauge
+	CheckupScoreGauge     metric.Float64Gauge
 
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
@@ -49,6 +54,7 @@ var (
 	WindowsUpdatesQueryFailureCounter metric.Int64Counter
 	TablewrapperTimeoutCounter        metric.Int64Counter
 	AutoupdateFailureCounter          metric.Int64Counter
+	CheckupErrorCounter               metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -74,6 +80,9 @@ func ReinitializeMetrics() {
 	CpuPercentGauge = int64GaugeOrNoop(cpuPercentGaugeName,
 		metric.WithDescription(cpuPercentGaugeDescription),
 		metric.WithUnit(unitPercent))
+	CheckupScoreGauge = float64GaugeOrNoop(checkupScoreGaugeName,
+		metric.WithDescription(checkupScoreGaugeDescription),
+		metric.WithUnit(unitPercent))
 
 	// Counters
 	LauncherRestartCounter = int64CounterOrNoop(launcherRestartCounterName,
@@ -91,6 +100,9 @@ func ReinitializeMetrics() {
 	AutoupdateFailureCounter = int64CounterOrNoop(autoupdateFailureCounterName,
 		metric.WithDescription(autoupdateFailureCounterDescription),
 		metric.WithUnit(unitFailure))
+	CheckupErrorCounter = int64CounterOrNoop(checkupErrorCounterName,
+		metric.WithDescription(checkupErrorCounterDescription),
+		metric.WithUnit(unitFailure))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create
@@ -99,6 +111,16 @@ func int64GaugeOrNoop(name string, options ...metric.Int64GaugeOption) metric.In
 	gauge, err := otel.Meter(instrumentationPkg).Int64Gauge(name, options...)
 	if err != nil {
 		return noop.Int64Gauge{}
+	}
+	return gauge
+}
+
+// float64GaugeOrNoop is guaranteed to return an Float64Gauge -- if we cannot create
+// a real Float64Gauge, we return a noop version instead.
+func float64GaugeOrNoop(name string, options ...metric.Float64GaugeOption) metric.Float64Gauge {
+	gauge, err := otel.Meter(instrumentationPkg).Float64Gauge(name, options...)
+	if err != nil {
+		return noop.Float64Gauge{}
 	}
 	return gauge
 }
