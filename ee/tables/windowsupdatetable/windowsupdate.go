@@ -161,16 +161,22 @@ func callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string,
 	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("running query-windowsupdates: %w", err)
+		err = fmt.Errorf("running query-windowsupdates: %w", err)
+		observability.SetError(span, err)
+		return nil, err
 	}
 
 	var res QueryResults
 	if err := json.Unmarshal(out, &res); err != nil {
-		return nil, fmt.Errorf("unmarshalling results of running launcher query-windowsupdates: %w", err)
+		err = fmt.Errorf("unmarshalling results of running launcher query-windowsupdates: %w", err)
+		observability.SetError(span, err)
+		return nil, err
 	}
 
 	if res.ErrStr != "" {
-		return nil, fmt.Errorf("launcher query-windowsupdates returned error: %s", res.ErrStr)
+		err = fmt.Errorf("launcher query-windowsupdates returned error: %s", res.ErrStr)
+		observability.SetError(span, err)
+		return nil, err
 	}
 
 	return &res, nil

@@ -6,7 +6,9 @@ import (
 	"time"
 
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,8 +18,11 @@ func TestInterrupt_Multiple(t *testing.T) {
 	slogger := multislogger.NewNopLogger()
 	testStore, err := storageci.NewStore(t, slogger, "test_cache_bucket")
 	require.NoError(t, err)
+	testFlags := typesmocks.NewFlags(t)
+	testFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
+	testFlags.On("InModernStandby").Maybe().Return(false)
 
-	cacher := NewWindowsUpdatesCacher(testStore, 1*time.Minute, slogger)
+	cacher := NewWindowsUpdatesCacher(testFlags, testStore, 1*time.Minute, slogger)
 
 	// Start and then interrupt
 	go cacher.Execute()
