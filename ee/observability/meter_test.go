@@ -105,6 +105,34 @@ func Test_int64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	require.Greater(t, len(meterOutBytes.String()), 0)
 }
 
+// Test_float64GaugeOrNoop does not run in parallel to avoid setting a global meter provider
+// too early during the test run.
+func Test_float64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
+	// Before we set up the meter provider, we should still get a usable float64 gauge
+	testGauge := float64GaugeOrNoop("launcher.test.gauge", metric.WithUnit(unitPercent))
+	require.NotNil(t, testGauge)
+	testGauge.Record(context.TODO(), 5)
+
+	// Set up a meter provider that writes to a buffer every 100 milliseconds
+	writeInterval := 100 * time.Millisecond
+	meterOutBytes := &threadsafebuffer.ThreadSafeBuffer{}
+	testExporter, err := stdoutmetric.New(stdoutmetric.WithWriter(meterOutBytes))
+	require.NoError(t, err)
+	testProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(testExporter, sdkmetric.WithInterval(writeInterval))))
+	otel.SetMeterProvider(testProvider)
+
+	// We should still be able to use our test gauge -- write data and wait
+	// for it to be written to our exporter.
+	for i := range 3 {
+		time.Sleep(writeInterval)
+		testGauge.Record(context.TODO(), float64(i))
+	}
+	time.Sleep(writeInterval)
+
+	// Confirm we exported data
+	require.Greater(t, len(meterOutBytes.String()), 0)
+}
+
 // Test_int64CounterOrNoop does not run in parallel to avoid setting a global meter provider
 // too early during the test run.
 func Test_int64CounterOrNoop(t *testing.T) { //nolint:paralleltest
