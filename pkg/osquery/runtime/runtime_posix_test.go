@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
+	"github.com/kolide/launcher/pkg/osquery/osquerypublisher"
 	"github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -77,7 +78,7 @@ func TestOsquerySlowStart(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s, WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s, WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -145,7 +146,7 @@ func TestExtensionSocketPath(t *testing.T) {
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
 
-	runner := New(k, mockServiceClient(t), s, WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s, WithExtensionSocketPath(extensionSocketPath))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 

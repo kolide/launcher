@@ -121,6 +121,7 @@ type OsqueryInstance struct {
 	extensionManagerClient  *osquery.ExtensionManagerClient
 	history                 types.OsqueryHistorian
 	startFunc               func(cmd *exec.Cmd) error
+	osqPublisher            launcherosq.OsqueryPublisher
 }
 
 // Healthy will check to determine whether or not the osquery process that is
@@ -218,7 +219,7 @@ type osqueryOptions struct {
 	extensionSocketPath string
 }
 
-func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, osqueryPublisher launcherosq.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
 		registrationId:          registrationId,
@@ -229,6 +230,7 @@ func newInstance(registrationId string, knapsack types.Knapsack, serviceClient s
 		runId:                   runId,
 		extensionManagerServers: make(map[string]*osquery.ExtensionManagerServer),
 		history:                 knapsack.OsqueryHistory(),
+		osqPublisher:            osqueryPublisher,
 	}
 
 	for _, opt := range opts {
@@ -695,7 +697,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.settingsWriter, i.knapsack, i.registrationId, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.settingsWriter, i.osqPublisher, i.knapsack, i.registrationId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}

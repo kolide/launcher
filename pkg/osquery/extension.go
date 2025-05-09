@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -32,6 +33,12 @@ type settingsStoreWriter interface {
 	WriteSettings() error
 }
 
+// OsqueryPublisher defines an interface for sending logs to an additional destination.
+type OsqueryPublisher interface {
+	PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) error
+	PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) error
+}
+
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
@@ -45,6 +52,7 @@ type Extension struct {
 	settingsWriter                settingsStoreWriter
 	enrollMutex                   *sync.Mutex
 	done                          chan struct{}
+	osqPublisher                  OsqueryPublisher // Added field for teeing
 	interrupted                   atomic.Bool
 	slogger                       *slog.Logger
 	logPublicationState           *logPublicationState
@@ -122,7 +130,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, osqueryPublisher OsqueryPublisher, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -177,6 +185,7 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		NodeKey:                       nodekey,
 		Opts:                          opts,
 		enrollMutex:                   &sync.Mutex{},
+		osqPublisher:                  osqueryPublisher,
 		done:                          make(chan struct{}),
 		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
 		lastRequestQueriesTimestamp:   initialTimestamp,
@@ -764,10 +773,29 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
 	e.enrollMutex.Lock()
 	nodeKey := e.NodeKey
 	e.enrollMutex.Unlock()
+
+	// Tee logs to log publisher if configured
+	gowrapper.Go(ctx, e.slogger, func() {
+		if err := e.osqPublisher.PublishLogs(ctx, nodeKey, typ, logs); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"failed to publish logs with osquery publisher",
+				"log_type", typ.String(),
+				"err", err,
+			)
+
+			span.RecordError(fmt.Errorf("failed to publish logs with osquery publisher: %w", err))
+			return
+		}
+
+		span.AddEvent("published_logs_with_osquery_publisher")
+	})
 
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
@@ -978,6 +1006,20 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	e.enrollMutex.Lock()
 	nodeKey := e.NodeKey
 	e.enrollMutex.Unlock()
+
+	gowrapper.Go(ctx, e.slogger, func() {
+		if err := e.osqPublisher.PublishResults(ctx, nodeKey, results); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"failed to publish results with osquery publisher",
+				"err", err,
+			)
+
+			span.RecordError(fmt.Errorf("failed to publish results with osquery publisher: %w", err))
+			return
+		}
+
+		span.AddEvent("published_results_with_osquery_publisher")
+	})
 
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {

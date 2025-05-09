@@ -778,3 +778,21 @@ func (fc *FlagController) CachedQueryResultsTTL() time.Duration {
 		WithMax(72*time.Hour),
 	).get(fc.getControlServerValue(keys.CachedQueryResultsTTL))
 }
+
+func (fc *FlagController) SetOsqueryPublishURL(u string) error {
+	return fc.setControlServerValue(keys.OsqueryPublishURL, []byte(u))
+}
+func (fc *FlagController) OsqueryPublishURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(""),
+	).get(fc.getControlServerValue(keys.OsqueryPublishURL))
+}
+
+func (fc *FlagController) SetOsqueryPublishEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.OsqueryPublishEnabled, boolToBytes(enabled))
+}
+func (fc *FlagController) OsqueryPublishEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.OsqueryPublishEnabled))
+}

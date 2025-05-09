@@ -1087,6 +1087,42 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
+// OsqueryPublishEnabled provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublishEnabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublishEnabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// OsqueryPublishURL provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublishURL() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublishURL")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // OsqueryVerbose provides a mock function with no fields
 func (_m *Knapsack) OsqueryVerbose() bool {
 	ret := _m.Called()
@@ -1890,6 +1926,42 @@ func (_m *Knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
 // SetOsqueryHistory provides a mock function with given fields: osqHistory
 func (_m *Knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	_m.Called(osqHistory)
+}
+
+// SetOsqueryPublishEnabled provides a mock function with given fields: enabled
+func (_m *Knapsack) SetOsqueryPublishEnabled(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublishEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryPublishURL provides a mock function with given fields: u
+func (_m *Knapsack) SetOsqueryPublishURL(u string) error {
+	ret := _m.Called(u)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublishURL")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(u)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetOsqueryVerbose provides a mock function with given fields: verbose

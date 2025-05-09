@@ -58,6 +58,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/log/teelogger"
 	"github.com/kolide/launcher/pkg/osquery"
+	"github.com/kolide/launcher/pkg/osquery/osquerypublisher"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	osqueryruntime "github.com/kolide/launcher/pkg/osquery/runtime"
 	osqueryInstanceHistory "github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -386,6 +387,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
+		osquerypublisher.NewOsqueryPublisher(k),
 		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)

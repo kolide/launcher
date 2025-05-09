@@ -30,6 +30,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
+	"github.com/kolide/launcher/pkg/osquery/osquerypublisher"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/service"
@@ -148,7 +149,7 @@ func TestBadBinaryPath(t *testing.T) {
 	setUpMockStores(t, k)
 	setupHistory(t, k)
 
-	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// The runner will repeatedly try to launch the instance, so `Run`
@@ -204,7 +205,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -256,7 +257,7 @@ func TestFlagsChanged(t *testing.T) {
 	s.On("WriteSettings").Return(nil)
 
 	// Start the runner
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -372,7 +373,7 @@ func TestPing(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 
 	// Start the runner
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -626,7 +627,7 @@ func TestSimplePath(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -678,7 +679,7 @@ func TestMultipleInstances(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, serviceClient, s)
+	runner := New(k, serviceClient, osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
@@ -762,7 +763,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, serviceClient, s)
+	runner := New(k, serviceClient, osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
@@ -840,7 +841,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -891,7 +892,7 @@ func TestOsqueryDies(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -937,7 +938,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
-	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -1064,7 +1065,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner = New(k, mockServiceClient(t), s)
+	runner = New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
 

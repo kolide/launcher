@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
@@ -36,9 +37,10 @@ type Runner struct {
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
 	shutdown        chan struct{}
 	interrupted     atomic.Bool
+	osqPublisher    osquery.OsqueryPublisher
 }
 
-func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, serviceClient service.KolideService, osqueryPublisher osquery.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
 		registrationIds: k.RegistrationIDs(),
 		instances:       make(map[string]*OsqueryInstance),
@@ -48,6 +50,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 		settingsWriter:  settingsWriter,
 		shutdown:        make(chan struct{}),
 		opts:            opts,
+		osqPublisher:    osqueryPublisher,
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -153,7 +156,7 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
-		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.settingsWriter, r.opts...)
+		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.osqPublisher, r.settingsWriter, r.opts...)
 		r.instances[registrationId] = instance
 		r.instanceLock.Unlock()
 		err := instance.Launch()
