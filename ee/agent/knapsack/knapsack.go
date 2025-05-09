@@ -128,10 +128,6 @@ func (k *knapsack) KatcConfigStore() types.KVStore {
 	return k.getKVStore(storage.KatcConfigStore)
 }
 
-func (k *knapsack) AutoupdateErrorsStore() types.KVStore {
-	return k.getKVStore(storage.AutoupdateErrorsStore)
-}
-
 func (k *knapsack) ConfigStore() types.KVStore {
 	return k.getKVStore(storage.ConfigStore)
 }

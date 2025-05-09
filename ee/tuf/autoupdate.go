@@ -88,7 +88,6 @@ type TufAutoupdater struct {
 	osquerier              querier // used to query for current running osquery version
 	osquerierRetryInterval time.Duration
 	knapsack               types.Knapsack
-	store                  types.KVStore // stores autoupdater errors for kolide_tuf_autoupdater_errors table
 	updateChannel          string
 	pinnedVersions         map[autoupdatableBinary]string        // maps the binaries to their pinned versions
 	pinnedVersionGetters   map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
@@ -121,7 +120,6 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		knapsack:      k,
 		interrupt:     make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
 		signalRestart: make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
-		store:         k.AutoupdateErrorsStore(),
 		updateChannel: k.UpdateChannel(),
 		pinnedVersions: map[autoupdatableBinary]string{
 			binaryLauncher: k.PinnedLauncherVersion(), // empty string if not pinned
@@ -241,9 +239,6 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// For now, tidy the library on startup. In the future, we will tidy the library
 	// earlier, after version selection.
 	ta.tidyLibrary()
-
-	// Delete contents of error store -- we don't need it anymore. It will be removed in a future release.
-	go ta.cleanUpOldErrors()
 
 	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
 	defer checkTicker.Stop()
@@ -723,20 +718,4 @@ func PlatformArch() string {
 	}
 
 	return runtime.GOARCH
-}
-
-// cleanUpOldErrors removes all errors from the store in preparation for removing the store
-// in the future.
-func (ta *TufAutoupdater) cleanUpOldErrors() {
-	// We want to delete all errors
-	if err := ta.store.DeleteAll(); err != nil {
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not delete old autoupdater errors from bucket",
-			"err", err,
-		)
-	} else {
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"deleted autoupdater error store contents",
-		)
-	}
 }

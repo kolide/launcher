@@ -89,6 +89,9 @@ func (wt *wrappedTable) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagK
 	defer wt.genTimeoutLock.Unlock()
 
 	newGenTimeout := wt.flagsController.TableGenerateTimeout()
+	if newGenTimeout == wt.genTimeout {
+		return
+	}
 
 	wt.slogger.Log(ctx, slog.LevelInfo,
 		"received changed value for table_generate_timeout",
