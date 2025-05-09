@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package mapplist
+package plist
 
 import (
 	"bytes"
