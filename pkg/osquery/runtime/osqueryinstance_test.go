@@ -72,6 +72,8 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -95,6 +97,8 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -128,6 +132,8 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -177,6 +183,8 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return("")
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -217,6 +225,8 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -229,6 +239,8 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
@@ -242,6 +254,8 @@ func Test_healthcheckWithRetries(t *testing.T) {
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), settingsstoremock.NewSettingsStoreWriter(t))
 
@@ -287,6 +301,8 @@ func TestHealthy(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	setupHistory(t, k)
 
 	// Run the instance
