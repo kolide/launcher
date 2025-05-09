@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
 	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
+	"github.com/kolide/launcher/ee/tables/execparsers/plist"
 	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
 	"github.com/kolide/launcher/ee/tables/execparsers/repcli"
 	"github.com/kolide/launcher/ee/tables/execparsers/socketfilterfw"
@@ -106,18 +107,12 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		mdmclient.TablePlugin(k, slogger),
 		apple_silicon_security_policy.TablePlugin(k, slogger),
 		legacyexec.TablePlugin(),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_diskutil_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"list", "-plist"}),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_falconctl_stats", dataflattentable.PlistType, allowedcmd.Launcher, []string{"rundisclaimed", "falconctl", "stats", "-p"}),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_apfs_list", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_apfs_users", dataflattentable.PlistType, allowedcmd.Diskutil, []string{"apfs", "listUsers", "/", "-plist"}),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_tmutil_destinationinfo", dataflattentable.PlistType, allowedcmd.Tmutil, []string{"destinationinfo", "-X"}),
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_powermetrics", dataflattentable.PlistType, allowedcmd.Powermetrics, []string{"-n", "1", "-f", "plist"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_diskutil_list", plist.Parser, allowedcmd.Diskutil, []string{"list", "-plist"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_falconctl_stats", plist.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "falconctl", "stats", "-p"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apfs_list", plist.Parser, allowedcmd.Diskutil, []string{"apfs", "list", "-plist"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apfs_users", plist.Parser, allowedcmd.Diskutil, []string{"apfs", "listUsers", "/", "-plist"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_tmutil_destinationinfo", plist.Parser, allowedcmd.Tmutil, []string{"destinationinfo", "-X"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_powermetrics", plist.Parser, allowedcmd.Powermetrics, []string{"-n", "1", "-f", "plist"}),
 		screenlockTable,
 		pwpolicy.TablePlugin(k, slogger),
 		systemprofiler.TablePlugin(k, slogger),
