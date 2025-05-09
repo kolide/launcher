@@ -66,6 +66,7 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 	warningCount := 0
 	failingCount := 0
 	passingCount := 0
+	erroringCount := 0
 
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
@@ -85,11 +86,14 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 			failingCount += 1
 		case Passing:
 			passingCount += 1
-		case Erroring, Informational, Unknown:
+		case Erroring:
+			erroringCount += 1
+		case Informational, Unknown:
 			// Nothing to do here
 		}
 	}
 
+	// Compute score from warning, passing, and failing counts
 	scoredCheckups := warningCount + failingCount + passingCount
 	score := (float64(passingCount+(warningCount/2)) / float64(scoredCheckups)) * 100
 	observability.CheckupScoreGauge.Record(ctx, score)
@@ -98,4 +102,7 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 		"computed checkup score",
 		"score", score,
 	)
+
+	// Record number of errors separately
+	observability.CheckupErrorCounter.Add(ctx, int64(erroringCount))
 }

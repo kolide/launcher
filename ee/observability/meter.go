@@ -36,6 +36,8 @@ const (
 	tablewrapperTimeoutCounterDescription        = "The number of timeouts when querying a Kolide extension table"
 	autoupdateFailureCounterName                 = "launcher.autoupdate.failed"
 	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
+	checkupErrorCounterName                      = "launcher.checkup.error"
+	checkupErrorCounterDescription               = "The number of errors when running checkups"
 )
 
 var (
@@ -52,6 +54,7 @@ var (
 	WindowsUpdatesQueryFailureCounter metric.Int64Counter
 	TablewrapperTimeoutCounter        metric.Int64Counter
 	AutoupdateFailureCounter          metric.Int64Counter
+	CheckupErrorCounter               metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -96,6 +99,9 @@ func ReinitializeMetrics() {
 		metric.WithUnit(unitFailure))
 	AutoupdateFailureCounter = int64CounterOrNoop(autoupdateFailureCounterName,
 		metric.WithDescription(autoupdateFailureCounterDescription),
+		metric.WithUnit(unitFailure))
+	CheckupErrorCounter = int64CounterOrNoop(checkupErrorCounterName,
+		metric.WithDescription(checkupErrorCounterDescription),
 		metric.WithUnit(unitFailure))
 }
 
