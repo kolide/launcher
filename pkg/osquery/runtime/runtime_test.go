@@ -370,6 +370,8 @@ func TestPing(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 
 	// Start the runner
 	runner := New(k, mockServiceClient(t), osquerypublisher.NewOsqueryPublisher(k), s)
@@ -1058,6 +1060,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
+
 	setUpMockStores(t, k)
 	osqHistory = setupHistory(t, k)
 

@@ -378,6 +378,8 @@ func TestLaunch(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
@@ -475,6 +477,8 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("OsqueryPublishURL").Return("").Maybe()
+	k.On("OsqueryPublishEnabled").Return(false).Maybe()
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	osqHistory := setupHistory(t, k)
