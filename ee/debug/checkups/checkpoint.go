@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type (
@@ -62,6 +63,10 @@ func (c *logCheckPointer) Interrupt(_ error) {
 func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
+	warningCount := 0
+	failingCount := 0
+	passingCount := 0
+
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
 
@@ -72,5 +77,25 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 			"data", checkup.Data(),
 			"status", checkup.Status(),
 		)
+
+		switch checkup.Status() {
+		case Warning:
+			warningCount += 1
+		case Failing:
+			failingCount += 1
+		case Passing:
+			passingCount += 1
+		case Erroring, Informational, Unknown:
+			// Nothing to do here
+		}
 	}
+
+	scoredCheckups := warningCount + failingCount + passingCount
+	score := (float64(passingCount+(warningCount/2)) / float64(scoredCheckups)) * 100
+	observability.CheckupScoreGauge.Record(ctx, score)
+
+	c.slogger.Log(ctx, slog.LevelDebug,
+		"computed checkup score",
+		"score", score,
+	)
 }
