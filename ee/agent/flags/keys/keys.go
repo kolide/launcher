@@ -63,6 +63,9 @@ const (
 	TableGenerateTimeout             FlagKey = "table_generate_timeout"
 	UseCachedDataForScheduledQueries FlagKey = "use_cached_data_for_scheduled_queries"
 	CachedQueryResultsTTL            FlagKey = "cached_query_results_ttl"
+
+	OsqueryPublishURL     FlagKey = "osquery_publish_url"
+	OsqueryPublishEnabled FlagKey = "osquery_publish_enabled"
 )
 
 func (key FlagKey) String() string {
