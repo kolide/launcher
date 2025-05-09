@@ -92,26 +92,6 @@ func (_m *Knapsack) Autoupdate() bool {
 	return r0
 }
 
-// AutoupdateErrorsStore provides a mock function with no fields
-func (_m *Knapsack) AutoupdateErrorsStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for AutoupdateErrorsStore")
-	}
-
-	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
-	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
-		}
-	}
-
-	return r0
-}
-
 // AutoupdateInitialDelay provides a mock function with no fields
 func (_m *Knapsack) AutoupdateInitialDelay() time.Duration {
 	ret := _m.Called()

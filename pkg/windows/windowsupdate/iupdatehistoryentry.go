@@ -32,19 +32,19 @@ type IUpdateHistoryEntry struct {
 func toIUpdateHistoryEntries(updateHistoryEntriesDisp *ole.IDispatch) ([]*IUpdateHistoryEntry, error) {
 	count, err := oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntriesDisp, "Count"))
 	if err != nil {
-		return nil, fmt.Errorf("Count: %w", err)
+		return nil, fmt.Errorf("getting property Count as int32: %w", err)
 	}
 
 	updateHistoryEntries := make([]*IUpdateHistoryEntry, count)
 	for i := 0; i < int(count); i++ {
 		updateHistoryEntryDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateHistoryEntriesDisp, "Item", i))
 		if err != nil {
-			return nil, fmt.Errorf("item %d: %w", i, err)
+			return nil, fmt.Errorf("getting property Item at index %d of %d as IDispatch: %w", i, count, err)
 		}
 
 		updateHistoryEntry, err := toIUpdateHistoryEntry(updateHistoryEntryDisp)
 		if err != nil {
-			return nil, fmt.Errorf("toIUpdateHistoryEntry: %w", err)
+			return nil, fmt.Errorf("converting Item IDispatch at index %d of %d to IUpdateHistoryEntry: %w", i, count, err)
 		}
 
 		updateHistoryEntries[i] = updateHistoryEntry
@@ -59,64 +59,64 @@ func toIUpdateHistoryEntry(updateHistoryEntryDisp *ole.IDispatch) (*IUpdateHisto
 	}
 
 	if iUpdateHistoryEntry.ClientApplicationID, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "ClientApplicationID")); err != nil {
-		return nil, fmt.Errorf("ClientApplicationID: %w", err)
+		return nil, fmt.Errorf("getting property ClientApplicationID as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.Date, err = oleconv.ToTimeErr(oleutil.GetProperty(updateHistoryEntryDisp, "Date")); err != nil {
-		return nil, fmt.Errorf("Date: %w", err)
+		return nil, fmt.Errorf("getting property Date as time: %w", err)
 	}
 
 	if iUpdateHistoryEntry.Description, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "Description")); err != nil {
-		return nil, fmt.Errorf("Description: %w", err)
+		return nil, fmt.Errorf("getting property Description as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.HResult, err = oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntryDisp, "HResult")); err != nil {
-		return nil, fmt.Errorf("HResult: %w", err)
+		return nil, fmt.Errorf("getting property HResult as int32: %w", err)
 	}
 
 	if iUpdateHistoryEntry.Operation, err = oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntryDisp, "Operation")); err != nil {
-		return nil, fmt.Errorf("Operation: %w", err)
+		return nil, fmt.Errorf("getting property Operation as int32: %w", err)
 	}
 
 	if iUpdateHistoryEntry.ResultCode, err = oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntryDisp, "ResultCode")); err != nil {
-		return nil, fmt.Errorf("ResultCode: %w", err)
+		return nil, fmt.Errorf("getting property ResultCode as int32: %w", err)
 	}
 
 	if iUpdateHistoryEntry.ServerSelection, err = oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntryDisp, "ServerSelection")); err != nil {
-		return nil, fmt.Errorf("ServerSelection: %w", err)
+		return nil, fmt.Errorf("getting property ServerSelection as int32: %w", err)
 	}
 
 	if iUpdateHistoryEntry.ServiceID, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "ServiceID")); err != nil {
-		return nil, fmt.Errorf("ServiceID: %w", err)
+		return nil, fmt.Errorf("getting property ServiceID as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.SupportUrl, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "SupportUrl")); err != nil {
-		return nil, fmt.Errorf("SupportUrl: %w", err)
+		return nil, fmt.Errorf("getting property SupportUrl as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.Title, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "Title")); err != nil {
-		return nil, fmt.Errorf("Title: %w", err)
+		return nil, fmt.Errorf("getting property Title as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.UninstallationNotes, err = oleconv.ToStringErr(oleutil.GetProperty(updateHistoryEntryDisp, "UninstallationNotes")); err != nil {
-		return nil, fmt.Errorf("UninstallationNotes: %w", err)
+		return nil, fmt.Errorf("getting property UninstallationNotes as string: %w", err)
 	}
 
 	if iUpdateHistoryEntry.UninstallationSteps, err = oleconv.ToStringSliceErr(oleutil.GetProperty(updateHistoryEntryDisp, "UninstallationSteps")); err != nil {
-		return nil, fmt.Errorf("UninstallationSteps: %w", err)
+		return nil, fmt.Errorf("getting property UninstallationSteps as string slice: %w", err)
 	}
 
 	if iUpdateHistoryEntry.UnmappedResultCode, err = oleconv.ToInt32Err(oleutil.GetProperty(updateHistoryEntryDisp, "UnmappedResultCode")); err != nil {
-		return nil, fmt.Errorf("UnmappedResultCode: %w", err)
+		return nil, fmt.Errorf("getting property UnmappedResultCode as int32: %w", err)
 	}
 
 	updateIdentityDisp, err := oleconv.ToIDispatchErr(oleutil.GetProperty(updateHistoryEntryDisp, "UpdateIdentity"))
 	if err != nil {
-		return nil, fmt.Errorf("UpdateIdentity: %w", err)
+		return nil, fmt.Errorf("getting property UpdateIdentity as IDispatch: %w", err)
 	}
 	if updateIdentityDisp != nil {
 		if iUpdateHistoryEntry.UpdateIdentity, err = toIUpdateIdentity(updateIdentityDisp); err != nil {
-			return nil, fmt.Errorf("toIUpdateIdentity: %w", err)
+			return nil, fmt.Errorf("converting UpdateIdentity IDispatch to IUpdateIdentity: %w", err)
 		}
 	}
 

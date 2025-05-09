@@ -18,9 +18,6 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
-	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -33,10 +30,8 @@ func TestNewTufAutoupdater(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	s := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -73,7 +68,6 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -86,7 +80,6 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("AutoupdateInterval").Return(500 * time.Millisecond)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -174,7 +167,6 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -187,7 +179,6 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -264,7 +255,6 @@ func TestExecute_downgrade(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "3.22.9"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -277,7 +267,6 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -361,11 +350,9 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, _ := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -420,7 +407,6 @@ func TestExecute_inModernStandby(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.2.3"
 	tufServerUrl, _ := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -430,7 +416,6 @@ func TestExecute_inModernStandby(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("AutoupdateInterval").Return(100 * time.Millisecond) // Set the check interval to something short so we can make a couple requests to our test metadata server
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -481,7 +466,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	})
 
 	testRootDir := t.TempDir()
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -491,7 +475,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("AutoupdateInterval").Return(60 * time.Second)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -617,7 +600,6 @@ func TestDo(t *testing.T) {
 			testRootDir := t.TempDir()
 			testReleaseVersion := "2.2.3"
 			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-			s := setupStorage(t)
 			// setup fake osqueryd binary to mock file existence for currentRunningVersion
 			fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 			_, err := os.Create(fakeOsqBinaryPath)
@@ -629,7 +611,6 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("PinnedLauncherVersion").Return("")
 			mockKnapsack.On("PinnedOsquerydVersion").Return("")
 			mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
-			mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 			mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 			mockKnapsack.On("UpdateDirectory").Return("")
 			mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -690,7 +671,6 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.5.0"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -704,7 +684,6 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	interval := 500 * time.Millisecond
 	mockKnapsack.On("AutoupdateInterval").Return(interval)
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Millisecond)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -775,7 +754,6 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "1.5.0"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -790,7 +768,6 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("AutoupdateInterval").Return(interval)
 	initialDelay := 1 * time.Second
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -857,7 +834,6 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	testRootDir := t.TempDir()
 	testReleaseVersion := "2.2.3"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -865,7 +841,6 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -924,7 +899,6 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	testRootDir := t.TempDir()
 	pinnedOsquerydVersion := "5.11.0"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, pinnedOsquerydVersion)
-	s := setupStorage(t)
 	// setup fake osqueryd binary to mock file existence for currentRunningVersion
 	fakeOsqBinaryPath := executableLocation(testRootDir, "osqueryd")
 	_, err := os.Create(fakeOsqBinaryPath)
@@ -932,7 +906,6 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return(tufServerUrl)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -987,7 +960,6 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	t.Parallel()
 
 	testRootDir := t.TempDir()
-	s := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(testRootDir)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
@@ -996,7 +968,6 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("AutoupdateInterval").Return(interval).Maybe()
 	initialDelay := 1 * time.Second
 	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay)
-	mockKnapsack.On("AutoupdateErrorsStore").Return(s)
 	mockKnapsack.On("TufServerURL").Return("https://example.com")
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
@@ -1108,53 +1079,4 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
 	require.Equal(t, "", osqueryVersion)
-}
-
-func Test_cleanUpOldErrors(t *testing.T) {
-	t.Parallel()
-
-	autoupdater := &TufAutoupdater{
-		store:   setupStorage(t),
-		slogger: multislogger.NewNopLogger(),
-	}
-
-	// Add one legitimate timestamp
-	oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", oneHourAgo)), []byte("{}")), "could not set recent timestamp for test")
-
-	// Add some old timestamps
-	eightDaysAgo := time.Now().Add(-8 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", eightDaysAgo)), []byte("{}")), "could not set old timestamp for test")
-	twoWeeksAgo := time.Now().Add(-14 * 24 * time.Hour).Unix()
-	require.NoError(t, autoupdater.store.Set([]byte(fmt.Sprintf("%d", twoWeeksAgo)), []byte("{}")), "could not set old timestamp for test")
-
-	// Add a malformed entry
-	require.NoError(t, autoupdater.store.Set([]byte("not a timestamp"), []byte("{}")), "could not set old timestamp for test")
-
-	// Confirm we added them
-	keyCountBeforeCleanup := 0
-	err := autoupdater.store.ForEach(func(_, _ []byte) error {
-		keyCountBeforeCleanup += 1
-		return nil
-	})
-	require.NoError(t, err, "could not iterate over keys")
-	require.Equal(t, 4, keyCountBeforeCleanup, "did not correctly seed errors in bucket")
-
-	// Call the cleanup function
-	autoupdater.cleanUpOldErrors()
-
-	keyCount := 0
-	err = autoupdater.store.ForEach(func(_, _ []byte) error {
-		keyCount += 1
-		return nil
-	})
-	require.NoError(t, err, "could not iterate over keys")
-
-	require.Equal(t, 0, keyCount, "cleanup routine did not clean up all errors")
-}
-
-func setupStorage(t *testing.T) types.KVStore {
-	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.AutoupdateErrorsStore.String())
-	require.NoError(t, err)
-	return s
 }
