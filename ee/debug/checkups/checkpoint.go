@@ -63,10 +63,10 @@ func (c *logCheckPointer) Interrupt(_ error) {
 func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
-	warningCount := 0
-	failingCount := 0
-	passingCount := 0
-	erroringCount := 0
+	warningCount := 0.0
+	failingCount := 0.0
+	passingCount := 0.0
+	erroringCount := 0.0
 
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
@@ -95,12 +95,16 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 
 	// Compute score from warning, passing, and failing counts
 	scoredCheckups := warningCount + failingCount + passingCount
-	score := (float64(passingCount+(warningCount/2)) / float64(scoredCheckups)) * 100
+	score := ((passingCount + (warningCount / 2)) / scoredCheckups) * 100
 	observability.CheckupScoreGauge.Record(ctx, score)
 
 	c.slogger.Log(ctx, slog.LevelDebug,
 		"computed checkup score",
 		"score", score,
+		"failing_count", failingCount,
+		"warning_count", warningCount,
+		"passing_count", passingCount,
+		"total_scored_checkups", scoredCheckups,
 	)
 
 	// Record number of errors separately
