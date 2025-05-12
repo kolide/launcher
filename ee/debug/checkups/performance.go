@@ -8,9 +8,15 @@ import (
 	"github.com/kolide/launcher/ee/performance"
 )
 
+const (
+	cpuPercentThreshold = 30
+	memPercentThreshold = 30
+)
+
 type perfCheckup struct {
 	data    map[string]any
 	summary string
+	status  Status
 }
 
 func (p *perfCheckup) Name() string {
@@ -21,7 +27,16 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	p.data = make(map[string]any)
 	stats, err := performance.CurrentProcessStats(ctx)
 	if err != nil {
+		p.status = Erroring
 		return fmt.Errorf("gathering performance stats: %w", err)
+	}
+
+	if stats.CPUPercent > cpuPercentThreshold && stats.MemInfo.MemPercent > memPercentThreshold {
+		p.status = Failing
+	} else if stats.CPUPercent > cpuPercentThreshold || stats.MemInfo.MemPercent > memPercentThreshold {
+		p.status = Warning
+	} else {
+		p.status = Passing
 	}
 
 	p.summary = fmt.Sprintf(
@@ -42,7 +57,7 @@ func (p *perfCheckup) ExtraFileName() string {
 }
 
 func (p *perfCheckup) Status() Status {
-	return Informational
+	return p.status
 }
 
 func (p *perfCheckup) Summary() string {
