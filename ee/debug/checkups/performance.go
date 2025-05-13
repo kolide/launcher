@@ -34,10 +34,8 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 
 	memOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
 	cpuOver := stats.CPUPercent > cpuPercentThreshold
-	if cpuOver && memOver {
+	if cpuOver || memOver {
 		p.status = Failing
-	} else if cpuOver || memOver {
-		p.status = Warning
 	} else {
 		p.status = Passing
 	}
