@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -96,10 +97,10 @@ func (c *logCheckPointer) LogCheckupsOnStartup(ctx context.Context) {
 func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
-	warningCount := 0.0
-	failingCount := 0.0
-	passingCount := 0.0
-	erroringCount := 0.0
+	warningCheckups := make([]string, 0)
+	failingCheckups := make([]string, 0)
+	passingCheckups := make([]string, 0)
+	erroringCheckups := make([]string, 0)
 
 	for _, checkup := range checkups {
 		checkup.Run(ctx, io.Discard)
@@ -114,32 +115,39 @@ func (c *logCheckPointer) Once(ctx context.Context) {
 
 		switch checkup.Status() {
 		case Warning:
-			warningCount += 1
+			warningCheckups = append(warningCheckups, checkup.Name())
 		case Failing:
-			failingCount += 1
+			failingCheckups = append(failingCheckups, checkup.Name())
 		case Passing:
-			passingCount += 1
+			passingCheckups = append(passingCheckups, checkup.Name())
 		case Erroring:
-			erroringCount += 1
+			erroringCheckups = append(erroringCheckups, checkup.Name())
 		case Informational, Unknown:
 			// Nothing to do here
 		}
 	}
 
 	// Compute score from warning, passing, and failing counts
-	scoredCheckups := warningCount + failingCount + passingCount
+	passingCount := float64(len(passingCheckups))
+	warningCount := float64(len(warningCheckups))
+	scoredCheckups := float64(len(warningCheckups) + len(failingCheckups) + len(passingCheckups))
 	score := ((passingCount + (warningCount / 2)) / scoredCheckups) * 100
 	observability.CheckupScoreGauge.Record(ctx, score)
 
-	c.slogger.Log(ctx, slog.LevelDebug,
+	logLevel := slog.LevelDebug
+	if score < 100 {
+		logLevel = slog.LevelWarn
+	}
+	c.slogger.Log(ctx, logLevel,
 		"computed checkup score",
 		"score", score,
-		"failing_count", failingCount,
-		"warning_count", warningCount,
-		"passing_count", passingCount,
+		"failing_checkups", strings.Join(failingCheckups, ","),
+		"warning_checkups", strings.Join(warningCheckups, ","),
+		"passing_checkups", strings.Join(passingCheckups, ","),
+		"erroring_checkups", strings.Join(erroringCheckups, ","),
 		"total_scored_checkups", scoredCheckups,
 	)
 
 	// Record number of errors separately
-	observability.CheckupErrorCounter.Add(ctx, int64(erroringCount))
+	observability.CheckupErrorCounter.Add(ctx, int64(len(erroringCheckups)))
 }
