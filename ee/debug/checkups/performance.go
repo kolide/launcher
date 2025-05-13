@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	cpuPercentThreshold = 30
-	memPercentThreshold = 30
+	cpuPercentThreshold        = 30
+	golangMemUsageThreshold    = 200 * 1024 * 1024 // 200 MB in bytes
+	nonGolangMemUsageThreshold = 100 * 1024 * 1024 // 100 MB in bytes
 )
 
 type perfCheckup struct {
@@ -31,9 +32,11 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 		return fmt.Errorf("gathering performance stats: %w", err)
 	}
 
-	if stats.CPUPercent > cpuPercentThreshold && stats.MemInfo.MemPercent > memPercentThreshold {
+	memOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
+	cpuOver := stats.CPUPercent > cpuPercentThreshold
+	if cpuOver && memOver {
 		p.status = Failing
-	} else if stats.CPUPercent > cpuPercentThreshold || stats.MemInfo.MemPercent > memPercentThreshold {
+	} else if cpuOver || memOver {
 		p.status = Warning
 	} else {
 		p.status = Passing
