@@ -31,6 +31,17 @@ func NewCheckupLogger(slogger *slog.Logger, k types.Knapsack) *logCheckPointer {
 // Run starts a log checkpoint routine. The purpose of this is to
 // ensure we get good debugging information in the logs.
 func (c *logCheckPointer) Run() error {
+	// We want to wait slightly to allow some stats like CPU percentage to settle.
+	select {
+	case <-c.interrupt:
+		c.slogger.Log(context.TODO(), slog.LevelDebug,
+			"received external interrupt during initial delay, stopping",
+		)
+		return nil
+	case <-time.After(1 * time.Minute):
+		break
+	}
+
 	ticker := time.NewTicker(time.Minute * 60)
 	defer ticker.Stop()
 
