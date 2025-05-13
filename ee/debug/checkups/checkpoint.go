@@ -71,6 +71,10 @@ func (c *logCheckPointer) Interrupt(_ error) {
 	c.interrupt <- struct{}{}
 }
 
+// LogCheckupsOnStartup is intended to be called on launcher startup; it runs and logs all
+// checkups that are appropriate for launcher startup to get that data into the logs as soon
+// as possible. Notably, it does not run the performance checkup, because launcher has not been
+// running long enough for that data to be meaningful.
 func (c *logCheckPointer) LogCheckupsOnStartup(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, startupLogSupported)
 	for _, checkup := range checkups {
@@ -86,6 +90,9 @@ func (c *logCheckPointer) LogCheckupsOnStartup(ctx context.Context) {
 	}
 }
 
+// Once runs all log-supported checkups. It logs the status of each, and additionally calculates a score
+// based on those statuses; it logs the score and reports it as a metric. Once allows us to see a snapshot
+// of launcher health.
 func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
