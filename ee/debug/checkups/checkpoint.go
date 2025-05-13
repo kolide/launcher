@@ -71,6 +71,21 @@ func (c *logCheckPointer) Interrupt(_ error) {
 	c.interrupt <- struct{}{}
 }
 
+func (c *logCheckPointer) LogCheckupsOnStartup(ctx context.Context) {
+	checkups := checkupsFor(c.knapsack, startupLogSupported)
+	for _, checkup := range checkups {
+		checkup.Run(ctx, io.Discard)
+
+		c.slogger.Log(ctx, slog.LevelDebug,
+			"ran checkup on startup",
+			"checkup", checkup.Name(),
+			"summary", checkup.Summary(),
+			"data", checkup.Data(),
+			"status", checkup.Status(),
+		)
+	}
+}
+
 func (c *logCheckPointer) Once(ctx context.Context) {
 	checkups := checkupsFor(c.knapsack, logSupported)
 
