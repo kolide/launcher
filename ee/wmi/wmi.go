@@ -175,7 +175,9 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 
 	// ExecQuery runs semi-synchronously by default. To ensure we aren't missing any results,
 	// we prefer synchronous mode, which we achieve by setting iFlags to wbemFlagForwardOnly+wbemFlagReturnWhenComplete
-	// instead of the default wbemFlagReturnImmediately. See https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
+	// instead of the default wbemFlagReturnImmediately. (wbemFlagReturnWhenComplete will make the call synchronous,
+	// and wbemFlagForwardOnly helps us avoid any potential performance issues.)
+	// See https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
 	// The result is a SWBemObjectSet.
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString, "WQL", WBEM_FLAG_FORWARD_ONLY+WBEM_FLAG_RETURN_WHEN_COMPLETE)
 	if err != nil {
