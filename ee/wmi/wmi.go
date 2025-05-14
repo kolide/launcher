@@ -42,8 +42,11 @@ import (
 	"github.com/scjalliance/comshim"
 )
 
-// S_FALSE is returned by CoInitializeEx if it was already called on this thread.
-const S_FALSE = 0x00000001
+const (
+	S_FALSE                        = 0x00000001 // S_FALSE is returned by CoInitializeEx if it was already called on this thread.
+	WBEM_FLAG_RETURN_WHEN_COMPLETE = 0          // https://learn.microsoft.com/en-us/windows/win32/wmisdk/swbemservices-execquery#parameters
+	WBEM_FLAG_FORWARD_ONLY         = 32
+)
 
 // querySettings contains various options. Mostly for the
 // connectServerArgs args. See
@@ -170,8 +173,11 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 		"query", queryString,
 	)
 
-	// result is a SWBemObjectSet
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString)
+	// ExecQuery runs semi-synchronously by default. To ensure we aren't missing any results,
+	// we prefer synchronous mode, which we achieve by setting iFlags to wbemFlagForwardOnly+wbemFlagReturnWhenComplete
+	// instead of the default wbemFlagReturnImmediately. See https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
+	// The result is a SWBemObjectSet.
+	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString, "WQL", WBEM_FLAG_FORWARD_ONLY+WBEM_FLAG_RETURN_WHEN_COMPLETE)
 	if err != nil {
 		return nil, fmt.Errorf("Running query %s: %w", queryString, err)
 	}
