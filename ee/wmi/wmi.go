@@ -176,8 +176,17 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	// ExecQuery runs semi-synchronously by default. To ensure we aren't missing any results,
 	// we prefer synchronous mode, which we achieve by setting iFlags to wbemFlagForwardOnly+wbemFlagReturnWhenComplete
 	// instead of the default wbemFlagReturnImmediately. (wbemFlagReturnWhenComplete will make the call synchronous,
-	// and wbemFlagForwardOnly helps us avoid any potential performance issues.)
-	// See https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
+	// and wbemFlagForwardOnly helps us avoid any potential performance issues.) The flags values are not
+	// incredibly well-documented and there are multiple zero-value flags. We assume that wbemFlagForwardOnly (32)
+	// and wbemFlagBidirectional (0) are mutually exclusive, and that wbemFlagReturnImmediately (16) and
+	// wbemFlagReturnWhenComplete (0) are mutually exclusive. We assume, therefore, that WMI correctly understands
+	// an `iFlags` value of 32 as wbemFlagForwardOnly+wbemFlagReturnWhenComplete. (It cannot be understood as
+	// wbemFlagForwardOnly+wbemFlagBidirectional, because that is not a possible combination. It cannot be understood
+	// as wbemFlagForwardOnly only, because the return behavior flag must be set as either wbemFlagReturnWhenComplete or
+	// wbemFlagReturnImmediately.)
+	// See
+	// * https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
+	// * https://learn.microsoft.com/en-us/windows/win32/wmisdk/swbemservices-execquery#parameters
 	// The result is a SWBemObjectSet.
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString, "WQL", WBEM_FLAG_FORWARD_ONLY+WBEM_FLAG_RETURN_WHEN_COMPLETE)
 	if err != nil {
