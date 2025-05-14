@@ -179,7 +179,7 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	// The result is a SWBemObjectSet.
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString, "WQL", WBEM_FLAG_FORWARD_ONLY+WBEM_FLAG_RETURN_WHEN_COMPLETE)
 	if err != nil {
-		return nil, fmt.Errorf("Running query %s: %w", queryString, err)
+		return nil, fmt.Errorf("running query `%s`: %w", queryString, err)
 	}
 	defer resultRaw.Clear()
 
