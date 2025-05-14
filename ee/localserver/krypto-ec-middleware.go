@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
@@ -40,6 +42,7 @@ const (
 	kolideOsHeaderKey                                 = "X-Kolide-Os"
 	kolideArchHeaderKey                               = "X-Kolide-Arch"
 	kolideMunemoHeaderKey                             = "X-Kolide-Munemo"
+	kolideEnrollmentSecretHeaderKey                   = "X-Kolide-Enrollment-Token"
 )
 
 type v2CmdRequestType struct {
@@ -76,10 +79,12 @@ func (cmdReq v2CmdRequestType) CallbackReq() (*http.Request, error) {
 type kryptoEcMiddleware struct {
 	localDbSigner         crypto.Signer
 	counterParty          ecdsa.PublicKey
+	knapsack              types.Knapsack
 	slogger               *slog.Logger
 	presenceDetector      presenceDetector
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          string
+	tenantMunemoMutex     *sync.Mutex
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -87,15 +92,17 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, knapsack types.Knapsack, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	return &kryptoEcMiddleware{
 		localDbSigner:                         localDbSigner,
 		counterParty:                          counterParty,
+		knapsack:                              knapsack,
 		slogger:                               slogger.With("keytype", "ec"),
 		presenceDetector:                      presenceDetector,
 		timestampValidityRange:                timestampValidityRange,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          tenantMunemo,
+		tenantMunemoMutex:                     &sync.Mutex{},
 	}
 }
 
@@ -223,6 +230,10 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
+
+		// The request is valid -- if we don't have an enrollment secret and k2 has provided one,
+		// then set it!
+		e.setEnrollmentSecretFromHeaders(cmdReq.Headers)
 
 		// set the kolide session id if it exists, this also the saml session id
 		kolideSessionId, ok := cmdReq.CallbackHeaders[kolideSessionIdHeaderKey]
@@ -750,6 +761,9 @@ func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *ht
 }
 
 func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
+	e.tenantMunemoMutex.Lock()
+	defer e.tenantMunemoMutex.Unlock()
+
 	if e.tenantMunemo == "" {
 		e.slogger.Log(context.TODO(), slog.LevelError,
 			"no munemo set in krypto middleware, continuing",
@@ -773,4 +787,38 @@ func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
 	}
 
 	return errors.New("munemo in request does not match munemo in middleware")
+}
+
+func (e *kryptoEcMiddleware) setEnrollmentSecretFromHeaders(headers map[string][]string) {
+	e.tenantMunemoMutex.Lock()
+	defer e.tenantMunemoMutex.Unlock()
+
+	if e.tenantMunemo != "" {
+		// Already enrolled, no need to set secret
+		return
+	}
+
+	enrollmentSecretHeaders, ok := headers[kolideEnrollmentSecretHeaderKey]
+	if !ok || len(enrollmentSecretHeaders) == 0 || enrollmentSecretHeaders[0] == "" {
+		e.slogger.Log(context.TODO(), slog.LevelDebug,
+			"no enrollment secret header in request headers, cannot set enrollment secret",
+		)
+		return
+	}
+
+	enrollmentSecretPath := e.knapsack.EnrollSecretPath()
+	if enrollmentSecretPath == "" {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"enrollment secret path not set, cannot write enrollment secret to file",
+		)
+		return
+	}
+
+	if err := os.WriteFile(enrollmentSecretPath, []byte(enrollmentSecretHeaders[0]), 0600); err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"could not write enrollment secret to file",
+			"secret_path", enrollmentSecretPath,
+			"err", err,
+		)
+	}
 }

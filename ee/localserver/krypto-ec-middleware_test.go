@@ -23,9 +23,8 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
-	"github.com/kolide/launcher/ee/localserver/mocks"
-
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
@@ -197,6 +196,8 @@ func TestKryptoEcMiddleware(t *testing.T) {
 						Level: slog.LevelDebug,
 					})).Logger
 
+					mockKnapsack := typesmocks.NewKnapsack(t)
+					mockKnapsack.On("EnrollSecretPath").Return("").Maybe()
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
 
 					if runtime.GOOS != "linux" { // only doing persence detection on windows and macos for now
@@ -207,7 +208,7 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					}
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockKnapsack, mockPresenceDetector, "test-munemo")
 					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
@@ -347,8 +348,11 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
+					mockKnapsack := typesmocks.NewKnapsack(t)
+					mockKnapsack.On("EnrollSecretPath").Return("").Maybe()
+
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockKnapsack, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
 						tt.middlewareOpt(kryptoEcMiddleware)
 					}
@@ -479,8 +483,11 @@ func Test_AllowedOrigin(t *testing.T) {
 			mockPresenceDetector := mocks.NewPresenceDetector(t)
 			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("EnrollSecretPath").Return("").Maybe()
+
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockKnapsack, mockPresenceDetector, "")
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -654,6 +661,7 @@ func TestMunemoCheck(t *testing.T) {
 
 			k := typesmocks.NewKnapsack(t)
 			k.On("ReadEnrollSecret").Return(token, nil)
+			k.On("EnrollSecretPath").Return("").Maybe()
 
 			munemo, err := getMunemoFromEnrollSecret(k)
 			if tt.expectMunemoExtractionErr {
@@ -662,7 +670,7 @@ func TestMunemoCheck(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
+			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), nil, mustGenEcdsaKey(t).PublicKey, k, nil, munemo)
 			err = e.checkMunemo(tt.headers)
 			if tt.expectMiddleWareCheckErr {
 				require.Error(t, err)
