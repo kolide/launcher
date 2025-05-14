@@ -49,12 +49,14 @@ func TestQuery(t *testing.T) {
 			class:      "Win32_OperatingSystem;",
 			properties: []string{"name", "version"},
 			noData:     true,
+			err:        true,
 		},
 		{
 			name:       "unknown classname",
 			class:      "Win32_MadeUp",
 			properties: []string{"name"},
 			noData:     true,
+			err:        true,
 		},
 		{
 			name:       "semicolon in properties",
@@ -67,6 +69,7 @@ func TestQuery(t *testing.T) {
 			class:      "Win32_OperatingSystem;",
 			properties: []string{"madeup1", "imaginary2"},
 			noData:     true,
+			err:        true,
 		},
 		{
 			name:       "blank namespace",
@@ -123,6 +126,7 @@ func TestQuery(t *testing.T) {
 			properties: []string{"name", "hidden"},
 			options:    []Option{WithWhere(`nameNope = 'c:\\does\\not\\exist'`)},
 			noData:     true,
+			err:        true,
 		},
 	}
 
