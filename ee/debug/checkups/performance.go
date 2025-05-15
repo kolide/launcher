@@ -8,9 +8,16 @@ import (
 	"github.com/kolide/launcher/ee/performance"
 )
 
+const (
+	cpuPercentThreshold        = 30
+	golangMemUsageThreshold    = 200 * 1024 * 1024 // 200 MB in bytes
+	nonGolangMemUsageThreshold = 100 * 1024 * 1024 // 100 MB in bytes
+)
+
 type perfCheckup struct {
 	data    map[string]any
 	summary string
+	status  Status
 }
 
 func (p *perfCheckup) Name() string {
@@ -21,7 +28,16 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	p.data = make(map[string]any)
 	stats, err := performance.CurrentProcessStats(ctx)
 	if err != nil {
+		p.status = Erroring
 		return fmt.Errorf("gathering performance stats: %w", err)
+	}
+
+	memOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
+	cpuOver := stats.CPUPercent > cpuPercentThreshold
+	if cpuOver || memOver {
+		p.status = Failing
+	} else {
+		p.status = Passing
 	}
 
 	p.summary = fmt.Sprintf(
@@ -42,7 +58,7 @@ func (p *perfCheckup) ExtraFileName() string {
 }
 
 func (p *perfCheckup) Status() Status {
-	return Informational
+	return p.status
 }
 
 func (p *perfCheckup) Summary() string {

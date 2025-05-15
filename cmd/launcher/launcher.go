@@ -317,7 +317,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// The checkpointer can take up to 5 seconds to run, so do this in the background.
 	checkpointer := checkups.NewCheckupLogger(slogger, k)
 	gowrapper.Go(ctx, slogger, func() {
-		checkpointer.Once(ctx)
+		checkpointer.LogCheckupsOnStartup(ctx)
 	})
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
 

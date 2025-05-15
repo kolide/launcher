@@ -66,6 +66,7 @@ const (
 	doctorSupported targetBits = 1 << iota
 	flareSupported
 	logSupported
+	startupLogSupported
 )
 
 //const checkupFor iota
@@ -77,12 +78,12 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		c       checkupInt
 		targets targetBits
 	}{
-		{&Platform{}, doctorSupported | flareSupported | logSupported},
-		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported},
-		{&Version{k: k}, doctorSupported | flareSupported | logSupported},
-		{&Processes{}, doctorSupported | flareSupported},
+		{&Platform{}, doctorSupported | flareSupported | logSupported | startupLogSupported},
+		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
+		{&Version{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
+		{&Processes{}, doctorSupported | flareSupported | logSupported}, // Not startupLogSupported because processes may not have started up yet
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
-		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported},
+		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
 		{&Logs{k: k}, doctorSupported | flareSupported},
 		{&InitLogs{}, flareSupported},
 		{&BinaryDirectory{}, doctorSupported | flareSupported},
@@ -99,17 +100,17 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&gnomeExtensions{}, doctorSupported | flareSupported},
 		{&quarantine{}, doctorSupported | flareSupported},
 		{&systemTime{}, doctorSupported | flareSupported},
-		{&dnsCheckup{k: k}, doctorSupported | flareSupported | logSupported},
+		{&dnsCheckup{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
 		{&tufCheckup{k: k}, doctorSupported | flareSupported},
 		{&osqConfigConflictCheckup{}, doctorSupported | flareSupported},
-		{&serverDataCheckup{k: k}, flareSupported | logSupported},
+		{&serverDataCheckup{k: k}, flareSupported | logSupported | startupLogSupported},
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
 		{&uninstallHistoryCheckup{k: k}, flareSupported},
 		{&desktopMenu{k: k}, flareSupported},
 		{&coredumpCheckup{}, doctorSupported | flareSupported},
 		{&downloadDirectory{}, flareSupported},
-		{&perfCheckup{}, flareSupported | logSupported},
+		{&perfCheckup{}, flareSupported | logSupported}, // Not startupLogSupported -- we get inaccurate data on first startup
 	}
 
 	checkupsToRun := make([]checkupInt, 0)
