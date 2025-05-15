@@ -81,7 +81,6 @@ func TestProc(t *testing.T) {
 			name:            "flags",
 			useShortRootDir: true,
 			osqueryFlags: []string{
-				"verbose",
 				"force=false",
 			},
 			wantProc: true,
