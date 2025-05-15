@@ -25,6 +25,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/packaging"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	osquery "github.com/osquery/osquery-go"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -138,11 +139,21 @@ func TestProc(t *testing.T) {
 
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
+			var server *osquery.ExtensionManagerServer
 			startErr := make(chan error)
 			go func() {
-				proc, _, err = StartProcess(mockSack, rootDir)
+				proc, server, err = StartProcess(mockSack, rootDir)
 				startErr <- err
 			}()
+
+			// Make sure we shut down the extension manager server at the end of the test case, if created
+			t.Cleanup(func() {
+				if server != nil {
+					// We don't check the error here because depending on the test case and state, it may not
+					// be possible for the server to shut down successfully.
+					_ = server.Shutdown(context.TODO())
+				}
+			})
 
 			select {
 			case err := <-startErr:
