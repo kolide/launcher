@@ -258,4 +258,16 @@ type Flags interface {
 	// CachedQueryResultsTTL indicates how long cached query results are valid.
 	SetCachedQueryResultsTTL(ttl time.Duration) error
 	CachedQueryResultsTTL() time.Duration
+
+	// OsqueryPublishURL is destination to publish osquery logs.
+	// 5/9/2025 - currently a secondary destination for osquery logs, with plans to
+	// eventually replace KolideServerURL as publish destination.
+	SetOsqueryPublishURL(u string) error
+	OsqueryPublishURL() string
+
+	// SetOsqueryPublishEnabled enables publishing osquery logs.
+	// 5/9/2025 - planned to be used for transtion period to allow control server
+	// to set percentage of devices to publish logs.
+	SetOsqueryPublishEnabled(enabled bool) error
+	OsqueryPublishEnabled() bool
 }
