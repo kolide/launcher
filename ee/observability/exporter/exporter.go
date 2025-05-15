@@ -345,7 +345,7 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 	// Create new meter provider and let otel set it globally
 	newMeterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithResource(launcherResource),
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricsExporter)),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricsExporter, sdkmetric.WithInterval(10*time.Minute))),
 	)
 	otel.SetMeterProvider(newMeterProvider)
 
