@@ -3,6 +3,7 @@ package knapsack
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -99,6 +100,25 @@ func (k *knapsack) SetInstanceQuerier(q types.InstanceQuerier) {
 // RegistrationTracker interface methods
 func (k *knapsack) RegistrationIDs() []string {
 	return []string{types.DefaultRegistrationID}
+}
+
+func (k *knapsack) Registrations() ([]types.Registration, error) {
+	registrations := make([]types.Registration, 0)
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return nil, errors.New("no registration store")
+	}
+	if err := registrationStore.ForEach(func(k []byte, v []byte) error {
+		var r types.Registration
+		if err := json.Unmarshal(v, &r); err != nil {
+			return fmt.Errorf("unmarshalling registration %s: %w", string(k), err)
+		}
+		registrations = append(registrations, r)
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("fetching registrations from store: %w", err)
+	}
+	return registrations, nil
 }
 
 // InstanceStatuses returns the current status of each osquery instance.
