@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -304,6 +305,124 @@ func isNodeInvalidErr(err error) bool {
 	}
 }
 
+func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) {
+	// Extract munemo from enrollment secret.
+	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+	if err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not parse enrollment secret",
+			"err", err,
+		)
+		return
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"no claims in enrollment secret",
+		)
+		return
+	}
+	munemo, munemoFound := claims["organization"]
+	if !munemoFound {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"no claim for organization in enrollment secret",
+		)
+		return
+	}
+
+	r := types.Registration{
+		RegistrationID:   e.registrationId,
+		Munemo:           fmt.Sprintf("%s", munemo),
+		NodeKey:          nodeKey,
+		EnrollmentSecret: enrollmentSecret,
+	}
+
+	rawRegistration, err := json.Marshal(r)
+	if err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not marshal registration",
+			"err", err,
+		)
+	}
+
+	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), rawRegistration); err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not add registration",
+			"err", err,
+		)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully stored new registration",
+		"munemo", r.Munemo,
+	)
+}
+
+func (e *Extension) updateRegistration(nodeKey string) {
+	registrationStore := e.knapsack.RegistrationStore()
+
+	existingRegistrationRaw, err := registrationStore.Get([]byte(e.registrationId))
+	if err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"could not get existing registration",
+			"err", err,
+		)
+		return
+	}
+	// If the registration doesn't already exist, add it instead
+	if existingRegistrationRaw == nil {
+		enrollSecret, err := e.knapsack.ReadEnrollSecret()
+		if err != nil {
+			e.slogger.Log(context.TODO(), slog.LevelError,
+				"could not read enroll secret to add new registration",
+				"err", err,
+			)
+			return
+		}
+		e.addRegistration(nodeKey, enrollSecret)
+		return
+	}
+
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"could not unmarshal existing registration",
+			"err", err,
+		)
+		return
+	}
+
+	// Check to see if node key changed
+	if existingRegistration.NodeKey == nodeKey {
+		return
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelError,
+			"could not marshal updated registration",
+			"err", err,
+		)
+		return
+	}
+
+	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), updatedRegistrationRaw); err != nil {
+		e.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not update registration",
+			"err", err,
+		)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+	)
+}
+
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
@@ -328,6 +447,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
+		e.updateRegistration(e.NodeKey)
 		return e.NodeKey, false, nil
 	}
 
@@ -344,6 +464,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
+		e.updateRegistration(key)
 		return e.NodeKey, false, nil
 	}
 
@@ -419,6 +540,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	e.NodeKey = keyString
+	e.addRegistration(keyString, enrollSecret)
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",
@@ -445,6 +567,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
 	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
+	e.knapsack.RegistrationStore().Delete([]byte(e.registrationId))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If

@@ -60,6 +60,7 @@ func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
 	m.On("OsquerydPath").Maybe().Return("")
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	m.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	m.On("RootDirectory").Maybe().Return("whatever")
@@ -80,6 +81,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("OsquerydPath").Maybe().Return("")
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	m.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	m.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	m.On("Slogger").Return(multislogger.NewNopLogger())
 	m.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
@@ -234,6 +236,7 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
@@ -379,6 +382,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
@@ -559,6 +563,7 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
@@ -603,6 +608,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
@@ -674,6 +680,7 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
@@ -727,6 +734,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
@@ -803,6 +811,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ResultLogsStore").Return(resultLogsStore)
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
@@ -891,6 +900,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
@@ -1019,6 +1029,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("StatusLogsStore").Return(statusLogsStore)
 	k.On("ResultLogsStore").Return(resultLogsStore)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
@@ -1091,6 +1102,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 
 	k := mocks.NewKnapsack(t)
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
