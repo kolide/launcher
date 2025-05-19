@@ -1219,6 +1219,26 @@ func (_m *Knapsack) RegistrationIDs() []string {
 	return r0
 }
 
+// RegistrationStore provides a mock function with no fields
+func (_m *Knapsack) RegistrationStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegistrationStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
+	}
+
+	return r0
+}
+
 // ResultLogsStore provides a mock function with no fields
 func (_m *Knapsack) ResultLogsStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
