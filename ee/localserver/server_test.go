@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -19,7 +20,12 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
