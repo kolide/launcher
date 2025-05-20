@@ -305,6 +305,10 @@ func isNodeInvalidErr(err error) bool {
 	}
 }
 
+// addRegistration should be called after enrollment to store enrollment/registration details
+// in our persistent store under e.registrationId. We frequently use the munemo associated with
+// the registration (e.g. in checkups), so we parse the enrollment secret in order to extract
+// the munemo from the claims and store it as well.
 func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) {
 	// Extract munemo from enrollment secret.
 	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
@@ -359,9 +363,14 @@ func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) {
 	)
 }
 
+// updateRegistration saves the provided nodeKey under the registration associated with
+// e.registrationId; it should be called whenever the nodeKey is updated. Since storing
+// registrations in the store is newer functionality, we may not actually have a stored
+// registration yet -- this will happen if this launcher install enrolled before we started
+// storing registrations in the store. In this case, we call `e.addRegistration` instead.
 func (e *Extension) updateRegistration(nodeKey string) {
+	// Get the existing registration in order to update it with the new node key
 	registrationStore := e.knapsack.RegistrationStore()
-
 	existingRegistrationRaw, err := registrationStore.Get([]byte(e.registrationId))
 	if err != nil {
 		e.slogger.Log(context.TODO(), slog.LevelError,
@@ -370,8 +379,11 @@ func (e *Extension) updateRegistration(nodeKey string) {
 		)
 		return
 	}
-	// If the registration doesn't already exist, add it instead
+
+	// If the registration doesn't already exist (launcher probably enrolled before we started
+	// storing registrations in the store), add it instead
 	if existingRegistrationRaw == nil {
+		// Grab the enroll secret, since we need that to create a new registration
 		enrollSecret, err := e.knapsack.ReadEnrollSecret()
 		if err != nil {
 			e.slogger.Log(context.TODO(), slog.LevelError,
@@ -384,6 +396,7 @@ func (e *Extension) updateRegistration(nodeKey string) {
 		return
 	}
 
+	// We have an existing registration -- unmarshal it so we can update it appropriately
 	var existingRegistration types.Registration
 	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
 		e.slogger.Log(context.TODO(), slog.LevelError,
@@ -393,14 +406,13 @@ func (e *Extension) updateRegistration(nodeKey string) {
 		return
 	}
 
-	// Check to see if node key changed
+	// Check to see if node key changed -- if not, no need to do anything here
 	if existingRegistration.NodeKey == nodeKey {
 		return
 	}
 
 	// Make update
 	existingRegistration.NodeKey = nodeKey
-
 	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
 	if err != nil {
 		e.slogger.Log(context.TODO(), slog.LevelError,
