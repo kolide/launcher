@@ -17,6 +17,7 @@ import (
 	"testing/quick"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/testutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -220,7 +221,40 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+// createTestEnrollSecret creates a JWT that can be parsed by the extension
+// to extract its munemo.
+func createTestEnrollSecret(t *testing.T, munemo string) string {
+	testSigningKey := []byte("test-key")
+
+	type CustomKolideJwtClaims struct {
+		Munemo string `json:"organization"`
+		jwt.RegisteredClaims
+	}
+
+	claims := CustomKolideJwtClaims{
+		munemo,
+		jwt.RegisteredClaims{
+			// A usual scenario is to set the expiration time relative to the current time
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "test",
+			Subject:   "somebody",
+			ID:        "1",
+			Audience:  []string{"somebody_else"},
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedTokenStr, err := token.SignedString(testSigningKey)
+	require.NoError(t, err)
+
+	return signedTokenStr
+}
+
 func TestExtensionEnroll(t *testing.T) {
+	expectedMunemo := "test_fake_munemo"
+	expectedEnrollSecret := createTestEnrollSecret(t, expectedMunemo)
 
 	var gotEnrollSecret string
 	expectedNodeKey := "node_key"
@@ -236,9 +270,10 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
-	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
+	registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+	require.NoError(t, err)
+	k.On("RegistrationStore").Return(registrationStore)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	expectedEnrollSecret := "foo_secret"
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
@@ -254,6 +289,16 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+
+	initialRegistrationRaw, err := registrationStore.Get([]byte(types.DefaultRegistrationID))
+	require.NoError(t, err)
+	require.NotNil(t, initialRegistrationRaw)
+	var initialRegistration types.Registration
+	require.NoError(t, json.Unmarshal(initialRegistrationRaw, &initialRegistration))
+	require.Equal(t, types.DefaultRegistrationID, initialRegistration.RegistrationID)
+	require.Equal(t, expectedEnrollSecret, initialRegistration.EnrollmentSecret)
+	require.Equal(t, expectedNodeKey, initialRegistration.NodeKey)
+	require.Equal(t, expectedMunemo, initialRegistration.Munemo)
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
@@ -285,6 +330,17 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
+
+	// Check that registration is up-to-date
+	updatedRegistrationRaw, err := registrationStore.Get([]byte(types.DefaultRegistrationID))
+	require.NoError(t, err)
+	require.NotNil(t, updatedRegistrationRaw)
+	var updatedRegistration types.Registration
+	require.NoError(t, json.Unmarshal(updatedRegistrationRaw, &updatedRegistration))
+	require.Equal(t, types.DefaultRegistrationID, updatedRegistration.RegistrationID)
+	require.Equal(t, expectedEnrollSecret, updatedRegistration.EnrollmentSecret)
+	require.Equal(t, expectedNodeKey, updatedRegistration.NodeKey)
+	require.Equal(t, expectedMunemo, updatedRegistration.Munemo)
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
