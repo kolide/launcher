@@ -28,14 +28,20 @@ func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 
 	// Check registrations first -- will only be available if we're running in situ
 	if registrations, err := c.k.Registrations(); err == nil {
-		for i, registration := range registrations {
-			if registration.Munemo != "" {
-				fmt.Fprintf(extraFH, "registration store (%d/%s): %s\n", i, registration.RegistrationID, registration.Munemo)
-			} else {
-				fmt.Fprintf(extraFH, "registration store (%d/%s): no munemo set\n", i, registration.RegistrationID)
+		if len(registrations) == 0 {
+			fmt.Fprint(extraFH, "no registrations found in knapsack")
+		} else {
+			for i, registration := range registrations {
+				if registration.Munemo != "" {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): %s\n", i, registration.RegistrationID, registration.Munemo)
+				} else {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): no munemo set\n", i, registration.RegistrationID)
+				}
+
 			}
-			fmt.Fprintf(extraFH, "\n\n")
 		}
+
+		fmt.Fprintf(extraFH, "\n\n")
 	}
 
 	for _, secretPath := range c.getSecretPaths() {
