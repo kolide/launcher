@@ -349,12 +349,15 @@ func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) err
 	return nil
 }
 
-// updateRegistration saves the provided nodeKey under the registration associated with
-// e.registrationId; it should be called whenever the nodeKey is updated. Since storing
-// registrations in the store is newer functionality, we may not actually have a stored
-// registration yet -- this will happen if this launcher install enrolled before we started
-// storing registrations in the store. In this case, we call `e.addRegistration` instead.
-func (e *Extension) updateRegistration(nodeKey string) error {
+// ensureNodeKeyStored saves the provided nodeKey under the registration associated with
+// e.registrationId. Since storing registrations in the store is newer functionality,
+// we may not actually have a stored registration yet -- this will happen if this launcher
+// install enrolled before we started storing registrations in the store. In this case,
+// we fetch the enrollment secret and call `e.addRegistration` instead. ensureNodeKeyStored
+// does handle the case where there is an existing registration and the node key changed,
+// but we don't expect this use case at the moment. (On re-enroll, the registration is deleted,
+// then re-added via addRegistration instead.)
+func (e *Extension) ensureNodeKeyStored(nodeKey string) error {
 	// Get the existing registration in order to update it with the new node key
 	registrationStore := e.knapsack.RegistrationStore()
 	existingRegistrationRaw, err := registrationStore.Get([]byte(e.registrationId))
@@ -426,7 +429,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
-		if err := e.updateRegistration(e.NodeKey); err != nil {
+		if err := e.ensureNodeKeyStored(e.NodeKey); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"could not update registration",
 				"err", err,
@@ -448,7 +451,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
-		if err := e.updateRegistration(key); err != nil {
+		if err := e.ensureNodeKeyStored(key); err != nil {
 			e.slogger.Log(ctx, slog.LevelError,
 				"could not update registration",
 				"err", err,
