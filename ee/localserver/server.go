@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -44,6 +43,7 @@ type localServer struct {
 	srv                    *http.Server
 	identifiers            identifiers
 	ecLimiter, dt4aLimiter *rate.Limiter
+	kryptoMiddleware       *kryptoEcMiddleware
 	tlsCerts               []tls.Certificate
 	querier                Querier
 	kolideServer           string
@@ -81,7 +81,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		return nil, err
 	}
 
-	munemo, err := getMunemoFromEnrollSecret(k)
+	munemo, err := getMunemoFromKnapsack(k)
 	if err != nil {
 		ls.slogger.Log(ctx, slog.LevelError,
 			"getting munemo from enroll secret, not fatal, continuing",
@@ -89,7 +89,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		)
 	}
 
-	ecKryptoMiddleware := newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
+	ls.kryptoMiddleware = newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
@@ -130,8 +130,8 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	// after making it through the kryptoEcMiddleware
 	// by using v1, k2 can call endpoints without fear of panicing local server
 	// /v0/cmd left for transition period
-	rootMux.Handle("/v1/cmd", ls.rateLimitHandler(ls.ecLimiter, ecKryptoMiddleware.Wrap(ecAuthedMux)))
-	rootMux.Handle("/v0/cmd", ls.rateLimitHandler(ls.ecLimiter, ecKryptoMiddleware.Wrap(ecAuthedMux)))
+	rootMux.Handle("/v1/cmd", ls.rateLimitHandler(ls.ecLimiter, ls.kryptoMiddleware.Wrap(ecAuthedMux)))
+	rootMux.Handle("/v0/cmd", ls.rateLimitHandler(ls.ecLimiter, ls.kryptoMiddleware.Wrap(ecAuthedMux)))
 
 	// uncomment to test without going through middleware
 	// for example:
@@ -276,6 +276,42 @@ func (ls *localServer) Start() error {
 		}
 	})
 
+	// If we don't have a tenant munemo yet (because we are unenrolled), poll until
+	// enrollment completes so we can set the munemo.
+	gowrapper.Go(ctx, ls.slogger, func() {
+		// Enrollment tends to happen pretty quickly, so we don't need a large interval here
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for {
+			// Tenant munemo set successfully, nothing more to do here
+			if ls.kryptoMiddleware.tenantMunemo.Load() != "" {
+				break
+			}
+
+			select {
+			case <-ctx.Done():
+				ls.slogger.Log(ctx, slog.LevelDebug,
+					"getMunemoFromKnapsack received shutdown signal",
+				)
+				return
+			case <-ticker.C:
+				munemo, err := getMunemoFromKnapsack(ls.knapsack)
+				if err != nil {
+					ls.slogger.Log(ctx, slog.LevelWarn,
+						"could not get munemo from knapsack",
+						"err", err,
+					)
+					continue
+				}
+				ls.kryptoMiddleware.tenantMunemo.Store(munemo)
+				ls.slogger.Log(ctx, slog.LevelInfo,
+					"successfully retrieved munemo and set in krypto middleware",
+				)
+			}
+		}
+	})
+
 	l, err := ls.startListener()
 	if err != nil {
 		return fmt.Errorf("starting listener: %w", err)
@@ -410,34 +446,22 @@ func (ls *localServer) rateLimitHandler(l *rate.Limiter, next http.Handler) http
 	})
 }
 
-// getMunemoFromEnrollSecret extracts the munemo from the enroll secret
-func getMunemoFromEnrollSecret(k types.Knapsack) (string, error) {
-	enrollSecret, err := k.ReadEnrollSecret()
+// getMunemoFromKnapsack retrieves the munemo from the stored registrations
+func getMunemoFromKnapsack(k types.Knapsack) (string, error) {
+	registrations, err := k.Registrations()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getting registrations from knapsack: %w", err)
+	}
+	if len(registrations) == 0 {
+		return "", errors.New("no registrations in knapsack")
 	}
 
-	// We do not have the key, and thus CANNOT verify. So this is ParseUnverified
-	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
-	if err != nil {
-		return "", err
+	// For now, we just want the default registration.
+	for _, r := range registrations {
+		if r.RegistrationID == types.DefaultRegistrationID {
+			return r.Munemo, nil
+		}
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.New("invalid token claims")
-	}
-
-	org, ok := claims["organization"]
-	if !ok {
-		return "", errors.New("no organization claim")
-	}
-
-	// convert org to string
-	munemo, ok := org.(string)
-	if !ok {
-		return "", errors.New("organization claim not a string")
-	}
-
-	return munemo, nil
+	return "", fmt.Errorf("no registration found for `%s` registration ID, cannot find munemo", types.DefaultRegistrationID)
 }

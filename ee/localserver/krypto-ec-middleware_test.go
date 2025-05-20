@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -602,44 +602,61 @@ func mustExtractJsonProperty[T any](t *testing.T, jsonData []byte, property stri
 func TestMunemoCheck(t *testing.T) {
 	t.Parallel()
 
-	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {"test-munemo"}}
+	expectedMunemo := "test-munemo"
+	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {expectedMunemo}}
 
 	tests := []struct {
 		name                      string
 		headers                   map[string][]string
-		tokenClaims               jwt.MapClaims
+		registrations             []types.Registration
 		expectMunemoExtractionErr bool
 		expectMiddleWareCheckErr  bool
 	}{
 		{
-			name:        "matching munemo",
-			headers:     validTestHeader,
-			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+			name:    "matching munemo",
+			headers: validTestHeader,
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 		},
 		{
-			name:        "no munemo header",
-			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+			name: "no munemo header",
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 		},
 		{
-			name:                      "no token claims",
+			name:                      "no registrations",
 			headers:                   validTestHeader,
+			registrations:             []types.Registration{},
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:                      "token claim not string",
-			headers:                   validTestHeader,
-			tokenClaims:               jwt.MapClaims{"organization": 1},
+			name:    "no default registration",
+			headers: validTestHeader,
+			registrations: []types.Registration{
+				{
+					RegistrationID: "some-other-registration-id",
+					Munemo:         "some-other-munemo",
+				},
+			},
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:        "empty org claim",
-			headers:     validTestHeader,
-			tokenClaims: jwt.MapClaims{"organization": ""},
-		},
-		{
-			name:                     "header and munemo dont match",
-			headers:                  map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
-			tokenClaims:              jwt.MapClaims{"organization": "test-munemo"},
+			name:    "header and munemo dont match",
+			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 			expectMiddleWareCheckErr: true,
 		},
 	}
@@ -649,13 +666,10 @@ func TestMunemoCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.tokenClaims).SignedString([]byte("test"))
-			require.NoError(t, err)
-
 			k := typesmocks.NewKnapsack(t)
-			k.On("ReadEnrollSecret").Return(token, nil)
+			k.On("Registrations").Return(tt.registrations, nil)
 
-			munemo, err := getMunemoFromEnrollSecret(k)
+			munemo, err := getMunemoFromKnapsack(k)
 			if tt.expectMunemoExtractionErr {
 				require.Error(t, err)
 				return
