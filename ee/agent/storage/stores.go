@@ -20,6 +20,7 @@ const (
 	LauncherHistoryStore        Store = "launcher_history"         // The store used for storing launcher start time history currently.
 	Dt4aInfoStore               Store = "zta_info"                 // The store used for storing dt4a info about this device
 	WindowsUpdatesCacheStore    Store = "windows_updates_cache"    // The store used for caching the results of recent searches against the Windows Update Agent API
+	RegistrationStore           Store = "registrations"            // The store used for persisting launcher's enrollments/registrations
 )
 
 func (storeType Store) String() string {
