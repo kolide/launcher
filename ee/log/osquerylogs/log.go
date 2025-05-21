@@ -32,9 +32,8 @@ func WithLevel(level slog.Level) Option {
 }
 
 var (
-	callerRegexp  = regexp.MustCompile(`[\w.]+:\d+]`)
-	pidRegex      = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
-	lockfileRegex = regexp.MustCompile(`lock file: ([a-zA-Z0-9_\.\s\\\/\-:]*LOCK):`)
+	callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
+	pidRegex     = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
 )
 
 func extractOsqueryCaller(msg string) string {
