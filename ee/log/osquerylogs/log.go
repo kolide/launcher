@@ -199,29 +199,3 @@ func getSliceStat(getFunc func() ([]uint32, error)) string {
 	}
 	return fmt.Sprintf("%+v", stat)
 }
-
-func processStr(ctx context.Context, p *process.Process) string {
-	name := "unknown"
-	processOwner := "unknown"
-	runningStatus := "unknown"
-	cmdline := "unknown"
-
-	if gotName, err := p.NameWithContext(ctx); err == nil {
-		name = gotName
-	}
-	if gotUsername, err := p.UsernameWithContext(ctx); err == nil {
-		processOwner = gotUsername
-	}
-	if gotIsRunning, err := p.IsRunningWithContext(ctx); err == nil {
-		if gotIsRunning {
-			runningStatus = "running"
-		} else {
-			runningStatus = "not running"
-		}
-	}
-	if gotCmdline, err := p.CmdlineWithContext(ctx); err == nil {
-		cmdline = gotCmdline
-	}
-
-	return fmt.Sprintf("process with name `%s` and PID %d belonging to user `%s` has current status `%s` (%s)", name, p.Pid, processOwner, runningStatus, cmdline)
-}
