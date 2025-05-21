@@ -213,10 +213,9 @@ func (e *Extension) Execute() error {
 // with this extension.
 func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if e.interrupted.Load() {
+	if e.interrupted.Swap(true) {
 		return
 	}
-	e.interrupted.Store(true)
 
 	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)

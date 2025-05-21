@@ -34,10 +34,9 @@ func (w *windowsNotifier) Execute() error {
 func (w *windowsNotifier) Listen() {}
 
 func (w *windowsNotifier) Interrupt(err error) {
-	if w.interrupted.Load() {
+	if w.interrupted.Swap(true) {
 		return
 	}
-	w.interrupted.Store(true)
 
 	w.interrupt <- struct{}{}
 }

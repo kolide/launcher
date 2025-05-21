@@ -235,11 +235,9 @@ func (p *powerEventWatcher) Execute() error {
 
 func (p *powerEventWatcher) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if p.interrupted.Load() {
+	if p.interrupted.Swap(true) {
 		return
 	}
-
-	p.interrupted.Store(true)
 
 	// EvtClose: https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtclose
 	ret, _, err := p.unsubscribeProcedure.Call(p.subscriptionHandle)

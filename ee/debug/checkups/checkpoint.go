@@ -63,11 +63,9 @@ func (c *logCheckPointer) Run() error {
 
 func (c *logCheckPointer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if c.interrupted.Load() {
+	if c.interrupted.Swap(true) {
 		return
 	}
-
-	c.interrupted.Store(true)
 
 	c.interrupt <- struct{}{}
 }

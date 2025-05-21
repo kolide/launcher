@@ -72,10 +72,9 @@ func (d *databaseBackupSaver) Execute() error {
 
 func (d *databaseBackupSaver) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if d.interrupted.Load() {
+	if d.interrupted.Swap(true) {
 		return
 	}
-	d.interrupted.Store(true)
 
 	d.interrupt <- struct{}{}
 }

@@ -35,7 +35,7 @@ type Runner struct {
 	settingsWriter  settingsStoreWriter     // writes to startup settings store
 	opts            []OsqueryInstanceOption // global options applying to all osquery instances
 	shutdown        chan struct{}
-	interrupted     atomic.Bool
+	interrupted     *atomic.Bool
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
@@ -48,6 +48,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 		settingsWriter:  settingsWriter,
 		shutdown:        make(chan struct{}),
 		opts:            opts,
+		interrupted:     &atomic.Bool{},
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -221,12 +222,11 @@ func (r *Runner) Shutdown() error {
 	ctx, span := observability.StartSpan(context.TODO())
 	defer span.End()
 
-	if r.interrupted.Load() {
+	if r.interrupted.Swap(true) {
 		// Already shut down, nothing else to do
 		return nil
 	}
 
-	r.interrupted.Store(true)
 	close(r.shutdown)
 
 	if err := r.triggerShutdownForInstances(ctx); err != nil {

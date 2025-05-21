@@ -30,10 +30,9 @@ func (n *noopUniversalLinkHandler) Execute() error {
 
 func (n *noopUniversalLinkHandler) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if n.interrupted.Load() {
+	if n.interrupted.Swap(true) {
 		return
 	}
-	n.interrupted.Store(true)
 
 	n.interrupt <- struct{}{}
 	close(n.unusedInput)

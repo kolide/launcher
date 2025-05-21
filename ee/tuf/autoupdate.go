@@ -278,10 +278,9 @@ func (ta *TufAutoupdater) Execute() (err error) {
 
 func (ta *TufAutoupdater) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ta.interrupted.Load() {
+	if ta.interrupted.Swap(true) {
 		return
 	}
-	ta.interrupted.Store(true)
 
 	ta.interrupt <- struct{}{}
 }
