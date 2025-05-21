@@ -5,21 +5,27 @@ package universallink
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	handler, _ := NewUniversalLinkHandler(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	handler, _ := NewUniversalLinkHandler(slogger)
 
 	// Let the handler run for a bit
 	go handler.Execute()
 	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	handler.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -43,7 +49,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

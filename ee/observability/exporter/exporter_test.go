@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"runtime"
 	"sync"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/observability/bufspanprocessor"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
@@ -124,7 +126,11 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
-	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack.On("Slogger").Return(slogger)
 
 	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
@@ -132,6 +138,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 
 	go telemetryExporter.Execute()
 	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	telemetryExporter.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -155,7 +162,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

@@ -6,6 +6,7 @@ package tpmrunner
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/tpmrunner/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,7 +97,11 @@ func Test_tpmRunner(t *testing.T) {
 		t.Parallel()
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		var logBytes threadsafebuffer.ThreadSafeBuffer
+		slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+		tpmRunner, err := New(context.TODO(), slogger, inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// force the runner to think the machine has a TPM
@@ -112,10 +118,12 @@ func Test_tpmRunner(t *testing.T) {
 		go func() {
 			tpmRunner.Execute()
 		}()
+		time.Sleep(3 * time.Second)
 
 		// Confirm we can call Interrupt multiple times without blocking
 		interruptComplete := make(chan struct{})
 		expectedInterrupts := 3
+		interruptStart := time.Now()
 		for i := 0; i < expectedInterrupts; i += 1 {
 			go func() {
 				tpmRunner.Interrupt(nil)
@@ -134,7 +142,7 @@ func Test_tpmRunner(t *testing.T) {
 				receivedInterrupts += 1
 				continue
 			case <-time.After(5 * time.Second):
-				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 				t.FailNow()
 			}
 		}
