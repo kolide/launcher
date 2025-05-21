@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -55,7 +56,12 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-			mockKnapsack.On("ReadEnrollSecret").Return("enroll_secret", nil)
+			mockKnapsack.On("Registrations").Return([]types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         "test-munemo",
+				},
+			}, nil)
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -221,7 +227,12 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-			mockKnapsack.On("ReadEnrollSecret").Return("enroll_secret", nil)
+			mockKnapsack.On("Registrations").Return([]types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         "test-munemo",
+				},
+			}, nil)
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)

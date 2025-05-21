@@ -26,6 +26,7 @@ import (
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/atomic"
 )
 
 const (
@@ -79,7 +80,7 @@ type kryptoEcMiddleware struct {
 	slogger               *slog.Logger
 	presenceDetector      presenceDetector
 	presenceDetectionLock sync.Mutex
-	tenantMunemo          string
+	tenantMunemo          *atomic.String
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -88,6 +89,7 @@ type kryptoEcMiddleware struct {
 }
 
 func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
+	atomicMunemo := atomic.NewString(tenantMunemo)
 	return &kryptoEcMiddleware{
 		localDbSigner:                         localDbSigner,
 		counterParty:                          counterParty,
@@ -95,7 +97,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, co
 		presenceDetector:                      presenceDetector,
 		timestampValidityRange:                timestampValidityRange,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
-		tenantMunemo:                          tenantMunemo,
+		tenantMunemo:                          atomicMunemo,
 	}
 }
 
@@ -750,7 +752,8 @@ func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *ht
 }
 
 func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
-	if e.tenantMunemo == "" {
+	storedMunemo := e.tenantMunemo.Load()
+	if storedMunemo == "" {
 		e.slogger.Log(context.TODO(), slog.LevelError,
 			"no munemo set in krypto middleware, continuing",
 		)
@@ -765,7 +768,7 @@ func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
 		return nil
 	}
 
-	if munemoHeaders[0] == e.tenantMunemo {
+	if munemoHeaders[0] == storedMunemo {
 		e.slogger.Log(context.TODO(), slog.LevelDebug,
 			"munemo in request matches munemo in enroll secret, continuing",
 		)

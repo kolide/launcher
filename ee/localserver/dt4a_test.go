@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +38,12 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -86,7 +92,12 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -125,7 +136,12 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -180,7 +196,12 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -219,7 +240,12 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -257,7 +283,12 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -305,7 +336,12 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			k.On("KolideServerURL").Return("localserver")
 			k.On("Slogger").Return(slogger)
 			k.On("AllowOverlyBroadDt4aAcceleration").Maybe().Return(false)
-			k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+			k.On("Registrations").Return([]types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         "test-munemo",
+				},
+			}, nil)
 
 			// Set up localserver
 			ls, err := New(context.TODO(), k, nil)
@@ -339,7 +375,12 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)
@@ -368,7 +409,12 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
 	// Validate that we accelerate osquery distributed requests
 	k.On("SetDistributedForwardingIntervalOverride", mock.Anything, mock.Anything).Return()
-	k.On("ReadEnrollSecret").Return("enroll_secret", nil)
+	k.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	// Set up localserver
 	ls, err := New(context.TODO(), k, nil)

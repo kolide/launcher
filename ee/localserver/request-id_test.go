@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/assert"
@@ -24,11 +23,12 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("localhost")
 	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
 	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil)
-
-	enrollSecret, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"organization": "test-munemo"}).SignedString([]byte("test"))
-	require.NoError(t, err)
-
-	mockKnapsack.On("ReadEnrollSecret").Return(enrollSecret, nil)
+	mockKnapsack.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo",
+		},
+	}, nil)
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{
