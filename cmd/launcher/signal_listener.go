@@ -37,11 +37,10 @@ func (s *signalListener) Execute() error {
 
 func (s *signalListener) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if s.interrupted.Load() {
+	if s.interrupted.Swap(true) {
 		return
 	}
 
-	s.interrupted.Store(true)
 	s.cancel()
 	close(s.sigChannel)
 }

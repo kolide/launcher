@@ -378,11 +378,9 @@ func (t *TelemetryExporter) Execute() error {
 
 func (t *TelemetryExporter) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if t.interrupted.Load() {
+	if t.interrupted.Swap(true) {
 		return
 	}
-
-	t.interrupted.Store(true)
 
 	// We must use context.Background here, not t.ctx -- if we use t.ctx, the restart metric won't ship,
 	// and calls to Shutdown will time out.

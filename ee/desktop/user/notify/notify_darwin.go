@@ -41,11 +41,9 @@ func (m *macNotifier) Execute() error {
 }
 
 func (m *macNotifier) Interrupt(err error) {
-	if m.interrupted.Load() {
+	if m.interrupted.Swap(true) {
 		return
 	}
-
-	m.interrupted.Store(true)
 
 	m.interrupt <- struct{}{}
 }

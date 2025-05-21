@@ -74,10 +74,9 @@ func (u *universalLinkHandler) Interrupt(_ error) {
 	)
 
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if u.interrupted.Load() {
+	if u.interrupted.Swap(true) {
 		return
 	}
-	u.interrupted.Store(true)
 
 	u.interrupt <- struct{}{}
 	close(u.urlInput)

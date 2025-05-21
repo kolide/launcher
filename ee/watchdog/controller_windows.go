@@ -154,12 +154,11 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 
 func (wc *WatchdogController) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if wc.interrupted.Load() {
+	if wc.interrupted.Swap(true) {
 		return
 	}
 
 	wc.logPublisher.Close()
-	wc.interrupted.Store(true)
 	wc.interrupt <- struct{}{}
 }
 
