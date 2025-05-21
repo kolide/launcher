@@ -28,7 +28,7 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		)
 	}
 
-	if err := agent.ResetDatabase(ctx, k, resetReasonUninstallRequested); err != nil {
+	if err := agent.ResetDatabase(ctx, k, slogger, resetReasonUninstallRequested); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"resetting database",
 			"err", err,

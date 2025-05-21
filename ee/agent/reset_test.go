@@ -89,8 +89,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		osquerySuccess         bool
 		munemoSetInStore       bool
 		munemoChanged          bool
-		secretLivesInFile      bool
-		secretReadable         bool
+		registrationsExist     bool
 		expectDatabaseWipe     bool
 	}{
 		{
@@ -102,8 +101,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -115,8 +113,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     true,
 		},
 		{
@@ -128,8 +125,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     true,
 		},
 		{
@@ -141,21 +137,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          true,
-			secretLivesInFile:      true,
-			secretReadable:         true,
-			expectDatabaseWipe:     true,
-		},
-		{
-			name:                   "munemo changed, enroll secret does not live in file, database wipe",
-			serialSetInStore:       true,
-			serialChanged:          false,
-			hardwareUUIDSetInStore: true,
-			hardwareUUIDChanged:    false,
-			osquerySuccess:         true,
-			munemoSetInStore:       true,
-			munemoChanged:          true,
-			secretLivesInFile:      false,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     true,
 		},
 		{
@@ -167,8 +149,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          true,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     true,
 		},
 		{
@@ -180,8 +161,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         false,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -193,8 +173,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         false,
+			registrationsExist:     false,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -206,8 +185,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -219,8 +197,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -232,8 +209,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       false,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     false,
 		},
 		{
@@ -245,8 +221,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
-			secretLivesInFile:      true,
-			secretReadable:         true,
+			registrationsExist:     true,
 			expectDatabaseWipe:     true,
 		},
 	}
@@ -313,24 +288,16 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 
 			// Set up dependencies: ensure that retrieved tenant matches current data
 			munemoValue := []byte("test-munemo")
-			secretJwt := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{"organization": string(munemoValue)})
-			secretValue, err := secretJwt.SignedString(jwt.UnsafeAllowNoneSignatureType)
-			require.NoError(t, err, "could not create test enroll secret")
 
-			if tt.secretLivesInFile {
-				var secretFilepath string
-				if tt.secretReadable {
-					secretDir := t.TempDir()
-					secretFilepath = filepath.Join(secretDir, "test-secret")
-					require.NoError(t, os.WriteFile(secretFilepath, []byte(secretValue), 0644), "could not write out test secret")
-				} else {
-					secretFilepath = filepath.Join("not", "a", "real", "enroll", "secret")
-				}
-
-				mockKnapsack.On("EnrollSecret").Return("")
-				mockKnapsack.On("EnrollSecretPath").Return(secretFilepath)
+			if tt.registrationsExist {
+				mockKnapsack.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         string(munemoValue),
+					},
+				}, nil)
 			} else {
-				mockKnapsack.On("EnrollSecret").Return(secretValue)
+				mockKnapsack.On("Registrations").Return(nil, nil)
 			}
 
 			if tt.munemoSetInStore {
@@ -424,7 +391,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				require.NoError(t, err, "could not get hardware UUID from test store")
 				require.Equal(t, actualHardwareUUID, string(hardwareUUID), "hardware UUID in test store does not match expected hardware UUID")
 			}
-			if tt.secretReadable {
+			if tt.registrationsExist {
 				munemo, err := testHostDataStore.Get(hostDataKeyMunemo)
 				require.NoError(t, err, "could not get munemo from test store")
 				require.Equal(t, munemoValue, munemo, "munemo in test store does not match expected munemo")
