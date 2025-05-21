@@ -272,7 +272,11 @@ func TestStopCleanup_Multiple(t *testing.T) {
 	mockActor := mocks.NewActor(t)
 	store := setupStorage(t)
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack.On("Slogger").Return(slogger)
 	actionQueue := New(
 		mockKnapsack,
 		WithStore(store),
@@ -284,6 +288,7 @@ func TestStopCleanup_Multiple(t *testing.T) {
 	// start clean up
 	go actionQueue.StartCleanup()
 	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	actionQueue.StopCleanup(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -307,7 +312,7 @@ func TestStopCleanup_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

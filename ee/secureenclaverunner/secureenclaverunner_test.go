@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/secureenclaverunner/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -141,16 +143,22 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
 
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		var logBytes threadsafebuffer.ThreadSafeBuffer
+		slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+		ser, err := New(context.TODO(), slogger, inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {
 			ser.Execute()
 		}()
+		time.Sleep(3 * time.Second)
 
 		// Confirm we can call Interrupt multiple times without blocking
 		interruptComplete := make(chan struct{})
 		expectedInterrupts := 3
+		interruptStart := time.Now()
 		for i := 0; i < expectedInterrupts; i += 1 {
 			go func() {
 				ser.Interrupt(nil)
@@ -169,7 +177,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 				receivedInterrupts += 1
 				continue
 			case <-time.After(5 * time.Second):
-				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+				t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 				t.FailNow()
 			}
 		}
