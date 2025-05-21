@@ -18,6 +18,9 @@ changelog:
     - title: Tests, Docs, and Other No-op Changes
       labels:
         - "tests-docs"
+    - title: Dependency Updates
+      labels:
+        - "dependencies"
     - title: General # Non-code changes like tests, CI, documentation
       labels:
         - "*"
