@@ -63,7 +63,7 @@ func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDelete
 		secureEnclaveClient: secureEnclaveClient,
 		slogger:             slogger.With("component", "secureenclaverunner"),
 		uidPubKeyMapMux:     &sync.Mutex{},
-		interrupt:           make(chan struct{}),
+		interrupt:           make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
 		noConsoleUsersDelay: 15 * time.Second,
 	}, nil
 }
@@ -153,6 +153,9 @@ func (ser *secureEnclaveRunner) Interrupt(_ error) {
 	ser.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
+	ser.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received request to interrupt, sending interrupt to secure enclave signer execute loop",
+	)
 	ser.interrupt <- struct{}{}
 }
 
