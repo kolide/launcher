@@ -478,7 +478,11 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("TufServerURL").Return(testMetadataServer.URL)
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
-	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack.On("Slogger").Return(slogger)
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
@@ -501,6 +505,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
 	time.Sleep(300 * time.Millisecond)
+	interruptStart := time.Now()
 	autoupdater.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -524,7 +529,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

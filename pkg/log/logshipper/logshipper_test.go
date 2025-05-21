@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -140,13 +141,18 @@ func TestStop_Multiple(t *testing.T) {
 	knapsack.On("LogIngestServerURL").Return(endpoint).Times(1)
 	knapsack.On("ServerProvidedDataStore").Return(tokenStore)
 	knapsack.On("LogShippingLevel").Return("debug")
-	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	knapsack.On("Slogger").Return(slogger)
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 
 	ls := New(knapsack, log.NewNopLogger())
 
 	go ls.Run()
 	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	ls.Stop(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -170,7 +176,7 @@ func TestStop_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

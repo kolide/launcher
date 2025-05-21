@@ -2,12 +2,13 @@ package windowsupdatetable
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,10 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	slogger := multislogger.NewNopLogger()
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
 	testStore, err := storageci.NewStore(t, slogger, "test_cache_bucket")
 	require.NoError(t, err)
 	testFlags := typesmocks.NewFlags(t)
@@ -26,6 +30,8 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	// Start and then interrupt
 	go cacher.Execute()
+	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	cacher.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -49,7 +55,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}
