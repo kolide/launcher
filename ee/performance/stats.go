@@ -98,6 +98,7 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 	observability.NonGoMemoryUsageGauge.Record(ctx, int64(ps.MemInfo.NonGoMemUsage))
 	observability.MemoryPercentGauge.Record(ctx, int64(ps.MemInfo.MemPercent))
 	observability.CpuPercentGauge.Record(ctx, int64(ps.CPUPercent))
+	observability.RSSHistogram.Record(ctx, int64(ps.MemInfo.RSS))
 
 	return ps, nil
 }
