@@ -63,7 +63,7 @@ func New(_ context.Context, slogger *slog.Logger, store types.GetterSetterDelete
 		secureEnclaveClient: secureEnclaveClient,
 		slogger:             slogger.With("component", "secureenclaverunner"),
 		uidPubKeyMapMux:     &sync.Mutex{},
-		interrupt:           make(chan struct{}, 1), // provide a buffer for the channel so that Interrupt can send to it and return immediately
+		interrupt:           make(chan struct{}),
 		noConsoleUsersDelay: 15 * time.Second,
 	}, nil
 }
@@ -146,11 +146,9 @@ func (ser *secureEnclaveRunner) Execute() error {
 
 func (ser *secureEnclaveRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ser.interrupted.Load() {
+	if ser.interrupted.Swap(true) {
 		return
 	}
-
-	ser.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
 	ser.slogger.Log(context.TODO(), slog.LevelDebug,
