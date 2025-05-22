@@ -35,6 +35,8 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var results []map[string]string
 
 	for _, durationStr := range tablehelpers.GetConstraints(queryContext, "duration") {
+		// This is using an anonymous function so that the ticker.Stop can cleanly be deferred. Elsewise, we end up
+		// stacking them, and the linter complains.
 		if err := func() error {
 			duration, err := strconv.Atoi(durationStr)
 			if err != nil {
