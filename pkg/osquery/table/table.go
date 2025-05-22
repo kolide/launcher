@@ -20,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/jwt"
 	"github.com/kolide/launcher/ee/tables/launcher_db"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
+	"github.com/kolide/launcher/ee/tables/sleeper"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
 
@@ -55,6 +56,7 @@ func PlatformTables(k types.Knapsack, registrationId string, slogger *slog.Logge
 		cryptoinfotable.TablePlugin(k, slogger),
 		dev_table_tooling.TablePlugin(k, slogger),
 		firefox_preferences.TablePlugin(k, slogger),
+		sleeper.TablePlugin(k, slogger),
 		jwt.TablePlugin(k, slogger),
 		dataflattentable.TablePluginExec(k, slogger,
 			"kolide_zerotier_info", dataflattentable.JsonType, allowedcmd.ZerotierCli, []string{"info"}),
