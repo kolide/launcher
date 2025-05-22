@@ -25,12 +25,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	k.On("Slogger").Return(slogger)
-	k.On("Registrations").Return([]types.Registration{
-		{
-			RegistrationID: types.DefaultRegistrationID,
-			Munemo:         "test-munemo",
-		},
-	}, nil)
+	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
@@ -80,6 +75,14 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+
+	// Confirm all workers shut down. Checking against logs can be a little flaky in CI, so we sleep a couple seconds first
+	// just to be safe.
+	time.Sleep(3 * time.Second)
+	logs := logBytes.String()
+	require.Contains(t, logs, "runAsyncdWorkers received shutdown signal", "id fields worker did not shut down")
+	require.Contains(t, logs, "getMunemoFromKnapsack received shutdown signal", "munemo worker did not shut down")
+	require.Contains(t, logs, "callback worker shut down", "middleware callback worker did not shut down")
 
 	k.AssertExpectations(t)
 	querier.AssertExpectations(t)
