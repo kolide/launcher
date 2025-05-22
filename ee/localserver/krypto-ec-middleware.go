@@ -31,6 +31,7 @@ import (
 
 const (
 	timestampValidityRange                            = 150
+	maxCallbackQueueSize                              = 10 // we may want to increase this in the future
 	kolideKryptoEccHeader20230130Value                = "2023-01-30"
 	kolideKryptoHeaderKey                             = "X-Kolide-Krypto"
 	kolideSessionIdHeaderKey                          = "X-Kolide-Session"
@@ -200,6 +201,14 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 
 	req.Body = io.NopCloser(bytes.NewReader(b))
 
+	// Check to make sure our queue isn't filling up too rapidly -- drop oldest callback
+	if len(e.callbackQueue) >= maxCallbackQueueSize {
+		e.slogger.Log(req.Context(), slog.LevelWarn,
+			"callback queue exceeds desired max callback queue size, dropping oldest callback from queue",
+			"queue_len", len(e.callbackQueue),
+		)
+		<-e.callbackQueue
+	}
 	e.callbackQueue <- req
 }
 
