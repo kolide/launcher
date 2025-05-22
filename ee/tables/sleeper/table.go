@@ -34,23 +34,28 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	var results []map[string]string
 
 	for _, durationStr := range tablehelpers.GetConstraints(queryContext, "duration") {
-		duration, err := strconv.Atoi(durationStr)
-		if err != nil {
+		if err := func() error {
+			duration, err := strconv.Atoi(durationStr)
+			if err != nil {
+				return err
+			}
+
+			t.slogger.Log(ctx, slog.LevelWarn, "The deadly sleeper table sleeps!", "duration", duration)
+
+			ticker := time.NewTicker(time.Duration(duration) * time.Second)
+			defer ticker.Stop() // nolint:revive // we want to
+
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			results = append(results, map[string]string{"duration": durationStr})
+			return nil
+		}(); err != nil {
 			return results, err
 		}
-
-		t.slogger.Log(ctx, slog.LevelWarn, "The deadly sleeper table sleeps!", "duration", duration)
-
-		ticker := time.NewTicker(time.Duration(duration) * time.Second)
-		defer ticker.Stop()
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return results, ctx.Err()
-		}
-
-		results = append(results, map[string]string{"duration": durationStr})
 	}
 
 	return results, nil
