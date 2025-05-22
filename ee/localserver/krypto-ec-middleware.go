@@ -31,7 +31,8 @@ import (
 
 const (
 	timestampValidityRange                            = 150
-	maxCallbackQueueSize                              = 10 // we may want to increase this in the future
+	maxDesiredCallbackQueueSize                       = 10 // we may want to increase this in the future
+	callbackQueueCapacity                             = 100
 	kolideKryptoEccHeader20230130Value                = "2023-01-30"
 	kolideKryptoHeaderKey                             = "X-Kolide-Krypto"
 	kolideSessionIdHeaderKey                          = "X-Kolide-Session"
@@ -95,7 +96,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, co
 
 	// Set up our callback queue with a worker to send callbacks. The callback queue has a buffer
 	// because we never want to block on sending to the queue.
-	callbackQueue := make(chan *http.Request, 100)
+	callbackQueue := make(chan *http.Request, callbackQueueCapacity)
 	workerSlogger := slogger.With("subcomponent", "middleware_callback_worker")
 	gowrapper.Go(context.TODO(), workerSlogger, func() {
 		callbackWorker(callbackQueue, workerSlogger)
@@ -202,7 +203,7 @@ func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataS
 	req.Body = io.NopCloser(bytes.NewReader(b))
 
 	// Check to make sure our queue isn't filling up too rapidly -- drop oldest callback
-	if len(e.callbackQueue) >= maxCallbackQueueSize {
+	if len(e.callbackQueue) >= maxDesiredCallbackQueueSize {
 		e.slogger.Log(req.Context(), slog.LevelWarn,
 			"callback queue exceeds desired max callback queue size, dropping oldest callback from queue",
 			"queue_len", len(e.callbackQueue),
