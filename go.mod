@@ -3,6 +3,7 @@ module github.com/kolide/launcher
 require (
 	github.com/Masterminds/semver v1.4.2
 	github.com/Microsoft/go-winio v0.6.2
+	github.com/NozomiNetworks/go-comshim v0.0.0-20241023091934-f8db5c9d85e0
 	github.com/clbanning/mxj v1.8.4
 	github.com/go-ini/ini v1.61.0
 	github.com/go-kit/kit v0.9.0
@@ -21,7 +22,6 @@ require (
 	github.com/osquery/osquery-go v0.0.0-20250131154556-629f995b6947
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/pkg/errors v0.9.1
-	github.com/scjalliance/comshim v0.0.0-20190308082608-cf06d2532c4e
 	github.com/serenize/snaker v0.0.0-20171204205717-a683aaf2d516
 	github.com/stretchr/testify v1.10.0
 	github.com/theupdateframework/go-tuf v0.5.2
