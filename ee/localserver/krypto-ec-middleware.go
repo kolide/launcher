@@ -81,6 +81,7 @@ type kryptoEcMiddleware struct {
 	presenceDetector      presenceDetector
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
+	callbackQueue         chan *http.Request
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -90,6 +91,15 @@ type kryptoEcMiddleware struct {
 
 func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	atomicMunemo := atomic.NewString(tenantMunemo)
+
+	// Set up our callback queue with a worker to send callbacks. The callback queue has a buffer
+	// because we never want to block on sending to the queue.
+	callbackQueue := make(chan *http.Request, 100)
+	workerSlogger := slogger.With("subcomponent", "middleware_callback_worker")
+	gowrapper.Go(context.TODO(), workerSlogger, func() {
+		callbackWorker(callbackQueue, workerSlogger)
+	})
+
 	return &kryptoEcMiddleware{
 		localDbSigner:                         localDbSigner,
 		counterParty:                          counterParty,
@@ -98,6 +108,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, co
 		timestampValidityRange:                timestampValidityRange,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
+		callbackQueue:                         callbackQueue,
 	}
 }
 
@@ -118,21 +129,70 @@ type callbackDataStruct struct {
 	UserAgent string
 }
 
+// callbackWorker processes requests from the given channel one at a time;
+// this ensures that we don't have multiple callback requests firing simultaneously,
+// to avoid data races during secretless registration.
+func callbackWorker(requests <-chan *http.Request, slogger *slog.Logger) {
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	// Worker loop
+	for req := range requests {
+		// Anonymous function to avoid piling up defers
+		if err := func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
+			defer cancel()
+			ctx, span := observability.StartSpan(ctx)
+			defer span.End()
+
+			callbackStart := time.Now()
+			resp, err := client.Do(req.WithContext(ctx))
+			if err != nil {
+				err = fmt.Errorf("sending request: %w", err)
+				observability.SetError(span, err)
+				return err
+			}
+
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
+
+			slogger.Log(req.Context(), slog.LevelDebug,
+				"finished callback",
+				"response_status", resp.Status,
+				"took", time.Since(callbackStart),
+			)
+			return nil
+		}(); err != nil {
+			slogger.Log(context.TODO(), slog.LevelError,
+				"got error in callback",
+				"err", err,
+			)
+		}
+	}
+
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"callback worker shut down",
+	)
+}
+
 // sendCallback is a command to allow launcher to callback to the SaaS side with krypto responses. As the URL it inside
 // the signed data, and the response is encrypted, this is reasonably secure.
 //
 // Also, because the URL is the box, we cannot cleanly do this through middleware. It reqires a lot of passing data
 // around through context. Doing it here, as part of kryptoEcMiddleware, allows for a fairly succint defer.
 //
-// Note that because this is a network call, it should be called in a goroutine.
-func sendCallback(slogger *slog.Logger, req *http.Request, data *callbackDataStruct) {
+// Because we only want to allow one callback request through at a time, we pass the request off to the callback queue,
+// where the callback worker will pick it up.
+func (e *kryptoEcMiddleware) sendCallback(req *http.Request, data *callbackDataStruct) {
 	if req == nil {
 		return
 	}
 
 	b, err := json.Marshal(data)
 	if err != nil {
-		slogger.Log(req.Context(), slog.LevelError,
+		e.slogger.Log(req.Context(), slog.LevelError,
 			"unable to marshal callback data",
 			"err", err,
 		)
@@ -140,30 +200,7 @@ func sendCallback(slogger *slog.Logger, req *http.Request, data *callbackDataStr
 
 	req.Body = io.NopCloser(bytes.NewReader(b))
 
-	// TODO: This feels like it would be cleaner if we passed in an http client at initialzation time
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
-	defer cancel()
-
-	resp, err := client.Do(req.WithContext(ctx))
-	if err != nil {
-		slogger.Log(req.Context(), slog.LevelError,
-			"got error in callback",
-			"err", err,
-		)
-		return
-	}
-
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
-	}
-
-	slogger.Log(req.Context(), slog.LevelDebug,
-		"finished callback",
-		"response_status", resp.Status,
-	)
+	e.callbackQueue <- req
 }
 
 func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
@@ -254,9 +291,8 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 					)
 				}
 
-				gowrapper.Go(r.Context(), e.slogger, func() {
-					sendCallback(e.slogger, callbackReq, callbackData)
-				})
+				// Sending the callback passes the request off to our callback queue, so this is non-blocking.
+				e.sendCallback(callbackReq, callbackData)
 
 				gowrapper.Go(r.Context(), e.slogger, func() {
 					e.detectPresence(challengeBox)
@@ -316,6 +352,11 @@ func (e *kryptoEcMiddleware) Wrap(next http.Handler) http.Handler {
 			w.Write([]byte(base64.StdEncoding.EncodeToString(response)))
 		}
 	})
+}
+
+// Close ensures we shut down our callback worker
+func (e *kryptoEcMiddleware) Close() {
+	close(e.callbackQueue)
 }
 
 // extractChallenge finds the challenge in an http request. It prefers the GET parameter, but will fall back to POST data.
@@ -548,7 +589,7 @@ func (e *kryptoEcMiddleware) detectPresence(challengeBox *challenge.OuterChallen
 			return
 		}
 
-		sendCallback(e.slogger, req, callBackData)
+		e.sendCallback(req, callBackData)
 
 		if finalPresenceDetectionResult != nil || hasPresenceDetectionTimedout {
 			return
