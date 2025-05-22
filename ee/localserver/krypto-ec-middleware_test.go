@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
@@ -713,7 +714,7 @@ func Test_sendCallback(t *testing.T) {
 	mw := newKryptoEcMiddleware(slogger, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
 	for range callbackQueueCapacity {
 		go func() {
-			req, err := http.NewRequest(http.MethodPost, testCallbackServer.URL, nil)
+			req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, testCallbackServer.URL, nil)
 			require.NoError(t, err)
 			mw.sendCallback(req, &callbackDataStruct{})
 			requestsQueued.Add(1)
