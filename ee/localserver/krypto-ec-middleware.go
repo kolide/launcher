@@ -135,7 +135,7 @@ type callbackDataStruct struct {
 // to avoid data races during secretless registration.
 func callbackWorker(requests <-chan *http.Request, slogger *slog.Logger) {
 	client := http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 8 * time.Second,
 	}
 
 	// Worker loop
