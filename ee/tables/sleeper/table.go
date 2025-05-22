@@ -12,6 +12,7 @@ import (
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
+// sleeper.Table is a debugging table, used to test queries that take a long time to run.
 type Table struct {
 	slogger *slog.Logger
 }
@@ -43,7 +44,7 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 			t.slogger.Log(ctx, slog.LevelWarn, "The deadly sleeper table sleeps!", "duration", duration)
 
 			ticker := time.NewTicker(time.Duration(duration) * time.Second)
-			defer ticker.Stop() // nolint:revive // we want to
+			defer ticker.Stop()
 
 			select {
 			case <-ticker.C:
