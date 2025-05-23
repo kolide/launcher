@@ -5,11 +5,13 @@ package checkups
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -78,6 +80,23 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	c.status = Passing
 	c.summary = "state is running"
+
+	// all done unless we're running flare
+	if extraWriter == io.Discard {
+		return nil
+	}
+
+	launchdLogBytes, err := gatherLaunchdLogs()
+	if err != nil {
+		launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
+	}
+
+	if len(launchdLogBytes) > 0 {
+		// don't love swallowing the potential error here but we don't have a logger here
+		// and an error definitely shouldn't hold anything else up or impact the summary
+		addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes))
+	}
+
 	return nil
 }
 
@@ -95,4 +114,36 @@ func (c *launchdCheckup) Summary() string {
 
 func (c *launchdCheckup) Data() any {
 	return nil
+}
+
+func gatherLaunchdLogs() ([]byte, error) {
+	matches, err := filepath.Glob("/var/log/com.apple.xpc.launchd/launchd.log*")
+	if err != nil {
+		return nil, fmt.Errorf("globbing launchd logfiles: %w", err)
+	}
+
+	var logBuffer bytes.Buffer
+	for _, filename := range matches {
+		file, err := os.Open(filename)
+		if err != nil {
+			return nil, fmt.Errorf("opening file '%s': %w", filename, err)
+		}
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "kolide") {
+				logBuffer.WriteString(line + "\n")
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			file.Close()
+			return nil, fmt.Errorf("scanning file '%s': %w", filename, err)
+		}
+
+		file.Close()
+	}
+
+	return logBuffer.Bytes(), nil
 }
