@@ -10,11 +10,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
@@ -24,6 +26,7 @@ const (
 )
 
 type launchdCheckup struct {
+	k       types.Knapsack
 	status  Status
 	summary string
 }
@@ -91,10 +94,18 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
 	}
 
-	if len(launchdLogBytes) > 0 {
-		// don't love swallowing the potential error here but we don't have a logger here
-		// and an error definitely shouldn't hold anything else up or impact the summary
-		addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes))
+	if len(launchdLogBytes) == 0 {
+		return nil
+	}
+
+	if err := addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes)); err != nil {
+		// log the error if slogger is available but don't change summary for this
+		if c.k.Slogger() != nil {
+			c.k.Slogger().Log(context.Background(), slog.LevelDebug,
+				"adding launchd logs to zip",
+				"err", err,
+			)
+		}
 	}
 
 	return nil
