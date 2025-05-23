@@ -87,7 +87,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&Logs{k: k}, doctorSupported | flareSupported},
 		{&InitLogs{}, flareSupported},
 		{&BinaryDirectory{}, doctorSupported | flareSupported},
-		{&launchdCheckup{}, doctorSupported | flareSupported},
+		{&launchdCheckup{k: k}, doctorSupported | flareSupported},
 		{&runtimeCheckup{}, flareSupported},
 		{&enrollSecretCheckup{k: k}, doctorSupported | flareSupported},
 		{&bboltdbCheckup{k: k}, flareSupported},
