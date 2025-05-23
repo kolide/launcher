@@ -32,6 +32,12 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 		return fmt.Errorf("gathering performance stats: %w", err)
 	}
 
+	childStats, err := performance.CurrentProcessChildStats(ctx)
+	if err != nil {
+		p.status = Erroring
+		return fmt.Errorf("gathering child performance stats: %w", err)
+	}
+
 	memOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
 	cpuOver := stats.CPUPercent > cpuPercentThreshold
 	if cpuOver || memOver {
@@ -49,6 +55,7 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	)
 
 	p.data["stats"] = stats
+	p.data["child_stats"] = childStats
 
 	return nil
 }
