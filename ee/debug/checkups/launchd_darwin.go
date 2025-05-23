@@ -132,6 +132,7 @@ func gatherLaunchdLogs() ([]byte, error) {
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
+			// our logs should all contain something like 'system/com.kolide-k2.launcher'
 			if strings.Contains(line, "kolide") {
 				logBuffer.WriteString(line + "\n")
 			}
