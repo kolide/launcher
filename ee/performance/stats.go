@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
@@ -102,6 +103,11 @@ func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStat
 			continue
 		}
 		stats = append(stats, ps)
+
+		if strings.Contains(ps.Cmdline, "osquery") {
+			observability.OsqueryRssHistogram.Record(ctx, int64(ps.MemInfo.RSS))
+			observability.OsqueryCpuPercentHistogram.Record(ctx, ps.CPUPercent)
+		}
 
 		// We want to grab one more level of child processes, to account for the desktop process
 		// being invoked with sudo first on posix.
