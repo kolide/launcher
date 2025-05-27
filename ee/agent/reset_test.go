@@ -105,7 +105,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "serial changed, database wipe",
+			name:                   "serial changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          true,
 			hardwareUUIDSetInStore: true,
@@ -114,10 +114,10 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "hardware UUID changed, database wipe",
+			name:                   "hardware UUID changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
@@ -126,10 +126,10 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "munemo changed, database wipe",
+			name:                   "munemo changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
@@ -138,7 +138,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoSetInStore:       true,
 			munemoChanged:          true,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
 			name:                   "multiple values changed, database wipe",
@@ -213,7 +213,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "serial not previously stored, other data changed, database wipe",
+			name:                   "serial not previously stored, other data changed, no database wipe",
 			serialSetInStore:       false,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
@@ -222,7 +222,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 	}
 

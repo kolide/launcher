@@ -78,6 +78,8 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		hardwareUUIDChanged = valueChanged(ctx, k, slogger, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
+	// Collect munemo for logging/record-keeping purposes only -- we don't use it to determine whether
+	// we should perform a reset
 	currentTenantMunemo, err := currentMunemo(k)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelWarn, "could not get current munemo", "err", err)
@@ -85,7 +87,12 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		munemoChanged = valueChanged(ctx, k, slogger, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	if serialChanged || hardwareUUIDChanged || munemoChanged {
+	if serialChanged && hardwareUUIDChanged {
+		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
+			"serial_changed", serialChanged,
+			"hardware_uuid_changed", hardwareUUIDChanged,
+			"tenant_munemo_changed", munemoChanged,
+		)
 		// In the future, we can proceed with backing up and resetting the database.
 		// For now, we are only logging that we detected the change until we have a dependable
 		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
@@ -100,14 +107,20 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 				slogger.Log(ctx, slog.LevelError, "failed to reset database", "err", err)
 			}
 		*/
+	}
 
-		// Cache hardware and rollout data for future checks
+	// Update store for record-keeping purposes and future checks
+	if serialChanged {
 		if err := k.PersistentHostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
+	}
+	if hardwareUUIDChanged {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
+	}
+	if munemoChanged {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
