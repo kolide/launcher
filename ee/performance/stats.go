@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
@@ -41,10 +42,15 @@ type MemInfo struct {
 type PerformanceStats struct {
 	Pid        int      `json:"pid"`
 	Exe        string   `json:"exe"`
+	Cmdline    string   `json:"cmdline"`
 	MemInfo    *MemInfo `json:"mem_info"`
 	CPUPercent float64  `json:"cpu_percent"`
 }
 
+// CurrentProcessStats gets memory and CPU stats for the current process;
+// it has the side effect of recording those metrics. (Pretty much any time we
+// do the work of collecting these stats, we want to emit measurements to our
+// metrics instruments.)
 func CurrentProcessStats(ctx context.Context) (*PerformanceStats, error) {
 	pid := os.Getpid()
 	return ProcessStatsForPid(ctx, pid)
@@ -56,40 +62,15 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 		return nil, fmt.Errorf("getting process handle for pid %d: %w", pid, err)
 	}
 
-	ps := &PerformanceStats{
-		Pid:     pid,
-		MemInfo: &MemInfo{},
-	}
-
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	if exe, err := proc.ExeWithContext(ctx); err != nil {
-		return nil, fmt.Errorf("gathering exe: %w", err)
-	} else {
-		ps.Exe = exe
+	ps, memInfo, err := statsForProcess(ctx, proc)
+	if err != nil {
+		return nil, fmt.Errorf("gathering stats for process: %w", err)
 	}
 
-	if memInfo, err := proc.MemoryInfoWithContext(ctx); err != nil {
-		return nil, fmt.Errorf("gathering mem info: %w", err)
-	} else {
-		ps.MemInfo.RSS = memInfo.RSS
-		ps.MemInfo.VMS = memInfo.VMS
-		ps.MemInfo.NonGoMemUsage = nonGoMemUsage(memInfo, &memStats)
-	}
-
-	if memPercent, err := proc.MemoryPercentWithContext(ctx); err != nil {
-		return nil, fmt.Errorf("gathering mem percent: %w", err)
-	} else {
-		ps.MemInfo.MemPercent = memPercent
-	}
-
-	if cpuPercent, err := proc.CPUPercentWithContext(ctx); err != nil {
-		return nil, fmt.Errorf("gathering cpu percent: %w", err)
-	} else {
-		ps.CPUPercent = cpuPercent
-	}
-
+	ps.MemInfo.NonGoMemUsage = nonGoMemUsage(memInfo, &memStats)
 	ps.MemInfo.GoMemUsage = goMemUsage(&memStats)
 	ps.MemInfo.HeapTotal = heapTotal(&memStats)
 
@@ -101,6 +82,101 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 	observability.RSSHistogram.Record(ctx, int64(ps.MemInfo.RSS))
 
 	return ps, nil
+}
+
+// CurrentProcessChildStats gets memory and CPU stats for the current process's child processes;
+// it has the side effect of recording those metrics. (Pretty much any time we
+// do the work of collecting these stats, we want to emit measurements to our
+// metrics instruments.)
+func CurrentProcessChildStats(ctx context.Context) ([]*PerformanceStats, error) {
+	pid := os.Getpid()
+	return ChildProcessStatsForPid(ctx, int32(pid))
+}
+
+func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStats, error) {
+	proc, err := process.NewProcessWithContext(ctx, pid)
+	if err != nil {
+		return nil, fmt.Errorf("getting process handle for pid %d: %w", pid, err)
+	}
+
+	childProcesses, err := proc.ChildrenWithContext(ctx)
+	// ChildrenWithContext uses pgrep, which will exit with exit status 1 if there were no matching processes
+	// (i.e. no child processes). This is unexpected for us -- launcher should typically have child processes --
+	// but it's not necessarily an error. Only return an error if we got an actual error string back here;
+	// callers can handle an empty list of children appropriately in the case that we received exit status 1.
+	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
+		return nil, fmt.Errorf("getting child processes for pid %d: %w", pid, err)
+	}
+
+	stats := make([]*PerformanceStats, 0)
+	for _, childProcess := range childProcesses {
+		ps, _, err := statsForProcess(ctx, childProcess)
+		if err != nil {
+			continue
+		}
+		stats = append(stats, ps)
+
+		if strings.Contains(ps.Cmdline, "osquery") {
+			observability.OsqueryRssHistogram.Record(ctx, int64(ps.MemInfo.RSS))
+			observability.OsqueryCpuPercentHistogram.Record(ctx, ps.CPUPercent)
+		}
+
+		// We want to grab one more level of child processes, to account for the desktop process
+		// being invoked with sudo first on posix.
+		grandchildProcesses, err := childProcess.ChildrenWithContext(ctx)
+		if err != nil {
+			continue
+		}
+		for _, grandchildProcess := range grandchildProcesses {
+			ps, _, err := statsForProcess(ctx, grandchildProcess)
+			if err != nil {
+				continue
+			}
+			stats = append(stats, ps)
+		}
+	}
+
+	return stats, nil
+}
+
+func statsForProcess(ctx context.Context, proc *process.Process) (*PerformanceStats, *process.MemoryInfoStat, error) {
+	ps := &PerformanceStats{
+		Pid:     int(proc.Pid),
+		MemInfo: &MemInfo{},
+	}
+
+	if exe, err := proc.ExeWithContext(ctx); err != nil {
+		return nil, nil, fmt.Errorf("gathering exe: %w", err)
+	} else {
+		ps.Exe = exe
+	}
+
+	if cmdline, err := proc.CmdlineWithContext(ctx); err != nil {
+		return nil, nil, fmt.Errorf("gathering cmdline: %w", err)
+	} else {
+		ps.Cmdline = cmdline
+	}
+
+	memInfo, err := proc.MemoryInfoWithContext(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gathering mem info: %w", err)
+	}
+	ps.MemInfo.RSS = memInfo.RSS
+	ps.MemInfo.VMS = memInfo.VMS
+
+	if memPercent, err := proc.MemoryPercentWithContext(ctx); err != nil {
+		return nil, nil, fmt.Errorf("gathering mem percent: %w", err)
+	} else {
+		ps.MemInfo.MemPercent = memPercent
+	}
+
+	if cpuPercent, err := proc.CPUPercentWithContext(ctx); err != nil {
+		return nil, nil, fmt.Errorf("gathering cpu percent: %w", err)
+	} else {
+		ps.CPUPercent = cpuPercent
+	}
+
+	return ps, memInfo, nil
 }
 
 func heapTotal(ms *runtime.MemStats) uint64 {
