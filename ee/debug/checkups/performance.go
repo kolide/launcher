@@ -43,7 +43,8 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	// We don't have access to runtime stats for the child processes, so we only check against the launcher process here.
 	launcherMemOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
 
-	// We have access to CPU percent for the children, so sum those up too.
+	// We have access to CPU percent for the children, so sum those up too -- they are not accounted
+	// for in the launcher process `stats.CPUPercent` automatically.
 	totalCpu := stats.CPUPercent
 	for _, c := range childStats {
 		totalCpu += c.CPUPercent
