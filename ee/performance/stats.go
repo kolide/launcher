@@ -47,6 +47,8 @@ type PerformanceStats struct {
 	CPUPercent float64  `json:"cpu_percent"`
 }
 
+// CurrentProcessStats gets memory and CPU stats for the current process;
+// it has the side effect of recording those metrics.
 func CurrentProcessStats(ctx context.Context) (*PerformanceStats, error) {
 	pid := os.Getpid()
 	return ProcessStatsForPid(ctx, pid)
@@ -80,6 +82,8 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 	return ps, nil
 }
 
+// CurrentProcessChildStats gets memory and CPU stats for the current process's child processes;
+// it has the side effect of recording those metrics.
 func CurrentProcessChildStats(ctx context.Context) ([]*PerformanceStats, error) {
 	pid := os.Getpid()
 	return ChildProcessStatsForPid(ctx, int32(pid))
