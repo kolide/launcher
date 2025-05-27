@@ -92,7 +92,11 @@ func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStat
 	}
 
 	childProcesses, err := proc.ChildrenWithContext(ctx)
-	if err != nil {
+	// ChildrenWithContext uses pgrep, which will exit with exit status 1 if there were no matching processes
+	// (i.e. no child processes). This is unexpected for us -- launcher should typically have child processes --
+	// but it's not necessarily an error. Only return an error if we got an actual error string back here;
+	// callers can handle an empty list of children appropriately in the case that we received exit status 1.
+	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
 		return nil, fmt.Errorf("getting child processes for pid %d: %w", pid, err)
 	}
 
