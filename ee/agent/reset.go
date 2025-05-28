@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ var (
 	hostDataKeyHardwareUuid = []byte("hardware_uuid")
 	hostDataKeyMunemo       = []byte("munemo")
 	hostDataKeyResetRecords = []byte("reset_records")
+	hostDataKeyMachineGuid  = []byte("machine_guid") // used for windows only, because the hardware_uuid is not stable
 )
 
 const (
@@ -61,11 +63,13 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	serialChanged := false
 	hardwareUUIDChanged := false
 	munemoChanged := false
+	machineGuidChanged := false
 
 	defer func() {
 		slogger.Log(ctx, slog.LevelDebug, "finished check to see if database should be reset",
 			"serial", serialChanged,
 			"hardware_uuid", hardwareUUIDChanged,
+			"machine_guid", machineGuidChanged,
 			"munemo", munemoChanged,
 		)
 	}()
@@ -78,6 +82,13 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		hardwareUUIDChanged = valueChanged(ctx, k, slogger, currentHardwareUUID, hostDataKeyHardwareUuid)
 	}
 
+	currentMachineGuid, err := currentMachineGuid(ctx, k)
+	if err != nil {
+		slogger.Log(ctx, slog.LevelWarn, "could not get current machine GUID", "err", err)
+	} else {
+		munemoChanged = valueChanged(ctx, k, slogger, currentMachineGuid, hostDataKeyMachineGuid)
+	}
+
 	// Collect munemo for logging/record-keeping purposes only -- we don't use it to determine whether
 	// we should perform a reset
 	currentTenantMunemo, err := currentMunemo(k)
@@ -87,11 +98,12 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		munemoChanged = valueChanged(ctx, k, slogger, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	if serialChanged && hardwareUUIDChanged {
+	if (serialChanged && hardwareUUIDChanged) || (runtime.GOOS == "windows" && machineGuidChanged) {
 		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"tenant_munemo_changed", munemoChanged,
+			"machine_guid_changed", machineGuidChanged,
 		)
 		// In the future, we can proceed with backing up and resetting the database.
 		// For now, we are only logging that we detected the change until we have a dependable
@@ -123,6 +135,11 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	if munemoChanged {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
+		}
+	}
+	if machineGuidChanged {
+		if err := k.PersistentHostDataStore().Set(hostDataKeyMachineGuid, []byte(currentMachineGuid)); err != nil {
+			slogger.Log(ctx, slog.LevelWarn, "could not set machine GUID in host data store", "err", err)
 		}
 	}
 }
