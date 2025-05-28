@@ -99,7 +99,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 		munemoChanged = valueChanged(ctx, k, slogger, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	// note that machineGuid is only collected for windows. machineGuidChanged will only ever be true there
+	// note that machineGuid is only collected for windows. machineGuidChanged will only ever have a meaningful value for Windows
 	remediationRequired := (serialChanged && hardwareUUIDChanged) || machineGuidChanged
 	if remediationRequired {
 		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
