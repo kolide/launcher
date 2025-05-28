@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,24 @@ func TestEcho(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, tracedCmd.Path, "echo")
 	require.Contains(t, tracedCmd.Args, "hello")
+}
+
+func TestIsNixOS(t *testing.T) { // nolint:paralleltest
+	// Make sure we can call the function
+	isNixOSOriginalValue := IsNixOS()
+	require.True(t, checkedIsNixOS.Load())
+
+	// Make sure that the value does not change
+	for range 5 {
+		require.Equal(t, isNixOSOriginalValue, IsNixOS())
+		require.True(t, checkedIsNixOS.Load())
+	}
+
+	// Reset bools and check again
+	checkedIsNixOS = &atomic.Bool{}
+	isNixOS = &atomic.Bool{}
+	require.Equal(t, isNixOSOriginalValue, IsNixOS())
+	require.True(t, checkedIsNixOS.Load())
 }
 
 func Test_newCmd(t *testing.T) {
