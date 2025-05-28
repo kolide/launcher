@@ -263,7 +263,7 @@ func valueChanged(ctx context.Context, k types.Knapsack, slogger *slog.Logger, c
 		return false // assume no change
 	}
 
-	if len(storedValue) == 0 {
+	if len(storedValue) == 0 && len(currentValue) > 0 {
 		slogger.Log(ctx, slog.LevelDebug, "value not previously stored, storing now", "key", string(dataKey))
 		if err := k.PersistentHostDataStore().Set(dataKey, []byte(currentValue)); err != nil {
 			slogger.Log(ctx, slog.LevelError, "could not store value", "err", err, "key", string(dataKey))
