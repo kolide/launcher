@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"strings"
 	"time"
 
@@ -54,7 +53,9 @@ func (use UninitializedStorageError) Error() string {
 // stored data in the HostDataStore. If the hardware- or enrollment-identifying information
 // has changed, it logs the change. In the future, it will take a backup of the database, and
 // then clear all data from it.
-func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
+// returns a bool of whether remediation occurred (for now, just whether it would have occurred
+// given the detection parameters in place)
+func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -86,7 +87,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 	if err != nil {
 		slogger.Log(ctx, slog.LevelWarn, "could not get current machine GUID", "err", err)
 	} else {
-		munemoChanged = valueChanged(ctx, k, slogger, currentMachineGuid, hostDataKeyMachineGuid)
+		machineGuidChanged = valueChanged(ctx, k, slogger, currentMachineGuid, hostDataKeyMachineGuid)
 	}
 
 	// Collect munemo for logging/record-keeping purposes only -- we don't use it to determine whether
@@ -98,7 +99,9 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 		munemoChanged = valueChanged(ctx, k, slogger, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	if (serialChanged && hardwareUUIDChanged) || (runtime.GOOS == "windows" && machineGuidChanged) {
+	// note that machineGuid is only collected for windows. machineGuidChanged will only ever be true there
+	remediationRequired := (serialChanged && hardwareUUIDChanged) || machineGuidChanged
+	if remediationRequired {
 		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
@@ -112,6 +115,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 			slogger.Log(ctx, slog.LevelWarn, "resetting the database",
 				"serial_changed", serialChanged,
 				"hardware_uuid_changed", hardwareUUIDChanged,
+				"machine_guid_changed", machineGuidChanged,
 				"tenant_munemo_changed", munemoChanged,
 			)
 
@@ -142,6 +146,8 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) {
 			slogger.Log(ctx, slog.LevelWarn, "could not set machine GUID in host data store", "err", err)
 		}
 	}
+
+	return remediationRequired
 }
 
 func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, error) {
