@@ -52,11 +52,17 @@ type PerformanceStats struct {
 // do the work of collecting these stats, we want to emit measurements to our
 // metrics instruments.)
 func CurrentProcessStats(ctx context.Context) (*PerformanceStats, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	pid := os.Getpid()
 	return ProcessStatsForPid(ctx, pid)
 }
 
 func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	proc, err := process.NewProcessWithContext(ctx, int32(pid))
 	if err != nil {
 		return nil, fmt.Errorf("getting process handle for pid %d: %w", pid, err)
@@ -89,11 +95,17 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 // do the work of collecting these stats, we want to emit measurements to our
 // metrics instruments.)
 func CurrentProcessChildStats(ctx context.Context) ([]*PerformanceStats, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	pid := os.Getpid()
 	return ChildProcessStatsForPid(ctx, int32(pid))
 }
 
 func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStats, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	proc, err := process.NewProcessWithContext(ctx, pid)
 	if err != nil {
 		return nil, fmt.Errorf("getting process handle for pid %d: %w", pid, err)
@@ -140,6 +152,9 @@ func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStat
 }
 
 func statsForProcess(ctx context.Context, proc *process.Process) (*PerformanceStats, *process.MemoryInfoStat, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	ps := &PerformanceStats{
 		Pid:     int(proc.Pid),
 		MemInfo: &MemInfo{},
