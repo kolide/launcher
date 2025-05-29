@@ -18,6 +18,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/dpkg"
 	flatpak_upgradeable "github.com/kolide/launcher/ee/tables/execparsers/flatpak/remote_ls/upgradeable"
 	json "github.com/kolide/launcher/ee/tables/execparsers/json"
+	"github.com/kolide/launcher/ee/tables/execparsers/key_value"
 	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
 	pacman_group "github.com/kolide/launcher/ee/tables/execparsers/pacman/group"
 	pacman_info "github.com/kolide/launcher/ee/tables/execparsers/pacman/info"
@@ -50,7 +51,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		falconctl.NewFalconctlOptionTable(k, slogger),
 		xfconf.TablePlugin(k, slogger),
 
-		dataflattentable.TablePluginExec(k, slogger, "kolide_nmcli_wifi", dataflattentable.KeyValueType, allowedcmd.Nmcli, []string{"--mode=multiline", "--fields=all", "device", "wifi", "list"}, dataflattentable.WithKVSeparator(":")),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_nmcli_wifi", key_value.NewWithDelimiter(":"), allowedcmd.Nmcli, []string{"--mode=multiline", "--fields=all", "device", "wifi", "list"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_lsblk", json.Parser, allowedcmd.Lsblk, []string{"-fJp"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_enroll", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--enroll"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_dependency", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--dependency"}),
