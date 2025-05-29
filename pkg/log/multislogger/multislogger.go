@@ -20,6 +20,9 @@ const (
 	SpanIdKey          contextKey = "span_id"
 	TraceIdKey         contextKey = "trace_id"
 	TraceSampledKey    contextKey = "trace_sampled"
+
+	// Custom slog level for errors we want to group in our error reporting service
+	LevelReportedError slog.Level = slog.LevelError + 4
 )
 
 // ctxValueKeysToAdd is a list of context keys that will be
@@ -65,6 +68,7 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
+			Pipe(slogmulti.NewHandleInlineMiddleware(reportedErrorMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
 }
@@ -83,6 +87,22 @@ func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(cont
 			})
 		}
 	}
+
+	return next(ctx, record)
+}
+
+func reportedErrorMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	if record.Level != LevelReportedError {
+		return next(ctx, record)
+	}
+
+	// We re-level "ReportedError" errors to the Error level, and then tag them for GCP.
+	// See: https://cloud.google.com/error-reporting/docs/formatting-error-messages
+	record.Level = slog.LevelError
+	record.AddAttrs(slog.Attr{
+		Key:   "@type",
+		Value: slog.StringValue("type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
+	})
 
 	return next(ctx, record)
 }
