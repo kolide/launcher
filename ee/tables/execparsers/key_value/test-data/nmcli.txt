@@ -1,0 +1,663 @@
+﻿NAME:                                                                      AP[1]
+SSID:                                                                      JAMGUEST
+SSID-HEX:                                                              4A414D4755455354
+BSSID:                                                                    D8:50:E6:94:7A:28
+MODE:                                                                      Infra
+CHAN:                                                                      9
+FREQ:                                                                      2452 MHz
+RATE:                                                                      195 Mbit/s
+SIGNAL:                                                                  87
+BARS:                                                                      ▂▄▆█
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/4
+NAME:                                                                      AP[2]
+SSID:                                                                      JAM5G
+SSID-HEX:                                                              4A414D3547
+BSSID:                                                                    7C:10:C9:EA:99:4C
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  85
+BARS:                                                                      ▂▄▆█
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  yes
+IN-USE:                                                                  *
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/1
+NAME:                                                                      AP[3]
+SSID:                                                                      JAMGUEST-5G
+SSID-HEX:                                                              4A414D47554553542D3547
+BSSID:                                                                    D8:50:E6:94:7A:2C
+MODE:                                                                      Infra
+CHAN:                                                                      40
+FREQ:                                                                      5200 MHz
+RATE:                                                                      405 Mbit/s
+SIGNAL:                                                                  72
+BARS:                                                                      ▂▄▆_
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/3
+NAME:                                                                      AP[4]
+SSID:                                                                      JAM
+SSID-HEX:                                                              4A414D
+BSSID:                                                                    7C:10:C9:EA:99:48
+MODE:                                                                      Infra
+CHAN:                                                                      7
+FREQ:                                                                      2442 MHz
+RATE:                                                                      405 Mbit/s
+SIGNAL:                                                                  70
+BARS:                                                                      ▂▄▆_
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/2
+NAME:                                                                      AP[5]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    72:13:01:84:A7:FC
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  42
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/10
+NAME:                                                                      AP[6]
+SSID:                                                                      Ives
+SSID-HEX:                                                              49766573
+BSSID:                                                                    72:13:01:84:A7:F9
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  42
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2 WPA3
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk sae
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/11
+NAME:                                                                      AP[7]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    72:13:01:84:A7:FE
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  42
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/9
+NAME:                                                                      AP[8]
+SSID:                                                                      SONOS-AyMBDAACIjhCC/kIegM=
+SSID-HEX:                                                              534F4E4F532D41794D4244414143496A6843432F6B4965674D3D
+BSSID:                                                                    3A:42:0B:F9:08:7A
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      54 Mbit/s
+SIGNAL:                                                                  42
+BARS:                                                                      ▂▄__
+SECURITY:                                                              --
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            (none)
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/27
+NAME:                                                                      AP[9]
+SSID:                                                                      island13
+SSID-HEX:                                                              69736C616E643133
+BSSID:                                                                    FA:5E:42:F8:3E:A0
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  35
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/5
+NAME:                                                                      AP[10]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    FA:5E:42:F8:3E:A3
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  35
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/6
+NAME:                                                                      AP[11]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    5E:7D:7D:77:5D:8B
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  34
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/33
+NAME:                                                                      AP[12]
+SSID:                                                                      Bemisberry
+SSID-HEX:                                                              42656D69736265727279
+BSSID:                                                                    5E:7D:7D:77:5D:8E
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  34
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/34
+NAME:                                                                      AP[13]
+SSID:                                                                      Bemisberry family
+SSID-HEX:                                                              42656D697362657272792066616D696C79
+BSSID:                                                                    9C:C9:EB:54:A8:65
+MODE:                                                                      Infra
+CHAN:                                                                      4
+FREQ:                                                                      2427 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  34
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/15
+NAME:                                                                      AP[14]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    FA:5E:42:F8:3E:A5
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  34
+BARS:                                                                      ▂▄__
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/7
+NAME:                                                                      AP[15]
+SSID:                                                                      [range]_E30AJT7113353H
+SSID-HEX:                                                              5B72616E67655D5F453330414A543731313333353348
+BSSID:                                                                    50:FD:D5:1A:15:C2
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      135 Mbit/s
+SIGNAL:                                                                  29
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/22
+NAME:                                                                      AP[16]
+SSID:                                                                      heavymeadow
+SSID-HEX:                                                              68656176796D6561646F77
+BSSID:                                                                    54:A6:5C:9D:A5:93
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      130 Mbit/s
+SIGNAL:                                                                  27
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/42
+NAME:                                                                      AP[17]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    E8:9C:25:A0:A8:00
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  25
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 WPA3
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk sae
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/16
+NAME:                                                                      AP[18]
+SSID:                                                                      DIRECT-40-HP DeskJet 2800 series
+SSID-HEX:                                                              4449524543542D34302D4850204465736B4A6574203238303020736572696573
+BSSID:                                                                    30:13:8B:B7:28:42
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      65 Mbit/s
+SIGNAL:                                                                  25
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/39
+NAME:                                                                      AP[19]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    54:A6:5C:9D:A5:99
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      130 Mbit/s
+SIGNAL:                                                                  25
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/14
+NAME:                                                                      AP[20]
+SSID:                                                                      island13
+SSID-HEX:                                                              69736C616E643133
+BSSID:                                                                    FA:5E:42:FF:3E:A9
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  25
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/28
+NAME:                                                                      AP[21]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    5E:7D:7D:77:5D:89
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/32
+NAME:                                                                      AP[22]
+SSID:                                                                      The Batcave
+SSID-HEX:                                                              5468652042617463617665
+BSSID:                                                                    4A:BD:CE:83:E9:81
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 WPA3
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk sae
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/19
+NAME:                                                                      AP[23]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:83:E9:84
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/30
+NAME:                                                                      AP[24]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:83:E9:87
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA1
+WPA-FLAGS:                                                            pair_tkip pair_ccmp group_tkip psk
+RSN-FLAGS:                                                            (none)
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/31
+NAME:                                                                      AP[25]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:83:E9:86
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/36
+NAME:                                                                      AP[26]
+SSID:                                                                      xfinitywifi
+SSID-HEX:                                                              7866696E69747977696669
+BSSID:                                                                    FA:5E:42:FF:3E:AB
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  24
+BARS:                                                                      ▂___
+SECURITY:                                                              --
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            (none)
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/40
+NAME:                                                                      AP[27]
+SSID:                                                                      NETGEAR12
+SSID-HEX:                                                              4E4554474541523132
+BSSID:                                                                    3C:37:86:C7:B9:C3
+MODE:                                                                      Infra
+CHAN:                                                                      10
+FREQ:                                                                      2457 MHz
+RATE:                                                                      195 Mbit/s
+SIGNAL:                                                                  22
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/12
+NAME:                                                                      AP[28]
+SSID:                                                                      Ives
+SSID-HEX:                                                              49766573
+BSSID:                                                                    72:13:01:8B:A7:FA
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  22
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 WPA3
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk sae
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/8
+NAME:                                                                      AP[29]
+SSID:                                                                      Firepaw's New Domain
+SSID-HEX:                                                              466972657061772773204E657720446F6D61696E
+BSSID:                                                                    62:9C:25:A0:A8:01
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/43
+NAME:                                                                      AP[30]
+SSID:                                                                      BW-Airjet-V01-fc04
+SSID-HEX:                                                              42572D4169726A65742D5630312D66633034
+BSSID:                                                                    56:32:04:4C:FC:04
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      135 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA1 WPA2
+WPA-FLAGS:                                                            pair_tkip pair_ccmp group_tkip psk
+RSN-FLAGS:                                                            pair_tkip pair_ccmp group_tkip psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/18
+NAME:                                                                      AP[31]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:82:A5:3E
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/17
+NAME:                                                                      AP[32]
+SSID:                                                                      DeeKs
+SSID-HEX:                                                              4465654B73
+BSSID:                                                                    4A:BD:CE:82:A5:39
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 WPA3
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk sae
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/35
+NAME:                                                                      AP[33]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:82:A5:3A
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/37
+NAME:                                                                      AP[34]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    72:13:01:8B:A7:FD
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/41
+NAME:                                                                      AP[35]
+SSID:                                                                      xfinitywifi
+SSID-HEX:                                                              7866696E69747977696669
+BSSID:                                                                    72:13:01:8B:A7:FC
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  20
+BARS:                                                                      ▂___
+SECURITY:                                                              --
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            (none)
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/46
+NAME:                                                                      AP[36]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    D4:B9:2F:B0:12:A5
+MODE:                                                                      Infra
+CHAN:                                                                      1
+FREQ:                                                                      2412 MHz
+RATE:                                                                      130 Mbit/s
+SIGNAL:                                                                  19
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA1 WPA2 802.1X
+WPA-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/44
+NAME:                                                                      AP[37]
+SSID:                                                                      --
+SSID-HEX:                                                              --
+BSSID:                                                                    4A:BD:CE:82:A5:3C
+MODE:                                                                      Infra
+CHAN:                                                                      11
+FREQ:                                                                      2462 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  19
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/38
+NAME:                                                                      AP[38]
+SSID:                                                                      Xfinity Mobile
+SSID-HEX:                                                              5866696E697479204D6F62696C65
+BSSID:                                                                    FA:5E:42:FF:3E:AD
+MODE:                                                                      Infra
+CHAN:                                                                      44
+FREQ:                                                                      5220 MHz
+RATE:                                                                      540 Mbit/s
+SIGNAL:                                                                  15
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2 802.1X
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp 802.1X
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/29
+NAME:                                                                      AP[39]
+SSID:                                                                      DIRECT-A7-HP DeskJet 2800 series
+SSID-HEX:                                                              4449524543542D41372D4850204465736B4A6574203238303020736572696573
+BSSID:                                                                    6C:0B:5E:C5:61:A8
+MODE:                                                                      Infra
+CHAN:                                                                      6
+FREQ:                                                                      2437 MHz
+RATE:                                                                      65 Mbit/s
+SIGNAL:                                                                  14
+BARS:                                                                      ▂___
+SECURITY:                                                              WPA2
+WPA-FLAGS:                                                            (none)
+RSN-FLAGS:                                                            pair_ccmp group_ccmp psk
+DEVICE:                                                                  wlo1
+ACTIVE:                                                                  no
+IN-USE:                                                                    
+DBUS-PATH:                                                            /org/freedesktop/NetworkManager/AccessPoint/45
