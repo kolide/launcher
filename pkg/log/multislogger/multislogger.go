@@ -99,10 +99,19 @@ func reportedErrorMiddleware(ctx context.Context, record slog.Record, next func(
 	// We re-level "ReportedError" errors to the Error level, and then tag them for GCP.
 	// See: https://cloud.google.com/error-reporting/docs/formatting-error-messages
 	record.Level = slog.LevelError
-	record.AddAttrs(slog.Attr{
-		Key:   "@type",
-		Value: slog.StringValue("type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
-	})
+	record.AddAttrs(
+		// We must set @type so that GCP knows it's a ReportedError
+		slog.Attr{
+			Key:   "@type",
+			Value: slog.StringValue("type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
+		},
+		// GCP must have a "message", "stack_trace", or "exception" field, none of which we're guaranteed here
+		// (we report up record.Message under key "msg"). Duplicate record.Message to key "message" so the error will be recorded.
+		slog.Attr{
+			Key:   "message",
+			Value: slog.StringValue(record.Message),
+		},
+	)
 
 	return next(ctx, record)
 }
