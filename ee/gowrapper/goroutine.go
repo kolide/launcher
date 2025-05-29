@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/pkg/errors"
 )
 
@@ -21,12 +22,12 @@ func GoWithRecoveryAction(ctx context.Context, slogger *slog.Logger, goroutine f
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slogger.Log(ctx, slog.LevelError,
+				slogger.Log(ctx, multislogger.LevelReportedError,
 					"panic occurred in goroutine",
 					"err", r,
 				)
 				if err, ok := r.(error); ok {
-					slogger.Log(ctx, slog.LevelError,
+					slogger.Log(ctx, multislogger.LevelReportedError,
 						"panic stack trace",
 						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 					)
