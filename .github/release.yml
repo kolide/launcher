@@ -15,6 +15,9 @@ changelog:
     - title: Bug Fixes
       labels:
         - "bug-fixes"
+    - title: Observability
+      labels:
+        - "observability"
     - title: Tests, Docs, and Other No-op Changes
       labels:
         - "tests-docs"
