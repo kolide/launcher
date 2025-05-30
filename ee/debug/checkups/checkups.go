@@ -93,7 +93,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&bboltdbCheckup{k: k}, flareSupported},
 		{&networkCheckup{}, doctorSupported | flareSupported},
 		{&installCheckup{k: k}, flareSupported},
-		{&servicesCheckup{}, doctorSupported | flareSupported},
+		{&servicesCheckup{k: k}, doctorSupported | flareSupported},
 		{&powerCheckup{}, flareSupported},
 		{&osqueryCheckup{k: k}, doctorSupported | flareSupported},
 		{&launcherFlags{k: k}, doctorSupported | flareSupported},
