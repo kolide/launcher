@@ -18,6 +18,7 @@ var nmcliTestData string
 func TestParseKeyValue(t *testing.T) {
 	t.Parallel()
 	t.Run("simple key-value pairs", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := "key1=value1\nkey2=value2"
 		reader := strings.NewReader(input)
@@ -32,6 +33,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("with comments and empty lines", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 			# This is a comment
@@ -52,6 +54,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("custom delimiter", func(t *testing.T) {
+		t.Parallel()
 		p := NewWithDelimiter(":")
 		input := "key1:value1\nkey2: value2 "
 		reader := strings.NewReader(input)
@@ -66,6 +69,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("quoted values", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 			key1="value1"
@@ -89,6 +93,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("duplicate keys", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 		key1=value1
@@ -108,6 +113,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("nested keys", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 		section.key1=value1
@@ -131,6 +137,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("nested keys with duplicates", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 		section.key1=value1
@@ -151,6 +158,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("malformed lines", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 		key1=value1
@@ -177,6 +185,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("empty input", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := ""
 		reader := strings.NewReader(input)
@@ -186,6 +195,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("nmcli data", func(t *testing.T) {
+		t.Parallel()
 		p := NewWithDelimiter(":") // nmcli output uses ":" as delimiter)
 
 		reader := strings.NewReader(nmcliTestData)
@@ -321,6 +331,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("set delimiter method", func(t *testing.T) {
+		t.Parallel()
 		p := New() // Default is "="
 		p.SetDelimiter(":")
 		input := "key1:value1\nkey2:value2"
@@ -336,6 +347,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("set delimiter method", func(t *testing.T) {
+		t.Parallel()
 		p := New() // Default is "="
 		p.SetDelimiter(":")
 		input := "key1:value1\nkey2:value2"
@@ -351,6 +363,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("nested key conflict with existing non-map value", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `
 		parent=iamastring
@@ -369,6 +382,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("deeply nested keys", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := "a.b.c.d.e=deep_value"
 		reader := strings.NewReader(input)
@@ -390,6 +404,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("keys with spaces (if delimiter allows)", func(t *testing.T) {
+		t.Parallel()
 		p := New() // Delimiter is "="
 		input := "key with spaces = value with spaces"
 		reader := strings.NewReader(input)
@@ -403,6 +418,7 @@ func TestParseKeyValue(t *testing.T) {
 	})
 
 	t.Run("values with delimiter character", func(t *testing.T) {
+		t.Parallel()
 		p := New()
 		input := `key1=value1=with=equals
 		key2="value2=with=equals"
