@@ -1,11 +1,7 @@
-//go:build darwin || linux
-// +build darwin linux
-
 package json
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
@@ -35,7 +31,7 @@ func (p *parser) parseJson(reader io.Reader) (any, error) {
 	// We don't have valid json data, so try to convert possible utf16 data to utf8
 	rawdata, _, err = transform.Bytes(unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder(), rawdata)
 	if err != nil {
-		return nil, errors.New("invalid json. (Despite attempted transform from utf16 to utf8)")
+		return nil, fmt.Errorf("transforming invalid json from utf16 to utf8: %w", err)
 	}
 
 	// Try to unmarshal the transformed data
