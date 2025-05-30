@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/observability"
@@ -22,7 +23,6 @@ import (
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/osquery/osquery-go/plugin/table"
-	"github.com/scjalliance/comshim"
 )
 
 // QueryResults is the data returned by execing `launcher.exe query-windowsupdates`.
@@ -212,7 +212,10 @@ func (t *Table) searchLocale(ctx context.Context, locale string, queryContext ta
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	comshim.Add(1)
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return nil, fmt.Errorf("unable to init comshim: %w", err)
+	}
 	defer comshim.Done()
 
 	var results []map[string]string

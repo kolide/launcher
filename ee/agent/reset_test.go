@@ -86,6 +86,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		serialChanged          bool
 		hardwareUUIDSetInStore bool
 		hardwareUUIDChanged    bool
+		machineGUIDSetInStore  bool
+		machineGUIDChanged     bool
 		osquerySuccess         bool
 		munemoSetInStore       bool
 		munemoChanged          bool
@@ -98,6 +100,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -105,40 +109,46 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "serial changed, database wipe",
+			name:                   "serial changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          true,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "hardware UUID changed, database wipe",
+			name:                   "hardware UUID changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "munemo changed, database wipe",
+			name:                   "munemo changed, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          true,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     false,
 		},
 		{
 			name:                   "multiple values changed, database wipe",
@@ -146,6 +156,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          true,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
+			machineGUIDSetInStore:  true,
+			machineGUIDChanged:     true,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          true,
@@ -158,6 +170,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         false,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -170,6 +184,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -182,6 +198,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -194,6 +212,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: false,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -206,6 +226,8 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
 			osquerySuccess:         true,
 			munemoSetInStore:       false,
 			munemoChanged:          false,
@@ -213,11 +235,55 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "serial not previously stored, other data changed, database wipe",
+			name:                   "serial not previously stored, other data changed, no database wipe",
 			serialSetInStore:       false,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
 			hardwareUUIDChanged:    true,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     false,
+			osquerySuccess:         true,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
+			registrationsExist:     true,
+			expectDatabaseWipe:     false,
+		},
+		{
+			name:                   "machine GUID previously stored, all other data unchanged, no database wipe",
+			serialSetInStore:       true,
+			serialChanged:          false,
+			hardwareUUIDSetInStore: true,
+			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  true,
+			machineGUIDChanged:     false,
+			osquerySuccess:         true,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
+			registrationsExist:     true,
+			expectDatabaseWipe:     false,
+		},
+		{
+			name:                   "machine GUID not previously stored, all other data unchanged, no database wipe",
+			serialSetInStore:       true,
+			serialChanged:          false,
+			hardwareUUIDSetInStore: true,
+			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  false,
+			machineGUIDChanged:     true,
+			osquerySuccess:         true,
+			munemoSetInStore:       true,
+			munemoChanged:          false,
+			registrationsExist:     true,
+			expectDatabaseWipe:     false,
+		},
+		{
+			name:                   "machine GUID previously stored, then changed, expect database wipe",
+			serialSetInStore:       true,
+			serialChanged:          false,
+			hardwareUUIDSetInStore: true,
+			hardwareUUIDChanged:    false,
+			machineGUIDSetInStore:  true,
+			machineGUIDChanged:     true,
 			osquerySuccess:         true,
 			munemoSetInStore:       true,
 			munemoChanged:          false,
@@ -230,11 +296,6 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			// For now, we never expect the database to be wiped. In the future, when we
-			// decide to proceed with resetting the database, we can remove this line from
-			// the tests and they will continue to validate expected behavior.
-			tt.expectDatabaseWipe = false
 
 			slogger := multislogger.NewNopLogger()
 
@@ -270,6 +331,9 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				actualHardwareUUID = "test-hardware-uuid"
 			}
 
+			actualMachineGUID, err := currentMachineGuid(context.TODO(), mockKnapsack)
+			require.NoError(t, err, "expected to be able to read machine GUID")
+
 			if tt.serialSetInStore {
 				if tt.serialChanged {
 					require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("some-old-serial")), "could not set serial in test store")
@@ -283,6 +347,14 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 					require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte("some-old-hardware-uuid")), "could not set hardware uuid in test store")
 				} else {
 					require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte(actualHardwareUUID)), "could not set hardware uuid in test store")
+				}
+			}
+
+			if tt.machineGUIDSetInStore {
+				if tt.machineGUIDChanged {
+					require.NoError(t, testHostDataStore.Set(hostDataKeyMachineGuid, []byte("some-old-machine-guid")), "could not set machine guid in test store")
+				} else {
+					require.NoError(t, testHostDataStore.Set(hostDataKeyMachineGuid, []byte(actualMachineGUID)), "could not set machine guid in test store")
 				}
 			}
 
@@ -331,7 +403,13 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
+			remediationRequired := DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack)
+			require.Equal(t, tt.expectDatabaseWipe, remediationRequired, "expected remediation to be required when database should be wiped")
+
+			// For now, we never expect the database to be wiped. In the future, when we
+			// decide to proceed with resetting the database, we can remove this line from
+			// the tests and they will continue to validate expected behavior.
+			tt.expectDatabaseWipe = false
 
 			// Confirm backup occurred, if database got wiped
 			if tt.expectDatabaseWipe {

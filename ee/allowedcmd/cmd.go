@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/kolide/launcher/ee/observability"
 )
@@ -94,21 +95,21 @@ func allowSearchPath() bool {
 // Save results of lookup so we don't have to stat for /etc/NIXOS every time
 // we want to know.
 var (
-	checkedIsNixOS = false
-	isNixOS        = false
+	checkedIsNixOS = &atomic.Bool{}
+	isNixOS        = &atomic.Bool{}
 )
 
 func IsNixOS() bool {
-	if checkedIsNixOS {
-		return isNixOS
+	if checkedIsNixOS.Load() {
+		return isNixOS.Load()
 	}
 
 	if _, err := os.Stat("/etc/NIXOS"); err == nil {
-		isNixOS = true
+		isNixOS.Store(true)
 	}
 
-	checkedIsNixOS = true
-	return isNixOS
+	checkedIsNixOS.Store(true)
+	return isNixOS.Load()
 }
 
 func Launcher(ctx context.Context, arg ...string) (*TracedCmd, error) {

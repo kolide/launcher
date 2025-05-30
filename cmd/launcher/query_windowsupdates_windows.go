@@ -10,11 +10,11 @@ import (
 	"os"
 	"strconv"
 
+	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/windows/windowsupdate"
 	"github.com/peterbourgon/ff/v3"
-	"github.com/scjalliance/comshim"
 )
 
 // runQueryWindowsUpdates is a subcommand allowing us to call the Windows Update Agent
@@ -54,7 +54,10 @@ func runQueryWindowsUpdates(systemMultiSlogger *multislogger.MultiSlogger, args 
 }
 
 func searchLocale(locale string, tableMode int) ([]byte, string, int, error) {
-	comshim.Add(1)
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return nil, "", 0, fmt.Errorf("unable to init comshim: %w", err)
+	}
 	defer comshim.Done()
 
 	searcher, setLocale, isDefaultLocale, err := getSearcher(locale)
