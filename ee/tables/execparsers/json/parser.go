@@ -36,7 +36,7 @@ func (p *parser) parseJson(reader io.Reader) (any, error) {
 
 	// Try to unmarshal the transformed data
 	if err := json.Unmarshal(rawdata, &data); err != nil {
-		return nil, fmt.Errorf("unmarshalling json: %w", err)
+		return nil, fmt.Errorf("unmarshalling json after transforming from utf16 to utf8: %w", err)
 	}
 
 	return data, nil
