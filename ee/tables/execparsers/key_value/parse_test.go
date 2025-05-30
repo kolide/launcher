@@ -16,6 +16,7 @@ import (
 var nmcliTestData string
 
 func TestParseKeyValue(t *testing.T) {
+	t.Parallel()
 	t.Run("simple key-value pairs", func(t *testing.T) {
 		p := New()
 		input := "key1=value1\nkey2=value2"
@@ -187,7 +188,7 @@ func TestParseKeyValue(t *testing.T) {
 	t.Run("nmcli data", func(t *testing.T) {
 		p := NewWithDelimiter(":") // nmcli output uses ":" as delimiter)
 
-		reader := strings.NewReader(string(nmcliTestData))
+		reader := strings.NewReader(nmcliTestData)
 		result, err := p.Parse(reader)
 		require.NoError(t, err)
 		require.NotNil(t, result)
