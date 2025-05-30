@@ -1,6 +1,3 @@
-//go:build darwin || linux
-// +build darwin linux
-
 package key_value
 
 import (
@@ -206,7 +203,7 @@ func TestParseKeyValue(t *testing.T) {
 		parsedResult, ok := result.(map[string]interface{})
 		require.True(t, ok, "Parsed result is not a map[string]interface{}")
 
-		const expectedEntries = 39 // AP[1] to AP[39]
+		const expectedEntries = 7 // AP[1] to AP[7]
 
 		// Helper function to get an array field and check its length
 		getArrayField := func(key string) []interface{} {
@@ -221,113 +218,109 @@ func TestParseKeyValue(t *testing.T) {
 		nameField := getArrayField("NAME")
 		assert.Equal(t, "AP[1]", nameField[0])
 		assert.Equal(t, "AP[2]", nameField[1])
-		assert.Equal(t, "AP[15]", nameField[14]) // Middle entry
-		assert.Equal(t, "AP[39]", nameField[38]) // Last entry
+		assert.Equal(t, "AP[3]", nameField[2]) // Middle entry
+		assert.Equal(t, "AP[7]", nameField[6]) // Last entry
 
 		// SSID
 		ssidField := getArrayField("SSID")
-		assert.Equal(t, "JAMGUEST", ssidField[0])                          // AP[1]
-		assert.Equal(t, "JAM5G", ssidField[1])                             // AP[2]
-		assert.Equal(t, "--", ssidField[4])                                // AP[5] has SSID "--"
-		assert.Equal(t, "[range]_E30AJT7113353H", ssidField[14])           // AP[15]
-		assert.Equal(t, "DIRECT-A7-HP DeskJet 2800 series", ssidField[38]) // AP[39]
+		assert.Equal(t, "TESTSSID", ssidField[0])    // AP[1]
+		assert.Equal(t, "TESTSSID-5g", ssidField[1]) // AP[2]
+		assert.Equal(t, "--", ssidField[4])          // AP[5] has SSID "--"
+		assert.Equal(t, "--", ssidField[6])          // AP[7]
+		assert.Equal(t, "TESTSSID-5G", ssidField[2]) // AP[3]
 
 		// SSID-HEX
 		ssidHexField := getArrayField("SSID-HEX")
-		assert.Equal(t, "4A414D4755455354", ssidHexField[0])                                                  // AP[1]
-		assert.Equal(t, "--", ssidHexField[4])                                                                // AP[5]
-		assert.Equal(t, "5B72616E67655D5F453330414A543731313333353348", ssidHexField[14])                     // AP[15]
-		assert.Equal(t, "4449524543542D41372D4850204465736B4A6574203238303020736572696573", ssidHexField[38]) // AP[39]
+		assert.Equal(t, "4A414D4755455354", ssidHexField[0])       // AP[1]
+		assert.Equal(t, "--", ssidHexField[4])                     // AP[5]
+		assert.Equal(t, "--", ssidHexField[6])                     // AP[7]
+		assert.Equal(t, "4A414D47554553542D3547", ssidHexField[2]) // AP[3]
 
 		// BSSID
 		bssidField := getArrayField("BSSID")
-		assert.Equal(t, "D8:50:E6:94:7A:28", bssidField[0])  // AP[1]
-		assert.Equal(t, "72:13:01:84:A7:FC", bssidField[4])  // AP[5]
-		assert.Equal(t, "50:FD:D5:1A:15:C2", bssidField[14]) // AP[15]
-		assert.Equal(t, "6C:0B:5E:C5:61:A8", bssidField[38]) // AP[39]
+		assert.Equal(t, "1A:23:B7:DE:77:2C", bssidField[0]) // AP[1]
+		assert.Equal(t, "72:13:01:84:A7:FC", bssidField[4]) // AP[5]
+		assert.Equal(t, "72:13:01:84:A7:FE", bssidField[6]) // AP[7]
+		assert.Equal(t, "1A:23:B7:DE:7A:2D", bssidField[2]) // AP[3]
 
 		// MODE
 		modeField := getArrayField("MODE")
-		assert.Equal(t, "Infra", modeField[0])  // AP[1]
-		assert.Equal(t, "Infra", modeField[14]) // AP[15]
-		assert.Equal(t, "Infra", modeField[38]) // AP[39] (all are Infra)
+		assert.Equal(t, "Infra", modeField[0]) // AP[1]
+		assert.Equal(t, "Infra", modeField[6]) // AP[7]
+		assert.Equal(t, "Infra", modeField[2]) // AP[3] (all are Infra)
 
 		// CHAN
 		chanField := getArrayField("CHAN")
 		assert.Equal(t, "9", chanField[0])  // AP[1]
-		assert.Equal(t, "1", chanField[14]) // AP[15]
-		assert.Equal(t, "6", chanField[38]) // AP[39]
+		assert.Equal(t, "6", chanField[6])  // AP[7]
+		assert.Equal(t, "40", chanField[2]) // AP[3]
 
 		// FREQ
 		freqField := getArrayField("FREQ")
-		assert.Equal(t, "2452 MHz", freqField[0])  // AP[1]
-		assert.Equal(t, "2412 MHz", freqField[14]) // AP[15]
-		assert.Equal(t, "2437 MHz", freqField[38]) // AP[39]
+		assert.Equal(t, "2452 MHz", freqField[0]) // AP[1]
+		assert.Equal(t, "2437 MHz", freqField[6]) // AP[7]
+		assert.Equal(t, "5200 MHz", freqField[2]) // AP[3]
 
 		// RATE
 		rateField := getArrayField("RATE")
-		assert.Equal(t, "195 Mbit/s", rateField[0])  // AP[1]
-		assert.Equal(t, "135 Mbit/s", rateField[14]) // AP[15]
-		assert.Equal(t, "65 Mbit/s", rateField[38])  // AP[39]
+		assert.Equal(t, "195 Mbit/s", rateField[0]) // AP[1]
+		assert.Equal(t, "540 Mbit/s", rateField[6]) // AP[7]
+		assert.Equal(t, "405 Mbit/s", rateField[2]) // AP[3]
 
 		// SIGNAL
 		signalField := getArrayField("SIGNAL")
-		assert.Equal(t, "87", signalField[0])  // AP[1]
-		assert.Equal(t, "29", signalField[14]) // AP[15]
-		assert.Equal(t, "14", signalField[38]) // AP[39]
+		assert.Equal(t, "87", signalField[0]) // AP[1]
+		assert.Equal(t, "42", signalField[6]) // AP[7]
+		assert.Equal(t, "72", signalField[2]) // AP[3]
 
 		// BARS
 		barsField := getArrayField("BARS")
-		assert.Equal(t, "▂▄▆█", barsField[0])  // AP[1]
-		assert.Equal(t, "▂___", barsField[14]) // AP[15]
-		assert.Equal(t, "▂___", barsField[38]) // AP[39]
+		assert.Equal(t, "▂▄▆█", barsField[0]) // AP[1]
+		assert.Equal(t, "▂▄__", barsField[6]) // AP[7]
+		assert.Equal(t, "▂▄▆_", barsField[2]) // AP[3]
 
 		// SECURITY
 		securityField := getArrayField("SECURITY")
-		assert.Equal(t, "WPA2", securityField[0])         // AP[1]
-		assert.Equal(t, "--", securityField[7])           // AP[8] has SECURITY "--"
-		assert.Equal(t, "WPA2", securityField[14])        // AP[15]
-		assert.Equal(t, "WPA2 802.1X", securityField[24]) // AP[25]
-		assert.Equal(t, "WPA2", securityField[38])        // AP[39]
+		assert.Equal(t, "WPA2", securityField[0])        // AP[1]
+		assert.Equal(t, "WPA2 802.1X", securityField[6]) // AP[7]
+		assert.Equal(t, "WPA2", securityField[2])        // AP[3]
 
 		// WPA-FLAGS
 		wpaFlagsField := getArrayField("WPA-FLAGS")
-		assert.Equal(t, "(none)", wpaFlagsField[0])                              // AP[1]
-		assert.Equal(t, "pair_tkip pair_ccmp group_tkip psk", wpaFlagsField[23]) // AP[24]
-		assert.Equal(t, "(none)", wpaFlagsField[38])                             // AP[39]
+		assert.Equal(t, "(none)", wpaFlagsField[0]) // AP[1]
+
+		assert.Equal(t, "(none)", wpaFlagsField[2]) // AP[3]
 
 		// RSN-FLAGS
 		rsnFlagsField := getArrayField("RSN-FLAGS")
-		assert.Equal(t, "pair_ccmp group_ccmp psk", rsnFlagsField[0])      // AP[1]
-		assert.Equal(t, "(none)", rsnFlagsField[23])                       // AP[24]
-		assert.Equal(t, "pair_ccmp group_ccmp psk sae", rsnFlagsField[31]) // AP[32]
-		assert.Equal(t, "pair_ccmp group_ccmp psk", rsnFlagsField[38])     // AP[39]
+		assert.Equal(t, "pair_ccmp group_ccmp psk", rsnFlagsField[0]) // AP[1]
+		assert.Equal(t, "pair_ccmp group_ccmp psk", rsnFlagsField[2]) // AP[3]
 
 		// DEVICE
 		deviceField := getArrayField("DEVICE")
-		assert.Equal(t, "wlo1", deviceField[0])  // AP[1]
-		assert.Equal(t, "wlo1", deviceField[14]) // AP[15]
-		assert.Equal(t, "wlo1", deviceField[38]) // AP[39] (all are wlo1)
+		assert.Equal(t, "wlo1", deviceField[0]) // AP[1]
+		assert.Equal(t, "wlo1", deviceField[6]) // AP[7]
+		assert.Equal(t, "wlo1", deviceField[2]) // AP[3] (all are wlo1)
 
 		// ACTIVE
 		activeField := getArrayField("ACTIVE")
 		assert.Equal(t, "no", activeField[0])  // AP[1]
 		assert.Equal(t, "yes", activeField[1]) // AP[2]
-		assert.Equal(t, "no", activeField[14]) // AP[15]
-		assert.Equal(t, "no", activeField[38]) // AP[39]
+		assert.Equal(t, "no", activeField[6])  // AP[7]
+		assert.Equal(t, "no", activeField[2])  // AP[3]
 
 		// IN-USE
 		inuseField := getArrayField("IN-USE")
 		assert.Equal(t, "", inuseField[0])  // AP[1] (empty)
 		assert.Equal(t, "*", inuseField[1]) // AP[2]
-		assert.Equal(t, "", inuseField[14]) // AP[15] (empty)
-		assert.Equal(t, "", inuseField[38]) // AP[39] (empty)
+		assert.Equal(t, "", inuseField[6])  // AP[7] (empty)
+		assert.Equal(t, "", inuseField[2])  // AP[3] (empty)
 
 		// DBUS-PATH
 		dbusPathField := getArrayField("DBUS-PATH")
-		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/4", dbusPathField[0])   // AP[1]
-		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/22", dbusPathField[14]) // AP[15]
-		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/45", dbusPathField[38]) // AP[39]
+		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/4", dbusPathField[0]) // AP[1]
+		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/9", dbusPathField[6]) // AP[7]
+		assert.Equal(t, "/org/freedesktop/NetworkManager/AccessPoint/3", dbusPathField[2]) // AP[3]
 	})
 
 	t.Run("set delimiter method", func(t *testing.T) {

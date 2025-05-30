@@ -1,6 +1,3 @@
-//go:build darwin || linux
-// +build darwin linux
-
 package key_value
 
 import (
@@ -26,6 +23,10 @@ func (p *parser) parseKeyValue(reader io.Reader) (any, error) {
 	// When encoded in UTF-8, it becomes the byte sequence EF BB BF.
 	// In a Go string, "\uFEFF" represents this character.
 	content = strings.TrimPrefix(content, "\uFEFF")
+
+	// Normalize line endings: replace \r\n with \n, then \r with \n
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
 
 	// Split into lines
 	lines := strings.Split(content, "\n")
