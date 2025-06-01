@@ -150,3 +150,7 @@ func Zfs(ctx context.Context, arg ...string) (*TracedCmd, error) {
 func Zpool(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
 }
+
+func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(context.Background(), "/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli", arg...)
+}
