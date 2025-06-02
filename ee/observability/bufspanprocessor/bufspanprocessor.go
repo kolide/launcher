@@ -75,6 +75,11 @@ func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
 	b.bufMu.Lock()
 	defer b.bufMu.Unlock()
 
+	b.slogger.Log(context.TODO(), slog.LevelDebug,
+		"forwarded all buffered spans to child processor",
+		"buffer_length", len(b.bufferedSpans),
+	)
+
 	// now that the spans are sent, clear the buffer
 	b.bufferedSpans = nil
 }
