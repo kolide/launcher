@@ -10,15 +10,16 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/launcher"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-const kolideSvcName = "LauncherKolideK2Svc"
-
 type servicesCheckup struct {
+	k                         types.Knapsack
 	data                      map[string]any
 	serviceState              svc.State
 	serviceStateHumanReadable string
@@ -39,6 +40,11 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 	s.data = make(map[string]any)
 
 	// Fetch information about Kolide service
+	identifier := launcher.DefaultLauncherIdentifier
+	if s.k.Identifier() != "" {
+		identifier = s.k.Identifier()
+	}
+	kolideSvcName := launcher.ServiceName(identifier)
 	serviceHandle, err := serviceManager.OpenService(kolideSvcName)
 	if err != nil {
 		return fmt.Errorf("opening service: %w", err)
@@ -98,11 +104,11 @@ func (s *servicesCheckup) Run(ctx context.Context, extraWriter io.Writer) error 
 		return fmt.Errorf("gathering service list: %w", err)
 	}
 
-	if err := gatherServiceManagerEventLogs(ctx, extraZip); err != nil {
+	if err := gatherServiceManagerEventLogs(ctx, extraZip, kolideSvcName); err != nil {
 		return fmt.Errorf("gathering service manager event logs: %w", err)
 	}
 
-	if err := gatherServiceManagerEvents(ctx, extraZip); err != nil {
+	if err := gatherServiceManagerEvents(ctx, extraZip, kolideSvcName); err != nil {
 		return fmt.Errorf("gathering service manager events: %w", err)
 	}
 
@@ -233,7 +239,7 @@ func gatherServices(z *zip.Writer, serviceManager *mgr.Mgr) error {
 }
 
 // gatherServiceManagerEvents uses Get-WinEvent to fetch the service manager logs. This might be newer than Get-EventLog
-func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
+func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer, kolideSvcName string) error {
 	out, err := z.Create("eventlog-Get-WinEvent.json")
 	if err != nil {
 		return fmt.Errorf("creating eventlog-Get-WinEvent.json: %w", err)
@@ -264,7 +270,7 @@ func gatherServiceManagerEvents(ctx context.Context, z *zip.Writer) error {
 }
 
 // gatherServiceManagerEventLogs uses Get-EventLog to getch service manager logs. This might be a legacy path
-func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer) error {
+func gatherServiceManagerEventLogs(ctx context.Context, z *zip.Writer, kolideSvcName string) error {
 	eventLogOut, err := z.Create("eventlog-Get-EventLog.txt")
 	if err != nil {
 		return fmt.Errorf("creating eventlog-Get-EventLog.txt: %w", err)
