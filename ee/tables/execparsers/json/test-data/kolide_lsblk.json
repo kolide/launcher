@@ -1,0 +1,240 @@
+{
+   "blockdevices": [
+      {
+         "name": "/dev/sda",
+         "fstype": null,
+         "fsver": null,
+         "label": null,
+         "uuid": null,
+         "fsavail": null,
+         "fsuse%": null,
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "/dev/sda1",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sda2",
+               "fstype": "vfat",
+               "fsver": "FAT16",
+               "label": "EFI",
+               "uuid": "9897-112B",
+               "fsavail": "17M",
+               "fsuse%": "15%",
+               "mountpoints": [
+                   "/boot/efi"
+               ]
+            },{
+               "name": "/dev/sda3",
+               "fstype": "xfs",
+               "fsver": null,
+               "label": "ROOT",
+               "uuid": "e79633fa-bfea-4834-9386-5ba31335dbbc",
+               "fsavail": "2.5G",
+               "fsuse%": "75%",
+               "mountpoints": [
+                   "/"
+               ]
+            }
+         ]
+      },{
+         "name": "/dev/sdb",
+         "fstype": null,
+         "fsver": null,
+         "label": null,
+         "uuid": null,
+         "fsavail": null,
+         "fsuse%": null,
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "/dev/sdb1",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdb2",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdb3",
+               "fstype": "crypto_LUKS",
+               "fsver": "1",
+               "label": null,
+               "uuid": "11766e3a-87ba-40bc-8327-48baf4d618d2",
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            }
+         ]
+      },{
+         "name": "/dev/sdc",
+         "fstype": null,
+         "fsver": null,
+         "label": null,
+         "uuid": null,
+         "fsavail": null,
+         "fsuse%": null,
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "/dev/sdc1",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdc2",
+               "fstype": "LVM2_member",
+               "fsver": "LVM2 001",
+               "label": null,
+               "uuid": "7eNvjY-pW0X-vwzp-vtWz-9Dam-Hqmx-51IpWT",
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ],
+               "children": [
+                  {
+                     "name": "/dev/mapper/LvmEncrypt-lvmcryptroot",
+                     "fstype": "crypto_LUKS",
+                     "fsver": "1",
+                     "label": null,
+                     "uuid": "81ab83e7-2ed2-4b6b-a77f-8e2e86488aba",
+                     "fsavail": null,
+                     "fsuse%": null,
+                     "mountpoints": [
+                         null
+                     ]
+                  },{
+                     "name": "/dev/mapper/LvmEncrypt-lvmcryptswap",
+                     "fstype": null,
+                     "fsver": null,
+                     "label": null,
+                     "uuid": null,
+                     "fsavail": null,
+                     "fsuse%": null,
+                     "mountpoints": [
+                         null
+                     ]
+                  },{
+                     "name": "/dev/mapper/LvmEncrypt-lvmcrypttmp",
+                     "fstype": null,
+                     "fsver": null,
+                     "label": null,
+                     "uuid": null,
+                     "fsavail": null,
+                     "fsuse%": null,
+                     "mountpoints": [
+                         null
+                     ]
+                  },{
+                     "name": "/dev/mapper/LvmEncrypt-lvmcrypthome",
+                     "fstype": "ext4",
+                     "fsver": "1.0",
+                     "label": null,
+                     "uuid": "d240f932-3706-41b6-8590-81b629947774",
+                     "fsavail": null,
+                     "fsuse%": null,
+                     "mountpoints": [
+                         null
+                     ]
+                  }
+               ]
+            }
+         ]
+      },{
+         "name": "/dev/sdd",
+         "fstype": null,
+         "fsver": null,
+         "label": null,
+         "uuid": null,
+         "fsavail": null,
+         "fsuse%": null,
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "/dev/sdd1",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdd2",
+               "fstype": null,
+               "fsver": null,
+               "label": null,
+               "uuid": null,
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdd3",
+               "fstype": "crypto_LUKS",
+               "fsver": "1",
+               "label": null,
+               "uuid": "7288f39c-e674-4685-864a-6a56d799bb92",
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "/dev/sdd4",
+               "fstype": "crypto_LUKS",
+               "fsver": "1",
+               "label": null,
+               "uuid": "89b90ec8-8518-4b1c-9e0a-e0f91d075af3",
+               "fsavail": null,
+               "fsuse%": null,
+               "mountpoints": [
+                   null
+               ]
+            }
+         ]
+      }
+   ]
+}
