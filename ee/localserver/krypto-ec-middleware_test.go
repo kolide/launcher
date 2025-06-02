@@ -753,7 +753,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	// Set up a test server to receive callback requests and return enrollment info
 	requestsReceived := &atomic.Int64{}
 	expectedNodeKey := "test-node-key"
-	expectedNodeKeyKey := storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID))
+	expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID))
 	expectedMunemo := "test-munemo"
 	resp := callbackResponse{
 		NodeKey: expectedNodeKey,

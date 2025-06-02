@@ -205,7 +205,7 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			}
 
 			// Until we tackle multitenancy, store the key under the default registration ID
-			if err := e.nodeKeyStore.Set(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(r.NodeKey)); err != nil {
+			if err := e.nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(r.NodeKey)); err != nil {
 				return fmt.Errorf("setting nodekey in store: %w", err)
 			}
 
