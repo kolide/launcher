@@ -165,6 +165,20 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     true,
 		},
 		{
+			name:                   "hardware and serial changed, database wipe on non-Windows only",
+			serialSetInStore:       true,
+			serialChanged:          true,
+			hardwareUUIDSetInStore: true,
+			hardwareUUIDChanged:    true,
+			machineGUIDSetInStore:  true,
+			machineGUIDChanged:     false,
+			osquerySuccess:         true,
+			munemoSetInStore:       true,
+			munemoChanged:          true,
+			registrationsExist:     true,
+			expectDatabaseWipe:     runtime.GOOS != "windows",
+		},
+		{
 			name:                   "osquery failed and secret unchanged, no database wipe",
 			serialSetInStore:       true,
 			serialChanged:          false,
@@ -277,7 +291,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			expectDatabaseWipe:     false,
 		},
 		{
-			name:                   "machine GUID previously stored, then changed, expect database wipe",
+			name:                   "machine GUID previously stored, then changed, expect database wipe on Windows only",
 			serialSetInStore:       true,
 			serialChanged:          false,
 			hardwareUUIDSetInStore: true,
@@ -288,7 +302,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			munemoSetInStore:       true,
 			munemoChanged:          false,
 			registrationsExist:     true,
-			expectDatabaseWipe:     true,
+			expectDatabaseWipe:     runtime.GOOS == "windows",
 		},
 	}
 
