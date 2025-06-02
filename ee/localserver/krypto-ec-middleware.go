@@ -21,6 +21,8 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/storage"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
@@ -43,6 +45,10 @@ const (
 	kolideOsHeaderKey                                 = "X-Kolide-Os"
 	kolideArchHeaderKey                               = "X-Kolide-Arch"
 	kolideMunemoHeaderKey                             = "X-Kolide-Munemo"
+)
+
+var (
+	nodeKeyKey = []byte("nodeKey")
 )
 
 type v2CmdRequestType struct {
@@ -84,6 +90,7 @@ type kryptoEcMiddleware struct {
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
+	nodeKeyStore          types.Setter
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -91,27 +98,30 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	atomicMunemo := atomic.NewString(tenantMunemo)
 
 	// Set up our callback queue with a worker to send callbacks. The callback queue has a buffer
 	// because we never want to block on sending to the queue.
 	callbackQueue := make(chan *http.Request, callbackQueueCapacity)
-	workerSlogger := slogger.With("subcomponent", "middleware_callback_worker")
-	gowrapper.Go(context.TODO(), workerSlogger, func() {
-		callbackWorker(callbackQueue, workerSlogger)
-	})
 
-	return &kryptoEcMiddleware{
+	k := &kryptoEcMiddleware{
 		localDbSigner:                         localDbSigner,
 		counterParty:                          counterParty,
-		slogger:                               slogger.With("keytype", "ec"),
+		slogger:                               slogger.With("component", "krypto_middleware", "keytype", "ec"),
 		presenceDetector:                      presenceDetector,
 		timestampValidityRange:                timestampValidityRange,
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
+		nodeKeyStore:                          nodeKeyStore,
 	}
+
+	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
+		k.callbackWorker()
+	})
+
+	return k
 }
 
 // Because callback errors are effectively a shared API with K2, let's define them as a constant and not just
@@ -124,23 +134,30 @@ const (
 	originDisallowedErr callbackErrors = "origin-disallowed"
 )
 
-type callbackDataStruct struct {
-	Time      int64
-	Error     callbackErrors
-	Response  string // expected base64 encoded krypto box
-	UserAgent string
-}
+type (
+	callbackDataStruct struct {
+		Time      int64
+		Error     callbackErrors
+		Response  string // expected base64 encoded krypto box
+		UserAgent string
+	}
+
+	callbackResponse struct {
+		NodeKey string `json:"node_key"`
+		Munemo  string `json:"munemo"`
+	}
+)
 
 // callbackWorker processes requests from the given channel one at a time;
 // this ensures that we don't have multiple callback requests firing simultaneously,
 // to avoid data races during secretless registration.
-func callbackWorker(requests <-chan *http.Request, slogger *slog.Logger) {
+func (e *kryptoEcMiddleware) callbackWorker() {
 	client := http.Client{
 		Timeout: 8 * time.Second,
 	}
 
 	// Worker loop
-	for req := range requests {
+	for req := range e.callbackQueue {
 		// Anonymous function to avoid piling up defers
 		if err := func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), client.Timeout)
@@ -156,25 +173,52 @@ func callbackWorker(requests <-chan *http.Request, slogger *slog.Logger) {
 				return err
 			}
 
-			if resp != nil && resp.Body != nil {
-				resp.Body.Close()
-			}
-
-			slogger.Log(req.Context(), slog.LevelDebug,
-				"finished callback",
+			defer resp.Body.Close()
+			e.slogger.Log(req.Context(), slog.LevelDebug,
+				"sent callback",
 				"response_status", resp.Status,
 				"took", time.Since(callbackStart),
 			)
+
+			respBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("could not read callback response body: %w", err)
+			}
+
+			// Nothing to do here -- likely already enrolled
+			if len(respBytes) == 0 {
+				return nil
+			}
+
+			var r callbackResponse
+			if err := json.Unmarshal(respBytes, &r); err != nil {
+				return fmt.Errorf("unmarshalling callback response: %w", err)
+			}
+
+			// Nothing to do here -- likely already enrolled
+			if r.NodeKey == "" {
+				return nil
+			}
+
+			if r.Munemo != "" {
+				e.tenantMunemo.Store(r.Munemo)
+			}
+
+			// Until we tackle multitenancy, store the key under the default registration ID
+			if err := e.nodeKeyStore.Set(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(r.NodeKey)); err != nil {
+				return fmt.Errorf("setting nodekey in store: %w", err)
+			}
+
 			return nil
 		}(); err != nil {
-			slogger.Log(context.TODO(), slog.LevelError,
+			e.slogger.Log(context.TODO(), slog.LevelError,
 				"got error in callback",
 				"err", err,
 			)
 		}
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
 		"callback worker shut down",
 	)
 }

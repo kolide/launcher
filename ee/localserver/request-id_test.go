@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +37,10 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	mockKnapsack.On("Slogger").Return(slogger)
+
+	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+	require.NoError(t, err)
+	mockKnapsack.On("ConfigStore").Return(testConfigStore)
 
 	server := testServer(t, mockKnapsack)
 
