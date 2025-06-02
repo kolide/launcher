@@ -288,7 +288,7 @@ func TestPing(t *testing.T) {
 
 	traceExporter := &TelemetryExporter{
 		knapsack:                  mockKnapsack,
-		bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+		bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 		slogger:                   multislogger.NewNopLogger(),
 		attrs:                     make([]attribute.KeyValue, 0),
 		attrLock:                  sync.RWMutex{},
@@ -373,7 +373,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
-				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -445,7 +445,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
-				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -515,7 +515,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
-				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -590,7 +590,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
-				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
@@ -664,7 +664,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
-				bufSpanProcessor:          &bufspanprocessor.BufSpanProcessor{},
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
 				slogger:                   multislogger.NewNopLogger(),
 				attrs:                     make([]attribute.KeyValue, 0),
 				attrLock:                  sync.RWMutex{},
