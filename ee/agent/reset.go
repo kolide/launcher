@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 	"time"
 
@@ -99,8 +100,13 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 		munemoChanged = valueChanged(ctx, k, slogger, currentTenantMunemo, hostDataKeyMunemo)
 	}
 
-	// note that machineGuid is only collected for windows. machineGuidChanged will only ever have a meaningful value for Windows
-	remediationRequired := (serialChanged && hardwareUUIDChanged) || machineGuidChanged
+	remediationRequired := serialChanged && hardwareUUIDChanged
+	if runtime.GOOS == "windows" {
+		// note that machineGuid is only collected for windows; machineGuidChanged will only ever have a meaningful value for Windows.
+		// serialChanged and hardwareUUIDChanged are NOT meaningful on Windows -- we see a lot of flapping there that does not indicate
+		// actual hardware changes.
+		remediationRequired = machineGuidChanged
+	}
 	if remediationRequired {
 		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
 			"serial_changed", serialChanged,
