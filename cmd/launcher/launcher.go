@@ -278,6 +278,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// will also be shipped.
 	runGroup.SetSlogger(k.Slogger())
 
+	// Set slogger on initial trace buffer (in order to troubleshoot unexpected nil spans)
+	initialTraceBuffer.SetSlogger(k.Slogger())
+
 	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)

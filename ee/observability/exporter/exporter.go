@@ -89,9 +89,8 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 		t.bufSpanProcessor = initialTraceBuffer.bufSpanProcessor
 		t.attrs = initialTraceBuffer.attrs
 	} else {
-		t.bufSpanProcessor = &bufspanprocessor.BufSpanProcessor{
-			MaxBufferedSpans: 500,
-		}
+		t.bufSpanProcessor = bufspanprocessor.NewBufSpanProcessor(500)
+		t.bufSpanProcessor.SetSlogger(k.Slogger())
 		t.attrs = initialAttrs()
 	}
 

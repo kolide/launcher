@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"log/slog"
 	"runtime"
 
 	"github.com/kolide/kit/version"
@@ -31,9 +32,7 @@ func NewInitialTraceBuffer() *InitialTraceBuffer {
 		r = resource.Default()
 	}
 
-	bufferedSpanProcessor := &bufspanprocessor.BufSpanProcessor{
-		MaxBufferedSpans: 500,
-	}
+	bufferedSpanProcessor := bufspanprocessor.NewBufSpanProcessor(500)
 
 	newProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(bufferedSpanProcessor),
@@ -49,6 +48,10 @@ func NewInitialTraceBuffer() *InitialTraceBuffer {
 		bufSpanProcessor: bufferedSpanProcessor,
 		attrs:            attrs,
 	}
+}
+
+func (i *InitialTraceBuffer) SetSlogger(slogger *slog.Logger) {
+	i.bufSpanProcessor.SetSlogger(slogger)
 }
 
 func initialAttrs() []attribute.KeyValue {
