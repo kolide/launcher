@@ -56,5 +56,5 @@ func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
 }
 
 func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(context.Background(), filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"), arg...)
+	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"), arg...)
 }
