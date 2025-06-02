@@ -9,10 +9,13 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type BinaryDirectory struct {
+	k       types.Knapsack
 	status  Status
 	summary string
 }
@@ -22,7 +25,7 @@ func (c *BinaryDirectory) Name() string {
 }
 
 func (c *BinaryDirectory) Run(_ context.Context, extraFH io.Writer) error {
-	bindir := getBinDir()
+	bindir := c.getBinDir()
 	if bindir == "" {
 		return errors.New("no default bin directory")
 	}
@@ -66,17 +69,22 @@ func (c *BinaryDirectory) Data() any {
 
 // getBinDir returns the platform default binary directory. It should probably get folded into flags, but I'm not
 // quite sure how yet.
-func getBinDir() string {
+func (c *BinaryDirectory) getBinDir() string {
+	identifier := launcher.DefaultLauncherIdentifier
+	if c.k.Identifier() != "" {
+		identifier = c.k.Identifier()
+	}
+
 	switch runtime.GOOS {
 	case "darwin":
-		return "/usr/local/kolide-k2"
+		return fmt.Sprintf("/usr/local/%s", identifier)
 	case "linux":
 		if allowedcmd.IsNixOS() {
 			return getBinDirOnNixOS()
 		}
-		return "/usr/local/kolide-k2"
+		return fmt.Sprintf("/usr/local/%s", identifier)
 	case "windows":
-		return "C:\\Program Files\\Kolide\\Launcher-kolide-k2\\bin"
+		return fmt.Sprintf("C:\\Program Files\\Kolide\\Launcher-%s\\bin", identifier)
 	}
 
 	return ""
