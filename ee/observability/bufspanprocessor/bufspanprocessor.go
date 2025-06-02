@@ -58,6 +58,8 @@ func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
 	b.childProcessor = p
 
 	// send the spans that were buffered before the processor was set
+	b.bufMu.Lock()
+	defer b.bufMu.Unlock()
 	for i, span := range b.bufferedSpans {
 		// We've seen a panic in b.childProcessor.OnEnd(span), where it ultimately calls
 		// span.SpanContext().IsSampled() inside enqueueDrop. It's not really clear exactly
@@ -71,9 +73,6 @@ func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
 		}
 		b.childProcessor.OnEnd(span)
 	}
-
-	b.bufMu.Lock()
-	defer b.bufMu.Unlock()
 
 	b.slogger.Log(context.TODO(), slog.LevelDebug,
 		"forwarded all buffered spans to child processor",
