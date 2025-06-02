@@ -47,7 +47,12 @@ func (b *BufSpanProcessor) SetSlogger(slogger *slog.Logger) {
 // If a processor was already set, it will be shutdown.
 func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
 	if b.childProcessor != nil {
-		b.childProcessor.Shutdown(context.Background())
+		if err := b.childProcessor.Shutdown(context.Background()); err != nil {
+			b.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not shut down previous child processor before setting new one",
+				"err", err,
+			)
+		}
 	}
 
 	b.childProcessor = p
@@ -96,6 +101,12 @@ func (b *BufSpanProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	defer b.bufMu.Unlock()
 
 	if len(b.bufferedSpans) >= b.MaxBufferedSpans {
+		// This log might get a little verbose, but we should only be using this functionality in the
+		// BufSpanProcessor for under a minute -- we should be setting the child processor within a very
+		// short time window on launcher startup.
+		b.slogger.Log(context.TODO(), slog.LevelDebug,
+			"hit max number of buffered spans, dropping",
+		)
 		return
 	}
 
