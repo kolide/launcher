@@ -778,3 +778,12 @@ func (fc *FlagController) CachedQueryResultsTTL() time.Duration {
 		WithMax(72*time.Hour),
 	).get(fc.getControlServerValue(keys.CachedQueryResultsTTL))
 }
+
+func (fc *FlagController) SetResetOnHardwareChangeEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.ResetOnHardwareChangeEnabled, boolToBytes(enabled))
+}
+func (fc *FlagController) ResetOnHardwareChangeEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.ResetOnHardwareChangeEnabled))
+}
