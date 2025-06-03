@@ -124,7 +124,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 				)
 			} else {
 				slogger.Log(ctx, slog.LevelInfo,
-					"sucessfully reset the database after hardware change detected",
+					"successfully reset the database after hardware change detected",
 				)
 				remediationOccurred = true
 			}
