@@ -39,23 +39,6 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
-	file, err := os.CreateTemp("", "kolide_launcher_test")
-	if err != nil {
-		t.Fatalf("creating temp file: %s", err.Error())
-	}
-
-	db, err = bbolt.Open(file.Name(), 0600, nil)
-	if err != nil {
-		t.Fatalf("opening bolt DB: %s", err.Error())
-	}
-
-	return db, func() {
-		db.Close()
-		os.Remove(file.Name())
-	}
-}
-
 func makeKnapsack(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
 	m.On("OsquerydPath").Maybe().Return("")
@@ -96,13 +79,16 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 }
 
 func TestNewExtensionDatabaseError(t *testing.T) {
-
 	file, err := os.CreateTemp("", "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
 
-	db, _ := makeTempDB(t)
+	// open to create, then immediately close DB
+	db, err := bbolt.Open(file.Name(), 0600, nil)
+	if err != nil {
+		t.Fatalf("opening bolt DB: %s", err.Error())
+	}
 	path := db.Path()
 	db.Close()
 
