@@ -255,8 +255,8 @@ jobs:
           - macos-13
           - macos-14
           - macos-15
-          - windows-2019
           - windows-2022
+          - windows-2025
     needs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
