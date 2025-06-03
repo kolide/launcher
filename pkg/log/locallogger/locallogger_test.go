@@ -70,4 +70,5 @@ func TestKitLogging(t *testing.T) {
 		assert.Equal(t, v, contents[k])
 	}
 
+	require.NoError(t, logger.Close())
 }
