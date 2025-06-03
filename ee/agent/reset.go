@@ -132,22 +132,22 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 	}
 
 	// Update store for record-keeping purposes and future checks
-	if serialChanged {
+	if serialChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
 	}
-	if hardwareUUIDChanged {
+	if hardwareUUIDChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
 	}
-	if munemoChanged {
+	if munemoChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
 	}
-	if machineGuidChanged {
+	if machineGuidChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMachineGuid, []byte(currentMachineGuid)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set machine GUID in host data store", "err", err)
 		}
