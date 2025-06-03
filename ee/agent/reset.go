@@ -107,7 +107,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 	}
 	remediationOccurred := false
 	if remediationRequired {
-		slogger.Log(ctx, slog.LevelWarn,
+		slogger.Log(ctx, slog.LevelInfo,
 			"detected hardware change",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
