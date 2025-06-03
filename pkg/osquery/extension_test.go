@@ -56,7 +56,7 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 	}
 }
 
-func makeKnapsack(t *testing.T, db *bbolt.DB) types.Knapsack {
+func makeKnapsack(t *testing.T) types.Knapsack {
 	m := mocks.NewKnapsack(t)
 	m.On("OsquerydPath").Maybe().Return("")
 	m.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
@@ -128,10 +128,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 }
 
 func TestGetHostIdentifier(t *testing.T) {
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -144,9 +141,7 @@ func TestGetHostIdentifier(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, oldIdent, ident)
 
-	db, cleanup = makeTempDB(t)
-	defer cleanup()
-	k = makeKnapsack(t, db)
+	k = makeKnapsack(t)
 	e, err = NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -157,11 +152,8 @@ func TestGetHostIdentifier(t *testing.T) {
 }
 
 func TestGetHostIdentifierCorruptedData(t *testing.T) {
-
 	// Put bad data in the DB and ensure we can still generate a fresh UUID
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -180,16 +172,13 @@ func TestGetHostIdentifierCorruptedData(t *testing.T) {
 }
 
 func TestExtensionEnrollTransportError(t *testing.T) {
-
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", false, errors.New("transport")
 		},
 	}
 
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -202,15 +191,12 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 }
 
 func TestExtensionEnrollSecretInvalid(t *testing.T) {
-
 	m := &mock.KolideService{
 		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
 			return "", true, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	k := makeKnapsack(t, db)
-	defer cleanup()
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -344,15 +330,12 @@ func TestExtensionEnroll(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
-
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	k.ConfigStore().Set([]byte(nodeKeyKey), []byte("some_node_key"))
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
@@ -365,16 +348,13 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsCaching(t *testing.T) {
-
 	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	e, err := NewExtension(context.TODO(), m, s, k, ulid.New(), ExtensionOpts{})
@@ -399,7 +379,6 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
-
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -411,9 +390,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
@@ -464,16 +441,13 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 }
 
 func TestExtensionGenerateConfigs(t *testing.T) {
-
 	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	m := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return configVal, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	e, err := NewExtension(context.TODO(), m, s, k, ulid.New(), ExtensionOpts{})
@@ -486,15 +460,12 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 }
 
 func TestExtensionWriteLogsTransportError(t *testing.T) {
-
 	m := &mock.KolideService{
 		PublishLogsFunc: func(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -504,7 +475,6 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 }
 
 func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
-
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -516,9 +486,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
@@ -531,7 +499,6 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteLogs(t *testing.T) {
-
 	var gotNodeKey string
 	var gotLogType logger.LogType
 	var gotLogs []string
@@ -545,9 +512,7 @@ func TestExtensionWriteLogs(t *testing.T) {
 	}
 
 	expectedNodeKey := "node_key"
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = expectedNodeKey
@@ -1124,15 +1089,12 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 }
 
 func TestExtensionGetQueriesTransportError(t *testing.T) {
-
 	m := &mock.KolideService{
 		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
 			return nil, false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -1181,7 +1143,6 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionGetQueries(t *testing.T) {
-
 	expectedQueries := map[string]string{
 		"time":    "select * from time",
 		"version": "select version from osquery_info",
@@ -1193,9 +1154,7 @@ func TestExtensionGetQueries(t *testing.T) {
 			}, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -1217,9 +1176,7 @@ func TestGetQueries_Forwarding(t *testing.T) {
 			}, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -1267,9 +1224,7 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 			}, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -1299,15 +1254,12 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 }
 
 func TestExtensionWriteResultsTransportError(t *testing.T) {
-
 	m := &mock.KolideService{
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
 			return "", "", false, errors.New("transport")
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
@@ -1317,7 +1269,6 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 }
 
 func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
-
 	expectedNodeKey := "good_node_key"
 	var gotNodeKey string
 	m := &mock.KolideService{
@@ -1329,9 +1280,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 			return expectedNodeKey, false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
@@ -1344,7 +1293,6 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestExtensionWriteResults(t *testing.T) {
-
 	var gotResults []distributed.Result
 	m := &mock.KolideService{
 		PublishResultsFunc: func(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
@@ -1352,9 +1300,7 @@ func TestExtensionWriteResults(t *testing.T) {
 			return "", "", false, nil
 		},
 	}
-	db, cleanup := makeTempDB(t)
-	defer cleanup()
-	k := makeKnapsack(t, db)
+	k := makeKnapsack(t)
 	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
