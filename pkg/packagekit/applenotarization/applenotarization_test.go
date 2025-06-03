@@ -57,9 +57,8 @@ func TestSubmit(t *testing.T) {
 	t.Parallel()
 	ctx := context.TODO()
 
-	tmpZipFile, err := os.CreateTemp("", "fake-for-submission.*.zip")
+	tmpZipFile, err := os.CreateTemp(t.TempDir(), "fake-for-submission.*.zip")
 	require.NoError(t, err)
-	defer os.Remove(tmpZipFile.Name())
 
 	var tests = []struct {
 		fakeFile     string

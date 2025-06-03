@@ -40,7 +40,7 @@ import (
 )
 
 func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
-	file, err := os.CreateTemp("", "kolide_launcher_test")
+	file, err := os.CreateTemp(t.TempDir(), "kolide_launcher_test")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
@@ -52,7 +52,6 @@ func makeTempDB(t *testing.T) (db *bbolt.DB, cleanup func()) {
 
 	return db, func() {
 		db.Close()
-		os.Remove(file.Name())
 	}
 }
 
@@ -96,25 +95,18 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 }
 
 func TestNewExtensionDatabaseError(t *testing.T) {
-
-	file, err := os.CreateTemp("", "kolide_launcher_test")
-	if err != nil {
-		t.Fatalf("creating temp file: %s", err.Error())
-	}
-
 	db, _ := makeTempDB(t)
 	path := db.Path()
 	db.Close()
 
 	// Open read-only DB
-	db, err = bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true})
+	db, err := bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true})
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
-	defer func() {
-		db.Close()
-		os.Remove(file.Name())
-	}()
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
 
 	m := mocks.NewKnapsack(t)
 	m.On("ConfigStore").Return(agentbbolt.NewStore(context.TODO(), multislogger.NewNopLogger(), db, storage.ConfigStore.String()))

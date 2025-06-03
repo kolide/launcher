@@ -123,9 +123,8 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	t.Parallel()
 
 	// First make a broken truncated binary. Lots of setup for this.
-	truncatedBinary, err := os.CreateTemp("", "test-autoupdate-check-executable-truncation")
+	truncatedBinary, err := os.CreateTemp(t.TempDir(), "test-autoupdate-check-executable-truncation")
 	require.NoError(t, err, "make temp file")
-	defer os.Remove(truncatedBinary.Name())
 	truncatedBinary.Close()
 
 	copyFileTruncated(t, truncatedBinary.Name(), os.Args[0])

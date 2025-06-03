@@ -25,7 +25,7 @@ func getDebugURL(t *testing.T, tokenPath string) string {
 
 func TestStartDebugServer(t *testing.T) {
 	t.Parallel()
-	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp(t.TempDir(), "kolide_debug_test")
 	require.Nil(t, err)
 
 	serv, err := startDebugServer(tokenFile.Name(), multislogger.NewNopLogger())
@@ -43,7 +43,7 @@ func TestStartDebugServer(t *testing.T) {
 
 func TestDebugServerUnauthorized(t *testing.T) {
 	t.Parallel()
-	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp(t.TempDir(), "kolide_debug_test")
 	require.Nil(t, err)
 
 	serv, err := startDebugServer(tokenFile.Name(), multislogger.NewNopLogger())
@@ -62,7 +62,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 func TestAttachDebugHandler(t *testing.T) {
 	t.Parallel()
 
-	tokenFile, err := os.CreateTemp("", "kolide_debug_test")
+	tokenFile, err := os.CreateTemp(t.TempDir(), "kolide_debug_test")
 	require.Nil(t, err)
 
 	AttachDebugHandler(tokenFile.Name(), multislogger.NewNopLogger())
