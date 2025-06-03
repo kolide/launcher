@@ -50,12 +50,10 @@ func (use UninitializedStorageError) Error() string {
 }
 
 // DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
-// has changed, by checking current hardware- and enrollment- identifying information against
-// stored data in the HostDataStore. If the hardware- or enrollment-identifying information
-// has changed, it logs the change. In the future, it will take a backup of the database, and
-// then clear all data from it.
-// returns a bool of whether remediation occurred (for now, just whether it would have occurred
-// given the detection parameters in place)
+// has changed, by checking current hardware-identifying information against stored data in the
+// HostDataStore. If the hardware-identifying information has changed, it logs the change; if the
+// ResetOnHardwareChangeEnabled feature flag is enabled, then it will reset the database. Returns
+// a bool of whether remediation occurred.
 func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
@@ -107,28 +105,30 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 		// actual hardware changes.
 		remediationRequired = machineGuidChanged
 	}
+	remediationOccurred := false
 	if remediationRequired {
-		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
+		slogger.Log(ctx, slog.LevelWarn,
+			"detected hardware change",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"tenant_munemo_changed", munemoChanged,
 			"machine_guid_changed", machineGuidChanged,
+			"reset_on_hardware_change_enabled", k.ResetOnHardwareChangeEnabled(),
 		)
-		// In the future, we can proceed with backing up and resetting the database.
-		// For now, we are only logging that we detected the change until we have a dependable
-		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
-		/*
-			slogger.Log(ctx, slog.LevelWarn, "resetting the database",
-				"serial_changed", serialChanged,
-				"hardware_uuid_changed", hardwareUUIDChanged,
-				"machine_guid_changed", machineGuidChanged,
-				"tenant_munemo_changed", munemoChanged,
-			)
 
-			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
-				slogger.Log(ctx, slog.LevelError, "failed to reset database", "err", err)
+		if k.ResetOnHardwareChangeEnabled() {
+			if err := ResetDatabase(ctx, k, slogger, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"failed to reset database",
+					"err", err,
+				)
+			} else {
+				slogger.Log(ctx, slog.LevelInfo,
+					"sucessfully reset the database after hardware change detected",
+				)
+				remediationOccurred = true
 			}
-		*/
+		}
 	}
 
 	// Update store for record-keeping purposes and future checks
@@ -153,7 +153,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 		}
 	}
 
-	return remediationRequired
+	return remediationOccurred
 }
 
 func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, error) {
@@ -185,7 +185,7 @@ func ResetDatabase(ctx context.Context, k types.Knapsack, slogger *slog.Logger, 
 		return err
 	}
 
-	if err := wipeDatabase(ctx, k); err != nil {
+	if err := wipeDatabase(k); err != nil {
 		slogger.Log(ctx, slog.LevelError, "could not wipe database", "err", err)
 		return err
 	}
@@ -414,7 +414,7 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(ctx context.Context, k types.Knapsack) error {
+func wipeDatabase(k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
 			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)
