@@ -58,7 +58,7 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	slogger := k.Slogger().With("component", "db_reset_check")
+	slogger := k.Slogger().With("component", "hardware_change_check")
 
 	serialChanged := false
 	hardwareUUIDChanged := false
