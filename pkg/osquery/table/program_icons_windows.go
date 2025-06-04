@@ -187,6 +187,7 @@ func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
 	if err != nil {
 		return programIcon, fmt.Errorf("opening path: %w", err)
 	}
+	defer icoReader.Close()
 	img, err := ico.Decode(icoReader)
 	if err != nil {
 		return programIcon, fmt.Errorf("decoding image: %w", err)

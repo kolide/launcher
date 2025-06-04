@@ -41,6 +41,7 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 		lf.summary = fmt.Sprintf("failed to open %s: %s", configFilePath, err)
 		return nil
 	}
+	defer file.Close()
 
 	fmt.Fprint(extraFh, "\nlauncher.flags contents:\n\n")
 
