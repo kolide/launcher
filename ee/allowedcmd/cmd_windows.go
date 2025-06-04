@@ -54,3 +54,7 @@ func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	// For windows, "-q" should be prepended before all other args
 	return validatedCommand(ctx, filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "ZeroTier", "One", "zerotier-one_x64.exe"), append([]string{"-q"}, arg...)...)
 }
+
+func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Zscaler", "ZSACli", "ZSACli.exe"), arg...)
+}

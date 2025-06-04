@@ -14,6 +14,7 @@ import (
 	appicons "github.com/kolide/launcher/ee/tables/app-icons"
 	"github.com/kolide/launcher/ee/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	json "github.com/kolide/launcher/ee/tables/execparsers/json"
 	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
 	"github.com/kolide/launcher/ee/tables/execparsers/plist"
 	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
@@ -125,6 +126,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "carbonblack_repcli", "status"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zscaler", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "zscaler", "status", "-s", "all"}),
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
 	}
