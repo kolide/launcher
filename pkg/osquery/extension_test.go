@@ -79,35 +79,29 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 }
 
 func TestNewExtensionDatabaseError(t *testing.T) {
-	file, err := os.CreateTemp("", "kolide_launcher_test")
+	file, err := os.CreateTemp(t.TempDir(), "kolide_extension.db")
 	if err != nil {
 		t.Fatalf("creating temp file: %s", err.Error())
 	}
+	t.Cleanup(func() {
+		file.Close()
+	})
 
-	// open to create, then immediately close DB
 	db, err := bbolt.Open(file.Name(), 0600, nil)
 	if err != nil {
 		t.Fatalf("opening bolt DB: %s", err.Error())
 	}
-	path := db.Path()
-	db.Close()
-
-	// Open read-only DB
-	db, err = bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true})
-	if err != nil {
-		t.Fatalf("opening bolt DB: %s", err.Error())
-	}
-	defer func() {
-		db.Close()
-		os.Remove(file.Name())
-	}()
 
 	m := mocks.NewKnapsack(t)
-	m.On("ConfigStore").Return(agentbbolt.NewStore(context.TODO(), multislogger.NewNopLogger(), db, storage.ConfigStore.String()))
+	confStore, err := agentbbolt.NewStore(context.TODO(), multislogger.NewNopLogger(), db, storage.ConfigStore.String())
+	require.NoError(t, err)
+	m.On("ConfigStore").Return(confStore)
 	m.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 
+	// close the DB connection here to trigger the error
+	require.NoError(t, db.Close())
 	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
