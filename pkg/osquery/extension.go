@@ -500,6 +500,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during enrollment, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -621,6 +624,9 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during config request, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -891,6 +897,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during log publish, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -1039,6 +1048,9 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during queries request, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -1101,6 +1113,9 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during results publish, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow

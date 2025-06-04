@@ -49,9 +49,8 @@ func TestKitLogging(t *testing.T) {
 	//	expectedJson, err := json.Marshal(expected)
 	//require.NoError(t, err, "json marshal expected")
 
-	tmpfile, err := os.CreateTemp("", "test-locallogger")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-locallogger")
 	require.NoError(t, err, "make temp file")
-	defer os.Remove(tmpfile.Name())
 
 	// we only need a file path, not the file handle
 	tmpfile.Close()
@@ -71,4 +70,5 @@ func TestKitLogging(t *testing.T) {
 		assert.Equal(t, v, contents[k])
 	}
 
+	require.NoError(t, logger.Close())
 }
