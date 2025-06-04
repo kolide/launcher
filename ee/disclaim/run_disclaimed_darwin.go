@@ -90,6 +90,14 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: allowedcmd.Repcli,
 	},
+	"zscaler": {
+		allowedOpts: map[string]struct{}{
+			"status": {},
+			"-s":     {},
+			"all":    {},
+		},
+		generate: allowedcmd.Zscli,
+	},
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
