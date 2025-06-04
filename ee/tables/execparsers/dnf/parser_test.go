@@ -35,6 +35,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name:     "more malformed input",
+			input:    []byte("three words here"),
+			expected: []map[string]string{},
+		},
+		{
 			name:  "dnf_upgradeable",
 			input: dnf_upgradeable,
 			expected: []map[string]string{
