@@ -3,6 +3,7 @@ package firefox_preferences
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"regexp"
@@ -70,37 +71,14 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 				dataflatten.WithQuery(strings.Split(dataQuery, "/")),
 			}
 
-			file, err := os.Open(filePath)
+			rawKeyVals, err := parsePreferences(filePath)
 			if err != nil {
 				t.slogger.Log(ctx, slog.LevelInfo,
-					"failed to open file",
+					"failed to parse preferences from file",
 					"path", filePath,
 					"err", err,
 				)
 				continue
-			}
-
-			rawKeyVals := make(map[string]interface{})
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := scanner.Text()
-
-				// Given the line format: user_pref("app.normandy.first_run", false);
-				// the return value should be a three element array, where the second
-				// and third elements are the key and value, respectively.
-				match := re.FindStringSubmatch(line)
-
-				// If the match doesn't have a length of 3, the line is malformed in some way.
-				// Skip it.
-				if len(match) != 3 {
-					continue
-				}
-
-				// The regex already stripped out the surrounding quotes, so now we're
-				// left with escaped quotes that no longer make sense.
-				// i.e. {\"249024122\":[1660860020218]}
-				// Replace those with unescaped quotes.
-				rawKeyVals[match[1]] = strings.ReplaceAll(match[2], "\\\"", "\"")
 			}
 
 			flatData, err := dataflatten.Flatten(rawKeyVals, flattenOpts...)
@@ -119,4 +97,37 @@ func (t *Table) generate(ctx context.Context, queryContext table.QueryContext) (
 	}
 
 	return results, nil
+}
+
+func parsePreferences(filePath string) (map[string]interface{}, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening file at %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	rawKeyVals := make(map[string]interface{})
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Given the line format: user_pref("app.normandy.first_run", false);
+		// the return value should be a three element array, where the second
+		// and third elements are the key and value, respectively.
+		match := re.FindStringSubmatch(line)
+
+		// If the match doesn't have a length of 3, the line is malformed in some way.
+		// Skip it.
+		if len(match) != 3 {
+			continue
+		}
+
+		// The regex already stripped out the surrounding quotes, so now we're
+		// left with escaped quotes that no longer make sense.
+		// i.e. {\"249024122\":[1660860020218]}
+		// Replace those with unescaped quotes.
+		rawKeyVals[match[1]] = strings.ReplaceAll(match[2], "\\\"", "\"")
+	}
+
+	return rawKeyVals, nil
 }

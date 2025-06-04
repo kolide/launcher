@@ -53,6 +53,7 @@ func TestGsettingsValues(t *testing.T) {
 			getBytes: func(ctx context.Context, slogger *slog.Logger, username string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
+				defer f.Close()
 				_, err = buf.ReadFrom(f)
 				require.NoError(t, err, "read file %s", tt.filename)
 
@@ -176,6 +177,7 @@ func TestListKeys(t *testing.T) {
 			cmdRunner: func(ctx context.Context, args []string, tmpdir string, buf *bytes.Buffer) error {
 				f, err := os.Open(filepath.Join("testdata", tt.filename))
 				require.NoError(t, err, "opening file %s", tt.filename)
+				defer f.Close()
 				_, err = buf.ReadFrom(f)
 				require.NoError(t, err, "read file %s", tt.filename)
 

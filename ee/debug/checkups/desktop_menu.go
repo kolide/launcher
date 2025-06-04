@@ -37,6 +37,7 @@ func (d *desktopMenu) Run(_ context.Context, fullFH io.Writer) error {
 		d.summary = fmt.Sprintf("failed to open %s: %s", menuJsonPath, err)
 		return nil
 	}
+	defer file.Close()
 
 	menuJson, err := io.ReadAll(file)
 	if err != nil {
