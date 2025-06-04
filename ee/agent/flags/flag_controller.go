@@ -135,6 +135,10 @@ func (fc *FlagController) notifyObservers(ctx context.Context, flagKeys ...keys.
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// If we hold `fc.observersMutex` for the duration of this function, we can have a deadlock
+	// if any `observer.FlagsChanged` function results in calling `fc.RegisterChangeObserver`,
+	// which uses the same `fc.observersMutex`. Therefore, we create a copy of the current
+	// observers map here and release `fc.observersMutex` preemptively.
 	fc.observersMutex.RLock()
 	span.AddEvent("observers_lock_acquired")
 	currentObservers := make(map[types.FlagsChangeObserver][]keys.FlagKey)
