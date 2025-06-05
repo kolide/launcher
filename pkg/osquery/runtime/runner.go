@@ -279,7 +279,7 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	)
 
 	if err := r.Restart(ctx); err != nil {
-		r.slogger.Log(ctx, slog.LevelError,
+		r.slogger.Log(ctx, multislogger.LevelReportedError,
 			"could not restart osquery instance after flag change",
 			"err", err,
 		)
@@ -318,7 +318,7 @@ func (r *Runner) Ping() {
 	)
 
 	if err := r.Restart(ctx); err != nil {
-		r.slogger.Log(ctx, slog.LevelError,
+		r.slogger.Log(ctx, multislogger.LevelReportedError,
 			"could not restart osquery instance after KATC configuration changed",
 			"err", err,
 		)
