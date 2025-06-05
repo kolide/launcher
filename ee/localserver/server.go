@@ -87,7 +87,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	munemo, err := getMunemoFromKnapsack(k)
 	if err != nil {
 		ls.slogger.Log(ctx, slog.LevelError,
-			"getting munemo from enroll secret, not fatal, continuing",
+			"getting munemo from knapsack, not fatal, continuing",
 			"err", err,
 		)
 	}
