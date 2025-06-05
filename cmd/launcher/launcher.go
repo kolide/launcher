@@ -341,11 +341,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// For now, remediation is not performed -- we only log the hardware change. So we can
-	// perform this operation in the background to avoid slowing down launcher startup.
-	gowrapper.Go(ctx, slogger, func() {
-		agent.DetectAndRemediateHardwareChange(ctx, k)
-	})
+	// Check to see whether hardware has changed -- if it has, we want to wipe the database
+	// so that k2 will see this as a new device. This must happen during startup to avoid data
+	// races.
+	agent.DetectAndRemediateHardwareChange(ctx, k)
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
