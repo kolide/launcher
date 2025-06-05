@@ -135,10 +135,7 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 
 func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) error {
 	if runtime.GOOS == "darwin" {
-		c.slogger.Log(req.Context(), slog.LevelDebug,
-			"hardware key signing not supported on darwin",
-		)
-
+		// Hardware key signing not supported on darwin
 		return nil
 	}
 

@@ -130,6 +130,8 @@ func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...key
 					"error caching windows update data after exiting modern standby",
 					"err", err,
 				)
+				// Increment our counter tracking query failures/timeouts
+				observability.WindowsUpdatesQueryFailureCounter.Add(context.TODO(), 1)
 				return
 			}
 
