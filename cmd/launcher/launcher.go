@@ -534,7 +534,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
-			slogger.Log(ctx, slog.LevelError,
+			slogger.Log(ctx, multislogger.LevelReportedError,
 				"failed to setup local server",
 				"err", err,
 			)
