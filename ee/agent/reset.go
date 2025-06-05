@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -49,16 +50,52 @@ func (use UninitializedStorageError) Error() string {
 	return "storage is uninitialized in knapsack"
 }
 
+type hardwareChangeDetector struct {
+	slogger     *slog.Logger
+	k           types.Knapsack
+	interrupt   chan struct{}
+	interrupted *atomic.Bool
+}
+
+func NewHardwareChangeDetector(k types.Knapsack, slogger *slog.Logger) *hardwareChangeDetector {
+	return &hardwareChangeDetector{
+		slogger:     slogger.With("component", "hardware_change_detector"),
+		k:           k,
+		interrupt:   make(chan struct{}),
+		interrupted: &atomic.Bool{},
+	}
+}
+
+func (h *hardwareChangeDetector) Execute() error {
+	if remediationOccurred := DetectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger); remediationOccurred {
+		h.slogger.Log(context.TODO(), slog.LevelInfo,
+			"hardware change detected and database wiped, sending shutdown request to launcher",
+		)
+		return errors.New("hardware change detected and database wiped")
+	}
+
+	// We're done with our check -- nothing to do now except wait to shut down whenever launcher shuts down next.
+	<-h.interrupt
+	return nil
+}
+
+func (h *hardwareChangeDetector) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if h.interrupted.Swap(true) {
+		return
+	}
+
+	h.interrupt <- struct{}{}
+}
+
 // DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
 // has changed, by checking current hardware-identifying information against stored data in the
 // HostDataStore. If the hardware-identifying information has changed, it logs the change; if the
 // ResetOnHardwareChangeEnabled feature flag is enabled, then it will reset the database. Returns
 // a bool of whether remediation occurred.
-func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) bool {
+func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
-
-	slogger := k.Slogger().With("component", "hardware_change_check")
 
 	serialChanged := false
 	hardwareUUIDChanged := false

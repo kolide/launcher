@@ -341,10 +341,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// Check to see whether hardware has changed -- if it has, we want to wipe the database
-	// so that k2 will see this as a new device. This must happen during startup to avoid data
-	// races.
-	agent.DetectAndRemediateHardwareChange(ctx, k)
+	// Add an actor to detect hardware changes. If a hardware change is detected (and remediation is enabled
+	// via feature flag), the actor will wipe launcher's database, then shut down to trigger a restart.
+	hardwareChangeDetector := agent.NewHardwareChangeDetector(k, slogger)
+	runGroup.Add("hardwareChangeDetector", hardwareChangeDetector.Execute, hardwareChangeDetector.Interrupt)
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
