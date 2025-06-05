@@ -45,6 +45,7 @@ func readChannelXml(file string) (ChannelXML, error) {
 	if err != nil {
 		return ChannelXML{}, err
 	}
+	defer rdr.Close()
 
 	xmlDecoder := xml.NewDecoder(rdr)
 
