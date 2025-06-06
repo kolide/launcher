@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
@@ -25,6 +27,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	k.On("Slogger").Return(slogger)
+	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+	require.NoError(t, err)
+	k.On("ConfigStore").Return(testConfigStore)
 	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers

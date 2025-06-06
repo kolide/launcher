@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
@@ -55,7 +57,11 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			slogger := multislogger.NewNopLogger()
+			mockKnapsack.On("Slogger").Return(slogger)
+			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("ConfigStore").Return(testConfigStore)
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,
@@ -226,7 +232,11 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			slogger := multislogger.NewNopLogger()
+			mockKnapsack.On("Slogger").Return(slogger)
+			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("ConfigStore").Return(testConfigStore)
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,

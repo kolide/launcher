@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -19,10 +21,14 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 
 	slogger := multislogger.NewNopLogger()
 
+	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+	require.NoError(t, err)
+
 	defaultMockKnapsack := func() types.Knapsack {
 		m := mocks.NewKnapsack(t)
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(slogger)
+		m.On("ConfigStore").Return(testConfigStore)
 		m.On("Registrations").Return([]types.Registration{
 			{Munemo: "test-munemo"},
 		}, nil)
@@ -51,6 +57,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m.On("SetControlRequestIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("SetDistributedForwardingIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(slogger)
+				m.On("ConfigStore").Return(testConfigStore)
 				m.On("Registrations").Return([]types.Registration{
 					{Munemo: "test-munemo"},
 				}, nil)
