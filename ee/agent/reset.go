@@ -38,6 +38,8 @@ var (
 	hostDataKeyMunemo       = []byte("munemo")
 	hostDataKeyResetRecords = []byte("reset_records")
 	hostDataKeyMachineGuid  = []byte("machine_guid") // used for windows only, because the hardware_uuid is not stable
+
+	ErrNewHardwareDetected = errors.New("need to reload launcher: hardware change detected and database wiped")
 )
 
 const (
@@ -71,7 +73,7 @@ func (h *hardwareChangeDetector) Execute() error {
 		h.slogger.Log(context.TODO(), slog.LevelInfo,
 			"hardware change detected and database wiped, sending shutdown request to launcher",
 		)
-		return errors.New("hardware change detected and database wiped")
+		return ErrNewHardwareDetected
 	}
 
 	// We're done with our check -- nothing to do now except wait to shut down whenever launcher shuts down next.

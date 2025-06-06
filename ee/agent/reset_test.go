@@ -633,6 +633,61 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	mockKnapsack.AssertExpectations(t)
 }
 
+func TestExecute(t *testing.T) {
+	t.Parallel()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	// Set up dependencies: data store for hardware-identifying data
+	testHostDataStore, err := storageci.NewStore(t, slogger, storage.PersistentHostDataStore.String())
+	require.NoError(t, err, "could not create test host data store")
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("PersistentHostDataStore").Return(testHostDataStore)
+	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	mockKnapsack.On("ConfigStore").Return(testConfigStore)
+	testServerProvidedDataStore, err := storageci.NewStore(t, slogger, storage.ServerProvidedDataStore.String())
+	require.NoError(t, err, "could not create test server provided data store")
+	mockKnapsack.On("ServerProvidedDataStore").Return(testServerProvidedDataStore)
+	mockKnapsack.On("Stores").Return(map[storage.Store]types.KVStore{
+		storage.PersistentHostDataStore: testHostDataStore,
+		storage.ConfigStore:             testConfigStore,
+		storage.ServerProvidedDataStore: testServerProvidedDataStore,
+	})
+	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
+	mockKnapsack.On("ResetOnHardwareChangeEnabled").Return(true)
+	mockKnapsack.On("Registrations").Return([]types.Registration{
+		{
+			RegistrationID: types.DefaultRegistrationID,
+			Munemo:         "test-munemo-1",
+		},
+	}, nil)
+	mockKnapsack.On("RegistrationIDs").Return([]string{"default"})
+
+	// Set up dependencies: ensure that all hardware data is incorrect so that a reset will be triggered
+	require.NoError(t, testHostDataStore.Set(hostDataKeySerial, []byte("not-the-correct-serial")), "could not set serial in test store")
+	require.NoError(t, testHostDataStore.Set(hostDataKeyHardwareUuid, []byte("not-the-correct-hardware-uuid")), "could not set hardware uuid in test store")
+	require.NoError(t, testHostDataStore.Set(hostDataKeyMachineGuid, []byte("not-the-correct-machine-guid")), "could not set machine guid in test store")
+
+	detector := NewHardwareChangeDetector(mockKnapsack, slogger)
+
+	executeErrs := make(chan error)
+	go func() {
+		executeErrs <- detector.Execute()
+	}()
+
+	select {
+	case executeErr := <-executeErrs:
+		require.True(t, errors.Is(executeErr, ErrNewHardwareDetected), "unexpected error returned from Execute")
+	case <-time.After(15 * time.Second):
+		t.Errorf("detector did not detect hardware change and return within 15 seconds -- logs: \n%s\n", logBytes.String())
+		t.FailNow()
+	}
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
