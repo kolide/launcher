@@ -69,7 +69,7 @@ func NewHardwareChangeDetector(k types.Knapsack, slogger *slog.Logger) *hardware
 }
 
 func (h *hardwareChangeDetector) Execute() error {
-	if remediationOccurred := DetectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger); remediationOccurred {
+	if remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger); remediationOccurred {
 		h.slogger.Log(context.TODO(), slog.LevelInfo,
 			"hardware change detected and database wiped, sending shutdown request to launcher",
 		)
@@ -90,12 +90,12 @@ func (h *hardwareChangeDetector) Interrupt(_ error) {
 	h.interrupt <- struct{}{}
 }
 
-// DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
+// detectAndRemediateHardwareChange checks to see if the hardware this installation is running on
 // has changed, by checking current hardware-identifying information against stored data in the
 // HostDataStore. If the hardware-identifying information has changed, it logs the change; if the
 // ResetOnHardwareChangeEnabled feature flag is enabled, then it will reset the database. Returns
 // a bool of whether remediation occurred.
-func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger) bool {
+func detectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 

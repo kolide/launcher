@@ -464,7 +464,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			remediationOccurred := DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger)
+			remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger)
 			require.Equal(t, tt.expectDatabaseWipe, remediationOccurred, "expected remediation to occur when database should be wiped")
 
 			// Confirm backup occurred, if database got wiped
@@ -590,7 +590,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make first test call
-	require.True(t, DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -615,7 +615,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make second test call
-	require.True(t, DetectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
