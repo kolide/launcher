@@ -263,7 +263,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		telemetryExporter, err = exporter.NewTelemetryExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
-			slogger.Log(ctx, slog.LevelDebug,
+			slogger.Log(ctx, multislogger.LevelReportedError,
 				"could not set up telemetry exporter",
 				"err", err,
 			)
@@ -341,16 +341,15 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	signalListener := newSignalListener(sigChannel, cancel, slogger)
 	runGroup.Add("sigChannel", signalListener.Execute, signalListener.Interrupt)
 
-	// For now, remediation is not performed -- we only log the hardware change. So we can
-	// perform this operation in the background to avoid slowing down launcher startup.
-	gowrapper.Go(ctx, slogger, func() {
-		agent.DetectAndRemediateHardwareChange(ctx, k)
-	})
+	// Add an actor to detect hardware changes. If a hardware change is detected (and remediation is enabled
+	// via feature flag), the actor will wipe launcher's database, then shut down to trigger a restart.
+	hardwareChangeDetector := agent.NewHardwareChangeDetector(k, slogger)
+	runGroup.Add("hardwareChangeDetector", hardwareChangeDetector.Execute, hardwareChangeDetector.Interrupt)
 
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
 	if err != nil {
-		slogger.Log(ctx, slog.LevelDebug,
+		slogger.Log(ctx, multislogger.LevelReportedError,
 			"could not init power event watcher",
 			"err", err,
 		)
@@ -497,7 +496,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
-			slogger.Log(ctx, slog.LevelDebug,
+			slogger.Log(ctx, multislogger.LevelReportedError,
 				"unable to set up metadata writer",
 				"err", err,
 			)
@@ -534,7 +533,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
-			slogger.Log(ctx, slog.LevelError,
+			slogger.Log(ctx, multislogger.LevelReportedError,
 				"failed to setup local server",
 				"err", err,
 			)

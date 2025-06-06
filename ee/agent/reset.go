@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -37,6 +38,8 @@ var (
 	hostDataKeyMunemo       = []byte("munemo")
 	hostDataKeyResetRecords = []byte("reset_records")
 	hostDataKeyMachineGuid  = []byte("machine_guid") // used for windows only, because the hardware_uuid is not stable
+
+	ErrNewHardwareDetected = errors.New("need to reload launcher: hardware change detected and database wiped")
 )
 
 const (
@@ -49,18 +52,52 @@ func (use UninitializedStorageError) Error() string {
 	return "storage is uninitialized in knapsack"
 }
 
-// DetectAndRemediateHardwareChange checks to see if the hardware this installation is running on
-// has changed, by checking current hardware- and enrollment- identifying information against
-// stored data in the HostDataStore. If the hardware- or enrollment-identifying information
-// has changed, it logs the change. In the future, it will take a backup of the database, and
-// then clear all data from it.
-// returns a bool of whether remediation occurred (for now, just whether it would have occurred
-// given the detection parameters in place)
-func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) bool {
+type hardwareChangeDetector struct {
+	slogger     *slog.Logger
+	k           types.Knapsack
+	interrupt   chan struct{}
+	interrupted *atomic.Bool
+}
+
+func NewHardwareChangeDetector(k types.Knapsack, slogger *slog.Logger) *hardwareChangeDetector {
+	return &hardwareChangeDetector{
+		slogger:     slogger.With("component", "hardware_change_detector"),
+		k:           k,
+		interrupt:   make(chan struct{}),
+		interrupted: &atomic.Bool{},
+	}
+}
+
+func (h *hardwareChangeDetector) Execute() error {
+	if remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), h.k, h.slogger); remediationOccurred {
+		h.slogger.Log(context.TODO(), slog.LevelInfo,
+			"hardware change detected and database wiped, sending shutdown request to launcher",
+		)
+		return ErrNewHardwareDetected
+	}
+
+	// We're done with our check -- nothing to do now except wait to shut down whenever launcher shuts down next.
+	<-h.interrupt
+	return nil
+}
+
+func (h *hardwareChangeDetector) Interrupt(_ error) {
+	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
+	if h.interrupted.Swap(true) {
+		return
+	}
+
+	h.interrupt <- struct{}{}
+}
+
+// detectAndRemediateHardwareChange checks to see if the hardware this installation is running on
+// has changed, by checking current hardware-identifying information against stored data in the
+// HostDataStore. If the hardware-identifying information has changed, it logs the change; if the
+// ResetOnHardwareChangeEnabled feature flag is enabled, then it will reset the database. Returns
+// a bool of whether remediation occurred.
+func detectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack, slogger *slog.Logger) bool {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
-
-	slogger := k.Slogger().With("component", "db_reset_check")
 
 	serialChanged := false
 	hardwareUUIDChanged := false
@@ -107,53 +144,55 @@ func DetectAndRemediateHardwareChange(ctx context.Context, k types.Knapsack) boo
 		// actual hardware changes.
 		remediationRequired = machineGuidChanged
 	}
+	remediationOccurred := false
 	if remediationRequired {
-		slogger.Log(ctx, slog.LevelWarn, "detected hardware change",
+		slogger.Log(ctx, slog.LevelInfo,
+			"detected hardware change",
 			"serial_changed", serialChanged,
 			"hardware_uuid_changed", hardwareUUIDChanged,
 			"tenant_munemo_changed", munemoChanged,
 			"machine_guid_changed", machineGuidChanged,
+			"reset_on_hardware_change_enabled", k.ResetOnHardwareChangeEnabled(),
 		)
-		// In the future, we can proceed with backing up and resetting the database.
-		// For now, we are only logging that we detected the change until we have a dependable
-		// hardware change detection method - see issue here https://github.com/kolide/launcher/issues/1346
-		/*
-			slogger.Log(ctx, slog.LevelWarn, "resetting the database",
-				"serial_changed", serialChanged,
-				"hardware_uuid_changed", hardwareUUIDChanged,
-				"machine_guid_changed", machineGuidChanged,
-				"tenant_munemo_changed", munemoChanged,
-			)
 
-			if err := ResetDatabase(ctx, k, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
-				slogger.Log(ctx, slog.LevelError, "failed to reset database", "err", err)
+		if k.ResetOnHardwareChangeEnabled() {
+			if err := ResetDatabase(ctx, k, slogger, resetReasonNewHardwareOrEnrollmentDetected); err != nil {
+				slogger.Log(ctx, slog.LevelWarn,
+					"failed to reset database",
+					"err", err,
+				)
+			} else {
+				slogger.Log(ctx, slog.LevelInfo,
+					"successfully reset the database after hardware change detected",
+				)
+				remediationOccurred = true
 			}
-		*/
+		}
 	}
 
 	// Update store for record-keeping purposes and future checks
-	if serialChanged {
+	if serialChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeySerial, []byte(currentSerial)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set serial in host data store", "err", err)
 		}
 	}
-	if hardwareUUIDChanged {
+	if hardwareUUIDChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyHardwareUuid, []byte(currentHardwareUUID)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set hardware UUID in host data store", "err", err)
 		}
 	}
-	if munemoChanged {
+	if munemoChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMunemo, []byte(currentTenantMunemo)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set munemo in host data store", "err", err)
 		}
 	}
-	if machineGuidChanged {
+	if machineGuidChanged || remediationOccurred {
 		if err := k.PersistentHostDataStore().Set(hostDataKeyMachineGuid, []byte(currentMachineGuid)); err != nil {
 			slogger.Log(ctx, slog.LevelWarn, "could not set machine GUID in host data store", "err", err)
 		}
 	}
 
-	return remediationRequired
+	return remediationOccurred
 }
 
 func GetResetRecords(ctx context.Context, k types.Knapsack) ([]dbResetRecord, error) {
@@ -185,7 +224,7 @@ func ResetDatabase(ctx context.Context, k types.Knapsack, slogger *slog.Logger, 
 		return err
 	}
 
-	if err := wipeDatabase(ctx, k); err != nil {
+	if err := wipeDatabase(k); err != nil {
 		slogger.Log(ctx, slog.LevelError, "could not wipe database", "err", err)
 		return err
 	}
@@ -414,7 +453,7 @@ func getLocalPubKey(k types.Knapsack) ([]byte, error) { // nolint:unused
 
 // wipeDatabase iterates over all stores in the database, deleting all keys from
 // each one.
-func wipeDatabase(ctx context.Context, k types.Knapsack) error {
+func wipeDatabase(k types.Knapsack) error {
 	for storeName, store := range k.Stores() {
 		if err := store.DeleteAll(); err != nil {
 			return fmt.Errorf("deleting keys in store %s: %w", storeName, err)

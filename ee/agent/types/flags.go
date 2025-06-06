@@ -258,4 +258,8 @@ type Flags interface {
 	// CachedQueryResultsTTL indicates how long cached query results are valid.
 	SetCachedQueryResultsTTL(ttl time.Duration) error
 	CachedQueryResultsTTL() time.Duration
+
+	// ResetOnHardwareChangeEnabled controls whether launcher will reset its database on hardware change detected
+	SetResetOnHardwareChangeEnabled(enabled bool) error
+	ResetOnHardwareChangeEnabled() bool
 }

@@ -829,6 +829,24 @@ func (_m *Flags) RegisterChangeObserver(observer types.FlagsChangeObserver, flag
 	_m.Called(_ca...)
 }
 
+// ResetOnHardwareChangeEnabled provides a mock function with no fields
+func (_m *Flags) ResetOnHardwareChangeEnabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResetOnHardwareChangeEnabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // RootDirectory provides a mock function with no fields
 func (_m *Flags) RootDirectory() string {
 	ret := _m.Called()
@@ -1454,6 +1472,24 @@ func (_m *Flags) SetPinnedOsquerydVersion(version string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(version)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetResetOnHardwareChangeEnabled provides a mock function with given fields: enabled
+func (_m *Flags) SetResetOnHardwareChangeEnabled(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetResetOnHardwareChangeEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
 	} else {
 		r0 = ret.Error(0)
 	}
