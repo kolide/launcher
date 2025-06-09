@@ -52,13 +52,14 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			expectMunemo: true,
 		},
 		{
-			name: "no enroll secret, singed url req from knapsack",
+			name: "no enroll secret, signed url req from knapsack",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
 				k.On("Slogger").Return(multislogger.NewNopLogger())
 				k.On("Registrations").Return([]types.Registration{}, nil)
+				k.On("RootDirectory").Return(t.TempDir())
 				return k
 			},
 			assertion:            assert.NoError,
