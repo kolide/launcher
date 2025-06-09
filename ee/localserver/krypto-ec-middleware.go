@@ -91,6 +91,7 @@ type kryptoEcMiddleware struct {
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
 	nodeKeyStore          types.Setter
+	registrationStore     types.Setter
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -98,7 +99,8 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
+func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, registrationStore types.Setter,
+	localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	atomicMunemo := atomic.NewString(tenantMunemo)
 
 	// Set up our callback queue with a worker to send callbacks. The callback queue has a buffer
@@ -115,6 +117,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, loca
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
 		nodeKeyStore:                          nodeKeyStore,
+		registrationStore:                     registrationStore,
 	}
 
 	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
@@ -207,6 +210,22 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			// Until we tackle multitenancy, store the key under the default registration ID
 			if err := e.nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(r.NodeKey)); err != nil {
 				return fmt.Errorf("setting nodekey in store: %w", err)
+			}
+
+			// Save the registration too
+			newRegistration := types.Registration{
+				RegistrationID: types.DefaultRegistrationID, // default registration ID for now
+				Munemo:         r.Munemo,
+				NodeKey:        r.NodeKey,
+			}
+
+			rawRegistration, err := json.Marshal(newRegistration)
+			if err != nil {
+				return fmt.Errorf("marshalling registration: %w", err)
+			}
+
+			if err := e.registrationStore.Set([]byte(types.DefaultRegistrationID), rawRegistration); err != nil {
+				return fmt.Errorf("adding registration to store: %w", err)
 			}
 
 			return nil

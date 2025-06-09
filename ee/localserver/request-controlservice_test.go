@@ -23,12 +23,15 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	defaultMockKnapsack := func() types.Knapsack {
 		m := mocks.NewKnapsack(t)
 		m.On("KolideServerURL").Return("localhost")
 		m.On("Slogger").Return(slogger)
 		m.On("ConfigStore").Return(testConfigStore)
+		m.On("RegistrationStore").Return(testRegistrationStore)
 		m.On("Registrations").Return([]types.Registration{
 			{Munemo: "test-munemo"},
 		}, nil)
@@ -58,6 +61,7 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m.On("SetDistributedForwardingIntervalOverride", 250*time.Millisecond, 1*time.Second)
 				m.On("Slogger").Return(slogger)
 				m.On("ConfigStore").Return(testConfigStore)
+				m.On("RegistrationStore").Return(testRegistrationStore)
 				m.On("Registrations").Return([]types.Registration{
 					{Munemo: "test-munemo"},
 				}, nil)

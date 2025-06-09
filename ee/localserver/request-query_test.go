@@ -62,6 +62,9 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 			require.NoError(t, err)
 			mockKnapsack.On("ConfigStore").Return(testConfigStore)
+			testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("RegistrationStore").Return(testRegistrationStore)
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,
@@ -237,6 +240,9 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 			require.NoError(t, err)
 			mockKnapsack.On("ConfigStore").Return(testConfigStore)
+			testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("RegistrationStore").Return(testRegistrationStore)
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,

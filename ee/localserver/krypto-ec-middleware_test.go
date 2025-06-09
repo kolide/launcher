@@ -212,9 +212,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 
 					testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 					require.NoError(t, err)
+					testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+					require.NoError(t, err)
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
@@ -356,9 +358,11 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 
 					testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 					require.NoError(t, err)
+					testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+					require.NoError(t, err)
 
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
 						tt.middlewareOpt(kryptoEcMiddleware)
 					}
@@ -491,9 +495,11 @@ func Test_AllowedOrigin(t *testing.T) {
 
 			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 			require.NoError(t, err)
+			testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+			require.NoError(t, err)
 
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -689,10 +695,13 @@ func TestMunemoCheck(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			slogger := multislogger.NewNopLogger()
+			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
+			require.NoError(t, err)
+			testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
 			require.NoError(t, err)
 
-			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), testConfigStore, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
+			e := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
 			err = e.checkMunemo(tt.headers)
 			if tt.expectMiddleWareCheckErr {
 				require.Error(t, err)
@@ -725,9 +734,11 @@ func Test_sendCallback(t *testing.T) {
 	}))
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	requestsQueued := &atomic.Int64{}
-	mw := newKryptoEcMiddleware(slogger, testConfigStore, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
+	mw := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
 	for range callbackQueueCapacity {
 		go func() {
 			req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, testCallbackServer.URL, nil)
@@ -778,13 +789,20 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	}))
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Confirm that we have no nodekey set to start
 	initialVal, err := testConfigStore.Get(expectedNodeKeyKey)
 	require.NoError(t, err)
 	require.Nil(t, initialVal)
 
-	mw := newKryptoEcMiddleware(slogger, testConfigStore, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+	// Confirm we have no registrations to start
+	initialRegistration, err := testRegistrationStore.Get([]byte(types.DefaultRegistrationID))
+	require.NoError(t, err)
+	require.Nil(t, initialRegistration)
+
+	mw := newKryptoEcMiddleware(slogger, testConfigStore, testRegistrationStore, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 
 	// Confirm we do not have a munemo set
 	require.Equal(t, "", mw.tenantMunemo.Load())
@@ -815,4 +833,13 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 
 	// We should have set the munemo
 	require.Equal(t, expectedMunemo, mw.tenantMunemo.Load())
+
+	// We should have created a registration
+	rawRegistration, err := testRegistrationStore.Get([]byte(types.DefaultRegistrationID))
+	require.NoError(t, err)
+	var r types.Registration
+	require.NoError(t, json.Unmarshal(rawRegistration, &r))
+	require.Equal(t, types.DefaultRegistrationID, r.RegistrationID)
+	require.Equal(t, expectedMunemo, r.Munemo)
+	require.Equal(t, expectedNodeKey, r.NodeKey)
 }

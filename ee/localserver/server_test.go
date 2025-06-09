@@ -30,6 +30,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
 	k.On("ConfigStore").Return(testConfigStore)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers

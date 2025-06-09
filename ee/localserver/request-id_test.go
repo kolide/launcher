@@ -42,6 +42,10 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 	require.NoError(t, err)
 	mockKnapsack.On("ConfigStore").Return(testConfigStore)
 
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
+	mockKnapsack.On("RegistrationStore").Return(testRegistrationStore)
+
 	server := testServer(t, mockKnapsack)
 
 	req, err := http.NewRequest("", "", nil) //nolint:noctx // Don't care about this in tests

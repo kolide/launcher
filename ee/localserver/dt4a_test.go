@@ -34,6 +34,8 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -41,6 +43,7 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -92,6 +95,8 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -99,6 +104,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -140,6 +146,8 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -147,6 +155,7 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -204,6 +213,8 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -211,6 +222,7 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -252,6 +264,8 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -259,6 +273,7 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -299,6 +314,8 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -306,6 +323,7 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -358,10 +376,13 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 			slogger := multislogger.NewNopLogger()
 			testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 			require.NoError(t, err)
+			testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+			require.NoError(t, err)
 			k := typesmocks.NewKnapsack(t)
 			k.On("KolideServerURL").Return("localserver")
 			k.On("Slogger").Return(slogger)
 			k.On("ConfigStore").Return(testConfigStore)
+			k.On("RegistrationStore").Return(testRegistrationStore)
 			k.On("AllowOverlyBroadDt4aAcceleration").Maybe().Return(false)
 			k.On("Registrations").Return([]types.Registration{
 				{
@@ -398,6 +419,8 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
 
 	// Set up the rest of our localserver dependencies
 	k := typesmocks.NewKnapsack(t)
@@ -405,6 +428,7 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Dt4aInfoStore").Return(dt4aInfoStore)
 	k.On("ConfigStore").Return(testConfigStore)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("AllowOverlyBroadDt4aAcceleration").Return(false)
 	k.On("Registrations").Return([]types.Registration{
 		{
@@ -440,6 +464,9 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
 	require.NoError(t, err)
 	k.On("ConfigStore").Return(testConfigStore)
+	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
+	require.NoError(t, err)
+	k.On("RegistrationStore").Return(testRegistrationStore)
 	// Validate that we accelerate control requests
 	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
 	// Validate that we accelerate osquery distributed requests
