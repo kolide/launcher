@@ -11,11 +11,11 @@ When troubleshooting, we want to be able to distinguish between and easily find 
 * Error information (any time launcher tries to perform an action but cannot)
 * Critical error information (any time an actor exits and must be restarted due to an error)
 
-We want logs to be stored by level in different locations:
+We want logs to be stored by level in different locations according to purpose:
 
-* Stored locally and collected via flare, to troubleshoot individual devices
-* Shipped to Cloud Log, to troubleshoot devices across a tenant or multiple tenants
-* Shipped to Cloud Log and Error Reporting, to identify error trends that might indicate launcher bugs
+* Stored locally and collected via flare; used to troubleshoot individual devices; may be more verbose
+* Shipped to Cloud Log; used to troubleshoot devices across a tenant or multiple tenants, or to look for trends across a tenant or multiple tenants
+* Shipped to Cloud Log and Error Reporting; used to identify errors and highlight trends that might indicate launcher bugs
 
 ## Proposal
 
