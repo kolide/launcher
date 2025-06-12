@@ -8,7 +8,6 @@ import (
 
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -46,12 +45,12 @@ func (l *LoggedErrgroup) StartGoroutine(ctx context.Context, goroutineName strin
 		// we return an error from this goroutine overall if it panics.
 		defer func() {
 			if r := recover(); r != nil {
-				slogger.Log(ctx, multislogger.LevelReportedError,
+				slogger.Log(ctx, slog.LevelError,
 					"panic occurred in goroutine",
 					"err", r,
 				)
 				if recoveredErr, ok := r.(error); ok {
-					slogger.Log(ctx, multislogger.LevelReportedError,
+					slogger.Log(ctx, slog.LevelError,
 						"panic stack trace",
 						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(recoveredErr)),
 					)
@@ -131,12 +130,12 @@ func (l *LoggedErrgroup) AddShutdownGoroutine(ctx context.Context, goroutineName
 		// shutdown goroutines should not return an error besides the errgroup's initial error.
 		defer func() {
 			if r := recover(); r != nil {
-				slogger.Log(ctx, multislogger.LevelReportedError,
+				slogger.Log(ctx, slog.LevelError,
 					"panic occurred in shutdown goroutine",
 					"err", r,
 				)
 				if err, ok := r.(error); ok {
-					slogger.Log(ctx, multislogger.LevelReportedError,
+					slogger.Log(ctx, slog.LevelError,
 						"panic stack trace",
 						"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 					)
