@@ -345,7 +345,7 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(ctx, subsystem, data); err != nil {
 		// Returning the error so we don't store the hash and we can try again next time
-		slogger.Log(ctx, slog.LevelError,
+		slogger.Log(ctx, slog.LevelWarn,
 			"failed to update consumers and subscribers",
 			"err", err,
 		)
