@@ -98,6 +98,13 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: allowedcmd.Zscli,
 	},
+	"microsoft_defender_atp": {
+		allowedOpts: map[string]struct{}{
+			"health":        {},
+			"--output json": {},
+		},
+		generate: allowedcmd.MicrosoftDefenderATP,
+	},
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
