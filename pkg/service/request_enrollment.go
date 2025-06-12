@@ -113,7 +113,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 
 		message := "success"
 		if err != nil {
-			message = "failure"
+			message = "failure requesting enrollment"
 		}
 
 		keyvals := []interface{}{
