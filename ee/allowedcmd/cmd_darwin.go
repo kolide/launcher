@@ -79,6 +79,10 @@ func Mdmclient(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/libexec/mdmclient", arg...)
 }
 
+func MicrosoftDefenderATP(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, "/usr/local/bin/mdatp", arg...)
+}
+
 func Netstat(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/netstat", arg...)
 }
