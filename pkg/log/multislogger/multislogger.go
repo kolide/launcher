@@ -20,9 +20,6 @@ const (
 	SpanIdKey          contextKey = "span_id"
 	TraceIdKey         contextKey = "trace_id"
 	TraceSampledKey    contextKey = "trace_sampled"
-
-	// Custom slog level for errors we want to group in our error reporting service
-	LevelReportedError slog.Level = slog.LevelError + 4
 )
 
 // ctxValueKeysToAdd is a list of context keys that will be
@@ -92,13 +89,12 @@ func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(cont
 }
 
 func reportedErrorMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	if record.Level != LevelReportedError {
+	if record.Level != slog.LevelError {
 		return next(ctx, record)
 	}
 
-	// We re-level "ReportedError" errors to the Error level, and then tag them for GCP.
+	// We tag LevelError logs for GCP.
 	// See: https://cloud.google.com/error-reporting/docs/formatting-error-messages
-	record.Level = slog.LevelError
 	record.AddAttrs(
 		// We must set @type so that GCP knows it's a ReportedError
 		slog.Attr{
