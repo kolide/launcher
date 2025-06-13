@@ -103,7 +103,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 
 		message := "success"
 		if err != nil {
-			message = "failure"
+			message = "failure requesting config"
 		}
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
