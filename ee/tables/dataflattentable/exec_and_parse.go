@@ -3,7 +3,6 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -30,6 +29,7 @@ type execTableV2 struct {
 	timeoutSeconds int
 	tabledebug     bool
 	includeStderr  bool
+	reportStderr   bool
 	cmd            allowedcmd.AllowedCommand
 	execArgs       []string
 }
@@ -48,9 +48,18 @@ func WithTableDebug() execTableV2Opt {
 	}
 }
 
+// WithIncludeStderr combines stdout and stderr before attempting any parsing
 func WithIncludeStderr() execTableV2Opt {
 	return func(t *execTableV2) {
 		t.includeStderr = true
+	}
+}
+
+// WithReportStderr will include stderr (if populated) in the parsed output as a
+// separate row in the results produced by the query
+func WithReportStderr() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.reportStderr = true
 	}
 }
 
@@ -76,14 +85,17 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	defer span.End()
 
 	var results []map[string]string
-	var stdout bytes.Buffer
-	stdErr := io.Discard
+	var stdout, stdErr bytes.Buffer
 
+	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here
+	// callers are free to ignore stdErr if not needed in other cases.
+	// we cannot declare stdErr as io.Discard and then overwrite it conditionally because there
+	// will be no way to read from it later if needed (e.g. for WithReportStderr).
 	if t.includeStderr {
-		stdErr = &stdout
+		stdErr = stdout
 	}
 
-	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, stdErr); err != nil {
+	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, &stdErr); err != nil {
 		// exec will error if there's no binary, so we never want to record that
 		if os.IsNotExist(errors.Cause(err)) {
 			return nil, nil
@@ -111,10 +123,20 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 				"failure flattening output",
 				"err", err,
 			)
+
 			continue
 		}
 
 		results = append(results, ToMap(flattened, dataQuery, nil)...)
+	}
+
+	if t.reportStderr && stdErr.Len() > 0 {
+		results = append(results, ToMap([]dataflatten.Row{
+			{
+				Path:  []string{"error"},
+				Value: stdErr.String(),
+			},
+		}, "*", nil)...)
 	}
 
 	return results, nil
