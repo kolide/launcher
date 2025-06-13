@@ -159,7 +159,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 		switch objPropertyStart {
 		case tokenObjectEnd:
 			// No more properties. We've reached the end of the object -- return.
-			// The next byte is `properties_written`, which we don't care about -- read it
+			// The next varint is `properties_written`, which we don't care about -- read it
 			// so it doesn't affect future parsing.
 			_, _ = binary.ReadVarint(srcReader)
 			return obj, nil
@@ -404,10 +404,10 @@ func deserializeSparseArray(ctx context.Context, slogger *slog.Logger, srcReader
 			}
 			i = int(arrIdx)
 		case tokenEndSparseArray:
-			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
+			// We have extra padding here -- the next two varints are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
-			_, _ = srcReader.ReadByte()
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadVarint(srcReader)
+			_, _ = binary.ReadVarint(srcReader)
 			// The array has ended -- return.
 			reachedEndOfArray = true
 		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
@@ -484,10 +484,10 @@ func deserializeDenseArray(ctx context.Context, slogger *slog.Logger, srcReader 
 
 		switch nextByte {
 		case tokenEndDenseArray:
-			// We have extra padding here -- the next two bytes are `properties_written` and `length`,
+			// We have extra padding here -- the next two varints are `properties_written` and `length`,
 			// respectively. We don't care about checking them, so we read and discard them.
-			_, _ = srcReader.ReadByte()
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadVarint(srcReader)
+			_, _ = binary.ReadVarint(srcReader)
 			reachedEndOfArray = true
 			continue
 		case tokenPossiblyArrayTermination0x01, tokenPossiblyArrayTermination0x03:
