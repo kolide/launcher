@@ -100,8 +100,9 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 	},
 	"microsoft_defender_atp": {
 		allowedOpts: map[string]struct{}{
-			"health":        {},
-			"--output json": {},
+			"health":   {},
+			"--output": {},
+			"json":     {},
 		},
 		generate: allowedcmd.MicrosoftDefenderATP,
 	},
