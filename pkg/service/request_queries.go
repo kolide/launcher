@@ -110,7 +110,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 
 		message := "success"
 		if err != nil {
-			message = "failure"
+			message = "failure requesting queries"
 		}
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here

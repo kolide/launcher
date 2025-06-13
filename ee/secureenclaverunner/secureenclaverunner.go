@@ -162,7 +162,7 @@ func (ser *secureEnclaveRunner) Interrupt(_ error) {
 func (ser *secureEnclaveRunner) Public() crypto.PublicKey {
 	k, err := ser.currentConsoleUserKey(context.TODO())
 	if err != nil {
-		ser.slogger.Log(context.TODO(), slog.LevelError,
+		ser.slogger.Log(context.TODO(), slog.LevelWarn,
 			"getting public key",
 			"err", err,
 		)
