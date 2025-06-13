@@ -143,6 +143,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 	defer span.End()
 
 	obj := make(map[string][]byte)
+	lastPropertyName := ""
 
 	for {
 		// Parse the next property in this object.
@@ -174,6 +175,9 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
 			}
 			currentPropertyName = string(objectPropertyNameBytes)
+		case tokenPossiblyArrayTermination0x01:
+			// Ignore any additional padding we run into and advance to (hopefully) the next key
+			continue
 		default:
 			// Handle unexpected tokens here. Likely, if we run into this issue, we've
 			// already committed an error when parsing. Collect as much information as
@@ -194,6 +198,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				"total_byte_count", srcReader.Size(),
 				"next_byte", fmt.Sprintf("%02x", nextByte),
 				"next_byte_read_err", err,
+				"last_property_name_read", lastPropertyName,
 			)
 			return obj, fmt.Errorf("object property name has unexpected non-string type %02x / `%s`", objPropertyStart, string(objPropertyStart))
 		}
@@ -210,6 +215,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 			return obj, fmt.Errorf("decoding value for `%s`: %w", currentPropertyName, err)
 		}
 		obj[currentPropertyName] = val
+		lastPropertyName = currentPropertyName
 	}
 }
 
