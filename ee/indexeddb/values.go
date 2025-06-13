@@ -161,7 +161,7 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 			// No more properties. We've reached the end of the object -- return.
 			// The next byte is `properties_written`, which we don't care about -- read it
 			// so it doesn't affect future parsing.
-			_, _ = srcReader.ReadByte()
+			_, _ = binary.ReadVarint(srcReader)
 			return obj, nil
 		case tokenAsciiStr:
 			objectPropertyNameBytes, err := deserializeAsciiStr(srcReader)
@@ -175,9 +175,6 @@ func deserializeObject(ctx context.Context, slogger *slog.Logger, srcReader *byt
 				return obj, fmt.Errorf("deserializing object property UTF-16 string: %w", err)
 			}
 			currentPropertyName = string(objectPropertyNameBytes)
-		case tokenPossiblyArrayTermination0x01:
-			// Ignore any additional padding we run into and advance to (hopefully) the next key
-			continue
 		default:
 			// Handle unexpected tokens here. Likely, if we run into this issue, we've
 			// already committed an error when parsing. Collect as much information as
