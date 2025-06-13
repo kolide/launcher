@@ -48,15 +48,15 @@ func WithTableDebug() execTableV2Opt {
 	}
 }
 
+// WithIncludeStderr combines stdout and stderr before attempting any parsing
 func WithIncludeStderr() execTableV2Opt {
 	return func(t *execTableV2) {
 		t.includeStderr = true
 	}
 }
 
-// WithReportStderr will include stderr in the parsed output as a separate column
-// in the results produced by the query. this will override the behavior from WithIncludeStderr,
-// which simply includes stderr in the stdout produced
+// WithReportStderr will include stderr (if populated) in the parsed output as a
+// separate row in the results produced by the query
 func WithReportStderr() execTableV2Opt {
 	return func(t *execTableV2) {
 		t.reportStderr = true
@@ -124,21 +124,19 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 				"err", err,
 			)
 
-			// if we failed to flatten it is likely due to a parse error,
-			// include stderr as error in these cases if configured to do so
-			if !t.reportStderr {
-				continue
-			}
-
-			flattened = []dataflatten.Row{
-				{
-					Path:  []string{"error"},
-					Value: stdErr.String(),
-				},
-			}
+			continue
 		}
 
 		results = append(results, ToMap(flattened, dataQuery, nil)...)
+	}
+
+	if t.reportStderr && stdErr.Len() > 0 {
+		results = append(results, ToMap([]dataflatten.Row{
+			{
+				Path:  []string{"error"},
+				Value: stdErr.String(),
+			},
+		}, "*", nil)...)
 	}
 
 	return results, nil
