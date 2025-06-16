@@ -103,8 +103,6 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 
 	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here.
 	// callers are free to ignore stdErr if not needed in other cases.
-	// we cannot declare stdErr as io.Discard and then overwrite it conditionally because there
-	// will be no way to read from it later if needed (e.g. for WithReportStderr).
 	if t.includeStderr {
 		stdErr = stdout
 	}
