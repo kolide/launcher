@@ -152,6 +152,5 @@ func Zpool(ctx context.Context, arg ...string) (*TracedCmd, error) {
 }
 
 func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	// return validatedCommand(ctx, "/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli", arg...)
-	return validatedCommand(ctx, "/tmp/zscaler", arg...)
+	return validatedCommand(ctx, "/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli", arg...)
 }

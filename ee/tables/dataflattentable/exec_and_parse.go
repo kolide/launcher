@@ -23,15 +23,16 @@ type bytesFlattener interface {
 
 // execTableV2 is the next iteration of the dataflattentable wrapper. Aim to migrate exec based tables to this.
 type execTableV2 struct {
-	slogger        *slog.Logger
-	tableName      string
-	flattener      bytesFlattener
-	timeoutSeconds int
-	tabledebug     bool
-	includeStderr  bool
-	reportStderr   bool
-	cmd            allowedcmd.AllowedCommand
-	execArgs       []string
+	slogger             *slog.Logger
+	tableName           string
+	flattener           bytesFlattener
+	timeoutSeconds      int
+	tabledebug          bool
+	includeStderr       bool
+	reportStderr        bool
+	reportMissingBinary bool
+	cmd                 allowedcmd.AllowedCommand
+	execArgs            []string
 }
 
 type execTableV2Opt func(*execTableV2)
@@ -63,6 +64,19 @@ func WithReportStderr() execTableV2Opt {
 	}
 }
 
+// WithReportMissingBinary will include an error row in the results
+// indicating that the binary is missing. Without this option, queries
+// against missing binaries typically return no results, with the error
+// being ignored.
+// Note that for tables that run through macos RunDisclaimed, we cannot pass our missing
+// binary errors back through- this information is conveyed through stderr, so callers
+// should also include the WithReportStderr option to see the same behavior there.
+func WithReportMissingBinary() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.reportMissingBinary = true
+	}
+}
+
 func NewExecAndParseTable(flags types.Flags, slogger *slog.Logger, tableName string, p parser, cmd allowedcmd.AllowedCommand, execArgs []string, opts ...execTableV2Opt) *table.Plugin {
 	t := &execTableV2{
 		slogger:        slogger.With("table", tableName),
@@ -87,7 +101,7 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	var results []map[string]string
 	var stdout, stdErr bytes.Buffer
 
-	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here
+	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here.
 	// callers are free to ignore stdErr if not needed in other cases.
 	// we cannot declare stdErr as io.Discard and then overwrite it conditionally because there
 	// will be no way to read from it later if needed (e.g. for WithReportStderr).
@@ -96,10 +110,20 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	}
 
 	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, &stdErr); err != nil {
-		// exec will error if there's no binary, so we never want to record that
-		if os.IsNotExist(errors.Cause(err)) {
-			return nil, nil
+		// exec will error if there's no binary, don't record that unless configured to do so
+		if os.IsNotExist(errors.Cause(err)) || errors.Is(err, allowedcmd.ErrCommandNotFound) {
+			if !t.reportMissingBinary {
+				return nil, nil
+			}
+
+			return append(results, ToMap([]dataflatten.Row{
+				{
+					Path:  []string{"error"},
+					Value: "binary is not present on device",
+				},
+			}, "*", nil)...), nil
 		}
+
 		observability.SetError(span, err)
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"exec failed",
