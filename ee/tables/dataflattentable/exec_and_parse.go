@@ -112,16 +112,16 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, &stdErr); err != nil {
 		// exec will error if there's no binary, don't record that unless configured to do so
 		if os.IsNotExist(errors.Cause(err)) || errors.Is(err, allowedcmd.ErrCommandNotFound) {
-			if !t.reportMissingBinary {
-				return nil, nil
+			if t.reportMissingBinary {
+				return append(results, ToMap([]dataflatten.Row{
+					{
+						Path:  []string{"error"},
+						Value: "binary is not present on device",
+					},
+				}, "*", nil)...), nil
 			}
 
-			return append(results, ToMap([]dataflatten.Row{
-				{
-					Path:  []string{"error"},
-					Value: "binary is not present on device",
-				},
-			}, "*", nil)...), nil
+			return nil, nil
 		}
 
 		observability.SetError(span, err)
@@ -129,6 +129,17 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 			"exec failed",
 			"err", err,
 		)
+
+		// Run failed, but we may have stderr to report with results anyway
+		if t.reportStderr && stdErr.Len() > 0 {
+			return append(results, ToMap([]dataflatten.Row{
+				{
+					Path:  []string{"error"},
+					Value: stdErr.String(),
+				},
+			}, "*", nil)...), nil
+		}
+
 		return nil, nil
 	}
 
@@ -154,6 +165,8 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 		results = append(results, ToMap(flattened, dataQuery, nil)...)
 	}
 
+	// we could have made it through tablehelpers.Run above but still have seen error messaging
+	// to stderr- ensure we include that here if configured to do so
 	if t.reportStderr && stdErr.Len() > 0 {
 		results = append(results, ToMap([]dataflatten.Row{
 			{
