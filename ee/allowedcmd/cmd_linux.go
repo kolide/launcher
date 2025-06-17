@@ -105,6 +105,10 @@ func Lsof(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/bin/lsof", arg...)
 }
 
+func MicrosoftDefenderATP(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, "/usr/bin/mdatp", arg...)
+}
+
 func NixEnv(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/run/current-system/sw/bin/nix-env", arg...)
 }
