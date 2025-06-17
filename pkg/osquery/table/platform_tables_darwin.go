@@ -127,7 +127,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "carbonblack_repcli", "status"}),
-		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zscaler", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "zscaler", "status", "-s", "all"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zscaler", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "zscaler", "status", "-s", "all"}, dataflattentable.WithReportStderr(), dataflattentable.WithReportMissingBinary()),
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_microsoft_defender_atp_health", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "microsoft_defender_atp", "health", "--output", "json"}),
