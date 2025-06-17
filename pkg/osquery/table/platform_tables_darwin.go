@@ -31,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/ee/tables/profiles"
 	"github.com/kolide/launcher/ee/tables/pwpolicy"
+	"github.com/kolide/launcher/ee/tables/security"
 	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
 	"github.com/kolide/launcher/ee/tables/zfs"
@@ -129,5 +130,6 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zscaler", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "zscaler", "status", "-s", "all"}),
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
+		security.CertTrustSettingsTablePlugin(k, slogger),
 	}
 }
