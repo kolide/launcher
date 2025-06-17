@@ -320,6 +320,8 @@ func parseTrustSetting(reader *bufio.Reader) (*trustSetting, error) {
 		// typically with 3 spaces before it. So, we peek ahead len(trustSettingHeaderPrefix)+10, to be safe.
 		nextBytes, err := reader.Peek(len(trustSettingHeaderPrefix) + 10)
 		if err != nil && !errors.Is(err, bufio.ErrBufferFull) && !errors.Is(err, io.EOF) {
+			// If the error is io.EOF, we don't want to return yet -- we might have another line left
+			// to read that is under `len(trustSettingHeaderPrefix) + 10` bytes in length.
 			return nil, fmt.Errorf("peeking ahead: %w", err)
 		}
 		nextStr := strings.TrimSpace(string(nextBytes))
