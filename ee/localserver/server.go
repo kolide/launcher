@@ -86,7 +86,8 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 
 	munemo, err := getMunemoFromKnapsack(k)
 	if err != nil {
-		ls.slogger.Log(ctx, slog.LevelError,
+		// Probably a new installation that isn't registered yet
+		ls.slogger.Log(ctx, slog.LevelDebug,
 			"getting munemo from knapsack, not fatal, continuing",
 			"err", err,
 		)
@@ -182,7 +183,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	slogLevel := slog.LevelDebug
 
 	switch {
-	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."), strings.Contains(ls.kolideServer, ".kolide.test"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using developer certificates",
 		)
