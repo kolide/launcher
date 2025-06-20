@@ -95,7 +95,6 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		MDMInfo(k, slogger),
 		macos_software_update.MacOSUpdate(k, slogger),
 		macos_software_update.RecommendedUpdates(k, slogger),
-		macos_software_update.AvailableProducts(k, slogger),
 		MachoInfo(k, slogger),
 		spotlight.TablePlugin(k, slogger),
 		TouchIDUserConfig(k, slogger),
