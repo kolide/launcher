@@ -100,7 +100,6 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		spotlight.TablePlugin(k, slogger),
 		TouchIDUserConfig(k, slogger),
 		TouchIDSystemConfig(k, slogger),
-		UserAvatar(k, slogger),
 		ioreg.TablePlugin(k, slogger),
 		profiles.TablePlugin(k, slogger),
 		airport.TablePlugin(k, slogger),
