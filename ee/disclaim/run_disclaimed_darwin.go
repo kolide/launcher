@@ -57,6 +57,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/user"
 	"unsafe"
 
@@ -98,6 +99,14 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: allowedcmd.Zscli,
 	},
+	"microsoft_defender_atp": {
+		allowedOpts: map[string]struct{}{
+			"health":   {},
+			"--output": {},
+			"json":     {},
+		},
+		generate: allowedcmd.MicrosoftDefenderATP,
+	},
 }
 
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
@@ -105,6 +114,8 @@ func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	cmd, err := commandToDisclaim(ctx, args)
 	// this command is used to generate table data, do not error if the target binary is not found
 	if err != nil && errors.Is(err, allowedcmd.ErrCommandNotFound) {
+		// write that we haven't found the binary to stderr so callers can report on this if needed
+		fmt.Fprint(os.Stderr, "binary is not present on device")
 		return nil
 	}
 

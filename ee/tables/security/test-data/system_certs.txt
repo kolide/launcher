@@ -1,0 +1,15 @@
+Number of trusted certs = 7
+Cert 0: Go Daddy Root Certificate Authority - G2
+   Number of trust settings : 0
+Cert 1: HARICA TLS ECC Root CA 2021
+   Number of trust settings : 0
+Cert 2: NAVER Global Root Certification Authority
+   Number of trust settings : 0
+Cert 3: DigiCert TLS ECC P384 Root G5
+   Number of trust settings : 0
+Cert 4: Sectigo Public Time Stamping Root R46
+   Number of trust settings : 0
+Cert 5: OISTE WISeKey Global Root GA CA
+   Number of trust settings : 0
+Cert 6: Trustwave Global ECC P384 Certification Authority
+   Number of trust settings : 0
