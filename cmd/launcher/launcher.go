@@ -213,9 +213,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	initLauncherHistory(k)
 
 	gowrapper.Go(ctx, slogger, func() {
-		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
-	})
-	gowrapper.Go(ctx, slogger, func() {
 		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	})
 	gowrapper.Go(ctx, slogger, func() {
@@ -376,6 +373,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
 	}
+
+	// Now that the keys exist, collect and set enrollment details (which include the agent keys) in the background
+	gowrapper.Go(ctx, slogger, func() {
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
+	})
 
 	// init osquery instance history
 	if osqHistory, err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
