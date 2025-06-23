@@ -76,8 +76,7 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 })
 
 // copyBinary ensures we've downloaded a test osquery binary, then creates a symlink
-// between the real binary and the expected `executablePath` location. (We used to
-// actually copy the entire binary, but found that was very slow.)
+// between the real binary and the expected `executablePath` location.
 func copyBinary(t *testing.T, executablePath string) {
 	downloadOnceFunc()
 
