@@ -91,11 +91,12 @@ func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		useShortRootDir bool
-		osqueryFlags    []string
-		wantProc        bool
-		errContainsStr  string
+		name               string
+		useShortRootDir    bool
+		osqueryFlags       []string
+		configFileContents []byte
+		wantProc           bool
+		errContainsStr     string
 	}{
 		{
 			name:            "no flags",
@@ -114,9 +115,13 @@ func TestProc(t *testing.T) {
 		{
 			name:            "config path",
 			useShortRootDir: true,
-			osqueryFlags: []string{
-				fmt.Sprintf("config_path=%s", ulid.New()),
-			},
+			configFileContents: []byte(`
+{
+  "options": {
+    "verbose": true
+  }
+}
+`),
 			wantProc: true,
 		},
 		{
@@ -144,6 +149,13 @@ func TestProc(t *testing.T) {
 				AddSource: true,
 				Level:     slog.LevelDebug,
 			}))
+
+			// Set up config file, if needed
+			if len(tt.configFileContents) > 0 {
+				configFilePath := filepath.Join(rootDir, "osquery.conf")
+				require.NoError(t, os.WriteFile(configFilePath, tt.configFileContents, 0755), "writing config file")
+				tt.osqueryFlags = append(tt.osqueryFlags, fmt.Sprintf("config_path=%s", configFilePath))
+			}
 
 			// Set up knapsack
 			mockSack := mocks.NewKnapsack(t)
