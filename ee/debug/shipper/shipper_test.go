@@ -11,6 +11,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/control"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -24,6 +25,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
 		expectSignatureHeaders bool
 		expectSecret           bool
+		expectMunemo           bool
 		withUploadRequestURL   bool
 		assertion              assert.ErrorAssertionFunc
 	}{
@@ -34,6 +36,12 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
 				k.On("Slogger").Return(multislogger.NewNopLogger())
+				k.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         "test-munemo",
+					},
+				}, nil)
 				return k
 			},
 			assertion:            assert.NoError,
@@ -41,14 +49,17 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			// if the secret exists at the default path, is should error when
 			// we try to read it unless we run tests as root
 			expectSecret: false,
+			expectMunemo: true,
 		},
 		{
-			name: "no enroll secret, singed url req from knapsack",
+			name: "no enroll secret, signed url req from knapsack",
 			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
 				k.On("Slogger").Return(multislogger.NewNopLogger())
+				k.On("Registrations").Return([]types.Registration{}, nil)
+				k.On("RootDirectory").Return(t.TempDir())
 				return k
 			},
 			assertion:            assert.NoError,
@@ -56,6 +67,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			// if the secret exists at the default path, is should error when
 			// we try to read it unless we run tests as root
 			expectSecret: false,
+			expectMunemo: false,
 		},
 		{
 			name: "happy path with signing keys and enroll secret",
@@ -66,10 +78,17 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
 				k.On("Slogger").Return(multislogger.NewNopLogger())
+				k.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         "test-munemo",
+					},
+				}, nil)
 				return k
 			},
 			expectSignatureHeaders: true,
 			expectSecret:           true,
+			expectMunemo:           true,
 			withUploadRequestURL:   true,
 			assertion:              assert.NoError,
 		},
@@ -95,6 +114,7 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				require.NoError(t, json.Unmarshal(body, &data))
 
 				require.Equal(t, tt.expectSecret, len(data["enroll_secret"]) > 0)
+				require.Equal(t, tt.expectMunemo, len(data["munemo"]) > 0)
 				require.NotEmpty(t, data["hostname"])
 				require.NotEmpty(t, data["note"])
 				require.NotEmpty(t, data["console_users"])
