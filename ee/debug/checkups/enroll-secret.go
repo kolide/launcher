@@ -26,6 +26,24 @@ func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	secretStatus := make(map[string]Status, 0)
 	secretSummary := make(map[string]string, 0)
 
+	// Check registrations first -- will only be available if we're running in situ
+	if registrations, err := c.k.Registrations(); err == nil {
+		if len(registrations) == 0 {
+			fmt.Fprint(extraFH, "no registrations found in knapsack")
+		} else {
+			for i, registration := range registrations {
+				if registration.Munemo != "" {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): %s\n", i, registration.RegistrationID, registration.Munemo)
+				} else {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): no munemo set\n", i, registration.RegistrationID)
+				}
+
+			}
+		}
+
+		fmt.Fprintf(extraFH, "\n\n")
+	}
+
 	for _, secretPath := range c.getSecretPaths() {
 		// Later on, we want to fall back to the _first_ secret's status. Set it here
 		st, summary := parseSecret(extraFH, secretPath)

@@ -146,13 +146,14 @@ func (ser *secureEnclaveRunner) Execute() error {
 
 func (ser *secureEnclaveRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if ser.interrupted.Load() {
+	if ser.interrupted.Swap(true) {
 		return
 	}
 
-	ser.interrupted.Store(true)
-
 	// Tell the execute loop to stop checking, and exit
+	ser.slogger.Log(context.TODO(), slog.LevelDebug,
+		"received request to interrupt, sending interrupt to secure enclave signer execute loop",
+	)
 	ser.interrupt <- struct{}{}
 }
 
@@ -161,7 +162,7 @@ func (ser *secureEnclaveRunner) Interrupt(_ error) {
 func (ser *secureEnclaveRunner) Public() crypto.PublicKey {
 	k, err := ser.currentConsoleUserKey(context.TODO())
 	if err != nil {
-		ser.slogger.Log(context.TODO(), slog.LevelError,
+		ser.slogger.Log(context.TODO(), slog.LevelWarn,
 			"getting public key",
 			"err", err,
 		)

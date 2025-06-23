@@ -57,6 +57,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/user"
 	"unsafe"
 
@@ -69,6 +70,12 @@ type allowedCmdGenerator struct {
 	generate    func(ctx context.Context, args ...string) (*allowedcmd.TracedCmd, error)
 }
 
+// allowedCmdGenerators maps command names to their allowed options and generator functions.
+// Each entry defines which command-line options are permitted for a given command when
+// running in disclaimed mode, along with the function to generate the TracedCmd.
+// in most cases you should be able to set generator to the corresponding allowedcmd,
+// but you may need to add a helper for additional setup if your command
+// requires it (see generateBrewCommand)
 var allowedCmdGenerators = map[string]allowedCmdGenerator{
 	"brew": {
 		allowedOpts: map[string]struct{}{
@@ -90,13 +97,38 @@ var allowedCmdGenerators = map[string]allowedCmdGenerator{
 		},
 		generate: allowedcmd.Repcli,
 	},
+	"zscaler": {
+		allowedOpts: map[string]struct{}{
+			"status": {},
+			"-s":     {},
+			"all":    {},
+		},
+		generate: allowedcmd.Zscli,
+	},
+	"microsoft_defender_atp": {
+		allowedOpts: map[string]struct{}{
+			"health":   {},
+			"--output": {},
+			"json":     {},
+		},
+		generate: allowedcmd.MicrosoftDefenderATP,
+	},
 }
 
+// RunDisclaimed executes a command using posix_spawn with disclaimed privileges.
+// It validates the command and arguments against our allowedCmdGenerators, then spawns the process
+// using C bindings to spawn_disclaimed. If the target binary is not found, it writes a
+// message to stderr and returns nil to allow callers to handle missing binaries gracefully.
+// An error is returned if any command validation fails, or if spawn_disclaimed is unsuccessful-
+// in these cases the subcommand itself will return a non-zero exit status, meaning that the
+// corresponding table Run command will see an error here as a failure to run
 func RunDisclaimed(_ *multislogger.MultiSlogger, args []string) error {
 	ctx := context.Background()
 	cmd, err := commandToDisclaim(ctx, args)
 	// this command is used to generate table data, do not error if the target binary is not found
 	if err != nil && errors.Is(err, allowedcmd.ErrCommandNotFound) {
+		// write that we haven't found the binary to stderr so callers can report on this if needed
+		fmt.Fprint(os.Stderr, "binary is not present on device")
 		return nil
 	}
 

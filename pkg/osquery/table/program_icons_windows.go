@@ -181,20 +181,21 @@ func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("expanding path: %w", err)
 	}
 	icoReader, err := os.Open(expandedPath)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("opening path: %w", err)
 	}
+	defer icoReader.Close()
 	img, err := ico.Decode(icoReader)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("decoding image: %w", err)
 	}
 	buf := new(bytes.Buffer)
 	img = resize.Resize(128, 128, img, resize.Bilinear)
 	if err := png.Encode(buf, img); err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("encoding image: %w", err)
 	}
 
 	checksum := crc64.Checksum(buf.Bytes(), crcTable)

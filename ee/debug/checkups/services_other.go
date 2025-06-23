@@ -6,9 +6,12 @@ package checkups
 import (
 	"context"
 	"io"
+
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type servicesCheckup struct {
+	k types.Knapsack
 }
 
 func (s *servicesCheckup) Name() string {

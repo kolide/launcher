@@ -367,7 +367,7 @@ func (i *OsqueryInstance) Launch() error {
 	// Register as many of our shutdown functions ahead of time as we can, so that we can make sure
 	// we fully clean up after any partially-launched erroring instances.
 	i.errgroup.AddShutdownGoroutine(ctx, "kill_osquery_process", func() error {
-		if i.cmd.Process == nil {
+		if i.cmd == nil || i.cmd.Process == nil {
 			return nil
 		}
 

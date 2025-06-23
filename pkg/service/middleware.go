@@ -30,7 +30,7 @@ type uuidmw struct {
 // levelForError returns slog.LevelError if err != nil, else slog.LevelDebug
 func levelForError(err error) slog.Level {
 	if err != nil {
-		return slog.LevelError
+		return slog.LevelWarn
 	}
 	return slog.LevelDebug
 }

@@ -79,6 +79,10 @@ func Mdmclient(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/libexec/mdmclient", arg...)
 }
 
+func MicrosoftDefenderATP(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, "/usr/local/bin/mdatp", arg...)
+}
+
 func Netstat(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/netstat", arg...)
 }
@@ -123,6 +127,10 @@ func Scutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/scutil", arg...)
 }
 
+func Security(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, "/usr/bin/security", arg...)
+}
+
 func Socketfilterfw(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/libexec/ApplicationFirewall/socketfilterfw", arg...)
 }
@@ -149,4 +157,8 @@ func Zfs(ctx context.Context, arg ...string) (*TracedCmd, error) {
 
 func Zpool(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/sbin/zpool", arg...)
+}
+
+func Zscli(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, "/Applications/Zscaler/Zscaler.app/Contents/PlugIns/zscli", arg...)
 }

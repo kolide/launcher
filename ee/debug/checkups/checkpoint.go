@@ -63,11 +63,9 @@ func (c *logCheckPointer) Run() error {
 
 func (c *logCheckPointer) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if c.interrupted.Load() {
+	if c.interrupted.Swap(true) {
 		return
 	}
-
-	c.interrupted.Store(true)
 
 	c.interrupt <- struct{}{}
 }
@@ -95,6 +93,9 @@ func (c *logCheckPointer) LogCheckupsOnStartup(ctx context.Context) {
 // based on those statuses; it logs the score and reports it as a metric. Once allows us to see a snapshot
 // of launcher health.
 func (c *logCheckPointer) Once(ctx context.Context) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	checkups := checkupsFor(c.knapsack, logSupported)
 
 	warningCheckups := make([]string, 0)

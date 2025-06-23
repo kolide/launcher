@@ -37,9 +37,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/scjalliance/comshim"
 )
 
 const (
@@ -134,7 +134,10 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	queryString := fmt.Sprintf("SELECT * FROM %s%s", className, whereClause)
 
 	// Initialize the COM system.
-	comshim.Add(1)
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return nil, fmt.Errorf("unable to init comshim: %w", err)
+	}
 	defer comshim.Done()
 
 	unknown, err := oleutil.CreateObject("WbemScripting.SWbemLocator")

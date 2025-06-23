@@ -132,11 +132,9 @@ func (tr *tpmRunner) Execute() error {
 
 func (tr *tpmRunner) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if tr.interrupted.Load() {
+	if tr.interrupted.Swap(true) {
 		return
 	}
-
-	tr.interrupted.Store(true)
 
 	// Tell the execute loop to stop checking, and exit
 	tr.interrupt <- struct{}{}

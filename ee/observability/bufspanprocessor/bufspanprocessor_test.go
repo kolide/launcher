@@ -31,9 +31,7 @@ func TestBufSpanProcessor(t *testing.T) {
 			maxBufSpans := 10
 
 			// create the buf span processor
-			bsp := &BufSpanProcessor{
-				MaxBufferedSpans: maxBufSpans,
-			}
+			bsp := NewBufSpanProcessor(maxBufSpans)
 
 			// callling these for shameless code coverage
 			require.NoError(t, bsp.ForceFlush(context.TODO()))

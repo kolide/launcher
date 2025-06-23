@@ -17,6 +17,9 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/dnf"
 	"github.com/kolide/launcher/ee/tables/execparsers/dpkg"
 	flatpak_upgradeable "github.com/kolide/launcher/ee/tables/execparsers/flatpak/remote_ls/upgradeable"
+	json "github.com/kolide/launcher/ee/tables/execparsers/json"
+	"github.com/kolide/launcher/ee/tables/execparsers/key_value"
+	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
 	pacman_group "github.com/kolide/launcher/ee/tables/execparsers/pacman/group"
 	pacman_info "github.com/kolide/launcher/ee/tables/execparsers/pacman/info"
 	pacman_upgradeable "github.com/kolide/launcher/ee/tables/execparsers/pacman/upgradeable"
@@ -48,17 +51,11 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		falconctl.NewFalconctlOptionTable(k, slogger),
 		xfconf.TablePlugin(k, slogger),
 
-		dataflattentable.TablePluginExec(k, slogger,
-			"kolide_nmcli_wifi", dataflattentable.KeyValueType,
-			allowedcmd.Nmcli,
-			[]string{"--mode=multiline", "--fields=all", "device", "wifi", "list"},
-			dataflattentable.WithKVSeparator(":")),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_lsblk", dataflattentable.JsonType,
-			allowedcmd.Lsblk, []string{"-fJp"},
-		),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_wsone_uem_status_enroll", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--enroll"}),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_wsone_uem_status_dependency", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--dependency"}),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_wsone_uem_status_profile", dataflattentable.JsonType, allowedcmd.Ws1HubUtil, []string{"status", "--profile"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_nmcli_wifi", key_value.NewWithDelimiter(":"), allowedcmd.Nmcli, []string{"--mode=multiline", "--fields=all", "device", "wifi", "list"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_lsblk", json.Parser, allowedcmd.Lsblk, []string{"-fJp"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_enroll", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--enroll"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_dependency", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--dependency"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_wsone_uem_status_profile", json.Parser, allowedcmd.Ws1HubUtil, []string{"status", "--profile"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_falconctl_systags", simple_array.New("systags"), allowedcmd.Falconctl, []string{"-g", "--systags"}),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_apt_upgradeable", apt.Parser, allowedcmd.Apt, []string{"list", "--upgradeable"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_dnf_upgradeable", dnf.Parser, allowedcmd.Dnf, []string{"check-update"}, dataflattentable.WithIncludeStderr()),
@@ -71,10 +68,11 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_snap_installed", data_table.NewParser(), allowedcmd.Snap, []string{"list"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_snap_upgradeable", data_table.NewParser(), allowedcmd.Snap, []string{"refresh", "--list"}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Repcli, []string{"status"}, dataflattentable.WithIncludeStderr()),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_zypper_upgradeable_packages", dataflattentable.XmlType, allowedcmd.Zypper, []string{"-x", "lu"}),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_zypper_upgradeable_patches", dataflattentable.XmlType, allowedcmd.Zypper, []string{"-x", "lp"}),
-		dataflattentable.TablePluginExec(k, slogger, "kolide_nftables", dataflattentable.JsonType, allowedcmd.Nftables, []string{"-jat", "list", "ruleset"}), // -j (json) -a (show object handles) -t (terse, omit set contents)
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zypper_upgradeable_packages", mapxml.Parser, allowedcmd.Zypper, []string{"-x", "lu"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zypper_upgradeable_patches", mapxml.Parser, allowedcmd.Zypper, []string{"-x", "lp"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_nftables", json.Parser, allowedcmd.Nftables, []string{"-jat", "list", "ruleset"}), // -j (json) -a (show object handles) -t (terse, omit set contents)
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_microsoft_defender_atp_health", json.Parser, allowedcmd.MicrosoftDefenderATP, []string{"health", "--output", "json"}),
 	}
 }

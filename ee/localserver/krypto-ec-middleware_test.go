@@ -2,6 +2,7 @@ package localserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/base64"
@@ -16,13 +17,14 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -609,44 +611,61 @@ func mustExtractJsonProperty[T any](t *testing.T, jsonData []byte, property stri
 func TestMunemoCheck(t *testing.T) {
 	t.Parallel()
 
-	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {"test-munemo"}}
+	expectedMunemo := "test-munemo"
+	validTestHeader := map[string][]string{"kolideMunemoHeaderKey": {expectedMunemo}}
 
 	tests := []struct {
 		name                      string
 		headers                   map[string][]string
-		tokenClaims               jwt.MapClaims
+		registrations             []types.Registration
 		expectMunemoExtractionErr bool
 		expectMiddleWareCheckErr  bool
 	}{
 		{
-			name:        "matching munemo",
-			headers:     validTestHeader,
-			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+			name:    "matching munemo",
+			headers: validTestHeader,
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 		},
 		{
-			name:        "no munemo header",
-			tokenClaims: jwt.MapClaims{"organization": "test-munemo"},
+			name: "no munemo header",
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 		},
 		{
-			name:                      "no token claims",
+			name:                      "no registrations",
 			headers:                   validTestHeader,
+			registrations:             []types.Registration{},
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:                      "token claim not string",
-			headers:                   validTestHeader,
-			tokenClaims:               jwt.MapClaims{"organization": 1},
+			name:    "no default registration",
+			headers: validTestHeader,
+			registrations: []types.Registration{
+				{
+					RegistrationID: "some-other-registration-id",
+					Munemo:         "some-other-munemo",
+				},
+			},
 			expectMunemoExtractionErr: true,
 		},
 		{
-			name:        "empty org claim",
-			headers:     validTestHeader,
-			tokenClaims: jwt.MapClaims{"organization": ""},
-		},
-		{
-			name:                     "header and munemo dont match",
-			headers:                  map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
-			tokenClaims:              jwt.MapClaims{"organization": "test-munemo"},
+			name:    "header and munemo dont match",
+			headers: map[string][]string{kolideMunemoHeaderKey: {"other-munemo"}},
+			registrations: []types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         expectedMunemo,
+				},
+			},
 			expectMiddleWareCheckErr: true,
 		},
 	}
@@ -656,14 +675,11 @@ func TestMunemoCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, tt.tokenClaims).SignedString([]byte("test"))
-			require.NoError(t, err)
-
 			k := typesmocks.NewKnapsack(t)
-			k.On("ReadEnrollSecret").Return(token, nil)
 			k.On("EnrollSecretPath").Return("").Maybe()
+			k.On("Registrations").Return(tt.registrations, nil)
 
-			munemo, err := getMunemoFromEnrollSecret(k)
+			munemo, err := getMunemoFromKnapsack(k)
 			if tt.expectMunemoExtractionErr {
 				require.Error(t, err)
 				return
@@ -679,4 +695,48 @@ func TestMunemoCheck(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func Test_sendCallback(t *testing.T) {
+	t.Parallel()
+
+	// Set up a test server to receive callback requests
+	requestsReceived := &atomic.Int64{}
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestsReceived.Add(1)
+		w.Write([]byte("{}"))
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testCallbackServer.Close()
+	})
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
+	k := typesmocks.NewKnapsack(t)
+
+	requestsQueued := &atomic.Int64{}
+	mw := newKryptoEcMiddleware(slogger, nil, mustGenEcdsaKey(t).PublicKey, k, nil, "test-munemo")
+	for range callbackQueueCapacity {
+		go func() {
+			req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, testCallbackServer.URL, nil)
+			require.NoError(t, err)
+			mw.sendCallback(req, &callbackDataStruct{})
+			requestsQueued.Add(1)
+		}()
+	}
+
+	// Wait a little bit to give the requests a chance to enqueue
+	time.Sleep(5 * time.Second)
+
+	// We should have been able to add all requests to the queue
+	require.Equal(t, callbackQueueCapacity, int(requestsQueued.Load()), "could not add all requests to queue; logs: ", logBytes.String())
+
+	// We should have sent at least some of them
+	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
 }

@@ -118,9 +118,8 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	testArgs, expectedOpts := getArgsAndResponse()
 
-	flagFile, err := os.CreateTemp("", "flag-file")
+	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")
 	require.NoError(t, err)
-	defer os.Remove(flagFile.Name())
 	expectedOpts.ConfigFilePath = flagFile.Name()
 
 	for k, val := range testArgs {

@@ -65,6 +65,7 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
+			Pipe(slogmulti.NewHandleInlineMiddleware(reportedErrorMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
 }
@@ -83,6 +84,30 @@ func ctxValuesMiddleWare(ctx context.Context, record slog.Record, next func(cont
 			})
 		}
 	}
+
+	return next(ctx, record)
+}
+
+func reportedErrorMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	if record.Level != slog.LevelError {
+		return next(ctx, record)
+	}
+
+	// We tag LevelError logs for GCP.
+	// See: https://cloud.google.com/error-reporting/docs/formatting-error-messages
+	record.AddAttrs(
+		// We must set @type so that GCP knows it's a ReportedError
+		slog.Attr{
+			Key:   "@type",
+			Value: slog.StringValue("type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent"),
+		},
+		// GCP must have a "message", "stack_trace", or "exception" field, none of which we're guaranteed here
+		// (we report up record.Message under key "msg"). Duplicate record.Message to key "message" so the error will be recorded.
+		slog.Attr{
+			Key:   "message",
+			Value: slog.StringValue(record.Message),
+		},
+	)
 
 	return next(ctx, record)
 }

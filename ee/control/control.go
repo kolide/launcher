@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 )
 
@@ -22,20 +23,19 @@ const ForceFullControlDataFetchAction = "force_full_control_data_fetch"
 // ControlService is the main object that manages the control service. It is responsible for fetching
 // and caching control data, and updating consumers and subscribers.
 type ControlService struct {
-	slogger              *slog.Logger
-	knapsack             types.Knapsack
-	cancel               context.CancelFunc
-	requestIntervalMutex *sync.RWMutex
-	requestInterval      time.Duration
-	requestTicker        *time.Ticker
-	fetcher              dataProvider
-	fetchMutex           sync.Mutex
-	fetchFull            bool
-	fetchFullMutex       sync.Mutex
-	store                types.GetterSetter
-	lastFetched          map[string]string
-	consumers            map[string]consumer
-	subscribers          map[string][]subscriber
+	slogger         *slog.Logger
+	knapsack        types.Knapsack
+	cancel          context.CancelFunc
+	requestInterval *atomic.Duration
+	requestTicker   *time.Ticker
+	fetcher         dataProvider
+	fetchMutex      sync.Mutex
+	fetchFull       bool
+	fetchFullMutex  sync.Mutex
+	store           types.GetterSetter
+	lastFetched     map[string]string
+	consumers       map[string]consumer
+	subscribers     map[string][]subscriber
 }
 
 // consumer is an interface for something that consumes control server data updates. The
@@ -60,21 +60,20 @@ type dataProvider interface {
 
 func New(k types.Knapsack, fetcher dataProvider, opts ...Option) *ControlService {
 	cs := &ControlService{
-		slogger:              k.Slogger().With("component", "control"),
-		knapsack:             k,
-		requestInterval:      k.ControlRequestInterval(),
-		requestIntervalMutex: &sync.RWMutex{},
-		fetcher:              fetcher,
-		lastFetched:          make(map[string]string),
-		consumers:            make(map[string]consumer),
-		subscribers:          make(map[string][]subscriber),
+		slogger:         k.Slogger().With("component", "control"),
+		knapsack:        k,
+		requestInterval: atomic.NewDuration(k.ControlRequestInterval()),
+		fetcher:         fetcher,
+		lastFetched:     make(map[string]string),
+		consumers:       make(map[string]consumer),
+		subscribers:     make(map[string][]subscriber),
 	}
 
 	for _, opt := range opts {
 		opt(cs)
 	}
 
-	cs.requestTicker = time.NewTicker(cs.requestInterval)
+	cs.requestTicker = time.NewTicker(cs.requestInterval.Load())
 
 	// Observe ControlRequestInterval changes to know when to accelerate/decelerate fetching frequency
 	cs.knapsack.RegisterChangeObserver(cs, keys.ControlRequestInterval)
@@ -212,7 +211,7 @@ func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterva
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	currentRequestInterval := cs.readRequestInterval()
+	currentRequestInterval := cs.requestInterval.Load()
 	if newInterval == currentRequestInterval {
 		return
 	}
@@ -243,20 +242,8 @@ func (cs *ControlService) requestIntervalChanged(ctx context.Context, newInterva
 	}
 
 	// restart the ticker on new interval
-	cs.setRequestInterval(newInterval)
+	cs.requestInterval.Store(newInterval)
 	cs.requestTicker.Reset(newInterval)
-}
-
-func (cs *ControlService) setRequestInterval(interval time.Duration) {
-	cs.requestIntervalMutex.Lock()
-	defer cs.requestIntervalMutex.Unlock()
-	cs.requestInterval = interval
-}
-
-func (cs *ControlService) readRequestInterval() time.Duration {
-	cs.requestIntervalMutex.RLock()
-	defer cs.requestIntervalMutex.RUnlock()
-	return cs.requestInterval
 }
 
 // Performs a retrieval of the latest control server data, and notifies observers of updates.
@@ -358,7 +345,7 @@ func (cs *ControlService) fetchAndUpdate(ctx context.Context, subsystem, hash st
 	// Consumer and subscriber(s) notified now
 	if err := cs.update(ctx, subsystem, data); err != nil {
 		// Returning the error so we don't store the hash and we can try again next time
-		slogger.Log(ctx, slog.LevelError,
+		slogger.Log(ctx, slog.LevelWarn,
 			"failed to update consumers and subscribers",
 			"err", err,
 		)

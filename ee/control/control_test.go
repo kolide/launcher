@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"strconv"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/control/consumers/keyvalueconsumer"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -435,7 +437,7 @@ func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
 	service.Interrupt(errors.New("test error"))
 
 	// Confirm request interval was updated as expected
-	require.Equal(t, expectedInterval, service.readRequestInterval())
+	require.Equal(t, expectedInterval, service.requestInterval.Load())
 }
 
 func TestControlServicePersistLastFetched(t *testing.T) {
@@ -570,13 +572,18 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("ControlRequestInterval").Return(24 * time.Hour)
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
-	k.On("Slogger").Return(multislogger.NewNopLogger())
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	k.On("Slogger").Return(slogger)
 	data := &TestClient{}
 	control := New(k, data)
 
 	go control.ExecuteWithContext(ctx)
 
 	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	control.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -600,7 +607,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

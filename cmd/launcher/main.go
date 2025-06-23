@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/kit/env"
 	"github.com/kolide/kit/logutil"
 	"github.com/kolide/kit/version"
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/disclaim"
 	"github.com/kolide/launcher/ee/tuf"
@@ -45,6 +46,14 @@ func runMain() int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// these systemslogger logs will go to stderr, which will dirty the results of our
+	// rundisclaimed operations (some specifically collect stderr for reporting).
+	// the only log we would see before running the subcommand
+	// should be "launcher starting up", so override here with a no-op logger
+	if len(os.Args) > 1 && os.Args[1] == "rundisclaimed" {
+		systemSlogger = multislogger.New()
+	}
 
 	systemSlogger.Log(ctx, slog.LevelInfo,
 		"launcher starting up",
@@ -156,7 +165,7 @@ func runMain() int {
 
 	if err := runLauncher(ctx, cancel, slogger, systemSlogger, opts); err != nil {
 		// launcher exited due to error that does not require further handling -- return now so we can exit
-		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) {
+		if !tuf.IsLauncherReloadNeededErr(err) && !errors.Is(err, remoterestartconsumer.ErrRemoteRestartRequested) && !errors.Is(err, agent.ErrNewHardwareDetected) {
 			level.Debug(logger).Log("msg", "run launcher", "stack", fmt.Sprintf("%+v", err))
 			return 1
 		}
@@ -169,18 +178,18 @@ func runMain() int {
 			}
 		}
 
-		// A remote restart was requested -- run this version of launcher again.
+		// A restart was requested -- run this version of launcher again.
 		// We need a full exec of our current executable, rather than just calling runLauncher again.
 		// This ensures we don't run into issues where artifacts of our previous runLauncher call
 		// stick around (for example, the signal listener panicking on send to closed channel).
 		currentExecutable, err := os.Executable()
 		if err != nil {
-			level.Debug(logger).Log("msg", "could not get current executable to perform remote restart", "err", err.Error())
+			level.Debug(logger).Log("msg", "could not get current executable to perform restart", "err", err.Error())
 			return 1
 		}
 		if err := execwrapper.Exec(ctx, currentExecutable, os.Args, os.Environ()); err != nil {
 			slogger.Log(ctx, slog.LevelError,
-				"error execing launcher after remote restart was requested",
+				"error execing launcher after restart was requested",
 				"binary", currentExecutable,
 				"err", err,
 			)

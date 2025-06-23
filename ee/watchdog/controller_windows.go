@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/NozomiNetworks/go-comshim"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -154,12 +155,11 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 
 func (wc *WatchdogController) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if wc.interrupted.Load() {
+	if wc.interrupted.Swap(true) {
 		return
 	}
 
 	wc.logPublisher.Close()
-	wc.interrupted.Store(true)
 	wc.interrupt <- struct{}{}
 }
 
@@ -226,10 +226,11 @@ func installWatchdogTask(identifier, configFilePath string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitialize because it
-	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitialize(0)
-	defer ole.CoUninitialize()
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return fmt.Errorf("unable to init comshim: %w", err)
+	}
+	defer comshim.Done()
 
 	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")
@@ -556,10 +557,11 @@ func RemoveWatchdogTask(identifier string) error {
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitialize because it
-	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitialize(0)
-	defer ole.CoUninitialize()
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return fmt.Errorf("unable to init comshim: %w", err)
+	}
+	defer comshim.Done()
 
 	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")
@@ -607,10 +609,11 @@ func watchdogTaskExists(identifier string) (bool, error) { // nolint:unused
 	}
 
 	taskName := launcher.TaskName(identifier, watchdogTaskType)
-	// init COM - we discard the error returned by CoInitialize because it
-	// harmlessly returns S_FALSE if we call it more than once
-	ole.CoInitialize(0)
-	defer ole.CoUninitialize()
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return false, fmt.Errorf("unable to init comshim: %w", err)
+	}
+	defer comshim.Done()
 
 	// create our scheduler object
 	schedService, err := oleutil.CreateObject("Schedule.Service")

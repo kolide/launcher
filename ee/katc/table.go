@@ -140,6 +140,7 @@ func (k *katcTable) generate(ctx context.Context, queryContext table.QueryContex
 					k.slogger.Log(ctx, slog.LevelWarn,
 						"running transform func",
 						"transform_step", step.name,
+						"path", s.path,
 						"err", err,
 					)
 					return nil, fmt.Errorf("running transform func %s: %w", step.name, err)

@@ -128,10 +128,9 @@ func (d *dbusNotifier) Execute() error {
 }
 
 func (d *dbusNotifier) Interrupt(err error) {
-	if d.interrupted.Load() {
+	if d.interrupted.Swap(true) {
 		return
 	}
-	d.interrupted.Store(true)
 
 	d.interrupt <- struct{}{}
 

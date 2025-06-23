@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -212,10 +213,9 @@ func (e *Extension) Execute() error {
 // with this extension.
 func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if e.interrupted.Load() {
+	if e.interrupted.Swap(true) {
 		return
 	}
-	e.interrupted.Store(true)
 
 	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)
@@ -304,6 +304,106 @@ func isNodeInvalidErr(err error) bool {
 	}
 }
 
+// addRegistration should be called after enrollment to store enrollment/registration details
+// in our persistent store under e.registrationId. We frequently use the munemo associated with
+// the registration (e.g. in checkups), so we parse the enrollment secret in order to extract
+// the munemo from the claims and store it as well.
+func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) error {
+	// Extract munemo from enrollment secret.
+	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("parsing enrollment secret: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("no claims in enrollment secret")
+	}
+	munemo, munemoFound := claims["organization"]
+	if !munemoFound {
+		return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+	}
+
+	r := types.Registration{
+		RegistrationID:   e.registrationId,
+		Munemo:           fmt.Sprintf("%s", munemo),
+		NodeKey:          nodeKey,
+		EnrollmentSecret: enrollmentSecret,
+	}
+
+	rawRegistration, err := json.Marshal(r)
+	if err != nil {
+		return fmt.Errorf("marshalling registration: %w", err)
+	}
+
+	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), rawRegistration); err != nil {
+		return fmt.Errorf("adding registration to store: %w", err)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully stored new registration",
+		"munemo", r.Munemo,
+	)
+
+	return nil
+}
+
+// ensureNodeKeyStored saves the provided nodeKey under the registration associated with
+// e.registrationId. Since storing registrations in the store is newer functionality,
+// we may not actually have a stored registration yet -- this will happen if this launcher
+// install enrolled before we started storing registrations in the store. In this case,
+// we fetch the enrollment secret and call `e.addRegistration` instead. ensureNodeKeyStored
+// does handle the case where there is an existing registration and the node key changed,
+// but we don't expect this use case at the moment. (On re-enroll, the registration is deleted,
+// then re-added via addRegistration instead.)
+func (e *Extension) ensureNodeKeyStored(nodeKey string) error {
+	// Get the existing registration in order to update it with the new node key
+	registrationStore := e.knapsack.RegistrationStore()
+	existingRegistrationRaw, err := registrationStore.Get([]byte(e.registrationId))
+	if err != nil {
+		return fmt.Errorf("getting existing registration: %w", err)
+	}
+
+	// If the registration doesn't already exist (launcher probably enrolled before we started
+	// storing registrations in the store), add it instead
+	if existingRegistrationRaw == nil {
+		// Grab the enroll secret, since we need that to create a new registration
+		enrollSecret, err := e.knapsack.ReadEnrollSecret()
+		if err != nil {
+			return fmt.Errorf("reading enroll secret to add new registration: %w", err)
+		}
+		return e.addRegistration(nodeKey, enrollSecret)
+	}
+
+	// We have an existing registration -- unmarshal it so we can update it appropriately
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		return fmt.Errorf("unmarshalling existing registration: %w", err)
+	}
+
+	// Check to see if node key changed -- if not, no need to do anything here
+	if existingRegistration.NodeKey == nodeKey {
+		return nil
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		return fmt.Errorf("marshalling updated registration: %w", err)
+	}
+
+	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), updatedRegistrationRaw); err != nil {
+		return fmt.Errorf("updating registration: %w", err)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+	)
+	return nil
+}
+
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
@@ -328,6 +428,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
+		if err := e.ensureNodeKeyStored(e.NodeKey); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update registration",
+				"err", err,
+			)
+		}
 		return e.NodeKey, false, nil
 	}
 
@@ -344,6 +450,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
+		if err := e.ensureNodeKeyStored(key); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update registration",
+				"err", err,
+			)
+		}
 		return e.NodeKey, false, nil
 	}
 
@@ -388,6 +500,9 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during enrollment, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -419,6 +534,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	}
 
 	e.NodeKey = keyString
+	if err := e.addRegistration(keyString, enrollSecret); err != nil {
+		e.slogger.Log(ctx, slog.LevelError,
+			"could not add new registration to store",
+			"err", err,
+		)
+	}
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",
@@ -445,6 +566,7 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
 	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
+	e.knapsack.RegistrationStore().Delete([]byte(e.registrationId))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -502,6 +624,9 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during config request, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -772,6 +897,9 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during log publish, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -920,6 +1048,9 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during queries request, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow
@@ -982,6 +1113,9 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during results publish, uninstalling",
+		)
 		uninstall.Uninstall(ctx, e.knapsack, true)
 		// the uninstall call above will cause launcher to uninstall and exit
 		// so we are returning the err here just incase something somehow

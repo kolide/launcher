@@ -2,17 +2,29 @@ package bufspanprocessor
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type BufSpanProcessor struct {
+	slogger       *slog.Logger
 	bufferedSpans []sdktrace.ReadOnlySpan
-	bufMu         sync.Mutex
+	bufMu         *sync.Mutex
 
 	childProcessor   sdktrace.SpanProcessor
 	MaxBufferedSpans int
+}
+
+func NewBufSpanProcessor(maxBufferedSpans int) *BufSpanProcessor {
+	return &BufSpanProcessor{
+		slogger:          multislogger.NewNopLogger(),
+		bufferedSpans:    make([]sdktrace.ReadOnlySpan, 0),
+		bufMu:            &sync.Mutex{},
+		MaxBufferedSpans: maxBufferedSpans,
+	}
 }
 
 // HasProcessor returns true if the processor has been set.
@@ -23,6 +35,10 @@ func (b *BufSpanProcessor) HasProcessor() bool {
 	return b.childProcessor != nil
 }
 
+func (b *BufSpanProcessor) SetSlogger(slogger *slog.Logger) {
+	b.slogger = slogger.With("component", "buf_span_processor")
+}
+
 // SetChildProcessor sets the processor that will receive the spans.
 // Any buffered spans will be sent to the processor.
 // After the child processor is set, spans will no longer be buffered
@@ -31,18 +47,37 @@ func (b *BufSpanProcessor) HasProcessor() bool {
 // If a processor was already set, it will be shutdown.
 func (b *BufSpanProcessor) SetChildProcessor(p sdktrace.SpanProcessor) {
 	if b.childProcessor != nil {
-		b.childProcessor.Shutdown(context.Background())
+		if err := b.childProcessor.Shutdown(context.Background()); err != nil {
+			b.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not shut down previous child processor before setting new one",
+				"err", err,
+			)
+		}
 	}
 
 	b.childProcessor = p
 
 	// send the spans that were buffered before the processor was set
-	for _, span := range b.bufferedSpans {
+	b.bufMu.Lock()
+	defer b.bufMu.Unlock()
+	for i, span := range b.bufferedSpans {
+		// We've seen a panic in b.childProcessor.OnEnd(span), where it ultimately calls
+		// span.SpanContext().IsSampled() inside enqueueDrop. It's not really clear exactly
+		// how the span could be nil, but it appears to be the only possibility here.
+		if span == nil {
+			b.slogger.Log(context.TODO(), slog.LevelInfo,
+				"got nil span",
+				"buffered_span_idx", i,
+			)
+			continue
+		}
 		b.childProcessor.OnEnd(span)
 	}
 
-	b.bufMu.Lock()
-	defer b.bufMu.Unlock()
+	b.slogger.Log(context.TODO(), slog.LevelDebug,
+		"forwarded all buffered spans to child processor",
+		"buffer_length", len(b.bufferedSpans),
+	)
 
 	// now that the spans are sent, clear the buffer
 	b.bufferedSpans = nil

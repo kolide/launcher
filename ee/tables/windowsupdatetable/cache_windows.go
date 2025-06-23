@@ -95,10 +95,9 @@ func (w *windowsUpdatesCacher) Execute() (err error) {
 
 func (w *windowsUpdatesCacher) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if w.interrupted.Load() {
+	if w.interrupted.Swap(true) {
 		return
 	}
-	w.interrupted.Store(true)
 
 	// If we have a long-running query going right now, cancel it so that it doesn't prevent
 	// shutdown.
@@ -131,6 +130,8 @@ func (w *windowsUpdatesCacher) FlagsChanged(ctx context.Context, flagKeys ...key
 					"error caching windows update data after exiting modern standby",
 					"err", err,
 				)
+				// Increment our counter tracking query failures/timeouts
+				observability.WindowsUpdatesQueryFailureCounter.Add(context.TODO(), 1)
 				return
 			}
 

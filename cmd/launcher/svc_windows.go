@@ -83,12 +83,12 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 	// Log panics from the windows service
 	defer func() {
 		if r := recover(); r != nil {
-			systemSlogger.Log(context.TODO(), slog.LevelInfo,
+			systemSlogger.Log(context.TODO(), slog.LevelError,
 				"panic occurred in windows service",
 				"err", r,
 			)
 			if err, ok := r.(error); ok {
-				systemSlogger.Log(context.TODO(), slog.LevelInfo,
+				systemSlogger.Log(context.TODO(), slog.LevelError,
 					"panic stack trace",
 					"stack_trace", fmt.Sprintf("%+v", errors.WithStack(err)),
 				)

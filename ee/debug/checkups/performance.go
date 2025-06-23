@@ -32,9 +32,30 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 		return fmt.Errorf("gathering performance stats: %w", err)
 	}
 
-	memOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
-	cpuOver := stats.CPUPercent > cpuPercentThreshold
-	if cpuOver || memOver {
+	childStats, err := performance.CurrentProcessChildStats(ctx)
+	if err != nil {
+		p.status = Erroring
+		return fmt.Errorf("gathering child performance stats: %w", err)
+	}
+
+	// Compute checkup status.
+
+	// We don't have access to runtime stats for the child processes, so we only check against the launcher process here.
+	launcherMemOver := stats.MemInfo.GoMemUsage > golangMemUsageThreshold || stats.MemInfo.NonGoMemUsage > nonGolangMemUsageThreshold
+
+	// We have access to CPU percent for the children, so sum those up too -- they are not accounted
+	// for in the launcher process `stats.CPUPercent` automatically.
+	totalCpu := stats.CPUPercent
+	for _, c := range childStats {
+		totalCpu += c.CPUPercent
+	}
+	cpuOver := totalCpu > cpuPercentThreshold
+
+	// Make sure we have the expected number of child processes
+	childProcessesMissing := len(childStats) < 2
+
+	// Set checkup status based on launcher performance stats, plus launcher child process stats.
+	if cpuOver || launcherMemOver || childProcessesMissing {
 		p.status = Failing
 	} else {
 		p.status = Passing
@@ -49,6 +70,7 @@ func (p *perfCheckup) Run(ctx context.Context, _ io.Writer) error {
 	)
 
 	p.data["stats"] = stats
+	p.data["child_stats"] = childStats
 
 	return nil
 }

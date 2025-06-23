@@ -1,9 +1,6 @@
 // Go callbacks
 extern void updatesFound(unsigned int);
 extern void updateKeyValueFound(unsigned int, char*, char*);
-extern void productsFound(unsigned int);
-extern void productKeyValueFound(unsigned int, char*, char*);
-extern void productNestedKeyValueFound(unsigned int, char*, char*, char*);
 
 // Gets software update config flags from SUSharedPrefs API
 void getSoftwareUpdateConfiguration(

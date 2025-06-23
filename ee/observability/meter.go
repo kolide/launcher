@@ -26,6 +26,12 @@ const (
 	cpuPercentGaugeDescription                   = "Process CPU percent"
 	checkupScoreGaugeName                        = "launcher.checkup.score"
 	checkupScoreGaugeDescription                 = "Computed checkup score"
+	rssHistogramName                             = "launcher.memory.rss"
+	rssHistogramDescription                      = "launcher process RSS bytes"
+	osqueryCpuHistogramName                      = "launcher.osquery.cpu.percent"
+	osqueryCpuHistogramDescription               = "osquery process CPU percent"
+	osqueryRssHistogramName                      = "launcher.osquery.memory.rss"
+	osqueryRssHistogramDescription               = "osquery process RSS bytes"
 	launcherRestartCounterName                   = "launcher.restart"
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
@@ -47,6 +53,11 @@ var (
 	MemoryPercentGauge    metric.Int64Gauge
 	CpuPercentGauge       metric.Int64Gauge
 	CheckupScoreGauge     metric.Float64Gauge
+
+	// Histograms
+	RSSHistogram               metric.Int64Histogram
+	OsqueryCpuPercentHistogram metric.Float64Histogram
+	OsqueryRssHistogram        metric.Int64Histogram
 
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
@@ -83,6 +94,17 @@ func ReinitializeMetrics() {
 	CheckupScoreGauge = float64GaugeOrNoop(checkupScoreGaugeName,
 		metric.WithDescription(checkupScoreGaugeDescription),
 		metric.WithUnit(unitPercent))
+
+	// Histograms
+	RSSHistogram = int64HistogramOrNoop(rssHistogramName,
+		metric.WithDescription(rssHistogramDescription),
+		metric.WithUnit(unitByte))
+	OsqueryCpuPercentHistogram = float64HistogramOrNoop(osqueryCpuHistogramName,
+		metric.WithDescription(osqueryCpuHistogramDescription),
+		metric.WithUnit(unitPercent))
+	OsqueryRssHistogram = int64HistogramOrNoop(osqueryRssHistogramName,
+		metric.WithDescription(osqueryRssHistogramDescription),
+		metric.WithUnit(unitByte))
 
 	// Counters
 	LauncherRestartCounter = int64CounterOrNoop(launcherRestartCounterName,
@@ -123,6 +145,26 @@ func float64GaugeOrNoop(name string, options ...metric.Float64GaugeOption) metri
 		return noop.Float64Gauge{}
 	}
 	return gauge
+}
+
+// int64HistogramOrNoop is guaranteed to return an Int64Histogram -- if we cannot create
+// a real Int64Histogram, we return a noop version instead.
+func int64HistogramOrNoop(name string, options ...metric.Int64HistogramOption) metric.Int64Histogram {
+	hist, err := otel.Meter(instrumentationPkg).Int64Histogram(name, options...)
+	if err != nil {
+		return noop.Int64Histogram{}
+	}
+	return hist
+}
+
+// int64HistogramOrNoop is guaranteed to return an Float64Histogram -- if we cannot create
+// a real Float64Histogram, we return a noop version instead.
+func float64HistogramOrNoop(name string, options ...metric.Float64HistogramOption) metric.Float64Histogram {
+	hist, err := otel.Meter(instrumentationPkg).Float64Histogram(name, options...)
+	if err != nil {
+		return noop.Float64Histogram{}
+	}
+	return hist
 }
 
 // int64CounterOrNoop is guaranteed to return an Int64Counter -- if we cannot create

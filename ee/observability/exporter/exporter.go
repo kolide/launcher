@@ -3,6 +3,7 @@ package exporter
 import (
 	"context"
 	"log/slog"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,9 +90,8 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 		t.bufSpanProcessor = initialTraceBuffer.bufSpanProcessor
 		t.attrs = initialTraceBuffer.attrs
 	} else {
-		t.bufSpanProcessor = &bufspanprocessor.BufSpanProcessor{
-			MaxBufferedSpans: 500,
-		}
+		t.bufSpanProcessor = bufspanprocessor.NewBufSpanProcessor(500)
+		t.bufSpanProcessor.SetSlogger(k.Slogger())
 		t.attrs = initialAttrs()
 	}
 
@@ -132,7 +132,7 @@ func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 
 	if deviceId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("device_id")); err != nil {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get device id",
+			"could not get device id for attributes",
 			"err", err,
 		)
 	} else {
@@ -142,7 +142,7 @@ func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 
 	if munemo, err := t.knapsack.ServerProvidedDataStore().Get([]byte("munemo")); err != nil {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get munemo",
+			"could not get munemo for attributes",
 			"err", err,
 		)
 	} else {
@@ -151,7 +151,7 @@ func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 
 	if orgId, err := t.knapsack.ServerProvidedDataStore().Get([]byte("organization_id")); err != nil {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get organization id",
+			"could not get organization id for attributes",
 			"err", err,
 		)
 	} else {
@@ -160,11 +160,25 @@ func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 
 	if serialNumber, err := t.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get serial number",
+			"could not get serial number for attributes",
 			"err", err,
 		)
 	} else {
 		t.attrs = append(t.attrs, attribute.String("launcher.serial", string(serialNumber)))
+	}
+
+	t.attrs = append(t.attrs, attribute.String("launcher.update_channel", t.knapsack.UpdateChannel()))
+
+	// Add some attributes about the currently-running process, too
+	t.attrs = append(t.attrs, attribute.String("launcher.run_id", t.knapsack.GetRunID()))
+	t.attrs = append(t.attrs, semconv.ProcessPID(os.Getpid()))
+	if execPath, err := os.Executable(); err != nil {
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get executable path for attributes",
+			"err", err,
+		)
+	} else {
+		t.attrs = append(t.attrs, semconv.ProcessExecutablePath(execPath))
 	}
 }
 
@@ -345,7 +359,7 @@ func (t *TelemetryExporter) setNewGlobalMeterProvider(launcherResource *resource
 	// Create new meter provider and let otel set it globally
 	newMeterProvider := sdkmetric.NewMeterProvider(
 		sdkmetric.WithResource(launcherResource),
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricsExporter)),
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricsExporter, sdkmetric.WithInterval(15*time.Minute))),
 	)
 	otel.SetMeterProvider(newMeterProvider)
 
@@ -378,11 +392,9 @@ func (t *TelemetryExporter) Execute() error {
 
 func (t *TelemetryExporter) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if t.interrupted.Load() {
+	if t.interrupted.Swap(true) {
 		return
 	}
-
-	t.interrupted.Store(true)
 
 	// We must use context.Background here, not t.ctx -- if we use t.ctx, the restart metric won't ship,
 	// and calls to Shutdown will time out.

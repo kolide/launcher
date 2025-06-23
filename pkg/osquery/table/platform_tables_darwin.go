@@ -14,6 +14,7 @@ import (
 	appicons "github.com/kolide/launcher/ee/tables/app-icons"
 	"github.com/kolide/launcher/ee/tables/apple_silicon_security_policy"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
+	json "github.com/kolide/launcher/ee/tables/execparsers/json"
 	"github.com/kolide/launcher/ee/tables/execparsers/mapxml"
 	"github.com/kolide/launcher/ee/tables/execparsers/plist"
 	"github.com/kolide/launcher/ee/tables/execparsers/remotectl"
@@ -30,6 +31,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/osquery_user_exec_table"
 	"github.com/kolide/launcher/ee/tables/profiles"
 	"github.com/kolide/launcher/ee/tables/pwpolicy"
+	"github.com/kolide/launcher/ee/tables/security"
 	"github.com/kolide/launcher/ee/tables/spotlight"
 	"github.com/kolide/launcher/ee/tables/systemprofiler"
 	"github.com/kolide/launcher/ee/tables/zfs"
@@ -93,12 +95,10 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		MDMInfo(k, slogger),
 		macos_software_update.MacOSUpdate(k, slogger),
 		macos_software_update.RecommendedUpdates(k, slogger),
-		macos_software_update.AvailableProducts(k, slogger),
 		MachoInfo(k, slogger),
 		spotlight.TablePlugin(k, slogger),
 		TouchIDUserConfig(k, slogger),
 		TouchIDSystemConfig(k, slogger),
-		UserAvatar(k, slogger),
 		ioreg.TablePlugin(k, slogger),
 		profiles.TablePlugin(k, slogger),
 		airport.TablePlugin(k, slogger),
@@ -125,7 +125,10 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`, `--no-scan`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_softwareupdate_scan", softwareupdate.Parser, allowedcmd.Softwareupdate, []string{`--list`}, dataflattentable.WithIncludeStderr()),
 		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_carbonblack_repcli_status", repcli.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "carbonblack_repcli", "status"}),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_zscaler", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "zscaler", "status", "-s", "all"}, dataflattentable.WithReportStderr(), dataflattentable.WithReportMissingBinary()),
 		zfs.ZfsPropertiesPlugin(k, slogger),
 		zfs.ZpoolPropertiesPlugin(k, slogger),
+		dataflattentable.NewExecAndParseTable(k, slogger, "kolide_microsoft_defender_atp_health", json.Parser, allowedcmd.Launcher, []string{"rundisclaimed", "microsoft_defender_atp", "health", "--output", "json"}),
+		security.CertTrustSettingsTablePlugin(k, slogger),
 	}
 }
