@@ -3,7 +3,6 @@ package dataflattentable
 import (
 	"bytes"
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -24,14 +23,16 @@ type bytesFlattener interface {
 
 // execTableV2 is the next iteration of the dataflattentable wrapper. Aim to migrate exec based tables to this.
 type execTableV2 struct {
-	slogger        *slog.Logger
-	tableName      string
-	flattener      bytesFlattener
-	timeoutSeconds int
-	tabledebug     bool
-	includeStderr  bool
-	cmd            allowedcmd.AllowedCommand
-	execArgs       []string
+	slogger             *slog.Logger
+	tableName           string
+	flattener           bytesFlattener
+	timeoutSeconds      int
+	tabledebug          bool
+	includeStderr       bool
+	reportStderr        bool
+	reportMissingBinary bool
+	cmd                 allowedcmd.AllowedCommand
+	execArgs            []string
 }
 
 type execTableV2Opt func(*execTableV2)
@@ -48,9 +49,31 @@ func WithTableDebug() execTableV2Opt {
 	}
 }
 
+// WithIncludeStderr combines stdout and stderr before attempting any parsing
 func WithIncludeStderr() execTableV2Opt {
 	return func(t *execTableV2) {
 		t.includeStderr = true
+	}
+}
+
+// WithReportStderr will include stderr (if populated) in the parsed output as a
+// separate row in the results produced by the query
+func WithReportStderr() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.reportStderr = true
+	}
+}
+
+// WithReportMissingBinary will include an error row in the results
+// indicating that the binary is missing. Without this option, queries
+// against missing binaries typically return no results, with the error
+// being ignored.
+// Note that for tables that run through macos RunDisclaimed, we cannot pass our missing
+// binary errors back through- this information is conveyed through stderr, so callers
+// should also include the WithReportStderr option to see the same behavior there.
+func WithReportMissingBinary() execTableV2Opt {
+	return func(t *execTableV2) {
+		t.reportMissingBinary = true
 	}
 }
 
@@ -76,23 +99,45 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 	defer span.End()
 
 	var results []map[string]string
-	var stdout bytes.Buffer
-	stdErr := io.Discard
+	var stdout, stdErr bytes.Buffer
 
+	// historically, callers expect that includeStderr implies stdout == stderr, so we do that here.
+	// callers are free to ignore stdErr if not needed in other cases.
 	if t.includeStderr {
-		stdErr = &stdout
+		stdErr = stdout
 	}
 
-	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, stdErr); err != nil {
-		// exec will error if there's no binary, so we never want to record that
-		if os.IsNotExist(errors.Cause(err)) {
+	if err := tablehelpers.Run(ctx, t.slogger, t.timeoutSeconds, t.cmd, t.execArgs, &stdout, &stdErr); err != nil {
+		// exec will error if there's no binary, don't record that unless configured to do so
+		if os.IsNotExist(errors.Cause(err)) || errors.Is(err, allowedcmd.ErrCommandNotFound) {
+			if t.reportMissingBinary {
+				return append(results, ToMap([]dataflatten.Row{
+					{
+						Path:  []string{"error"},
+						Value: "binary is not present on device",
+					},
+				}, "*", nil)...), nil
+			}
+
 			return nil, nil
 		}
+
 		observability.SetError(span, err)
 		t.slogger.Log(ctx, slog.LevelInfo,
 			"exec failed",
 			"err", err,
 		)
+
+		// Run failed, but we may have stderr to report with results anyway
+		if t.reportStderr && stdErr.Len() > 0 {
+			return append(results, ToMap([]dataflatten.Row{
+				{
+					Path:  []string{"error"},
+					Value: stdErr.String(),
+				},
+			}, "*", nil)...), nil
+		}
+
 		return nil, nil
 	}
 
@@ -111,10 +156,22 @@ func (t *execTableV2) generate(ctx context.Context, queryContext table.QueryCont
 				"failure flattening output",
 				"err", err,
 			)
+
 			continue
 		}
 
 		results = append(results, ToMap(flattened, dataQuery, nil)...)
+	}
+
+	// we could have made it through tablehelpers.Run above but still have seen error messaging
+	// to stderr- ensure we include that here if configured to do so
+	if t.reportStderr && stdErr.Len() > 0 {
+		results = append(results, ToMap([]dataflatten.Row{
+			{
+				Path:  []string{"error"},
+				Value: stdErr.String(),
+			},
+		}, "*", nil)...)
 	}
 
 	return results, nil

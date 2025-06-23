@@ -107,7 +107,7 @@ func (mw logmw) PublishResults(ctx context.Context, nodeKey string, results []di
 			if err == nil {
 				message = "success"
 			} else {
-				message = "failure"
+				message = "failure publishing results"
 			}
 		}
 

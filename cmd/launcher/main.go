@@ -47,6 +47,14 @@ func runMain() int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// these systemslogger logs will go to stderr, which will dirty the results of our
+	// rundisclaimed operations (some specifically collect stderr for reporting).
+	// the only log we would see before running the subcommand
+	// should be "launcher starting up", so override here with a no-op logger
+	if len(os.Args) > 1 && os.Args[1] == "rundisclaimed" {
+		systemSlogger = multislogger.New()
+	}
+
 	systemSlogger.Log(ctx, slog.LevelInfo,
 		"launcher starting up",
 		"version", version.Version().Version,

@@ -213,9 +213,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	initLauncherHistory(k)
 
 	gowrapper.Go(ctx, slogger, func() {
-		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
-	})
-	gowrapper.Go(ctx, slogger, func() {
 		runOsqueryVersionCheckAndAddToKnapsack(ctx, slogger, k, k.LatestOsquerydPath(ctx))
 	})
 	gowrapper.Go(ctx, slogger, func() {
@@ -263,7 +260,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		telemetryExporter, err = exporter.NewTelemetryExporter(ctx, k, initialTraceBuffer)
 		if err != nil {
-			slogger.Log(ctx, multislogger.LevelReportedError,
+			slogger.Log(ctx, slog.LevelError,
 				"could not set up telemetry exporter",
 				"err", err,
 			)
@@ -349,7 +346,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	powerEventSubscriber := powereventwatcher.NewKnapsackSleepStateUpdater(slogger, k)
 	powerEventWatcher, err := powereventwatcher.New(ctx, slogger, powerEventSubscriber)
 	if err != nil {
-		slogger.Log(ctx, multislogger.LevelReportedError,
+		slogger.Log(ctx, slog.LevelError,
 			"could not init power event watcher",
 			"err", err,
 		)
@@ -376,6 +373,11 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	if err := agent.SetupKeys(ctx, k.Slogger(), k.ConfigStore()); err != nil {
 		return fmt.Errorf("setting up agent keys: %w", err)
 	}
+
+	// Now that the keys exist, collect and set enrollment details (which include the agent keys) in the background
+	gowrapper.Go(ctx, slogger, func() {
+		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
+	})
 
 	// init osquery instance history
 	if osqHistory, err := osqueryInstanceHistory.InitHistory(k.OsqueryHistoryInstanceStore()); err != nil {
@@ -496,7 +498,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		}
 
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
-			slogger.Log(ctx, multislogger.LevelReportedError,
+			slogger.Log(ctx, slog.LevelError,
 				"unable to set up metadata writer",
 				"err", err,
 			)
@@ -533,7 +535,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 		if err != nil {
 			// For now, log this and move on. It might be a fatal error
-			slogger.Log(ctx, multislogger.LevelReportedError,
+			slogger.Log(ctx, slog.LevelError,
 				"failed to setup local server",
 				"err", err,
 			)

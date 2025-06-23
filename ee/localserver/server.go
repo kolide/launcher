@@ -182,7 +182,7 @@ func (ls *localServer) LoadDefaultKeyIfNotSet() error {
 	slogLevel := slog.LevelDebug
 
 	switch {
-	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."):
+	case strings.HasPrefix(ls.kolideServer, "localhost"), strings.HasPrefix(ls.kolideServer, "127.0.0.1"), strings.Contains(ls.kolideServer, ".ngrok."), strings.Contains(ls.kolideServer, ".kolide.test"):
 		ls.slogger.Log(ctx, slogLevel,
 			"using developer certificates",
 		)

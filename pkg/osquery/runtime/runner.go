@@ -12,7 +12,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
@@ -68,7 +67,7 @@ func (r *Runner) Run() error {
 		id := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
-				r.slogger.Log(ctx, multislogger.LevelReportedError,
+				r.slogger.Log(ctx, slog.LevelError,
 					"runner terminated running osquery instance unexpectedly, shutting down runner",
 					"err", err,
 				)
@@ -279,7 +278,7 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	)
 
 	if err := r.Restart(ctx); err != nil {
-		r.slogger.Log(ctx, multislogger.LevelReportedError,
+		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after flag change",
 			"err", err,
 		)
@@ -318,7 +317,7 @@ func (r *Runner) Ping() {
 	)
 
 	if err := r.Restart(ctx); err != nil {
-		r.slogger.Log(ctx, multislogger.LevelReportedError,
+		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after KATC configuration changed",
 			"err", err,
 		)

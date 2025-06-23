@@ -11,7 +11,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	"github.com/kolide/launcher/ee/debug/shipper"
-	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
 const (
@@ -103,7 +102,7 @@ func (fc *FlareConsumer) Do(data io.Reader) error {
 	}
 
 	if err := fc.flarer.RunFlare(context.Background(), fc.knapsack, flareStream); err != nil {
-		fc.slogger.Log(ctx, multislogger.LevelReportedError,
+		fc.slogger.Log(ctx, slog.LevelError,
 			"failed to run flare, not retrying",
 			"err", err,
 			"note", flareData.Note,

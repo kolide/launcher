@@ -106,7 +106,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			if err == nil {
 				message = "success"
 			} else {
-				message = "failure"
+				message = "failure publishing logs"
 			}
 		}
 
