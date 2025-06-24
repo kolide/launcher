@@ -28,7 +28,7 @@ const (
 	defaultConfigPluginName = "interactive_config"
 )
 
-func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Process, *osquery.ExtensionManagerServer, error) {
+func StartProcess(knapsack types.Knapsack, interactiveRootDir string, inFile, outFile, errFile *os.File) (*os.Process, *osquery.ExtensionManagerServer, error) {
 	if err := os.MkdirAll(interactiveRootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
@@ -83,7 +83,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 
 	proc, err := os.StartProcess(knapsack.OsquerydPath(), buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
 		// Transfer stdin, stdout, and stderr to the new process
-		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+		Files: []*os.File{inFile, outFile, errFile},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)

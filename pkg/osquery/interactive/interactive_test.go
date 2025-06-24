@@ -174,12 +174,36 @@ func TestProc(t *testing.T) {
 			require.NoError(t, err, "initializing startup settings store")
 			require.NoError(t, startupSettingsStore.Close())
 
+			// Set up our replacement for stdin
+			inFilePath := filepath.Join(rootDir, "in.txt")
+			// For stdin, we want at least some data in the file so that interactive will run a command
+			commandContents := `
+select * from osquery_info;
+`
+			err = os.WriteFile(inFilePath, []byte(commandContents), 0755)
+			require.NoError(t, err)
+			inFile, err := os.Create(inFilePath)
+			require.NoError(t, err)
+			defer inFile.Close()
+
+			// Set up our replacement for stdout
+			outFilePath := filepath.Join(rootDir, "out.txt")
+			outFile, err := os.Create(outFilePath)
+			require.NoError(t, err)
+			defer outFile.Close()
+
+			// Set up our replacement for stderr
+			errFilePath := filepath.Join(rootDir, "err.txt")
+			errFile, err := os.Create(errFilePath)
+			require.NoError(t, err)
+			defer errFile.Close()
+
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
 			startErr := make(chan error)
 			startTime := time.Now()
 			go func() {
-				proc, _, err = StartProcess(mockSack, rootDir)
+				proc, _, err = StartProcess(mockSack, rootDir, inFile, outFile, errFile)
 				startErr <- err
 			}()
 
@@ -192,7 +216,8 @@ func TestProc(t *testing.T) {
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				}
 			case <-time.After(2 * time.Minute):
-				t.Errorf("process did not start before timeout: started at %s, failed at %s: logs:\n%s", startTime.String(), time.Now().String(), logBytes.String())
+				errContents, _ := os.ReadFile(errFilePath)
+				t.Errorf("process did not start before timeout: started at %s, failed at %s: logs:\n%s\nosquery logs:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents))
 				t.FailNow()
 			}
 
@@ -210,7 +235,8 @@ func TestProc(t *testing.T) {
 				case err := <-procExitErr:
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				case <-time.After(2 * time.Minute):
-					t.Error("process did not exit before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+					errContents, _ := os.ReadFile(errFilePath)
+					t.Error("process did not exit before timeout", fmt.Sprintf("logs:\n%s\nosquery logs:\n%s\n", logBytes.String(), string(errContents)))
 					t.FailNow()
 				}
 			} else {
