@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/packaging"
@@ -163,6 +164,7 @@ func TestProc(t *testing.T) {
 			mockSack.On("KatcConfigStore").Return(store)
 			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+			mockSack.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 
 			// Set up the startup settings store -- opening RW ensures that the db exists
 			// with the appropriate migrations.
