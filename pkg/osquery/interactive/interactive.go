@@ -89,9 +89,9 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
 	}
 
-	knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+	slogger := knapsack.Slogger().With("pid", proc.Pid)
+	slogger.Log(context.TODO(), slog.LevelDebug,
 		"created osquery process",
-		"pid", proc.Pid,
 	)
 
 	// while developing for windows it was found that it will sometimes take osquery a while
@@ -105,12 +105,16 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		return nil, nil, fmt.Errorf("error waiting for osquery to create socket: %w", err)
 	}
 
-	knapsack.Slogger().Log(context.TODO(), slog.LevelDebug,
+	slogger.Log(context.TODO(), slog.LevelDebug,
 		"osquery socket file created",
 	)
 
-	extensionServer, err := loadExtensions(knapsack.Slogger(), socketPath, osqPlugins...)
+	extensionServer, err := loadExtensions(slogger, socketPath, osqPlugins...)
 	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"could not load extensions, terminating osquery process",
+			"err", err,
+		)
 		err = fmt.Errorf("error loading extensions: %w", err)
 
 		procKillErr := proc.Kill()
@@ -120,6 +124,10 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 
 		return nil, nil, err
 	}
+
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"extensions loaded",
+	)
 
 	return proc, extensionServer, nil
 }
