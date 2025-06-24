@@ -217,7 +217,7 @@ select * from osquery_info;
 				}
 			case <-time.After(2 * time.Minute):
 				errContents, _ := os.ReadFile(errFilePath)
-				t.Errorf("process did not start before timeout: started at %s, failed at %s: logs:\n%s\nosquery logs:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents))
+				t.Errorf("process did not start before timeout: started at %s, failed at %s: interactive logs:\n%s\nosquery logs:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents))
 				t.FailNow()
 			}
 
@@ -236,7 +236,7 @@ select * from osquery_info;
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				case <-time.After(2 * time.Minute):
 					errContents, _ := os.ReadFile(errFilePath)
-					t.Error("process did not exit before timeout", fmt.Sprintf("logs:\n%s\nosquery logs:\n%s\n", logBytes.String(), string(errContents)))
+					t.Error("process did not exit before timeout", fmt.Sprintf("interactive logs:\n%s\nosquery logs:\n%s\n", logBytes.String(), string(errContents)))
 					t.FailNow()
 				}
 			} else {
