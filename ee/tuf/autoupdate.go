@@ -54,7 +54,8 @@ var autoupdatableBinaryMap = map[string]autoupdatableBinary{
 }
 
 type ReleaseFileCustomMetadata struct {
-	Target string `json:"target"`
+	Target      string `json:"target"`
+	PromoteTime int64  `json:"promote_time"`
 }
 
 // Control server subsystem (used to send "update now" commands)
@@ -593,6 +594,10 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find appropriate target: %w", err)
 	}
 
+	if ta.shouldDelayDownload(targetMetadata) {
+		return "", nil
+	}
+
 	// Ensure we don't download duplicate versions
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
@@ -717,4 +722,59 @@ func PlatformArch() string {
 	}
 
 	return runtime.GOARCH
+}
+
+func (ta *TufAutoupdater) shouldDelayDownload(target data.TargetFileMeta) bool {
+	// if the splay is disabled, we should always download immediately
+	if ta.knapsack.AutoupdateDownloadSplay() == 0*time.Second {
+		return false
+	}
+
+	var customMetadata ReleaseFileCustomMetadata
+	var releasePromotedAt int64 = 0
+	if err := json.Unmarshal(*target.Custom, &customMetadata); err != nil {
+		// note the failure but continue as we would have if the metadata was not present at all,
+		// leaving the releasePromotedAt time at 0 will ensure we proceed to download without delay
+		ta.slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to unmarshal release file custom metadata",
+			"err", err,
+		)
+	} else {
+		releasePromotedAt = customMetadata.PromoteTime
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"ZACK DEBUGGING promote start is SET, will evaluate against download splay",
+			"promote_start", releasePromotedAt,
+			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
+		)
+	}
+
+	// if for any reason we can't determine the promote time, we should download immediately.
+	// this also covers the case where we have not published a promote time for whatever reason
+	if releasePromotedAt == 0 {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"ZACK DEBUGGING promote start is ZERO, will not delay",
+			"promote_start", releasePromotedAt,
+			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
+		)
+		return false
+	}
+
+	promoteStart := time.Unix(releasePromotedAt, 0)
+	// if promotion happened greater than our max splay threshold, download immediately
+	if time.Since(promoteStart) > ta.knapsack.AutoupdateDownloadSplay() {
+		ta.slogger.Log(context.TODO(), slog.LevelDebug,
+			"ZACK DEBUGGING promote start further than download splay, will not delay",
+			"promote_start", promoteStart,
+			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
+		)
+		return false
+	}
+
+	ta.slogger.Log(context.TODO(), slog.LevelDebug,
+		"ZACK DEBUGGING release promoted within 24 hours, determining download eligibility",
+		"promote_start", promoteStart,
+		"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
+	)
+
+	return false
 }

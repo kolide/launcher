@@ -507,9 +507,10 @@ func (fc *FlagController) SetTufServerURL(url string) error {
 	return fc.setControlServerValue(keys.TufServerURL, []byte(url))
 }
 func (fc *FlagController) TufServerURL() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.TufServerURL),
-	).get(fc.getControlServerValue(keys.TufServerURL))
+	return "https://tuf-devel.kolide.com"
+	// return NewStringFlagValue(
+	// 	WithDefaultString(fc.cmdLineOpts.TufServerURL),
+	// ).get(fc.getControlServerValue(keys.TufServerURL))
 }
 
 func (fc *FlagController) SetMirrorServerURL(url string) error {
