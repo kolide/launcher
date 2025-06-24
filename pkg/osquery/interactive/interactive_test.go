@@ -1,9 +1,3 @@
-//go:build !windows
-// +build !windows
-
-// disabling on windows because for some reason the test cannot get access to the windows pipe it fails with:
-// however it's just the test, works when using interactive mode on windows
-// open \\.\pipe\kolide-osquery-.....: The system cannot find the file specified.
 package interactive
 
 import (
@@ -64,8 +58,10 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
-	// Don't need to add .exe here because these tests don't run on Windows
 	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
+	if runtime.GOOS == "windows" {
+		testOsqueryBinary = testOsqueryBinary + ".exe"
+	}
 
 	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
 		fmt.Printf("error copying osqueryd binary: %v", err)
