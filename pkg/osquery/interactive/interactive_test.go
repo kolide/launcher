@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,34 +30,58 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var osquerydCacheDir = filepath.Join(os.TempDir(), "launcher_interactive_tests")
+var testOsqueryBinary string
 
-func TestMain(m *testing.M) {
-	// download and cache the osquerd binary before tests run
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	downloadDir, err := os.MkdirTemp("", "testinteractive")
+	if err != nil {
+		fmt.Printf("failed to make temp dir for test osquery binary: %v", err)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
+	}
+
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		fmt.Printf("error parsing platform: %s, %s", err, runtime.GOOS)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
+		fmt.Printf("error parsing platform %s: %v", runtime.GOOS, err)
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
 	if runtime.GOOS == "darwin" {
 		target.Arch = packaging.Universal
 	}
 
-	if err := os.MkdirAll(osquerydCacheDir, fsutil.DirMode); err != nil {
-		fmt.Printf("error creating cache dir: %s", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := packaging.FetchBinary(context.TODO(), osquerydCacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
+	dlPath, err := packaging.FetchBinary(ctx, downloadDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "nightly", target)
 	if err != nil {
-		fmt.Printf("error fetching binary osqueryd binary: %s", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
+		fmt.Printf("error fetching binary osqueryd binary: %v", err)
+		cancel()                  // explicit cancel as defer will not run when os.Exit is called
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
-	// Run the tests!
-	retCode := m.Run()
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
+	// Don't need to add .exe here because these tests don't run on Windows
+	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
+
+	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
+		fmt.Printf("error copying osqueryd binary: %v", err)
+		cancel()                  // explicit cancel as defer will not run when os.Exit is called
+		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
+		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
+	}
+})
+
+// copyBinary ensures we've downloaded a test osquery binary, then creates a symlink
+// between the real binary and the expected `executablePath` location.
+func copyBinary(t *testing.T, executablePath string) {
+	downloadOnceFunc()
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
+	require.NoError(t, os.Symlink(testOsqueryBinary, executablePath))
 }
 
 // TestProc tests the start process function, it's named weird because path of the temp dir has to be short enough
@@ -65,11 +90,12 @@ func TestProc(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name            string
-		useShortRootDir bool
-		osqueryFlags    []string
-		wantProc        bool
-		errContainsStr  string
+		name               string
+		useShortRootDir    bool
+		osqueryFlags       []string
+		configFileContents []byte
+		wantProc           bool
+		errContainsStr     string
 	}{
 		{
 			name:            "no flags",
@@ -88,9 +114,13 @@ func TestProc(t *testing.T) {
 		{
 			name:            "config path",
 			useShortRootDir: true,
-			osqueryFlags: []string{
-				fmt.Sprintf("config_path=%s", ulid.New()),
-			},
+			configFileContents: []byte(`
+{
+  "options": {
+    "verbose": true
+  }
+}
+`),
 			wantProc: true,
 		},
 		{
@@ -110,7 +140,8 @@ func TestProc(t *testing.T) {
 				rootDir = t.TempDir()
 			}
 
-			require.NoError(t, downloadOsquery(rootDir))
+			osquerydPath := filepath.Join(rootDir, "osquery")
+			copyBinary(t, osquerydPath)
 
 			var logBytes threadsafebuffer.ThreadSafeBuffer
 			slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -118,9 +149,16 @@ func TestProc(t *testing.T) {
 				Level:     slog.LevelDebug,
 			}))
 
+			// Set up config file, if needed
+			if len(tt.configFileContents) > 0 {
+				configFilePath := filepath.Join(rootDir, "osquery.conf")
+				require.NoError(t, os.WriteFile(configFilePath, tt.configFileContents, 0755), "writing config file")
+				tt.osqueryFlags = append(tt.osqueryFlags, fmt.Sprintf("config_path=%s", configFilePath))
+			}
+
 			// Set up knapsack
 			mockSack := mocks.NewKnapsack(t)
-			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osqueryd"))
+			mockSack.On("OsquerydPath").Return(filepath.Join(rootDir, "osquery"))
 			mockSack.On("OsqueryFlags").Return(tt.osqueryFlags)
 			mockSack.On("Slogger").Return(slogger)
 			mockSack.On("RootDirectory").Maybe().Return(rootDir)
@@ -179,23 +217,6 @@ func TestProc(t *testing.T) {
 			}
 		})
 	}
-}
-
-func downloadOsquery(dir string) error {
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
-	}
-
-	// Binary is already downloaded to osquerydCacheDir -- create a symlink at outputFile,
-	// rather than copying the file, to maybe avoid https://github.com/golang/go/issues/22315
-	outputFile := filepath.Join(dir, "osqueryd")
-	sourceFile := filepath.Join(osquerydCacheDir, fmt.Sprintf("osqueryd-%s-stable", runtime.GOOS), "osqueryd")
-	if err := os.Symlink(sourceFile, outputFile); err != nil {
-		return fmt.Errorf("creating symlink from %s to %s: %w", sourceFile, outputFile, err)
-	}
-
-	return nil
 }
 
 // testRootDirectory returns a temporary directory suitable for use in these tests.
