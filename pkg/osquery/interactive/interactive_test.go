@@ -177,6 +177,7 @@ func TestProc(t *testing.T) {
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
 			startErr := make(chan error)
+			startTime := time.Now()
 			go func() {
 				proc, _, err = StartProcess(mockSack, rootDir)
 				startErr <- err
@@ -191,7 +192,7 @@ func TestProc(t *testing.T) {
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				}
 			case <-time.After(2 * time.Minute):
-				t.Error("process did not start before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+				t.Errorf("process did not start before timeout: started at %s, failed at %s: logs:\n%s", startTime.String(), time.Now().String(), logBytes.String())
 				t.FailNow()
 			}
 
