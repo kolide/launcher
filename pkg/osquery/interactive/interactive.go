@@ -180,6 +180,20 @@ func loadExtensions(slogger *slog.Logger, socketPath string, plugins ...osquery.
 		"registered plugins with server",
 	)
 
+	// Immediately before starting server, confirm we can reach the osquery process
+	status, err := client.Ping()
+	if err != nil {
+		if status != nil {
+			return extensionManagerServer, fmt.Errorf("could not ping client: status %d (%s): %w", status.Code, status.Message, err)
+		}
+		return extensionManagerServer, fmt.Errorf("could not ping client: %w", err)
+	}
+	slogger.Log(context.TODO(), slog.LevelDebug,
+		"osquery client is operational",
+		"status_code", status.Code,
+		"status_message", status.Message,
+	)
+
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
 	}
