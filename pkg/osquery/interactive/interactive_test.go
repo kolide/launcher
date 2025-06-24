@@ -172,15 +172,17 @@ func TestProc(t *testing.T) {
 
 			// Set up our replacement for stdin
 			inFilePath := filepath.Join(rootDir, "in.txt")
-			// For stdin, we want at least some data in the file so that interactive will run a command
+			inFile, err := os.Create(inFilePath)
+			require.NoError(t, err)
+			defer inFile.Close()
+
+			// For our stdin replacement, we want at least some data in the file so that interactive will actually do something
+			// instead of exiting immediately.
 			commandContents := `
 select * from osquery_info;
 `
 			err = os.WriteFile(inFilePath, []byte(commandContents), 0755)
 			require.NoError(t, err)
-			inFile, err := os.Create(inFilePath)
-			require.NoError(t, err)
-			defer inFile.Close()
 
 			// Set up our replacement for stdout
 			outFilePath := filepath.Join(rootDir, "out.txt")
@@ -235,6 +237,14 @@ select * from osquery_info;
 					t.Error("process did not exit before timeout", fmt.Sprintf("interactive logs:\n%s\nosquery logs:\n%s\n", logBytes.String(), string(errContents)))
 					t.FailNow()
 				}
+
+				// Confirm we got output, indicating that osquery actually ran a query
+				outContents, err := os.ReadFile(outFilePath)
+				require.NoError(t, err)
+				require.Greater(t, len(outContents), 0)
+
+				// osquery_info should include runtime.GOOS in it for build_platform column
+				require.Contains(t, string(outContents), runtime.GOOS)
 			} else {
 				require.Nil(t, proc)
 			}
