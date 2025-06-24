@@ -86,14 +86,16 @@ func copyBinary(t *testing.T, executablePath string) {
 func TestProc(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
+	type testCase struct {
 		name               string
 		useShortRootDir    bool
 		osqueryFlags       []string
 		configFileContents []byte
 		wantProc           bool
 		errContainsStr     string
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name:            "no flags",
 			useShortRootDir: true,
@@ -120,12 +122,16 @@ func TestProc(t *testing.T) {
 `),
 			wantProc: true,
 		},
-		{
+	}
+
+	if runtime.GOOS != "windows" {
+		tests = append(tests, testCase{
 			name:            "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			useShortRootDir: false,
 			wantProc:        false,
 			errContainsStr:  "error waiting for osquery to create socket",
 		},
+		)
 	}
 	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
