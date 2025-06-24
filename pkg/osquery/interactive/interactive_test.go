@@ -223,7 +223,8 @@ select * from osquery_info;
 				}
 			case <-time.After(2 * time.Minute):
 				errContents, _ := os.ReadFile(errFilePath)
-				t.Errorf("process did not start before timeout: started at %s, failed at %s: interactive logs:\n%s\nosquery logs:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents))
+				outContents, _ := os.ReadFile(outFilePath)
+				t.Errorf("process did not start before timeout: started at %s, failed at %s: interactive logs:\n%s\nosquery logs:\n%s\nosquery output:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents), string(outContents))
 				t.FailNow()
 			}
 
