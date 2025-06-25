@@ -184,10 +184,11 @@ func TestProc(t *testing.T) {
 			require.NoError(t, err)
 			defer inFile.Close()
 
-			// For our stdin replacement, we want at least some data in the file so that interactive will actually do something
-			// instead of exiting immediately.
+			// For our stdin replacement, we want at least some data in the file  -- we want interactive to run a query,
+			// and then exit.
 			commandContents := `
 select * from osquery_info;
+.exit
 `
 			err = os.WriteFile(inFilePath, []byte(commandContents), 0755)
 			require.NoError(t, err)
