@@ -1063,15 +1063,35 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 			continue
 		}
 
-		// Kill the desktop process for the given uid to force it to restart systray.
+		// We know that systray needs to restart, which means we need to kill this desktop
+		// process in order to restart it fully. However, this process is still starting up --
+		// we may not have a record for it yet in r.uidProcs. We want to delay slightly before
+		// attempting to kill the process. We usually see the process show up in under a second
+		// after we detect that systray needs a restart, so delaying five seconds should be sufficient.
+		time.Sleep(5 * time.Second)
+
 		r.slogger.Log(context.TODO(), slog.LevelInfo,
 			"noticed systray error -- shutting down and restarting desktop processes",
 			"systray_log", logLine,
 			"uid", uid,
 		)
-		if err := r.killDesktopProcess(context.Background(), uid); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelInfo,
-				"could not kill desktop process",
+
+		// We want to perform some retries if we can't kill the process -- we aren't likely to get
+		// another log indicating that systray needs to restart, so we really want to fix this now.
+		// The call to `Shutdown` has a 30-second timeout, so we have a 35-second retry interval.
+		if err := backoff.WaitFor(func() error {
+			if err := r.killDesktopProcess(context.Background(), uid); err != nil {
+				r.slogger.Log(context.TODO(), slog.LevelWarn,
+					"could not kill desktop process, will retry",
+					"err", err,
+					"uid", uid,
+				)
+			}
+
+			return nil
+		}, 3*time.Minute, 35*time.Second); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"could not kill desktop process after detecting systray initialization error",
 				"err", err,
 				"uid", uid,
 			)
