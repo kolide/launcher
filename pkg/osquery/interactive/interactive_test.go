@@ -1,9 +1,3 @@
-//go:build !windows
-// +build !windows
-
-// disabling on windows because for some reason the test cannot get access to the windows pipe it fails with:
-// however it's just the test, works when using interactive mode on windows
-// open \\.\pipe\kolide-osquery-.....: The system cannot find the file specified.
 package interactive
 
 import (
@@ -22,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/packaging"
@@ -64,8 +59,10 @@ var downloadOnceFunc = sync.OnceFunc(func() {
 		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
 	}
 
-	// Don't need to add .exe here because these tests don't run on Windows
 	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
+	if runtime.GOOS == "windows" {
+		testOsqueryBinary = testOsqueryBinary + ".exe"
+	}
 
 	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
 		fmt.Printf("error copying osqueryd binary: %v", err)
@@ -89,14 +86,16 @@ func copyBinary(t *testing.T, executablePath string) {
 func TestProc(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
+	type testCase struct {
 		name               string
 		useShortRootDir    bool
 		osqueryFlags       []string
 		configFileContents []byte
 		wantProc           bool
 		errContainsStr     string
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name:            "no flags",
 			useShortRootDir: true,
@@ -123,12 +122,16 @@ func TestProc(t *testing.T) {
 `),
 			wantProc: true,
 		},
-		{
+	}
+
+	if runtime.GOOS != "windows" {
+		tests = append(tests, testCase{
 			name:            "socket path too long, the name of the test causes the socket path to be to long to be created, resulting in timeout waiting for the socket",
 			useShortRootDir: false,
 			wantProc:        false,
 			errContainsStr:  "error waiting for osquery to create socket",
 		},
+		)
 	}
 	for _, tt := range tests { //nolint:paralleltest
 		tt := tt
@@ -167,6 +170,7 @@ func TestProc(t *testing.T) {
 			mockSack.On("KatcConfigStore").Return(store)
 			mockSack.On("TableGenerateTimeout").Return(4 * time.Minute).Maybe()
 			mockSack.On("RegisterChangeObserver", mock.Anything, keys.TableGenerateTimeout).Return().Maybe()
+			mockSack.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
 
 			// Set up the startup settings store -- opening RW ensures that the db exists
 			// with the appropriate migrations.
@@ -174,11 +178,38 @@ func TestProc(t *testing.T) {
 			require.NoError(t, err, "initializing startup settings store")
 			require.NoError(t, startupSettingsStore.Close())
 
+			// Set up our replacement for stdin
+			inFilePath := filepath.Join(rootDir, "in.txt")
+			inFile, err := os.Create(inFilePath)
+			require.NoError(t, err)
+			defer inFile.Close()
+
+			// For our stdin replacement, we want at least some data in the file so that interactive will actually do something
+			// instead of exiting immediately.
+			commandContents := `
+select * from osquery_info;
+`
+			err = os.WriteFile(inFilePath, []byte(commandContents), 0755)
+			require.NoError(t, err)
+
+			// Set up our replacement for stdout
+			outFilePath := filepath.Join(rootDir, "out.txt")
+			outFile, err := os.Create(outFilePath)
+			require.NoError(t, err)
+			defer outFile.Close()
+
+			// Set up our replacement for stderr
+			errFilePath := filepath.Join(rootDir, "err.txt")
+			errFile, err := os.Create(errFilePath)
+			require.NoError(t, err)
+			defer errFile.Close()
+
 			// Make sure the process starts in a timely fashion
 			var proc *os.Process
 			startErr := make(chan error)
+			startTime := time.Now()
 			go func() {
-				proc, _, err = StartProcess(mockSack, rootDir)
+				proc, _, err = StartProcess(mockSack, rootDir, inFile, outFile, errFile)
 				startErr <- err
 			}()
 
@@ -191,7 +222,9 @@ func TestProc(t *testing.T) {
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				}
 			case <-time.After(2 * time.Minute):
-				t.Error("process did not start before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+				errContents, _ := os.ReadFile(errFilePath)
+				outContents, _ := os.ReadFile(outFilePath)
+				t.Errorf("process did not start before timeout: started at %s, failed at %s: interactive logs:\n%s\nosquery logs:\n%s\nosquery output:\n%s\n", startTime.String(), time.Now().String(), logBytes.String(), string(errContents), string(outContents))
 				t.FailNow()
 			}
 
@@ -209,9 +242,18 @@ func TestProc(t *testing.T) {
 				case err := <-procExitErr:
 					require.NoError(t, err, fmt.Sprintf("logs: %s", logBytes.String()))
 				case <-time.After(2 * time.Minute):
-					t.Error("process did not exit before timeout", fmt.Sprintf("logs: %s", logBytes.String()))
+					errContents, _ := os.ReadFile(errFilePath)
+					t.Error("process did not exit before timeout", fmt.Sprintf("interactive logs:\n%s\nosquery logs:\n%s\n", logBytes.String(), string(errContents)))
 					t.FailNow()
 				}
+
+				// Confirm we got output, indicating that osquery actually ran a query
+				outContents, err := os.ReadFile(outFilePath)
+				require.NoError(t, err)
+				require.Greater(t, len(outContents), 0)
+
+				// osquery_info should include runtime.GOOS in it for build_platform column
+				require.Contains(t, string(outContents), runtime.GOOS)
 			} else {
 				require.Nil(t, proc)
 			}

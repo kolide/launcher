@@ -93,7 +93,7 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 
 	knapsack := knapsack.New(nil, flagController, nil, systemMultiSlogger, nil)
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(knapsack, interactiveRootDir)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(knapsack, interactiveRootDir, os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}
