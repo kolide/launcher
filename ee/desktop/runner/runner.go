@@ -1091,7 +1091,7 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 			return nil
 		}, 3*time.Minute, 35*time.Second); err != nil {
 			r.slogger.Log(context.TODO(), slog.LevelError,
-				"could not kill desktop process",
+				"could not kill desktop process after detecting systray initialization error",
 				"err", err,
 				"uid", uid,
 			)
