@@ -9,7 +9,6 @@ void getSoftwareUpdateConfiguration(
     int* isAutomaticallyCheckForUpdatesEnabled,
     int* isdoBackgroundDownloadManaged,
     int* doesBackgroundDownload,
-    int* isAppStoreAutoUpdatesManaged,
     int* doesAppStoreAutoUpdates,
     int* doesOSXAutoUpdatesManaged,
     int* doesOSXAutoUpdates,
