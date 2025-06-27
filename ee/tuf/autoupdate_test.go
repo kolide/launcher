@@ -87,6 +87,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -185,6 +186,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -273,6 +275,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -698,6 +701,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
@@ -781,6 +785,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))

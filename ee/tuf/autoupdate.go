@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"io"
 	"log/slog"
 	"net/http"
@@ -248,7 +249,8 @@ func (ta *TufAutoupdater) Execute() (err error) {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
 			"checking for updates",
 		)
-		if err := ta.checkForUpdate(context.TODO(), binaries); err != nil {
+		// always allow delay during routine checks for autoupdates
+		if err := ta.checkForUpdate(context.TODO(), binaries, true); err != nil {
 			observability.AutoupdateFailureCounter.Add(context.TODO(), 1)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
 				"error checking for update",
@@ -336,7 +338,8 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 	)
 
-	if err := ta.checkForUpdate(ctx, binariesToUpdate); err != nil {
+	// do not allow delay during autoupdate now requests
+	if err := ta.checkForUpdate(ctx, binariesToUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update per control server request",
@@ -397,7 +400,8 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 	}
 
 	// At least one binary requires a recheck -- perform that now
-	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate); err != nil {
+	// do not allow delay when responding to flag changes
+	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
 			"error checking for update after autoupdate setting changed",
@@ -480,7 +484,9 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 
 // checkForUpdate fetches latest metadata from the TUF server, then checks to see if there's
 // a new release that we should download. If so, it will add the release to our updates library.
-func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary) error {
+// If allowDelay is set to false, our knapsack.AutoupdateDownloadSplay will be ignored and the update
+// will be downloaded immediately, regardless of promotion time.
+func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []autoupdatableBinary, allowDelay bool) error {
 	ctx, span := observability.StartSpan(ctx, "binaries", fmt.Sprintf("%+v", binariesToCheck))
 	defer span.End()
 
@@ -524,7 +530,7 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
 	for _, binary := range binariesToCheck {
-		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets)
+		downloadedUpdateVersion, err := ta.downloadUpdate(binary, targets, allowDelay)
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("could not download update for %s: %w", binary, err))
 		}
@@ -587,14 +593,15 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 }
 
 // downloadUpdate will download a new release for the given binary, if available from TUF
-// and not already downloaded.
-func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles) (string, error) {
+// and not already downloaded. If allowDelay is true, the download may be delayed according to
+// the promotion time and the knapsack.AutoupdateDownloadSplay.
+func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets data.TargetFiles, allowDelay bool) (string, error) {
 	target, targetMetadata, err := findTarget(context.Background(), binary, targets, ta.pinnedVersions[binary], ta.updateChannel, ta.slogger)
 	if err != nil {
 		return "", fmt.Errorf("could not find appropriate target: %w", err)
 	}
 
-	if ta.shouldDelayDownload(targetMetadata) {
+	if allowDelay && ta.shouldDelayDownload(binary, targets) {
 		return "", nil
 	}
 
@@ -714,6 +721,28 @@ func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.T
 	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }
 
+func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) int64 {
+	_, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	// find the metadata for the channel release file - this will include the promote_time
+	targetReleaseFile := path.Join(string(binary), runtime.GOOS, PlatformArch(), channel, "release.json")
+	for targetName, target := range targets {
+		if targetName != targetReleaseFile {
+			continue
+		}
+
+		var custom ReleaseFileCustomMetadata
+		if err := json.Unmarshal(*target.Custom, &custom); err != nil {
+			return 0
+		}
+
+		return custom.PromoteTime
+	}
+
+	return 0
+}
+
 // PlatformArch returns the correct arch for the runtime OS. For now, since osquery doesn't publish an arm64 release,
 // we use the universal binaries for darwin.
 func PlatformArch() string {
@@ -724,29 +753,20 @@ func PlatformArch() string {
 	return runtime.GOARCH
 }
 
-func (ta *TufAutoupdater) shouldDelayDownload(target data.TargetFileMeta) bool {
+// shouldDelayDownload determines whether to delay downloading an update based on our AutoupdateDownloadSplay mechanism.
+// It returns false (no delay) if:
+// - AutoupdateDownloadSplay is disabled (set to 0s)
+// - the release promote time cannot be determined or is unset
+// - the promotion happened longer ago than the configured splay duration
+// Otherwise, it uses a hash of the hardware UUID to determine a consistent delay offset within the splay window,
+// returning true if the current time is before the calculated delay cutoff.
+func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets data.TargetFiles) bool {
 	// if the splay is disabled, we should always download immediately
 	if ta.knapsack.AutoupdateDownloadSplay() == 0*time.Second {
 		return false
 	}
 
-	var customMetadata ReleaseFileCustomMetadata
-	var releasePromotedAt int64 = 0
-	if err := json.Unmarshal(*target.Custom, &customMetadata); err != nil {
-		// note the failure but continue as we would have if the metadata was not present at all,
-		// leaving the releasePromotedAt time at 0 will ensure we proceed to download without delay
-		ta.slogger.Log(context.TODO(), slog.LevelWarn,
-			"unable to unmarshal release file custom metadata",
-			"err", err,
-		)
-	} else {
-		releasePromotedAt = customMetadata.PromoteTime
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"ZACK DEBUGGING promote start is SET, will evaluate against download splay",
-			"promote_start", releasePromotedAt,
-			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
-		)
-	}
+	releasePromotedAt := findReleasePromoteTime(context.TODO(), binary, targets, ta.updateChannel)
 
 	// if for any reason we can't determine the promote time, we should download immediately.
 	// this also covers the case where we have not published a promote time for whatever reason
@@ -760,7 +780,7 @@ func (ta *TufAutoupdater) shouldDelayDownload(target data.TargetFileMeta) bool {
 	}
 
 	promoteStart := time.Unix(releasePromotedAt, 0)
-	// if promotion happened greater than our max splay threshold, download immediately
+	// if promotion happened greater than our max splay threshold, we should download immediately
 	if time.Since(promoteStart) > ta.knapsack.AutoupdateDownloadSplay() {
 		ta.slogger.Log(context.TODO(), slog.LevelDebug,
 			"ZACK DEBUGGING promote start further than download splay, will not delay",
@@ -770,11 +790,25 @@ func (ta *TufAutoupdater) shouldDelayDownload(target data.TargetFileMeta) bool {
 		return false
 	}
 
+	delayWindow := int64(ta.knapsack.AutoupdateDownloadSplay().Seconds())
+	splayHash := getSplayHash(ta.knapsack.GetEnrollmentDetails().HardwareUUID)
+	delaySeconds := splayHash % delayWindow
+	delayCutoff := releasePromotedAt + delaySeconds
 	ta.slogger.Log(context.TODO(), slog.LevelDebug,
 		"ZACK DEBUGGING release promoted within 24 hours, determining download eligibility",
 		"promote_start", promoteStart,
 		"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
+		"delay_seconds", delaySeconds,
+		"delay_cutoff", time.Unix(delayCutoff, 0),
+		"should_delay", time.Now().Before(time.Unix(delayCutoff, 0)),
 	)
 
-	return false
+	// we should delay unless the current time is after the delay cutoff selected
+	return time.Now().Before(time.Unix(delayCutoff, 0))
+}
+
+func getSplayHash(uuid string) int64 {
+	var mh maphash.Hash
+	mh.WriteString(uuid)
+	return int64(mh.Sum64())
 }
