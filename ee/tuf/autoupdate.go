@@ -34,6 +34,10 @@ import (
 //go:embed assets/tuf/root.json
 var rootJson []byte
 
+// splayHashSeed generated one time as package level variable so we maintain
+// consistent delays across launcher uptime
+var splayHashSeed = maphash.MakeSeed()
+
 // Configuration defaults
 const (
 	tufDirectoryName = "tuf"
@@ -526,6 +530,11 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
+	ta.slogger.Log(ctx, slog.LevelInfo,
+		"ZACK DEBUGGING GOT TARGETS",
+		"targets", targets,
+	)
+
 	// Check for and download any new releases that are available
 	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
@@ -721,6 +730,10 @@ func findRelease(ctx context.Context, binary autoupdatableBinary, targets data.T
 	return "", data.TargetFileMeta{}, fmt.Errorf("could not find metadata for release target %s for binary %s", releaseTarget, binary)
 }
 
+// findReleasePromoteTime extracts the promotion timestamp from the release file metadata for a given binary and channel.
+// It searches the TUF targets for the appropriate release.json file based on the binary, OS, architecture, and channel,
+// then unmarshals the custom metadata to retrieve the PromoteTime field.
+// Returns the Unix timestamp of when the release was promoted, or 0 if the release file is not found or cannot be parsed.
 func findReleasePromoteTime(ctx context.Context, binary autoupdatableBinary, targets data.TargetFiles, channel string) int64 {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
@@ -762,7 +775,7 @@ func PlatformArch() string {
 // returning true if the current time is before the calculated delay cutoff.
 func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets data.TargetFiles) bool {
 	// if the splay is disabled, we should always download immediately
-	if ta.knapsack.AutoupdateDownloadSplay() == 0*time.Second {
+	if ta.knapsack.AutoupdateDownloadSplay() == 0 {
 		return false
 	}
 
@@ -795,7 +808,7 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 	delaySeconds := splayHash % delayWindow
 	delayCutoff := releasePromotedAt + delaySeconds
 	ta.slogger.Log(context.TODO(), slog.LevelDebug,
-		"ZACK DEBUGGING release promoted within 24 hours, determining download eligibility",
+		"ZACK DEBUGGING release promoted within splay time, determining download eligibility",
 		"promote_start", promoteStart,
 		"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
 		"delay_seconds", delaySeconds,
@@ -803,12 +816,22 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 		"should_delay", time.Now().Before(time.Unix(delayCutoff, 0)),
 	)
 
+	fmt.Printf("WOULD DELAY FOR %v MINUTES\n", time.Until(time.Unix(delayCutoff, 0)).Minutes())
+
 	// we should delay unless the current time is after the delay cutoff selected
 	return time.Now().Before(time.Unix(delayCutoff, 0))
 }
 
+// getSplayHash generates a consistent hash value from a UUID string using maphash.
+// This is used to create deterministic delay offsets for autoupdate download scheduling
+// based on hardware UUID - note this is not cryptographically secure, it is intended only to
+// provide a fast hash value for spreading these delays out
 func getSplayHash(uuid string) int64 {
-	var mh maphash.Hash
-	mh.WriteString(uuid)
-	return int64(mh.Sum64())
+	// note converting to int64 can result in a negative value here, so we take the absolute value
+	splayHash := int64(maphash.String(splayHashSeed, uuid))
+	if splayHash < 0 {
+		return -splayHash
+	}
+
+	return splayHash
 }

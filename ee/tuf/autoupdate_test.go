@@ -3,6 +3,7 @@ package tuf
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,13 +19,16 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver"
+	"github.com/google/uuid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/theupdateframework/go-tuf/data"
 )
 
 func TestNewTufAutoupdater(t *testing.T) {
@@ -1089,4 +1094,177 @@ func Test_currentRunningVersion_osqueryd_handlesQueryError(t *testing.T) {
 	osqueryVersion, err := autoupdater.currentRunningVersion("osqueryd")
 	require.Error(t, err, "expected an error returning osquery version when querying osquery fails")
 	require.Equal(t, "", osqueryVersion)
+}
+
+//go:embed testdata/test_promote_time_target_files.json
+var sampleTargetJson []byte
+
+func getSampleTargets(t *testing.T) data.TargetFiles {
+	var targetFiles data.TargetFiles
+	err := json.Unmarshal([]byte(sampleTargetJson), &targetFiles)
+	require.NoError(t, err, "expected to be able to unmarshal sample json into data.TargetFiles")
+	return targetFiles
+}
+
+func Test_findReleasePromoteTime(t *testing.T) {
+	t.Parallel()
+
+	// note that the sample targets file json is pre-curated so that the the promotion times
+	// match across OS and arch to simplify testing across platforms here
+	targets := getSampleTargets(t)
+	tests := []struct {
+		name    string
+		binary  autoupdatableBinary
+		channel string
+		want    int64
+	}{
+		{
+			name:    "osqueryd with valid alpha targets",
+			binary:  "osqueryd",
+			channel: "alpha",
+			want:    1750955751,
+		},
+		{
+			name:    "osqueryd with valid nightly targets",
+			binary:  "osqueryd",
+			channel: "nightly",
+			want:    1750870406,
+		},
+		{
+			name:    "osqueryd with valid stable targets",
+			binary:  "osqueryd",
+			channel: "stable",
+			want:    1750954246,
+		},
+		{
+			// note that this is testing our zero value behavior,
+			// all beta targets are in the sample targets file are intentionally missing promote_time
+			name:    "osqueryd with missing beta target promotion times",
+			binary:  "osqueryd",
+			channel: "beta",
+			want:    0,
+		},
+		{
+			name:    "launcher with valid alpha targets",
+			binary:  "launcher",
+			channel: "alpha",
+			want:    1750961031,
+		},
+		{
+			name:    "launcher with valid nightly targets",
+			binary:  "launcher",
+			channel: "nightly",
+			want:    1750859203,
+		},
+		{
+			name:    "launcher with valid stable targets",
+			binary:  "launcher",
+			channel: "stable",
+			want:    1750955736,
+		},
+		{
+			// note that this is testing our zero value behavior,
+			// all beta targets are in the sample targets file are intentionally missing promote_time
+			name:    "launcher with missing beta target promotion times",
+			binary:  "launcher",
+			channel: "beta",
+			want:    0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := findReleasePromoteTime(context.Background(), tt.binary, targets, tt.channel)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_shouldDelayDownloadRespectsDisabledSplay(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
+
+	autoupdater := &TufAutoupdater{
+		slogger:  multislogger.NewNopLogger(),
+		knapsack: mockKnapsack,
+	}
+
+	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("osqueryd"), data.TargetFiles{}))
+}
+
+func Test_shouldDelayDownloadDoesNotDelayWithoutPromoteTime(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(8 * time.Hour)
+
+	autoupdater := &TufAutoupdater{
+		slogger:       multislogger.NewNopLogger(),
+		knapsack:      mockKnapsack,
+		updateChannel: "beta", // none of the beta targets have promote_time set
+	}
+
+	targets := getSampleTargets(t)
+	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("osqueryd"), targets))
+	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("launcher"), targets))
+}
+
+func Test_shouldDelayDownloadDoesNotDelayIfPromoteTimeExceedsSplay(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(2 * time.Hour)
+
+	autoupdater := &TufAutoupdater{
+		slogger:       multislogger.NewNopLogger(),
+		knapsack:      mockKnapsack,
+		updateChannel: "alpha", // all promote_times in here will always be greater than 2 hours ago (splay time)
+	}
+
+	targets := getSampleTargets(t)
+	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("osqueryd"), targets))
+	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("launcher"), targets))
+}
+
+func Test_shouldDelayDownloadDelaysIfPromotedWithinSplay(t *testing.T) {
+	t.Parallel()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(8 * time.Hour)
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{HardwareUUID: "9360B8A7-0B13-45E5-9B62-92BC7374D7D1"})
+
+	autoupdater := &TufAutoupdater{
+		slogger:       multislogger.NewNopLogger(),
+		knapsack:      mockKnapsack,
+		updateChannel: "alpha",
+	}
+
+	targets := getSampleTargets(t)
+	for _, binary := range []string{"osqueryd", "launcher"} {
+		// find the release file from samples and update the promote time to be within the splay time
+		targetReleaseFile := path.Join(binary, runtime.GOOS, PlatformArch(), autoupdater.updateChannel, "release.json")
+		existingTarget := targets[targetReleaseFile]
+		// setting promote time to be 5 minutes after splay time so there's no way it should not be delayed, regardless of uuid/hash seed
+		updatedPromote := fmt.Sprintf(`{"promote_time": %d}`, time.Now().Add(5*time.Minute).Unix())
+		newCustomMetadata := json.RawMessage([]byte(updatedPromote))
+		existingTarget.Custom = &newCustomMetadata
+		targets[targetReleaseFile] = existingTarget
+
+		require.True(t, autoupdater.shouldDelayDownload(autoupdatableBinary(binary), targets))
+	}
+}
+
+func Test_splayHashReturnsConsistentHash(t *testing.T) {
+	t.Parallel()
+
+	id := uuid.New().String()
+	originalSplayHash := getSplayHash(id)
+	for i := 0; i < 5; i++ {
+		require.Equal(t, originalSplayHash, getSplayHash(id))
+	}
 }
