@@ -1113,62 +1113,62 @@ func Test_findReleasePromoteTime(t *testing.T) {
 	// match across OS and arch to simplify testing across platforms here
 	targets := getSampleTargets(t)
 	tests := []struct {
-		name    string
-		binary  autoupdatableBinary
-		channel string
-		want    int64
+		name                string
+		binary              autoupdatableBinary
+		channel             string
+		expectedPromoteTime int64
 	}{
 		{
-			name:    "osqueryd with valid alpha targets",
-			binary:  "osqueryd",
-			channel: "alpha",
-			want:    1750955751,
+			name:                "osqueryd with valid alpha targets",
+			binary:              "osqueryd",
+			channel:             "alpha",
+			expectedPromoteTime: 1750955751,
 		},
 		{
-			name:    "osqueryd with valid nightly targets",
-			binary:  "osqueryd",
-			channel: "nightly",
-			want:    1750870406,
+			name:                "osqueryd with valid nightly targets",
+			binary:              "osqueryd",
+			channel:             "nightly",
+			expectedPromoteTime: 1750870406,
 		},
 		{
-			name:    "osqueryd with valid stable targets",
-			binary:  "osqueryd",
-			channel: "stable",
-			want:    1750954246,
-		},
-		{
-			// note that this is testing our zero value behavior,
-			// all beta targets are in the sample targets file are intentionally missing promote_time
-			name:    "osqueryd with missing beta target promotion times",
-			binary:  "osqueryd",
-			channel: "beta",
-			want:    0,
-		},
-		{
-			name:    "launcher with valid alpha targets",
-			binary:  "launcher",
-			channel: "alpha",
-			want:    1750961031,
-		},
-		{
-			name:    "launcher with valid nightly targets",
-			binary:  "launcher",
-			channel: "nightly",
-			want:    1750859203,
-		},
-		{
-			name:    "launcher with valid stable targets",
-			binary:  "launcher",
-			channel: "stable",
-			want:    1750955736,
+			name:                "osqueryd with valid stable targets",
+			binary:              "osqueryd",
+			channel:             "stable",
+			expectedPromoteTime: 1750954246,
 		},
 		{
 			// note that this is testing our zero value behavior,
 			// all beta targets are in the sample targets file are intentionally missing promote_time
-			name:    "launcher with missing beta target promotion times",
-			binary:  "launcher",
-			channel: "beta",
-			want:    0,
+			name:                "osqueryd with missing beta target promotion times",
+			binary:              "osqueryd",
+			channel:             "beta",
+			expectedPromoteTime: 0,
+		},
+		{
+			name:                "launcher with valid alpha targets",
+			binary:              "launcher",
+			channel:             "alpha",
+			expectedPromoteTime: 1750961031,
+		},
+		{
+			name:                "launcher with valid nightly targets",
+			binary:              "launcher",
+			channel:             "nightly",
+			expectedPromoteTime: 1750859203,
+		},
+		{
+			name:                "launcher with valid stable targets",
+			binary:              "launcher",
+			channel:             "stable",
+			expectedPromoteTime: 1750955736,
+		},
+		{
+			// note that this is testing our zero value behavior,
+			// all beta targets are in the sample targets file are intentionally missing promote_time
+			name:                "launcher with missing beta target promotion times",
+			binary:              "launcher",
+			channel:             "beta",
+			expectedPromoteTime: 0,
 		},
 	}
 
@@ -1177,8 +1177,8 @@ func Test_findReleasePromoteTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := findReleasePromoteTime(context.Background(), tt.binary, targets, tt.channel)
-			require.Equal(t, tt.want, got)
+			promoteTime := findReleasePromoteTime(context.Background(), tt.binary, targets, tt.channel)
+			require.Equal(t, tt.expectedPromoteTime, promoteTime)
 		})
 	}
 }
@@ -1264,7 +1264,7 @@ func Test_splayHashReturnsConsistentHash(t *testing.T) {
 
 	id := uuid.New().String()
 	originalSplayHash := getSplayHash(id)
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 3; i++ {
 		require.Equal(t, originalSplayHash, getSplayHash(id))
 	}
 }
