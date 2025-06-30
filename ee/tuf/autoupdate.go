@@ -530,11 +530,6 @@ func (ta *TufAutoupdater) checkForUpdate(ctx context.Context, binariesToCheck []
 		return fmt.Errorf("could not get complete list of targets: %w", err)
 	}
 
-	ta.slogger.Log(ctx, slog.LevelInfo,
-		"ZACK DEBUGGING GOT TARGETS",
-		"targets", targets,
-	)
-
 	// Check for and download any new releases that are available
 	updatesDownloaded := make(map[autoupdatableBinary]string)
 	updateErrors := make([]error, 0)
@@ -610,6 +605,7 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find appropriate target: %w", err)
 	}
 
+	// TODO move this below currentRunningVersion check below once done testing
 	if allowDelay && ta.shouldDelayDownload(binary, targets) {
 		return "", nil
 	}
@@ -779,26 +775,26 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 		return false
 	}
 
-	releasePromotedAt := findReleasePromoteTime(context.TODO(), binary, targets, ta.updateChannel)
+	slogger := ta.slogger.With(
+		"download_splay_minutes", ta.knapsack.AutoupdateDownloadSplay().Minutes(),
+		"binary", binary,
+		"update_channel", ta.updateChannel,
+	)
 
+	releasePromotedAt := findReleasePromoteTime(context.TODO(), binary, targets, ta.updateChannel)
 	// if for any reason we can't determine the promote time, we should download immediately.
 	// this also covers the case where we have not published a promote time for whatever reason
 	if releasePromotedAt == 0 {
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"ZACK DEBUGGING promote start is ZERO, will not delay",
-			"promote_start", releasePromotedAt,
-			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
-		)
+		slogger.Log(context.TODO(), slog.LevelDebug, "no release promotion time found, will not delay download")
 		return false
 	}
 
 	promoteStart := time.Unix(releasePromotedAt, 0)
 	// if promotion happened greater than our max splay threshold, we should download immediately
 	if time.Since(promoteStart) > ta.knapsack.AutoupdateDownloadSplay() {
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"ZACK DEBUGGING promote start further than download splay, will not delay",
+		slogger.Log(context.TODO(), slog.LevelDebug,
+			"promote start was longer ago than download splay, will not delay download",
 			"promote_start", promoteStart,
-			"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
 		)
 		return false
 	}
@@ -807,16 +803,14 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 	splayHash := getSplayHash(ta.knapsack.GetEnrollmentDetails().HardwareUUID)
 	delaySeconds := splayHash % delayWindow
 	delayCutoff := releasePromotedAt + delaySeconds
-	ta.slogger.Log(context.TODO(), slog.LevelDebug,
-		"ZACK DEBUGGING release promoted within splay time, determining download eligibility",
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"release promoted within splay time, determining download eligibility",
 		"promote_start", promoteStart,
-		"download_splay", ta.knapsack.AutoupdateDownloadSplay(),
 		"delay_seconds", delaySeconds,
 		"delay_cutoff", time.Unix(delayCutoff, 0),
-		"should_delay", time.Now().Before(time.Unix(delayCutoff, 0)),
+		"delay_minutes_from_now", time.Until(time.Unix(delayCutoff, 0)).Minutes(),
+		"will_delay", time.Now().Before(time.Unix(delayCutoff, 0)),
 	)
-
-	fmt.Printf("WOULD DELAY FOR %v MINUTES\n", time.Until(time.Unix(delayCutoff, 0)).Minutes())
 
 	// we should delay unless the current time is after the delay cutoff selected
 	return time.Now().Before(time.Unix(delayCutoff, 0))

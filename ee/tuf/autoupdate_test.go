@@ -1249,7 +1249,7 @@ func Test_shouldDelayDownloadDelaysIfPromotedWithinSplay(t *testing.T) {
 		// find the release file from samples and update the promote time to be within the splay time
 		targetReleaseFile := path.Join(binary, runtime.GOOS, PlatformArch(), autoupdater.updateChannel, "release.json")
 		existingTarget := targets[targetReleaseFile]
-		// setting promote time to be 5 minutes after splay time so there's no way it should not be delayed, regardless of uuid/hash seed
+		// setting promote time to be 5 minutes after splay time so there's no way it should not be delayed, regardless of uuid hash or seed
 		updatedPromote := fmt.Sprintf(`{"promote_time": %d}`, time.Now().Add(5*time.Minute).Unix())
 		newCustomMetadata := json.RawMessage([]byte(updatedPromote))
 		existingTarget.Custom = &newCustomMetadata
