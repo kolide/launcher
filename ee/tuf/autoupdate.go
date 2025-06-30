@@ -605,15 +605,15 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", fmt.Errorf("could not find appropriate target: %w", err)
 	}
 
-	// TODO move this below currentRunningVersion check below once done testing
-	if allowDelay && ta.shouldDelayDownload(binary, targets) {
-		return "", nil
-	}
-
 	// Ensure we don't download duplicate versions
 	var currentVersion string
 	currentVersion, _ = ta.currentRunningVersion(binary)
 	if currentVersion == versionFromTarget(binary, target) {
+		return "", nil
+	}
+
+	// determine whether we should skip this check cycle if delaying the download
+	if allowDelay && ta.shouldDelayDownload(binary, targets) {
 		return "", nil
 	}
 
