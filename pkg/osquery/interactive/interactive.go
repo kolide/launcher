@@ -28,7 +28,7 @@ const (
 	defaultConfigPluginName = "interactive_config"
 )
 
-func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Process, *osquery.ExtensionManagerServer, error) {
+func StartProcess(knapsack types.Knapsack, interactiveRootDir string, inFile, outFile, errFile *os.File) (*os.Process, *osquery.ExtensionManagerServer, error) {
 	if err := os.MkdirAll(interactiveRootDir, fsutil.DirMode); err != nil {
 		return nil, nil, fmt.Errorf("creating root dir for interactive mode: %w", err)
 	}
@@ -83,7 +83,7 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 
 	proc, err := os.StartProcess(knapsack.OsquerydPath(), buildOsqueryFlags(socketPath, augeasLensesPath, osqueryFlags), &os.ProcAttr{
 		// Transfer stdin, stdout, and stderr to the new process
-		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+		Files: []*os.File{inFile, outFile, errFile},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error starting osqueryd in interactive mode: %w", err)
@@ -109,7 +109,8 @@ func StartProcess(knapsack types.Knapsack, interactiveRootDir string) (*os.Proce
 		"osquery socket file created",
 	)
 
-	extensionServer, err := loadExtensions(knapsack.Slogger(), socketPath, osqPlugins...)
+	// This call is blocking -- it will run the extension manager server until the user exits.
+	extensionServer, err := loadExtensionsAndStartServer(knapsack.Slogger(), socketPath, osqPlugins...)
 	if err != nil {
 		err = fmt.Errorf("error loading extensions: %w", err)
 
@@ -150,7 +151,9 @@ func buildOsqueryFlags(socketPath, augeasLensesPath string, osqueryFlags []strin
 	return flags
 }
 
-func loadExtensions(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
+// loadExtensionsAndStartServer calls *osquery.ExtensionManagerServer.Start, which will block (while running the server)
+// until the user exits the process.
+func loadExtensionsAndStartServer(slogger *slog.Logger, socketPath string, plugins ...osquery.OsqueryPlugin) (*osquery.ExtensionManagerServer, error) {
 	client, err := osquery.NewClient(socketPath, 10*time.Second, osquery.MaxWaitTime(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("error creating osquery client: %w", err)
@@ -180,13 +183,10 @@ func loadExtensions(slogger *slog.Logger, socketPath string, plugins ...osquery.
 		"registered plugins with server",
 	)
 
+	// Start will start and _run_ the server; it returns once the server is shut down.
 	if err := extensionManagerServer.Start(); err != nil {
 		return nil, fmt.Errorf("error starting extension manager server: %w", err)
 	}
-
-	slogger.Log(context.TODO(), slog.LevelDebug,
-		"started osquery extension server",
-	)
 
 	return extensionManagerServer, nil
 }
