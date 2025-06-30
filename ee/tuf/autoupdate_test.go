@@ -1101,7 +1101,7 @@ var sampleTargetJson []byte
 
 func getSampleTargets(t *testing.T) data.TargetFiles {
 	var targetFiles data.TargetFiles
-	err := json.Unmarshal([]byte(sampleTargetJson), &targetFiles)
+	err := json.Unmarshal(sampleTargetJson, &targetFiles)
 	require.NoError(t, err, "expected to be able to unmarshal sample json into data.TargetFiles")
 	return targetFiles
 }
