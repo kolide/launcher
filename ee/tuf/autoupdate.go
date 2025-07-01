@@ -253,7 +253,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
 			"checking for updates",
 		)
-		// always allow delay during routine checks for autoupdates
+		// always allow our AutoupdateDownloadSplay delay during routine checks for autoupdates
 		if err := ta.checkForUpdate(context.TODO(), binaries, true); err != nil {
 			observability.AutoupdateFailureCounter.Add(context.TODO(), 1)
 			ta.slogger.Log(context.TODO(), slog.LevelError,
@@ -342,7 +342,7 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		"binaries_to_update", fmt.Sprintf("%+v", binariesToUpdate),
 	)
 
-	// do not allow delay during autoupdate now requests
+	// do not allow AutoupdateDownloadSplay delay during autoupdate now requests
 	if err := ta.checkForUpdate(ctx, binariesToUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
@@ -404,7 +404,7 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 	}
 
 	// At least one binary requires a recheck -- perform that now
-	// do not allow delay when responding to flag changes
+	// do not allow AutoupdateDownloadSplay delay when responding to flag changes
 	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
 		ta.slogger.Log(ctx, slog.LevelError,
