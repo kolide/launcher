@@ -392,7 +392,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
-		r.slogger.Log(ctx, slog.LevelError,
+		r.slogger.Log(ctx, slog.LevelInfo,
 			"timeout waiting for desktop processes to exit, now killing",
 		)
 
