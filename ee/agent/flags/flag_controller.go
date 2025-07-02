@@ -794,3 +794,15 @@ func (fc *FlagController) ResetOnHardwareChangeEnabled() bool {
 		WithDefaultBool(false),
 	).get(fc.getControlServerValue(keys.ResetOnHardwareChangeEnabled))
 }
+
+func (fc *FlagController) AutoupdateDownloadSplay() time.Duration {
+	return NewDurationFlagValue(fc.slogger, keys.AutoupdateDownloadSplay,
+		WithDefault(8*time.Hour),
+		WithMin(0*time.Second),
+		WithMax(72*time.Hour),
+	).get(fc.getControlServerValue(keys.AutoupdateDownloadSplay))
+}
+
+func (fc *FlagController) SetAutoupdateDownloadSplay(val time.Duration) error {
+	return fc.setControlServerValue(keys.AutoupdateDownloadSplay, durationToBytes(val))
+}
