@@ -1284,3 +1284,35 @@ func Test_splayDelaySecondsReturnsConsistentDelay(t *testing.T) {
 		require.Equal(t, initialDelay, autoupdater.getSplayDelaySeconds())
 	}
 }
+
+func Test_FlagsChangedAutoupdateDownloadSplayResetsCalculatedSplay(t *testing.T) {
+	t.Parallel()
+
+	downloadSplayDuration := 8 * time.Hour
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(downloadSplayDuration)
+	mockKnapsack.On("UpdateChannel").Return("alpha")
+
+	autoupdater := &TufAutoupdater{
+		slogger:              multislogger.NewNopLogger(),
+		knapsack:             mockKnapsack,
+		updateChannel:        "alpha",
+		calculatedSplayDelay: &atomic.Int64{},
+		pinnedVersions:       map[autoupdatableBinary]string{},
+	}
+	initialDelay := autoupdater.getSplayDelaySeconds()
+
+	// initial delay should have a minimum value of 1,
+	// and should never exceed our AutoupdateDownloadSplay time in seconds
+	require.GreaterOrEqual(t, initialDelay, int64(1))
+	require.LessOrEqual(t, initialDelay, int64(downloadSplayDuration.Seconds()))
+
+	autoupdater.FlagsChanged(context.TODO(), keys.AutoupdateDownloadSplay)
+	// verify that it was reset
+	require.Equal(t, int64(0), autoupdater.calculatedSplayDelay.Load())
+
+	// verify that it is repopulated on next read
+	newDelay := autoupdater.getSplayDelaySeconds()
+	require.GreaterOrEqual(t, newDelay, int64(1))
+	require.LessOrEqual(t, newDelay, int64(downloadSplayDuration.Seconds()))
+}
