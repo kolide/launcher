@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/maphash"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"os"
 	"path"
@@ -33,10 +33,6 @@ import (
 
 //go:embed assets/tuf/root.json
 var rootJson []byte
-
-// splayHashSeed generated one time as package level variable so we maintain
-// consistent delays across launcher uptime
-var splayHashSeed = maphash.MakeSeed()
 
 // Configuration defaults
 const (
@@ -104,6 +100,8 @@ type TufAutoupdater struct {
 	signalRestart          chan error
 	slogger                *slog.Logger
 	restartFuncs           map[autoupdatableBinary]func(context.Context) error
+	downloadSplay          time.Duration // the max splay window time as determined by knapsack.AutoupdateDownloadSplay()
+	calculatedSplayDelay   *atomic.Int64 // the randomly selected delay within the download splay window
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -141,6 +139,8 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		osquerierRetryInterval: 30 * time.Second,
 		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
 		restartFuncs:           make(map[autoupdatableBinary]func(context.Context) error),
+		downloadSplay:          k.AutoupdateDownloadSplay(),
+		calculatedSplayDelay:   &atomic.Int64{},
 	}
 
 	for _, opt := range opts {
@@ -164,7 +164,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	}
 
 	// Subscribe to changes in update-related flags
-	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion)
+	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay)
 
 	return ta, nil
 }
@@ -367,6 +367,14 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	// check if our autoupdate download splay has changed- if so,
+	// reset our internally stored value and our calculated splay delay so
+	// that it will be recalculated next time it is required
+	if ta.downloadSplay != ta.knapsack.AutoupdateDownloadSplay() {
+		ta.downloadSplay = ta.knapsack.AutoupdateDownloadSplay()
+		ta.calculatedSplayDelay.Store(0)
+	}
 
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
 
@@ -771,12 +779,12 @@ func PlatformArch() string {
 // returning true if the current time is before the calculated delay cutoff.
 func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets data.TargetFiles) bool {
 	// if the splay is disabled, we should always download immediately
-	if ta.knapsack.AutoupdateDownloadSplay() == 0 {
+	if ta.downloadSplay == 0 {
 		return false
 	}
 
 	slogger := ta.slogger.With(
-		"download_splay_minutes", ta.knapsack.AutoupdateDownloadSplay().Minutes(),
+		"download_splay_minutes", ta.downloadSplay.Minutes(),
 		"binary", binary,
 		"update_channel", ta.updateChannel,
 	)
@@ -791,7 +799,7 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 
 	promoteStart := time.Unix(releasePromotedAt, 0)
 	// if promotion happened greater than our max splay threshold, we should download immediately
-	if time.Since(promoteStart) > ta.knapsack.AutoupdateDownloadSplay() {
+	if time.Since(promoteStart) > ta.downloadSplay {
 		slogger.Log(context.TODO(), slog.LevelDebug,
 			"promote start was longer ago than download splay, will not delay download",
 			"promote_start", promoteStart,
@@ -799,33 +807,35 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 		return false
 	}
 
-	delayWindow := int64(ta.knapsack.AutoupdateDownloadSplay().Seconds())
-	splayHash := getSplayHash(ta.knapsack.GetEnrollmentDetails().HardwareUUID)
-	delaySeconds := splayHash % delayWindow
-	delayCutoff := releasePromotedAt + delaySeconds
+	splayDelaySeconds := ta.getDelaySplaySeconds()
+	delayCutoffTime := time.Unix(releasePromotedAt+splayDelaySeconds, 0)
 	slogger.Log(context.TODO(), slog.LevelInfo,
 		"release promoted within splay time, determining download eligibility",
 		"promote_start", promoteStart,
-		"delay_seconds", delaySeconds,
-		"delay_cutoff", time.Unix(delayCutoff, 0),
-		"delay_minutes_from_now", time.Until(time.Unix(delayCutoff, 0)).Minutes(),
-		"will_delay", time.Now().Before(time.Unix(delayCutoff, 0)),
+		"delay_seconds", splayDelaySeconds,
+		"delay_cutoff", delayCutoffTime,
+		"delay_minutes_from_now", time.Until(delayCutoffTime).Minutes(),
+		"will_delay", time.Now().Before(delayCutoffTime),
 	)
 
 	// we should delay unless the current time is after the delay cutoff selected
-	return time.Now().Before(time.Unix(delayCutoff, 0))
+	return time.Now().Before(delayCutoffTime)
 }
 
-// getSplayHash generates a consistent hash value from a UUID string using maphash.
-// This is used to create deterministic delay offsets for autoupdate download scheduling
-// based on hardware UUID - note this is not cryptographically secure, it is intended only to
-// provide a fast hash value for spreading these delays out
-func getSplayHash(uuid string) int64 {
-	// note converting to int64 can result in a negative value here, so we take the absolute value
-	splayHash := int64(maphash.String(splayHashSeed, uuid))
-	if splayHash < 0 {
-		return -splayHash
+// getDelaySplaySeconds returns a random delay value in seconds to indicate how long we should
+// wait after promotion_time before downloading the update.
+// This value is stable across a single launcher run- it uses a cached value if already calculated,
+// otherwise generates a new random value between 0 and the configured AutoupdateDownloadSplay duration in seconds.
+func (ta *TufAutoupdater) getDelaySplaySeconds() int64 {
+	currentValue := ta.calculatedSplayDelay.Load()
+	if currentValue != 0 {
+		return currentValue
 	}
 
-	return splayHash
+	maxSplayValue := int64(ta.downloadSplay.Seconds())
+	// set a minimum of 1 second to ensure we don't set autoupdateDelaySplay to zero value
+	// and regenerate a new value on subsequent calls
+	newSplayValue := rand.Int63n(maxSplayValue) + 1
+	ta.calculatedSplayDelay.Store(newSplayValue)
+	return newSplayValue
 }
