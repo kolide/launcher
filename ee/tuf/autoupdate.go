@@ -772,7 +772,7 @@ func PlatformArch() string {
 // - AutoupdateDownloadSplay is disabled (set to 0s)
 // - the release promote time cannot be determined or is unset
 // - the promotion happened longer ago than the configured splay duration
-// Otherwise, it uses a hash of the hardware UUID to determine a consistent delay offset within the splay window,
+// Otherwise, it uses a randomly selected delay offset within the splay window,
 // returning true if the current time is before the calculated delay cutoff.
 func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, targets data.TargetFiles) bool {
 	// if the splay is disabled, we should always download immediately
