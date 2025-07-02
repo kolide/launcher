@@ -45,7 +45,6 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(8 * time.Hour)
 
 	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, newMockQuerier(t))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -368,7 +367,6 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set logger so that we can capture output
@@ -435,7 +433,6 @@ func TestExecute_inModernStandby(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -499,7 +496,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 	mockQuerier := newMockQuerier(t)
 
 	// Set up autoupdater
@@ -636,7 +632,6 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("InModernStandby").Return(false)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath).Maybe()
-			mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -875,7 +870,6 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	// Start out on beta channel, then swap to nightly
 	mockKnapsack.On("UpdateChannel").Return("beta").Once()
 	mockKnapsack.On("UpdateChannel").Return("nightly")
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
@@ -937,7 +931,6 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(fakeOsqBinaryPath)
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Start out with no pinned version, then set a pinned version
 	mockKnapsack.On("PinnedOsquerydVersion").Return("").Once()
@@ -999,7 +992,6 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	pinnedLauncherVersion := "1.7.3"
 	mockKnapsack.On("PinnedLauncherVersion").Return(pinnedLauncherVersion).Once()
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
@@ -1193,12 +1185,12 @@ func Test_shouldDelayDownloadRespectsDisabledSplay(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	autoupdater := &TufAutoupdater{
 		slogger:              multislogger.NewNopLogger(),
 		knapsack:             mockKnapsack,
 		calculatedSplayDelay: &atomic.Int64{},
-		downloadSplay:        0,
 	}
 
 	require.False(t, autoupdater.shouldDelayDownload(autoupdatableBinary("osqueryd"), data.TargetFiles{}))
@@ -1208,13 +1200,13 @@ func Test_shouldDelayDownloadDoesNotDelayWithoutPromoteTime(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(8 * time.Hour)
 
 	autoupdater := &TufAutoupdater{
 		slogger:              multislogger.NewNopLogger(),
 		knapsack:             mockKnapsack,
 		updateChannel:        "beta", // none of the beta targets have promote_time set
 		calculatedSplayDelay: &atomic.Int64{},
-		downloadSplay:        8 * time.Hour,
 	}
 
 	targets := getSampleTargets(t)
@@ -1226,13 +1218,13 @@ func Test_shouldDelayDownloadDoesNotDelayIfPromoteTimeExceedsSplay(t *testing.T)
 	t.Parallel()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(2 * time.Hour)
 
 	autoupdater := &TufAutoupdater{
 		slogger:              multislogger.NewNopLogger(),
 		knapsack:             mockKnapsack,
 		updateChannel:        "alpha", // all promote_times in here will always be greater than 2 hours ago (splay time)
 		calculatedSplayDelay: &atomic.Int64{},
-		downloadSplay:        2 * time.Hour,
 	}
 
 	targets := getSampleTargets(t)
@@ -1244,13 +1236,13 @@ func Test_shouldDelayDownloadDelaysIfPromotedWithinSplay(t *testing.T) {
 	t.Parallel()
 
 	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(8 * time.Hour)
 
 	autoupdater := &TufAutoupdater{
 		slogger:              multislogger.NewNopLogger(),
 		knapsack:             mockKnapsack,
 		updateChannel:        "alpha",
 		calculatedSplayDelay: &atomic.Int64{},
-		downloadSplay:        8 * time.Hour,
 	}
 
 	targets := getSampleTargets(t)
@@ -1268,20 +1260,20 @@ func Test_shouldDelayDownloadDelaysIfPromotedWithinSplay(t *testing.T) {
 	}
 }
 
-func Test_splayHashReturnsConsistentDelay(t *testing.T) {
+func Test_splayDelaySecondsReturnsConsistentDelay(t *testing.T) {
 	t.Parallel()
 
 	downloadSplayDuration := 8 * time.Hour
 	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("AutoupdateDownloadSplay").Return(downloadSplayDuration)
 
 	autoupdater := &TufAutoupdater{
 		slogger:              multislogger.NewNopLogger(),
 		knapsack:             mockKnapsack,
 		updateChannel:        "alpha",
 		calculatedSplayDelay: &atomic.Int64{},
-		downloadSplay:        downloadSplayDuration,
 	}
-	initialDelay := autoupdater.getDelaySplaySeconds()
+	initialDelay := autoupdater.getSplayDelaySeconds()
 
 	// initial delay should have a minimum value of 1,
 	// and should never exceed our AutoupdateDownloadSplay time in seconds
@@ -1289,6 +1281,6 @@ func Test_splayHashReturnsConsistentDelay(t *testing.T) {
 	require.LessOrEqual(t, initialDelay, int64(downloadSplayDuration.Seconds()))
 
 	for range 3 {
-		require.Equal(t, initialDelay, autoupdater.getDelaySplaySeconds())
+		require.Equal(t, initialDelay, autoupdater.getSplayDelaySeconds())
 	}
 }
