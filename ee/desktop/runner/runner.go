@@ -782,7 +782,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		if err := cmd.Process.Kill(); err != nil {
+		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			r.slogger.Log(ctx, slog.LevelError,
 				"killing user desktop process after startup ping / show desktop failed",
 				"uid", uid,
