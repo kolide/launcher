@@ -50,8 +50,9 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 		ls.accelerate(r.Context())
 	}
 
-	// this should be removed when we drop unauthed endpoint
-	if r.Header.Get(dt4aAccountUuidHeaderKey) == "" {
+	// this should be removed when we drop unauthed endpoint and have a better solution for testing in dev
+	// without requiring an account UUID match
+	if _, isDevOrigin := allowlistedDevOriginsLookup[requestOrigin]; isDevOrigin || r.Header.Get(dt4aAccountUuidHeaderKey) == "" {
 		// This is a legacy request to the unauthed endpoint that does not include the dt4a account uuid header.
 		// We will return the dt4a info stored under the legacy key.
 		dt4aInfo, err := ls.knapsack.Dt4aInfoStore().Get(legacyDt4aInfoKey)
