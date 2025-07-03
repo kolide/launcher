@@ -12,7 +12,6 @@ void getSoftwareUpdateConfiguration(
     int* isAutomaticallyCheckForUpdatesEnabled,
     int* isdoBackgroundDownloadManaged,
     int* doesBackgroundDownload,
-    int* isAppStoreAutoUpdatesManaged,
     int* doesAppStoreAutoUpdates,
     int* doesOSXAutoUpdatesManaged,
     int* doesOSXAutoUpdates,
@@ -57,8 +56,6 @@ void getSoftwareUpdateConfiguration(
                        : [manager doesBackgroundDownload];
   *doesBackgroundDownload = value ? 1 : 0;
 
-  *isAppStoreAutoUpdatesManaged =
-      [manager isAppStoreAutoUpdatesManaged] ? 1 : 0;
   *doesAppStoreAutoUpdates = [manager doesAppStoreAutoUpdates] ? 1 : 0;
 
   value = os_framework ? [settings automaticallyInstallOSUpdatesManaged]
