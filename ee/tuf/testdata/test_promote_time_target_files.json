@@ -1,0 +1,532 @@
+{
+    "launcher/darwin/universal/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/universal/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/windows/amd64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/amd64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/windows/arm64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/arm64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/linux/arm64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/arm64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/linux/amd64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/amd64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/darwin/universal/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/universal/launcher-1.22.0.tar.gz"
+        }
+    },
+    "launcher/windows/amd64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/amd64/launcher-1.22.0.tar.gz"
+        }
+    },
+    "launcher/windows/arm64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/arm64/launcher-1.22.0.tar.gz"
+        }
+    },
+    "launcher/linux/arm64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/arm64/launcher-1.22.0.tar.gz"
+        }
+    },
+    "launcher/linux/amd64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/amd64/launcher-1.22.0.tar.gz"
+        }
+    },
+    "launcher/darwin/amd64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/amd64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955736
+        }
+    },
+    "launcher/darwin/amd64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/amd64/launcher-1.22.0-8-g3d775255.tar.gz",
+            "promote_time": 1750859205
+        }
+    },
+    "launcher/darwin/arm64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/arm64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750955735
+        }
+    },
+    "launcher/darwin/arm64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz",
+            "promote_time": 1750954243
+        }
+    },
+    "launcher/darwin/universal/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/universal/launcher-1.22.0.tar.gz",
+            "promote_time": 1750961031
+        }
+    },
+    "launcher/darwin/universal/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/darwin/universal/launcher-1.22.0-8-g3d775255.tar.gz",
+            "promote_time": 1750859203
+        }
+    },
+    "launcher/linux/amd64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/amd64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750961031
+        }
+    },
+    "launcher/linux/amd64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/amd64/launcher-1.22.0-8-g3d775255.tar.gz",
+            "promote_time": 1750859203
+        }
+    },
+    "launcher/linux/arm64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/arm64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750961031
+        }
+    },
+    "osqueryd/windows/arm64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/arm64/osqueryd-5.17.0.tar.gz"
+        }
+    },
+    "osqueryd/windows/amd64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/amd64/osqueryd-5.17.0.tar.gz"
+        }
+    },
+    "osqueryd/linux/amd64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/amd64/osqueryd-5.17.0.tar.gz"
+        }
+    },
+    "osqueryd/linux/arm64/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/arm64/osqueryd-5.17.0.tar.gz"
+        }
+    },
+    "osqueryd/darwin/universal/beta/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/darwin/universal/osqueryd-5.17.0.tar.gz"
+        }
+    },
+    "osqueryd/windows/arm64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750954246
+        }
+    },
+    "osqueryd/windows/amd64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750954246
+        }
+    },
+    "osqueryd/linux/amd64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750954246
+        }
+    },
+    "osqueryd/linux/arm64/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750954246
+        }
+    },
+    "osqueryd/darwin/universal/stable/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/darwin/universal/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750954246
+        }
+    },
+    "launcher/linux/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz": {
+        "length": 10782666,
+        "hashes": {
+            "sha512": "66074fee703ec07c352fe09ea817544a9d795d1c8c7fa32c20697c79daf2e4b3109277c207aade0fb511d0a67c7d85a62249e66705e6de641c231bc986af80a1"
+        },
+        "custom": {
+            "publish_time": 1750954246,
+            "publisher": "porter"
+        }
+    },
+    "launcher/linux/arm64/launcher-1.22.0-5-gc5205b76.tar.gz": {
+        "length": 10782650,
+        "hashes": {
+            "sha512": "186b1fb5956526aa5c3a5d6de49947f3a3cfe7c7e5394282fe5087847b310b5e06e73d2b25dd7f098e12273e2a94ba974268f4823ff8e62ae75df79368d834b6"
+        },
+        "custom": {
+            "publish_time": 1750952177,
+            "publisher": "porter"
+        }
+    },
+    "launcher/linux/arm64/launcher-1.22.0.tar.gz": {
+        "length": 10782458,
+        "hashes": {
+            "sha512": "5e449dcf0038cd849c9c6649b8455200f5633d27a95289dbf431fb897ebadf3e88fe5674c638be72f3b22c1f7acb6b733392a81d575e9ab3d1fa65be6663c579"
+        },
+        "custom": {
+            "publish_time": 1750953738,
+            "publisher": "porter"
+        }
+    },
+    "launcher/linux/arm64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/linux/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz",
+            "promote_time": 1750859203
+        }
+    },
+    "launcher/windows/amd64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/amd64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750961031
+        }
+    },
+    "launcher/windows/amd64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/amd64/launcher-1.22.0-8-g3d775255.tar.gz",
+            "promote_time": 1750859203
+        }
+    },
+    "launcher/windows/arm64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/arm64/launcher-1.22.0.tar.gz",
+            "promote_time": 1750961031
+        }
+    },
+    "launcher/windows/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz": {
+        "length": 9550554,
+        "hashes": {
+            "sha512": "3325c2e79bd1986fa7d300cef51686d415e2cefd086c9f359ae1ba1c7b20854d6b7f5961b4e2ed2b3b83f17be1cb13add079ef474e9dbcf1449f6fc778f01c5d"
+        },
+        "custom": {
+            "publish_time": 1750954244,
+            "publisher": "porter"
+        }
+    },
+    "launcher/windows/arm64/launcher-1.22.0-5-gc5205b76.tar.gz": {
+        "length": 9550542,
+        "hashes": {
+            "sha512": "1b49f06f1405bc89b3ed863cd9a152e95884006bbaa3d17c7024870c64fbbab321029ff2d25b19ecc68bf101435c5a8c6963712c202e384b976881feda3b5da4"
+        },
+        "custom": {
+            "publish_time": 1750952175,
+            "publisher": "porter"
+        }
+    },
+    "launcher/windows/arm64/launcher-1.22.0.tar.gz": {
+        "length": 9550633,
+        "hashes": {
+            "sha512": "5ab37274893cf63969e9f9361b6883eaefbbf8c9d17bdb158f2531174a885e550968397b4c4458f66347fe71e1b11a1c63878c93f3584a57e58655a1a93e21d2"
+        },
+        "custom": {
+            "publish_time": 1750953736,
+            "publisher": "porter"
+        }
+    },
+    "launcher/windows/arm64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "launcher/windows/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz",
+            "promote_time": 1750859203
+        }
+    },
+    "osqueryd/darwin/universal/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/darwin/universal/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750955751
+        }
+    },
+    "osqueryd/darwin/universal/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/darwin/universal/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750870406
+        }
+    },
+    "osqueryd/linux/amd64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750955751
+        }
+    },
+    "osqueryd/linux/amd64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750870406
+        }
+    },
+    "osqueryd/linux/arm64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750955751
+        }
+    },
+    "osqueryd/linux/arm64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/linux/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750870406
+        }
+    },
+    "osqueryd/windows/amd64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750955751
+        }
+    },
+    "osqueryd/windows/amd64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/amd64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750870406
+        }
+    },
+    "osqueryd/windows/arm64/alpha/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750955751
+        }
+    },
+    "osqueryd/windows/arm64/nightly/release.json": {
+        "length": 2,
+        "hashes": {
+            "sha512": "27c74670adb75075fad058d5ceaf7b20c4e7786c83bae8a32f626f9782af34c9a33c2046ef60fd2a7878d378e29fec851806bbd9a67878f3a9f1cda4830763fd"
+        },
+        "custom": {
+            "target": "osqueryd/windows/arm64/osqueryd-5.17.0.tar.gz",
+            "promote_time": 1750870406
+        }
+    },
+    "launcher/darwin/arm64/launcher-1.22.0-1-gdd5f2441.tar.gz": {
+        "length": 19622378,
+        "hashes": {
+            "sha512": "e7a86484e8807f4415b3894b9326ef756a9ae0cb28ae33b172e00b5da3b671aa761eb34ae22b08bb827cbdc08a755c396e4718618b307428f3056f3877b499b4"
+        },
+        "custom": {
+            "publish_time": 1750954241,
+            "publisher": "porter"
+        }
+    },
+    "launcher/darwin/arm64/launcher-1.22.0-5-gc5205b76.tar.gz": {
+        "length": 19603910,
+        "hashes": {
+            "sha512": "93f7ef2ac486c3df5c8ce6ee8b7ffae70d10f952e385d3ef5b4451d2b16f8e90103806d826f23be19c9ceefb98b09b6c4b03794956ae2dbcbad2ece4cbcae47d"
+        },
+        "custom": {
+            "publish_time": 1750952172,
+            "publisher": "porter"
+        }
+    },
+    "launcher/darwin/arm64/launcher-1.22.0.tar.gz": {
+        "length": 19622705,
+        "hashes": {
+            "sha512": "eaed8c4181bf2d69ccfbe4858fde33a11f9df62851920b03519edbf8e0bc2108e1f685202a2fb7abb464c4f12b72790f9ce13b5f7436ca54e6f8a998f5622bb9"
+        },
+        "custom": {
+            "publish_time": 1750953733,
+            "publisher": "porter"
+        }
+    },
+    "launcher/darwin/universal/launcher-1.22.0.tar.gz": {
+        "length": 40621571,
+        "hashes": {
+            "sha512": "b1dee8b95a244c7a88489445a6a3fffec1e2d2c6e5fdc8bca42bd0b45e25a42683994cc251059cf32ac3f971abfc1f3f16dca1ca9089f98842ec38bfeccb3e25"
+        },
+        "custom": {
+            "publish_time": 1750961030,
+            "publisher": "porter"
+        }
+    }
+}

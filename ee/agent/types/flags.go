@@ -262,4 +262,7 @@ type Flags interface {
 	// ResetOnHardwareChangeEnabled controls whether launcher will reset its database on hardware change detected
 	SetResetOnHardwareChangeEnabled(enabled bool) error
 	ResetOnHardwareChangeEnabled() bool
+
+	AutoupdateDownloadSplay() time.Duration
+	SetAutoupdateDownloadSplay(val time.Duration) error
 }

@@ -92,6 +92,24 @@ func (_m *Knapsack) Autoupdate() bool {
 	return r0
 }
 
+// AutoupdateDownloadSplay provides a mock function with no fields
+func (_m *Knapsack) AutoupdateDownloadSplay() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for AutoupdateDownloadSplay")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // AutoupdateInitialDelay provides a mock function with no fields
 func (_m *Knapsack) AutoupdateInitialDelay() time.Duration {
 	ret := _m.Called()
@@ -1412,6 +1430,24 @@ func (_m *Knapsack) SetAutoupdate(enabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetAutoupdateDownloadSplay provides a mock function with given fields: val
+func (_m *Knapsack) SetAutoupdateDownloadSplay(val time.Duration) error {
+	ret := _m.Called(val)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetAutoupdateDownloadSplay")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(val)
 	} else {
 		r0 = ret.Error(0)
 	}
