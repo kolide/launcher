@@ -39,6 +39,13 @@ var (
 		"chrome-extension://hiajhnnfoihkhlmfejoljaokdpgboiea":  {},
 		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
 		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
+		// Development web app
+		"https://my.b5local.com:4000": {},
+	}
+
+	allowlistedDevOriginsLookup = map[string]struct{}{
+		// Development web app
+		"https://my.b5local.com:4000": {},
 	}
 )
 
