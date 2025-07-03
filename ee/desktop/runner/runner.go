@@ -557,7 +557,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.ShowDesktop(); err != nil {
 			r.slogger.Log(ctx, slog.LevelError,
-				"sending refresh command to user desktop process",
+				"sending refresh command to user desktop process after DesktopEnabled flag change",
 				"uid", uid,
 				"pid", proc.Process.Pid,
 				"path", proc.socketPath,
