@@ -161,7 +161,7 @@ func callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string,
 	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		err = fmt.Errorf("running query-windowsupdates: %w", err)
+		err = fmt.Errorf("running query-windowsupdates: output `%s`: %w", string(out), err)
 		observability.SetError(span, err)
 		return nil, err
 	}
