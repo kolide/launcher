@@ -783,6 +783,12 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 // createOsquerydCommand uses osqueryOptions to return an *exec.Cmd
 // which will launch a properly configured osqueryd process.
 func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cmd, error) {
+	// Get the certs for the instance
+	certs, err := launcherosq.InstallCaCerts(i.knapsack.RootDirectory())
+	if err != nil {
+		return nil, fmt.Errorf("installing CA certs: %w", err)
+	}
+
 	// Create the reference instance for the running osquery instance
 	args := []string{
 		fmt.Sprintf("--logger_plugin=%s", KolideSaasExtensionName),
@@ -793,6 +799,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		"--host_identifier=uuid",
 		"--force=true",
 		"--utc",
+		fmt.Sprintf("tls_server_certs=%s", certs),
 	}
 
 	if i.knapsack.WatchdogEnabled() {
