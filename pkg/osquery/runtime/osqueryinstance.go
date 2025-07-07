@@ -799,7 +799,7 @@ func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cm
 		"--host_identifier=uuid",
 		"--force=true",
 		"--utc",
-		fmt.Sprintf("tls_server_certs=%s", certs),
+		fmt.Sprintf("--tls_server_certs=%s", certs),
 	}
 
 	if i.knapsack.WatchdogEnabled() {
