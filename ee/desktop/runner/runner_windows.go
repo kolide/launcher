@@ -21,8 +21,11 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	defer span.End()
 
 	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
-	if err != nil || explorerProc == nil {
+	if err != nil {
 		return fmt.Errorf("getting user explorer process: %w", err)
+	}
+	if explorerProc == nil {
+		return fmt.Errorf("no user explorer process found for %s", uid)
 	}
 
 	// get the access token of the user that owns the explorer process

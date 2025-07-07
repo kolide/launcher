@@ -392,7 +392,7 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 		maps.Clear(r.uidProcs)
 		return
 	case <-time.After(r.interruptTimeout):
-		r.slogger.Log(ctx, slog.LevelError,
+		r.slogger.Log(ctx, slog.LevelInfo,
 			"timeout waiting for desktop processes to exit, now killing",
 		)
 
@@ -557,7 +557,7 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.ShowDesktop(); err != nil {
 			r.slogger.Log(ctx, slog.LevelError,
-				"sending refresh command to user desktop process",
+				"sending refresh command to user desktop process after DesktopEnabled flag change",
 				"uid", uid,
 				"pid", proc.Process.Pid,
 				"path", proc.socketPath,
@@ -782,7 +782,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		if err := cmd.Process.Kill(); err != nil {
+		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			r.slogger.Log(ctx, slog.LevelError,
 				"killing user desktop process after startup ping / show desktop failed",
 				"uid", uid,
