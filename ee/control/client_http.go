@@ -98,7 +98,11 @@ func (c *HTTPClient) GetConfig(ctx context.Context) (io.Reader, error) {
 	if localDbKeys.Public() == nil {
 		return nil, errors.New("cannot request control data without local keys")
 	}
-	key1, err := echelper.PublicEcdsaToB64Der(localDbKeys.Public().(*ecdsa.PublicKey))
+	ecdsaPubKey, ok := localDbKeys.Public().(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("local db keys in unexpected format (expected ECDSA, got %T)", localDbKeys.Public())
+	}
+	key1, err := echelper.PublicEcdsaToB64Der(ecdsaPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not get key header from local db keys: %w", err)
 	}
@@ -145,7 +149,11 @@ func (c *HTTPClient) setHardwareKeyHeader(req *http.Request, challenge []byte) e
 		return errors.New("nil hardware keys")
 	}
 
-	key2, err := echelper.PublicEcdsaToB64Der(hardwareKeys.Public().(*ecdsa.PublicKey))
+	ecdsaPubKey, ok := hardwareKeys.Public().(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("hardware keys in unexpected format (expected ECDSA, got %T)", hardwareKeys.Public())
+	}
+	key2, err := echelper.PublicEcdsaToB64Der(ecdsaPubKey)
 	if err != nil {
 		return fmt.Errorf("could not get key header from hardware keys: %w", err)
 	}
