@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -43,6 +44,8 @@ var (
 		"https://my.b5local.com:4000":           {},
 		"https://dev.sites.gitlab.1password.io": {},
 	}
+
+	allowlisted1POriginRegex = regexp.MustCompile(`https:\/\/.+\.1password\.com`)
 )
 
 const (
@@ -60,6 +63,32 @@ type dt4aResponse struct {
 	PubKey string `json:"pubKey"`
 }
 
+// originIsAllowlisted checks the given request origin against our allowable values.
+// We allow present-but-empty origins.
+func originIsAllowlisted(requestOrigin string) bool {
+	// Allow present-but-empty origins
+	if requestOrigin == "" {
+		return true
+	}
+
+	// Allow origins in the allowlist
+	if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; ok {
+		return true
+	}
+
+	// Allow origin from safari web extension
+	if strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
+		return true
+	}
+
+	// Check against known/allowlisted origin patterns
+	if allowlisted1POriginRegex.MatchString(requestOrigin) {
+		return true
+	}
+
+	return false
+}
+
 func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r, span := observability.StartHttpRequestSpan(r)
@@ -69,16 +98,14 @@ func (d *dt4aAuthMiddleware) Wrap(next http.Handler) http.Handler {
 		// present but empty, or to be missing. We will not allow a request with a nonempty origin
 		// that is not in the allowlist.
 		requestOrigin := r.Header.Get("Origin")
-		if requestOrigin != "" {
-			if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
-				escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
-				d.slogger.Log(r.Context(), slog.LevelInfo,
-					"received dt4a request with origin not in allowlist",
-					"req_origin", escapedOrigin,
-				)
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
+		if !originIsAllowlisted(requestOrigin) {
+			escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+			d.slogger.Log(r.Context(), slog.LevelInfo,
+				"received dt4a request with origin not in allowlist",
+				"req_origin", escapedOrigin,
+			)
+			w.WriteHeader(http.StatusForbidden)
+			return
 		}
 
 		boxParam := r.URL.Query().Get("payload")

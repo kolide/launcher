@@ -33,16 +33,14 @@ func (ls *localServer) requestDt4aInfoHandlerFunc(w http.ResponseWriter, r *http
 	// unauthenticated endpoint that points directly to this handler, so we're leaving the check
 	// in both places for now. We can remove it once /zta is removed.
 	requestOrigin := r.Header.Get("Origin")
-	if requestOrigin != "" {
-		if _, ok := allowlistedDt4aOriginsLookup[requestOrigin]; !ok && !strings.HasPrefix(requestOrigin, safariWebExtensionScheme) {
-			escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
-			ls.slogger.Log(r.Context(), slog.LevelInfo,
-				"received dt4a request with origin not in allowlist",
-				"req_origin", escapedOrigin,
-			)
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
+	if !originIsAllowlisted(requestOrigin) {
+		escapedOrigin := strings.ReplaceAll(strings.ReplaceAll(requestOrigin, "\n", ""), "\r", "") // remove any newlines
+		ls.slogger.Log(r.Context(), slog.LevelInfo,
+			"received dt4a request with origin not in allowlist",
+			"req_origin", escapedOrigin,
+		)
+		w.WriteHeader(http.StatusForbidden)
+		return
 	}
 
 	// We only allow acceleration via this endpoint if this testing flag is set.
