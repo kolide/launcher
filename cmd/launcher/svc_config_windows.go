@@ -466,7 +466,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 	)
 
 	if strings.TrimSpace(enrollSecretPath) == "" {
-		logger.Log(context.TODO(), slog.LevelError,
+		logger.Log(context.TODO(), slog.LevelDebug,
 			"unable to check permissions without enroll secret path set, skipping",
 		)
 
