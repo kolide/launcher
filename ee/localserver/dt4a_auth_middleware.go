@@ -45,7 +45,7 @@ var (
 		"https://dev.sites.gitlab.1password.io": {},
 	}
 
-	allowlisted1POriginRegex = regexp.MustCompile(`https:\/\/.+\.1password\.com`)
+	allowlisted1POriginRegex = regexp.MustCompile(`https:\/\/.+\.1password\.(com|ca|eu)`)
 )
 
 const (

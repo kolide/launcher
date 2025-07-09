@@ -350,6 +350,16 @@ func Test_originIsAllowlisted(t *testing.T) {
 			expectAllowlisted: true,
 		},
 		{
+			testCaseName:      "1p with .ca",
+			requestOrigin:     "https://example2.1password.ca",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "1p with .eu",
+			requestOrigin:     "https://example3.1password.eu",
+			expectAllowlisted: true,
+		},
+		{
 			testCaseName:      "origin not on allowlist",
 			requestOrigin:     "https://example.com",
 			expectAllowlisted: false,
