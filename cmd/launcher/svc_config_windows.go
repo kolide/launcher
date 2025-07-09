@@ -508,7 +508,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 		{
 			AccessPermissions: windows.GENERIC_ALL,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
@@ -518,7 +518,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 		{
 			AccessPermissions: windows.GENERIC_ALL,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
@@ -528,7 +528,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 		{
 			AccessPermissions: windows.GENERIC_ALL,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT, // ensure access is inherited by sub folders
+			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
@@ -559,7 +559,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 
 	if err != nil {
 		logger.Log(context.TODO(), slog.LevelError,
-			"setting named security info from new DACL",
+			"setting named security info for enroll secret from new DACL",
 			"err", err,
 		)
 
