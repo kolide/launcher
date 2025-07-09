@@ -40,7 +40,7 @@ type (
 )
 
 const (
-	idSQL = "select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info"
+	idSQL = "select instance_id, osquery_info.uuid, hardware_serial from osquery_info, system_info;"
 )
 
 func (ls *localServer) updateIdFields() error {
