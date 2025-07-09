@@ -40,7 +40,8 @@ var (
 		"chrome-extension://kioanpobaefjdloichnjebbdafiloboa":  {},
 		"chrome-extension://bkpbhnjcbehoklfkljkkbbmipaphipgl":  {},
 		// Development web app
-		"https://my.b5local.com:4000": {},
+		"https://my.b5local.com:4000":           {},
+		"https://dev.sites.gitlab.1password.io": {},
 	}
 )
 
