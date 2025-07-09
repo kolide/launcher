@@ -5,6 +5,8 @@ package main
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
 	"testing"
 	"unsafe"
 
@@ -76,4 +78,62 @@ func Test_checkRootDirACLs(t *testing.T) {
 
 	// Confirm permissions have not updated
 	require.Equal(t, rootDirInfo.String(), rootDirInfoUpdated.String(), "permissions should not have changed")
+}
+
+func Test_checkEnrollSecretACLs(t *testing.T) {
+	t.Parallel()
+
+	confDir := t.TempDir()
+	secretPath := filepath.Join(confDir, "secret")
+	require.NoError(t, os.WriteFile(secretPath, []byte("secretsecretshhh"), 0644))
+
+	// Get info about our starting permissions
+	intialSecretInfo, err := windows.GetNamedSecurityInfo(secretPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting initial named security info")
+	initialSecretDacl, _, err := intialSecretInfo.DACL()
+	require.NoError(t, err, "getting initial DACL")
+	require.NotNil(t, initialSecretDacl)
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+
+	// Check the secret ACLs -- expect that we update the permissions
+	checkEnrollSecretACLs(slogger, secretPath)
+	require.Contains(t, logBytes.String(), "updated ACLs for enroll secret")
+
+	// Get our updated permissions
+	updatedSecretInfo, err := windows.GetNamedSecurityInfo(secretPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting secret named security info")
+	updatedSecretDacl, _, err := updatedSecretInfo.DACL()
+	require.NoError(t, err, "getting secret DACL")
+	require.NotNil(t, updatedSecretDacl)
+
+	// Confirm permissions have updated
+	require.NotEqual(t, intialSecretInfo.String(), updatedSecretInfo.String(), "permissions did not change")
+
+	// Confirm that users have not been granted any permissions
+	usersSID, err := windows.CreateWellKnownSid(windows.WinBuiltinUsersSid)
+	require.NoError(t, err, "getting users SID")
+	for i := 0; i < int(updatedSecretDacl.AceCount); i++ {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		require.NoError(t, windows.GetAce(updatedSecretDacl, uint32(i), &ace), "getting ACE")
+
+		sid := (*windows.SID)(unsafe.Pointer(uintptr(unsafe.Pointer(ace)) + unsafe.Offsetof(ace.SidStart)))
+		require.False(t, sid.Equals(usersSID), "did not expect to find ACE for users SID")
+	}
+
+	// Run checkEnrollSecretACLs and confirm that the permissions do not change
+	checkEnrollSecretACLs(slogger, secretPath)
+
+	// Get permissions again
+	secretInfoFinal, err := windows.GetNamedSecurityInfo(secretPath, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	require.NoError(t, err, "getting secret named security info after running permissions update twice")
+	secretDaclFinal, _, err := secretInfoFinal.DACL()
+	require.NoError(t, err, "getting secret DACL after running permissions update twice")
+	require.NotNil(t, secretDaclFinal)
+
+	// Confirm permissions have not updated
+	require.Equal(t, updatedSecretInfo.String(), secretInfoFinal.String(), "permissions should not have changed")
 }
