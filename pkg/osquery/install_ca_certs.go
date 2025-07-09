@@ -1,4 +1,4 @@
-package internal
+package osquery
 
 import (
 	"crypto/sha256"
