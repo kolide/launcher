@@ -548,7 +548,7 @@ func checkEnrollSecretACLs(logger *slog.Logger, enrollSecretPath string) {
 		return
 	}
 
-	// apply the new DACL to the root directory
+	// apply the new DACL to the secret file
 	err = windows.SetNamedSecurityInfo(
 		enrollSecretPath,
 		windows.SE_FILE_OBJECT,
