@@ -9,7 +9,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,6 +25,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}))
 	k.On("Slogger").Return(slogger)
 	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
+	k.On("LatestOsquerydPath", mock.Anything).Return("")
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
@@ -35,12 +35,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 	// Create the localserver
 	ls, err := New(context.TODO(), k, nil)
 	require.NoError(t, err)
-
-	// Set the querier
-	querier := mocks.NewQuerier(t)
-	// On a 2-sec interval, letting the server run for 3 seconds, we should see only one query
-	querier.On("Query", mock.Anything).Return(nil, nil).Once()
-	ls.SetQuerier(querier)
 
 	// Let the server run for a bit
 	go ls.Start()
@@ -85,5 +79,4 @@ func TestInterrupt_Multiple(t *testing.T) {
 	require.Contains(t, logs, "callback worker shut down", "middleware callback worker did not shut down")
 
 	k.AssertExpectations(t)
-	querier.AssertExpectations(t)
 }
