@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -187,7 +188,7 @@ func TestProc(t *testing.T) {
 			// For our stdin replacement, we want at least some data in the file  -- we want interactive to run a query,
 			// and then exit.
 			commandContents := `
-select * from osquery_info;
+select * from time;
 .exit
 `
 			err = os.WriteFile(inFilePath, []byte(commandContents), 0755)
@@ -253,8 +254,9 @@ select * from osquery_info;
 				require.NoError(t, err)
 				require.Greater(t, len(outContents), 0)
 
-				// osquery_info should include runtime.GOOS in it for build_platform column
-				require.Contains(t, string(outContents), runtime.GOOS)
+				// Response data from `time` should include the `timestamp` column and the current year, at least
+				require.Contains(t, string(outContents), "timestamp")
+				require.Contains(t, string(outContents), strconv.Itoa(time.Now().Year()))
 			} else {
 				require.Nil(t, proc)
 			}
