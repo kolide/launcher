@@ -61,8 +61,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	}
 
 	osquerydPath := testOsqueryBinary
-
-	rootDirectory := testRootDirectory(t)
+	rootDir := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
@@ -72,7 +71,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("RootDirectory").Return(rootDirectory)
+	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -82,7 +81,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDirectory, "ca-certs-*.crt"))
+	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
 	require.NoError(t, err, "globbing for certs")
 	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
@@ -92,7 +91,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := testRootDirectory(t)
+	rootDir := t.TempDir()
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -101,7 +100,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("OsqueryFlags").Return([]string{"verbose=false", "windows_event_channels=foo,bar"})
 	k.On("OsqueryVerbose").Return(true)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("RootDirectory").Return(rootDirectory)
+	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -121,7 +120,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	)
 
 	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDirectory, "ca-certs-*.crt"))
+	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
 	require.NoError(t, err, "globbing for certs")
 	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
@@ -131,7 +130,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := testRootDirectory(t)
+	rootDir := t.TempDir()
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(true)
 	k.On("WatchdogMemoryLimitMB").Return(150)
@@ -140,7 +139,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
-	k.On("RootDirectory").Return(rootDirectory)
+	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -179,7 +178,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
 
 	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDirectory, "ca-certs-*.crt"))
+	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
 	require.NoError(t, err, "globbing for certs")
 	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
@@ -189,13 +188,13 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testing.T) {
 	t.Parallel()
 
-	rootDirectory := testRootDirectory(t)
+	rootDir := t.TempDir()
 	k := typesMocks.NewKnapsack(t)
 	k.On("WatchdogEnabled").Return(false)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("OsqueryVerbose").Return(true)
 	k.On("OsqueryFlags").Return([]string{})
-	k.On("RootDirectory").Return(rootDirectory)
+	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -229,7 +228,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	require.True(t, disableWatchdogFound, "watchdog disabled not set")
 
 	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDirectory, "ca-certs-*.crt"))
+	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
 	require.NoError(t, err, "globbing for certs")
 	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
