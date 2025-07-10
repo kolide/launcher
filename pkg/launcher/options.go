@@ -80,6 +80,8 @@ type Options struct {
 	AutoupdateInitialDelay time.Duration
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	UpdateDirectory string
+	// AutoupdateDownloadSplay duration of time over which launcher should select random delay before downloading
+	AutoupdateDownloadSplay time.Duration
 
 	// Debug enables debug logging.
 	Debug bool
@@ -225,13 +227,14 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
 		// Autoupdate options
-		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
-		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
-		flMirrorURL              = flagset.String("mirror_url", DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
-		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
-		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
-		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
-		flUpdateDirectory        = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
+		flAutoupdate              = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flTufServerURL            = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
+		flMirrorURL               = flagset.String("mirror_url", DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flAutoupdateInterval      = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flUpdateChannel           = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
+		flAutoupdateInitialDelay  = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
+		flUpdateDirectory         = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
+		flAutoupdateDownloadSplay = flagset.Duration("autoupdate_download_splay", 8*time.Hour, "duration of time over which launcher should select random delay before downloading")
 
 		// Development & Debugging options
 		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
@@ -374,6 +377,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		Autoupdate:                      *flAutoupdate,
 		AutoupdateInterval:              *flAutoupdateInterval,
 		AutoupdateInitialDelay:          *flAutoupdateInitialDelay,
+		AutoupdateDownloadSplay:         *flAutoupdateDownloadSplay,
 		CertPins:                        certPins,
 		ConfigFilePath:                  *flConfigFilePath,
 		Control:                         false,

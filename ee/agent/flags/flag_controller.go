@@ -797,7 +797,7 @@ func (fc *FlagController) ResetOnHardwareChangeEnabled() bool {
 
 func (fc *FlagController) AutoupdateDownloadSplay() time.Duration {
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateDownloadSplay,
-		WithDefault(8*time.Hour),
+		WithDefault(fc.cmdLineOpts.AutoupdateDownloadSplay),
 		WithMin(0*time.Second),
 		WithMax(72*time.Hour),
 	).get(fc.getControlServerValue(keys.AutoupdateDownloadSplay))
