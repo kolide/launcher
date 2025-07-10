@@ -33,25 +33,41 @@ func AddExclusions(ctx context.Context, k types.Knapsack) {
 		launcher.pid
 	*/
 
-	exclusionPatternsFirstBatch := []string{
-		"*.json",
-		"*.db*", // expected to match osquery.db, launcher.db, and any launcher.db.bak.X
-	}
-
-	addExclusionsFromPathPatterns(ctx, k, exclusionPatternsFirstBatch)
-
 	// Attempting to run this with a single tmutil call we see a lot of tmutil failures logged with error "argument list too long".
-	// To avoid this we run in two separate batches, attempting to cut the post-glob argument list roughly in half
-	exclusionPatternsSecondBatch := []string{
-		"*.sqlite",
-		"desktop_*",
-		"*.pid",
-		"augeas-lenses",
-		"*.plist",
-		"osquery*",
+	// To avoid this we run in separate batches.
+	exclusionPatternBatches := [][]string{
+		// All of our databases -- these are the most important ones to exclude, so we handle them
+		// separately in the first batch.
+		{
+			"*.db*", // expected to match osquery.db, launcher.db, and any launcher.db.bak.X
+			"*.sqlite",
+		},
+		// Handle the rest of the files that aren't ephemeral
+		{
+			"*.json",
+			"augeas-lenses",
+			"*.plist",
+		},
+		// Handle files that may disappear (pid files, desktop process files) separately, so that
+		// if we get `Error (100002)` (kPOSIXErrorENOENT) because the file disappeared, we at least
+		// won't fail to exclude the more important files above.
+		{
+			"desktop_*",
+			"*.pid",
+		},
+		// osquery sock/pid files are even more ephemeral and often disappear between globbing for matches
+		// and actually finishing running tmutil, so we handle them in their own case here --
+		// 1) to reduce the amount of time between globbing and tmutil processing these files,
+		// 2) so that any failures here won't disrupt tmutil calls for other, more critical files, and
+		// 3) doing these last gives osquery as much time as possible to start up and become stable.
+		{
+			"osquery*",
+		},
 	}
 
-	addExclusionsFromPathPatterns(ctx, k, exclusionPatternsSecondBatch)
+	for _, batch := range exclusionPatternBatches {
+		addExclusionsFromPathPatterns(ctx, k, batch)
+	}
 }
 
 func addExclusionsFromPathPatterns(ctx context.Context, k types.Knapsack, exclusionPatterns []string) {
@@ -71,6 +87,10 @@ func addExclusionsFromPathPatterns(ctx context.Context, k types.Knapsack, exclus
 		exclusionPaths = append(exclusionPaths, matches...)
 	}
 
+	if len(exclusionPaths) == 0 {
+		return
+	}
+
 	cmd, err := allowedcmd.Tmutil(ctx, append([]string{"addexclusion"}, exclusionPaths...)...)
 	if err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
@@ -86,6 +106,8 @@ func addExclusionsFromPathPatterns(ctx context.Context, k types.Knapsack, exclus
 			"running command to add launcher machine exclusions",
 			"err", err,
 			"output", string(out),
+			"num_exclusions", len(exclusionPaths),
+			"first_exclusion", exclusionPaths[0],
 		)
 
 		return
