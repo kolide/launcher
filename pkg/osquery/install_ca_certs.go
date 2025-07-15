@@ -1,4 +1,4 @@
-package internal
+package osquery
 
 import (
 	"crypto/sha256"
@@ -26,9 +26,12 @@ func InstallCaCerts(directory string) (string, error) {
 
 	switch {
 	case os.IsNotExist(err):
-		return caFile, os.WriteFile(caFile, defaultCaCerts, 0444)
+		if err := os.WriteFile(caFile, defaultCaCerts, 0444); err != nil {
+			return "", fmt.Errorf("writing to %s: %w", caFile, err)
+		}
+		return caFile, nil
 	case err != nil:
-		return "", err
+		return "", fmt.Errorf("statting %s: %w", caFile, err)
 	}
 	return caFile, nil
 

@@ -67,8 +67,10 @@ func (r *Runner) Run() error {
 		id := registrationId
 		wg.Go(func() error {
 			if err := r.runInstance(id); err != nil {
-				r.slogger.Log(ctx, slog.LevelError,
-					"runner terminated running osquery instance unexpectedly, shutting down runner",
+				// This is likely due to calling runner.Interrupt -- if not, the error will have
+				// already been logged at the error level in r.runInstance
+				r.slogger.Log(ctx, slog.LevelInfo,
+					"instance terminated, proceeding with runner shutdown",
 					"err", err,
 				)
 
@@ -129,7 +131,7 @@ func (r *Runner) runInstance(registrationId string) error {
 		// The osquery instance either exited on its own, or we called `Restart`.
 		// Either way, we wait for exit to complete, and then restart the instance.
 		err := instance.WaitShutdown(ctx)
-		slogger.Log(context.TODO(), slog.LevelInfo,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"unexpected restart of instance",
 			"err", err,
 		)
