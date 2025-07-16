@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"github.com/pkg/errors"
 )
 
 // default CA certs for osquery. Copied from macOS's `/etc/ssl/cert.pem`
@@ -67,5 +69,5 @@ func getSystemCaCertPath() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no system CA certificates found")
+	return "", errors.New("no system CA certificates found")
 }
