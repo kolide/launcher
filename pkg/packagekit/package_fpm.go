@@ -100,13 +100,20 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	}
 	defer os.RemoveAll(outputPathDir)
 
+	// Set arch correctly when invoking fpm. Allowable values are amd64 (does not require update) and
+	// aarch64 (requires update from "arm64").
+	arch := f.arch
+	if arch == "arm64" {
+		arch = "aarch64"
+	}
+
 	fpmCommand := []string{
 		"fpm",
 		"-s", "dir",
 		"-t", string(f.outputType),
 		"-n", fmt.Sprintf("%s-%s", po.Name, po.Identifier),
 		"-v", po.Version,
-		"-a", f.arch,
+		"-a", arch,
 		"-p", filepath.Join("/out", outputFilename),
 		"-C", "/pkgsrc",
 	}
