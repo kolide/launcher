@@ -305,7 +305,7 @@ jobs:
           #- centos:7 # Unsupported by actions/cache/restore GLIBC Issues
           - centos:8
           - debian:11
-          - debian:10
+          - debian:12
     needs:
       - version_baseline # version_baseline implies build_linux
       - build # need the other builds too
