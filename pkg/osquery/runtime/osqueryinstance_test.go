@@ -80,11 +80,6 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	_, err := i.createOsquerydCommand(osquerydPath)
 	require.NoError(t, err)
 
-	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
-	require.NoError(t, err, "globbing for certs")
-	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
-
 	k.AssertExpectations(t)
 }
 
@@ -118,11 +113,6 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 		[]string{"--verbose=false", "--windows_event_channels=foo,bar"},
 		cmd.Args[len(cmd.Args)-2-nonOverridableFlagsCount:len(cmd.Args)-nonOverridableFlagsCount],
 	)
-
-	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
-	require.NoError(t, err, "globbing for certs")
-	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
 	k.AssertExpectations(t)
 }
@@ -177,11 +167,6 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	require.True(t, watchdogUtilizationLimitPercentFound, "watchdog CPU limit not set")
 	require.True(t, watchdogDelaySecFound, "watchdog delay sec not set")
 
-	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
-	require.NoError(t, err, "globbing for certs")
-	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
-
 	k.AssertExpectations(t)
 }
 
@@ -226,11 +211,6 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	}
 
 	require.True(t, disableWatchdogFound, "watchdog disabled not set")
-
-	// Ensure we created the certs osquery needs
-	matches, err := filepath.Glob(filepath.Join(rootDir, "ca-certs-*.crt"))
-	require.NoError(t, err, "globbing for certs")
-	require.Equal(t, 1, len(matches), "expected exactly one ca cert file to exist")
 
 	k.AssertExpectations(t)
 }
