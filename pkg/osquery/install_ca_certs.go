@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // default CA certs for osquery. Copied from macOS's `/etc/ssl/cert.pem`
