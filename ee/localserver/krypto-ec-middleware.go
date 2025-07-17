@@ -755,7 +755,7 @@ func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *chall
 	if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
 		span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 		observability.SetError(span, errors.New("timestamp is out of range"))
-		e.slogger.Log(r.Context(), slog.LevelError,
+		e.slogger.Log(r.Context(), slog.LevelWarn,
 			"timestamp is out of range",
 			"delta", timestampDelta,
 		)
