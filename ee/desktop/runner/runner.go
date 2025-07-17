@@ -518,7 +518,7 @@ func (r *DesktopUsersProcessesRunner) Update(data io.Reader) error {
 		return fmt.Errorf("error reading control data: %w", err)
 	}
 	if err := r.writeSharedFile(r.menuTemplatePath(), dataBytes); err != nil {
-		r.slogger.Log(context.TODO(), slog.LevelError,
+		r.slogger.Log(context.TODO(), slog.LevelWarn,
 			"menu template file did not exist, could not create it",
 			"err", err,
 		)
@@ -685,7 +685,7 @@ func (r *DesktopUsersProcessesRunner) writeDefaultMenuTemplateFile() {
 
 	if os.IsNotExist(err) {
 		if err := r.writeSharedFile(menuTemplatePath, menu.InitialMenu); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
+			r.slogger.Log(context.TODO(), slog.LevelWarn,
 				"menu template file did not exist, could not create it",
 				"err", err,
 			)
