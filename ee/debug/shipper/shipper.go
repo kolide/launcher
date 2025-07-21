@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/user"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -263,6 +264,7 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
+		"munemo":        munemo(k),
 		"console_users": consoleUsers,
 		"running_user":  runningUsername,
 		"hostname":      hostname,
@@ -300,4 +302,42 @@ func enrollSecret(k types.Knapsack) string {
 	}
 
 	return string(b)
+}
+
+// munemo fetches the registration's munemo from the knapsack. If that is not available,
+// it looks for the munemo stored in metadata.json.
+func munemo(k types.Knapsack) string {
+	if k == nil {
+		return munemoFromMetadataJson(launcher.DefaultRootDirectoryPath)
+	}
+
+	registrations, err := k.Registrations()
+	if err != nil {
+		return munemoFromMetadataJson(k.RootDirectory())
+	}
+
+	// For now, we can return the munemo for the default registration (also, the only registration currently)
+	for _, registration := range registrations {
+		if registration.RegistrationID == types.DefaultRegistrationID {
+			return registration.Munemo
+		}
+	}
+
+	return munemoFromMetadataJson(k.RootDirectory())
+}
+
+type metadataJson struct {
+	OrganizationMunemo string `json:"organization_munemo"`
+}
+
+func munemoFromMetadataJson(rootDirectory string) string {
+	rawMetadata, err := os.ReadFile(filepath.Join(rootDirectory, "metadata.json"))
+	if err != nil {
+		return ""
+	}
+	var m metadataJson
+	if err := json.Unmarshal(rawMetadata, &m); err != nil {
+		return ""
+	}
+	return m.OrganizationMunemo
 }
