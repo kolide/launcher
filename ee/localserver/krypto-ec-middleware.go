@@ -755,7 +755,7 @@ func (e *kryptoEcMiddleware) checkTimestamp(r *http.Request, challengeBox *chall
 	if timestampDelta > e.timestampValidityRange || timestampDelta < -e.timestampValidityRange {
 		span.SetAttributes(attribute.Int64("timestamp_delta", timestampDelta))
 		observability.SetError(span, errors.New("timestamp is out of range"))
-		e.slogger.Log(r.Context(), slog.LevelError,
+		e.slogger.Log(r.Context(), slog.LevelWarn,
 			"timestamp is out of range",
 			"delta", timestampDelta,
 		)
@@ -805,7 +805,8 @@ func cmdReqToHttpReq(originalRequest *http.Request, cmdReq v2CmdRequestType) *ht
 func (e *kryptoEcMiddleware) checkMunemo(headers map[string][]string) error {
 	storedMunemo := e.tenantMunemo.Load()
 	if storedMunemo == "" {
-		e.slogger.Log(context.TODO(), slog.LevelError,
+		// This likely means this is a new installation that hasn't enrolled yet
+		e.slogger.Log(context.TODO(), slog.LevelDebug,
 			"no munemo set in krypto middleware, continuing",
 		)
 		return nil

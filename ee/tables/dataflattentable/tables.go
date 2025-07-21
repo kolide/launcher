@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -98,11 +97,6 @@ type Table struct {
 
 	flattenFileFunc  dataflatten.DataFileFunc
 	flattenBytesFunc dataflatten.DataFunc
-
-	cmdGen   allowedcmd.AllowedCommand
-	execArgs []string
-
-	keyValueSeparator string
 }
 
 // AllTablePlugins is a helper to return all the expected flattening tables.

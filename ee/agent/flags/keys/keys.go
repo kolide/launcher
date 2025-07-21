@@ -45,6 +45,7 @@ const (
 	AutoupdateInterval               FlagKey = "autoupdate_interval"
 	UpdateChannel                    FlagKey = "update_channel"
 	AutoupdateInitialDelay           FlagKey = "autoupdater_initial_delay"
+	AutoupdateDownloadSplay          FlagKey = "autoupdate_download_splay"
 	UpdateDirectory                  FlagKey = "update_directory"
 	PinnedLauncherVersion            FlagKey = "pinned_launcher_version"
 	PinnedOsquerydVersion            FlagKey = "pinned_osqueryd_version"

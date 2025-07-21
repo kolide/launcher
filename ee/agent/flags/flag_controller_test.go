@@ -221,6 +221,13 @@ func TestControllerDurationFlags(t *testing.T) {
 			valuesToSet: []time.Duration{1 * time.Second, 7 * time.Second, 20 * time.Minute},
 			valuesToGet: []time.Duration{5 * time.Second, 7 * time.Second, 20 * time.Minute},
 		},
+		{
+			name:        "AutoupdateDownloadSplay",
+			getFlag:     func(fc *FlagController) time.Duration { return fc.AutoupdateDownloadSplay() },
+			setFlag:     func(fc *FlagController, d time.Duration) error { return fc.SetAutoupdateDownloadSplay(d) },
+			valuesToSet: []time.Duration{0 * time.Second, 12 * time.Hour, 110 * time.Hour},
+			valuesToGet: []time.Duration{0 * time.Second, 12 * time.Hour, 72 * time.Hour},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt

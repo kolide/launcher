@@ -324,6 +324,66 @@ func Test_ValidateCertChain(t *testing.T) {
 	})
 }
 
+func Test_originIsAllowlisted(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		testCaseName      string
+		requestOrigin     string
+		expectAllowlisted bool
+	}
+
+	testCases := []testCase{
+		{
+			testCaseName:      "empty origin",
+			requestOrigin:     "",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "safari web extension",
+			requestOrigin:     "safari-web-extension://testtest",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "1p prod",
+			requestOrigin:     "https://example.1password.com",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "1p with .ca",
+			requestOrigin:     "https://example2.1password.ca",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "1p with .eu",
+			requestOrigin:     "https://example3.1password.eu",
+			expectAllowlisted: true,
+		},
+		{
+			testCaseName:      "origin not on allowlist",
+			requestOrigin:     "https://example.com",
+			expectAllowlisted: false,
+		},
+	}
+
+	for allowlistedOrigin := range allowlistedDt4aOriginsLookup {
+		testCases = append(testCases, testCase{
+			testCaseName:      allowlistedOrigin,
+			requestOrigin:     allowlistedOrigin,
+			expectAllowlisted: true,
+		})
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.expectAllowlisted, originIsAllowlisted(tt.requestOrigin))
+		})
+	}
+}
+
 // newChain creates a new chain of keys, where each key signs the next key in the chain
 // leaving this in the _test file since we will always be receiving a chain of keys
 // so this is only needed for testing

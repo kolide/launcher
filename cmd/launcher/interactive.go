@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kolide/launcher/cmd/launcher/internal"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/knapsack"
@@ -16,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/tuf"
 	"github.com/kolide/launcher/pkg/launcher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/interactive"
 )
 
@@ -80,7 +80,7 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 
 	// if we were not passed a tls_server_certs flag, pass default to osquery
 	if !hasTlsServerCertsOsqueryFlag {
-		certs, err := internal.InstallCaCerts(interactiveRootDir)
+		certs, err := osquery.InstallCaCerts(interactiveRootDir)
 		if err != nil {
 			return fmt.Errorf("installing CA certs: %w", err)
 		}
@@ -93,7 +93,7 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 
 	knapsack := knapsack.New(nil, flagController, nil, systemMultiSlogger, nil)
 
-	osqueryProc, extensionsServer, err := interactive.StartProcess(knapsack, interactiveRootDir)
+	osqueryProc, extensionsServer, err := interactive.StartProcess(knapsack, interactiveRootDir, os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("error starting osqueryd: %s", err)
 	}

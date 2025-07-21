@@ -144,6 +144,41 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 	require.Equal(t, expectedOpts, opts)
 }
 
+func TestAutoupdateDownloadSPlayCanBeDisabledFromFlagsFile(t *testing.T) { //nolint:paralleltest
+	os.Clearenv()
+
+	testArgs, expectedOpts := getArgsAndResponse()
+	// add in our disable flag to be written to flags file
+	testArgs["autoupdate_download_splay"] = "0s"
+	// update expectations to require that the resulting options have download splay disabled
+	expectedOpts.AutoupdateDownloadSplay = 0 * time.Second
+
+	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")
+	require.NoError(t, err)
+	expectedOpts.ConfigFilePath = flagFile.Name()
+
+	for k, val := range testArgs {
+		var err error
+
+		_, err = flagFile.WriteString(strings.TrimLeft(k, "-"))
+		require.NoError(t, err)
+
+		if val != "" {
+			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			require.NoError(t, err)
+		}
+
+		_, err = flagFile.WriteString("\n")
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, flagFile.Close())
+
+	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	require.NoError(t, err)
+	require.Equal(t, expectedOpts, opts)
+}
+
 func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	testCases := []struct {
 		testName                   string
@@ -263,6 +298,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		WatchdogMemoryLimitMB:           600,
 		WatchdogUtilizationLimitPercent: 50,
 		Identifier:                      DefaultLauncherIdentifier,
+		AutoupdateDownloadSplay:         8 * time.Hour,
 	}
 
 	return args, opts

@@ -204,7 +204,11 @@ func signHttpRequest(req *http.Request, body []byte) {
 			return
 		}
 
-		pub, err := echelper.PublicEcdsaToB64Der(signer.Public().(*ecdsa.PublicKey))
+		ecdsaPubKey, ok := signer.Public().(*ecdsa.PublicKey)
+		if !ok {
+			return
+		}
+		pub, err := echelper.PublicEcdsaToB64Der(ecdsaPubKey)
 		if err != nil {
 			return
 		}
