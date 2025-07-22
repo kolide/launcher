@@ -4,6 +4,7 @@
 package tuf
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/osquery/runsimple"
 	client "github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
 	"github.com/theupdateframework/go-tuf/data"
@@ -460,32 +463,26 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 		return launcherVersion, nil
 	case binaryOsqueryd:
-		// first verify that the osqueryd binary exists. if it doesn't, there's no reason to wait
-		// for initialization below
-		if ta.knapsack != nil {
-			latestOsqdPath := ta.knapsack.LatestOsquerydPath(context.TODO())
-			if _, statErr := os.Stat(latestOsqdPath); os.IsNotExist(statErr) {
-				return "", fmt.Errorf("finding current running version: osqueryd binary does not exist at `%s`", latestOsqdPath)
-			}
+		// Query via runsimple instead of client to avoid any socket contention
+		ctx, cancel := context.WithTimeout(context.Background(), ta.osquerierRetryInterval)
+		defer cancel()
+
+		var output bytes.Buffer
+		osquerydPath := ta.knapsack.LatestOsquerydPath(ctx)
+		osqVersionProc, err := runsimple.NewOsqueryProcess(osquerydPath, runsimple.WithStdout(&output))
+		if err != nil {
+			return "", fmt.Errorf("creating runsimple process to query for osqueryd version: %w", err)
 		}
 
-		// The osqueryd client may not have initialized yet, so retry the version
-		// check a couple times before giving up
-		osquerydVersionCheckRetries := 5
-		var err error
-		for i := 0; i < osquerydVersionCheckRetries; i += 1 {
-			var resp []map[string]string
-			resp, err = ta.osquerier.Query("SELECT version FROM osquery_info;")
-			if err == nil && len(resp) > 0 {
-				if osquerydVersion, ok := resp[0]["version"]; ok {
-					return osquerydVersion, nil
-				}
-			}
-			err = fmt.Errorf("error querying for osquery_info: %w; rows returned: %d", err, len(resp))
-
-			time.Sleep(ta.osquerierRetryInterval)
+		if err := osqVersionProc.RunVersion(ctx); err != nil {
+			return "", fmt.Errorf("running runsimple to query for osqueryd version: %w", err)
 		}
-		return "", err
+
+		// Output looks like `osquery version x.y.z`, so split on `version` and return the last part of the string
+		parts := strings.SplitAfter(strings.TrimSpace(output.String()), "version")
+		osquerydVersion := strings.TrimSpace(parts[len(parts)-1])
+
+		return osquerydVersion, nil
 	default:
 		return "", fmt.Errorf("cannot determine current running version for unexpected binary %s", binary)
 	}
