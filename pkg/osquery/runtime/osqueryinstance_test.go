@@ -383,7 +383,7 @@ func TestLaunch(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
-	s.On("WriteSettings").Return(nil)
+	s.On("WriteSettings").Return(nil).Maybe()
 	osqHistory := setupHistory(t, k)
 
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
