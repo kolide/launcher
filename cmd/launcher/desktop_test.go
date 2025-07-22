@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -18,6 +17,13 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	runnerServer, err := runnerserver.New(multislogger.NewNopLogger(), nil, nil)
 	require.NoError(t, err)
 
+	// start server
+	go func() {
+		if err := runnerServer.Serve(); err != nil {
+			require.ErrorIs(t, err, http.ErrServerClosed)
+		}
+	}()
+
 	// register client and get token
 	token := runnerServer.RegisterClient("0")
 
@@ -29,40 +35,33 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 		Level:     slog.LevelDebug,
 	}))
 
+	// Start up monitoring the parent process, waiting just a moment for the server to start
+	time.Sleep(monitorInterval * 2)
+	monitorShutdownChan := make(chan struct{}, 1)
 	go func() {
 		monitorParentProcess(slogger, runnerServer.Url(), token, monitorInterval)
+		monitorShutdownChan <- struct{}{}
 	}()
 
-	time.Sleep(monitorInterval * 2)
-
-	// should retry
-	require.Contains(t, logBytes.String(), "will retry")
-
-	// start server
-	go func() {
-		if err := runnerServer.Serve(); err != nil {
-			require.ErrorIs(t, err, http.ErrServerClosed)
-		}
-	}()
-
-	// wait a moment for server to start
-	time.Sleep(monitorInterval * 2)
-
-	// clear the log
-	io.Copy(io.Discard, &logBytes)
 	// let it run for a few intervals and make sure there is no error
 	time.Sleep(monitorInterval * 4)
 
 	// we should succeed now, nothing should be in the log
 	require.Empty(t, logBytes.String())
 
-	// stop the server, should now start getting errors
+	// stop the server -- we should now start getting errors
 	require.NoError(t, runnerServer.Shutdown(context.Background()))
 	time.Sleep(monitorInterval * 8)
 
-	// should retry
+	// `monitorParentProcess` should perform some retries during this time
 	require.Contains(t, logBytes.String(), "will retry")
 
-	// should exit
-	require.Contains(t, logBytes.String(), "exiting")
+	// `monitorParentProcess` should exit
+	select {
+	case <-monitorShutdownChan:
+		// monitorParentProcess returned
+	case <-time.After(8 * monitorInterval):
+		t.Errorf("monitorParentProcess did not exit after parent server shutdown: logs:\n%s\n", logBytes.String())
+		t.FailNow()
+	}
 }
