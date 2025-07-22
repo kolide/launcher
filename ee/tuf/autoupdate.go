@@ -473,7 +473,11 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		}
 
 		// Output looks like `osquery version x.y.z`, so split on `version` and return the last part of the string
-		parts := strings.SplitAfter(strings.TrimSpace(output.String()), "version")
+		outputStr := strings.TrimSpace(output.String())
+		parts := strings.SplitAfter(outputStr, "version")
+		if len(parts) < 2 {
+			return "", fmt.Errorf("malformed osqueryd version output %s", outputStr)
+		}
 		osquerydVersion := strings.TrimSpace(parts[len(parts)-1])
 
 		return osquerydVersion, nil
