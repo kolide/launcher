@@ -83,14 +83,9 @@ type librarian interface {
 	TidyLibrary(binary autoupdatableBinary, currentVersion string)
 }
 
-type querier interface {
-	Query(query string) ([]map[string]string, error)
-}
-
 type TufAutoupdater struct {
 	metadataClient       *client.Client
 	libraryManager       librarian
-	osquerier            querier // used to query for current running osquery version
 	osqueryTimeout       time.Duration
 	knapsack             types.Knapsack
 	updateChannel        string
@@ -118,7 +113,7 @@ func WithOsqueryRestart(restart func(context.Context) error) TufAutoupdaterOptio
 }
 
 func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient *http.Client, mirrorHttpClient *http.Client,
-	osquerier querier, opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
+	opts ...TufAutoupdaterOption) (*TufAutoupdater, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -137,7 +132,6 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		},
 		initialDelayEnd:      time.Now().Add(k.AutoupdateInitialDelay()),
 		updateLock:           &sync.Mutex{},
-		osquerier:            osquerier,
 		osqueryTimeout:       30 * time.Second,
 		slogger:              k.Slogger().With("component", "tuf_autoupdater"),
 		restartFuncs:         make(map[autoupdatableBinary]func(context.Context) error),

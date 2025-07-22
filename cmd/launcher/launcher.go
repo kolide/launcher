@@ -558,7 +558,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			k,
 			metadataClient,
 			mirrorClient,
-			osqueryRunner,
 			tuf.WithOsqueryRestart(osqueryRunner.Restart),
 		)
 		if err != nil {
