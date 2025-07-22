@@ -808,9 +808,9 @@ func (ta *TufAutoupdater) shouldDelayDownload(binary autoupdatableBinary, target
 	delayCutoffTime := time.Unix(releasePromotedAt+splayDelaySeconds, 0)
 	slogger.Log(context.TODO(), slog.LevelInfo,
 		"release promoted within splay time, determining download eligibility",
-		"promote_start", promoteStart,
+		"promote_start", promoteStart.UTC(),
 		"delay_seconds", splayDelaySeconds,
-		"delay_cutoff", delayCutoffTime,
+		"delay_cutoff", delayCutoffTime.UTC(),
 		"delay_minutes_from_now", time.Until(delayCutoffTime).Minutes(),
 		"will_delay", time.Now().Before(delayCutoffTime),
 	)
