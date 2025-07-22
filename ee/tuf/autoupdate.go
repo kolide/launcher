@@ -88,22 +88,22 @@ type querier interface {
 }
 
 type TufAutoupdater struct {
-	metadataClient         *client.Client
-	libraryManager         librarian
-	osquerier              querier // used to query for current running osquery version
-	osquerierRetryInterval time.Duration
-	knapsack               types.Knapsack
-	updateChannel          string
-	pinnedVersions         map[autoupdatableBinary]string        // maps the binaries to their pinned versions
-	pinnedVersionGetters   map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
-	initialDelayEnd        time.Time
-	updateLock             *sync.Mutex
-	interrupt              chan struct{}
-	interrupted            atomic.Bool
-	signalRestart          chan error
-	slogger                *slog.Logger
-	restartFuncs           map[autoupdatableBinary]func(context.Context) error
-	calculatedSplayDelay   *atomic.Int64 // the randomly selected delay within the download splay window
+	metadataClient       *client.Client
+	libraryManager       librarian
+	osquerier            querier // used to query for current running osquery version
+	osqueryTimeout       time.Duration
+	knapsack             types.Knapsack
+	updateChannel        string
+	pinnedVersions       map[autoupdatableBinary]string        // maps the binaries to their pinned versions
+	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
+	initialDelayEnd      time.Time
+	updateLock           *sync.Mutex
+	interrupt            chan struct{}
+	interrupted          atomic.Bool
+	signalRestart        chan error
+	slogger              *slog.Logger
+	restartFuncs         map[autoupdatableBinary]func(context.Context) error
+	calculatedSplayDelay *atomic.Int64 // the randomly selected delay within the download splay window
 }
 
 type TufAutoupdaterOption func(*TufAutoupdater)
@@ -135,13 +135,13 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
-		initialDelayEnd:        time.Now().Add(k.AutoupdateInitialDelay()),
-		updateLock:             &sync.Mutex{},
-		osquerier:              osquerier,
-		osquerierRetryInterval: 30 * time.Second,
-		slogger:                k.Slogger().With("component", "tuf_autoupdater"),
-		restartFuncs:           make(map[autoupdatableBinary]func(context.Context) error),
-		calculatedSplayDelay:   &atomic.Int64{},
+		initialDelayEnd:      time.Now().Add(k.AutoupdateInitialDelay()),
+		updateLock:           &sync.Mutex{},
+		osquerier:            osquerier,
+		osqueryTimeout:       30 * time.Second,
+		slogger:              k.Slogger().With("component", "tuf_autoupdater"),
+		restartFuncs:         make(map[autoupdatableBinary]func(context.Context) error),
+		calculatedSplayDelay: &atomic.Int64{},
 	}
 
 	for _, opt := range opts {
@@ -464,7 +464,7 @@ func (ta *TufAutoupdater) currentRunningVersion(binary autoupdatableBinary) (str
 		return launcherVersion, nil
 	case binaryOsqueryd:
 		// Query via runsimple instead of client to avoid any socket contention
-		ctx, cancel := context.WithTimeout(context.Background(), ta.osquerierRetryInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), ta.osqueryTimeout)
 		defer cancel()
 
 		var output bytes.Buffer

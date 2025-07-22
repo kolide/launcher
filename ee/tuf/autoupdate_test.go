@@ -205,7 +205,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-	autoupdater.osquerierRetryInterval = 5 * time.Second
+	autoupdater.osqueryTimeout = 5 * time.Second
 
 	// Update the metadata client with our test root JSON
 	require.NoError(t, autoupdater.metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -228,7 +228,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 
 	// Let the autoupdater run for a bit
 	go autoupdater.Execute()
-	time.Sleep(2 * autoupdater.osquerierRetryInterval)
+	time.Sleep(2 * autoupdater.osqueryTimeout)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -446,7 +446,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
 		mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-	autoupdater.osquerierRetryInterval = 5 * time.Second
+	autoupdater.osqueryTimeout = 5 * time.Second
 
 	// Set up library manager: we should expect to tidy the library on startup, but NOT add anything to it
 	mockLibraryManager := NewMocklibrarian(t)
@@ -456,7 +456,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	// Let the autoupdater run for long enough to make it through tidying the library (which includes an osquery version query)
 	// and at least starting an autoupdate check
 	go autoupdater.Execute()
-	time.Sleep(2 * autoupdater.osquerierRetryInterval)
+	time.Sleep(2 * autoupdater.osqueryTimeout)
 
 	// Shut down the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
@@ -513,7 +513,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
 		mockQuerier, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
-	autoupdater.osquerierRetryInterval = 5 * time.Second
+	autoupdater.osqueryTimeout = 5 * time.Second
 
 	// Set up normal library and querier interactions
 	mockLibraryManager := NewMocklibrarian(t)
@@ -523,7 +523,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	// Let the autoupdater run for long enough to make it through tidying the library (which includes an osquery version query)
 	// and at least starting an autoupdate check
 	go autoupdater.Execute()
-	time.Sleep(2 * autoupdater.osquerierRetryInterval)
+	time.Sleep(2 * autoupdater.osqueryTimeout)
 
 	interruptStart := time.Now()
 	autoupdater.Interrupt(errors.New("test error"))
@@ -1062,10 +1062,10 @@ func Test_currentRunningVersion_osqueryd(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	autoupdater := &TufAutoupdater{
-		slogger:                multislogger.NewNopLogger(),
-		osquerier:              mockQuerier,
-		osquerierRetryInterval: 5 * time.Second,
-		knapsack:               mockKnapsack,
+		slogger:        multislogger.NewNopLogger(),
+		osquerier:      mockQuerier,
+		osqueryTimeout: 5 * time.Second,
+		knapsack:       mockKnapsack,
 	}
 
 	// Expect to return one row containing the version
