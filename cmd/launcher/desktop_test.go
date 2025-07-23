@@ -21,7 +21,7 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	// register client and get token
 	token := runnerServer.RegisterClient("0")
 
-	monitorInterval := 250 * time.Millisecond
+	monitorInterval := 2 * time.Second
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
