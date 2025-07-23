@@ -39,6 +39,7 @@ import (
 	"github.com/kolide/launcher/ee/control/consumers/notificationconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/remoterestartconsumer"
 	"github.com/kolide/launcher/ee/control/consumers/uninstallconsumer"
+	performancedebug "github.com/kolide/launcher/ee/debug"
 	"github.com/kolide/launcher/ee/debug/checkups"
 	desktopRunner "github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/gowrapper"
@@ -319,6 +320,10 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		checkpointer.LogCheckupsOnStartup(ctx)
 	})
 	runGroup.Add("logcheckpoint", checkpointer.Run, checkpointer.Interrupt)
+
+	// Periodically check launcher performance
+	performanceMonitor := performancedebug.NewPerformanceMonitor(k)
+	runGroup.Add("performanceMonitor", performanceMonitor.Execute, performanceMonitor.Interrupt)
 
 	watchdogController, err := watchdog.NewController(ctx, k, opts.ConfigFilePath)
 	if err != nil { // log any issues here but move on, watchdog is not critical path
