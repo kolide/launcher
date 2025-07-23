@@ -66,6 +66,11 @@ func (p *performanceMonitor) Execute() error {
 // checkPerformance gathers stats for the current process and assesses them. If performance
 // seems egregiously bad, it triggers a flare upload.
 func (p *performanceMonitor) checkPerformance() {
+	// Only gather stats if performance monitoring is enabled
+	if !p.knapsack.PerformanceMonitoringEnabled() {
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
