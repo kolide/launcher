@@ -5,8 +5,8 @@ package osquery
 
 import (
 	"crypto/sha256"
-	"crypto/x509"
 	_ "embed"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,20 +18,21 @@ import (
 var defaultCaCerts []byte
 
 // InstallCaCerts returns the path to CA certificates.
-// On Windows, it verifies SystemCertPool is available but uses embedded bundle for the file.
+// On Windows, it exports system certificates to a file for osquery to use.
 func InstallCaCerts(directory string) (string, error) {
-	// Check if SystemCertPool is available (this validates Windows cert store access)
-	if _, err := x509.SystemCertPool(); err != nil {
-		// If SystemCertPool fails, log it but continue with embedded certs
-		fmt.Printf("Warning: Windows system certificate pool unavailable: %v\n", err)
+	// Try to export Windows system certificates first
+	systemCertsPath, err := exportSystemCaCerts(directory)
+	if err == nil {
+		return systemCertsPath, nil
 	}
 
-	// Always use embedded bundle for file-based interface
-	// Applications can use x509.SystemCertPool() directly if they prefer
+	// If exporting system certs fails, fall back to embedded bundle
+	fmt.Printf("Warning: Failed to export Windows system certificates: %v. Using embedded bundle.\n", err)
+
 	sum := sha256.Sum256(defaultCaCerts)
 	caFile := filepath.Join(directory, fmt.Sprintf("ca-certs-embedded-%x.crt", sum))
 
-	_, err := os.Stat(caFile)
+	_, err = os.Stat(caFile)
 	switch {
 	case os.IsNotExist(err):
 		return caFile, os.WriteFile(caFile, defaultCaCerts, 0444)
@@ -41,8 +42,37 @@ func InstallCaCerts(directory string) (string, error) {
 	return caFile, nil
 }
 
-// GetSystemCertPool returns the Windows system certificate pool directly
-// This is the preferred method for Windows applications using Go 1.18+
-func GetSystemCertPool() (*x509.CertPool, error) {
-	return x509.SystemCertPool()
+// exportSystemCaCerts exports Windows system CA certificates to a file
+func exportSystemCaCerts(directory string) (string, error) {
+	// Extract certificates directly from Windows Certificate Store
+	certs, err := extractSystemCerts()
+	if err != nil {
+		return "", fmt.Errorf("failed to extract system certificates: %w", err)
+	}
+
+	// Create PEM bundle from certificates
+	var pemData []byte
+	for _, cert := range certs {
+		pemBlock := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		}
+		pemData = append(pemData, pem.EncodeToMemory(pemBlock)...)
+	}
+
+	// Calculate hash of the exported certificates
+	sum := sha256.Sum256(pemData)
+	caFile := filepath.Join(directory, fmt.Sprintf("ca-certs-system-%x.crt", sum))
+
+	// Check if file already exists with same content
+	if _, err := os.Stat(caFile); err == nil {
+		return caFile, nil
+	}
+
+	// Write the certificates to file
+	if err := os.WriteFile(caFile, pemData, 0444); err != nil {
+		return "", fmt.Errorf("failed to write system certificates: %w", err)
+	}
+
+	return caFile, nil
 }

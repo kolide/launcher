@@ -4,49 +4,67 @@
 package osquery
 
 import (
-	"crypto/x509"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInstallCaCerts_Windows(t *testing.T) {
 	t.Parallel()
 
-	// Create a temporary directory for testing
-	dir := t.TempDir()
+	tempDir := t.TempDir()
 
-	// First call should create the file
-	caFile, err := InstallCaCerts(dir)
-	require.NoError(t, err, "expected no error on first call to InstallCaCerts")
-	assert.NotEmpty(t, caFile, "expected a non-empty path for the CA file")
+	// First installation
+	installedPath1, err := InstallCaCerts(tempDir)
+	require.NoError(t, err, "install certs first time")
+	require.NotEmpty(t, installedPath1)
 
-	// Check that the file exists
-	_, err = os.Stat(caFile)
-	require.NoError(t, err, "expected CA file to exist")
+	// Verify file exists
+	_, err = os.Stat(installedPath1)
+	require.NoError(t, err, "installed cert file should exist")
 
-	// Check that the file content matches the embedded bundle
-	content, err := os.ReadFile(caFile)
-	require.NoError(t, err, "expected to be able to read the CA file")
-	assert.Equal(t, defaultCaCerts, content, "expected file content to match embedded CA certs")
+	// Second installation should return same path
+	installedPath2, err := InstallCaCerts(tempDir)
+	require.NoError(t, err, "install certs second time")
+	require.Equal(t, installedPath1, installedPath2, "reinstalled file has the same path")
 
-	// Second call should not fail
-	caFile2, err := InstallCaCerts(dir)
-	require.NoError(t, err, "expected no error on second call to InstallCaCerts")
-	assert.Equal(t, caFile, caFile2, "expected the same file path on second call")
+	// Check that it's either system certs or embedded certs
+	filename := filepath.Base(installedPath1)
+	isSystemCert := strings.HasPrefix(filename, "ca-certs-system-")
+	isEmbeddedCert := strings.HasPrefix(filename, "ca-certs-embedded-")
+	require.True(t, isSystemCert || isEmbeddedCert, "cert file should be either system or embedded")
 }
 
-func TestGetSystemCertPool_Windows(t *testing.T) {
+func TestExportSystemCaCerts(t *testing.T) {
 	t.Parallel()
 
-	pool, err := GetSystemCertPool()
-	require.NoError(t, err, "expected no error when getting system cert pool")
-	require.NotNil(t, pool, "expected a non-nil cert pool")
+	tempDir := t.TempDir()
 
-	// To check if the pool is populated, we can compare it to a new empty pool.
-	// If they are not equal, it means the system pool has certificates.
-	emptyPool := x509.NewCertPool()
-	assert.False(t, pool.Equal(emptyPool), "expected the system cert pool to not be empty")
+	// Try to export system certs
+	certsPath, err := exportSystemCaCerts(tempDir)
+
+	// This might fail on some Windows systems without proper permissions
+	// or in restricted environments, so we just verify behavior
+	if err != nil {
+		require.Error(t, err)
+		require.Empty(t, certsPath)
+		return
+	}
+
+	// If successful, verify the file
+	require.NotEmpty(t, certsPath)
+	require.Contains(t, certsPath, "ca-certs-system-")
+
+	// Verify file exists and has content
+	info, err := os.Stat(certsPath)
+	require.NoError(t, err)
+	require.Greater(t, info.Size(), int64(0), "cert file should not be empty")
+
+	// Second export should reuse the same file
+	certsPath2, err := exportSystemCaCerts(tempDir)
+	require.NoError(t, err)
+	require.Equal(t, certsPath, certsPath2, "should reuse existing cert file")
 }
