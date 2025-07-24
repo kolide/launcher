@@ -778,12 +778,13 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		pingFunc = client.ShowDesktop
 	}
 
-	// If the process isn't responsive after 10 seconds, kill it (if it's not already gone) and return an error
+	// If the process isn't responsive after 10 seconds, kill it and return an error
 	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		// Process may still exist -- try to kill it.
+		// Try to kill the process. It may already be gone, in which case Process.Kill() will return an error --
+		// we can ignore those.
 		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && err.Error() != "invalid argument" {
 			return fmt.Errorf("killing user desktop process after startup failed: %w", err)
 		}
