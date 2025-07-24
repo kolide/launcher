@@ -50,8 +50,8 @@ func TestExportSystemCaCerts(t *testing.T) {
 	certsPath, err := exportSystemCaCerts(tempDir, slogger)
 
 	// This might fail on some Windows systems without proper permissions
-	// or in restricted environments, so we just verify behavior
-	if err != nil {
+	//
+	if os.Getenv("CI") == "true" {
 		require.Error(t, err)
 		require.Empty(t, certsPath)
 		return
