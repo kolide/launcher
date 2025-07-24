@@ -148,7 +148,11 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 
 	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
 	if err != nil {
-		return err
+		slogger.Log(context.TODO(), slog.LevelError,
+			"could not create user server",
+			"err", err,
+		)
+		return fmt.Errorf("creating server: %w", err)
 	}
 
 	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
