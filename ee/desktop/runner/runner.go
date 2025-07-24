@@ -780,6 +780,8 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 
 	// If the process isn't responsive after 10 seconds, kill it and return an error
 	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
+		observability.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
+
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
