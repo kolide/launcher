@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -19,15 +20,15 @@ var defaultCaCerts []byte
 
 // InstallCaCerts returns the path to CA certificates.
 // On Windows, it exports system certificates to a file for osquery to use.
-func InstallCaCerts(directory string) (string, error) {
+func InstallCaCerts(directory string, slog *slog.Logger) (string, error) {
 	// Try to export Windows system certificates first
-	systemCertsPath, err := exportSystemCaCerts(directory)
+	systemCertsPath, err := exportSystemCaCerts(directory, slog)
 	if err == nil {
 		return systemCertsPath, nil
 	}
 
 	// If exporting system certs fails, fall back to embedded bundle
-	fmt.Printf("Warning: Failed to export Windows system certificates: %v. Using embedded bundle.\n", err)
+	slog.Warn("Warning: Failed to export Windows system certificates: %v. Using embedded bundle.\n", err)
 
 	sum := sha256.Sum256(defaultCaCerts)
 	caFile := filepath.Join(directory, fmt.Sprintf("ca-certs-embedded-%x.crt", sum))
@@ -43,9 +44,9 @@ func InstallCaCerts(directory string) (string, error) {
 }
 
 // exportSystemCaCerts exports Windows system CA certificates to a file
-func exportSystemCaCerts(directory string) (string, error) {
+func exportSystemCaCerts(directory string, slog *slog.Logger) (string, error) {
 	// Extract certificates directly from Windows Certificate Store
-	certs, err := extractSystemCerts()
+	certs, err := extractSystemCerts(slog)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract system certificates: %w", err)
 	}

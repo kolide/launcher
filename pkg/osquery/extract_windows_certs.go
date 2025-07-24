@@ -6,6 +6,7 @@ package osquery
 import (
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 	"syscall"
 	"unsafe"
 )
@@ -31,7 +32,7 @@ type CERT_CONTEXT struct {
 }
 
 // extractSystemCerts extracts CA certificates from Windows system stores
-func extractSystemCerts() ([]*x509.Certificate, error) {
+func extractSystemCerts(slog *slog.Logger) ([]*x509.Certificate, error) {
 	var certs []*x509.Certificate
 
 	// Certificate store names to check
@@ -41,7 +42,7 @@ func extractSystemCerts() ([]*x509.Certificate, error) {
 		storeCerts, err := extractCertsFromStore(storeName)
 		if err != nil {
 			// Log error but continue with other stores
-			fmt.Printf("Warning: Failed to extract certificates from %s store: %v\n", storeName, err)
+			slog.Warn("Warning: Failed to extract certificates from %s store: %v\n", storeName, err)
 			continue
 		}
 		certs = append(certs, storeCerts...)
@@ -63,6 +64,7 @@ func extractCertsFromStore(storeName string) ([]*x509.Certificate, error) {
 	}
 
 	// Open the certificate store
+	// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopensystemstorew first argument is not used and should be set to 0.
 	store, _, err := certOpenSystemStore.Call(0, uintptr(unsafe.Pointer(storeNamePtr)))
 	if store == 0 {
 		return nil, fmt.Errorf("failed to open certificate store %s: %w", storeName, err)
@@ -73,7 +75,8 @@ func extractCertsFromStore(storeName string) ([]*x509.Certificate, error) {
 	var prevContext uintptr
 
 	for {
-		// Enumerate certificates in the store
+		// The CertEnumCertificatesInStore function retrieves the first or next certificate in a certificate store. Used in a loop, this function can retrieve in sequence all certificates in a certificate store.
+		// https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certenumcertificatesinstore
 		context, _, _ := certEnumCertificatesInStore.Call(store, prevContext)
 		if context == 0 {
 			break

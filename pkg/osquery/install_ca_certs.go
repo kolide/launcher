@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -21,7 +22,7 @@ var defaultCaCerts []byte
 
 // InstallCaCerts returns the path to CA certificates.
 // It prefers system CA certificates over embedded bundle.
-func InstallCaCerts(directory string) (string, error) {
+func InstallCaCerts(directory string, slog *slog.Logger) (string, error) {
 	// Try to use system CA certificates directly
 	systemCaPath, err := getSystemCaCertPath()
 	if err == nil {

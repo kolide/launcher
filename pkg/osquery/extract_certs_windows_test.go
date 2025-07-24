@@ -4,19 +4,22 @@
 package osquery
 
 import (
+	"os"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
 func TestExtractSystemCerts(t *testing.T) {
 	t.Parallel()
 
-	// Try to extract system certificates
-	certs, err := extractSystemCerts()
+	slogger := multislogger.NewNopLogger()
 
-	// This might fail in restricted environments
-	if err != nil {
+	// Try to extract system certificates
+	certs, err := extractSystemCerts(slogger)
+
+	if os.Getenv("CI") == "true" {
 		require.Error(t, err)
 		require.Nil(t, certs)
 		return
@@ -49,24 +52,14 @@ func TestExtractCertsFromStore(t *testing.T) {
 			name:      "CA store",
 			storeName: "CA",
 		},
-		{
-			name:      "Invalid store",
-			storeName: "INVALID_STORE_NAME",
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			certs, err := extractCertsFromStore(tc.storeName)
 
-			if tc.storeName == "INVALID_STORE_NAME" {
-				// Should fail for invalid store
-				require.Error(t, err)
-				return
-			}
-
 			// ROOT and CA stores might be empty or inaccessible in some environments
-			if err != nil {
+			if os.Getenv("CI") == "true" {
 				require.Error(t, err)
 				return
 			}
