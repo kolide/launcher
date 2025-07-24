@@ -65,6 +65,7 @@ const (
 	UseCachedDataForScheduledQueries FlagKey = "use_cached_data_for_scheduled_queries"
 	CachedQueryResultsTTL            FlagKey = "cached_query_results_ttl"
 	ResetOnHardwareChangeEnabled     FlagKey = "reset_on_hardware_change_enabled"
+	PerformanceMonitoringEnabled     FlagKey = "performance_monitoring_enabled"
 )
 
 func (key FlagKey) String() string {
