@@ -5,7 +5,6 @@ package watchdog
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,6 +19,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/log"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/pkg/launcher"
@@ -112,30 +112,8 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 	logsToDelete := make([]any, 0)
 
 	if err := wc.logPublisher.ForEach(func(rowid, timestamp int64, v []byte) error {
-		logRecord := make(map[string]any)
 		logsToDelete = append(logsToDelete, rowid)
-
-		if err := json.Unmarshal(v, &logRecord); err != nil {
-			wc.slogger.Log(ctx, slog.LevelError,
-				"failed to unmarshal sqlite log",
-				"log", string(v),
-				"err", err,
-			)
-
-			// log the issue but don't return an error, we want to keep processing whatever we can
-			return nil
-		}
-
-		logArgs := make([]slog.Attr, len(logRecord))
-		for k, v := range logRecord {
-			logArgs = append(logArgs, slog.Any(k, v))
-		}
-
-		// re-issue the log, this time with the debug.json writer
-		// pulling out the existing log and re-adding all attributes like this will overwrite
-		// the automatic timestamp creation, as well as the msg and level set below
-		wc.slogger.LogAttrs(ctx, slog.LevelInfo, "", logArgs...)
-
+		log.LogRawLogRecord(ctx, v, wc.slogger)
 		return nil
 	}); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError, "iterating sqlite logs", "err", err)

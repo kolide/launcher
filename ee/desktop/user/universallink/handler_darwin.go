@@ -69,7 +69,7 @@ func (u *universalLinkHandler) Execute() error {
 }
 
 func (u *universalLinkHandler) Interrupt(_ error) {
-	u.slogger.Log(context.TODO(), slog.LevelInfo,
+	u.slogger.Log(context.TODO(), slog.LevelDebug,
 		"received interrupt",
 	)
 
