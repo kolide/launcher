@@ -4,6 +4,7 @@
 package osquery
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"log/slog"
@@ -32,7 +33,7 @@ type CERT_CONTEXT struct {
 }
 
 // extractSystemCerts extracts CA certificates from Windows system stores
-func extractSystemCerts(slog *slog.Logger) ([]*x509.Certificate, error) {
+func extractSystemCerts(slogger *slog.Logger) ([]*x509.Certificate, error) {
 	var certs []*x509.Certificate
 
 	// Certificate store names to check
@@ -42,7 +43,11 @@ func extractSystemCerts(slog *slog.Logger) ([]*x509.Certificate, error) {
 		storeCerts, err := extractCertsFromStore(storeName)
 		if err != nil {
 			// Log error but continue with other stores
-			slog.Warn("Warning: Failed to extract certificates from %s store: %v\n", storeName, err)
+			slogger.Log(context.TODO(), slog.LevelWarn,
+				"failed to extract certificates from store",
+				"store_name", storeName,
+				"err", err,
+			)
 			continue
 		}
 		certs = append(certs, storeCerts...)
