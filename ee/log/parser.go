@@ -59,8 +59,6 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 		}
 	}
 
-	// Re-issue the log using our slogger. Pulling out the existing log and
-	// re-adding all attributes like this will overwrite the automatic timestamp creation,
-	// as well as the msg and level set below.
+	// Re-issue the log using our slogger and our updated args.
 	slogger.LogAttrs(ctx, logLevel, logMsg, logArgs...)
 }
