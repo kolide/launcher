@@ -60,5 +60,5 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 	}
 
 	// Re-issue the log using our slogger and our updated args.
-	slogger.LogAttrs(ctx, logLevel, logMsg, logArgs...)
+	slogger.LogAttrs(ctx, logLevel, logMsg, logArgs...) // nolint:sloglint // it's fine to not have a constant or literal here
 }
