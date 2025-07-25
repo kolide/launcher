@@ -116,6 +116,25 @@ func TestLogRawLogRecord(t *testing.T) {
 			},
 		},
 		{
+			testCaseName:       "stack trace preserved",
+			rawLogRecord:       fmt.Appendf(nil, `{"time":"%s","level":"ERROR","msg":"panic stack trace","source":{"file":"/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go","function":"github.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1","line":%d},"subprocess":"desktop","uid":"501","stack_trace":"runtime error: index out of range [4] with length 0\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:31\nruntime.gopanic\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:792\nruntime.goPanicIndex\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:115\nmain.runDesktop.func3\n\t/Users/rebeccamahany-horton/Repos/launcher/cmd/launcher/desktop.go:135\ngithub.com/kolide/launcher/pkg/rungroup.(*Group).Run.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/pkg/rungroup/rungroup.go:76\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:39\nruntime.goexit\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/asm_arm64.s:1223","session_pid":46329,"component":"run_group"}`, logTimeString, fileLineInt),
+			expectedLogMessage: "panic stack trace",
+			expectedLogLevel:   slog.LevelError,
+			expectedLogAttributes: []slog.Attr{
+				slog.String("original.time", logTimeString),
+				slog.Any("original.source", map[string]any{
+					"file":     "/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go",
+					"function": "github.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1",
+					"line":     fileLineAsFloat,
+				}),
+				slog.String("original.component", "run_group"),
+				slog.String("original.subprocess", "desktop"),
+				slog.Float64("original.session_pid", 46329),
+				slog.String("original.uid", "501"),
+				slog.String("stack_trace", "runtime error: index out of range [4] with length 0\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1.1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:31\nruntime.gopanic\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:792\nruntime.goPanicIndex\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/panic.go:115\nmain.runDesktop.func3\n\t/Users/rebeccamahany-horton/Repos/launcher/cmd/launcher/desktop.go:135\ngithub.com/kolide/launcher/pkg/rungroup.(*Group).Run.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/pkg/rungroup/rungroup.go:76\ngithub.com/kolide/launcher/ee/gowrapper.GoWithRecoveryAction.func1\n\t/Users/rebeccamahany-horton/Repos/launcher/ee/gowrapper/goroutine.go:39\nruntime.goexit\n\t/opt/homebrew/Cellar/go/1.24.5/libexec/src/runtime/asm_arm64.s:1223"),
+			},
+		},
+		{
 			testCaseName:       "invalid JSON",
 			rawLogRecord:       []byte("not a log"),
 			expectedLogMessage: "failed to unmarshal incoming log",

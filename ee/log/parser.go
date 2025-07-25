@@ -30,8 +30,8 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 	// we may have duplicate values for, prepend "original." to the key -- most notably,
 	// we are handling potential duplicate `time` and `source` fields, and potentially
 	// `component` fields that could conflict with attributes set on our `slogger`.
-	// We do not prepend "original." to the error key, to make sure it's picked up correctly
-	// by our error reporting system.
+	// We do not prepend "original." to keys relating to errors or panics, to make sure they're
+	// picked up correctly by our error reporting system.
 	logArgs := make([]slog.Attr, len(logRecord))
 	logLevel := slog.LevelInfo
 	logMsg := "original log message missing"
@@ -52,7 +52,7 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 					)
 				}
 			}
-		case "err":
+		case "err", "stack_trace":
 			logArgs = append(logArgs, slog.Any(k, v))
 		default:
 			logArgs = append(logArgs, slog.Any(fmt.Sprintf(keyFormatWithPrefix, k), v))
