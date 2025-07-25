@@ -224,8 +224,8 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
 		if err := r.runConsoleUserDesktop(); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelInfo,
-				"running console user desktop",
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"could not run console user desktop process",
 				"err", err,
 			)
 		}
@@ -778,23 +778,20 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		pingFunc = client.ShowDesktop
 	}
 
+	// If the process isn't responsive after 10 seconds, kill it and return an error
 	if err := backoff.WaitFor(pingFunc, 10*time.Second, 1*time.Second); err != nil {
+		observability.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
+
 		// unregister proc from desktop server so server will not respond to its requests
 		r.runnerServer.DeRegisterClient(uid)
 
-		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-			r.slogger.Log(ctx, slog.LevelError,
-				"killing user desktop process after startup ping / show desktop failed",
-				"uid", uid,
-				"pid", cmd.Process.Pid,
-				"path", cmd.Path,
-				"err", err,
-			)
+		// Try to kill the process. It may already be gone, in which case Process.Kill() will return an error --
+		// we can ignore those.
+		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && err.Error() != "invalid argument" {
+			return fmt.Errorf("killing user desktop process after startup failed: %w", err)
 		}
 
-		observability.SetError(span, fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err))
-
-		return fmt.Errorf("pinging user desktop server after startup: pid %d: %w", cmd.Process.Pid, err)
+		return fmt.Errorf("user desktop server not responsive to ping after startup: pid %d: %w", cmd.Process.Pid, err)
 	}
 
 	r.slogger.Log(ctx, slog.LevelDebug,
@@ -849,7 +846,7 @@ func (r *DesktopUsersProcessesRunner) waitOnProcessAsync(uid string, proc *os.Pr
 		// waiting here gives the parent a chance to clean up
 		state, err := proc.Wait()
 		if err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelInfo,
+			r.slogger.Log(context.TODO(), slog.LevelError,
 				"desktop process died",
 				"uid", uid,
 				"pid", proc.Pid,

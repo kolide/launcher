@@ -1121,6 +1121,24 @@ func (_m *Knapsack) OsquerydPath() string {
 	return r0
 }
 
+// PerformanceMonitoringEnabled provides a mock function with no fields
+func (_m *Knapsack) PerformanceMonitoringEnabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for PerformanceMonitoringEnabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // PersistentHostDataStore provides a mock function with no fields
 func (_m *Knapsack) PersistentHostDataStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -1987,6 +2005,24 @@ func (_m *Knapsack) SetOsqueryVerbose(verbose bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(verbose)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetPerformanceMonitoringEnabled provides a mock function with given fields: enabled
+func (_m *Knapsack) SetPerformanceMonitoringEnabled(enabled bool) error {
+	ret := _m.Called(enabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPerformanceMonitoringEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(enabled)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -265,4 +265,8 @@ type Flags interface {
 
 	AutoupdateDownloadSplay() time.Duration
 	SetAutoupdateDownloadSplay(val time.Duration) error
+
+	// PerformanceMonitoringEnabled controls whether launcher self-monitors for performance issues
+	SetPerformanceMonitoringEnabled(enabled bool) error
+	PerformanceMonitoringEnabled() bool
 }
