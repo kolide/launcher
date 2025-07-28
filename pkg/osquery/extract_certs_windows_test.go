@@ -55,8 +55,8 @@ func TestExtractCertsFromStore(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Parallel()
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			certs, err := extractCertsFromStore(tc.storeName)
 
 			// ROOT and CA stores might be empty or inaccessible in some environments
