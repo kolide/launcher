@@ -33,6 +33,7 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/ee/log"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/ee/ui/assets"
@@ -1032,15 +1033,13 @@ func (r *DesktopUsersProcessesRunner) processLogs(uid string, stdErr io.ReadClos
 	combined := io.MultiReader(stdErr, stdOut)
 	scanner := bufio.NewScanner(combined)
 
+	slogger := r.slogger.With("uid", uid, "subprocess", "desktop")
+
 	for scanner.Scan() {
 		logLine := scanner.Text()
 
 		// First, log the incoming log.
-		r.slogger.Log(context.TODO(), slog.LevelDebug, // nolint:sloglint // it's fine to not have a constant or literal here
-			logLine,
-			"uid", uid,
-			"subprocess", "desktop",
-		)
+		log.LogRawLogRecord(context.TODO(), []byte(logLine), slogger)
 
 		// Now, check log to see if we need to restart systray.
 		// Only perform the restart if the feature flag is enabled.
