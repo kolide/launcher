@@ -30,8 +30,7 @@ func InstallCaCerts(directory string, slogger *slog.Logger) (string, error) {
 
 	// If exporting system certs fails, fall back to embedded bundle
 	slogger.Log(context.TODO(), slog.LevelWarn,
-		"Failed to export Windows system certificates",
-		"Using embedded bundle instead",
+		"Failed to export Windows system certificates, using embedded bundle instead",
 		"err", err,
 	)
 

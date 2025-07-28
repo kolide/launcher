@@ -55,6 +55,7 @@ func TestExtractCertsFromStore(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		t.Parallel()
 		t.Run(tc.name, func(t *testing.T) {
 			certs, err := extractCertsFromStore(tc.storeName)
 

@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"syscall"
 	"unsafe"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -54,7 +56,7 @@ func extractSystemCerts(slogger *slog.Logger) ([]*x509.Certificate, error) {
 	}
 
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("no certificates found in system stores")
+		return nil, errors.New("no certificates found in system stores")
 	}
 
 	return certs, nil
