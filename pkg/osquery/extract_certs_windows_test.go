@@ -4,7 +4,6 @@
 package osquery
 
 import (
-	"os"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -18,12 +17,6 @@ func TestExtractSystemCerts(t *testing.T) {
 
 	// Try to extract system certificates
 	certs, err := extractSystemCerts(slogger)
-
-	if os.Getenv("CI") == "true" {
-		require.Error(t, err)
-		require.Nil(t, certs)
-		return
-	}
 
 	// If successful, verify we got certificates
 	require.NoError(t, err)
@@ -58,12 +51,6 @@ func TestExtractCertsFromStore(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			certs, err := extractCertsFromStore(tc.storeName)
-
-			// ROOT and CA stores might be empty or inaccessible in some environments
-			if os.Getenv("CI") == "true" {
-				require.Error(t, err)
-				return
-			}
 
 			// If successful, verify certificates
 			require.NoError(t, err)
