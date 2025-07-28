@@ -52,6 +52,7 @@ func TestExportSystemCaCerts(t *testing.T) {
 	// If successful, verify the file
 	require.NotEmpty(t, certsPath)
 	require.Contains(t, certsPath, "ca-certs-system-")
+	require.NoError(t, err)
 
 	// Verify file exists and has content
 	info, err := os.Stat(certsPath)
