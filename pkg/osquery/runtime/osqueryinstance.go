@@ -784,7 +784,7 @@ func calculateOsqueryPaths(rootDirectory string, registrationId string, runId st
 // which will launch a properly configured osqueryd process.
 func (i *OsqueryInstance) createOsquerydCommand(osquerydBinary string) (*exec.Cmd, error) {
 	// Get the certs for the instance
-	certs, err := launcherosq.InstallCaCerts(i.knapsack.RootDirectory())
+	certs, err := launcherosq.InstallCaCerts(i.knapsack.RootDirectory(), i.slogger)
 	if err != nil {
 		return nil, fmt.Errorf("installing CA certs: %w", err)
 	}

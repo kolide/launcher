@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,11 +16,12 @@ func TestInstallCaCerts(t *testing.T) {
 	t.Parallel()
 
 	tempDir := t.TempDir()
+	slogger := multislogger.NewNopLogger()
 
-	installedPath1, err := InstallCaCerts(tempDir)
+	installedPath1, err := InstallCaCerts(tempDir, slogger)
 	require.NoError(t, err, "install certs one")
 
-	installedPath2, err := InstallCaCerts(tempDir)
+	installedPath2, err := InstallCaCerts(tempDir, slogger)
 	require.NoError(t, err, "install certs two")
 
 	require.Equal(t, installedPath1, installedPath2, "reinstalled file has the same path")
