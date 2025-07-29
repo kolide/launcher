@@ -16,12 +16,11 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 	logRecord := make(map[string]any)
 
 	if err := json.Unmarshal(rawLogRecord, &logRecord); err != nil {
-		// If we can't parse the log, then log the raw string.
-		slogger.Log(ctx, slog.LevelError,
-			"failed to unmarshal incoming log",
-			"log", string(rawLogRecord),
-			"err", err,
-		)
+		// If we can't parse the log, then log the raw string at the info level.
+		// Sometimes we get non-JSON logs when e.g. the process hasn't fully set up
+		// logging yet, or when we're interacting with systray or another library
+		// that emits its own logs.
+		slogger.Log(ctx, slog.LevelInfo, string(rawLogRecord)) // nolint:sloglint // it's fine to not have a constant or literal here
 		return
 	}
 
