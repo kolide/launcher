@@ -135,13 +135,18 @@ func TestLogRawLogRecord(t *testing.T) {
 			},
 		},
 		{
-			testCaseName:       "invalid JSON",
-			rawLogRecord:       []byte("not a log"),
-			expectedLogMessage: "failed to unmarshal incoming log",
-			expectedLogLevel:   slog.LevelError,
-			expectedLogAttributes: []slog.Attr{
-				slog.String("log", "not a log"),
-			},
+			testCaseName:          "invalid JSON, notification error",
+			rawLogRecord:          []byte(`2025-07-29 09:09:01.270 launcher[15047:189395675] Error asking for permission to send notifications Error Domain=UNErrorDomain Code=1 "Notifications are not allowed for this application" UserInfo={NSLocalizedDescription=Notifications are not allowed for this application}`),
+			expectedLogMessage:    `2025-07-29 09:09:01.270 launcher[15047:189395675] Error asking for permission to send notifications Error Domain=UNErrorDomain Code=1 "Notifications are not allowed for this application" UserInfo={NSLocalizedDescription=Notifications are not allowed for this application}`,
+			expectedLogLevel:      slog.LevelWarn,
+			expectedLogAttributes: []slog.Attr{},
+		},
+		{
+			testCaseName:          "invalid JSON, unknown log",
+			rawLogRecord:          []byte(`sudo: unable to execute /some/path/to/launcher: Permission denied`),
+			expectedLogMessage:    `sudo: unable to execute /some/path/to/launcher: Permission denied`,
+			expectedLogLevel:      slog.LevelError,
+			expectedLogAttributes: []slog.Attr{},
 		},
 	} {
 		tt := tt

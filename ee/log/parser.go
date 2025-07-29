@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,9 @@ import (
 
 const keyFormatWithPrefix = "original.%s"
 
+// https://developer.apple.com/documentation/usernotifications/unerrordomain?language=objc
+var notificationErrorDomain = []byte("UNErrorDomain")
+
 // LogRawLogRecord parses the given `rawLogRecord`, which should be a JSON-encoded slog LogRecord,
 // and then logs it. We use this to process logs from related subprocesses (launcher watchdog,
 // launcher desktop) and log them at the correct level.
@@ -16,12 +20,7 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 	logRecord := make(map[string]any)
 
 	if err := json.Unmarshal(rawLogRecord, &logRecord); err != nil {
-		// If we can't parse the log, then log the raw string.
-		slogger.Log(ctx, slog.LevelError,
-			"failed to unmarshal incoming log",
-			"log", string(rawLogRecord),
-			"err", err,
-		)
+		logRawNonJsonLogRecord(ctx, rawLogRecord, slogger)
 		return
 	}
 
@@ -61,4 +60,23 @@ func LogRawLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Log
 
 	// Re-issue the log using our slogger and our updated args.
 	slogger.LogAttrs(ctx, logLevel, logMsg, logArgs...) // nolint:sloglint // it's fine to not have a constant or literal here
+}
+
+// logRawNonJsonLogRecord handles incoming log messages that we are unable
+// to parse further. For example, sometimes we get non-JSON logs when the
+// process hasn't fully set up logging yet, or when we're interacting with
+// systray or another library that emits its own logs. We check for the types
+// of logs that we're aware of and know are not errors to log those at a non-error
+// level, and log all others at the error level.
+func logRawNonJsonLogRecord(ctx context.Context, rawLogRecord []byte, slogger *slog.Logger) {
+	logLevel := slog.LevelError
+
+	// Check for macOS notification-related errors. We typically see these due to the user
+	// not granting us permission to send notifications, which we can't do anything about.
+	if bytes.Contains(rawLogRecord, notificationErrorDomain) {
+		logLevel = slog.LevelWarn
+	}
+
+	// Log the raw log at the appropriate level
+	slogger.Log(ctx, logLevel, string(rawLogRecord)) // nolint:sloglint // it's fine to not have a constant or literal here
 }
