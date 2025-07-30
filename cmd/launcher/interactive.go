@@ -80,7 +80,7 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 
 	// if we were not passed a tls_server_certs flag, pass default to osquery
 	if !hasTlsServerCertsOsqueryFlag {
-		certs, err := osquery.InstallCaCerts(interactiveRootDir)
+		certs, err := osquery.InstallCaCerts(interactiveRootDir, systemMultiSlogger.Logger)
 		if err != nil {
 			return fmt.Errorf("installing CA certs: %w", err)
 		}

@@ -22,9 +22,9 @@ func NewKitLogger(logFilePath string) localLogger {
 	// This is meant as an always available debug tool. Thus we hardcode these options
 	lj := &lumberjack.Logger{
 		Filename:   logFilePath,
-		MaxSize:    3, // megabytes
+		MaxSize:    5, // megabytes
 		Compress:   true,
-		MaxBackups: 5,
+		MaxBackups: 8,
 	}
 
 	writer := log.NewSyncWriter(lj)

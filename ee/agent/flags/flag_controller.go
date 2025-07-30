@@ -806,3 +806,13 @@ func (fc *FlagController) AutoupdateDownloadSplay() time.Duration {
 func (fc *FlagController) SetAutoupdateDownloadSplay(val time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateDownloadSplay, durationToBytes(val))
 }
+
+func (fc *FlagController) SetPerformanceMonitoringEnabled(enabled bool) error {
+	return fc.setControlServerValue(keys.PerformanceMonitoringEnabled, boolToBytes(enabled))
+}
+
+func (fc *FlagController) PerformanceMonitoringEnabled() bool {
+	return NewBoolFlagValue(
+		WithDefaultBool(false),
+	).get(fc.getControlServerValue(keys.PerformanceMonitoringEnabled))
+}

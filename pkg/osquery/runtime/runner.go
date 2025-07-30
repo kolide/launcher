@@ -130,11 +130,12 @@ func (r *Runner) runInstance(registrationId string) error {
 
 		// The osquery instance either exited on its own, or we called `Restart`.
 		// Either way, we wait for exit to complete, and then restart the instance.
-		err := instance.WaitShutdown(ctx)
-		slogger.Log(context.TODO(), slog.LevelError,
-			"unexpected restart of instance",
-			"err", err,
-		)
+		if err := instance.WaitShutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slogger.Log(context.TODO(), slog.LevelError,
+				"received error on instance shutdown after instance exit or instance restart",
+				"err", err,
+			)
+		}
 
 		var launchErr error
 		instance, launchErr = r.launchInstanceWithRetries(ctx, registrationId)

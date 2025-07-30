@@ -370,7 +370,14 @@ func (e *Extension) ensureNodeKeyStored(nodeKey string) error {
 		// Grab the enroll secret, since we need that to create a new registration
 		enrollSecret, err := e.knapsack.ReadEnrollSecret()
 		if err != nil {
-			return fmt.Errorf("reading enroll secret to add new registration: %w", err)
+			e.slogger.Log(context.TODO(), slog.LevelWarn,
+				"unable to read enroll secret to add new registration",
+				"err", err,
+			)
+			// don't return an error here, there is nothing we can do. this is the
+			// result of a bad/manual installation (or uninstallation) and any errors
+			// returned here are reported
+			return nil
 		}
 		return e.addRegistration(nodeKey, enrollSecret)
 	}

@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -80,12 +81,12 @@ func New(slogger *slog.Logger,
 
 	// remove existing socket
 	if err := userServer.removeSocket(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("removing existing socket: %w", err)
 	}
 
 	listener, err := listener(socketPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initializing socket listener at %s: %w", socketPath, err)
 	}
 	userServer.listener = listener
 
@@ -109,14 +110,14 @@ func (s *UserServer) Serve() error {
 func (s *UserServer) Shutdown(ctx context.Context) error {
 	err := s.server.Shutdown(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("shutting down server: %w", err)
 	}
 
 	// on windows we need to expliclty close the listener
 	// on non-windows this gives an error
 	if runtime.GOOS == "windows" {
 		if err := s.listener.Close(); err != nil {
-			return err
+			return fmt.Errorf("closing listener: %w", err)
 		}
 	}
 
@@ -160,10 +161,7 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 	}
 
 	if err := s.notifier.SendNotification(notificationToSend); err != nil {
-		s.slogger.Log(context.TODO(), slog.LevelError,
-			"could not send notification",
-			"err", err,
-		)
+		// This error has already been logged appropriately by the notifier
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
