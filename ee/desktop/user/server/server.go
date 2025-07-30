@@ -161,10 +161,7 @@ func (s *UserServer) notificationHandler(w http.ResponseWriter, req *http.Reques
 	}
 
 	if err := s.notifier.SendNotification(notificationToSend); err != nil {
-		s.slogger.Log(context.TODO(), slog.LevelError,
-			"could not send notification",
-			"err", err,
-		)
+		// This error has already been logged appropriately by the notifier
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
