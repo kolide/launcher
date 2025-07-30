@@ -41,11 +41,6 @@ func forceNoChunkedEncoding(slogger *slog.Logger) func(context.Context, *http.Re
 		r.ContentLength = bodyReadBytes
 		r.Body = io.NopCloser(bodyBuf)
 
-		slogger.Log(ctx, slog.LevelDebug,
-			"issuing non-chunked request",
-			"content_length", r.ContentLength,
-		)
-
 		return ctx
 	}
 }
