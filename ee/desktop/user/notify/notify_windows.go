@@ -4,6 +4,8 @@
 package notify
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
 
@@ -11,13 +13,15 @@ import (
 )
 
 type windowsNotifier struct {
+	slogger      *slog.Logger
 	iconFilepath string
 	interrupt    chan struct{}
 	interrupted  atomic.Bool
 }
 
-func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
+		slogger:      slogger.With("component", "desktop_notifier"),
 		iconFilepath: iconFilepath,
 		interrupt:    make(chan struct{}),
 	}
@@ -66,5 +70,14 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 		}
 	}
 
-	return notification.Push()
+	if err := notification.Push(); err != nil {
+		w.slogger.Log(context.TODO(), slog.LevelError,
+			"could not send toast notification",
+			"title", n.Title,
+			"err", err,
+		)
+		return fmt.Errorf("sending toast notification: %w", err)
+	}
+
+	return nil
 }
