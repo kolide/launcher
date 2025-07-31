@@ -77,12 +77,31 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	l.slogger.Log(context.TODO(), l.level, // nolint:sloglint // it's fine to not have a constant or literal here
+	level := l.extractLogLevel(msg)
+	l.slogger.Log(context.TODO(), level, // nolint:sloglint // it's fine to not have a constant or literal here
 		msg,
 		"caller", caller,
 	)
 
 	return len(p), nil
+}
+
+func (l *OsqueryLogAdapter) extractLogLevel(msg string) slog.Level {
+	if len(msg) == 0 {
+		// Use default level
+		return l.level
+	}
+
+	switch msg[0] {
+	case 'E':
+		return slog.LevelError
+	case 'W':
+		return slog.LevelWarn
+	case 'I':
+		return slog.LevelInfo
+	default:
+		return l.level
+	}
 }
 
 // logInfoAboutUnrecognizedProcessLockingPidfile attempts to extract the PID of the process
