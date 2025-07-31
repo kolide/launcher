@@ -149,6 +149,8 @@ github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767 h1:kcLxfX6wdtztSwpgz
 github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767/go.mod h1:5LS6F96DhAwUc7C+1HLexzMXY1xGRSryjyPPKW6zv78=
 github.com/kolide/goleveldb v0.0.0-20250616200551-f51774e831fc h1:ubZk39hNWWTFW+66pFtH5OO+thR94hl1TPkw7qOq5GQ=
 github.com/kolide/goleveldb v0.0.0-20250616200551-f51774e831fc/go.mod h1:/ABgvSu1vZfgbLb1B9IwnFGv0xgoHSyCrTXiWX1UAQQ=
+github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de h1:uOqIPplWbS6Lf2VxMJqhkiJj9Z23U2oeR6tHKe/o7ss=
+github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de/go.mod h1:/ABgvSu1vZfgbLb1B9IwnFGv0xgoHSyCrTXiWX1UAQQ=
 github.com/kolide/kit v0.0.0-20250324140823-36d978ef488c h1:Bfea0JIcUHJ+r0+FHtOk/Q0pZa7VadkAKwV6zHc2JLw=
 github.com/kolide/kit v0.0.0-20250324140823-36d978ef488c/go.mod h1:TC+XiiSDeHCzs7upD67Z4AtoQUuISEyLyHFCQ6IHWP0=
 github.com/kolide/krypto v0.1.1-0.20250708213031-518c54eca90a h1:Z66UC5jlpCKOgA1vcffFY+6rFzxo1DyIcUkEGpinisQ=
