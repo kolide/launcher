@@ -1,8 +1,11 @@
 package locallogger
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
+	"sync"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -10,15 +13,34 @@ import (
 
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
+	// Deduplication configuration
+	defaultCacheExpiry  = 5 * time.Minute
+	defaultMaxCacheSize = 1000
+	cleanupInterval     = 1 * time.Minute
 )
+
+// logEntry tracks information about seen log messages for deduplication
+type logEntry struct {
+	firstSeen  time.Time
+	lastSeen   time.Time
+	count      int
+	lastLogged time.Time
+}
 
 type localLogger struct {
 	logger log.Logger
 	writer io.Writer
 	lj     *lumberjack.Logger
+
+	// Deduplication fields
+	dedupCache   map[string]*logEntry
+	dedupMutex   sync.RWMutex
+	cacheExpiry  time.Duration
+	maxCacheSize int
+	lastCleanup  time.Time
 }
 
-func NewKitLogger(logFilePath string) localLogger {
+func NewKitLogger(logFilePath string) *localLogger {
 	// This is meant as an always available debug tool. Thus we hardcode these options
 	lj := &lumberjack.Logger{
 		Filename:   logFilePath,
@@ -29,7 +51,7 @@ func NewKitLogger(logFilePath string) localLogger {
 
 	writer := log.NewSyncWriter(lj)
 
-	ll := localLogger{
+	ll := &localLogger{
 		logger: log.With(
 			log.NewJSONLogger(writer),
 			"ts", log.DefaultTimestampUTC,
@@ -37,21 +59,40 @@ func NewKitLogger(logFilePath string) localLogger {
 		),
 		lj:     lj, // keep a reference to lumberjack Logger so it can be closed if needed
 		writer: writer,
+
+		// Initialize deduplication
+		dedupCache:   make(map[string]*logEntry),
+		cacheExpiry:  defaultCacheExpiry,
+		maxCacheSize: defaultMaxCacheSize,
+		lastCleanup:  time.Now(),
 	}
 
 	return ll
 }
 
-func (ll localLogger) Close() error {
+func (ll *localLogger) Close() error {
 	return ll.lj.Close()
 }
 
-func (ll localLogger) Log(keyvals ...interface{}) error {
+func (ll *localLogger) Log(keyvals ...interface{}) error {
 	filterResults(keyvals...)
+
+	// Check if we should deduplicate this log message
+	hash := ll.hashKeyvals(keyvals...)
+	skip, duplicateCount := ll.shouldSkipDuplicate(hash)
+	if skip {
+		return nil
+	}
+
+	// If this is a duplicate being logged with count, add the count to keyvals
+	if duplicateCount > 1 {
+		keyvals = append(keyvals, "duplicate_count", duplicateCount)
+	}
+
 	return ll.logger.Log(keyvals...)
 }
 
-func (ll localLogger) Writer() io.Writer {
+func (ll *localLogger) Writer() io.Writer {
 	return ll.writer
 }
 
@@ -69,5 +110,111 @@ func filterResults(keyvals ...interface{}) {
 			}
 		}
 	}
+}
 
+// hashKeyvals creates a hash of the key-value pairs for deduplication
+// We exclude timestamp and caller fields since they change for identical log content
+func (ll *localLogger) hashKeyvals(keyvals ...interface{}) string {
+	hasher := sha256.New()
+
+	for i := 0; i < len(keyvals); i += 2 {
+		if i+1 >= len(keyvals) {
+			break
+		}
+
+		key := fmt.Sprintf("%v", keyvals[i])
+
+		// Skip timestamp and caller fields for content-based deduplication
+		if key == "ts" || key == "caller" {
+			continue
+		}
+
+		value := fmt.Sprintf("%v", keyvals[i+1])
+		hasher.Write([]byte(key + ":" + value + ";"))
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+// shouldSkipDuplicate checks if this log message is a duplicate and should be skipped
+// Returns (skip, duplicateCount) where skip indicates if the message should be skipped
+// and duplicateCount is the number of times this message has been seen
+func (ll *localLogger) shouldSkipDuplicate(hash string) (bool, int) {
+	ll.dedupMutex.Lock()
+	defer ll.dedupMutex.Unlock()
+
+	now := time.Now()
+
+	// Perform cleanup if needed
+	if now.Sub(ll.lastCleanup) > cleanupInterval {
+		ll.cleanupCacheUnsafe(now)
+		ll.lastCleanup = now
+	}
+
+	entry, exists := ll.dedupCache[hash]
+	if !exists {
+		// First time seeing this message
+		ll.dedupCache[hash] = &logEntry{
+			firstSeen:  now,
+			lastSeen:   now,
+			count:      1,
+			lastLogged: now,
+		}
+		return false, 1 // Don't skip, log it (first occurrence)
+	}
+
+	// Update the existing entry
+	entry.lastSeen = now
+	entry.count++
+
+	// Check if enough time has passed since we last logged this message
+	// We use a simple strategy: log the duplicate if it's been more than 1 minute
+	// since we last logged this exact message, and include the count
+	if now.Sub(entry.lastLogged) > time.Minute {
+		entry.lastLogged = now
+		return false, entry.count // Don't skip, log it with count
+	}
+
+	// Skip this duplicate
+	return true, entry.count
+}
+
+// cleanupCacheUnsafe removes expired entries from the deduplication cache
+// Must be called with dedupMutex held
+func (ll *localLogger) cleanupCacheUnsafe(now time.Time) {
+	// Remove entries older than cacheExpiry
+	for hash, entry := range ll.dedupCache {
+		if now.Sub(entry.lastSeen) > ll.cacheExpiry {
+			delete(ll.dedupCache, hash)
+		}
+	}
+
+	// If cache is still too large, remove oldest entries
+	if len(ll.dedupCache) > ll.maxCacheSize {
+		// Create a slice of hashes sorted by lastSeen time
+		type hashTime struct {
+			hash     string
+			lastSeen time.Time
+		}
+
+		var entries []hashTime
+		for hash, entry := range ll.dedupCache {
+			entries = append(entries, hashTime{hash: hash, lastSeen: entry.lastSeen})
+		}
+
+		// Sort by lastSeen time (oldest first)
+		for i := 0; i < len(entries)-1; i++ {
+			for j := i + 1; j < len(entries); j++ {
+				if entries[i].lastSeen.After(entries[j].lastSeen) {
+					entries[i], entries[j] = entries[j], entries[i]
+				}
+			}
+		}
+
+		// Remove oldest entries until we're under the limit
+		toRemove := len(ll.dedupCache) - ll.maxCacheSize
+		for i := 0; i < toRemove && i < len(entries); i++ {
+			delete(ll.dedupCache, entries[i].hash)
+		}
+	}
 }
