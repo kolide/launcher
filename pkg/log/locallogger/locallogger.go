@@ -26,10 +26,12 @@ const (
 
 // Fields to exclude when creating content hash for deduplication
 var excludedHashFields = map[string]bool{
-	"ts":     true, // go-kit timestamp
-	"time":   true, // slog timestamp
-	"caller": true, // go-kit caller info
-	"source": true, // slog source info
+	"ts":              true, // go-kit timestamp
+	"time":            true, // slog timestamp
+	"caller":          true, // go-kit caller info
+	"source":          true, // slog source info
+	"original.time":   true,
+	"original.source": true,
 }
 
 // logEntry tracks information about seen log messages for deduplication
