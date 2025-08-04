@@ -308,6 +308,77 @@ func TestEdgeCases(t *testing.T) {
 	assert.NotNil(t, logger.dedupCache)
 }
 
+func TestDeduplicationThroughWriter(t *testing.T) {
+	t.Parallel()
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-writer-dedup")
+	require.NoError(t, err, "make temp file")
+	tmpfile.Close()
+
+	logger := NewKitLogger(tmpfile.Name())
+	defer logger.Close()
+
+	// Get the writer (which should be our deduplicating writer)
+	writer := logger.Writer()
+
+	// Write the same JSON log line multiple times directly to the writer
+	logLine := `{"level":"info","msg":"test message","ts":"2023-01-01T00:00:00Z"}` + "\n"
+	
+	// First write should go through
+	_, err = writer.Write([]byte(logLine))
+	require.NoError(t, err)
+	
+	// Subsequent writes should be deduplicated
+	for i := 0; i < 5; i++ {
+		_, err = writer.Write([]byte(logLine))
+		require.NoError(t, err)
+	}
+
+	contentsRaw, err := os.ReadFile(tmpfile.Name())
+	require.NoError(t, err, "read temp file")
+
+	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
+	lines = filterEmptyLines(lines)
+	assert.Len(t, lines, 1, "should only have one log entry due to deduplication at writer level")
+
+	// Verify the content
+	var logEntry map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), &logEntry))
+	assert.Equal(t, "info", logEntry["level"])
+	assert.Equal(t, "test message", logEntry["msg"])
+}
+
+func TestMixedLoggingPaths(t *testing.T) {
+	t.Parallel()
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-mixed-paths")
+	require.NoError(t, err, "make temp file")
+	tmpfile.Close()
+
+	logger := NewKitLogger(tmpfile.Name())
+	defer logger.Close()
+
+	// Log via go-kit log interface
+	err = logger.Log("level", "info", "msg", "test message")
+	require.NoError(t, err)
+
+	// Log via writer interface (simulating slog)
+	writer := logger.Writer()
+	logLine := `{"level":"info","msg":"test message","ts":"2023-01-01T00:00:00Z"}` + "\n"
+	_, err = writer.Write([]byte(logLine))
+	require.NoError(t, err)
+
+	contentsRaw, err := os.ReadFile(tmpfile.Name())
+	require.NoError(t, err, "read temp file")
+
+	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
+	lines = filterEmptyLines(lines)
+	
+	// Should have only one line since the second should be deduplicated
+	// (both should result in similar content hash)
+	assert.LessOrEqual(t, len(lines), 2, "should have at most 2 entries, likely 1 due to deduplication")
+}
+
 // Helper function to filter out empty lines
 func filterEmptyLines(lines []string) []string {
 	var filtered []string

@@ -2,8 +2,10 @@ package locallogger
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +29,90 @@ type logEntry struct {
 	lastLogged time.Time
 }
 
+// dedupWriter wraps the actual writer and deduplicates JSON log lines
+type dedupWriter struct {
+	localLogger  *localLogger
+	actualWriter io.Writer
+}
+
+// Write implements io.Writer and deduplicates JSON log lines before writing
+func (w *dedupWriter) Write(p []byte) (n int, err error) {
+	// Handle the case where we receive multiple log lines in one write
+	lines := strings.Split(strings.TrimSpace(string(p)), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Try to parse as JSON to extract fields for deduplication
+		var logData map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &logData); err != nil {
+			// If it's not valid JSON, write it directly without deduplication
+			if _, writeErr := w.actualWriter.Write([]byte(line + "\n")); writeErr != nil {
+				return 0, writeErr
+			}
+			continue
+		}
+
+		// Create a content hash excluding timestamp and caller fields
+		hash := w.hashLogData(logData)
+
+		// Check if we should skip this duplicate
+		if skip, duplicateCount := w.localLogger.shouldSkipDuplicate(hash); skip {
+			continue // Skip this duplicate
+		} else if duplicateCount > 1 {
+			// Add duplicate count to the log data
+			logData["duplicate_count"] = duplicateCount
+			// Re-marshal with duplicate count
+			if updatedBytes, marshalErr := json.Marshal(logData); marshalErr == nil {
+				line = string(updatedBytes)
+			}
+		}
+
+		// Write the (possibly modified) log line
+		if _, writeErr := w.actualWriter.Write([]byte(line + "\n")); writeErr != nil {
+			return 0, writeErr
+		}
+	}
+
+	// Return the number of bytes we were asked to write (even if we skipped some)
+	return len(p), nil
+}
+
+// hashLogData creates a hash of the log data excluding timestamp and caller fields
+func (w *dedupWriter) hashLogData(logData map[string]interface{}) string {
+	hasher := sha256.New()
+
+	// Create a sorted list of keys to ensure consistent hashing
+	var keys []string
+	for key := range logData {
+		// Skip timestamp and caller fields for content-based deduplication
+		if key == "ts" || key == "time" || key == "caller" || key == "source" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+
+	// Sort keys for consistent hashing
+	for i := 0; i < len(keys)-1; i++ {
+		for j := i + 1; j < len(keys); j++ {
+			if keys[i] > keys[j] {
+				keys[i], keys[j] = keys[j], keys[i]
+			}
+		}
+	}
+
+	// Hash the key-value pairs
+	for _, key := range keys {
+		value := fmt.Sprintf("%v", logData[key])
+		hasher.Write([]byte(key + ":" + value + ";"))
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
 type localLogger struct {
 	logger log.Logger
 	writer io.Writer
@@ -38,6 +124,9 @@ type localLogger struct {
 	cacheExpiry  time.Duration
 	maxCacheSize int
 	lastCleanup  time.Time
+
+	// Deduplicating writer for slog and other direct writes
+	dedupWriter *dedupWriter
 }
 
 func NewKitLogger(logFilePath string) *localLogger {
@@ -67,6 +156,12 @@ func NewKitLogger(logFilePath string) *localLogger {
 		lastCleanup:  time.Now(),
 	}
 
+	// Create the deduplicating writer that wraps the actual writer
+	ll.dedupWriter = &dedupWriter{
+		localLogger:  ll,
+		actualWriter: writer,
+	}
+
 	return ll
 }
 
@@ -93,7 +188,7 @@ func (ll *localLogger) Log(keyvals ...interface{}) error {
 }
 
 func (ll *localLogger) Writer() io.Writer {
-	return ll.writer
+	return ll.dedupWriter
 }
 
 // filterResults filteres out the osquery results,
