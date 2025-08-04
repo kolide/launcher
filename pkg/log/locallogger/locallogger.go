@@ -161,29 +161,31 @@ func (w *dedupWriter) cleanupCacheUnsafe(now time.Time) {
 		}
 	}
 
-	// If cache is still too large, remove oldest entries
-	if len(w.dedupCache) > w.maxCacheSize {
-		// Create a slice of hashes sorted by lastSeen time
-		type hashTime struct {
-			hash     string
-			lastSeen time.Time
-		}
+	// If cache is not too large, nothing to do
+	if len(w.dedupCache) <= w.maxCacheSize {
+		return
+	}
 
-		var entries []hashTime
-		for hash, entry := range w.dedupCache {
-			entries = append(entries, hashTime{hash: hash, lastSeen: entry.lastSeen})
-		}
+	// Create a slice of hashes sorted by lastSeen time
+	type hashTime struct {
+		hash     string
+		lastSeen time.Time
+	}
 
-		// Sort by lastSeen time (oldest first)
-		sort.Slice(entries, func(i, j int) bool {
-			return entries[i].lastSeen.Before(entries[j].lastSeen)
-		})
+	var entries []hashTime
+	for hash, entry := range w.dedupCache {
+		entries = append(entries, hashTime{hash: hash, lastSeen: entry.lastSeen})
+	}
 
-		// Remove oldest entries until we're under the limit
-		toRemove := len(w.dedupCache) - w.maxCacheSize
-		for i := 0; i < toRemove && i < len(entries); i++ {
-			delete(w.dedupCache, entries[i].hash)
-		}
+	// Sort by lastSeen time (oldest first)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].lastSeen.Before(entries[j].lastSeen)
+	})
+
+	// Remove oldest entries until we're under the limit
+	toRemove := len(w.dedupCache) - w.maxCacheSize
+	for i := 0; i < toRemove && i < len(entries); i++ {
+		delete(w.dedupCache, entries[i].hash)
 	}
 }
 
