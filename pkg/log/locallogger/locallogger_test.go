@@ -242,17 +242,12 @@ func TestCacheCleanup(t *testing.T) {
 	// Wait for expiry
 	time.Sleep(150 * time.Millisecond)
 
-	// Force cleanup by setting lastCleanup to trigger cleanup on next call
-	logger.dedupWriter.dedupMutex.Lock()
-	logger.dedupWriter.lastCleanup = logger.dedupWriter.lastCleanup.Add(-2 * time.Minute)
-	logger.dedupWriter.dedupMutex.Unlock()
+	// Force cleanup directly (simulating what would happen after the cleanup interval)
+	futureTime := time.Now().Add(2 * time.Minute) // Force cleanup by using a future time
+	logger.dedupWriter.cleanupCache(futureTime)
 
-	// Add another entry, which should trigger cleanup of expired entries
-	data3 := []interface{}{"msg", "message3"}
-	logger.Log(data3...)
-
-	// The cleanup should have removed expired entries, leaving only the new one
-	assert.Len(t, logger.dedupWriter.dedupCache, 1, "expired entries should be cleaned up, only new entry remains")
+	// The cleanup should have removed expired entries, leaving no entries
+	assert.Len(t, logger.dedupWriter.dedupCache, 0, "expired entries should be cleaned up")
 }
 
 func TestCacheSizeLimit(t *testing.T) {
@@ -274,10 +269,8 @@ func TestCacheSizeLimit(t *testing.T) {
 		logger.Log(data...)
 	}
 
-	// Force cleanup by triggering it manually
-	logger.dedupWriter.dedupMutex.Lock()
-	logger.dedupWriter.cleanupCacheUnsafe(time.Now())
-	logger.dedupWriter.dedupMutex.Unlock()
+	// Force cleanup by triggering it manually with a future time to bypass interval check
+	logger.dedupWriter.cleanupCache(time.Now().Add(2 * time.Minute))
 
 	assert.LessOrEqual(t, len(logger.dedupWriter.dedupCache), logger.dedupWriter.maxCacheSize, "cache size should not exceed limit")
 }

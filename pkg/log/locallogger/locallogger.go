@@ -112,16 +112,13 @@ func (w *dedupWriter) hashLogData(logData map[string]interface{}) string {
 // Returns (skip, duplicateCount) where skip indicates if the message should be skipped
 // and duplicateCount is the number of times this message has been seen
 func (w *dedupWriter) shouldSkipDuplicate(hash string) (bool, int) {
-	w.dedupMutex.Lock()
-	defer w.dedupMutex.Unlock()
-
 	now := time.Now()
 
-	// Perform cleanup if needed
-	if now.Sub(w.lastCleanup) > cleanupInterval {
-		w.cleanupCacheUnsafe(now)
-		w.lastCleanup = now
-	}
+	// Always attempt cleanup - the cleanup function decides if it's needed
+	w.cleanupCache(now)
+
+	w.dedupMutex.Lock()
+	defer w.dedupMutex.Unlock()
 
 	entry, exists := w.dedupCache[hash]
 	if !exists {
@@ -151,9 +148,20 @@ func (w *dedupWriter) shouldSkipDuplicate(hash string) (bool, int) {
 	return true, entry.count
 }
 
-// cleanupCacheUnsafe removes expired entries from the deduplication cache
-// Must be called with dedupMutex held
-func (w *dedupWriter) cleanupCacheUnsafe(now time.Time) {
+// cleanupCache removes expired entries from the deduplication cache
+// This function is thread-safe and handles its own locking
+func (w *dedupWriter) cleanupCache(now time.Time) {
+	w.dedupMutex.Lock()
+	defer w.dedupMutex.Unlock()
+
+	// Check if cleanup is actually needed
+	if now.Sub(w.lastCleanup) <= cleanupInterval {
+		return
+	}
+
+	// Update cleanup timestamp
+	w.lastCleanup = now
+
 	// Remove entries older than cacheExpiry
 	for hash, entry := range w.dedupCache {
 		if now.Sub(entry.lastSeen) > w.cacheExpiry {
@@ -161,7 +169,7 @@ func (w *dedupWriter) cleanupCacheUnsafe(now time.Time) {
 		}
 	}
 
-	// If cache is not too large, nothing to do
+	// If cache is not too large, nothing more to do
 	if len(w.dedupCache) <= w.maxCacheSize {
 		return
 	}
