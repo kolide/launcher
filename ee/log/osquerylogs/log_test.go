@@ -1,9 +1,11 @@
 package osquerylogs
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractOsqueryCaller(t *testing.T) {
@@ -37,6 +39,71 @@ func TestExtractOsqueryCaller(t *testing.T) {
 			t.Parallel()
 
 			assert.Equal(t, tt.expected, extractOsqueryCaller(tt.log))
+		})
+	}
+}
+
+func Test_extractLogLevel(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName     string
+		defaultLogLevel  slog.Level
+		msg              string
+		expectedLogLevel slog.Level
+	}{
+		{
+			testCaseName:     "error",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "E0731 11:00:07.412808 135955776 registry_factory.cpp:188] sql registry sql plugin caused exception: map::at:  key not found",
+			expectedLogLevel: slog.LevelError,
+		},
+		{
+			testCaseName:     "warn",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "W0801 10:07:54.639108 1888202752 mdfind.mm:74] Could not execute mdfind query",
+			expectedLogLevel: slog.LevelWarn,
+		},
+		{
+			testCaseName:     "info",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "I0804 10:12:20.279402 1880748032 config.cpp:1334] Refreshing configuration state",
+			expectedLogLevel: slog.LevelInfo,
+		},
+		{
+			testCaseName:     "non-match from END in SQL",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "END AS some_name",
+			expectedLogLevel: slog.LevelDebug,
+		},
+		{
+			testCaseName:     "non-match from ELSE in SQL",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "ELSE 'false' END AS some_condition",
+			expectedLogLevel: slog.LevelDebug,
+		},
+		{
+			testCaseName:     "non-match from WHEN in SQL",
+			defaultLogLevel:  slog.LevelInfo,
+			msg:              "WHEN x = 100",
+			expectedLogLevel: slog.LevelInfo,
+		},
+		{
+			testCaseName:     "non-match from IN in SQL",
+			defaultLogLevel:  slog.LevelDebug,
+			msg:              "IN (100, 200)",
+			expectedLogLevel: slog.LevelDebug,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			adapter := &OsqueryLogAdapter{
+				level: tt.defaultLogLevel,
+			}
+
+			require.Equal(t, tt.expectedLogLevel, adapter.extractLogLevel(tt.msg))
 		})
 	}
 }

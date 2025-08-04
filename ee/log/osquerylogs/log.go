@@ -32,8 +32,9 @@ func WithLevel(level slog.Level) Option {
 }
 
 var (
-	callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
-	pidRegex     = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	callerRegexp  = regexp.MustCompile(`[\w.]+:\d+]`)
+	pidRegex      = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	logLevelRegex = regexp.MustCompile(`^[EWI]\d{4}`) // Looks like the log level followed by a two-digit month and two-digit date, e.g. E0801, I0804
 )
 
 func extractOsqueryCaller(msg string) string {
@@ -87,7 +88,7 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 }
 
 func (l *OsqueryLogAdapter) extractLogLevel(msg string) slog.Level {
-	if len(msg) == 0 {
+	if !logLevelRegex.MatchString(msg) {
 		// Use default level
 		return l.level
 	}
