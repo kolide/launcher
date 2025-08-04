@@ -137,11 +137,11 @@ func TestDeduplicationWithTimeInterval(t *testing.T) {
 	}
 
 	// Simulate time passing by modifying the lastLogged time
-	hash := logger.hashKeyvals(data...)
-	logger.dedupMutex.Lock()
-	entry := logger.dedupCache[hash]
+	hash := hashKeyValuePairs(data...)
+	logger.dedupWriter.dedupMutex.Lock()
+	entry := logger.dedupWriter.dedupCache[hash]
 	entry.lastLogged = entry.lastLogged.Add(-2 * time.Minute) // Simulate 2 minutes ago
-	logger.dedupMutex.Unlock()
+	logger.dedupWriter.dedupMutex.Unlock()
 
 	// This should now log with duplicate count
 	err = logger.Log(data...)
@@ -208,9 +208,9 @@ func TestHashKeyvals(t *testing.T) {
 	data2 := []interface{}{"level", "info", "msg", "test", "ts", "2023-01-01T00:01:00Z", "caller", "file.go:456"}
 	data3 := []interface{}{"level", "info", "msg", "different"}
 
-	hash1 := logger.hashKeyvals(data1...)
-	hash2 := logger.hashKeyvals(data2...)
-	hash3 := logger.hashKeyvals(data3...)
+	hash1 := hashKeyValuePairs(data1...)
+	hash2 := hashKeyValuePairs(data2...)
+	hash3 := hashKeyValuePairs(data3...)
 
 	assert.Equal(t, hash1, hash2, "hashes should be equal despite different ts and caller")
 	assert.NotEqual(t, hash1, hash3, "hashes should be different for different content")
@@ -227,8 +227,8 @@ func TestCacheCleanup(t *testing.T) {
 	defer logger.Close()
 
 	// Override cache settings for testing
-	logger.cacheExpiry = 100 * time.Millisecond
-	logger.maxCacheSize = 10 // Set higher to test expiry cleanup specifically
+	logger.dedupWriter.cacheExpiry = 100 * time.Millisecond
+	logger.dedupWriter.maxCacheSize = 10 // Set higher to test expiry cleanup specifically
 
 	// Add some entries
 	data1 := []interface{}{"msg", "message1"}
@@ -237,22 +237,22 @@ func TestCacheCleanup(t *testing.T) {
 	logger.Log(data1...)
 	logger.Log(data2...)
 
-	assert.Len(t, logger.dedupCache, 2, "should have 2 entries")
+	assert.Len(t, logger.dedupWriter.dedupCache, 2, "should have 2 entries")
 
 	// Wait for expiry
 	time.Sleep(150 * time.Millisecond)
 
 	// Force cleanup by setting lastCleanup to trigger cleanup on next call
-	logger.dedupMutex.Lock()
-	logger.lastCleanup = logger.lastCleanup.Add(-2 * time.Minute)
-	logger.dedupMutex.Unlock()
+	logger.dedupWriter.dedupMutex.Lock()
+	logger.dedupWriter.lastCleanup = logger.dedupWriter.lastCleanup.Add(-2 * time.Minute)
+	logger.dedupWriter.dedupMutex.Unlock()
 
 	// Add another entry, which should trigger cleanup of expired entries
 	data3 := []interface{}{"msg", "message3"}
 	logger.Log(data3...)
 
 	// The cleanup should have removed expired entries, leaving only the new one
-	assert.Len(t, logger.dedupCache, 1, "expired entries should be cleaned up, only new entry remains")
+	assert.Len(t, logger.dedupWriter.dedupCache, 1, "expired entries should be cleaned up, only new entry remains")
 }
 
 func TestCacheSizeLimit(t *testing.T) {
@@ -266,7 +266,7 @@ func TestCacheSizeLimit(t *testing.T) {
 	defer logger.Close()
 
 	// Set a small cache size for testing
-	logger.maxCacheSize = 3
+	logger.dedupWriter.maxCacheSize = 3
 
 	// Add more entries than the limit
 	for i := 0; i < 5; i++ {
@@ -275,11 +275,11 @@ func TestCacheSizeLimit(t *testing.T) {
 	}
 
 	// Force cleanup by triggering it manually
-	logger.dedupMutex.Lock()
-	logger.cleanupCacheUnsafe(time.Now())
-	logger.dedupMutex.Unlock()
+	logger.dedupWriter.dedupMutex.Lock()
+	logger.dedupWriter.cleanupCacheUnsafe(time.Now())
+	logger.dedupWriter.dedupMutex.Unlock()
 
-	assert.LessOrEqual(t, len(logger.dedupCache), logger.maxCacheSize, "cache size should not exceed limit")
+	assert.LessOrEqual(t, len(logger.dedupWriter.dedupCache), logger.dedupWriter.maxCacheSize, "cache size should not exceed limit")
 }
 
 func TestEdgeCases(t *testing.T) {
@@ -305,7 +305,7 @@ func TestEdgeCases(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify logger still works
-	assert.NotNil(t, logger.dedupCache)
+	assert.NotNil(t, logger.dedupWriter.dedupCache)
 }
 
 func TestDeduplicationThroughWriter(t *testing.T) {
