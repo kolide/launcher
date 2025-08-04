@@ -323,11 +323,11 @@ func TestDeduplicationThroughWriter(t *testing.T) {
 
 	// Write the same JSON log line multiple times directly to the writer
 	logLine := `{"level":"info","msg":"test message","ts":"2023-01-01T00:00:00Z"}` + "\n"
-	
+
 	// First write should go through
 	_, err = writer.Write([]byte(logLine))
 	require.NoError(t, err)
-	
+
 	// Subsequent writes should be deduplicated
 	for i := 0; i < 5; i++ {
 		_, err = writer.Write([]byte(logLine))
@@ -373,7 +373,7 @@ func TestMixedLoggingPaths(t *testing.T) {
 
 	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
 	lines = filterEmptyLines(lines)
-	
+
 	// Should have only one line since the second should be deduplicated
 	// (both should result in similar content hash)
 	assert.LessOrEqual(t, len(lines), 2, "should have at most 2 entries, likely 1 due to deduplication")
