@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,11 +16,21 @@ import (
 
 const (
 	truncatedFormatString = "%s[TRUNCATED]"
+
 	// Deduplication configuration
-	defaultCacheExpiry  = 5 * time.Minute
-	defaultMaxCacheSize = 1000
-	cleanupInterval     = 1 * time.Minute
+	defaultCacheExpiry   = 5 * time.Minute // How long to remember log entries
+	defaultMaxCacheSize  = 1000            // Maximum number of unique log entries to track
+	cleanupInterval      = 1 * time.Minute // How often to clean up expired entries
+	duplicateLogInterval = 1 * time.Minute // How long to wait before logging a duplicate again
 )
+
+// Fields to exclude when creating content hash for deduplication
+var excludedHashFields = map[string]bool{
+	"ts":     true, // go-kit timestamp
+	"time":   true, // slog timestamp
+	"caller": true, // go-kit caller info
+	"source": true, // slog source info
+}
 
 // logEntry tracks information about seen log messages for deduplication
 type logEntry struct {
@@ -83,34 +94,12 @@ func (w *dedupWriter) Write(p []byte) (n int, err error) {
 
 // hashLogData creates a hash of the log data excluding timestamp and caller fields
 func (w *dedupWriter) hashLogData(logData map[string]interface{}) string {
-	hasher := sha256.New()
-
-	// Create a sorted list of keys to ensure consistent hashing
-	var keys []string
-	for key := range logData {
-		// Skip timestamp and caller fields for content-based deduplication
-		if key == "ts" || key == "time" || key == "caller" || key == "source" {
-			continue
-		}
-		keys = append(keys, key)
+	// Convert map to key-value pairs for the shared hash function
+	var keyvals []interface{}
+	for key, value := range logData {
+		keyvals = append(keyvals, key, value)
 	}
-
-	// Sort keys for consistent hashing
-	for i := 0; i < len(keys)-1; i++ {
-		for j := i + 1; j < len(keys); j++ {
-			if keys[i] > keys[j] {
-				keys[i], keys[j] = keys[j], keys[i]
-			}
-		}
-	}
-
-	// Hash the key-value pairs
-	for _, key := range keys {
-		value := fmt.Sprintf("%v", logData[key])
-		hasher.Write([]byte(key + ":" + value + ";"))
-	}
-
-	return fmt.Sprintf("%x", hasher.Sum(nil))
+	return hashKeyValuePairs(keyvals...)
 }
 
 type localLogger struct {
@@ -191,7 +180,7 @@ func (ll *localLogger) Writer() io.Writer {
 	return ll.dedupWriter
 }
 
-// filterResults filteres out the osquery results,
+// filterResults filters out the osquery results,
 // which just make a lot of noise in our debug logs.
 // It's a bit fragile, since it parses keyvals, but
 // hopefully that's good enough
@@ -210,8 +199,15 @@ func filterResults(keyvals ...interface{}) {
 // hashKeyvals creates a hash of the key-value pairs for deduplication
 // We exclude timestamp and caller fields since they change for identical log content
 func (ll *localLogger) hashKeyvals(keyvals ...interface{}) string {
+	return hashKeyValuePairs(keyvals...)
+}
+
+// hashKeyValuePairs creates a consistent hash from key-value pairs, excluding timestamp fields
+func hashKeyValuePairs(keyvals ...interface{}) string {
 	hasher := sha256.New()
 
+	// Collect non-excluded key-value pairs
+	var pairs []string
 	for i := 0; i < len(keyvals); i += 2 {
 		if i+1 >= len(keyvals) {
 			break
@@ -219,13 +215,21 @@ func (ll *localLogger) hashKeyvals(keyvals ...interface{}) string {
 
 		key := fmt.Sprintf("%v", keyvals[i])
 
-		// Skip timestamp and caller fields for content-based deduplication
-		if key == "ts" || key == "caller" {
+		// Skip excluded fields for content-based deduplication
+		if excludedHashFields[key] {
 			continue
 		}
 
 		value := fmt.Sprintf("%v", keyvals[i+1])
-		hasher.Write([]byte(key + ":" + value + ";"))
+		pairs = append(pairs, key+":"+value)
+	}
+
+	// Sort pairs for consistent hashing
+	sort.Strings(pairs)
+
+	// Hash the sorted pairs
+	for _, pair := range pairs {
+		hasher.Write([]byte(pair + ";"))
 	}
 
 	return fmt.Sprintf("%x", hasher.Sum(nil))
@@ -263,9 +267,9 @@ func (ll *localLogger) shouldSkipDuplicate(hash string) (bool, int) {
 	entry.count++
 
 	// Check if enough time has passed since we last logged this message
-	// We use a simple strategy: log the duplicate if it's been more than 1 minute
+	// We use a simple strategy: log the duplicate if it's been more than the interval
 	// since we last logged this exact message, and include the count
-	if now.Sub(entry.lastLogged) > time.Minute {
+	if now.Sub(entry.lastLogged) > duplicateLogInterval {
 		entry.lastLogged = now
 		return false, entry.count // Don't skip, log it with count
 	}
@@ -298,13 +302,9 @@ func (ll *localLogger) cleanupCacheUnsafe(now time.Time) {
 		}
 
 		// Sort by lastSeen time (oldest first)
-		for i := 0; i < len(entries)-1; i++ {
-			for j := i + 1; j < len(entries); j++ {
-				if entries[i].lastSeen.After(entries[j].lastSeen) {
-					entries[i], entries[j] = entries[j], entries[i]
-				}
-			}
-		}
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].lastSeen.Before(entries[j].lastSeen)
+		})
 
 		// Remove oldest entries until we're under the limit
 		toRemove := len(ll.dedupCache) - ll.maxCacheSize
