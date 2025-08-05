@@ -1,16 +1,19 @@
 package locallogger
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -52,6 +55,13 @@ type dedupWriter struct {
 	cacheExpiry  time.Duration
 	maxCacheSize int
 	lastCleanup  time.Time
+
+	// Background cleanup
+	cleanupTrigger chan struct{}
+	cleanupDone    chan struct{}
+	ctx            context.Context
+	cancel         context.CancelFunc
+	slogger        *slog.Logger
 }
 
 // Write implements io.Writer and deduplicates JSON log lines before writing
@@ -116,8 +126,8 @@ func (w *dedupWriter) hashLogData(logData map[string]interface{}) string {
 func (w *dedupWriter) shouldSkipDuplicate(hash string) (bool, int) {
 	now := time.Now()
 
-	// Always attempt cleanup - the cleanup function decides if it's needed
-	w.cleanupCache(now)
+	// Trigger async cleanup if needed (non-blocking)
+	w.triggerCleanupIfNeeded(now)
 
 	w.dedupMutex.Lock()
 	defer w.dedupMutex.Unlock()
@@ -150,13 +160,63 @@ func (w *dedupWriter) shouldSkipDuplicate(hash string) (bool, int) {
 	return true, entry.count
 }
 
-// cleanupCache removes expired entries from the deduplication cache
+// triggerCleanupIfNeeded checks if cleanup is needed and triggers it asynchronously
+func (w *dedupWriter) triggerCleanupIfNeeded(now time.Time) {
+	// Quick check without locking - this is an optimization to avoid
+	// triggering cleanup too frequently
+	if now.Sub(w.lastCleanup) <= cleanupInterval {
+		return
+	}
+
+	// Non-blocking send to trigger cleanup
+	select {
+	case w.cleanupTrigger <- struct{}{}:
+		// Successfully triggered cleanup
+	default:
+		// Cleanup already in progress, skip
+	}
+}
+
+// startBackgroundCleanup starts the background cleanup goroutine using gowrapper
+func (w *dedupWriter) startBackgroundCleanup() {
+	gowrapper.Go(w.ctx, w.slogger, func() {
+		w.backgroundCleanup()
+	})
+}
+
+// backgroundCleanup runs in a separate goroutine and handles cache cleanup
+func (w *dedupWriter) backgroundCleanup() {
+	defer close(w.cleanupDone)
+
+	for {
+		select {
+		case _, ok := <-w.cleanupTrigger:
+			if !ok {
+				// Channel was closed, time to shutdown
+				w.slogger.Log(w.ctx, slog.LevelDebug,
+					"background cleanup goroutine shutting down (trigger channel closed)",
+				)
+				return
+			}
+			w.performCleanup()
+		case <-w.ctx.Done():
+			w.slogger.Log(w.ctx, slog.LevelDebug,
+				"background cleanup goroutine shutting down (context cancelled)",
+			)
+			return
+		}
+	}
+}
+
+// performCleanup removes expired entries from the deduplication cache
 // This function is thread-safe and handles its own locking
-func (w *dedupWriter) cleanupCache(now time.Time) {
+func (w *dedupWriter) performCleanup() {
+	now := time.Now()
+
 	w.dedupMutex.Lock()
 	defer w.dedupMutex.Unlock()
 
-	// Check if cleanup is actually needed
+	// Double-check if cleanup is actually needed (someone else might have done it)
 	if now.Sub(w.lastCleanup) <= cleanupInterval {
 		return
 	}
@@ -233,6 +293,14 @@ func (w *dedupWriter) LogKeyVals(keyvals ...interface{}) error {
 	return nil
 }
 
+// Close shuts down the background cleanup goroutine
+func (w *dedupWriter) Close() {
+	// Cancel the context to signal graceful shutdown
+	w.cancel()
+	// Wait for cleanup goroutine to finish
+	<-w.cleanupDone
+}
+
 type localLogger struct {
 	logger log.Logger
 	writer io.Writer
@@ -253,14 +321,25 @@ func NewKitLogger(logFilePath string) *localLogger {
 
 	writer := log.NewSyncWriter(lj)
 
+	// Create context for background cleanup goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Create the deduplicating writer that wraps the actual writer and owns all dedup logic
 	dedupWriter := &dedupWriter{
-		actualWriter: writer,
-		dedupCache:   make(map[string]*logEntry),
-		cacheExpiry:  defaultCacheExpiry,
-		maxCacheSize: defaultMaxCacheSize,
-		lastCleanup:  time.Now(),
+		actualWriter:   writer,
+		dedupCache:     make(map[string]*logEntry),
+		cacheExpiry:    defaultCacheExpiry,
+		maxCacheSize:   defaultMaxCacheSize,
+		lastCleanup:    time.Now(),
+		cleanupTrigger: make(chan struct{}, 1), // Buffered to avoid blocking
+		cleanupDone:    make(chan struct{}),
+		ctx:            ctx,
+		cancel:         cancel,
+		slogger:        slog.Default(), // Use default logger for local file logging
 	}
+
+	// Start background cleanup goroutine using gowrapper
+	dedupWriter.startBackgroundCleanup()
 
 	ll := &localLogger{
 		logger: log.With(
@@ -277,6 +356,9 @@ func NewKitLogger(logFilePath string) *localLogger {
 }
 
 func (ll *localLogger) Close() error {
+	// Close the deduplicating writer first (shuts down background goroutine)
+	ll.dedupWriter.Close()
+	// Then close the underlying log file
 	return ll.lj.Close()
 }
 
