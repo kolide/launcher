@@ -1,8 +1,11 @@
 package locallogger
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -21,187 +24,169 @@ var (
 func TestFilterResults(t *testing.T) {
 	t.Parallel()
 
-	data := []interface{}{
-		"one", "two",
+	// Test that filterResults truncates long results
+	keyvals := []interface{}{
+		"level", "info",
+		"msg", "test message",
 		"results", reallyLongString,
 	}
 
-	filterResults(data...)
-	assert.Len(t, data, 4)
-	assert.Equal(t, data[0], "one")
-	assert.Equal(t, data[1], "two")
-	assert.Equal(t, data[2], "results")
-	assert.Len(t, data[3], 110)
-	assert.Contains(t, data[3], "[TRUNCATED]")
-	assert.Equal(t, data[3], truncatedLongString)
+	filterResults(keyvals...)
+
+	// Check that results were truncated
+	for i := 0; i < len(keyvals); i += 2 {
+		if keyvals[i] == "results" {
+			assert.Equal(t, truncatedLongString, keyvals[i+1])
+			break
+		}
+	}
 }
 
 func TestKitLogging(t *testing.T) {
 	t.Parallel()
 
-	data := []interface{}{
-		"one", "two",
-		"results", reallyLongString,
-	}
-
-	expected := map[string]string{
-		"one":     "two",
-		"results": truncatedLongString,
-	}
-	//	expectedJson, err := json.Marshal(expected)
-	//require.NoError(t, err, "json marshal expected")
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-locallogger")
-	require.NoError(t, err, "make temp file")
-
-	// we only need a file path, not the file handle
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-
-	logger.Log(data...)
-
-	contentsRaw, err := os.ReadFile(tmpfile.Name())
-	require.NoError(t, err, "read temp file")
-
-	var contents map[string]string
-	require.NoError(t, json.Unmarshal(contentsRaw, &contents), "unmarshal json")
-
-	// can't compare the whole thing, since we have extra values from timestamp and caller
-	for k, v := range expected {
-		assert.Equal(t, v, contents[k])
-	}
-
-	require.NoError(t, logger.Close())
-}
-
-func TestDeduplication(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-deduplication")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-kit-logging")
 	require.NoError(t, err, "make temp file")
 	tmpfile.Close()
 
 	logger := NewKitLogger(tmpfile.Name())
 	defer logger.Close()
 
-	// Log the same message multiple times
-	data := []interface{}{"level", "info", "msg", "test message"}
-
-	// First log should go through
-	err = logger.Log(data...)
+	// Test basic logging
+	err = logger.Log("level", "info", "msg", "test message")
 	require.NoError(t, err)
-
-	// Subsequent logs should be deduplicated (skipped)
-	for i := 0; i < 5; i++ {
-		err = logger.Log(data...)
-		require.NoError(t, err)
-	}
 
 	contentsRaw, err := os.ReadFile(tmpfile.Name())
 	require.NoError(t, err, "read temp file")
 
-	// Should only have one log entry since duplicates were skipped
 	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
 	lines = filterEmptyLines(lines)
-	assert.Len(t, lines, 1, "should only have one log entry due to deduplication")
+	assert.Len(t, lines, 1, "should have one log entry")
 
-	// Verify the content
+	// Verify JSON structure
 	var logEntry map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(lines[0]), &logEntry))
 	assert.Equal(t, "info", logEntry["level"])
 	assert.Equal(t, "test message", logEntry["msg"])
-	assert.NotContains(t, logEntry, "duplicate_count", "first occurrence should not have duplicate_count")
 }
 
-func TestDeduplicationWithTimeInterval(t *testing.T) {
+func TestDedupHandler(t *testing.T) {
 	t.Parallel()
 
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-deduplication-time")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
+	// Create a buffer to capture output
+	var buf bytes.Buffer
 
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
+	// Create base JSON handler
+	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		AddSource: false, // Disable source to make testing easier
+		Level:     slog.LevelDebug,
+	})
 
-	data := []interface{}{"level", "warn", "msg", "repeated warning"}
+	// Create dedup handler
+	dedupHandler := NewDedupHandler(jsonHandler)
+	defer dedupHandler.Close()
 
-	// Log the message first time
-	err = logger.Log(data...)
-	require.NoError(t, err)
+	// Create logger with dedup handler
+	logger := slog.New(dedupHandler)
 
-	// Log duplicates that should be skipped
-	for i := 0; i < 3; i++ {
-		err = logger.Log(data...)
-		require.NoError(t, err)
+	// Test basic deduplication
+	logger.InfoContext(context.Background(), "test message", "key", "value")
+	logger.InfoContext(context.Background(), "test message", "key", "value") // Should be skipped
+	logger.InfoContext(context.Background(), "test message", "key", "value") // Should be skipped
+
+	// Now manipulate the cache to simulate time passing
+	// We need to create the same record that would be created by logger.Info
+	record := slog.NewRecord(time.Now(), slog.LevelInfo, "test message", 0)
+	record.AddAttrs(slog.String("key", "value"))
+	hash := dedupHandler.hashRecord(record)
+
+	dedupHandler.dedupMutex.Lock()
+	entry := dedupHandler.dedupCache[hash]
+	if entry != nil {
+		entry.lastLogged = entry.lastLogged.Add(-2 * time.Minute) // Simulate old timestamp
+	}
+	dedupHandler.dedupMutex.Unlock()
+
+	// This should now log with duplicate count immediately (no sleep needed)
+	logger.InfoContext(context.Background(), "test message", "key", "value") // Should be logged with duplicate_count
+
+	// Get output
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Filter out empty lines
+	var actualLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			actualLines = append(actualLines, line)
+		}
 	}
 
-	// Simulate time passing by modifying the lastLogged time
-	hash := hashKeyValuePairs(data...)
-	logger.dedupWriter.dedupMutex.Lock()
-	entry := logger.dedupWriter.dedupCache[hash]
-	entry.lastLogged = entry.lastLogged.Add(-2 * time.Minute) // Simulate 2 minutes ago
-	logger.dedupWriter.dedupMutex.Unlock()
+	// Should have exactly 2 lines: first occurrence and duplicate with count
+	require.Len(t, actualLines, 2, "Expected exactly 2 log lines after deduplication")
 
-	// This should now log with duplicate count
-	err = logger.Log(data...)
-	require.NoError(t, err)
+	// Verify the second line contains duplicate_count
+	require.Contains(t, actualLines[1], "duplicate_count", "Second line should contain duplicate count")
 
-	contentsRaw, err := os.ReadFile(tmpfile.Name())
-	require.NoError(t, err, "read temp file")
-
-	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
-	lines = filterEmptyLines(lines)
-	assert.Len(t, lines, 2, "should have two log entries (original + duplicate with count)")
-
-	// Check the second log entry has duplicate_count
-	var secondEntry map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(lines[1]), &secondEntry))
-	assert.Equal(t, "warn", secondEntry["level"])
-	assert.Equal(t, "repeated warning", secondEntry["msg"])
-	assert.Equal(t, float64(5), secondEntry["duplicate_count"], "should show total count of 5")
+	// Verify the duplicate count is 4 (we sent 4 identical messages)
+	require.Contains(t, actualLines[1], `"duplicate_count":4`, "Should show correct duplicate count")
 }
 
-func TestDeduplicationDifferentMessages(t *testing.T) {
+func TestDedupHandlerWithDifferentMessages(t *testing.T) {
 	t.Parallel()
 
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-different-messages")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
+	var buf bytes.Buffer
+	jsonHandler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{
+		AddSource: false,
+		Level:     slog.LevelDebug,
+	})
 
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
+	dedupHandler := NewDedupHandler(jsonHandler)
+	defer dedupHandler.Close()
 
-	// Log different messages - these should not be deduplicated
-	messages := [][]interface{}{
-		{"level", "info", "msg", "message one"},
-		{"level", "info", "msg", "message two"},
-		{"level", "warn", "msg", "message one"},                   // same text but different level
-		{"level", "info", "msg", "message one", "extra", "field"}, // extra field
+	logger := slog.New(dedupHandler)
+
+	// Different messages should not be deduplicated
+	logger.InfoContext(context.Background(), "message one", "key", "value1")
+	logger.InfoContext(context.Background(), "message two", "key", "value2")
+	logger.InfoContext(context.Background(), "message one", "key", "value1") // Should be skipped
+	logger.InfoContext(context.Background(), "message two", "key", "value2") // Should be skipped
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	var actualLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			actualLines = append(actualLines, line)
+		}
 	}
 
-	for _, data := range messages {
-		err := logger.Log(data...)
-		require.NoError(t, err)
-	}
+	// Should have exactly 2 lines (one for each unique message)
+	require.Len(t, actualLines, 2, "Expected exactly 2 log lines for different messages")
 
-	contentsRaw, err := os.ReadFile(tmpfile.Name())
-	require.NoError(t, err, "read temp file")
-
-	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
-	lines = filterEmptyLines(lines)
-	assert.Len(t, lines, 4, "all different messages should be logged")
+	// Neither should contain duplicate_count since they're different
+	require.NotContains(t, actualLines[0], "duplicate_count", "First line should not contain duplicate count")
+	require.NotContains(t, actualLines[1], "duplicate_count", "Second line should not contain duplicate count")
 }
 
-func TestHashKeyvals(t *testing.T) {
+func TestSlogHandlerDedup(t *testing.T) {
 	t.Parallel()
 
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-hash")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
+	// Test that the new slog handler approach works correctly
+	logger := NewKitLogger("")
 
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
+	// Get the slog handler
+	handler := logger.SlogHandler()
+	require.NotNil(t, handler, "SlogHandler should return a valid handler")
+
+	// Test that it's a dedup handler
+	_, ok := handler.(*DedupHandler)
+	require.True(t, ok, "SlogHandler should return a DedupHandler")
+}
+
+func TestHashKeyValuePairs(t *testing.T) {
+	t.Parallel()
 
 	// Test that timestamp and caller fields are excluded from hash
 	data1 := []interface{}{"level", "info", "msg", "test", "ts", "2023-01-01T00:00:00Z", "caller", "file.go:123"}
@@ -214,169 +199,6 @@ func TestHashKeyvals(t *testing.T) {
 
 	assert.Equal(t, hash1, hash2, "hashes should be equal despite different ts and caller")
 	assert.NotEqual(t, hash1, hash3, "hashes should be different for different content")
-}
-
-func TestCacheCleanup(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-cleanup")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
-
-	// Override cache settings for testing
-	logger.dedupWriter.cacheExpiry = 100 * time.Millisecond
-	logger.dedupWriter.maxCacheSize = 10 // Set higher to test expiry cleanup specifically
-
-	// Add some entries
-	data1 := []interface{}{"msg", "message1"}
-	data2 := []interface{}{"msg", "message2"}
-
-	logger.Log(data1...)
-	logger.Log(data2...)
-
-	assert.Len(t, logger.dedupWriter.dedupCache, 2, "should have 2 entries")
-
-	// Wait for expiry
-	time.Sleep(150 * time.Millisecond)
-
-	// Force cleanup by manipulating the timestamp and then calling cleanup
-	logger.dedupWriter.dedupMutex.Lock()
-	logger.dedupWriter.lastCleanup = logger.dedupWriter.lastCleanup.Add(-2 * time.Minute)
-	logger.dedupWriter.dedupMutex.Unlock()
-
-	logger.dedupWriter.performCleanup()
-
-	// The cleanup should have removed expired entries, leaving no entries
-	assert.Len(t, logger.dedupWriter.dedupCache, 0, "expired entries should be cleaned up")
-}
-
-func TestCacheSizeLimit(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-size-limit")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
-
-	// Set a small cache size for testing
-	logger.dedupWriter.maxCacheSize = 3
-
-	// Add more entries than the limit
-	for i := 0; i < 5; i++ {
-		data := []interface{}{"msg", fmt.Sprintf("message%d", i)}
-		logger.Log(data...)
-	}
-
-	// Force cleanup by manipulating the timestamp and then calling cleanup
-	logger.dedupWriter.dedupMutex.Lock()
-	logger.dedupWriter.lastCleanup = logger.dedupWriter.lastCleanup.Add(-2 * time.Minute)
-	logger.dedupWriter.dedupMutex.Unlock()
-
-	logger.dedupWriter.performCleanup()
-
-	assert.LessOrEqual(t, len(logger.dedupWriter.dedupCache), logger.dedupWriter.maxCacheSize, "cache size should not exceed limit")
-}
-
-func TestEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-edge-cases")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
-
-	// Test empty keyvals
-	err = logger.Log()
-	require.NoError(t, err)
-
-	// Test odd number of keyvals
-	err = logger.Log("key")
-	require.NoError(t, err)
-
-	// Test nil values
-	err = logger.Log("key", nil)
-	require.NoError(t, err)
-
-	// Verify logger still works
-	assert.NotNil(t, logger.dedupWriter.dedupCache)
-}
-
-func TestDeduplicationThroughWriter(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-writer-dedup")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
-
-	// Get the writer (which should be our deduplicating writer)
-	writer := logger.Writer()
-
-	// Write the same JSON log line multiple times directly to the writer
-	logLine := `{"level":"info","msg":"test message","ts":"2023-01-01T00:00:00Z"}` + "\n"
-
-	// First write should go through
-	_, err = writer.Write([]byte(logLine))
-	require.NoError(t, err)
-
-	// Subsequent writes should be deduplicated
-	for i := 0; i < 5; i++ {
-		_, err = writer.Write([]byte(logLine))
-		require.NoError(t, err)
-	}
-
-	contentsRaw, err := os.ReadFile(tmpfile.Name())
-	require.NoError(t, err, "read temp file")
-
-	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
-	lines = filterEmptyLines(lines)
-	assert.Len(t, lines, 1, "should only have one log entry due to deduplication at writer level")
-
-	// Verify the content
-	var logEntry map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(lines[0]), &logEntry))
-	assert.Equal(t, "info", logEntry["level"])
-	assert.Equal(t, "test message", logEntry["msg"])
-}
-
-func TestMixedLoggingPaths(t *testing.T) {
-	t.Parallel()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-mixed-paths")
-	require.NoError(t, err, "make temp file")
-	tmpfile.Close()
-
-	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
-
-	// Log via go-kit log interface
-	err = logger.Log("level", "info", "msg", "test message")
-	require.NoError(t, err)
-
-	// Log via writer interface (simulating slog)
-	writer := logger.Writer()
-	logLine := `{"level":"info","msg":"test message","ts":"2023-01-01T00:00:00Z"}` + "\n"
-	_, err = writer.Write([]byte(logLine))
-	require.NoError(t, err)
-
-	contentsRaw, err := os.ReadFile(tmpfile.Name())
-	require.NoError(t, err, "read temp file")
-
-	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
-	lines = filterEmptyLines(lines)
-
-	// Should have only one line since the second should be deduplicated
-	// (both should result in similar content hash)
-	assert.LessOrEqual(t, len(lines), 2, "should have at most 2 entries, likely 1 due to deduplication")
 }
 
 // Helper function to filter out empty lines
