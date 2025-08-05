@@ -140,8 +140,8 @@ func (dh *DedupHandler) hashRecord(record slog.Record) string {
 func (dh *DedupHandler) shouldSkipDuplicate(hash string) (bool, int) {
 	now := time.Now()
 
-	// Always attempt cleanup - the cleanup function decides if it's needed
-	dh.cleanupCache(now) // This call is non-blocking and triggers async cleanup
+	// Trigger background cleanup if needed (non-blocking)
+	dh.triggerCleanupIfNeeded()
 
 	dh.dedupMutex.Lock()
 	defer dh.dedupMutex.Unlock()
@@ -172,7 +172,7 @@ func (dh *DedupHandler) shouldSkipDuplicate(hash string) (bool, int) {
 }
 
 // triggerCleanupIfNeeded triggers background cleanup if needed
-func (dh *DedupHandler) triggerCleanupIfNeeded(now time.Time) {
+func (dh *DedupHandler) triggerCleanupIfNeeded() {
 	select {
 	case dh.cleanupTrigger <- struct{}{}:
 		// Cleanup triggered successfully
@@ -272,9 +272,4 @@ func (dh *DedupHandler) performCleanup() {
 			"remaining_entries", len(dh.dedupCache),
 		)
 	}
-}
-
-// cleanupCache is a wrapper that calls performCleanup with proper locking
-func (dh *DedupHandler) cleanupCache(now time.Time) {
-	dh.triggerCleanupIfNeeded(now)
 }
