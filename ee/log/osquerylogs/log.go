@@ -32,8 +32,9 @@ func WithLevel(level slog.Level) Option {
 }
 
 var (
-	callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
-	pidRegex     = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	callerRegexp  = regexp.MustCompile(`[\w.]+:\d+]`)
+	pidRegex      = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	logLevelRegex = regexp.MustCompile(`^[EWI]\d{4}`) // Looks like the log level followed by a two-digit month and two-digit date, e.g. E0801, I0804
 )
 
 func extractOsqueryCaller(msg string) string {
@@ -77,12 +78,31 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
-	l.slogger.Log(context.TODO(), l.level, // nolint:sloglint // it's fine to not have a constant or literal here
+	level := l.extractLogLevel(msg)
+	l.slogger.Log(context.TODO(), level, // nolint:sloglint // it's fine to not have a constant or literal here
 		msg,
 		"caller", caller,
 	)
 
 	return len(p), nil
+}
+
+func (l *OsqueryLogAdapter) extractLogLevel(msg string) slog.Level {
+	if !logLevelRegex.MatchString(msg) {
+		// Use default level
+		return l.level
+	}
+
+	switch msg[0] {
+	case 'E':
+		return slog.LevelError
+	case 'W':
+		return slog.LevelWarn
+	case 'I':
+		return slog.LevelInfo
+	default:
+		return l.level
+	}
 }
 
 // logInfoAboutUnrecognizedProcessLockingPidfile attempts to extract the PID of the process
