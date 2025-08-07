@@ -64,7 +64,10 @@ func runWindowsSvc(systemSlogger *multislogger.MultiSlogger, args []string) erro
 		ll := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = ll
 
-		localSloggerHandler := ll.SlogHandler()
+		localSloggerHandler := slog.NewJSONHandler(ll.Writer(), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})
 
 		localSlogger.AddHandler(localSloggerHandler)
 

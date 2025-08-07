@@ -2,6 +2,8 @@ package locallogger
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"log/slog"
 	"sort"
 	"sync"
@@ -9,6 +11,31 @@ import (
 
 	"github.com/kolide/launcher/ee/gowrapper"
 )
+
+const (
+	defaultCacheExpiry   = 5 * time.Minute // How long to remember log entries
+	defaultMaxCacheSize  = 2000            // Maximum number of unique log entries to track
+	cleanupInterval      = 1 * time.Minute // How often to clean up expired entries
+	duplicateLogInterval = 1 * time.Minute // How long to wait before logging a duplicate again
+)
+
+// Fields to exclude when creating content hash for deduplication
+var excludedHashFields = map[string]bool{
+	"ts":              true, // go-kit timestamp
+	"time":            true, // slog timestamp
+	"caller":          true, // go-kit caller info
+	"source":          true, // slog source info
+	"original.time":   true,
+	"original.source": true,
+}
+
+// logEntry tracks information about seen log messages for deduplication
+type logEntry struct {
+	firstSeen  time.Time
+	lastSeen   time.Time
+	count      int
+	lastLogged time.Time
+}
 
 // DedupHandler implements slog.Handler and provides content-based deduplication
 type DedupHandler struct {
@@ -272,4 +299,31 @@ func (dh *DedupHandler) performCleanup() {
 			"remaining_entries", len(dh.dedupCache),
 		)
 	}
+}
+
+// hashKeyValuePairs creates a hash of key-value pairs for deduplication
+// This function is shared between different deduplication approaches
+func hashKeyValuePairs(keyvals ...interface{}) string {
+	// Filter out excluded fields
+	var filtered []interface{}
+	for i := 0; i < len(keyvals); i += 2 {
+		if i+1 < len(keyvals) {
+			key := fmt.Sprintf("%v", keyvals[i])
+			if !excludedHashFields[key] {
+				filtered = append(filtered, keyvals[i], keyvals[i+1])
+			}
+		}
+	}
+
+	// Sort for consistent hashing
+	sort.Slice(filtered, func(i, j int) bool {
+		if i%2 == 0 && j%2 == 0 {
+			return fmt.Sprintf("%v", filtered[i]) < fmt.Sprintf("%v", filtered[j])
+		}
+		return i < j
+	})
+
+	// Create hash
+	h := sha256.Sum256([]byte(fmt.Sprintf("%v", filtered)))
+	return fmt.Sprintf("%x", h)
 }

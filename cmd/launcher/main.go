@@ -134,7 +134,10 @@ func runMain() int {
 		localLogger := locallogger.NewKitLogger(filepath.Join(opts.RootDirectory, "debug.json"))
 		logger = teelogger.New(logger, localLogger)
 
-		localSloggerHandler := localLogger.SlogHandler()
+		localSloggerHandler := slog.NewJSONHandler(localLogger.Writer(), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})
 
 		slogger.AddHandler(localSloggerHandler)
 
