@@ -100,7 +100,7 @@ type Engine struct {
 // NewEngine creates a new deduplication engine. The provided logger is used to
 // emit summary records on expiration; pass the pipeline's logger so records go
 // through the same handler chain.
-func NewEngine(logger *slog.Logger, opts ...Option) *Engine {
+func New(logger *slog.Logger, opts ...Option) *Engine {
 	cfg := Config{
 		CacheExpiry:        DefaultCacheExpiry,
 		MaxCacheSize:       DefaultMaxCacheSize,
