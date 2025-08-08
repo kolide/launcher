@@ -43,6 +43,12 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 		Level: slog.LevelInfo,
 	}))
 
-	// Combine closing eventlog writer and stopping the multislogger
-	return systemSlogger, combineClosers(eventLogWriter, closerFunc(func() error { systemSlogger.Stop(); return nil })), nil
+	// Return a closer that first closes the eventlog writer, then stops the multislogger
+	return systemSlogger, closerFunc(func() error {
+		if eventLogWriter != nil {
+			_ = eventLogWriter.Close()
+		}
+		systemSlogger.Stop()
+		return nil
+	}), nil
 }
