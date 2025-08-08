@@ -22,7 +22,8 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 			"launcher running on windows without elevated permissions, using default stderr instead of eventlog",
 		)
 
-		return syslogger, io.NopCloser(nil), nil
+		// Return a closer that stops multislogger resources
+		return syslogger, closerFunc(func() error { syslogger.Stop(); return nil }), nil
 	}
 
 	eventLogWriter, err := eventlog.NewWriter(serviceName)
@@ -34,12 +35,14 @@ func SystemSlogger() (*MultiSlogger, io.Closer, error) {
 			"err", err,
 		)
 
-		return syslogger, io.NopCloser(nil), nil
+		// Return a closer that stops multislogger resources
+		return syslogger, closerFunc(func() error { syslogger.Stop(); return nil }), nil
 	}
 
 	systemSlogger := New(slog.NewJSONHandler(eventLogWriter, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 
-	return systemSlogger, eventLogWriter, nil
+	// Combine closing eventlog writer and stopping the multislogger
+	return systemSlogger, combineClosers(eventLogWriter, closerFunc(func() error { systemSlogger.Stop(); return nil })), nil
 }

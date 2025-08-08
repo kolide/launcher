@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/kolide/launcher/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -34,6 +35,9 @@ var ctxValueKeysToAdd = []contextKey{
 type MultiSlogger struct {
 	*slog.Logger
 	handlers []slog.Handler
+
+	// middlewares with state that must persist across rebuilds
+	dedupEngine *dedup.Engine
 }
 
 // New creates a new multislogger if no handlers are passed in, it will
@@ -59,15 +63,36 @@ func NewNopLogger() *slog.Logger {
 func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
 
+	// Initialize deduper once and keep it persistent
+	if m.dedupEngine == nil {
+		// Temporary logger; will be replaced after construction
+		m.dedupEngine = dedup.NewEngine(slog.New(slogmulti.Fanout()))
+	}
+
 	// we have to rebuild the handler everytime because the slogmulti package we're
 	// using doesn't support adding handlers after the Fanout handler has been created
 	*m.Logger = *slog.New(
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
+			Pipe(slogmulti.NewHandleInlineMiddleware(dedup.Middleware(m.dedupEngine))).
 			Pipe(slogmulti.NewHandleInlineMiddleware(reportedErrorMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
+
+	// Point deduper emission to this fully built logger
+	m.dedupEngine.SetLogger(m.Logger)
+}
+
+// Stop releases background resources owned by the multislogger, such as the
+// deduplication engine cleanup goroutine.
+func (m *MultiSlogger) Stop() {
+	if m == nil {
+		return
+	}
+	if m.dedupEngine != nil {
+		m.dedupEngine.Stop()
+	}
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
