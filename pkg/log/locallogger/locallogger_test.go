@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/kolide/kit/stringutil"
@@ -20,59 +19,56 @@ var (
 func TestFilterResults(t *testing.T) {
 	t.Parallel()
 
-	// Test that filterResults truncates long results
-	keyvals := []interface{}{
-		"level", "info",
-		"msg", "test message",
+	data := []interface{}{
+		"one", "two",
 		"results", reallyLongString,
 	}
 
-	filterResults(keyvals...)
-
-	// Check that results were truncated
-	for i := 0; i < len(keyvals); i += 2 {
-		if keyvals[i] == "results" {
-			assert.Equal(t, truncatedLongString, keyvals[i+1])
-			break
-		}
-	}
+	filterResults(data...)
+	assert.Len(t, data, 4)
+	assert.Equal(t, data[0], "one")
+	assert.Equal(t, data[1], "two")
+	assert.Equal(t, data[2], "results")
+	assert.Len(t, data[3], 110)
+	assert.Contains(t, data[3], "[TRUNCATED]")
+	assert.Equal(t, data[3], truncatedLongString)
 }
 
 func TestKitLogging(t *testing.T) {
 	t.Parallel()
 
-	tmpfile, err := os.CreateTemp(t.TempDir(), "test-kit-logging")
+	data := []interface{}{
+		"one", "two",
+		"results", reallyLongString,
+	}
+
+	expected := map[string]string{
+		"one":     "two",
+		"results": truncatedLongString,
+	}
+	//	expectedJson, err := json.Marshal(expected)
+	//require.NoError(t, err, "json marshal expected")
+
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test-locallogger")
 	require.NoError(t, err, "make temp file")
+
+	// we only need a file path, not the file handle
 	tmpfile.Close()
 
 	logger := NewKitLogger(tmpfile.Name())
-	defer logger.Close()
 
-	// Test basic logging
-	err = logger.Log("level", "info", "msg", "test message")
-	require.NoError(t, err)
+	logger.Log(data...)
 
 	contentsRaw, err := os.ReadFile(tmpfile.Name())
 	require.NoError(t, err, "read temp file")
 
-	lines := strings.Split(strings.TrimSpace(string(contentsRaw)), "\n")
-	lines = filterEmptyLines(lines)
-	assert.Len(t, lines, 1, "should have one log entry")
+	var contents map[string]string
+	require.NoError(t, json.Unmarshal(contentsRaw, &contents), "unmarshal json")
 
-	// Verify JSON structure
-	var logEntry map[string]interface{}
-	require.NoError(t, json.Unmarshal([]byte(lines[0]), &logEntry))
-	assert.Equal(t, "info", logEntry["level"])
-	assert.Equal(t, "test message", logEntry["msg"])
-}
-
-// Helper function to filter out empty lines
-func filterEmptyLines(lines []string) []string {
-	var filtered []string
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			filtered = append(filtered, line)
-		}
+	// can't compare the whole thing, since we have extra values from timestamp and caller
+	for k, v := range expected {
+		assert.Equal(t, v, contents[k])
 	}
-	return filtered
+
+	require.NoError(t, logger.Close())
 }
