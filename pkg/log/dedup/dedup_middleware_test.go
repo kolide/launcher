@@ -99,7 +99,7 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 	)
 	defer engine.Stop()
 
-	mw := Middleware(engine)
+	mw := engine.Middleware
 	ctx := context.Background()
 
 	// First log: allowed through
@@ -153,7 +153,7 @@ func TestDebugLevelBypassesDedup(t *testing.T) {
 	)
 	defer engine.Stop()
 
-	mw := Middleware(engine)
+	mw := engine.Middleware
 	ctx := context.Background()
 
 	if err := mw(ctx, makeRecord(slog.LevelDebug, "debug msg"), next.next); err != nil {
@@ -180,7 +180,7 @@ func TestEmittedAttrSkipsDedup(t *testing.T) {
 	)
 	defer engine.Stop()
 
-	mw := Middleware(engine)
+	mw := engine.Middleware
 	ctx := context.Background()
 
 	// First record marked as emitted should bypass dedup
@@ -216,7 +216,7 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	)
 	defer engine.Stop()
 
-	mw := Middleware(engine)
+	mw := engine.Middleware
 	ctx := context.Background()
 
 	// Log a single record; should NOT emit a summary because count == 1

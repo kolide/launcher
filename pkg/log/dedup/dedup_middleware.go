@@ -126,71 +126,70 @@ func New(logger *slog.Logger, opts ...Option) *Engine {
 	return d
 }
 
-// Middleware returns the inline middleware function using the provided engine.
-func Middleware(d *Engine) func(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	return func(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-		// Do not deduplicate debug and lower logs; keep developer visibility.
-		if record.Level < slog.LevelInfo {
-			return next(ctx, record)
-		}
-		// Skip dedup if this is an internally emitted record
-		skip := false
-		record.Attrs(func(a slog.Attr) bool {
-			if a.Key == EmittedAttrKey {
-				// Only skip if it is truthy
-				if a.Value.Kind() == slog.KindBool && a.Value.Bool() {
-					skip = true
-				}
-			}
-			return !skip
-		})
-		if skip {
-			return next(ctx, record)
-		}
-
-		// Create a content hash for this record
-		hash := d.hashRecord(record)
-
-		// Possibly trigger cleanup in the background (non-blocking)
-		d.maybeCleanup()
-
-		// Update dedup state and decide whether to log
-		now := time.Now()
-
-		d.mu.Lock()
-		entry, exists := d.cache[hash]
-		if !exists {
-			attrs := collectAttrs(record)
-			d.cache[hash] = &logEntry{
-				firstSeen:  now,
-				lastSeen:   now,
-				count:      1,
-				lastLogged: now,
-				level:      record.Level,
-				message:    record.Message,
-				attrs:      attrs,
-				pc:         record.PC,
-			}
-			d.mu.Unlock()
-			// First occurrence: let it through unmodified
-			return next(ctx, record)
-		}
-
-		entry.lastSeen = now
-		entry.count++
-		if now.Sub(entry.lastLogged) >= d.cfg.DuplicateLogWindow {
-			entry.lastLogged = now
-			// Log this duplicate with the current accumulated count
-			d.mu.Unlock()
-
-			record.Add("duplicate_count", slog.IntValue(entry.count))
-			return next(ctx, record)
-		}
-
-		// Suppress this duplicate
-		d.mu.Unlock()
-		return nil
+// Middleware is an inline slog middleware method bound to this Engine instance.
+// It matches slog-multi's inline middleware signature.
+func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	// Do not deduplicate debug and lower logs; keep developer visibility.
+	if record.Level < slog.LevelInfo {
+		return next(ctx, record)
 	}
+	// Skip dedup if this is an internally emitted record
+	skip := false
+	record.Attrs(func(a slog.Attr) bool {
+		if a.Key == EmittedAttrKey {
+			// Only skip if it is truthy
+			if a.Value.Kind() == slog.KindBool && a.Value.Bool() {
+				skip = true
+			}
+		}
+		return !skip
+	})
+	if skip {
+		return next(ctx, record)
+	}
+
+	// Create a content hash for this record
+	hash := d.hashRecord(record)
+
+	// Possibly trigger cleanup in the background (non-blocking)
+	d.maybeCleanup()
+
+	// Update dedup state and decide whether to log
+	now := time.Now()
+
+	d.mu.Lock()
+	entry, exists := d.cache[hash]
+	if !exists {
+		attrs := collectAttrs(record)
+		d.cache[hash] = &logEntry{
+			firstSeen:  now,
+			lastSeen:   now,
+			count:      1,
+			lastLogged: now,
+			level:      record.Level,
+			message:    record.Message,
+			attrs:      attrs,
+			pc:         record.PC,
+		}
+		d.mu.Unlock()
+		// First occurrence: let it through unmodified
+		return next(ctx, record)
+	}
+
+	entry.lastSeen = now
+	entry.count++
+	if now.Sub(entry.lastLogged) >= d.cfg.DuplicateLogWindow {
+		entry.lastLogged = now
+		// Log this duplicate with the current accumulated count
+		d.mu.Unlock()
+
+		record.Add("duplicate_count", slog.IntValue(entry.count))
+		return next(ctx, record)
+	}
+
+	// Suppress this duplicate
+	d.mu.Unlock()
+	return nil
 }
 
 // Stop stops the background cleanup goroutine.
