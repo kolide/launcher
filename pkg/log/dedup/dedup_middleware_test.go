@@ -92,7 +92,7 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 	next := &nextCapture{}
 	sink := &captureHandler{}
 	// Keep windows small to make test fast
-	engine := NewEngine(slog.New(sink),
+	engine := New(slog.New(sink),
 		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -146,7 +146,7 @@ func TestDebugLevelBypassesDedup(t *testing.T) {
 
 	next := &nextCapture{}
 	sink := &captureHandler{}
-	engine := NewEngine(slog.New(sink),
+	engine := New(slog.New(sink),
 		WithDuplicateLogWindow(100*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -173,7 +173,7 @@ func TestEmittedAttrSkipsDedup(t *testing.T) {
 
 	next := &nextCapture{}
 	sink := &captureHandler{}
-	engine := NewEngine(slog.New(sink),
+	engine := New(slog.New(sink),
 		WithDuplicateLogWindow(200*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -209,7 +209,7 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 
 	next := &nextCapture{}
 	sink := &captureHandler{}
-	engine := NewEngine(slog.New(sink),
+	engine := New(slog.New(sink),
 		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(50*time.Millisecond),

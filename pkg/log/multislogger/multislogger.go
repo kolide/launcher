@@ -66,7 +66,7 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	// Initialize deduper once and keep it persistent
 	if m.dedupEngine == nil {
 		// Temporary logger; will be replaced after construction
-		m.dedupEngine = dedup.NewEngine(slog.New(slogmulti.Fanout()))
+		m.dedupEngine = dedup.New(slog.New(slogmulti.Fanout()))
 	}
 
 	// we have to rebuild the handler everytime because the slogmulti package we're
