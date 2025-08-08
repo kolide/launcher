@@ -3,6 +3,7 @@ package dedup
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -64,7 +65,9 @@ func (n *nextCapture) Get(i int) slog.Record {
 }
 
 func makeRecord(level slog.Level, msg string, attrs ...slog.Attr) slog.Record {
-	r := slog.NewRecord(time.Now(), level, msg, 0)
+	// capture the caller PC to simulate real logger behavior
+	pc, _, _, _ := runtime.Caller(1)
+	r := slog.NewRecord(time.Now(), level, msg, pc)
 	r.AddAttrs(attrs...)
 	return r
 }
@@ -270,5 +273,8 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	}
 	if v, ok := getAttrValue(summary, "original_msg"); !ok || v.Kind() != slog.KindString || v.String() != "dup msg" {
 		t.Fatalf("expected original_msg 'dup msg', got %q", v.String())
+	}
+	if summary.PC == 0 {
+		t.Fatalf("expected summary record to preserve original PC (call site)")
 	}
 }

@@ -73,6 +73,7 @@ type logEntry struct {
 	level   slog.Level
 	message string
 	attrs   []slog.Attr
+	pc      uintptr
 }
 
 // Engine is a stateful deduplication engine. It is safe for concurrent use.
@@ -168,6 +169,7 @@ func Middleware(d *Engine) func(ctx context.Context, record slog.Record, next fu
 				level:      record.Level,
 				message:    record.Message,
 				attrs:      attrs,
+				pc:         record.PC,
 			}
 			d.mu.Unlock()
 			// First occurrence: let it through unmodified
@@ -244,6 +246,7 @@ func (d *Engine) performCleanup(now time.Time) {
 		message string
 		attrs   []slog.Attr
 		count   int
+		pc      uintptr
 	}
 	var toEmit []expired
 
@@ -256,6 +259,7 @@ func (d *Engine) performCleanup(now time.Time) {
 					message: entry.message,
 					attrs:   append([]slog.Attr(nil), entry.attrs...),
 					count:   entry.count,
+					pc:      entry.pc,
 				})
 			}
 			delete(d.cache, hash)
@@ -284,16 +288,20 @@ func (d *Engine) performCleanup(now time.Time) {
 
 	// Emit outside the lock to avoid re-entrancy deadlocks
 	for _, e := range toEmit {
-		attrs := make([]slog.Attr, 0, len(e.attrs)+2)
-		attrs = append(attrs, e.attrs...)
-		attrs = append(attrs,
+		// Build a record that preserves the original call site via PC
+		rec := slog.NewRecord(time.Now(), e.level, duplicateSummaryMsg, 0)
+		rec.PC = e.pc
+		for _, a := range e.attrs {
+			rec.AddAttrs(a)
+		}
+		rec.AddAttrs(
 			slog.Int("duplicate_count", e.count),
 			slog.Bool(EmittedAttrKey, true),
 			slog.String("original_msg", e.message),
 		)
-		// Emit using the provided logger so it traverses the pipeline.
+		// Emit using the provided logger's handler so it traverses the pipeline
 		if d.logger != nil {
-			d.logger.LogAttrs(context.Background(), e.level, duplicateSummaryMsg, attrs...)
+			_ = d.logger.Handler().Handle(context.Background(), rec)
 		}
 	}
 }
