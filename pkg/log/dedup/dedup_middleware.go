@@ -64,10 +64,9 @@ func WithDuplicateLogWindow(d time.Duration) Option {
 
 // logEntry tracks information about seen log messages for deduplication.
 type logEntry struct {
-	firstSeen  time.Time
-	lastSeen   time.Time
-	count      int
-	lastLogged time.Time
+	firstSeen time.Time
+	lastSeen  time.Time
+	count     int
 
 	// For emission on cleanup
 	level   slog.Level
@@ -162,14 +161,13 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	if !exists {
 		attrs := collectAttrs(record)
 		d.cache[hash] = &logEntry{
-			firstSeen:  now,
-			lastSeen:   now,
-			count:      1,
-			lastLogged: now,
-			level:      record.Level,
-			message:    record.Message,
-			attrs:      attrs,
-			pc:         record.PC,
+			firstSeen: now,
+			lastSeen:  now,
+			count:     1,
+			level:     record.Level,
+			message:   record.Message,
+			attrs:     attrs,
+			pc:        record.PC,
 		}
 		d.mu.Unlock()
 		// First occurrence: let it through unmodified
@@ -178,9 +176,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 
 	entry.lastSeen = now
 	entry.count++
-	if now.Sub(entry.lastLogged) >= d.cfg.DuplicateLogWindow {
-		entry.lastLogged = now
-		// Log this duplicate with the current accumulated count
+	if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
 		d.mu.Unlock()
 
 		record.Add("duplicate_count", slog.IntValue(entry.count))
