@@ -141,13 +141,13 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 	}
 }
 
-func TestDebugLevelBypassesDedup(t *testing.T) {
+func TestDebugLevelIsDedupedLikeOthers(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
 	sink := &captureHandler{}
 	engine := New(slog.New(sink),
-		WithDuplicateLogWindow(100*time.Millisecond),
+		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
@@ -156,15 +156,28 @@ func TestDebugLevelBypassesDedup(t *testing.T) {
 	mw := engine.Middleware
 	ctx := context.Background()
 
+	// First debug log passes
 	if err := mw(ctx, makeRecord(slog.LevelDebug, "debug msg"), next.next); err != nil {
 		t.Fatalf("middleware err: %v", err)
 	}
+	// Immediate duplicate suppressed
 	if err := mw(ctx, makeRecord(slog.LevelDebug, "debug msg"), next.next); err != nil {
 		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 1 {
+		t.Fatalf("expected immediate duplicate to be suppressed, got %d", next.Len())
 	}
 
+	// After window, should re-log with count
+	time.Sleep(60 * time.Millisecond)
+	if err := mw(ctx, makeRecord(slog.LevelDebug, "debug msg"), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
 	if next.Len() != 2 {
-		t.Fatalf("expected all debug logs to pass, got %d", next.Len())
+		t.Fatalf("expected re-log after window, got %d", next.Len())
+	}
+	if val, ok := getAttrValue(next.Get(1), "duplicate_count"); !ok || val.Int64() != 3 {
+		t.Fatalf("expected duplicate_count 3 on relogged debug record, got %v (ok=%v)", val, ok)
 	}
 }
 

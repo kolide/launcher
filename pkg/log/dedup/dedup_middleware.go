@@ -81,16 +81,16 @@ type Engine struct {
 	cfg Config
 
 	// runtime state
-	mu          sync.RWMutex
-	cache       map[string]*logEntry
+	cacheLock   sync.RWMutex
+	cache       map[string]*logEntry // maps log hash to corresponding tracked entry
 	lastCleanup time.Time
 	// ensure only one cleanup runs at a time
 	cleanupRunning atomic.Bool
 
 	// background cleanup machinery
-	ctx    context.Context //nolint:containedctx // Used for background goroutine lifecycle
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx                          context.Context //nolint:containedctx // Used for background goroutine lifecycle
+	cancel                       context.CancelFunc
+	backGroundCleanUpWorkerGroup sync.WaitGroup
 
 	// logger used to emit records on cleanup
 	logger *slog.Logger
@@ -128,10 +128,6 @@ func New(logger *slog.Logger, opts ...Option) *Engine {
 // Middleware is an inline slog middleware method bound to this Engine instance.
 // It matches slog-multi's inline middleware signature.
 func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	// Do not deduplicate debug and lower logs; keep developer visibility.
-	if record.Level < slog.LevelInfo {
-		return next(ctx, record)
-	}
 	// If the duplicate window is disabled (<= 0), short-circuit and skip all dedup logic
 	if d.cfg.DuplicateLogWindow <= 0 {
 		return next(ctx, record)
@@ -160,7 +156,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	// Update dedup state and decide whether to log
 	now := time.Now()
 
-	d.mu.Lock()
+	d.cacheLock.Lock()
 	entry, exists := d.cache[hash]
 	if !exists {
 		attrs := collectAttrs(record)
@@ -173,7 +169,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 			attrs:     attrs,
 			pc:        record.PC,
 		}
-		d.mu.Unlock()
+		d.cacheLock.Unlock()
 		// First occurrence: let it through unmodified
 		return next(ctx, record)
 	}
@@ -181,41 +177,41 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	entry.lastSeen = now
 	entry.count++
 	if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
-		d.mu.Unlock()
+		d.cacheLock.Unlock()
 
 		record.Add("duplicate_count", slog.IntValue(entry.count))
 		return next(ctx, record)
 	}
 
 	// Suppress this duplicate
-	d.mu.Unlock()
+	d.cacheLock.Unlock()
 	return nil
 }
 
 // Stop stops the background cleanup goroutine.
 func (d *Engine) Stop() {
 	d.cancel()
-	d.wg.Wait()
+	d.backGroundCleanUpWorkerGroup.Wait()
 }
 
 // SetLogger updates the logger used for emitting records during cleanup. This
 // allows wiring the deduper into a pipeline first and then pointing emission to
 // that fully constructed pipeline logger.
 func (d *Engine) SetLogger(l *slog.Logger) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.cacheLock.Lock()
+	defer d.cacheLock.Unlock()
 	d.logger = l
 }
 
 // startBackgroundCleanup launches the periodic cleanup worker.
 func (d *Engine) startBackgroundCleanup() {
-	d.wg.Add(1)
+	d.backGroundCleanUpWorkerGroup.Add(1)
 	go d.periodicCleanupLoop()
 }
 
 // periodicCleanupLoop runs the cleanup ticker until the context is canceled.
 func (d *Engine) periodicCleanupLoop() {
-	defer d.wg.Done()
+	defer d.backGroundCleanUpWorkerGroup.Done()
 	ticker := time.NewTicker(d.cfg.CleanupInterval)
 	defer ticker.Stop()
 	for {
@@ -230,11 +226,11 @@ func (d *Engine) periodicCleanupLoop() {
 
 // performCleanup removes expired entries and emits a summary record for each.
 func (d *Engine) performCleanup(now time.Time) {
-	d.mu.Lock()
+	d.cacheLock.Lock()
 
 	// Remove expired entries
 	if now.Sub(d.lastCleanup) < d.cfg.CleanupInterval {
-		d.mu.Unlock()
+		d.cacheLock.Unlock()
 		return
 	}
 	d.lastCleanup = now
@@ -283,7 +279,7 @@ func (d *Engine) performCleanup(now time.Time) {
 		}
 	}
 
-	d.mu.Unlock()
+	d.cacheLock.Unlock()
 
 	// Emit outside the lock to avoid re-entrancy deadlocks
 	for _, e := range toEmit {
@@ -307,9 +303,9 @@ func (d *Engine) performCleanup(now time.Time) {
 
 // maybeCleanup triggers cleanup based on time since last cleanup.
 func (d *Engine) maybeCleanup() {
-	d.mu.RLock()
+	d.cacheLock.RLock()
 	last := d.lastCleanup
-	d.mu.RUnlock()
+	d.cacheLock.RUnlock()
 	if time.Since(last) >= d.cfg.CleanupInterval {
 		// Best-effort cleanup run in the background; the periodic ticker will also handle it
 		go d.runCleanup(time.Now())
