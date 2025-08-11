@@ -48,6 +48,10 @@ func New(h ...slog.Handler) *MultiSlogger {
 		Logger: slog.New(slogmulti.Fanout()),
 	}
 
+	// Initialize deduper once at construction; we'll point its emission
+	// to the fully built logger after handlers are wired in AddHandler
+	ms.dedupEngine = dedup.New(slog.New(slogmulti.Fanout()))
+
 	ms.AddHandler(h...)
 	return ms
 }
@@ -62,12 +66,6 @@ func NewNopLogger() *slog.Logger {
 // this means any attributes added with Logger.With will be lost
 func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 	m.handlers = append(m.handlers, handler...)
-
-	// Initialize deduper once and keep it persistent
-	if m.dedupEngine == nil {
-		// Temporary logger; will be replaced after construction
-		m.dedupEngine = dedup.New(slog.New(slogmulti.Fanout()))
-	}
 
 	// we have to rebuild the handler everytime because the slogmulti package we're
 	// using doesn't support adding handlers after the Fanout handler has been created
