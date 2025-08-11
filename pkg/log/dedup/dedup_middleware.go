@@ -274,7 +274,7 @@ func (d *Engine) performCleanup() {
 		}
 	}
 
-	// Enforce max cache size by removing oldest without emission
+	// Enforce max cache size by removing oldest; emit summaries for duplicates being evicted
 	if len(d.cache) > d.cfg.MaxCacheSize {
 		// Collect entries with lastSeen
 		type hashTime struct {
@@ -288,7 +288,20 @@ func (d *Engine) performCleanup() {
 		sort.Slice(items, func(i, j int) bool { return items[i].lastSeen.Before(items[j].lastSeen) })
 		removeCount := len(d.cache) - d.cfg.MaxCacheSize
 		for i := 0; i < removeCount; i++ {
-			delete(d.cache, items[i].hash)
+			if entry, ok := d.cache[items[i].hash]; ok {
+				if entry.count > 1 {
+					toEmit = append(toEmit, expired{
+						level:     entry.level,
+						message:   entry.message,
+						attrs:     append([]slog.Attr(nil), entry.attrs...),
+						count:     entry.count,
+						pc:        entry.pc,
+						firstSeen: entry.firstSeen,
+						lastSeen:  entry.lastSeen,
+					})
+				}
+				delete(d.cache, items[i].hash)
+			}
 		}
 	}
 
