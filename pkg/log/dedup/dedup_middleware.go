@@ -24,7 +24,8 @@ const (
 	DefaultDuplicateLogWindow = 1 * time.Minute
 )
 
-const duplicateSummaryMsg = "duplicate_summary"
+// duplicateSummaryMsg is no longer used; we emit the original message on summary
+// to preserve grouping in external log processing systems.
 
 // excludedHashFields are the attribute keys that should not affect the content hash.
 var excludedHashFields = map[string]bool{
@@ -289,8 +290,8 @@ func (d *Engine) performCleanup() {
 
 	// Emit outside the lock to avoid re-entrancy deadlocks
 	for _, e := range toEmit {
-		// Build a record that preserves the original call site via PC
-		rec := slog.NewRecord(time.Now(), e.level, duplicateSummaryMsg, 0)
+		// Build a record that preserves the original call site via PC and uses the original message
+		rec := slog.NewRecord(time.Now(), e.level, e.message, 0)
 		rec.PC = e.pc
 		for _, a := range e.attrs {
 			rec.AddAttrs(a)

@@ -307,8 +307,8 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	}
 
 	summary := sink.Get(0)
-	if summary.Message != duplicateSummaryMsg {
-		t.Fatalf("expected message %q, got %q", duplicateSummaryMsg, summary.Message)
+	if summary.Message != "dup msg" {
+		t.Fatalf("expected message %q, got %q", "dup msg", summary.Message)
 	}
 	if v, ok := getAttrValue(summary, EmittedAttrKey); !ok || v.Kind() != slog.KindBool || !v.Bool() {
 		t.Fatalf("expected %s to be true on summary record", EmittedAttrKey)
