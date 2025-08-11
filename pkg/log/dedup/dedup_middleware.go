@@ -177,6 +177,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 
 	entry.lastSeen = now
 	entry.count++
+	// Window for tracking this particular log has elapsed -- log the log with its duplicate count
 	if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
 		d.cacheLock.Unlock()
 
