@@ -181,6 +181,8 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 		d.cacheLock.Unlock()
 
 		record.Add("duplicate_count", slog.IntValue(entry.count))
+		record.Add("first_seen", slog.TimeValue(entry.firstSeen))
+		record.Add("last_seen", slog.TimeValue(entry.lastSeen))
 		return next(ctx, record)
 	}
 
@@ -244,11 +246,13 @@ func (d *Engine) performCleanup() {
 
 	// Build a list to avoid holding the lock while emitting
 	type expired struct {
-		level   slog.Level
-		message string
-		attrs   []slog.Attr
-		count   int
-		pc      uintptr
+		level     slog.Level
+		message   string
+		attrs     []slog.Attr
+		count     int
+		pc        uintptr
+		firstSeen time.Time
+		lastSeen  time.Time
 	}
 	var toEmit []expired
 
@@ -257,11 +261,13 @@ func (d *Engine) performCleanup() {
 			// Only emit a summary when there were actual duplicates
 			if entry.count > 1 {
 				toEmit = append(toEmit, expired{
-					level:   entry.level,
-					message: entry.message,
-					attrs:   append([]slog.Attr(nil), entry.attrs...),
-					count:   entry.count,
-					pc:      entry.pc,
+					level:     entry.level,
+					message:   entry.message,
+					attrs:     append([]slog.Attr(nil), entry.attrs...),
+					count:     entry.count,
+					pc:        entry.pc,
+					firstSeen: entry.firstSeen,
+					lastSeen:  entry.lastSeen,
 				})
 			}
 			delete(d.cache, hash)
@@ -300,6 +306,8 @@ func (d *Engine) performCleanup() {
 			slog.Int("duplicate_count", e.count),
 			slog.Bool(EmittedAttrKey, true),
 			slog.String("original_msg", e.message),
+			slog.Time("first_seen", e.firstSeen),
+			slog.Time("last_seen", e.lastSeen),
 		)
 		// Emit using the provided logger's handler so it traverses the pipeline
 		if d.logger != nil {
