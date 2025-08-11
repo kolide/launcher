@@ -132,6 +132,10 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	if record.Level < slog.LevelInfo {
 		return next(ctx, record)
 	}
+	// If the duplicate window is disabled (<= 0), short-circuit and skip all dedup logic
+	if d.cfg.DuplicateLogWindow <= 0 {
+		return next(ctx, record)
+	}
 	// Skip dedup if this is an internally emitted record
 	skip := false
 	record.Attrs(func(a slog.Attr) bool {

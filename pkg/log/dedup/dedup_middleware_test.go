@@ -168,6 +168,38 @@ func TestDebugLevelBypassesDedup(t *testing.T) {
 	}
 }
 
+func TestZeroWindowShortCircuitsDedup(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	sink := &captureHandler{}
+	engine := New(slog.New(sink),
+		WithDuplicateLogWindow(0), // disabled
+	)
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := context.Background()
+
+	// First log
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "x", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	// Duplicate immediately — should still pass because dedup is disabled
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "x", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	if next.Len() != 2 {
+		t.Fatalf("expected both records to pass when window disabled, got %d", next.Len())
+	}
+
+	// Ensure duplicate_count not automatically injected when disabled
+	if _, ok := getAttrValue(next.Get(1), "duplicate_count"); ok {
+		t.Fatalf("did not expect duplicate_count when window disabled")
+	}
+}
+
 func TestEmittedAttrSkipsDedup(t *testing.T) {
 	t.Parallel()
 
