@@ -149,7 +149,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	}
 
 	// Create a content hash for this record
-	hash := d.hashRecord(record)
+	hash := hashRecord(record)
 
 	// Possibly trigger cleanup in the background (non-blocking)
 	d.maybeCleanup()
@@ -341,7 +341,7 @@ func (d *Engine) maybeCleanup() {
 }
 
 // hashRecord creates a hash of the log record content, excluding time and source information.
-func (d *Engine) hashRecord(record slog.Record) string {
+func hashRecord(record slog.Record) string {
 	// Convert record to key-value pairs for hashing
 	var keyvals []interface{}
 
