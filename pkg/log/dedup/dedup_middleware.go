@@ -1,3 +1,57 @@
+// Package dedup provides a stateful slog middleware that suppresses bursts of
+// duplicate log records and later emits a summarized record with duplicate
+// counts. It computes a content hash of each record (excluding timestamps and
+// source metadata) to identify duplicates within a configurable time window.
+//
+// High-level flow:
+//   - Incoming slog.Record enters the middleware chain
+//   - If DuplicateLogWindow <= 0, pass-through (dedup disabled)
+//   - If record has the internal marker attribute EmittedAttrKey=true, pass-through
+//   - Compute a hash of the record's stable content
+//   - Update or create the cache entry:
+//   - First time: store entry and pass the record through unmodified
+//   - Subsequent times within the window: increment count and suppress
+//   - Once the window elapses for that entry: pass the record with
+//     duplicate_count/first_seen/last_seen attributes
+//   - In the background, a periodic cleanup removes expired entries and, for
+//     those that had duplicates, emits a summarized record preserving the
+//     original message, attributes, and call site (PC) while tagging the record
+//     with EmittedAttrKey=true to prevent re-deduplication.
+//
+// Mermaid overview of the runtime behavior:
+// ```mermaid
+// flowchart TD
+//     A["Incoming slog.Record"] --> B{"DuplicateLogWindow ≤ 0?"}
+//     B -- Yes --> N["Pass‑through (dedup disabled)"]
+//     B -- No  --> C{"EmittedAttrKey == true?"}
+
+//     C -- Yes --> N
+//     C -- No  --> D["Compute stable content hash"]
+
+//     D --> F{"Entry exists in cache?"}
+
+//     F -- No  --> G["Create new entry<br/> count = 1; firstSeen = lastSeen = now"]
+//     G --> N
+
+//     F -- Yes --> H["entry.count++<br/>entry.lastSeen = now"]
+//     H --> I{"Window elapsed (now - firstSeen ≥ DuplicateLogWindow)?"}
+
+//     I -- No  --> S["Suppress (return nil)"]
+//     I -- Yes --> J["Pass record with duplicate_count/first_seen/last_seen attrs"]
+//     J --> N
+
+//     %% Background maintenance
+//     subgraph "Background cleanup (periodic)"
+//         T["Every CleanupInterval"] --> U["performCleanup()"]
+//         U --> V{"Entry expired (now - lastSeen > CacheExpiry)?"}
+
+//         V -- Yes --> X["If count > 1:<br/> emit summary record<br/>(original msg/attrs/PC + duplicate_count)<br/>& set EmittedAttrKey=true"]
+//         V -- No  --> W{"Cache size > MaxCacheSize?"}
+
+//	    W -- Yes --> Y["Evict oldest; if count > 1 emit summary"]
+//	end
+//
+// ```
 package dedup
 
 import (
