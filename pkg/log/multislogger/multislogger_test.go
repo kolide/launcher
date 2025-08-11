@@ -46,10 +46,10 @@ func TestMultiSlogger(t *testing.T) {
 
 	// set shipper level to debug
 	shipperLogLevel.Set(slog.LevelDebug)
-	multislogger.Logger.DebugContext(context.TODO(), "debug_msg")
+	multislogger.Logger.DebugContext(context.TODO(), "debug_msg_2")
 
-	require.Contains(t, debugLogBuf.String(), "debug_msg", "should be in debug log since it's debug level")
-	require.Contains(t, shipperBuf.String(), "debug_msg", "should now be in shipper log since it's level was set to debug")
+	require.Contains(t, debugLogBuf.String(), "debug_msg_2", "should be in debug log since it's debug level")
+	require.Contains(t, shipperBuf.String(), "debug_msg_2", "should now be in shipper log since it's level was set to debug")
 	clearBufsFn()
 
 	// ensure that span_id gets added as an attribute when present in context
