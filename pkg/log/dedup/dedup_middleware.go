@@ -32,8 +32,8 @@ var excludedHashFields = map[string]bool{
 	"time":            true, // slog timestamp
 	"caller":          true, // go-kit caller info
 	"source":          true, // slog source info
-	"original.time":   true,
-	"original.source": true,
+	"original.time":   true, // slog timestamp forwarded from desktop/watchdog process (see ee/log package)
+	"original.source": true, // slog source info forwarded from desktop/watchdog process (see ee/log package)
 	EmittedAttrKey:    true, // internal marker
 }
 
@@ -85,7 +85,7 @@ type Engine struct {
 	cache       map[string]*logEntry
 	lastCleanup time.Time
 	// ensure only one cleanup runs at a time
-	cleanupRunning int32
+	cleanupRunning atomic.Bool
 
 	// background cleanup machinery
 	ctx    context.Context //nolint:containedctx // Used for background goroutine lifecycle
@@ -314,10 +314,10 @@ func (d *Engine) maybeCleanup() {
 
 // runCleanup executes performCleanup but ensures only one cleanup is running concurrently.
 func (d *Engine) runCleanup(now time.Time) {
-	if !atomic.CompareAndSwapInt32(&d.cleanupRunning, 0, 1) {
+	if !d.cleanupRunning.CompareAndSwap(false, true) {
 		return
 	}
-	defer atomic.StoreInt32(&d.cleanupRunning, 0)
+	defer d.cleanupRunning.Store(false)
 	d.performCleanup(now)
 }
 
