@@ -217,7 +217,7 @@ func (d *Engine) periodicCleanupLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			d.runCleanup(time.Now())
+			d.performCleanup()
 		case <-d.ctx.Done():
 			return
 		}
@@ -225,7 +225,13 @@ func (d *Engine) periodicCleanupLoop() {
 }
 
 // performCleanup removes expired entries and emits a summary record for each.
-func (d *Engine) performCleanup(now time.Time) {
+func (d *Engine) performCleanup() {
+	now := time.Now()
+	// Ensure only one cleanup runs at a time
+	if !d.cleanupRunning.CompareAndSwap(false, true) {
+		return
+	}
+	defer d.cleanupRunning.Store(false)
 	d.cacheLock.Lock()
 
 	// Remove expired entries
@@ -308,17 +314,8 @@ func (d *Engine) maybeCleanup() {
 	d.cacheLock.RUnlock()
 	if time.Since(last) >= d.cfg.CleanupInterval {
 		// Best-effort cleanup run in the background; the periodic ticker will also handle it
-		go d.runCleanup(time.Now())
+		go d.performCleanup()
 	}
-}
-
-// runCleanup executes performCleanup but ensures only one cleanup is running concurrently.
-func (d *Engine) runCleanup(now time.Time) {
-	if !d.cleanupRunning.CompareAndSwap(false, true) {
-		return
-	}
-	defer d.cleanupRunning.Store(false)
-	d.performCleanup(now)
 }
 
 // hashRecord creates a hash of the log record content, excluding time and source information.
