@@ -18,7 +18,7 @@
 @property (retain, nonatomic) FMFuture *future;
 @property (nonatomic) _Bool _testMockConnection;
 @property (readonly, nonatomic) long long state;
-@property (readonly) unsigned long long hash;
+@property (readonly) unsigned long hash;
 @property (readonly) Class superclass;
 @property (readonly, copy) NSString *description;
 @property (readonly, copy) NSString *debugDescription;
