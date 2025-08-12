@@ -612,11 +612,8 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 		return "", nil
 	}
 
-	// determine whether we should skip this check cycle if delaying the download
-	if allowDelay && ta.shouldDelayDownload(binary, targets) {
-		return "", nil
-	}
-
+	// If the release is already available in our update library, there's no need to perform a download --
+	// we can immediately return to load the newly-selected version.
 	if ta.libraryManager.Available(binary, target) {
 		// The release is already available in the library but we don't know if we're running it --
 		// err on the side of not restarting.
@@ -631,7 +628,17 @@ func (ta *TufAutoupdater) downloadUpdate(binary autoupdatableBinary, targets dat
 
 		// The release is already available in the library and it's not our current running version --
 		// return the version to signal for a restart.
+		ta.slogger.Log(context.TODO(), slog.LevelInfo,
+			"update is already available in library",
+			"binary", binary,
+			"target", target,
+		)
 		return target, nil
+	}
+
+	// Determine whether we should skip this check cycle if delaying the download
+	if allowDelay && ta.shouldDelayDownload(binary, targets) {
+		return "", nil
 	}
 
 	// We haven't yet downloaded this release -- download it
