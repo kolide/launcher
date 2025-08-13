@@ -323,3 +323,36 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 		t.Fatalf("expected summary record to preserve original PC (call site)")
 	}
 }
+
+func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	sink := &captureHandler{}
+	engine := New(slog.New(sink),
+		WithDuplicateLogWindow(200*time.Millisecond),
+		WithCleanupInterval(30*time.Millisecond),
+		WithCacheExpiry(80*time.Millisecond),
+	)
+
+	mw := engine.Middleware
+	ctx := context.Background()
+
+	// Create a duplicate set which would normally lead to a summary emission after expiry
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "stop-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "stop-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	// Stop the engine before the periodic cleanup can emit any summaries
+	engine.Stop()
+
+	// Wait beyond both cache expiry and cleanup interval; no summary should be emitted after Stop
+	time.Sleep(300 * time.Millisecond)
+
+	if got := sink.Len(); got != 0 {
+		t.Fatalf("expected no summary emission after Stop, got %d", got)
+	}
+}
