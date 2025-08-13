@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/execparsers/socketfilterfw"
 	"github.com/kolide/launcher/ee/tables/execparsers/softwareupdate"
 	"github.com/kolide/launcher/ee/tables/filevault"
+	"github.com/kolide/launcher/ee/tables/find_my"
 	"github.com/kolide/launcher/ee/tables/firmwarepasswd"
 	brew_upgradeable "github.com/kolide/launcher/ee/tables/homebrew"
 	"github.com/kolide/launcher/ee/tables/ioreg"
@@ -104,6 +105,7 @@ func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsque
 		airport.TablePlugin(k, slogger),
 		kextpolicy.TablePlugin(),
 		filevault.TablePlugin(k, slogger),
+		find_my.FindMyDevice(k, slogger),
 		mdmclient.TablePlugin(k, slogger),
 		apple_silicon_security_policy.TablePlugin(k, slogger),
 		legacyexec.TablePlugin(),
