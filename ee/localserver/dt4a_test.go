@@ -402,10 +402,9 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 	t.Parallel()
 
 	// Set up localserver dependencies
-	slogger := multislogger.NewNopLogger()
 	k := typesmocks.NewKnapsack(t)
 	k.On("KolideServerURL").Return("localserver")
-	k.On("Slogger").Return(slogger)
+	k.On("Slogger").Return(multislogger.NewNopLogger())
 	// Validate that we accelerate control requests
 	k.On("SetControlRequestIntervalOverride", mock.Anything, mock.Anything).Return()
 	// Validate that we accelerate osquery distributed requests

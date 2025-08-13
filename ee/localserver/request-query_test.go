@@ -55,8 +55,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			slogger := multislogger.NewNopLogger()
-			mockKnapsack.On("Slogger").Return(slogger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,
@@ -227,8 +226,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
 			mockKnapsack.On("KolideServerURL").Return("localhost")
-			slogger := multislogger.NewNopLogger()
-			mockKnapsack.On("Slogger").Return(slogger)
+			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("Registrations").Return([]types.Registration{
 				{
 					RegistrationID: types.DefaultRegistrationID,
