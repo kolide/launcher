@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -26,12 +24,6 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	k.On("Slogger").Return(slogger)
-	testConfigStore, err := storageci.NewStore(t, slogger, storage.ConfigStore.String())
-	require.NoError(t, err)
-	k.On("ConfigStore").Return(testConfigStore)
-	testRegistrationStore, err := storageci.NewStore(t, slogger, storage.RegistrationStore.String())
-	require.NoError(t, err)
-	k.On("RegistrationStore").Return(testRegistrationStore)
 	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
 

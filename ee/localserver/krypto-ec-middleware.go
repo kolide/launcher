@@ -21,7 +21,6 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
-	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
@@ -45,10 +44,6 @@ const (
 	kolideOsHeaderKey                                 = "X-Kolide-Os"
 	kolideArchHeaderKey                               = "X-Kolide-Arch"
 	kolideMunemoHeaderKey                             = "X-Kolide-Munemo"
-)
-
-var (
-	nodeKeyKey = []byte("nodeKey")
 )
 
 type v2CmdRequestType struct {
@@ -90,8 +85,7 @@ type kryptoEcMiddleware struct {
 	presenceDetectionLock sync.Mutex
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
-	nodeKeyStore          types.Setter
-	registrationStore     types.Setter
+	registrationTracker   types.RegistrationTracker
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -99,7 +93,7 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, registrationStore types.Setter,
+func newKryptoEcMiddleware(slogger *slog.Logger, registrationTracker types.RegistrationTracker,
 	localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	atomicMunemo := atomic.NewString(tenantMunemo)
 
@@ -116,8 +110,7 @@ func newKryptoEcMiddleware(slogger *slog.Logger, nodeKeyStore types.Setter, regi
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
-		nodeKeyStore:                          nodeKeyStore,
-		registrationStore:                     registrationStore,
+		registrationTracker:                   registrationTracker,
 	}
 
 	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
@@ -208,24 +201,8 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			}
 
 			// Until we tackle multitenancy, store the key under the default registration ID
-			if err := e.nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(r.NodeKey)); err != nil {
-				return fmt.Errorf("setting nodekey in store: %w", err)
-			}
-
-			// Save the registration too
-			newRegistration := types.Registration{
-				RegistrationID: types.DefaultRegistrationID, // default registration ID for now
-				Munemo:         r.Munemo,
-				NodeKey:        r.NodeKey,
-			}
-
-			rawRegistration, err := json.Marshal(newRegistration)
-			if err != nil {
-				return fmt.Errorf("marshalling registration: %w", err)
-			}
-
-			if err := e.registrationStore.Set([]byte(types.DefaultRegistrationID), rawRegistration); err != nil {
-				return fmt.Errorf("adding registration to store: %w", err)
+			if err := e.registrationTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
+				return fmt.Errorf("saving registration: %w", err)
 			}
 
 			return nil
