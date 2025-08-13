@@ -283,7 +283,6 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -795,7 +794,6 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
-	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
 	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
