@@ -211,39 +211,59 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	// Update dedup state and decide whether to log
 	now := time.Now()
 
-	d.cacheLock.Lock()
-	entry, exists := d.cache[hash]
-	if !exists {
-		attrs := collectAttrs(record)
-		d.cache[hash] = &logEntry{
-			firstSeen: now,
-			lastSeen:  now,
-			count:     1,
-			level:     record.Level,
-			message:   record.Message,
-			attrs:     attrs,
-			pc:        record.PC,
+	// Compute action under lock, then release before calling next
+	shouldPass := false
+	addDuplicateMeta := false
+	var duplicateCount int
+	var firstSeen time.Time
+	var lastSeen time.Time
+
+	func() {
+		d.cacheLock.Lock()
+		defer d.cacheLock.Unlock()
+
+		entry, exists := d.cache[hash]
+		if !exists {
+			attrs := collectAttrs(record)
+			d.cache[hash] = &logEntry{
+				firstSeen: now,
+				lastSeen:  now,
+				count:     1,
+				level:     record.Level,
+				message:   record.Message,
+				attrs:     attrs,
+				pc:        record.PC,
+			}
+			// First occurrence passes through unchanged
+			shouldPass = true
+			return
 		}
-		d.cacheLock.Unlock()
-		// First occurrence: let it through unmodified
-		return next(ctx, record)
+
+		entry.lastSeen = now
+		entry.count++
+		// Window for tracking this particular log has elapsed -- relog with duplicate metadata
+		if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
+			duplicateCount = entry.count
+			firstSeen = entry.firstSeen
+			lastSeen = entry.lastSeen
+			addDuplicateMeta = true
+			shouldPass = true
+			return
+		}
+
+		// Otherwise, suppress this duplicate
+		shouldPass = false
+	}()
+
+	if !shouldPass {
+		return nil
 	}
-
-	entry.lastSeen = now
-	entry.count++
-	// Window for tracking this particular log has elapsed -- log the log with its duplicate count
-	if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
-		d.cacheLock.Unlock()
-
-		record.Add("duplicate_count", slog.IntValue(entry.count))
-		record.Add("first_seen", slog.TimeValue(entry.firstSeen))
-		record.Add("last_seen", slog.TimeValue(entry.lastSeen))
-		return next(ctx, record)
+	if addDuplicateMeta {
+		record.Add("duplicate_count", slog.IntValue(duplicateCount))
+		record.Add("first_seen", slog.TimeValue(firstSeen))
+		record.Add("last_seen", slog.TimeValue(lastSeen))
 	}
-
-	// Suppress this duplicate
-	d.cacheLock.Unlock()
-	return nil
+	return next(ctx, record)
 }
 
 // Stop stops the background cleanup goroutine.
