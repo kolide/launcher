@@ -324,25 +324,13 @@ func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) err
 		return errors.New("no claim for organization in enrollment secret, cannot get munemo")
 	}
 
-	r := types.Registration{
-		RegistrationID:   e.registrationId,
-		Munemo:           fmt.Sprintf("%s", munemo),
-		NodeKey:          nodeKey,
-		EnrollmentSecret: enrollmentSecret,
-	}
-
-	rawRegistration, err := json.Marshal(r)
-	if err != nil {
-		return fmt.Errorf("marshalling registration: %w", err)
-	}
-
-	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), rawRegistration); err != nil {
-		return fmt.Errorf("adding registration to store: %w", err)
+	if err := e.knapsack.SaveRegistration(e.registrationId, fmt.Sprintf("%s", munemo), nodeKey, enrollmentSecret); err != nil {
+		return fmt.Errorf("saving registration: %w", err)
 	}
 
 	e.slogger.Log(context.TODO(), slog.LevelInfo,
 		"successfully stored new registration",
-		"munemo", r.Munemo,
+		"munemo", munemo,
 	)
 
 	return nil
@@ -534,12 +522,8 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, err
 	}
 
-	// Save newly acquired node key if successful
-	err = e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(keyString))
-	if err != nil {
-		return "", true, fmt.Errorf("saving node key: %w", err)
-	}
-
+	// Save newly acquired node key if successful -- adding the registration
+	// will do this.
 	e.NodeKey = keyString
 	if err := e.addRegistration(keyString, enrollSecret); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,

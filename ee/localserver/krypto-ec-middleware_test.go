@@ -208,8 +208,10 @@ func TestKryptoEcMiddleware(t *testing.T) {
 							Once()
 					}
 
+					k := typesmocks.NewKnapsack(t)
+
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					kryptoEcMiddleware.presenceDetectionStatusUpdateInterval = presenceDetectionCallbackInterval
 
 					rr := httptest.NewRecorder()
@@ -349,8 +351,10 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					mockPresenceDetector := mocks.NewPresenceDetector(t)
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
+					k := typesmocks.NewKnapsack(t)
+
 					// set up middlewares
-					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
+					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
 						tt.middlewareOpt(kryptoEcMiddleware)
 					}
@@ -481,8 +485,10 @@ func Test_AllowedOrigin(t *testing.T) {
 			mockPresenceDetector := mocks.NewPresenceDetector(t)
 			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
+			k := typesmocks.NewKnapsack(t)
+
 			// set up middlewares
-			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
+			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
 
 			h := kryptoEcMiddleware.Wrap(testHandler)
 
@@ -678,7 +684,9 @@ func TestMunemoCheck(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			e := newKryptoEcMiddleware(multislogger.NewNopLogger(), nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
+			slogger := multislogger.NewNopLogger()
+
+			e := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
 			err = e.checkMunemo(tt.headers)
 			if tt.expectMiddleWareCheckErr {
 				require.Error(t, err)
@@ -709,9 +717,10 @@ func Test_sendCallback(t *testing.T) {
 		AddSource: true,
 		Level:     slog.LevelDebug,
 	}))
+	k := typesmocks.NewKnapsack(t)
 
 	requestsQueued := &atomic.Int64{}
-	mw := newKryptoEcMiddleware(slogger, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
+	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
 	for range callbackQueueCapacity {
 		go func() {
 			req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, testCallbackServer.URL, nil)
@@ -729,4 +738,63 @@ func Test_sendCallback(t *testing.T) {
 
 	// We should have sent at least some of them
 	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
+}
+
+func Test_sendCallback_handlesEnrollment(t *testing.T) {
+	t.Parallel()
+
+	// Set up a test server to receive callback requests and return enrollment info
+	requestsReceived := &atomic.Int64{}
+	expectedNodeKey := "test-node-key"
+	expectedMunemo := "test-munemo"
+	resp := callbackResponse{
+		NodeKey: expectedNodeKey,
+		Munemo:  expectedMunemo,
+	}
+	respRaw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestsReceived.Add(1)
+		w.Write(respRaw)
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testCallbackServer.Close()
+	})
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+	k := typesmocks.NewKnapsack(t)
+	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+
+	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+
+	// Confirm we do not have a munemo set
+	require.Equal(t, "", mw.tenantMunemo.Load())
+
+	requestsQueued := &atomic.Int64{}
+	for range callbackQueueCapacity {
+		go func() {
+			req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, testCallbackServer.URL, nil)
+			require.NoError(t, err)
+			mw.sendCallback(req, &callbackDataStruct{})
+			requestsQueued.Add(1)
+		}()
+	}
+
+	// Wait a little bit to give the requests a chance to enqueue
+	time.Sleep(5 * time.Second)
+
+	// We should have been able to add all requests to the queue
+	require.Equal(t, callbackQueueCapacity, int(requestsQueued.Load()), "could not add all requests to queue; logs: ", logBytes.String())
+
+	// We should have sent at least some of them
+	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
+
+	// We should have called SaveRegistration
+	k.AssertExpectations(t)
 }

@@ -27,6 +27,9 @@ var enrollmentDetails *types.EnrollmentDetails
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
 
+// nodeKeyKey is the key that we store the node key under in the config store.
+var nodeKeyKey = []byte("nodeKey")
+
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
 type knapsack struct {
@@ -119,6 +122,43 @@ func (k *knapsack) Registrations() ([]types.Registration, error) {
 		return nil, fmt.Errorf("fetching registrations from store: %w", err)
 	}
 	return registrations, nil
+}
+
+// SaveRegistration creates a new registration using the given information and stores it
+// in our registration store; it also stores the node key separately in the config store.
+// It is permissible for the enrollment secret to be empty, in the case of a secretless enrollment.
+func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store")
+	}
+
+	// Prepare the new registration for storage
+	r := types.Registration{
+		RegistrationID:   registrationId,
+		Munemo:           munemo,
+		NodeKey:          nodeKey,
+		EnrollmentSecret: enrollmentSecret,
+	}
+	rawRegistration, err := json.Marshal(r)
+	if err != nil {
+		return fmt.Errorf("marshalling registration: %w", err)
+	}
+
+	// Now, store our data
+	if err := nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(nodeKey)); err != nil {
+		return fmt.Errorf("setting node key in store: %w", err)
+	}
+	if err := registrationStore.Set([]byte(registrationId), rawRegistration); err != nil {
+		return fmt.Errorf("adding registration to store: %w", err)
+	}
+
+	return nil
 }
 
 // InstanceStatuses returns the current status of each osquery instance.
