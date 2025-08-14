@@ -8,11 +8,5 @@ import (
 )
 
 func SystemSlogger() (*MultiSlogger, io.Closer, error) {
-	ms := defaultSystemSlogger()
-	// Ensure the dedup engine is stopped when the closer is closed
-	closer := closerFunc(func() error {
-		ms.Stop()
-		return nil
-	})
-	return ms, closer, nil
+	return defaultSystemSlogger(), io.NopCloser(nil), nil
 }
