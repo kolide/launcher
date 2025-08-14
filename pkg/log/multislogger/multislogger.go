@@ -49,7 +49,8 @@ func New(h ...slog.Handler) *MultiSlogger {
 	}
 
 	// Initialize deduper once at construction; it will emit summaries using the
-	// downstream middleware 'next' observed during handling.
+	// downstream middleware 'next' observed during handling. Call Start(ctx)
+	// to begin its background maintenance lifecycle.
 	ms.dedupEngine = dedup.New()
 
 	ms.AddHandler(h...)
@@ -88,6 +89,17 @@ func (m *MultiSlogger) Stop() {
 	}
 	if m.dedupEngine != nil {
 		m.dedupEngine.Stop()
+	}
+}
+
+// Start wires the lifecycle context for background middleware work (e.g.,
+// dedup engine cleanup). If called more than once, subsequent calls are no-ops.
+func (m *MultiSlogger) Start(ctx context.Context) {
+	if m == nil {
+		return
+	}
+	if m.dedupEngine != nil {
+		m.dedupEngine.Start(ctx)
 	}
 }
 

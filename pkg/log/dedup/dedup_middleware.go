@@ -145,9 +145,10 @@ type Engine struct {
 	lastCleanup time.Time
 	// ensure only one cleanup runs at a time
 	cleanupRunning atomic.Bool
+	// started indicates whether Start(ctx) has been called and the engine is active
+	started atomic.Bool
 
 	// background cleanup machinery
-	ctx                          context.Context //nolint:containedctx // Used for background goroutine lifecycle
 	cancel                       context.CancelFunc
 	backGroundCleanUpWorkerGroup sync.WaitGroup
 
@@ -172,23 +173,21 @@ func New(opts ...Option) *Engine {
 		opt(&cfg)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	d := &Engine{
 		cfg:         cfg,
 		cache:       make(map[string]*logEntry),
 		lastCleanup: time.Now(),
-		ctx:         ctx,
-		cancel:      cancel,
 	}
-
-	d.startBackgroundCleanup()
 	return d
 }
 
 // Middleware is an inline slog middleware method bound to this Engine instance.
 // It matches slog-multi's inline middleware signature.
 func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	// If the engine hasn't been started, act as a no-op middleware.
+	if !d.started.Load() {
+		return next(ctx, record)
+	}
 	// Remember the latest downstream 'next' so background cleanup can emit
 	// summary records through the same pipeline.
 	d.lastNext.Store(nextFunc(next))
@@ -277,18 +276,36 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 
 // Stop stops the background cleanup goroutine.
 func (d *Engine) Stop() {
-	d.cancel()
+	if d == nil {
+		return
+	}
+	if d.cancel != nil {
+		d.cancel()
+	}
 	d.backGroundCleanUpWorkerGroup.Wait()
+	d.started.Store(false)
 }
 
 // startBackgroundCleanup launches the periodic cleanup worker.
-func (d *Engine) startBackgroundCleanup() {
+// Start launches the periodic cleanup worker bound to the provided context.
+// Subsequent calls are no-ops until Stop is called.
+func (d *Engine) Start(ctx context.Context) {
+	if d == nil {
+		return
+	}
+	// If already started, do nothing.
+	if d.cancel != nil {
+		return
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	d.cancel = cancel
+	d.started.Store(true)
 	d.backGroundCleanUpWorkerGroup.Add(1)
-	go d.periodicCleanupLoop()
+	go d.periodicCleanupLoop(runCtx)
 }
 
 // periodicCleanupLoop runs the cleanup ticker until the context is canceled.
-func (d *Engine) periodicCleanupLoop() {
+func (d *Engine) periodicCleanupLoop(ctx context.Context) {
 	defer d.backGroundCleanUpWorkerGroup.Done()
 	ticker := time.NewTicker(d.cfg.CleanupInterval)
 	defer ticker.Stop()
@@ -296,7 +313,7 @@ func (d *Engine) periodicCleanupLoop() {
 		select {
 		case <-ticker.C:
 			d.performCleanup()
-		case <-d.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}

@@ -68,6 +68,7 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
+	engine.Start(context.Background())
 	defer engine.Stop()
 
 	mw := engine.Middleware
@@ -121,6 +122,7 @@ func TestDebugLevelIsDedupedLikeOthers(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
+	engine.Start(context.Background())
 	defer engine.Stop()
 
 	mw := engine.Middleware
@@ -158,6 +160,7 @@ func TestZeroWindowShortCircuitsDedup(t *testing.T) {
 	engine := New(
 		WithDuplicateLogWindow(0), // disabled
 	)
+	engine.Start(context.Background())
 	defer engine.Stop()
 
 	mw := engine.Middleware
@@ -191,6 +194,7 @@ func TestEmittedAttrSkipsDedup(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
+	engine.Start(context.Background())
 	defer engine.Stop()
 
 	mw := engine.Middleware
@@ -226,6 +230,7 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(50*time.Millisecond),
 	)
+	engine.Start(context.Background())
 	defer engine.Stop()
 
 	mw := engine.Middleware
@@ -303,6 +308,7 @@ func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
 		WithCleanupInterval(30*time.Millisecond),
 		WithCacheExpiry(80*time.Millisecond),
 	)
+	engine.Start(context.Background())
 
 	mw := engine.Middleware
 	ctx := context.Background()
