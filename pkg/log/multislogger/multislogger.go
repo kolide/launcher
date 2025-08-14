@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"sync/atomic"
 
 	"github.com/kolide/launcher/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
@@ -38,6 +39,10 @@ type MultiSlogger struct {
 
 	// middlewares with state that must persist across rebuilds
 	dedupEngine *dedup.Engine
+
+	// lifecycle coordination when managed by a rungroup
+	interrupted atomic.Bool
+	stopCh      chan struct{}
 }
 
 // New creates a new multislogger if no handlers are passed in, it will
@@ -90,6 +95,53 @@ func (m *MultiSlogger) Stop() {
 	if m.dedupEngine != nil {
 		m.dedupEngine.Stop()
 	}
+}
+
+// ExecuteWithContext returns a function suitable for a rungroup actor that starts
+// the multislogger background work and blocks until interrupted.
+func (m *MultiSlogger) ExecuteWithContext(ctx context.Context) func() error {
+	return func() error {
+		if m == nil {
+			return nil
+		}
+		// reset interruption state on each run
+		m.interrupted.Store(false)
+		// lazily initialize stop channel
+		if m.stopCh == nil {
+			m.stopCh = make(chan struct{})
+		}
+		// start background middleware (dedup cleanup loop)
+		m.Start(ctx)
+		// block until interrupted
+		select {
+		case <-ctx.Done():
+		case <-m.stopCh:
+		}
+		return nil
+	}
+}
+
+// Interrupt implements a rungroup-compatible interrupt handler. It is safe to
+// call multiple times; only the first call closes the internal stop channel and
+// stops background resources.
+func (m *MultiSlogger) Interrupt(_ error) {
+	if m == nil {
+		return
+	}
+	// ensure only first interrupt proceeds
+	if m.interrupted.Swap(true) {
+		return
+	}
+	if m.stopCh != nil {
+		select {
+		case <-m.stopCh:
+			// already closed
+		default:
+			close(m.stopCh)
+		}
+	}
+	// stop background middleware (idempotent)
+	m.Stop()
 }
 
 // Start wires the lifecycle context for background middleware work (e.g.,
