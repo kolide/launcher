@@ -279,6 +279,49 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Set slogger on initial trace buffer (in order to troubleshoot unexpected nil spans)
 	initialTraceBuffer.SetSlogger(k.Slogger())
 
+	// Manage multislogger lifecycle via rungroup
+	{
+		msStop := make(chan struct{})
+		runGroup.Add("multislogger", func() error {
+			// Start background middleware work (e.g., dedup cleanup)
+			multiSlogger.Start(ctx)
+			// Block until interrupted
+			select {
+			case <-ctx.Done():
+			case <-msStop:
+			}
+			return nil
+		}, func(error) {
+			// Ensure execute returns promptly and stop resources
+			select {
+			case <-msStop:
+			default:
+				close(msStop)
+			}
+			multiSlogger.Stop()
+		})
+	}
+
+	// Manage system multislogger lifecycle via rungroup
+	{
+		smsStop := make(chan struct{})
+		runGroup.Add("systemMultislogger", func() error {
+			systemMultiSlogger.Start(ctx)
+			select {
+			case <-ctx.Done():
+			case <-smsStop:
+			}
+			return nil
+		}, func(error) {
+			select {
+			case <-smsStop:
+			default:
+				close(smsStop)
+			}
+			systemMultiSlogger.Stop()
+		})
+	}
+
 	startupSettingsWriter, err := startupsettings.OpenWriter(ctx, k)
 	if err != nil {
 		return fmt.Errorf("creating startup db: %w", err)
