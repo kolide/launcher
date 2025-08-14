@@ -48,9 +48,9 @@ func New(h ...slog.Handler) *MultiSlogger {
 		Logger: slog.New(slogmulti.Fanout()),
 	}
 
-	// Initialize deduper once at construction; we'll point its emission
-	// to the fully built logger after handlers are wired in AddHandler
-	ms.dedupEngine = dedup.New(slog.New(slogmulti.Fanout()))
+	// Initialize deduper once at construction; it will emit summaries using the
+	// downstream middleware 'next' observed during handling.
+	ms.dedupEngine = dedup.New()
 
 	ms.AddHandler(h...)
 	return ms
@@ -78,8 +78,6 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
 
-	// Point deduper emission to this fully built logger
-	m.dedupEngine.SetLogger(m.Logger)
 }
 
 // Stop releases background resources owned by the multislogger, such as the

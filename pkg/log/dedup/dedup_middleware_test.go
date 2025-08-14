@@ -9,35 +9,7 @@ import (
 	"time"
 )
 
-// captureHandler is a slog.Handler implementation that captures handled records.
-type captureHandler struct {
-	mu      sync.Mutex
-	records []slog.Record
-}
-
-func (h *captureHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h *captureHandler) Handle(ctx context.Context, r slog.Record) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.records = append(h.records, r.Clone())
-	return nil
-}
-
-func (h *captureHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return h }
-func (h *captureHandler) WithGroup(name string) slog.Handler       { return h }
-
-func (h *captureHandler) Len() int {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return len(h.records)
-}
-
-func (h *captureHandler) Get(i int) slog.Record {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.records[i]
-}
+// captureHandler removed; tests now capture emissions via nextCapture only.
 
 // nextCapture captures records that pass through the middleware to the next handler.
 type nextCapture struct {
@@ -90,9 +62,8 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
 	// Keep windows small to make test fast
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -145,8 +116,7 @@ func TestDebugLevelIsDedupedLikeOthers(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -185,8 +155,7 @@ func TestZeroWindowShortCircuitsDedup(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(0), // disabled
 	)
 	defer engine.Stop()
@@ -217,8 +186,7 @@ func TestEmittedAttrSkipsDedup(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(200*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
@@ -253,8 +221,7 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(50*time.Millisecond),
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(50*time.Millisecond),
@@ -273,16 +240,17 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 
 	// Wait a little for any background cleanup emission to be handled
+	initialPassCount := next.Len() // should be 1 from the first pass-through
 	deadline := time.Now().Add(300 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if sink.Len() > 0 {
+		if next.Len() > initialPassCount {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if sink.Len() != 0 {
-		t.Fatalf("expected no summary emission for single record, got %d", sink.Len())
+	if next.Len() != initialPassCount {
+		t.Fatalf("expected no summary emission for single record, got %d new records", next.Len()-initialPassCount)
 	}
 
 	// Now log a duplicate set; should emit a summary (count > 1)
@@ -295,18 +263,20 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 
 	time.Sleep(150 * time.Millisecond)
 	deadline = time.Now().Add(500 * time.Millisecond)
+	// We expect one new record (the summary) beyond the initial pass-through of the first dup
+	expected := initialPassCount + 1 // from first pass-through in this section
 	for time.Now().Before(deadline) {
-		if sink.Len() > 0 {
+		if next.Len() > expected { // expecting summary to make it expected+1
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if sink.Len() == 0 {
+	if next.Len() <= expected {
 		t.Fatalf("expected a summary record to be emitted for duplicates on cleanup")
 	}
 
-	summary := sink.Get(0)
+	summary := next.Get(next.Len() - 1)
 	if summary.Message != "dup msg" {
 		t.Fatalf("expected message %q, got %q", "dup msg", summary.Message)
 	}
@@ -328,8 +298,7 @@ func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
 	t.Parallel()
 
 	next := &nextCapture{}
-	sink := &captureHandler{}
-	engine := New(slog.New(sink),
+	engine := New(
 		WithDuplicateLogWindow(200*time.Millisecond),
 		WithCleanupInterval(30*time.Millisecond),
 		WithCacheExpiry(80*time.Millisecond),
@@ -350,9 +319,10 @@ func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
 	engine.Stop()
 
 	// Wait beyond both cache expiry and cleanup interval; no summary should be emitted after Stop
+	before := next.Len()
 	time.Sleep(300 * time.Millisecond)
 
-	if got := sink.Len(); got != 0 {
-		t.Fatalf("expected no summary emission after Stop, got %d", got)
+	if got := next.Len() - before; got != 0 {
+		t.Fatalf("expected no summary emission after Stop, got %d new record(s)", got)
 	}
 }

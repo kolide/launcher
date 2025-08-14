@@ -65,6 +65,10 @@ import (
 	"time"
 )
 
+// nextFunc represents the downstream slog-multi inline middleware function
+// used to forward a record to the next handler in the chain.
+type nextFunc func(context.Context, slog.Record) error
+
 // EmittedAttrKey marks a record that is being emitted by the deduper itself
 // (e.g., during cleanup) so the middleware can skip deduplication to prevent
 // feedback loops.
@@ -147,14 +151,17 @@ type Engine struct {
 	cancel                       context.CancelFunc
 	backGroundCleanUpWorkerGroup sync.WaitGroup
 
-	// logger used to emit records on cleanup
-	logger *slog.Logger
+	// lastNext holds the most recently seen downstream middleware function used to
+	// forward records during background cleanup emissions. Stored via atomic.Value
+	// to allow lock-free reads from the cleanup goroutine.
+	lastNext atomic.Value // of type nextFunc
 }
 
-// NewEngine creates a new deduplication engine. The provided logger is used to
-// emit summary records on expiration; pass the pipeline's logger so records go
-// through the same handler chain.
-func New(logger *slog.Logger, opts ...Option) *Engine {
+// New creates a new deduplication engine. The engine keeps a reference to the
+// most recently observed downstream 'next' function (from Middleware) and uses
+// it to emit summary records during background cleanup so they flow through the
+// same handler chain.
+func New(opts ...Option) *Engine {
 	cfg := Config{
 		CacheExpiry:        DefaultCacheExpiry,
 		MaxCacheSize:       DefaultMaxCacheSize,
@@ -173,7 +180,6 @@ func New(logger *slog.Logger, opts ...Option) *Engine {
 		lastCleanup: time.Now(),
 		ctx:         ctx,
 		cancel:      cancel,
-		logger:      logger,
 	}
 
 	d.startBackgroundCleanup()
@@ -183,6 +189,9 @@ func New(logger *slog.Logger, opts ...Option) *Engine {
 // Middleware is an inline slog middleware method bound to this Engine instance.
 // It matches slog-multi's inline middleware signature.
 func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
+	// Remember the latest downstream 'next' so background cleanup can emit
+	// summary records through the same pipeline.
+	d.lastNext.Store(nextFunc(next))
 	// If the duplicate window is disabled (<= 0), short-circuit and skip all dedup logic
 	if d.cfg.DuplicateLogWindow <= 0 {
 		return next(ctx, record)
@@ -270,15 +279,6 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 func (d *Engine) Stop() {
 	d.cancel()
 	d.backGroundCleanUpWorkerGroup.Wait()
-}
-
-// SetLogger updates the logger used for emitting records during cleanup. This
-// allows wiring the deduper into a pipeline first and then pointing emission to
-// that fully constructed pipeline logger.
-func (d *Engine) SetLogger(l *slog.Logger) {
-	d.cacheLock.Lock()
-	defer d.cacheLock.Unlock()
-	d.logger = l
 }
 
 // startBackgroundCleanup launches the periodic cleanup worker.
@@ -397,9 +397,12 @@ func (d *Engine) performCleanup() {
 			slog.Time("first_seen", e.firstSeen),
 			slog.Time("last_seen", e.lastSeen),
 		)
-		// Emit using the provided logger's handler so it traverses the pipeline
-		if d.logger != nil {
-			_ = d.logger.Handler().Handle(context.Background(), rec)
+		// Emit using the most recently observed downstream 'next' so it
+		// traverses the same pipeline. Best-effort if available.
+		if v := d.lastNext.Load(); v != nil {
+			if n, ok := v.(nextFunc); ok && n != nil {
+				_ = n(context.Background(), rec)
+			}
 		}
 	}
 }
