@@ -77,7 +77,7 @@ const (
 	DefaultCacheExpiry        = 5 * time.Minute
 	DefaultMaxCacheSize       = 2000
 	DefaultCleanupInterval    = 1 * time.Minute
-	DefaultDuplicateLogWindow = 1 * time.Minute
+	DefaultDuplicateLogWindow = 0
 )
 
 // duplicateSummaryMsg is no longer used; we emit the original message on summary
