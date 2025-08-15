@@ -188,13 +188,15 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	if !d.started.Load() {
 		return next(ctx, record)
 	}
-	// Remember the latest downstream 'next' so background cleanup can emit
-	// summary records through the same pipeline.
-	d.lastNext.Store(nextFunc(next))
 	// If the duplicate window is disabled (<= 0), short-circuit and skip all dedup logic
 	if d.cfg.DuplicateLogWindow <= 0 {
 		return next(ctx, record)
 	}
+
+	// Remember the latest downstream 'next' so background cleanup can emit
+	// summary records through the same pipeline.
+	d.lastNext.Store(nextFunc(next))
+
 	// Skip dedup if this is an internally emitted record
 	skip := false
 	record.Attrs(func(a slog.Attr) bool {
