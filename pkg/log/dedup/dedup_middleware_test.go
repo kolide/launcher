@@ -185,42 +185,6 @@ func TestZeroWindowShortCircuitsDedup(t *testing.T) {
 	}
 }
 
-func TestEmittedAttrSkipsDedup(t *testing.T) {
-	t.Parallel()
-
-	next := &nextCapture{}
-	engine := New(
-		WithDuplicateLogWindow(200*time.Millisecond),
-		WithCleanupInterval(10*time.Millisecond),
-		WithCacheExpiry(500*time.Millisecond),
-	)
-	engine.Start(context.Background())
-	defer engine.Stop()
-
-	mw := engine.Middleware
-	ctx := context.Background()
-
-	// First record marked as emitted should bypass dedup
-	r := makeRecord(slog.LevelInfo, "info msg", slog.Bool(EmittedAttrKey, true))
-	if err := mw(ctx, r, next.next); err != nil {
-		t.Fatalf("middleware err: %v", err)
-	}
-
-	// Immediately log same message without emitted attr: should be treated as first occurrence
-	if err := mw(ctx, makeRecord(slog.LevelInfo, "info msg"), next.next); err != nil {
-		t.Fatalf("middleware err: %v", err)
-	}
-
-	// Immediate duplicate should be suppressed
-	if err := mw(ctx, makeRecord(slog.LevelInfo, "info msg"), next.next); err != nil {
-		t.Fatalf("middleware err: %v", err)
-	}
-
-	if next.Len() != 2 {
-		t.Fatalf("expected two passed records (emitted + first real), got %d", next.Len())
-	}
-}
-
 func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	t.Parallel()
 

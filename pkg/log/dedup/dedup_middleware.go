@@ -70,8 +70,6 @@ import (
 type nextFunc func(context.Context, slog.Record) error
 
 // EmittedAttrKey marks a record that is being emitted by the deduper itself
-// (e.g., during cleanup) so the middleware can skip deduplication to prevent
-// feedback loops.
 const EmittedAttrKey = "__dedup_emitted"
 
 // Default configuration values.
@@ -196,21 +194,6 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 	// Remember the latest downstream 'next' so background cleanup can emit
 	// summary records through the same pipeline.
 	d.lastNext.Store(nextFunc(next))
-
-	// Skip dedup if this is an internally emitted record
-	skip := false
-	record.Attrs(func(a slog.Attr) bool {
-		if a.Key == EmittedAttrKey {
-			// Only skip if it is truthy
-			if a.Value.Kind() == slog.KindBool && a.Value.Bool() {
-				skip = true
-			}
-		}
-		return !skip
-	})
-	if skip {
-		return next(ctx, record)
-	}
 
 	// Create a content hash for this record
 	hash := hashRecord(record)
