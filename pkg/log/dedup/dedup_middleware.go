@@ -138,9 +138,8 @@ type Engine struct {
 	cfg Config
 
 	// runtime state
-	cacheLock   sync.RWMutex
-	cache       map[string]*logEntry // maps log hash to corresponding tracked entry
-	lastCleanup time.Time
+	cacheLock sync.RWMutex
+	cache     map[string]*logEntry // maps log hash to corresponding tracked entry
 	// ensure only one cleanup runs at a time
 	cleanupRunning atomic.Bool
 	// started indicates whether Start(ctx) has been called and the engine is active
@@ -172,9 +171,8 @@ func New(opts ...Option) *Engine {
 	}
 
 	d := &Engine{
-		cfg:         cfg,
-		cache:       make(map[string]*logEntry),
-		lastCleanup: time.Now(),
+		cfg:   cfg,
+		cache: make(map[string]*logEntry),
 	}
 	return d
 }
@@ -197,9 +195,6 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 
 	// Create a content hash for this record
 	hash := hashRecord(record)
-
-	// Possibly trigger cleanup in the background (non-blocking)
-	d.maybeCleanup()
 
 	// Update dedup state and decide whether to log
 	now := time.Now()
@@ -314,13 +309,6 @@ func (d *Engine) performCleanup() {
 	defer d.cleanupRunning.Store(false)
 	d.cacheLock.Lock()
 
-	// Remove expired entries
-	if now.Sub(d.lastCleanup) < d.cfg.CleanupInterval {
-		d.cacheLock.Unlock()
-		return
-	}
-	d.lastCleanup = now
-
 	// Build a list to avoid holding the lock while emitting
 	type expired struct {
 		level     slog.Level
@@ -406,17 +394,6 @@ func (d *Engine) performCleanup() {
 				_ = n(context.Background(), rec)
 			}
 		}
-	}
-}
-
-// maybeCleanup triggers cleanup based on time since last cleanup.
-func (d *Engine) maybeCleanup() {
-	d.cacheLock.RLock()
-	last := d.lastCleanup
-	d.cacheLock.RUnlock()
-	if time.Since(last) >= d.cfg.CleanupInterval {
-		// Best-effort cleanup run in the background; the periodic ticker will also handle it
-		go d.performCleanup()
 	}
 }
 
