@@ -298,7 +298,7 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		WatchdogMemoryLimitMB:           600,
 		WatchdogUtilizationLimitPercent: 50,
 		Identifier:                      DefaultLauncherIdentifier,
-		AutoupdateDownloadSplay:         8 * time.Hour,
+		AutoupdateDownloadSplay:         24 * time.Hour,
 	}
 
 	return args, opts

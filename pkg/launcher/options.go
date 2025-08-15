@@ -234,7 +234,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flUpdateChannel           = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
 		flAutoupdateInitialDelay  = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
 		flUpdateDirectory         = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
-		flAutoupdateDownloadSplay = flagset.Duration("autoupdate_download_splay", 8*time.Hour, "duration of time over which launcher should select random delay before downloading")
+		flAutoupdateDownloadSplay = flagset.Duration("autoupdate_download_splay", 24*time.Hour, "duration of time over which launcher should select random delay before downloading")
 
 		// Development & Debugging options
 		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
