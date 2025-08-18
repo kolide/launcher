@@ -108,7 +108,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	// Start and then interrupt
 	go executeFunc()
-	time.Sleep(100 * time.Millisecond) // Give it time to start
+	time.Sleep(3 * time.Second) // Give it time to start
 	interruptStart := time.Now()
 	multislogger.Interrupt(errors.New("test error"))
 
