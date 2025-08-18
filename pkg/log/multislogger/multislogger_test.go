@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"log/slog"
 
@@ -93,4 +95,48 @@ func jsonl(t *testing.T, reader io.Reader) []map[string]interface{} {
 	}
 
 	return result
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	var logBuf bytes.Buffer
+	multislogger := New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	ctx := context.Background()
+	executeFunc := multislogger.ExecuteWithContext(ctx)
+
+	// Start and then interrupt
+	go executeFunc()
+	time.Sleep(100 * time.Millisecond) // Give it time to start
+	interruptStart := time.Now()
+	multislogger.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			multislogger.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBuf.String())
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }
