@@ -72,9 +72,6 @@ const (
 	DefaultDuplicateLogWindow = 0
 )
 
-// duplicateSummaryMsg is no longer used; we emit the original message on summary
-// to preserve grouping in external log processing systems.
-
 // excludedHashFields are the attribute keys that should not affect the content hash.
 var excludedHashFields = map[string]bool{
 	"ts":              true, // go-kit timestamp
@@ -171,12 +168,9 @@ func New(opts ...Option) *Engine {
 // Middleware is an inline slog middleware method bound to this Engine instance.
 // It matches slog-multi's inline middleware signature.
 func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
-	// If the engine hasn't been started, act as a no-op middleware.
-	if !d.started.Load() {
-		return next(ctx, record)
-	}
-	// If the duplicate window is disabled (<= 0), short-circuit and skip all dedup logic
-	if d.cfg.DuplicateLogWindow <= 0 {
+	// If the engine hasn't been started or duplicate log window is disabled,
+	// act as a no-op middleware.
+	if !d.started.Load() || d.cfg.DuplicateLogWindow <= 0 {
 		return next(ctx, record)
 	}
 
