@@ -51,6 +51,7 @@ func New(h ...slog.Handler) *MultiSlogger {
 	ms := &MultiSlogger{
 		// setting to fanout with no handlers is noop
 		Logger: slog.New(slogmulti.Fanout()),
+		stopCh: make(chan struct{}),
 	}
 
 	// Initialize deduper once at construction; it will emit summaries using the
@@ -106,9 +107,13 @@ func (m *MultiSlogger) ExecuteWithContext(ctx context.Context) func() error {
 		}
 		// reset interruption state on each run
 		m.interrupted.Store(false)
-		// lazily initialize stop channel
-		if m.stopCh == nil {
+		// recreate stop channel if it was previously closed
+		select {
+		case <-m.stopCh:
+			// channel was closed, create a new one
 			m.stopCh = make(chan struct{})
+		default:
+			// channel is open, use existing one
 		}
 		// start background middleware (dedup cleanup loop)
 		m.Start(ctx)

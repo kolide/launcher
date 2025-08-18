@@ -134,6 +134,7 @@ type Engine struct {
 	started atomic.Bool
 
 	// background cleanup machinery
+	lifecycleLock                sync.Mutex // protects cancel field for Start/Stop operations
 	cancel                       context.CancelFunc
 	backGroundCleanUpWorkerGroup sync.WaitGroup
 
@@ -244,8 +245,12 @@ func (d *Engine) Stop() {
 	if d == nil {
 		return
 	}
-	if d.cancel != nil {
-		d.cancel()
+	d.lifecycleLock.Lock()
+	cancel := d.cancel
+	d.lifecycleLock.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 	d.backGroundCleanUpWorkerGroup.Wait()
 	d.started.Store(false)
@@ -263,7 +268,11 @@ func (d *Engine) Start(ctx context.Context) {
 		return
 	}
 	runCtx, cancel := context.WithCancel(ctx)
+
+	d.lifecycleLock.Lock()
 	d.cancel = cancel
+	d.lifecycleLock.Unlock()
+
 	d.started.Store(true)
 	d.backGroundCleanUpWorkerGroup.Add(1)
 	go d.periodicCleanupLoop(runCtx)
