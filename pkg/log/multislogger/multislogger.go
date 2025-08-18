@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"sync/atomic"
 
+	"github.com/kolide/launcher/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -34,6 +36,13 @@ var ctxValueKeysToAdd = []contextKey{
 type MultiSlogger struct {
 	*slog.Logger
 	handlers []slog.Handler
+
+	// middlewares with state that must persist across rebuilds
+	dedupEngine *dedup.Engine
+
+	// lifecycle coordination when managed by a rungroup
+	interrupted atomic.Bool
+	stopCh      chan struct{}
 }
 
 // New creates a new multislogger if no handlers are passed in, it will
@@ -42,7 +51,13 @@ func New(h ...slog.Handler) *MultiSlogger {
 	ms := &MultiSlogger{
 		// setting to fanout with no handlers is noop
 		Logger: slog.New(slogmulti.Fanout()),
+		stopCh: make(chan struct{}),
 	}
+
+	// Initialize deduper once at construction; it will emit summaries using the
+	// downstream middleware 'next' observed during handling. Call Start(ctx)
+	// to begin its background maintenance lifecycle.
+	ms.dedupEngine = dedup.New()
 
 	ms.AddHandler(h...)
 	return ms
@@ -65,9 +80,84 @@ func (m *MultiSlogger) AddHandler(handler ...slog.Handler) {
 		slogmulti.
 			Pipe(slogmulti.NewHandleInlineMiddleware(utcTimeMiddleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(ctxValuesMiddleWare)).
+			Pipe(slogmulti.NewHandleInlineMiddleware(m.dedupEngine.Middleware)).
 			Pipe(slogmulti.NewHandleInlineMiddleware(reportedErrorMiddleware)).
 			Handler(slogmulti.Fanout(m.handlers...)),
 	)
+
+}
+
+// Stop releases background resources owned by the multislogger, such as the
+// deduplication engine cleanup goroutine.
+func (m *MultiSlogger) Stop() {
+	if m == nil {
+		return
+	}
+	if m.dedupEngine != nil {
+		m.dedupEngine.Stop()
+	}
+}
+
+// ExecuteWithContext returns a function suitable for a rungroup actor that starts
+// the multislogger background work and blocks until interrupted.
+func (m *MultiSlogger) ExecuteWithContext(ctx context.Context) func() error {
+	return func() error {
+		if m == nil {
+			return nil
+		}
+		// reset interruption state on each run
+		m.interrupted.Store(false)
+		// recreate stop channel if it was previously closed
+		select {
+		case <-m.stopCh:
+			// channel was closed, create a new one
+			m.stopCh = make(chan struct{})
+		default:
+			// channel is open, use existing one
+		}
+		// start background middleware (dedup cleanup loop)
+		m.Start(ctx)
+		// block until interrupted
+		select {
+		case <-ctx.Done():
+		case <-m.stopCh:
+		}
+		return nil
+	}
+}
+
+// Interrupt implements a rungroup-compatible interrupt handler. It is safe to
+// call multiple times; only the first call closes the internal stop channel and
+// stops background resources.
+func (m *MultiSlogger) Interrupt(_ error) {
+	if m == nil {
+		return
+	}
+	// ensure only first interrupt proceeds
+	if m.interrupted.Swap(true) {
+		return
+	}
+	if m.stopCh != nil {
+		select {
+		case <-m.stopCh:
+			// already closed
+		default:
+			close(m.stopCh)
+		}
+	}
+	// stop background middleware (idempotent)
+	m.Stop()
+}
+
+// Start wires the lifecycle context for background middleware work (e.g.,
+// dedup engine cleanup). If called more than once, subsequent calls are no-ops.
+func (m *MultiSlogger) Start(ctx context.Context) {
+	if m == nil {
+		return
+	}
+	if m.dedupEngine != nil {
+		m.dedupEngine.Start(ctx)
+	}
 }
 
 func utcTimeMiddleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
