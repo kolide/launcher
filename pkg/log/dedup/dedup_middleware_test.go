@@ -249,9 +249,6 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 	if summary.Message != "dup msg" {
 		t.Fatalf("expected message %q, got %q", "dup msg", summary.Message)
 	}
-	if v, ok := getAttrValue(summary, EmittedAttrKey); !ok || v.Kind() != slog.KindBool || !v.Bool() {
-		t.Fatalf("expected %s to be true on summary record", EmittedAttrKey)
-	}
 	if v, ok := getAttrValue(summary, "duplicate_count"); !ok || v.Kind() != slog.KindInt64 || v.Int64() < 2 {
 		t.Fatalf("expected duplicate_count >= 2 on summary record, got %v", v)
 	}

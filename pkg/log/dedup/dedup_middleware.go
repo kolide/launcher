@@ -6,7 +6,6 @@
 // High-level flow:
 //   - Incoming slog.Record enters the middleware chain
 //   - If DuplicateLogWindow <= 0, pass-through (dedup disabled)
-//   - If record has the internal marker attribute EmittedAttrKey=true, pass-through
 //   - Compute a hash of the record's stable content
 //   - Update or create the cache entry:
 //   - First time: store entry and pass the record through unmodified
@@ -15,18 +14,14 @@
 //     duplicate_count/first_seen/last_seen attributes
 //   - In the background, a periodic cleanup removes expired entries and, for
 //     those that had duplicates, emits a summarized record preserving the
-//     original message, attributes, and call site (PC) while tagging the record
-//     with EmittedAttrKey=true to prevent re-deduplication.
+//     original message, attributes, and call site (PC).
 //
 // Mermaid overview of the runtime behavior:
 // ```mermaid
 // flowchart TD
 //     A["Incoming slog.Record"] --> B{"DuplicateLogWindow ≤ 0?"}
 //     B -- Yes --> N["Pass‑through (dedup disabled)"]
-//     B -- No  --> C{"EmittedAttrKey == true?"}
-
-//     C -- Yes --> N
-//     C -- No  --> D["Compute stable content hash"]
+//     B -- No  --> D["Compute stable content hash"]
 
 //     D --> F{"Entry exists in cache?"}
 
@@ -45,7 +40,7 @@
 //         T["Every CleanupInterval"] --> U["performCleanup()"]
 //         U --> V{"Entry expired (now - lastSeen > CacheExpiry)?"}
 
-//         V -- Yes --> X["If count > 1:<br/> emit summary record<br/>(original msg/attrs/PC + duplicate_count)<br/>& set EmittedAttrKey=true"]
+//         V -- Yes --> X["If count > 1:<br/> emit summary record<br/>(original msg/attrs/PC + duplicate_count)"]
 //         V -- No  --> W{"Cache size > MaxCacheSize?"}
 
 //	    W -- Yes --> Y["Evict oldest; if count > 1 emit summary"]
@@ -69,9 +64,6 @@ import (
 // used to forward a record to the next handler in the chain.
 type nextFunc func(context.Context, slog.Record) error
 
-// EmittedAttrKey marks a record that is being emitted by the deduper itself
-const EmittedAttrKey = "__dedup_emitted"
-
 // Default configuration values.
 const (
 	DefaultCacheExpiry        = 5 * time.Minute
@@ -91,7 +83,6 @@ var excludedHashFields = map[string]bool{
 	"source":          true, // slog source info
 	"original.time":   true, // slog timestamp forwarded from desktop/watchdog process (see ee/log package)
 	"original.source": true, // slog source info forwarded from desktop/watchdog process (see ee/log package)
-	EmittedAttrKey:    true, // internal marker
 }
 
 // Config controls the behavior of the dedup middleware.
@@ -382,7 +373,6 @@ func (d *Engine) performCleanup() {
 		}
 		rec.AddAttrs(
 			slog.Int("duplicate_count", e.count),
-			slog.Bool(EmittedAttrKey, true),
 			slog.String("original_msg", e.message),
 			slog.Time("first_seen", e.firstSeen),
 			slog.Time("last_seen", e.lastSeen),
