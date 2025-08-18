@@ -291,10 +291,11 @@ func (d *Engine) performCleanup() {
 	if !d.cleanupRunning.CompareAndSwap(false, true) {
 		return
 	}
+
+	// Build a list to avoid holding the lock while emitting
 	defer d.cleanupRunning.Store(false)
 	d.cacheLock.Lock()
 
-	// Build a list to avoid holding the lock while emitting
 	type expired struct {
 		level     slog.Level
 		message   string
@@ -307,21 +308,22 @@ func (d *Engine) performCleanup() {
 	var toEmit []expired
 
 	for hash, entry := range d.cache {
-		if now.Sub(entry.lastSeen) > d.cfg.CacheExpiry {
-			// Only emit a summary when there were actual duplicates
-			if entry.count > 1 {
-				toEmit = append(toEmit, expired{
-					level:     entry.level,
-					message:   entry.message,
-					attrs:     append([]slog.Attr(nil), entry.attrs...),
-					count:     entry.count,
-					pc:        entry.pc,
-					firstSeen: entry.firstSeen,
-					lastSeen:  entry.lastSeen,
-				})
-			}
-			delete(d.cache, hash)
+		if now.Sub(entry.lastSeen) <= d.cfg.CacheExpiry {
+			continue
 		}
+		// Only emit a summary when there were actual duplicates
+		if entry.count > 1 {
+			toEmit = append(toEmit, expired{
+				level:     entry.level,
+				message:   entry.message,
+				attrs:     append([]slog.Attr(nil), entry.attrs...),
+				count:     entry.count,
+				pc:        entry.pc,
+				firstSeen: entry.firstSeen,
+				lastSeen:  entry.lastSeen,
+			})
+		}
+		delete(d.cache, hash)
 	}
 
 	// Enforce max cache size by removing oldest; emit summaries for duplicates being evicted
