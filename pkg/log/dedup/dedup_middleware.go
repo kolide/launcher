@@ -259,7 +259,7 @@ func (d *Engine) Start(ctx context.Context) {
 		return
 	}
 	// If already started, do nothing.
-	if d.cancel != nil {
+	if d.started.Load() {
 		return
 	}
 	runCtx, cancel := context.WithCancel(ctx)
