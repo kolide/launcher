@@ -816,3 +816,15 @@ func (fc *FlagController) PerformanceMonitoringEnabled() bool {
 		WithDefaultBool(false),
 	).get(fc.getControlServerValue(keys.PerformanceMonitoringEnabled))
 }
+
+func (fc *FlagController) SetDuplicateLogWindow(duration time.Duration) error {
+	return fc.setControlServerValue(keys.DuplicateLogWindow, durationToBytes(duration))
+}
+
+func (fc *FlagController) DuplicateLogWindow() time.Duration {
+	return NewDurationFlagValue(fc.slogger, keys.DuplicateLogWindow,
+		WithDefault(0*time.Second), // Default is 0 (disabled)
+		WithMin(0*time.Second),     // Allow 0 to disable deduplication
+		WithMax(24*time.Hour),      // Maximum of 24 hours seems reasonable
+	).get(fc.getControlServerValue(keys.DuplicateLogWindow))
+}

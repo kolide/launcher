@@ -365,6 +365,24 @@ func (_m *Flags) DistributedForwardingInterval() time.Duration {
 	return r0
 }
 
+// DuplicateLogWindow provides a mock function with no fields
+func (_m *Flags) DuplicateLogWindow() time.Duration {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DuplicateLogWindow")
+	}
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // EnableInitialRunner provides a mock function with no fields
 func (_m *Flags) EnableInitialRunner() bool {
 	ret := _m.Called()
@@ -1233,6 +1251,24 @@ func (_m *Flags) SetDistributedForwardingInterval(interval time.Duration) error 
 // SetDistributedForwardingIntervalOverride provides a mock function with given fields: value, duration
 func (_m *Flags) SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration) {
 	_m.Called(value, duration)
+}
+
+// SetDuplicateLogWindow provides a mock function with given fields: duration
+func (_m *Flags) SetDuplicateLogWindow(duration time.Duration) error {
+	ret := _m.Called(duration)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDuplicateLogWindow")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
+		r0 = rf(duration)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetExportTraces provides a mock function with given fields: enabled

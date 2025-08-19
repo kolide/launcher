@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/kolide/launcher/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
@@ -48,6 +49,11 @@ type MultiSlogger struct {
 // New creates a new multislogger if no handlers are passed in, it will
 // create a logger that discards all logs
 func New(h ...slog.Handler) *MultiSlogger {
+	return NewWithDedup(0, h...)
+}
+
+// NewWithDedup creates a new multislogger with configurable deduplication window
+func NewWithDedup(duplicateLogWindow time.Duration, h ...slog.Handler) *MultiSlogger {
 	ms := &MultiSlogger{
 		// setting to fanout with no handlers is noop
 		Logger: slog.New(slogmulti.Fanout()),
@@ -57,7 +63,7 @@ func New(h ...slog.Handler) *MultiSlogger {
 	// Initialize deduper once at construction; it will emit summaries using the
 	// downstream middleware 'next' observed during handling. Call Start(ctx)
 	// to begin its background maintenance lifecycle.
-	ms.dedupEngine = dedup.New()
+	ms.dedupEngine = dedup.New(dedup.WithDuplicateLogWindow(duplicateLogWindow))
 
 	ms.AddHandler(h...)
 	return ms
