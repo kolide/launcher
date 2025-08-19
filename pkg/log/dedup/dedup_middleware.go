@@ -142,6 +142,10 @@ type Engine struct {
 	// forward records during background cleanup emissions. Stored via atomic.Value
 	// to allow lock-free reads from the cleanup goroutine.
 	lastNext atomic.Value // of type nextFunc
+
+	// duplicateLogWindow holds the current duplicate log window duration for thread-safe access.
+	// When zero or negative, deduplication is disabled.
+	duplicateLogWindow atomic.Value // of type time.Duration
 }
 
 // New creates a new deduplication engine. The engine keeps a reference to the
@@ -163,6 +167,8 @@ func New(opts ...Option) *Engine {
 		cfg:   cfg,
 		cache: make(map[string]*logEntry),
 	}
+	// Initialize the atomic duplicate log window with the config value
+	d.duplicateLogWindow.Store(cfg.DuplicateLogWindow)
 	return d
 }
 
@@ -171,7 +177,7 @@ func New(opts ...Option) *Engine {
 func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(context.Context, slog.Record) error) error {
 	// If the engine hasn't been started or duplicate log window is disabled,
 	// act as a no-op middleware.
-	if !d.started.Load() || d.cfg.DuplicateLogWindow <= 0 {
+	if !d.started.Load() || d.getDuplicateLogWindow() <= 0 {
 		return next(ctx, record)
 	}
 
@@ -216,7 +222,7 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 		entry.lastSeen = now
 		entry.count++
 		// Window for tracking this particular log has elapsed -- relog with duplicate metadata
-		if now.Sub(entry.firstSeen) >= d.cfg.DuplicateLogWindow {
+		if now.Sub(entry.firstSeen) >= d.getDuplicateLogWindow() {
 			duplicateCount = entry.count
 			firstSeen = entry.firstSeen
 			lastSeen = entry.lastSeen
@@ -254,6 +260,26 @@ func (d *Engine) Stop() {
 	}
 	d.backGroundCleanUpWorkerGroup.Wait()
 	d.started.Store(false)
+}
+
+// getDuplicateLogWindow returns the current duplicate log window duration atomically.
+func (d *Engine) getDuplicateLogWindow() time.Duration {
+	if d == nil {
+		return 0
+	}
+	if v := d.duplicateLogWindow.Load(); v != nil {
+		return v.(time.Duration)
+	}
+	return 0
+}
+
+// SetDuplicateLogWindow updates the duplicate log window duration atomically.
+// When set to zero or negative, deduplication is effectively disabled.
+func (d *Engine) SetDuplicateLogWindow(window time.Duration) {
+	if d == nil {
+		return
+	}
+	d.duplicateLogWindow.Store(window)
 }
 
 // startBackgroundCleanup launches the periodic cleanup worker.

@@ -203,6 +203,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
+	// Set up flag-driven dedup configuration on the main slogger
+	// (following the user's preference that early logs and system logs don't need deduplication)
+	multiSlogger.SetFlags(flagController)
+	flagController.RegisterChangeObserver(multiSlogger, keys.DuplicateLogWindow)
+	// Set initial dedup window from current flag value
+	multiSlogger.UpdateDuplicateLogWindow(flagController.DuplicateLogWindow())
+
 	// Generate a new run ID
 	newRunID := k.GetRunID()
 

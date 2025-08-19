@@ -293,3 +293,145 @@ func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
 		t.Fatalf("expected no summary emission after Stop, got %d new record(s)", got)
 	}
 }
+
+func TestSetDuplicateLogWindow(t *testing.T) {
+	t.Parallel()
+
+	engine := New(WithDuplicateLogWindow(100 * time.Millisecond))
+
+	// Test initial value
+	if initial := engine.getDuplicateLogWindow(); initial != 100*time.Millisecond {
+		t.Fatalf("expected initial window 100ms, got %v", initial)
+	}
+
+	// Test setting new value
+	engine.SetDuplicateLogWindow(500 * time.Millisecond)
+	if updated := engine.getDuplicateLogWindow(); updated != 500*time.Millisecond {
+		t.Fatalf("expected updated window 500ms, got %v", updated)
+	}
+
+	// Test setting zero (disabling dedup)
+	engine.SetDuplicateLogWindow(0)
+	if disabled := engine.getDuplicateLogWindow(); disabled != 0 {
+		t.Fatalf("expected disabled window 0, got %v", disabled)
+	}
+}
+
+func TestSetDuplicateLogWindowAffectsMiddleware(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	engine := New(WithDuplicateLogWindow(0)) // Start disabled
+	engine.Start(context.Background())
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := context.Background()
+
+	// With dedup disabled, duplicates should pass through
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	if next.Len() != 2 {
+		t.Fatalf("expected both records to pass when dedup disabled, got %d", next.Len())
+	}
+
+	// Enable dedup with a window
+	engine.SetDuplicateLogWindow(100 * time.Millisecond)
+
+	// Reset capture
+	next.mu.Lock()
+	next.records = nil
+	next.mu.Unlock()
+
+	// Now duplicates should be suppressed
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "test2", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "test2", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	if next.Len() != 1 {
+		t.Fatalf("expected duplicate to be suppressed when dedup enabled, got %d", next.Len())
+	}
+}
+
+func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	engine := New(WithDuplicateLogWindow(50 * time.Millisecond))
+	engine.Start(context.Background())
+	defer engine.Stop()
+
+	next := &nextCapture{}
+	mw := engine.Middleware
+	ctx := context.Background()
+
+	// Start multiple goroutines that concurrently update the window and process logs
+	var wg sync.WaitGroup
+	done := make(chan struct{})
+
+	// Goroutine 1: Continuously update the window
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		windows := []time.Duration{0, 50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
+		i := 0
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				engine.SetDuplicateLogWindow(windows[i%len(windows)])
+				i++
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+	}()
+
+	// Goroutine 2: Continuously process logs
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			select {
+			case <-done:
+				return
+			default:
+				record := makeRecord(slog.LevelInfo, "concurrent test", slog.Int("i", i))
+				if err := mw(ctx, record, next.next); err != nil {
+					t.Errorf("middleware err: %v", err)
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
+	}()
+
+	// Goroutine 3: Continuously read the window
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			select {
+			case <-done:
+				return
+			default:
+				window := engine.getDuplicateLogWindow()
+				_ = window // Just read it, don't need to verify specific value due to concurrent updates
+				time.Sleep(3 * time.Millisecond)
+			}
+		}
+	}()
+
+	// Let the test run for a short duration
+	time.Sleep(500 * time.Millisecond)
+	close(done)
+	wg.Wait()
+
+	// Test passes if no race conditions occurred (detected by go test -race)
+}
