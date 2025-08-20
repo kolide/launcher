@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
-    name: lint
+    name: nilaway
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
