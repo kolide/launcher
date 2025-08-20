@@ -48,24 +48,24 @@ const (
 
 var (
 	// Gauges
-	GoMemoryUsageGauge    metric.Int64Gauge
-	NonGoMemoryUsageGauge metric.Int64Gauge
-	MemoryPercentGauge    metric.Int64Gauge
-	CpuPercentGauge       metric.Int64Gauge
-	CheckupScoreGauge     metric.Float64Gauge
+	GoMemoryUsageGauge    metric.Int64Gauge   = noop.Int64Gauge{}
+	NonGoMemoryUsageGauge metric.Int64Gauge   = noop.Int64Gauge{}
+	MemoryPercentGauge    metric.Int64Gauge   = noop.Int64Gauge{}
+	CpuPercentGauge       metric.Int64Gauge   = noop.Int64Gauge{}
+	CheckupScoreGauge     metric.Float64Gauge = noop.Float64Gauge{}
 
 	// Histograms
-	RSSHistogram               metric.Int64Histogram
-	OsqueryCpuPercentHistogram metric.Float64Histogram
-	OsqueryRssHistogram        metric.Int64Histogram
+	RSSHistogram               metric.Int64Histogram   = noop.Int64Histogram{}
+	OsqueryCpuPercentHistogram metric.Float64Histogram = noop.Float64Histogram{}
+	OsqueryRssHistogram        metric.Int64Histogram   = noop.Int64Histogram{}
 
 	// Counters
-	LauncherRestartCounter            metric.Int64Counter
-	OsqueryRestartCounter             metric.Int64Counter
-	WindowsUpdatesQueryFailureCounter metric.Int64Counter
-	TablewrapperTimeoutCounter        metric.Int64Counter
-	AutoupdateFailureCounter          metric.Int64Counter
-	CheckupErrorCounter               metric.Int64Counter
+	LauncherRestartCounter            metric.Int64Counter = noop.Int64Counter{}
+	OsqueryRestartCounter             metric.Int64Counter = noop.Int64Counter{}
+	WindowsUpdatesQueryFailureCounter metric.Int64Counter = noop.Int64Counter{}
+	TablewrapperTimeoutCounter        metric.Int64Counter = noop.Int64Counter{}
+	AutoupdateFailureCounter          metric.Int64Counter = noop.Int64Counter{}
+	CheckupErrorCounter               metric.Int64Counter = noop.Int64Counter{}
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
