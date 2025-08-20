@@ -197,11 +197,12 @@ func (m *MultiSlogger) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKe
 
 	// Check if DuplicateLogWindow flag is among the changed flags
 	for _, key := range flagKeys {
-		if key == keys.DuplicateLogWindow {
-			newWindow := m.flags.DuplicateLogWindow()
-			m.UpdateDuplicateLogWindow(newWindow)
-			return
+		if key != keys.DuplicateLogWindow {
+			continue
 		}
+		newWindow := m.flags.DuplicateLogWindow()
+		m.UpdateDuplicateLogWindow(newWindow)
+		return
 	}
 }
 
