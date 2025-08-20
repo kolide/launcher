@@ -38,6 +38,32 @@ jobs:
       - name: golangci-lint
         if: ${{ always() }}
         run: golangci-lint run
+
+  nilaway:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    name: lint
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: false
+
+      - run: make deps
+
+      - name: install nilaway
+        run: go install go.uber.org/nilaway/cmd/nilaway@latest
+
+      - name: nilaway
+        run: nilaway ./...
+
   govulncheck:
     strategy:
       fail-fast: false
