@@ -5,7 +5,10 @@ import (
 	"log/slog"
 	"os"
 	"sync/atomic"
+	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/log/dedup"
 	slogmulti "github.com/samber/slog-multi"
 )
@@ -40,6 +43,9 @@ type MultiSlogger struct {
 	// middlewares with state that must persist across rebuilds
 	dedupEngine *dedup.Engine
 
+	// flags interface for reading flag values when they change
+	flags types.Flags
+
 	// lifecycle coordination when managed by a rungroup
 	interrupted atomic.Bool
 	stopCh      chan struct{}
@@ -48,6 +54,11 @@ type MultiSlogger struct {
 // New creates a new multislogger if no handlers are passed in, it will
 // create a logger that discards all logs
 func New(h ...slog.Handler) *MultiSlogger {
+	return NewWithDedup(0, h...)
+}
+
+// NewWithDedup creates a new multislogger with configurable deduplication window
+func NewWithDedup(duplicateLogWindow time.Duration, h ...slog.Handler) *MultiSlogger {
 	ms := &MultiSlogger{
 		// setting to fanout with no handlers is noop
 		Logger: slog.New(slogmulti.Fanout()),
@@ -57,7 +68,7 @@ func New(h ...slog.Handler) *MultiSlogger {
 	// Initialize deduper once at construction; it will emit summaries using the
 	// downstream middleware 'next' observed during handling. Call Start(ctx)
 	// to begin its background maintenance lifecycle.
-	ms.dedupEngine = dedup.New()
+	ms.dedupEngine = dedup.New(dedup.WithDuplicateLogWindow(duplicateLogWindow))
 
 	ms.AddHandler(h...)
 	return ms
@@ -157,6 +168,41 @@ func (m *MultiSlogger) Start(ctx context.Context) {
 	}
 	if m.dedupEngine != nil {
 		m.dedupEngine.Start(ctx)
+	}
+}
+
+// UpdateDuplicateLogWindow updates the dedup engine's duplicate log window duration.
+// When set to zero or negative, deduplication is effectively disabled.
+func (m *MultiSlogger) UpdateDuplicateLogWindow(window time.Duration) {
+	if m == nil || m.dedupEngine == nil {
+		return
+	}
+	m.dedupEngine.SetDuplicateLogWindow(window)
+}
+
+// SetFlags sets the flags interface for this MultiSlogger to listen for flag changes.
+func (m *MultiSlogger) SetFlags(flags types.Flags) {
+	if m == nil {
+		return
+	}
+	m.flags = flags
+}
+
+// FlagsChanged implements types.FlagsChangeObserver to respond to flag changes.
+// When the DuplicateLogWindow flag changes, it updates the dedup engine configuration.
+func (m *MultiSlogger) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	if m == nil || m.flags == nil {
+		return
+	}
+
+	// Check if DuplicateLogWindow flag is among the changed flags
+	for _, key := range flagKeys {
+		if key != keys.DuplicateLogWindow {
+			continue
+		}
+		newWindow := m.flags.DuplicateLogWindow()
+		m.UpdateDuplicateLogWindow(newWindow)
+		return
 	}
 }
 

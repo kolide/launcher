@@ -269,4 +269,8 @@ type Flags interface {
 	// PerformanceMonitoringEnabled controls whether launcher self-monitors for performance issues
 	SetPerformanceMonitoringEnabled(enabled bool) error
 	PerformanceMonitoringEnabled() bool
+
+	// DuplicateLogWindow is the time window for deduplicating duplicate log records
+	SetDuplicateLogWindow(duration time.Duration) error
+	DuplicateLogWindow() time.Duration
 }

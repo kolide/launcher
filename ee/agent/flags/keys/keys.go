@@ -66,6 +66,7 @@ const (
 	CachedQueryResultsTTL            FlagKey = "cached_query_results_ttl"
 	ResetOnHardwareChangeEnabled     FlagKey = "reset_on_hardware_change_enabled"
 	PerformanceMonitoringEnabled     FlagKey = "performance_monitoring_enabled"
+	DuplicateLogWindow               FlagKey = "duplicate_log_window"
 )
 
 func (key FlagKey) String() string {
