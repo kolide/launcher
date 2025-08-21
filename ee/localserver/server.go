@@ -93,7 +93,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		)
 	}
 
-	ls.kryptoMiddleware = newKryptoEcMiddleware(k.Slogger(), ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
+	ls.kryptoMiddleware = newKryptoEcMiddleware(k.Slogger(), k, ls.myLocalDbSigner, *ls.serverEcKey, presenceDetector, munemo)
 	ecAuthedMux := http.NewServeMux()
 	ecAuthedMux.HandleFunc("/", http.NotFound)
 	ecAuthedMux.Handle("/acceleratecontrol", ls.requestAccelerateControlHandler())
