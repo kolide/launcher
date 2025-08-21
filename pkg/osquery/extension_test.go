@@ -235,10 +235,13 @@ func TestExtensionEnroll(t *testing.T) {
 	k := mocks.NewKnapsack(t)
 	k.On("OsquerydPath").Maybe().Return("")
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
-	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err)
+	k.On("ConfigStore").Return(configStore)
 	registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
 	require.NoError(t, err)
 	k.On("RegistrationStore").Return(registrationStore)
+	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("ReadEnrollSecret").Maybe().Return(expectedEnrollSecret, nil)
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
@@ -256,15 +259,18 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	initialRegistrationRaw, err := registrationStore.Get([]byte(types.DefaultRegistrationID))
+	// Add registration to test store (we store via `SaveRegistration`, which is mocked in this test,
+	// so we have to manually store the registration here)
+	currentRegistration := types.Registration{
+		RegistrationID:   types.DefaultRegistrationID,
+		Munemo:           expectedMunemo,
+		EnrollmentSecret: expectedEnrollSecret,
+		NodeKey:          expectedNodeKey,
+	}
+	currentRegistrationRaw, err := json.Marshal(currentRegistration)
 	require.NoError(t, err)
-	require.NotNil(t, initialRegistrationRaw)
-	var initialRegistration types.Registration
-	require.NoError(t, json.Unmarshal(initialRegistrationRaw, &initialRegistration))
-	require.Equal(t, types.DefaultRegistrationID, initialRegistration.RegistrationID)
-	require.Equal(t, expectedEnrollSecret, initialRegistration.EnrollmentSecret)
-	require.Equal(t, expectedNodeKey, initialRegistration.NodeKey)
-	require.Equal(t, expectedMunemo, initialRegistration.Munemo)
+	require.NoError(t, registrationStore.Set([]byte(types.DefaultRegistrationID), currentRegistrationRaw))
+	require.NoError(t, configStore.Set([]byte(nodeKeyKey), []byte(expectedNodeKey)))
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
@@ -287,6 +293,7 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
+	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 	e.RequireReenroll(context.Background())
 	assert.Empty(t, e.NodeKey)
 	key, invalid, err = e.Enroll(context.Background())
@@ -297,16 +304,7 @@ func TestExtensionEnroll(t *testing.T) {
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	// Check that registration is up-to-date
-	updatedRegistrationRaw, err := registrationStore.Get([]byte(types.DefaultRegistrationID))
-	require.NoError(t, err)
-	require.NotNil(t, updatedRegistrationRaw)
-	var updatedRegistration types.Registration
-	require.NoError(t, json.Unmarshal(updatedRegistrationRaw, &updatedRegistration))
-	require.Equal(t, types.DefaultRegistrationID, updatedRegistration.RegistrationID)
-	require.Equal(t, expectedEnrollSecret, updatedRegistration.EnrollmentSecret)
-	require.Equal(t, expectedNodeKey, updatedRegistration.NodeKey)
-	require.Equal(t, expectedMunemo, updatedRegistration.Munemo)
+	k.AssertExpectations(t)
 }
 
 func TestExtensionGenerateConfigsTransportError(t *testing.T) {
