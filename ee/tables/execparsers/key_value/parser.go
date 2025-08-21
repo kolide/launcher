@@ -91,6 +91,14 @@ func (p *parser) setValueWithDuplicates(result map[string]interface{}, key strin
 // and handles duplicate keys by creating arrays
 func (p *parser) setNestedValueWithDuplicates(result map[string]interface{}, key string, value string) {
 	parts := strings.Split(key, ".")
+
+	// We only call this function when we know that "key" contains ".", but just in case
+	// we do another check here.
+	if len(parts) < 2 {
+		p.setValueWithDuplicates(result, key, value)
+		return
+	}
+
 	current := result
 
 	// Navigate/create the nested structure
