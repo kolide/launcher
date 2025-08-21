@@ -1397,6 +1397,24 @@ func (_m *Knapsack) RootPEM() string {
 	return r0
 }
 
+// SaveRegistration provides a mock function with given fields: registrationId, munemo, nodeKey, enrollmentSecret
+func (_m *Knapsack) SaveRegistration(registrationId string, munemo string, nodeKey string, enrollmentSecret string) error {
+	ret := _m.Called(registrationId, munemo, nodeKey, enrollmentSecret)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveRegistration")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
+		r0 = rf(registrationId, munemo, nodeKey, enrollmentSecret)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SentNotificationsStore provides a mock function with no fields
 func (_m *Knapsack) SentNotificationsStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()

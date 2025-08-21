@@ -136,7 +136,7 @@ jobs:
       run: make deps
 
     - name: Set up zig
-      uses: goto-bus-stop/setup-zig@v2
+      uses: mlugg/setup-zig@v2
 
     - name: Build
       run: make -j2 github-build
