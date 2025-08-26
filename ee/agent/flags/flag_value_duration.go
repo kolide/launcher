@@ -64,7 +64,7 @@ func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 	int64Value := d.defaultVal
 
 	if controlServerValue != nil {
-		int64Value = d.parseControlServerValue(controlServerValue, int64Value)
+		int64Value = d.parseControlServerValue(controlServerValue)
 	}
 
 	if d.override != nil && d.override.Value() != nil {
@@ -81,7 +81,7 @@ func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 }
 
 // parseControlServerValue attempts to parse the control server value as either a duration string or nanoseconds
-func (d *durationFlagValue) parseControlServerValue(controlServerValue []byte, defaultValue int64) int64 {
+func (d *durationFlagValue) parseControlServerValue(controlServerValue []byte) int64 {
 	valueStr := string(controlServerValue)
 
 	// First try to parse as a duration string (e.g., "4s", "10m")
@@ -100,7 +100,7 @@ func (d *durationFlagValue) parseControlServerValue(controlServerValue []byte, d
 		"key", d.key,
 		"value", valueStr,
 	)
-	return defaultValue
+	return d.defaultVal
 }
 
 // clampValue returns a value that is clamped to be within the range defined by min and max.
