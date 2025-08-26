@@ -100,12 +100,9 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	}
 	defer os.RemoveAll(outputPathDir)
 
-	// Set arch correctly when invoking fpm. Allowable values are amd64 (does not require update) and
-	// aarch64 (requires update from "arm64").
-	arch := f.arch
-	if arch == "arm64" {
-		arch = "aarch64"
-	}
+	// Set arch correctly when invoking fpm. Allowable values are amd64 (does not require update),
+	// arm64 (for deb, also does not require update) and aarch64 (for RPM, requires update from "arm64").
+	arch := fpmArch(f)
 
 	fpmCommand := []string{
 		"fpm",
@@ -190,4 +187,15 @@ func PackageFPM(ctx context.Context, w io.Writer, po *PackageOptions, fpmOpts ..
 	SetInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
+}
+
+func fpmArch(f fpmOptions) string {
+	// Set arch correctly when invoking fpm. Allowable values are amd64 (does not require update),
+	// arm64 (for deb, also does not require update) and aarch64 (for RPM, requires update from "arm64").
+	arch := f.arch
+	if arch == "arm64" && f.outputType == RPM {
+		arch = "aarch64"
+	}
+
+	return arch
 }
