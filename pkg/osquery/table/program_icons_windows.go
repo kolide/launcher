@@ -38,19 +38,40 @@ func ProgramIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	return tablewrapper.New(flags, slogger, "kolide_program_icons", columns, generateProgramIcons)
 }
 
+func ProgramIconChecksums(flags types.Flags, slogger *slog.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
+		table.TextColumn("version"),
+		table.TextColumn("hash"),
+	}
+	return tablewrapper.New(flags, slogger, "kolide_program_icon_checksums", columns, generateProgramIconChecksums)
+}
+
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icons")
 	defer span.End()
 
 	var results []map[string]string
 
-	results = append(results, generateUninstallerProgramIcons(ctx)...)
-	results = append(results, generateInstallersProgramIcons(ctx)...)
+	results = append(results, generateUninstallerProgramIcons(ctx, true)...)
+	results = append(results, generateInstallersProgramIcons(ctx, true)...)
 
 	return results, nil
 }
 
-func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
+func generateProgramIconChecksums(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icon_checksums")
+	defer span.End()
+
+	var results []map[string]string
+
+	results = append(results, generateUninstallerProgramIcons(ctx, false)...)
+	results = append(results, generateInstallersProgramIcons(ctx, false)...)
+
+	return results, nil
+}
+
+func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -74,12 +95,17 @@ func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
 				continue
 			}
 
-			uninstallerIcons = append(uninstallerIcons, map[string]string{
-				"icon":    icon.base64,
+			result := map[string]string{
 				"hash":    fmt.Sprintf("%x", icon.hash),
 				"name":    name,
 				"version": version,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			uninstallerIcons = append(uninstallerIcons, result)
 		}
 	}
 	return uninstallerIcons
@@ -113,7 +139,7 @@ func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path strin
 	return iconPath, name, version, nil
 }
 
-func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
+func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -136,11 +162,16 @@ func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
 				continue
 			}
 
-			installerIcons = append(installerIcons, map[string]string{
-				"icon": icon.base64,
+			result := map[string]string{
 				"hash": fmt.Sprintf("%x", icon.hash),
 				"name": name,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			installerIcons = append(installerIcons, result)
 		}
 	}
 
