@@ -90,7 +90,7 @@ func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []ma
 				continue
 			}
 
-			icon, err := parseIcoFile(ctx, iconPath)
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
 			if err != nil {
 				continue
 			}
@@ -157,7 +157,7 @@ func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map
 				continue
 			}
 
-			icon, err := parseIcoFile(ctx, iconPath)
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
 			if err != nil {
 				continue
 			}
@@ -205,7 +205,7 @@ func getRegistryKeyProductData(ctx context.Context, key registry.Key, path strin
 //
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
 // the exe like 'OneDriveSetup.exe,-101'
-func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
+func parseIcoFile(ctx context.Context, fullPath string, includeIcon bool) (icon, error) {
 	_, span := observability.StartSpan(ctx, "icon_path", fullPath)
 	defer span.End()
 
@@ -228,9 +228,11 @@ func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
 	if err := png.Encode(buf, img); err != nil {
 		return programIcon, fmt.Errorf("encoding image: %w", err)
 	}
-
 	checksum := crc64.Checksum(buf.Bytes(), crcTable)
-	return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	if includeIcon {
+		return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	}
+	return icon{base64: "", hash: checksum}, nil
 }
 
 // expandRegistryKey takes a hive and path, and does a non-recursive glob expansion
