@@ -23,6 +23,7 @@ import (
 func platformSpecificTables(k types.Knapsack, slogger *slog.Logger, currentOsquerydBinaryPath string) []osquery.OsqueryPlugin {
 	return []osquery.OsqueryPlugin{
 		ProgramIcons(k, slogger),
+		ProgramIconChecksums(k, slogger),
 		dsim_default_associations.TablePlugin(k, slogger),
 		secedit.TablePlugin(k, slogger),
 		wifi_networks.TablePlugin(k, slogger),

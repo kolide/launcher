@@ -38,19 +38,40 @@ func ProgramIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	return tablewrapper.New(flags, slogger, "kolide_program_icons", columns, generateProgramIcons)
 }
 
+func ProgramIconChecksums(flags types.Flags, slogger *slog.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
+		table.TextColumn("version"),
+		table.TextColumn("hash"),
+	}
+	return tablewrapper.New(flags, slogger, "kolide_program_icon_checksums", columns, generateProgramIconChecksums)
+}
+
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icons")
 	defer span.End()
 
 	var results []map[string]string
 
-	results = append(results, generateUninstallerProgramIcons(ctx)...)
-	results = append(results, generateInstallersProgramIcons(ctx)...)
+	results = append(results, generateUninstallerProgramIcons(ctx, true)...)
+	results = append(results, generateInstallersProgramIcons(ctx, true)...)
 
 	return results, nil
 }
 
-func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
+func generateProgramIconChecksums(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icon_checksums")
+	defer span.End()
+
+	var results []map[string]string
+
+	results = append(results, generateUninstallerProgramIcons(ctx, false)...)
+	results = append(results, generateInstallersProgramIcons(ctx, false)...)
+
+	return results, nil
+}
+
+func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -69,17 +90,22 @@ func generateUninstallerProgramIcons(ctx context.Context) []map[string]string {
 				continue
 			}
 
-			icon, err := parseIcoFile(ctx, iconPath)
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
 			if err != nil {
 				continue
 			}
 
-			uninstallerIcons = append(uninstallerIcons, map[string]string{
-				"icon":    icon.base64,
+			result := map[string]string{
 				"hash":    fmt.Sprintf("%x", icon.hash),
 				"name":    name,
 				"version": version,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			uninstallerIcons = append(uninstallerIcons, result)
 		}
 	}
 	return uninstallerIcons
@@ -113,7 +139,7 @@ func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path strin
 	return iconPath, name, version, nil
 }
 
-func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
+func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -131,16 +157,21 @@ func generateInstallersProgramIcons(ctx context.Context) []map[string]string {
 				continue
 			}
 
-			icon, err := parseIcoFile(ctx, iconPath)
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
 			if err != nil {
 				continue
 			}
 
-			installerIcons = append(installerIcons, map[string]string{
-				"icon": icon.base64,
+			result := map[string]string{
 				"hash": fmt.Sprintf("%x", icon.hash),
 				"name": name,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			installerIcons = append(installerIcons, result)
 		}
 	}
 
@@ -174,7 +205,7 @@ func getRegistryKeyProductData(ctx context.Context, key registry.Key, path strin
 //
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
 // the exe like 'OneDriveSetup.exe,-101'
-func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
+func parseIcoFile(ctx context.Context, fullPath string, includeIcon bool) (icon, error) {
 	_, span := observability.StartSpan(ctx, "icon_path", fullPath)
 	defer span.End()
 
@@ -197,9 +228,11 @@ func parseIcoFile(ctx context.Context, fullPath string) (icon, error) {
 	if err := png.Encode(buf, img); err != nil {
 		return programIcon, fmt.Errorf("encoding image: %w", err)
 	}
-
 	checksum := crc64.Checksum(buf.Bytes(), crcTable)
-	return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	if includeIcon {
+		return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	}
+	return icon{base64: "", hash: checksum}, nil
 }
 
 // expandRegistryKey takes a hive and path, and does a non-recursive glob expansion
