@@ -33,7 +33,11 @@ func rpmParse(reader io.Reader) (any, error) {
 		// `Release: 27.el7`...
 		// We split each line by ":" to get a key/value pair.
 		kv := strings.SplitN(line, ":", 2)
-		var key = strings.ToLower(strings.TrimSpace(kv[0]))
+		var key, value string
+		if len(kv) == 2 {
+			key = strings.ToLower(strings.TrimSpace(kv[0]))
+			value = strings.TrimSpace(kv[1])
+		}
 		if slices.Contains(allowedKeys, key) {
 			// rpm doesn't provide a clean break. Description seems
 			// to come last, so once that is found we set a flag to
@@ -47,7 +51,7 @@ func rpmParse(reader io.Reader) (any, error) {
 				row = make(map[string]string)
 			}
 
-			row[key] = strings.TrimSpace(kv[1])
+			row[key] = strings.TrimSpace(value)
 		} else if readingDesc {
 			// This is where the multiline description will fall to.
 			row["description"] = strings.TrimSpace(row["description"] + " " + strings.TrimSpace(line))

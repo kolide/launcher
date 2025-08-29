@@ -61,7 +61,14 @@ func parseDsreg(reader io.Reader) (any, error) {
 		// Check if we've found a line
 		if m := lineRegex.FindStringSubmatch(line); len(m) > 0 {
 			if currentSectionHeader == "" {
-				return nil, fmt.Errorf("Found line before section header: %s", line)
+				return nil, fmt.Errorf("found line before section header: %s", line)
+			}
+
+			// If currentSectionHeader is non-empty, then we know it's been initialized into
+			// `results` in the block above. Nevertheless, we check here in case we've had
+			// a regression, largely to make nilaway happy.
+			if _, ok := results[currentSectionHeader]; !ok {
+				return nil, fmt.Errorf("found line corresponding to uninitialized section header %s: %s", currentSectionHeader, line)
 			}
 
 			// Add the key/value pair to the results

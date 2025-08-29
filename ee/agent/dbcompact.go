@@ -71,7 +71,7 @@ func rename(boltPath, newBoltPath, oldBoltPath string) error {
 
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if os.IsNotExist(err) || info == nil {
 		return false
 	}
 	return !info.IsDir()
