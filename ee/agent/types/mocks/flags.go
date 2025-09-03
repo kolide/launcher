@@ -781,12 +781,12 @@ func (_m *Flags) OsqueryHealthcheckStartupDelay() time.Duration {
 	return r0
 }
 
-// OsqueryLogIngestAPIKey provides a mock function with no fields
-func (_m *Flags) OsqueryLogIngestAPIKey() string {
+// OsqueryLogPublishAPIKey provides a mock function with no fields
+func (_m *Flags) OsqueryLogPublishAPIKey() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogIngestAPIKey")
+		panic("no return value specified for OsqueryLogPublishAPIKey")
 	}
 
 	var r0 string
@@ -799,12 +799,12 @@ func (_m *Flags) OsqueryLogIngestAPIKey() string {
 	return r0
 }
 
-// OsqueryLogIngestPercentEnabled provides a mock function with no fields
-func (_m *Flags) OsqueryLogIngestPercentEnabled() int {
+// OsqueryLogPublishPercentEnabled provides a mock function with no fields
+func (_m *Flags) OsqueryLogPublishPercentEnabled() int {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogIngestPercentEnabled")
+		panic("no return value specified for OsqueryLogPublishPercentEnabled")
 	}
 
 	var r0 int
@@ -817,12 +817,12 @@ func (_m *Flags) OsqueryLogIngestPercentEnabled() int {
 	return r0
 }
 
-// OsqueryLogIngestURL provides a mock function with no fields
-func (_m *Flags) OsqueryLogIngestURL() string {
+// OsqueryLogPublishURL provides a mock function with no fields
+func (_m *Flags) OsqueryLogPublishURL() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogIngestURL")
+		panic("no return value specified for OsqueryLogPublishURL")
 	}
 
 	var r0 string
@@ -1569,12 +1569,12 @@ func (_m *Flags) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
 	return r0
 }
 
-// SetOsqueryLogIngestAPIKey provides a mock function with given fields: key
-func (_m *Flags) SetOsqueryLogIngestAPIKey(key string) error {
+// SetOsqueryLogPublishAPIKey provides a mock function with given fields: key
+func (_m *Flags) SetOsqueryLogPublishAPIKey(key string) error {
 	ret := _m.Called(key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogIngestAPIKey")
+		panic("no return value specified for SetOsqueryLogPublishAPIKey")
 	}
 
 	var r0 error
@@ -1587,12 +1587,12 @@ func (_m *Flags) SetOsqueryLogIngestAPIKey(key string) error {
 	return r0
 }
 
-// SetOsqueryLogIngestPercentEnabled provides a mock function with given fields: percent
-func (_m *Flags) SetOsqueryLogIngestPercentEnabled(percent int) error {
+// SetOsqueryLogPublishPercentEnabled provides a mock function with given fields: percent
+func (_m *Flags) SetOsqueryLogPublishPercentEnabled(percent int) error {
 	ret := _m.Called(percent)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogIngestPercentEnabled")
+		panic("no return value specified for SetOsqueryLogPublishPercentEnabled")
 	}
 
 	var r0 error
@@ -1605,12 +1605,12 @@ func (_m *Flags) SetOsqueryLogIngestPercentEnabled(percent int) error {
 	return r0
 }
 
-// SetOsqueryLogIngestURL provides a mock function with given fields: url
-func (_m *Flags) SetOsqueryLogIngestURL(url string) error {
+// SetOsqueryLogPublishURL provides a mock function with given fields: url
+func (_m *Flags) SetOsqueryLogPublishURL(url string) error {
 	ret := _m.Called(url)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogIngestURL")
+		panic("no return value specified for SetOsqueryLogPublishURL")
 	}
 
 	var r0 error

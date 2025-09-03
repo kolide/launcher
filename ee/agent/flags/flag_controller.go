@@ -829,35 +829,35 @@ func (fc *FlagController) DuplicateLogWindow() time.Duration {
 	).get(fc.getControlServerValue(keys.DuplicateLogWindow))
 }
 
-// OsqueryLogIngest helpers
-func (fc *FlagController) OsqueryLogIngestURL() string {
+// OsqueryLogPublish helpers
+func (fc *FlagController) OsqueryLogPublishURL() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.OsqueryLogIngestURL),
-	).get(fc.getControlServerValue(keys.OsqueryLogIngestURL))
+		WithDefaultString(fc.cmdLineOpts.OsqueryLogPublishURL),
+	).get(fc.getControlServerValue(keys.OsqueryLogPublishURL))
 }
 
-func (fc *FlagController) SetOsqueryLogIngestURL(url string) error {
-	return fc.setControlServerValue(keys.OsqueryLogIngestURL, []byte(url))
+func (fc *FlagController) SetOsqueryLogPublishURL(url string) error {
+	return fc.setControlServerValue(keys.OsqueryLogPublishURL, []byte(url))
 }
 
-func (fc *FlagController) OsqueryLogIngestAPIKey() string {
+func (fc *FlagController) OsqueryLogPublishAPIKey() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.OsqueryLogIngestAPIKey),
-	).get(fc.getControlServerValue(keys.OsqueryLogIngestAPIKey))
+		WithDefaultString(fc.cmdLineOpts.OsqueryLogPublishAPIKey),
+	).get(fc.getControlServerValue(keys.OsqueryLogPublishAPIKey))
 }
 
-func (fc *FlagController) SetOsqueryLogIngestAPIKey(key string) error {
-	return fc.setControlServerValue(keys.OsqueryLogIngestAPIKey, []byte(key))
+func (fc *FlagController) SetOsqueryLogPublishAPIKey(key string) error {
+	return fc.setControlServerValue(keys.OsqueryLogPublishAPIKey, []byte(key))
 }
 
-func (fc *FlagController) OsqueryLogIngestPercentEnabled() int {
-	return NewIntFlagValue(fc.slogger, keys.OsqueryLogIngestPercentEnabled,
-		WithIntValueDefault(fc.cmdLineOpts.OsqueryLogIngestPercentEnabled),
-		WithIntValueMin(0),
+func (fc *FlagController) OsqueryLogPublishPercentEnabled() int {
+	return NewIntFlagValue(fc.slogger, keys.OsqueryLogPublishPercentEnabled,
+		WithIntValueDefault(fc.cmdLineOpts.OsqueryLogPublishPercentEnabled),
+		WithIntValueMin(0), // 0 is also default, and disables the cutover to our new ingest endpoint
 		WithIntValueMax(100),
-	).get(fc.getControlServerValue(keys.OsqueryLogIngestPercentEnabled))
+	).get(fc.getControlServerValue(keys.OsqueryLogPublishPercentEnabled))
 }
 
-func (fc *FlagController) SetOsqueryLogIngestPercentEnabled(percent int) error {
-	return fc.setControlServerValue(keys.OsqueryLogIngestPercentEnabled, intToBytes(percent))
+func (fc *FlagController) SetOsqueryLogPublishPercentEnabled(percent int) error {
+	return fc.setControlServerValue(keys.OsqueryLogPublishPercentEnabled, intToBytes(percent))
 }

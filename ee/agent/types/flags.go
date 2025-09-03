@@ -275,10 +275,10 @@ type Flags interface {
 	DuplicateLogWindow() time.Duration
 
 	// Osquery log ingest cutover helpers
-	OsqueryLogIngestURL() string
-	SetOsqueryLogIngestURL(url string) error
-	OsqueryLogIngestAPIKey() string
-	SetOsqueryLogIngestAPIKey(key string) error
-	OsqueryLogIngestPercentEnabled() int
-	SetOsqueryLogIngestPercentEnabled(percent int) error
+	OsqueryLogPublishURL() string
+	SetOsqueryLogPublishURL(url string) error
+	OsqueryLogPublishAPIKey() string
+	SetOsqueryLogPublishAPIKey(key string) error
+	OsqueryLogPublishPercentEnabled() int
+	SetOsqueryLogPublishPercentEnabled(percent int) error
 }
