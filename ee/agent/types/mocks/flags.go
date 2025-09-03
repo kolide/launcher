@@ -781,6 +781,60 @@ func (_m *Flags) OsqueryHealthcheckStartupDelay() time.Duration {
 	return r0
 }
 
+// OsqueryLogIngestAPIKey provides a mock function with no fields
+func (_m *Flags) OsqueryLogIngestAPIKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryLogIngestAPIKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// OsqueryLogIngestPercentEnabled provides a mock function with no fields
+func (_m *Flags) OsqueryLogIngestPercentEnabled() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryLogIngestPercentEnabled")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// OsqueryLogIngestURL provides a mock function with no fields
+func (_m *Flags) OsqueryLogIngestURL() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryLogIngestURL")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // OsqueryVerbose provides a mock function with no fields
 func (_m *Flags) OsqueryVerbose() bool {
 	ret := _m.Called()
@@ -1508,6 +1562,60 @@ func (_m *Flags) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
 		r0 = rf(delay)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryLogIngestAPIKey provides a mock function with given fields: key
+func (_m *Flags) SetOsqueryLogIngestAPIKey(key string) error {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryLogIngestAPIKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(key)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryLogIngestPercentEnabled provides a mock function with given fields: percent
+func (_m *Flags) SetOsqueryLogIngestPercentEnabled(percent int) error {
+	ret := _m.Called(percent)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryLogIngestPercentEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(percent)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryLogIngestURL provides a mock function with given fields: url
+func (_m *Flags) SetOsqueryLogIngestURL(url string) error {
+	ret := _m.Called(url)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryLogIngestURL")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(url)
 	} else {
 		r0 = ret.Error(0)
 	}
