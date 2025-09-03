@@ -67,6 +67,10 @@ const (
 	ResetOnHardwareChangeEnabled     FlagKey = "reset_on_hardware_change_enabled"
 	PerformanceMonitoringEnabled     FlagKey = "performance_monitoring_enabled"
 	DuplicateLogWindow               FlagKey = "duplicate_log_window"
+	// Osquery log ingest cutover flags
+	OsqueryLogIngestURL            FlagKey = "osquery_log_ingest_url"
+	OsqueryLogIngestAPIKey         FlagKey = "osquery_log_ingest_api_key"
+	OsqueryLogIngestPercentEnabled FlagKey = "osquery_log_ingest_percent_enabled"
 )
 
 func (key FlagKey) String() string {

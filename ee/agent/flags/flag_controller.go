@@ -828,3 +828,36 @@ func (fc *FlagController) DuplicateLogWindow() time.Duration {
 		WithMax(24*time.Hour),      // Maximum of 24 hours seems reasonable
 	).get(fc.getControlServerValue(keys.DuplicateLogWindow))
 }
+
+// OsqueryLogIngest helpers
+func (fc *FlagController) OsqueryLogIngestURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryLogIngestURL),
+	).get(fc.getControlServerValue(keys.OsqueryLogIngestURL))
+}
+
+func (fc *FlagController) SetOsqueryLogIngestURL(url string) error {
+	return fc.setControlServerValue(keys.OsqueryLogIngestURL, []byte(url))
+}
+
+func (fc *FlagController) OsqueryLogIngestAPIKey() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryLogIngestAPIKey),
+	).get(fc.getControlServerValue(keys.OsqueryLogIngestAPIKey))
+}
+
+func (fc *FlagController) SetOsqueryLogIngestAPIKey(key string) error {
+	return fc.setControlServerValue(keys.OsqueryLogIngestAPIKey, []byte(key))
+}
+
+func (fc *FlagController) OsqueryLogIngestPercentEnabled() int {
+	return NewIntFlagValue(fc.slogger, keys.OsqueryLogIngestPercentEnabled,
+		WithIntValueDefault(fc.cmdLineOpts.OsqueryLogIngestPercentEnabled),
+		WithIntValueMin(0),
+		WithIntValueMax(100),
+	).get(fc.getControlServerValue(keys.OsqueryLogIngestPercentEnabled))
+}
+
+func (fc *FlagController) SetOsqueryLogIngestPercentEnabled(percent int) error {
+	return fc.setControlServerValue(keys.OsqueryLogIngestPercentEnabled, intToBytes(percent))
+}
