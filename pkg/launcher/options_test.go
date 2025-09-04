@@ -179,6 +179,46 @@ func TestAutoupdateDownloadSPlayCanBeDisabledFromFlagsFile(t *testing.T) { //nol
 	require.Equal(t, expectedOpts, opts)
 }
 
+func TestOsqueryLogPublishFlags(t *testing.T) { //nolint:paralleltest
+	os.Clearenv()
+
+	testArgs, expectedOpts := getArgsAndResponse()
+	expectedPublishURL := "https://testerpublish.example.com"
+	expectedAPIKey := "test-api-key"
+	testArgs["osquery_log_publish_url"] = expectedPublishURL
+	testArgs["osquery_log_publish_api_key"] = expectedAPIKey
+	testArgs["osquery_log_publish_percent_enabled"] = "100"
+	// update expectations to to test overwrites + parsing from flag file
+	expectedOpts.OsqueryLogPublishURL = expectedPublishURL
+	expectedOpts.OsqueryLogPublishAPIKey = expectedAPIKey
+	expectedOpts.OsqueryLogPublishPercentEnabled = 100
+
+	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")
+	require.NoError(t, err)
+	expectedOpts.ConfigFilePath = flagFile.Name()
+
+	for k, val := range testArgs {
+		var err error
+
+		_, err = flagFile.WriteString(strings.TrimLeft(k, "-"))
+		require.NoError(t, err)
+
+		if val != "" {
+			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			require.NoError(t, err)
+		}
+
+		_, err = flagFile.WriteString("\n")
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, flagFile.Close())
+
+	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	require.NoError(t, err)
+	require.Equal(t, expectedOpts, opts)
+}
+
 func TestOptionsSetControlServerHost(t *testing.T) { // nolint:paralleltest
 	testCases := []struct {
 		testName                   string

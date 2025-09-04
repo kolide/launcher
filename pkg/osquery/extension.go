@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -866,6 +867,12 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	err = e.writeLogsWithReenroll(publicationCtx, typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
+	}
+
+	dualPublicationPercentEnabled := e.knapsack.OsqueryLogPublishPercentEnabled()
+	// generate random number between 0 and 100 to determine if this batch should be published
+	if dualPublicationPercentEnabled > 0 && rand.Intn(101) < dualPublicationPercentEnabled {
+		// insert new publication logic here
 	}
 
 	// Delete logs that were successfully sent
