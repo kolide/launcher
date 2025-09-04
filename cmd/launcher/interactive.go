@@ -42,18 +42,16 @@ func runInteractive(systemMultiSlogger *multislogger.MultiSlogger, args []string
 		AddSource: true,
 	}))
 
-	if opts.OsquerydPath == "" {
-		latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", systemMultiSlogger.Logger)
-		if err != nil {
-			opts.OsquerydPath = launcher.FindOsquery()
-			if opts.OsquerydPath == "" {
-				return errors.New("could not find osqueryd binary")
-			}
-
-			return fmt.Errorf("finding osqueryd binary: %w", err)
-		} else {
-			opts.OsquerydPath = latestOsquerydBinary.Path
+	latestOsquerydBinary, err := tuf.CheckOutLatestWithoutConfig("osqueryd", systemMultiSlogger.Logger)
+	if err != nil {
+		opts.OsquerydPath = launcher.FindOsquery()
+		if opts.OsquerydPath == "" {
+			return errors.New("could not find osqueryd binary")
 		}
+
+		return fmt.Errorf("finding osqueryd binary: %w", err)
+	} else {
+		opts.OsquerydPath = latestOsquerydBinary.Path
 	}
 
 	// this is a tmp root directory that launcher can use to store files it needs to run
