@@ -14,7 +14,7 @@ const (
 
 type PresenceDetector struct {
 	lastDetection time.Time
-	mutext        sync.Mutex
+	mutex         sync.Mutex
 	// detector is an interface to allow for mocking in tests
 	detector detectorIface
 }
@@ -33,8 +33,8 @@ func (d *detector) Detect(reason string, timeout time.Duration) (bool, error) {
 // DetectPresence checks if the user is present by detecting the presence of a user.
 // It returns the duration since the last detection.
 func (pd *PresenceDetector) DetectPresence(reason string, detectionInterval time.Duration) (time.Duration, error) {
-	pd.mutext.Lock()
-	defer pd.mutext.Unlock()
+	pd.mutex.Lock()
+	defer pd.mutex.Unlock()
 
 	if pd.detector == nil {
 		pd.detector = &detector{}
