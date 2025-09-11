@@ -1,7 +1,11 @@
 package osquerylogpublisher
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -9,7 +13,7 @@ import (
 	"github.com/kolide/kit/contexts/uuid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/osquery/osquery-go/plugin/logger"
+	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )
 
 type (
@@ -30,31 +34,104 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client *http.C
 	}
 }
 
-func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType logger.LogType, logs []string) (bool, error) {
+func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
+	logger := lpc.logger.With("request_uuid", requestUUID)
+	var resp *http.Response
+	var publishLogsResponse PublishLogsResponse
+	var err error
 
-	// defer func(begin time.Time) {
-	// 	pubStateVals, ok := ctx.Value(service.PublicationCtxKey).(map[string]int)
-	// 	if !ok {
-	// 		pubStateVals = make(map[string]int)
-	// 	}
+	defer func(begin time.Time) {
+		pubStateVals, ok := ctx.Value(service.PublicationCtxKey).(map[string]int)
+		if !ok {
+			pubStateVals = make(map[string]int)
+		}
 
-	// 	lpc.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
-	// 		"method", "PublishLogs",
-	// 		"uuid", requestUUID,
-	// 		"logType", logType,
-	// 		"log_count", len(logs),
-	// 		"errcode", errcode,
-	// 		"reauth", reauth,
-	// 		"err", err,
-	// 		"took", time.Since(begin),
-	// 		"publication_state", pubStateVals,
-	// 	)
-	// }(time.Now())
+		lpc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "attempted log publication",
+			"method", "PublishLogs",
+			"uuid", requestUUID,
+			"logType", logType,
+			"log_count", len(logs),
+			"response", publishLogsResponse,
+			"status_code", resp.StatusCode,
+			"err", err,
+			"took", time.Since(begin),
+			"publication_state", pubStateVals,
+		)
+	}(time.Now())
 
-	// use lpc.client to POST to the agent-ingester microservice /logs endpoint
+	payload := PublishLogsRequest{
+		LogType: logType,
+		Logs:    logs,
+	}
 
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to marshal log publish request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
 
-	return true, nil
+	url := fmt.Sprintf("%s/logs", lpc.knapsack.OsqueryLogPublishURL())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to create HTTP request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	// Set required headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryLogPublishAPIKey()))
+
+	// Make the request
+	resp, err = lpc.client.Do(req)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to issue HTTP request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to read response body",
+			"status_code", resp.StatusCode,
+			"err", err,
+		)
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	// unmarshal body into LogPublicationResponse
+	err = json.Unmarshal(body, &publishLogsResponse)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to unmarshal response body",
+			"status_code", resp.StatusCode,
+			"err", err,
+		)
+		return nil, fmt.Errorf("unmarshaling response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Log(ctx, slog.LevelError, "received non-200 response from agent-ingester",
+			"status_code", resp.StatusCode,
+		)
+
+		// in the future we can pivot on StatusCode to determine if this is something that will need the
+		// equivalent of reauth (e.g. a new mTLS cert)
+		// reauth := resp.StatusCode == http.StatusUnauthorized
+		return nil, fmt.Errorf("agent-ingester returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return &publishLogsResponse, nil
 }
