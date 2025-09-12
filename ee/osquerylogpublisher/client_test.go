@@ -60,6 +60,7 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 
 			mockKnapsack.On("OsqueryLogPublishURL").Return("https://example.com")
 			mockKnapsack.On("OsqueryLogPublishAPIKey").Return("test-api-key")
+			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(100)
 
 			resp := &http.Response{
 				StatusCode: tt.responseStatus,
@@ -68,11 +69,7 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 
 			mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return(resp, nil)
 
-			client := &LogPublisherClient{
-				knapsack: mockKnapsack,
-				client:   mockHTTPClient,
-				logger:   slogger,
-			}
+			client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
 
 			logs := []string{"log1", "log2", "log3"}
 			result, err := client.PublishLogs(context.Background(), osqlog.LogTypeStatus, logs)
@@ -82,13 +79,47 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			if tt.expectErrContains != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectErrContains)
-				return
+			} else {
+				// if we expect no error, we expect a properly unmarshalled response with a successful status
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, "success", result.Status)
 			}
+		})
+	}
+}
 
-			// if we expect no error, we expect a properly unmarshalled response with a successful status
-			require.NoError(t, err)
-			assert.NotNil(t, result)
-			assert.Equal(t, "success", result.Status)
+func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name              string
+		percentEnabled    int
+		shouldPublishLogs bool
+	}{
+		{
+			name:              "default disabled",
+			percentEnabled:    0,
+			shouldPublishLogs: false,
+		},
+		{
+			name:              "full cutover enabled",
+			percentEnabled:    100,
+			shouldPublishLogs: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockKnapsack := mocks.NewKnapsack(t)
+			mockHTTPClient := &mockHTTPClient{}
+			slogger := multislogger.NewNopLogger()
+
+			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(tt.percentEnabled)
+			client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
+
+			assert.Equal(t, tt.shouldPublishLogs, client.shouldPublishLogs())
+			mockHTTPClient.AssertExpectations(t)
 		})
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -26,7 +27,7 @@ type (
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client *http.Client) *LogPublisherClient {
+func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) *LogPublisherClient {
 	return &LogPublisherClient{
 		logger:   logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
@@ -35,6 +36,10 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client *http.C
 }
 
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
+	if !lpc.shouldPublishLogs() {
+		return nil, nil
+	}
+
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
 	logger := lpc.logger.With(
@@ -132,4 +137,15 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	return &publishLogsResponse, nil
+}
+
+func (lpc *LogPublisherClient) shouldPublishLogs() bool {
+	dualPublicationPercentEnabled := lpc.knapsack.OsqueryLogPublishPercentEnabled()
+	if dualPublicationPercentEnabled == 0 {
+		return false
+	}
+
+	// generate random number between 0 and 100 to determine if this batch should be published
+	// if the random number is less than the percentage enabled, publish the logs
+	return rand.Intn(101) <= dualPublicationPercentEnabled
 }
