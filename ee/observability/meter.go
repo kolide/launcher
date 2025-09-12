@@ -32,6 +32,10 @@ const (
 	osqueryCpuHistogramDescription               = "osquery process CPU percent"
 	osqueryRssHistogramName                      = "launcher.osquery.memory.rss"
 	osqueryRssHistogramDescription               = "osquery process RSS bytes"
+	desktopCpuHistogramName                      = "launcher.desktop.cpu.percent"
+	desktopCpuHistogramDescription               = "Desktop process CPU percent"
+	desktopRssHistogramName                      = "launcher.desktop.memory.rss"
+	desktopRssHistogramDescription               = "Desktop process RSS bytes"
 	launcherRestartCounterName                   = "launcher.restart"
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
@@ -58,6 +62,8 @@ var (
 	RSSHistogram               metric.Int64Histogram
 	OsqueryCpuPercentHistogram metric.Float64Histogram
 	OsqueryRssHistogram        metric.Int64Histogram
+	DesktopCpuPercentHistogram metric.Float64Histogram
+	DesktopRssHistogram        metric.Int64Histogram
 
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
@@ -104,6 +110,12 @@ func ReinitializeMetrics() {
 		metric.WithUnit(unitPercent))
 	OsqueryRssHistogram = int64HistogramOrNoop(osqueryRssHistogramName,
 		metric.WithDescription(osqueryRssHistogramDescription),
+		metric.WithUnit(unitByte))
+	DesktopCpuPercentHistogram = float64HistogramOrNoop(desktopCpuHistogramName,
+		metric.WithDescription(desktopCpuHistogramDescription),
+		metric.WithUnit(unitPercent))
+	DesktopRssHistogram = int64HistogramOrNoop(desktopRssHistogramName,
+		metric.WithDescription(desktopRssHistogramDescription),
 		metric.WithUnit(unitByte))
 
 	// Counters
