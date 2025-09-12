@@ -22,7 +22,7 @@ type (
 	LogPublisherClient struct {
 		logger   *slog.Logger
 		knapsack types.Knapsack
-		client   *http.Client
+		client   PublisherHTTPClient
 	}
 )
 
@@ -37,7 +37,11 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client *http.C
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := lpc.logger.With("request_uuid", requestUUID)
+	logger := lpc.logger.With(
+		"request_uuid", requestUUID,
+		"log_type", logType.String(),
+		"log_count", len(logs),
+	)
 	var resp *http.Response
 	var publishLogsResponse PublishLogsResponse
 	var err error
@@ -48,11 +52,8 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 			pubStateVals = make(map[string]int)
 		}
 
-		lpc.knapsack.Slogger().Log(ctx, slog.LevelInfo, "attempted log publication",
+		logger.Log(ctx, levelForError(err), "attempted log publication",
 			"method", "PublishLogs",
-			"uuid", requestUUID,
-			"logType", logType,
-			"log_count", len(logs),
 			"response", publishLogsResponse,
 			"status_code", resp.StatusCode,
 			"err", err,
@@ -85,11 +86,9 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	// Set required headers
+	// set required headers and issue the request
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryLogPublishAPIKey()))
-
-	// Make the request
 	resp, err = lpc.client.Do(req)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -100,7 +99,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 	defer resp.Body.Close()
 
-	// Read response body
+	// read in the response and unmarshal
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -111,7 +110,6 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
-	// unmarshal body into LogPublicationResponse
 	err = json.Unmarshal(body, &publishLogsResponse)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -119,7 +117,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 			"status_code", resp.StatusCode,
 			"err", err,
 		)
-		return nil, fmt.Errorf("unmarshaling response: %w", err)
+		return nil, fmt.Errorf("unable to unmarshal agent-ingester response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -2,6 +2,8 @@ package osquerylogpublisher
 
 import (
 	"context"
+	"log/slog"
+	"net/http"
 
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )
@@ -13,6 +15,10 @@ type (
 		PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error)
 		// PublishResults publishes the results of executed distributed queries.
 		//PublishResults(ctx context.Context, results []distributed.Result) (bool, error)
+	}
+
+	PublisherHTTPClient interface {
+		Do(req *http.Request) (*http.Response, error)
 	}
 
 	// PublishLogsRequest represents the expected JSON structure for log data. We will likely add some
@@ -34,3 +40,11 @@ type (
 		Message       string `json:"message"`
 	}
 )
+
+// levelForError returns slog.LevelError if err != nil, else slog.LevelDebug
+func levelForError(err error) slog.Level {
+	if err != nil {
+		return slog.LevelWarn
+	}
+	return slog.LevelDebug
+}
