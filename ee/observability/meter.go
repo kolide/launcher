@@ -10,6 +10,7 @@ const (
 	// Units as defined by https://ucum.org
 	unitByte    = "B"
 	unitPercent = "%"
+	unitByteGCP = "By" // Unfortunately, "B" isn't recognized by our metrics ingest -- we have to use "By" instead
 
 	// Custom units
 	unitRestart = "{restart}"
@@ -116,7 +117,7 @@ func ReinitializeMetrics() {
 		metric.WithUnit(unitPercent))
 	DesktopRssHistogram = int64HistogramOrNoop(desktopRssHistogramName,
 		metric.WithDescription(desktopRssHistogramDescription),
-		metric.WithUnit(unitByte))
+		metric.WithUnit(unitByteGCP))
 
 	// Counters
 	LauncherRestartCounter = int64CounterOrNoop(launcherRestartCounterName,
