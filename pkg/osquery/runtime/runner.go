@@ -26,17 +26,17 @@ type settingsStoreWriter interface {
 }
 
 type Runner struct {
-	registrationIds                      []string                    // we expect to run one instance per registration ID
-	instances                            map[string]*OsqueryInstance // maps registration ID to currently-running instance
-	instanceLock                         sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
-	slogger                              *slog.Logger
-	knapsack                             types.Knapsack
-	serviceClient                        service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
-	settingsWriter                       settingsStoreWriter     // writes to startup settings store
-	opts                                 []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown                             chan struct{}
-	interrupted                          *atomic.Bool
-	restartRequestedDurningModernStandby *atomic.Bool
+	registrationIds []string                    // we expect to run one instance per registration ID
+	instances       map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	instanceLock    sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
+	slogger         *slog.Logger
+	knapsack        types.Knapsack
+	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
+	settingsWriter  settingsStoreWriter     // writes to startup settings store
+	opts            []OsqueryInstanceOption // global options applying to all osquery instances
+	shutdown        chan struct{}
+	interrupted     *atomic.Bool
+	needsRestart    *atomic.Bool
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
@@ -280,29 +280,26 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	// only the InModernStandby flag changed
-	if len(flagKeys) == 1 && flagKeys[0] == keys.InModernStandby {
-
-		// don't need to request a restart just because we entered modern standby
-		if r.knapsack.InModernStandby() {
-			return
-		}
-
-		// not in modern standby
-		// don't need to restart if we have no pending restart request
-		if !r.restartRequestedDurningModernStandby.Load() {
-			return
-		}
+	// only modern standby changed and no restart pending
+	if len(flagKeys) == 1 && flagKeys[0] == keys.InModernStandby && !r.needsRestart.Load() {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"only modern standby flag changed and no restart needed, doing nothing",
+			"in_modern_standby", r.knapsack.InModernStandby(),
+			"needs_restart", r.needsRestart.Load(),
+		)
+		return
 	}
 
 	r.slogger.Log(ctx, slog.LevelDebug,
-		"control server flags changed, restarting instance to apply",
+		"restarting osquery instances due to flag changes or needed restart",
 		"flags", fmt.Sprintf("%+v", flagKeys),
+		"in_modern_standby", r.knapsack.InModernStandby(),
+		"needs_restart", r.needsRestart.Load(),
 	)
 
 	if err := r.Restart(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
-			"could not restart osquery instance after flag change",
+			"could not restart osquery instance after flag change or needed restart",
 			"err", err,
 		)
 	}
@@ -367,11 +364,11 @@ func (r *Runner) Restart(ctx context.Context) error {
 			"device is in modern standby, not restarting osquery instances, will apply changes on wake",
 		)
 
-		r.restartRequestedDurningModernStandby.Store(true)
+		r.needsRestart.Store(true)
 		return nil
 	}
 
-	r.restartRequestedDurningModernStandby.Store(false)
+	r.needsRestart.Store(false)
 
 	// Shut down the instances -- this will trigger a restart in each `runInstance`.
 	if err := r.triggerShutdownForInstances(ctx); err != nil {
