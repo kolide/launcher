@@ -50,6 +50,7 @@ func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter s
 		shutdown:        make(chan struct{}),
 		opts:            opts,
 		interrupted:     &atomic.Bool{},
+		needsRestart:    &atomic.Bool{},
 	}
 
 	k.RegisterChangeObserver(runner,
