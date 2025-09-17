@@ -12,11 +12,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
-	"strconv"
-	"strings"
 	"time"
-
-	"github.com/kolide/launcher/ee/allowedcmd"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
@@ -210,7 +206,8 @@ func (c *runtimeCheckup) discoverDesktopSockets() ([]desktopSocketInfo, error) {
 func (c *runtimeCheckup) discoverDesktopSocketsSystemWide() ([]desktopSocketInfo, error) {
 	processes, err := c.findDesktopProcessesWithLsof()
 	if err != nil {
-		return nil, fmt.Errorf("finding desktop processes: %w", err)
+		// System-wide discovery not available (e.g., on Windows)
+		return nil, nil
 	}
 
 	var validSockets []desktopSocketInfo
@@ -232,77 +229,6 @@ type desktopProcessInfo struct {
 	pid        int
 	socketPath string
 	authToken  string
-}
-
-func (c *runtimeCheckup) findDesktopProcessesWithLsof() ([]desktopProcessInfo, error) {
-	// Use lsof to find processes with desktop socket files
-	cmd, err := allowedcmd.Lsof(context.Background(), "-U", "-a", "-c", "launcher")
-	if err != nil {
-		return nil, fmt.Errorf("creating lsof command: %w", err)
-	}
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("running lsof: %w", err)
-	}
-
-	var processes []desktopProcessInfo
-	lines := strings.Split(string(output), "\n")
-
-	for _, line := range lines {
-		if !strings.Contains(line, "desktop.sock") {
-			continue
-		}
-
-		// Parse lsof output: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NAME
-		fields := strings.Fields(line)
-		if len(fields) < 8 {
-			continue
-		}
-
-		pidStr := fields[1]
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			continue
-		}
-
-		socketPath := fields[7] // Last field is the socket path
-
-		// Get auth token from process environment
-		authToken, err := c.getAuthTokenFromProcess(pid)
-		if err != nil {
-			continue // Skip processes we can't read
-		}
-
-		processes = append(processes, desktopProcessInfo{
-			pid:        pid,
-			socketPath: socketPath,
-			authToken:  authToken,
-		})
-	}
-
-	return processes, nil
-}
-
-func (c *runtimeCheckup) getAuthTokenFromProcess(pid int) (string, error) {
-	// Read process environment
-	cmd, err := allowedcmd.Ps(context.Background(), "eww", strconv.Itoa(pid))
-	if err != nil {
-		return "", fmt.Errorf("creating ps command: %w", err)
-	}
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading process environment: %w", err)
-	}
-
-	// Look for USER_SERVER_AUTH_TOKEN
-	envVars := strings.Split(string(output), " ")
-	for _, envVar := range envVars {
-		if strings.HasPrefix(envVar, "USER_SERVER_AUTH_TOKEN=") {
-			return strings.TrimPrefix(envVar, "USER_SERVER_AUTH_TOKEN="), nil
-		}
-	}
-
-	return "", errors.New("auth token not found in process environment")
 }
 
 func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken string) bool {
