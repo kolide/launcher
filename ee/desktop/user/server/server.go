@@ -333,7 +333,7 @@ func (s *UserServer) respondWithJSON(w http.ResponseWriter, data interface{}) {
 }
 
 func (s *UserServer) respondWithError(w http.ResponseWriter, message string, err error) {
-	s.slogger.Log(context.TODO(), slog.LevelError, message, "err", err)
+	s.slogger.Log(context.TODO(), slog.LevelError, "profile request error", "message", message, "err", err)
 	response := ProfileResponse{Error: fmt.Sprintf("%s: %s", message, err.Error())}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)

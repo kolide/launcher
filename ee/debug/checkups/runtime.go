@@ -10,12 +10,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kolide/launcher/ee/allowedcmd"
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
@@ -235,7 +236,10 @@ type desktopProcessInfo struct {
 
 func (c *runtimeCheckup) findDesktopProcessesWithLsof() ([]desktopProcessInfo, error) {
 	// Use lsof to find processes with desktop socket files
-	cmd := exec.Command("lsof", "-U", "-a", "-c", "launcher")
+	cmd, err := allowedcmd.Lsof(context.Background(), "-U", "-a", "-c", "launcher")
+	if err != nil {
+		return nil, fmt.Errorf("creating lsof command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("running lsof: %w", err)
@@ -281,7 +285,10 @@ func (c *runtimeCheckup) findDesktopProcessesWithLsof() ([]desktopProcessInfo, e
 
 func (c *runtimeCheckup) getAuthTokenFromProcess(pid int) (string, error) {
 	// Read process environment
-	cmd := exec.Command("ps", "eww", strconv.Itoa(pid))
+	cmd, err := allowedcmd.Ps(context.Background(), "eww", strconv.Itoa(pid))
+	if err != nil {
+		return "", fmt.Errorf("creating ps command: %w", err)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("reading process environment: %w", err)
@@ -295,7 +302,7 @@ func (c *runtimeCheckup) getAuthTokenFromProcess(pid int) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("auth token not found in process environment")
+	return "", errors.New("auth token not found in process environment")
 }
 
 func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken string) bool {
@@ -320,7 +327,7 @@ func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken strin
 	}
 
 	// Test cpuprofile endpoint with OPTIONS to see if it exists
-	req, err := http.NewRequest("OPTIONS", "http://unix/cpuprofile", nil)
+	req, err := http.NewRequestWithContext(context.Background(), "OPTIONS", "http://unix/cpuprofile", nil)
 	if err != nil {
 		return false
 	}
@@ -386,7 +393,7 @@ func requestDesktopProfile(socketPath, authToken, profileType string) (string, e
 
 	// Make POST request to profile endpoint
 	url := fmt.Sprintf("http://unix/%s", profileType)
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
