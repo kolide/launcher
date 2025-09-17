@@ -56,7 +56,6 @@ func (c *runtimeCheckup) findDesktopProcessesWithLsof() ([]desktopProcessInfo, e
 		}
 
 		processes = append(processes, desktopProcessInfo{
-			pid:        pid,
 			socketPath: socketPath,
 			authToken:  authToken,
 		})

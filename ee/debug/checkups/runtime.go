@@ -226,7 +226,6 @@ func (c *runtimeCheckup) discoverDesktopSocketsSystemWide() ([]desktopSocketInfo
 }
 
 type desktopProcessInfo struct {
-	pid        int
 	socketPath string
 	authToken  string
 }
