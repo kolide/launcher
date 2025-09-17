@@ -94,6 +94,14 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 	return instance.uidProcs
 }
 
+func InstanceDesktopAuthToken() string {
+	if instance == nil {
+		return ""
+	}
+
+	return instance.userServerAuthToken
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -153,6 +161,10 @@ func (pr processRecord) String() string {
 		pr.StartTime.String(),
 		pr.LastHealthCheck.String(),
 	)
+}
+
+func (pr processRecord) SocketPath() string {
+	return pr.socketPath
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields

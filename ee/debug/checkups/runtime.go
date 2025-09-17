@@ -7,12 +7,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/desktop/runner"
+	"github.com/kolide/launcher/ee/desktop/user/client"
 )
 
 type runtimeCheckup struct {
+	k types.Knapsack
 }
 
 func (c *runtimeCheckup) Name() string {
@@ -37,6 +48,10 @@ func (c *runtimeCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	if err := gatherPprofCpu(extraZip); err != nil {
 		return fmt.Errorf("gathering cpu profile: %w", err)
+	}
+
+	if err := c.gatherDesktopProfiles(ctx, extraZip); err != nil {
+		return fmt.Errorf("gathering desktop profiles: %w", err)
 	}
 
 	return nil
@@ -132,4 +147,298 @@ func gatherPprofCpu(z *zip.Writer) error {
 	case <-time.After(10 * time.Second):
 		return errors.New("timeout waiting for CPU profile to complete")
 	}
+}
+
+// ProfileResponse matches the response from desktop server profile endpoints
+type ProfileResponse struct {
+	FilePath string `json:"file_path"`
+	Error    string `json:"error,omitempty"`
+}
+
+func (c *runtimeCheckup) gatherDesktopProfiles(ctx context.Context, z *zip.Writer) error {
+	// Smart discovery: try runner instance first, then system-wide discovery
+	sockets, err := c.discoverDesktopSockets()
+	if err != nil {
+		return fmt.Errorf("discovering desktop sockets: %w", err)
+	}
+
+	if len(sockets) == 0 {
+		// No desktop processes found or none support profiling, this is not an error
+		return nil
+	}
+
+	// Gather profiles from each desktop process
+	for i, socketInfo := range sockets {
+		if err := gatherDesktopProfilesFromSocket(ctx, z, socketInfo.socketPath, socketInfo.authToken, i); err != nil {
+			// Log the error but continue with other processes
+			fmt.Printf("Error gathering profiles from desktop socket %s (%s): %v\n",
+				socketInfo.socketPath, socketInfo.source, err)
+		}
+	}
+
+	return nil
+}
+
+type desktopSocketInfo struct {
+	socketPath string
+	authToken  string
+	source     string // "runner_instance" or "system_discovery"
+}
+
+func (c *runtimeCheckup) discoverDesktopSockets() ([]desktopSocketInfo, error) {
+	// Try runner instance first (when flare is run by managing launcher)
+	if processes := runner.InstanceDesktopProcessRecords(); len(processes) > 0 {
+		authToken := runner.InstanceDesktopAuthToken()
+		var sockets []desktopSocketInfo
+		for _, processRecord := range processes {
+			if socketPath := processRecord.SocketPath(); socketPath != "" {
+				sockets = append(sockets, desktopSocketInfo{
+					socketPath: socketPath,
+					authToken:  authToken,
+					source:     "runner_instance",
+				})
+			}
+		}
+		return sockets, nil
+	}
+
+	// Fall back to system-wide discovery (when flare runs standalone)
+	return c.discoverDesktopSocketsSystemWide()
+}
+
+func (c *runtimeCheckup) discoverDesktopSocketsSystemWide() ([]desktopSocketInfo, error) {
+	processes, err := c.findDesktopProcessesWithLsof()
+	if err != nil {
+		return nil, fmt.Errorf("finding desktop processes: %w", err)
+	}
+
+	var validSockets []desktopSocketInfo
+	for _, proc := range processes {
+		// Test if this socket supports profiling endpoints
+		if c.testDesktopProfilingSupport(proc.socketPath, proc.authToken) {
+			validSockets = append(validSockets, desktopSocketInfo{
+				socketPath: proc.socketPath,
+				authToken:  proc.authToken,
+				source:     "system_discovery",
+			})
+		}
+	}
+
+	return validSockets, nil
+}
+
+type desktopProcessInfo struct {
+	pid        int
+	socketPath string
+	authToken  string
+}
+
+func (c *runtimeCheckup) findDesktopProcessesWithLsof() ([]desktopProcessInfo, error) {
+	// Use lsof to find processes with desktop socket files
+	cmd := exec.Command("lsof", "-U", "-a", "-c", "launcher")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("running lsof: %w", err)
+	}
+
+	var processes []desktopProcessInfo
+	lines := strings.Split(string(output), "\n")
+
+	for _, line := range lines {
+		if !strings.Contains(line, "desktop.sock") {
+			continue
+		}
+
+		// Parse lsof output: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NAME
+		fields := strings.Fields(line)
+		if len(fields) < 8 {
+			continue
+		}
+
+		pidStr := fields[1]
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+
+		socketPath := fields[7] // Last field is the socket path
+
+		// Get auth token from process environment
+		authToken, err := c.getAuthTokenFromProcess(pid)
+		if err != nil {
+			continue // Skip processes we can't read
+		}
+
+		processes = append(processes, desktopProcessInfo{
+			pid:        pid,
+			socketPath: socketPath,
+			authToken:  authToken,
+		})
+	}
+
+	return processes, nil
+}
+
+func (c *runtimeCheckup) getAuthTokenFromProcess(pid int) (string, error) {
+	// Read process environment
+	cmd := exec.Command("ps", "eww", strconv.Itoa(pid))
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("reading process environment: %w", err)
+	}
+
+	// Look for USER_SERVER_AUTH_TOKEN
+	envVars := strings.Split(string(output), " ")
+	for _, envVar := range envVars {
+		if strings.HasPrefix(envVar, "USER_SERVER_AUTH_TOKEN=") {
+			return strings.TrimPrefix(envVar, "USER_SERVER_AUTH_TOKEN="), nil
+		}
+	}
+
+	return "", fmt.Errorf("auth token not found in process environment")
+}
+
+func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken string) bool {
+	// Quick test to see if this desktop process supports profiling endpoints
+	// We'll try a simple ping first to avoid auth errors on old processes
+	client := client.New(authToken, socketPath, client.WithTimeout(5*time.Second))
+
+	// Test with a simple ping first
+	if err := client.Ping(); err != nil {
+		return false // Can't even ping, skip this process
+	}
+
+	// Now test if profiling endpoints exist by making a quick HTTP request
+	// We'll check if the endpoint exists without actually generating a profile
+	testClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+		Timeout: 5 * time.Second,
+	}
+
+	// Test cpuprofile endpoint with OPTIONS to see if it exists
+	req, err := http.NewRequest("OPTIONS", "http://unix/cpuprofile", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+
+	resp, err := testClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	// If we get anything other than 404, the profiling endpoints likely exist
+	// 404 = endpoint doesn't exist, others suggest profiling support exists
+	return resp.StatusCode != http.StatusNotFound
+}
+
+func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketPath, authToken string, processIndex int) error {
+	// Create a client to communicate with the desktop server
+	c := client.New(authToken, socketPath, client.WithTimeout(30*time.Second))
+
+	// Try to ping first to see if the server is responsive
+	if err := c.Ping(); err != nil {
+		return fmt.Errorf("desktop server not responsive: %w", err)
+	}
+
+	// Request CPU profile
+	cpuProfilePath, err := requestDesktopProfile(socketPath, authToken, "cpuprofile")
+	if err != nil {
+		return fmt.Errorf("requesting CPU profile: %w", err)
+	}
+	defer os.Remove(cpuProfilePath) // Clean up temp file
+
+	// Request memory profile
+	memProfilePath, err := requestDesktopProfile(socketPath, authToken, "memprofile")
+	if err != nil {
+		return fmt.Errorf("requesting memory profile: %w", err)
+	}
+	defer os.Remove(memProfilePath) // Clean up temp file
+
+	// Add CPU profile to zip
+	if err := addFileToZipFromPath(z, cpuProfilePath, fmt.Sprintf("desktop_%d_cpuprofile", processIndex)); err != nil {
+		return fmt.Errorf("adding desktop CPU profile to zip: %w", err)
+	}
+
+	// Add memory profile to zip
+	if err := addFileToZipFromPath(z, memProfilePath, fmt.Sprintf("desktop_%d_memprofile", processIndex)); err != nil {
+		return fmt.Errorf("adding desktop memory profile to zip: %w", err)
+	}
+
+	return nil
+}
+
+func requestDesktopProfile(socketPath, authToken, profileType string) (string, error) {
+	// Create HTTP client configured for Unix socket communication
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	// Make POST request to profile endpoint
+	url := fmt.Sprintf("http://unix/%s", profileType)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	// Parse response
+	var profileResp ProfileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&profileResp); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	if profileResp.Error != "" {
+		return "", fmt.Errorf("server error: %s", profileResp.Error)
+	}
+
+	if profileResp.FilePath == "" {
+		return "", errors.New("server did not return file path")
+	}
+
+	return profileResp.FilePath, nil
+}
+
+func addFileToZipFromPath(z *zip.Writer, filePath, zipEntryName string) error {
+	// Open the source file
+	srcFile, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("opening source file: %w", err)
+	}
+	defer srcFile.Close()
+
+	// Create entry in zip
+	dst, err := z.Create(zipEntryName)
+	if err != nil {
+		return fmt.Errorf("creating zip entry: %w", err)
+	}
+
+	// Copy file contents to zip
+	if _, err := io.Copy(dst, srcFile); err != nil {
+		return fmt.Errorf("copying file to zip: %w", err)
+	}
+
+	return nil
 }
