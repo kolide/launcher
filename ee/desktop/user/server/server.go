@@ -268,17 +268,9 @@ func (s *UserServer) cpuProfileHandler(w http.ResponseWriter, req *http.Request)
 		s.respondWithError(w, "failed to create temp file", err)
 		return
 	}
-	tempFile.Close() // Close immediately, we'll reopen for writing
+	defer tempFile.Close()
 
-	// Start CPU profiling
-	profileFile, err := os.Create(tempFile.Name())
-	if err != nil {
-		s.respondWithError(w, "failed to open profile file", err)
-		return
-	}
-	defer profileFile.Close()
-
-	if err := pprof.StartCPUProfile(profileFile); err != nil {
+	if err := pprof.StartCPUProfile(tempFile); err != nil {
 		s.respondWithError(w, "failed to start CPU profile", err)
 		return
 	}
