@@ -128,13 +128,22 @@ func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStat
 		}
 		stats = append(stats, ps)
 
+		// Record osquery metrics
 		if strings.Contains(ps.Cmdline, "osquery") {
 			observability.OsqueryRssHistogram.Record(ctx, int64(ps.MemInfo.RSS))
 			observability.OsqueryCpuPercentHistogram.Record(ctx, ps.CPUPercent)
 		}
 
+		// Record launcher desktop metrics. We check the executable for "launcher" string, rather than
+		// cmdline, to ignore the sudo parent desktop process on macOS. We may need to look in the
+		// grandchild processes instead.
+		if strings.Contains(ps.Exe, "launcher") && strings.HasSuffix(ps.Cmdline, "desktop") {
+			observability.DesktopRssHistogram.Record(ctx, int64(ps.MemInfo.RSS))
+			observability.DesktopCpuPercentHistogram.Record(ctx, ps.CPUPercent)
+		}
+
 		// We want to grab one more level of child processes, to account for the desktop process
-		// being invoked with sudo first on posix.
+		// being invoked with sudo first on macOS.
 		grandchildProcesses, err := childProcess.ChildrenWithContext(ctx)
 		if err != nil {
 			continue
@@ -145,6 +154,13 @@ func ChildProcessStatsForPid(ctx context.Context, pid int32) ([]*PerformanceStat
 				continue
 			}
 			stats = append(stats, ps)
+
+			// Record launcher desktop metrics. We check the executable for "launcher" string, rather than
+			// cmdline, to ignore the sudo parent desktop process on macOS.
+			if strings.Contains(ps.Exe, "launcher") && strings.HasSuffix(ps.Cmdline, "desktop") {
+				observability.DesktopRssHistogram.Record(ctx, int64(ps.MemInfo.RSS))
+				observability.DesktopCpuPercentHistogram.Record(ctx, ps.CPUPercent)
+			}
 		}
 	}
 
