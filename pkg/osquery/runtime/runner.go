@@ -298,6 +298,8 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 		"needs_restart", r.needsRestart.Load(),
 	)
 
+	// r.Restart will check if we are in modern standby and set the needsRestart flag if so and we will restart
+	// when we exit modern standby
 	if err := r.Restart(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
 			"could not restart osquery instance after flag change or needed restart",
