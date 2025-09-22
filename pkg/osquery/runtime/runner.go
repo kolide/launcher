@@ -37,6 +37,7 @@ type Runner struct {
 	shutdown        chan struct{}
 	interrupted     *atomic.Bool
 	needsRestart    *atomic.Bool
+	restartLock     sync.Mutex // use a restart lock to ensure we don't get multiple quick succesion restarts due to in modern standy flapping
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
@@ -281,6 +282,8 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	r.restartLock.Lock()
+
 	// only modern standby changed and no restart pending
 	if len(flagKeys) == 1 && flagKeys[0] == keys.InModernStandby && !r.needsRestart.Load() {
 		r.slogger.Log(ctx, slog.LevelDebug,
@@ -288,8 +291,12 @@ func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 			"in_modern_standby", r.knapsack.InModernStandby(),
 			"needs_restart", r.needsRestart.Load(),
 		)
+
+		r.restartLock.Unlock()
 		return
 	}
+
+	r.restartLock.Unlock()
 
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"restarting osquery instances due to flag changes or needed restart",
@@ -354,6 +361,9 @@ func (r *Runner) Ping() {
 func (r *Runner) Restart(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	r.restartLock.Lock()
+	defer r.restartLock.Unlock()
 
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"runner.Restart called",
