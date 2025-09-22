@@ -47,7 +47,8 @@ func agentLogs(zipWriter *zip.Writer) error {
 		return fmt.Errorf("globbing for agent logs at %s: %w", agentLogsPathPattern, err)
 	}
 	if len(matches) == 0 {
-		return fmt.Errorf("no intune agent logs found at %s", agentLogsPathPattern)
+		// Probably a non-Intune machine!
+		return nil
 	}
 
 	for _, match := range matches {
@@ -66,7 +67,8 @@ func installLogs(zipWriter *zip.Writer) error {
 		return fmt.Errorf("globbing for install logs at %s: %w", installLogsPathPattern, err)
 	}
 	if len(matches) == 0 {
-		return fmt.Errorf("no intune install logs found at %s", installLogsPathPattern)
+		// Probably a non-Intune machine!
+		return nil
 	}
 
 	for _, match := range matches {
