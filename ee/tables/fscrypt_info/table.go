@@ -3,6 +3,8 @@ package fscrypt_info
 import (
 	"log/slog"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/osquery/osquery-go/plugin/table"
 )
 
@@ -14,7 +16,7 @@ type Table struct {
 	slogger *slog.Logger
 }
 
-func TablePlugin(slogger *slog.Logger) *table.Plugin {
+func TablePlugin(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("path"),
 		table.IntegerColumn("encrypted"),
@@ -29,5 +31,5 @@ func TablePlugin(slogger *slog.Logger) *table.Plugin {
 	t := &Table{
 		slogger: slogger.With("table", tableName),
 	}
-	return table.NewPlugin(tableName, columns, t.generate)
+	return tablewrapper.New(flags, slogger, tableName, columns, t.generate)
 }

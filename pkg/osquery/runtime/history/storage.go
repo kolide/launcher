@@ -17,7 +17,7 @@ func (h *History) load() error {
 		return fmt.Errorf("error reading osquery_instance_history from db: %w", err)
 	}
 
-	var instances []*Instance
+	var instances []*instance
 
 	if instancesBytes == nil {
 		return nil

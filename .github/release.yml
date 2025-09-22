@@ -6,9 +6,24 @@ changelog:
     - title: Table Changes
       labels:
         - "component:table"
-    - title: General
-      labels:
-        - "*"
     - title: Build and Package
       labels:
         - "component:build&packaging"
+    - title: Features and Improvements
+      labels:
+        - "features-improvements"
+    - title: Bug Fixes
+      labels:
+        - "bug-fixes"
+    - title: Observability
+      labels:
+        - "observability"
+    - title: Tests, Docs, and Other No-op Changes
+      labels:
+        - "tests-docs"
+    - title: Dependency Updates
+      labels:
+        - "dependencies"
+    - title: General # Non-code changes like tests, CI, documentation
+      labels:
+        - "*"

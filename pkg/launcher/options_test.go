@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/stringutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,7 +106,7 @@ func TestOptionsFromEnv(t *testing.T) { //nolint:paralleltest
 			val = "true"
 		}
 		name := fmt.Sprintf("KOLIDE_LAUNCHER_%s", strings.ToUpper(strings.TrimLeft(k, "-")))
-		require.NoError(t, os.Setenv(name, val))
+		t.Setenv(name, val)
 	}
 	opts, err := ParseOptions("", []string{})
 	require.NoError(t, err)
@@ -117,9 +118,43 @@ func TestOptionsFromFile(t *testing.T) { // nolint:paralleltest
 
 	testArgs, expectedOpts := getArgsAndResponse()
 
-	flagFile, err := os.CreateTemp("", "flag-file")
+	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")
 	require.NoError(t, err)
-	defer os.Remove(flagFile.Name())
+	expectedOpts.ConfigFilePath = flagFile.Name()
+
+	for k, val := range testArgs {
+		var err error
+
+		_, err = flagFile.WriteString(strings.TrimLeft(k, "-"))
+		require.NoError(t, err)
+
+		if val != "" {
+			_, err = flagFile.WriteString(fmt.Sprintf(" %s", val))
+			require.NoError(t, err)
+		}
+
+		_, err = flagFile.WriteString("\n")
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, flagFile.Close())
+
+	opts, err := ParseOptions("", []string{"-config", flagFile.Name()})
+	require.NoError(t, err)
+	require.Equal(t, expectedOpts, opts)
+}
+
+func TestAutoupdateDownloadSPlayCanBeDisabledFromFlagsFile(t *testing.T) { //nolint:paralleltest
+	os.Clearenv()
+
+	testArgs, expectedOpts := getArgsAndResponse()
+	// add in our disable flag to be written to flags file
+	testArgs["autoupdate_download_splay"] = "0s"
+	// update expectations to require that the resulting options have download splay disabled
+	expectedOpts.AutoupdateDownloadSplay = 0 * time.Second
+
+	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")
+	require.NoError(t, err)
 	expectedOpts.ConfigFilePath = flagFile.Name()
 
 	for k, val := range testArgs {
@@ -237,13 +272,11 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		"-autoupdate_interval": "48h",
 		"-logging_interval":    fmt.Sprintf("%ds", randomInt),
 		"-osqueryd_path":       windowsAddExe("/dev/null"),
-		"-transport":           "grpc",
 	}
 
 	opts := &Options{
 		AutoupdateInitialDelay:          1 * time.Hour,
 		AutoupdateInterval:              48 * time.Hour,
-		CompactDbMaxTx:                  int64(65536),
 		Control:                         false,
 		ControlServerURL:                "",
 		ControlRequestInterval:          60 * time.Second,
@@ -257,16 +290,61 @@ func getArgsAndResponse() (map[string]string, *Options) {
 		TufServerURL:                    "https://tuf.kolide.com",
 		OsquerydPath:                    windowsAddExe("/dev/null"),
 		OsqueryHealthcheckStartupDelay:  10 * time.Minute,
-		Transport:                       "grpc",
+		Transport:                       "jsonrpc",
 		UpdateChannel:                   "stable",
 		DelayStart:                      0 * time.Second,
 		WatchdogEnabled:                 false,
 		WatchdogDelaySec:                120,
 		WatchdogMemoryLimitMB:           600,
 		WatchdogUtilizationLimitPercent: 50,
+		Identifier:                      DefaultLauncherIdentifier,
+		AutoupdateDownloadSplay:         8 * time.Hour,
 	}
 
 	return args, opts
+}
+
+func TestSanitizeUpdateChannel(t *testing.T) {
+	t.Parallel()
+	var tests = []struct {
+		name            string
+		channel         string
+		expectedChannel string
+	}{
+		{
+			name:            "default",
+			expectedChannel: Stable.String(),
+		},
+		{
+			name:            "alpha",
+			channel:         Alpha.String(),
+			expectedChannel: Alpha.String(),
+		},
+		{
+			name:            "beta",
+			channel:         Beta.String(),
+			expectedChannel: Beta.String(),
+		},
+		{
+			name:            "nightly",
+			channel:         Nightly.String(),
+			expectedChannel: Nightly.String(),
+		},
+		{
+			name:            "invalid",
+			channel:         "not-a-real-channel",
+			expectedChannel: Stable.String(),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expectedChannel, SanitizeUpdateChannel(tt.channel))
+		})
+	}
 }
 
 // windowsAddExe appends ".exe" to the input string when running on Windows

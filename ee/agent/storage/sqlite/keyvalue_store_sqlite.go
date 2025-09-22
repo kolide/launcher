@@ -6,9 +6,12 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log/slog"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -21,7 +24,10 @@ type storeName int
 
 const (
 	StartupSettingsStore storeName = iota
+	WatchdogLogStore     storeName = 1
 )
+
+var missingMigrationErrFormat = regexp.MustCompile(`no migration found for version \d+`)
 
 // String translates the exported int constant to the actual name of the
 // supported table in the sqlite database.
@@ -29,6 +35,8 @@ func (s storeName) String() string {
 	switch s {
 	case StartupSettingsStore:
 		return "startup_settings"
+	case WatchdogLogStore:
+		return "watchdog_logs"
 	}
 
 	return ""
@@ -38,15 +46,25 @@ func (s storeName) String() string {
 var migrations embed.FS
 
 type sqliteStore struct {
+	slogger       *slog.Logger
 	conn          *sql.DB
 	readOnly      bool
 	rootDirectory string
 	tableName     string
 }
 
+type sqliteColumns struct {
+	pk          string
+	valueColumn string
+	// isLogstore is used to determine whether the underlying table can support our LogStore interface methods.
+	// because any logstore iteration must scan the values into known types, we use this to avoid pulling in
+	// the reflect package here and making this more complicated than it needs to be
+	isLogstore bool
+}
+
 // OpenRO opens a connection to the database in the given root directory; it does
 // not perform database creation or migration.
-func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteStore, error) {
+func OpenRO(ctx context.Context, slogger *slog.Logger, rootDirectory string, name storeName) (*sqliteStore, error) {
 	if name.String() == "" {
 		return nil, fmt.Errorf("unsupported table %d", name)
 	}
@@ -57,6 +75,7 @@ func OpenRO(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 	}
 
 	return &sqliteStore{
+		slogger:       slogger.With("component", "keyvalue_store_sqlite", "table_name", name.String()),
 		conn:          conn,
 		readOnly:      true,
 		rootDirectory: rootDirectory,
@@ -83,7 +102,7 @@ func OpenRW(ctx context.Context, rootDirectory string, name storeName) (*sqliteS
 		tableName:     name.String(),
 	}
 
-	if err := s.migrate(ctx); err != nil {
+	if err := s.migrate(); err != nil {
 		s.Close()
 		return nil, fmt.Errorf("migrating the database: %w", err)
 	}
@@ -153,7 +172,7 @@ func dbLocation(rootDirectory string) string {
 }
 
 // migrate makes sure that the database schema is correct.
-func (s *sqliteStore) migrate(ctx context.Context) error {
+func (s *sqliteStore) migrate() error {
 	d, err := iofs.New(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("loading migration files: %w", err)
@@ -169,7 +188,23 @@ func (s *sqliteStore) migrate(ctx context.Context) error {
 		return fmt.Errorf("creating migrate instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+	// don't prevent DB access for a missing migration, this is the result of a downgrade after previously
+	// running a migration
+	if err := m.Up(); err != nil {
+		// Not actually errors for us -- we're in a successful state
+		if errors.Is(err, migrate.ErrNoChange) || isMissingMigrationError(err) {
+			return nil
+		}
+
+		// If we need to force, do that
+		if errDirty, ok := err.(migrate.ErrDirty); ok {
+			if err := m.Force(errDirty.Version); err != nil {
+				return fmt.Errorf("forcing migration version %d: %w", errDirty.Version, err)
+			}
+			return nil
+		}
+
+		// Some other error -- return it
 		return fmt.Errorf("running migrations: %w", err)
 	}
 
@@ -191,6 +226,9 @@ func (s *sqliteStore) Get(key []byte) (value []byte, err error) {
 
 	var keyValue string
 	if err := s.conn.QueryRow(query, string(key)).Scan(&keyValue); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("querying key `%s`: %w", string(key), err)
 	}
 	return []byte(keyValue), nil
@@ -254,6 +292,13 @@ VALUES %s
 ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	valueStr := strings.TrimRight(strings.Repeat("(?, ?),", len(kvPairs)), ",")
 
+	// make sure we don't go over max int size
+	// this is driven codeql code scanning
+	// https://codeql.github.com/codeql-query-help/go/go-allocation-size-overflow/
+	if len(kvPairs) > math.MaxInt/2 {
+		return nil, errors.New("too many key-value pairs")
+	}
+
 	// Build value args; save key names at the same time to determine which keys to prune later
 	valueArgs := make([]any, 2*len(kvPairs))
 	keyNames := make([]any, len(kvPairs))
@@ -285,7 +330,20 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 		}
 		return nil, fmt.Errorf("deleting keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"closing rows after scanning results",
+				"err", err,
+			)
+		}
+		if err := rows.Err(); err != nil {
+			s.slogger.Log(context.TODO(), slog.LevelWarn,
+				"encountered iteration error",
+				"err", err,
+			)
+		}
+	}()
 
 	deletedKeys := make([]string, 0)
 	for rows.Next() {
@@ -308,4 +366,19 @@ ON CONFLICT (name) DO UPDATE SET value=excluded.value;`
 	}
 
 	return deletedKeys, nil
+}
+
+func (s *sqliteStore) getColumns() *sqliteColumns {
+	switch s.tableName {
+	case StartupSettingsStore.String():
+		return &sqliteColumns{pk: "name", valueColumn: "value", isLogstore: false}
+	case WatchdogLogStore.String():
+		return &sqliteColumns{pk: "timestamp", valueColumn: "log", isLogstore: true}
+	}
+
+	return nil
+}
+
+func isMissingMigrationError(err error) bool {
+	return missingMigrationErrFormat.MatchString(err.Error())
 }

@@ -13,11 +13,11 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/kolide/launcher/pkg/autoupdate"
-
 	"github.com/kolide/kit/version"
 	"github.com/peterbourgon/ff/v3"
 )
+
+const DefaultLauncherIdentifier string = "kolide-k2"
 
 // Options is the set of options that may be configured for Launcher.
 type Options struct {
@@ -65,13 +65,6 @@ type Options struct {
 	// will check for updates from the control server.
 	ControlRequestInterval time.Duration
 
-	// Osquery TLS options
-	OsqueryTlsConfigEndpoint           string
-	OsqueryTlsEnrollEndpoint           string
-	OsqueryTlsLoggerEndpoint           string
-	OsqueryTlsDistributedReadEndpoint  string
-	OsqueryTlsDistributedWriteEndpoint string
-
 	// Autoupdate enables the autoupdate functionality.
 	Autoupdate bool
 	// TufServerURL is the URL for the tuf server.
@@ -82,11 +75,13 @@ type Options struct {
 	// updates.
 	AutoupdateInterval time.Duration
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
-	UpdateChannel autoupdate.UpdateChannel
+	UpdateChannel UpdateChannel
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	AutoupdateInitialDelay time.Duration
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	UpdateDirectory string
+	// AutoupdateDownloadSplay duration of time over which launcher should select random delay before downloading
+	AutoupdateDownloadSplay time.Duration
 
 	// Debug enables debug logging.
 	Debug bool
@@ -114,8 +109,6 @@ type Options struct {
 	InsecureTLS bool
 	// InsecureTransport disables TLS in the transport layer.
 	InsecureTransport bool
-	// CompactDbMaxTx sets the max transaction size for bolt db compaction operations
-	CompactDbMaxTx int64
 	// IAmBreakingEELicence disables the EE licence check before running the local server
 	IAmBreakingEELicense bool
 	// DelayStart allows for delaying launcher startup for a configurable amount of time
@@ -136,6 +129,9 @@ type Options struct {
 
 	// LocalDevelopmentPath is the path to a local build of launcher to test against, rather than finding the latest version in the library
 	LocalDevelopmentPath string
+
+	// Identifier is the key used to identify/namespace a single launcher installation (e.g. kolide-k2)
+	Identifier string
 }
 
 // ConfigFilePath returns the path to launcher's launcher.flags file. If the path
@@ -170,6 +166,7 @@ const (
 	defaultRootDirectory = "launcher-root"
 	skipEnvParse         = runtime.GOOS == "windows" // skip environmental variable parsing on windows
 	DefaultTufServer     = "https://tuf.kolide.com"
+	DefaultMirror        = "https://dl.kolide.co"
 )
 
 // Adapted from
@@ -209,7 +206,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flInitialRunner                   = flagset.Bool("with_initial_runner", false, "Run differential queries from config ahead of scheduled interval.")
 		flKolideServerURL                 = flagset.String("hostname", "", "The hostname of the gRPC server")
 		flKolideHosted                    = flagset.Bool("kolide_hosted", false, "Use Kolide SaaS settings for defaults")
-		flTransport                       = flagset.String("transport", "grpc", "The transport protocol that should be used to communicate with remote (default: grpc)")
+		flTransport                       = flagset.String("transport", "jsonrpc", "The transport protocol that should be used to communicate with remote (default: jsonrpc)")
 		flLoggingInterval                 = flagset.Duration("logging_interval", 60*time.Second, "The interval at which logs should be flushed to the server")
 		flOsquerydPath                    = flagset.String("osqueryd_path", "", "Path to the osqueryd binary to use (Default: find osqueryd in $PATH)")
 		flOsqueryHealthcheckStartupDelay  = flagset.Duration("osquery_healthcheck_startup_delay", 10*time.Minute, "time to wait before beginning osquery healthchecks")
@@ -222,7 +219,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flVersion                         = flagset.Bool("version", false, "Print Launcher version and exit")
 		flLogMaxBytesPerBatch             = flagset.Int("log_max_bytes_per_batch", 0, "Maximum size of a batch of logs. Recommend leaving unset, and launcher will determine")
 		flOsqueryFlags                    ArrayFlags // set below with flagset.Var
-		flCompactDbMaxTx                  = flagset.Int64("compactdb-max-tx", 65536, "Maximum transaction size used when compacting the internal DB")
 		flConfigFilePath                  = flagset.String("config", DefaultConfigFilePath, "config file to parse options from (optional)")
 		flExportTraces                    = flagset.Bool("export_traces", false, "Whether to export traces")
 		flTraceSamplingRate               = flagset.Float64("trace_sampling_rate", 0.0, "What fraction of traces should be sampled")
@@ -230,21 +226,15 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flTraceIngestServerURL            = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 
-		// osquery TLS endpoints
-		flOsqTlsConfig    = flagset.String("config_tls_endpoint", "", "Config endpoint for the osquery tls transport")
-		flOsqTlsEnroll    = flagset.String("enroll_tls_endpoint", "", "Enroll endpoint for the osquery tls transport")
-		flOsqTlsLogger    = flagset.String("logger_tls_endpoint", "", "Logger endpoint for the osquery tls transport")
-		flOsqTlsDistRead  = flagset.String("distributed_tls_read_endpoint", "", "Distributed read endpoint for the osquery tls transport")
-		flOsqTlsDistWrite = flagset.String("distributed_tls_write_endpoint", "", "Distributed write endpoint for the osquery tls transport")
-
 		// Autoupdate options
-		flAutoupdate             = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
-		flTufServerURL           = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
-		flMirrorURL              = flagset.String("mirror_url", autoupdate.DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
-		flAutoupdateInterval     = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
-		flUpdateChannel          = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
-		flAutoupdateInitialDelay = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
-		flUpdateDirectory        = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
+		flAutoupdate              = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
+		flTufServerURL            = flagset.String("tuf_url", DefaultTufServer, "TUF update server (default: https://tuf.kolide.com)")
+		flMirrorURL               = flagset.String("mirror_url", DefaultMirror, "The mirror server for autoupdates (default: https://dl.kolide.co)")
+		flAutoupdateInterval      = flagset.Duration("autoupdate_interval", 1*time.Hour, "The interval to check for updates (default: once every hour)")
+		flUpdateChannel           = flagset.String("update_channel", "stable", "The channel to pull updates from (options: stable, beta, nightly)")
+		flAutoupdateInitialDelay  = flagset.Duration("autoupdater_initial_delay", 1*time.Hour, "Initial autoupdater subprocess delay")
+		flUpdateDirectory         = flagset.String("update_directory", "", "Local directory to hold updates for osqueryd and launcher")
+		flAutoupdateDownloadSplay = flagset.Duration("autoupdate_download_splay", 8*time.Hour, "duration of time over which launcher should select random delay before downloading")
 
 		// Development & Debugging options
 		flDebug                = flagset.Bool("debug", false, "Whether or not debug logging is enabled (default: false)")
@@ -255,6 +245,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flIAmBreakingEELicense = flagset.Bool("i-am-breaking-ee-license", false, "Skip license check before running localserver (default: false)")
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
 		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
+		flPackageIdentifier    = flagset.String("identifier", DefaultLauncherIdentifier, "packaging identifier used to determine service names, paths, etc. (default: kolide-k2)")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -263,6 +254,12 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		_ = flagset.Bool("disable_control_tls", false, "DEPRECATED")
 		_ = flagset.String("notary_url", "", "DEPRECATED")
 		_ = flagset.String("notary_prefix", "", "DEPRECATED")
+		_ = flagset.String("config_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("enroll_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("logger_tls_endpoint", "", "DEPRECATED")
+		_ = flagset.String("distributed_tls_read_endpoint", "", "DEPRECATED")
+		_ = flagset.String("distributed_tls_write_endpoint", "", "DEPRECATED")
+		_ = flagset.Int64("compactdb-max-tx", 65536, "DEPRECATED") // moved to new flagset inside compactdb command
 	)
 
 	flagset.Var(&flOsqueryFlags, "osquery_flag", "Flags to pass to osquery (possibly overriding Launcher defaults)")
@@ -290,13 +287,13 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 	// handle --version
 	if *flVersion {
 		version.PrintFull()
-		os.Exit(0)
+		return nil, NewInfoCmdError("--version")
 	}
 
-	// handle --usage
+	// handle --dev_help
 	if *flDeveloperUsage {
 		developerUsage(flagset)
-		os.Exit(0)
+		return nil, NewInfoCmdError("--dev_help")
 	}
 
 	// if an osqueryd path was not set, it's likely that we want to use the bundled
@@ -319,16 +316,16 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		return nil, errors.New("both enroll_secret and enroll_secret_path were defined")
 	}
 
-	var updateChannel autoupdate.UpdateChannel
+	var updateChannel UpdateChannel
 	switch *flUpdateChannel {
 	case "", "stable":
-		updateChannel = autoupdate.Stable
+		updateChannel = Stable
 	case "beta":
-		updateChannel = autoupdate.Beta
+		updateChannel = Beta
 	case "alpha":
-		updateChannel = autoupdate.Alpha
+		updateChannel = Alpha
 	case "nightly":
-		updateChannel = autoupdate.Nightly
+		updateChannel = Nightly
 	default:
 		return nil, fmt.Errorf("unknown update channel %s", *flUpdateChannel)
 	}
@@ -368,56 +365,60 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		*flKolideHosted = true
 	}
 
+	if runtime.GOOS == "windows" {
+		// check for old root directories before returning the configured option in case we've stomped over with windows MSI install
+		updatedRootDirectory := DetermineRootDirectoryOverride(*flRootDirectory, *flKolideServerURL, *flPackageIdentifier)
+		if updatedRootDirectory != *flRootDirectory {
+			*flRootDirectory = updatedRootDirectory
+		}
+	}
+
 	opts := &Options{
-		Autoupdate:                         *flAutoupdate,
-		AutoupdateInterval:                 *flAutoupdateInterval,
-		AutoupdateInitialDelay:             *flAutoupdateInitialDelay,
-		CertPins:                           certPins,
-		CompactDbMaxTx:                     *flCompactDbMaxTx,
-		ConfigFilePath:                     *flConfigFilePath,
-		Control:                            false,
-		ControlServerURL:                   controlServerURL,
-		ControlRequestInterval:             *flControlRequestInterval,
-		Debug:                              *flDebug,
-		DelayStart:                         *flDelayStart,
-		DisableControlTLS:                  disableControlTLS,
-		InsecureControlTLS:                 insecureControlTLS,
-		EnableInitialRunner:                *flInitialRunner,
-		WatchdogEnabled:                    *flWatchdogEnabled,
-		EnrollSecret:                       *flEnrollSecret,
-		EnrollSecretPath:                   *flEnrollSecretPath,
-		ExportTraces:                       *flExportTraces,
-		LogIngestServerURL:                 *flLogIngestServerURL,
-		LocalDevelopmentPath:               *flLocalDevelopmentPath,
-		TraceIngestServerURL:               *flTraceIngestServerURL,
-		DisableTraceIngestTLS:              *flDisableIngestTLS,
-		IAmBreakingEELicense:               *flIAmBreakingEELicense,
-		InsecureTLS:                        *flInsecureTLS,
-		InsecureTransport:                  *flInsecureTransport,
-		KolideHosted:                       *flKolideHosted,
-		KolideServerURL:                    *flKolideServerURL,
-		LogMaxBytesPerBatch:                *flLogMaxBytesPerBatch,
-		LoggingInterval:                    *flLoggingInterval,
-		MirrorServerURL:                    *flMirrorURL,
-		TufServerURL:                       *flTufServerURL,
-		OsqueryFlags:                       flOsqueryFlags,
-		OsqueryTlsConfigEndpoint:           *flOsqTlsConfig,
-		OsqueryTlsDistributedReadEndpoint:  *flOsqTlsDistRead,
-		OsqueryTlsDistributedWriteEndpoint: *flOsqTlsDistWrite,
-		OsqueryTlsEnrollEndpoint:           *flOsqTlsEnroll,
-		OsqueryTlsLoggerEndpoint:           *flOsqTlsLogger,
-		OsqueryVerbose:                     *flOsqueryVerbose,
-		OsquerydPath:                       osquerydPath,
-		OsqueryHealthcheckStartupDelay:     *flOsqueryHealthcheckStartupDelay,
-		RootDirectory:                      *flRootDirectory,
-		RootPEM:                            *flRootPEM,
-		TraceSamplingRate:                  *flTraceSamplingRate,
-		Transport:                          *flTransport,
-		UpdateChannel:                      updateChannel,
-		UpdateDirectory:                    *flUpdateDirectory,
-		WatchdogDelaySec:                   *flWatchdogDelaySec,
-		WatchdogMemoryLimitMB:              *flWatchdogMemoryLimitMB,
-		WatchdogUtilizationLimitPercent:    *flWatchdogUtilizationLimitPercent,
+		Autoupdate:                      *flAutoupdate,
+		AutoupdateInterval:              *flAutoupdateInterval,
+		AutoupdateInitialDelay:          *flAutoupdateInitialDelay,
+		AutoupdateDownloadSplay:         *flAutoupdateDownloadSplay,
+		CertPins:                        certPins,
+		ConfigFilePath:                  *flConfigFilePath,
+		Control:                         false,
+		ControlServerURL:                controlServerURL,
+		ControlRequestInterval:          *flControlRequestInterval,
+		Debug:                           *flDebug,
+		DelayStart:                      *flDelayStart,
+		DisableControlTLS:               disableControlTLS,
+		Identifier:                      *flPackageIdentifier,
+		InsecureControlTLS:              insecureControlTLS,
+		EnableInitialRunner:             *flInitialRunner,
+		WatchdogEnabled:                 *flWatchdogEnabled,
+		EnrollSecret:                    *flEnrollSecret,
+		EnrollSecretPath:                *flEnrollSecretPath,
+		ExportTraces:                    *flExportTraces,
+		LogIngestServerURL:              *flLogIngestServerURL,
+		LocalDevelopmentPath:            *flLocalDevelopmentPath,
+		TraceIngestServerURL:            *flTraceIngestServerURL,
+		DisableTraceIngestTLS:           *flDisableIngestTLS,
+		IAmBreakingEELicense:            *flIAmBreakingEELicense,
+		InsecureTLS:                     *flInsecureTLS,
+		InsecureTransport:               *flInsecureTransport,
+		KolideHosted:                    *flKolideHosted,
+		KolideServerURL:                 *flKolideServerURL,
+		LogMaxBytesPerBatch:             *flLogMaxBytesPerBatch,
+		LoggingInterval:                 *flLoggingInterval,
+		MirrorServerURL:                 *flMirrorURL,
+		TufServerURL:                    *flTufServerURL,
+		OsqueryFlags:                    flOsqueryFlags,
+		OsqueryVerbose:                  *flOsqueryVerbose,
+		OsquerydPath:                    osquerydPath,
+		OsqueryHealthcheckStartupDelay:  *flOsqueryHealthcheckStartupDelay,
+		RootDirectory:                   *flRootDirectory,
+		RootPEM:                         *flRootPEM,
+		TraceSamplingRate:               *flTraceSamplingRate,
+		Transport:                       *flTransport,
+		UpdateChannel:                   updateChannel,
+		UpdateDirectory:                 *flUpdateDirectory,
+		WatchdogDelaySec:                *flWatchdogDelaySec,
+		WatchdogMemoryLimitMB:           *flWatchdogMemoryLimitMB,
+		WatchdogUtilizationLimitPercent: *flWatchdogUtilizationLimitPercent,
 	}
 
 	return opts, nil
@@ -582,6 +583,30 @@ func FindOsquery() string {
 	return ""
 }
 
+// UpdateChannel determines the TUF target for a Updater.
+// The Default UpdateChannel is Stable.
+type UpdateChannel string
+
+const (
+	Stable  UpdateChannel = "stable"
+	Alpha   UpdateChannel = "alpha"
+	Beta    UpdateChannel = "beta"
+	Nightly UpdateChannel = "nightly"
+)
+
+func (c UpdateChannel) String() string {
+	return string(c)
+}
+
+func SanitizeUpdateChannel(value string) string {
+	switch UpdateChannel(value) {
+	case Stable, Alpha, Beta, Nightly:
+		return value
+	}
+	// Fallback to stable if invalid channel
+	return Stable.String()
+}
+
 func commandUsage(fs *flag.FlagSet, short string) func() {
 	return func() {
 		fmt.Fprintf(os.Stderr, "  Usage:\n")
@@ -595,4 +620,10 @@ func commandUsage(fs *flag.FlagSet, short string) func() {
 		w.Flush()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
+}
+
+// IsKolideHostedServerURL is a convenience function to enable gating functionality for
+// developer (or other non-production) deployments
+func IsKolideHostedServerURL(serverURL string) bool {
+	return serverURL == "k2device.kolide.com" || serverURL == "k2device-preprod.kolide.com"
 }

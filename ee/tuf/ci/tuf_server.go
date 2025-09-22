@@ -18,6 +18,8 @@ import (
 //go:embed testdata/*.tar.gz
 var testTarballs embed.FS
 
+const NonReleaseVersion = "0.1.1"
+
 func getTarballContents(t *testing.T, binary string) []byte {
 	tarballName := fmt.Sprintf("testdata/%s_%s.tar.gz", runtime.GOOS, binary)
 
@@ -58,7 +60,7 @@ func InitRemoteTufServer(t *testing.T, testReleaseVersion string) (tufServerURL 
 
 	// Create test binaries and release files per binary and per release channel
 	for _, b := range []string{"osqueryd", "launcher"} {
-		for _, v := range []string{"0.1.1", "0.12.3-deadbeef", testReleaseVersion} {
+		for _, v := range []string{NonReleaseVersion, "0.12.3-deadbeef", testReleaseVersion} {
 			binaryFileName := fmt.Sprintf("%s-%s.tar.gz", b, v)
 
 			// Create a valid test binary -- an archive of an executable with the proper directory structure

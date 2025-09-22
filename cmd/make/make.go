@@ -42,7 +42,7 @@ func main() {
 
 	if err := ff.Parse(fs, os.Args[1:], ffOpts...); err != nil {
 		logger := logutil.NewCLILogger(true)
-		logutil.Fatal(logger, "msg", "Error parsing flags", "err", err)
+		logutil.Fatal(logger, "msg", "Error parsing flags", "err", err) //nolint:forbidigo // Fine to use logutil.Fatal outside of launcher proper
 	}
 
 	logger := logutil.NewCLILogger(*flDebug)
@@ -98,10 +98,10 @@ func main() {
 			if fn, ok := targetSet[target]; ok {
 				level.Debug(logger).Log("msg", "calling target", "target", target)
 				if err := fn(ctx); err != nil {
-					logutil.Fatal(logger, "msg", "Target Failed", "err", err, "target", target)
+					logutil.Fatal(logger, "msg", "Target Failed", "err", err, "target", target) //nolint:forbidigo // Fine to use logutil.Fatal outside of launcher proper
 				}
 			} else {
-				logutil.Fatal(logger, "err", "target does not exist", "target", target)
+				logutil.Fatal(logger, "err", "target does not exist", "target", target) //nolint:forbidigo // Fine to use logutil.Fatal outside of launcher proper
 			}
 		}
 	}

@@ -9,12 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Masterminds/semver"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
-	"github.com/kolide/launcher/pkg/autoupdate"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/launcher"
-	"github.com/kolide/launcher/pkg/traces"
 	"github.com/peterbourgon/ff/v3"
 	"github.com/spf13/pflag"
 )
@@ -29,12 +27,14 @@ type autoupdateConfig struct {
 	updateDirectory      string
 	channel              string
 	localDevelopmentPath string
+	hostname             string
+	identifier           string
 }
 
 // CheckOutLatestWithoutConfig returns information about the latest downloaded executable for our binary,
 // searching for launcher configuration values in its config file.
 func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(context.Background())
+	ctx, span := observability.StartSpan(context.Background())
 	defer span.End()
 
 	slogger = slogger.With("component", "tuf_library_lookup")
@@ -48,39 +48,58 @@ func CheckOutLatestWithoutConfig(binary autoupdatableBinary, slogger *slog.Logge
 		return &BinaryUpdateInfo{Path: cfg.localDevelopmentPath}, nil
 	}
 
+	// check for old root directories before returning final config in case we've stomped over with windows MSI install
+	updatedRootDirectory := launcher.DetermineRootDirectoryOverride(cfg.rootDirectory, cfg.hostname, cfg.identifier)
+	if updatedRootDirectory != cfg.rootDirectory {
+		slogger.Log(context.TODO(), slog.LevelInfo,
+			"old root directory contents detected, overriding for autoupdate config",
+			"opts_root_directory", cfg.rootDirectory,
+			"updated_root_directory", updatedRootDirectory,
+		)
+
+		cfg.rootDirectory = updatedRootDirectory
+	}
+
 	// Get update channel from startup settings
-	updateChannel, err := getUpdateChannelFromStartupSettings(ctx, cfg.rootDirectory)
+	pinnedVersion, updateChannel, err := getUpdateSettingsFromStartupSettings(ctx, slogger, binary, cfg.rootDirectory)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelWarn,
-			"could not get update channel from startup settings, falling back to config value instead",
-			"config_update_channel", cfg.channel,
+			"could not get startup settings",
 			"err", err,
 		)
+	}
+	// Default to config update channel if not set in startup settings
+	if updateChannel == "" {
 		updateChannel = cfg.channel
 	}
 
-	return CheckOutLatest(ctx, binary, cfg.rootDirectory, cfg.updateDirectory, updateChannel, slogger)
+	return CheckOutLatest(ctx, binary, cfg.rootDirectory, cfg.updateDirectory, pinnedVersion, updateChannel, slogger)
 }
 
-// getUpdateChannelFromStartupSettings queries the startup settings database to fetch the desired
-// update channel. This accounts for e.g. the control server sending down a particular value for
-// the update channel, overriding the config file.
-func getUpdateChannelFromStartupSettings(ctx context.Context, rootDirectory string) (string, error) {
-	ctx, span := traces.StartSpan(ctx)
+// getUpdateSettingsFromStartupSettings queries the startup settings database to fetch the
+// pinned version and update channel. This accounts for e.g. the control server sending down
+// a particular value for the update channel, overriding the config file.
+func getUpdateSettingsFromStartupSettings(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, rootDirectory string) (string, string, error) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	r, err := startupsettings.OpenReader(ctx, rootDirectory)
+	r, err := startupsettings.OpenReader(ctx, slogger, rootDirectory)
 	if err != nil {
-		return "", fmt.Errorf("opening startupsettings reader: %w", err)
+		return "", "", fmt.Errorf("opening startupsettings reader: %w", err)
 	}
 	defer r.Close()
 
-	updateChannel, err := r.Get(keys.UpdateChannel.String())
-	if err != nil {
-		return "", fmt.Errorf("getting update channel from startupsettings: %w", err)
+	var pinnedVersion string
+	switch binary {
+	case binaryLauncher:
+		pinnedVersion, _ = r.Get(keys.PinnedLauncherVersion.String())
+	case binaryOsqueryd:
+		pinnedVersion, _ = r.Get(keys.PinnedOsquerydVersion.String())
 	}
 
-	return updateChannel, nil
+	updateChannel, _ := r.Get(keys.UpdateChannel.String())
+
+	return pinnedVersion, updateChannel, nil
 }
 
 // getAutoupdateConfig pulls the configuration values necessary to work with the autoupdate library
@@ -107,12 +126,14 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 	pflagSet.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
 
 	// Extract the config flag plus the autoupdate flags
-	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath string
+	var flConfigFilePath, flRootDirectory, flUpdateDirectory, flUpdateChannel, flLocalDevelopmentPath, flHostname, flIdentifier string
 	pflagSet.StringVar(&flConfigFilePath, "config", "", "")
 	pflagSet.StringVar(&flRootDirectory, "root_directory", "", "")
 	pflagSet.StringVar(&flUpdateDirectory, "update_directory", "", "")
 	pflagSet.StringVar(&flUpdateChannel, "update_channel", "", "")
 	pflagSet.StringVar(&flLocalDevelopmentPath, "localdev_path", "", "")
+	pflagSet.StringVar(&flHostname, "hostname", "", "")
+	pflagSet.StringVar(&flIdentifier, "identifier", "", "")
 
 	if err := pflagSet.Parse(argsToParse); err != nil {
 		return nil, fmt.Errorf("parsing command-line flags: %w", err)
@@ -137,6 +158,7 @@ func getAutoupdateConfig(args []string) (*autoupdateConfig, error) {
 		updateDirectory:      flUpdateDirectory,
 		channel:              flUpdateChannel,
 		localDevelopmentPath: flLocalDevelopmentPath,
+		identifier:           flIdentifier,
 	}
 
 	return cfg, nil
@@ -166,6 +188,10 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 			cfg.channel = value
 		case "localdev_path":
 			cfg.localDevelopmentPath = value
+		case "hostname":
+			cfg.hostname = value
+		case "identifier":
+			cfg.identifier = value
 		}
 		return nil
 	}); err != nil {
@@ -177,19 +203,21 @@ func getAutoupdateConfigFromFile(configFilePath string) (*autoupdateConfig, erro
 
 // CheckOutLatest returns the path to the latest downloaded executable for our binary, as well
 // as its version.
-func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string, updateDirectory string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx, "binary", string(binary))
+func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirectory string,
+	updateDirectory string, pinnedVersion string, channel string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+	ctx, span := observability.StartSpan(ctx, "binary", string(binary))
 	defer span.End()
+	slogger = slogger.With("binary", string(binary), "update_channel", channel, "pinned_version", pinnedVersion)
 
 	if updateDirectory == "" {
 		updateDirectory = DefaultLibraryDirectory(rootDirectory)
 	}
 
-	update, err := findExecutableFromRelease(ctx, binary, LocalTufDirectory(rootDirectory), channel, updateDirectory)
+	update, err := findExecutable(ctx, binary, LocalTufDirectory(rootDirectory), pinnedVersion, channel, updateDirectory, slogger)
 	if err == nil {
-		span.AddEvent("found_latest_from_release")
+		span.AddEvent("found_latest")
 		slogger.Log(ctx, slog.LevelInfo,
-			"found executable matching current release",
+			"found executable matching current release or pinned version",
 			"executable_path", update.Path,
 			"executable_version", update.Version,
 		)
@@ -203,52 +231,59 @@ func CheckOutLatest(ctx context.Context, binary autoupdatableBinary, rootDirecto
 
 	// If we can't find the specific release version that we should be on, then just return the executable
 	// with the most recent version in the library
-	return mostRecentVersion(ctx, binary, updateDirectory, channel)
+	return mostRecentVersion(ctx, slogger, binary, updateDirectory, channel)
 }
 
-// findExecutableFromRelease looks at our local TUF repository to find the release for our
+// findExecutable looks at our local TUF repository to find the release for our
 // given channel. If it's already downloaded, then we return its path and version.
-func findExecutableFromRelease(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, channel string, baseUpdateDirectory string) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx)
+func findExecutable(ctx context.Context, binary autoupdatableBinary, tufRepositoryLocation string, pinnedVersion string, channel string, baseUpdateDirectory string, slogger *slog.Logger) (*BinaryUpdateInfo, error) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Initialize a read-only TUF metadata client to parse the data we already have downloaded about releases.
 	metadataClient, err := readOnlyTufMetadataClient(tufRepositoryLocation)
 	if err != nil {
-		return nil, errors.New("could not initialize TUF client, cannot find release")
+		return nil, fmt.Errorf("could not initialize TUF client, cannot find release: %w", err)
 	}
 
 	// From already-downloaded metadata, look for the release version
 	targets, err := metadataClient.Targets()
 	if err != nil {
-		return nil, fmt.Errorf("could not get target: %w", err)
+		return nil, fmt.Errorf("could not get targets: %w", err)
+	}
+	if len(targets) == 0 {
+		return nil, errors.New("no local TUF metadata available -- likely new install")
 	}
 
-	targetName, _, err := findRelease(ctx, binary, targets, channel)
+	targetName, _, err := findTarget(ctx, binary, targets, pinnedVersion, channel, slogger)
 	if err != nil {
 		return nil, fmt.Errorf("could not find release: %w", err)
 	}
 
 	targetPath, targetVersion := pathToTargetVersionExecutable(binary, targetName, baseUpdateDirectory)
-	if err := autoupdate.CheckExecutable(ctx, targetPath, "--version"); err != nil {
-		traces.SetError(span, err)
-		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version, not yet downloaded, or corrupted: %w", targetVersion, targetName, targetPath, err)
+	if _, err := os.Stat(targetPath); err != nil && errors.Is(err, os.ErrNotExist) {
+		observability.SetError(span, err)
+		return nil, fmt.Errorf("version %s from target %s at %s is either originally installed version or not yet downloaded", targetVersion, targetName, targetPath)
+	}
+	if err := CheckExecutable(ctx, slogger, targetPath, "--version"); err != nil {
+		observability.SetError(span, err)
+		return nil, fmt.Errorf("version %s from target %s at %s is corrupted: %w", targetVersion, targetName, targetPath, err)
 	}
 
 	return &BinaryUpdateInfo{
 		Path:    targetPath,
-		Version: targetVersion,
+		Version: trimVersionString(targetVersion),
 	}, nil
 }
 
 // mostRecentVersion returns the path to the most recent, valid version available in the library for the
 // given binary, along with its version.
-func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
-	ctx, span := traces.StartSpan(ctx)
+func mostRecentVersion(ctx context.Context, slogger *slog.Logger, binary autoupdatableBinary, baseUpdateDirectory, channel string) (*BinaryUpdateInfo, error) {
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	// Pull all available versions from library
-	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, binary, baseUpdateDirectory)
+	validVersionsInLibrary, _, err := sortedVersionsInLibrary(ctx, slogger, binary, baseUpdateDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("could not get sorted versions in library for %s: %w", binary, err)
 	}
@@ -265,22 +300,26 @@ func mostRecentVersion(ctx context.Context, binary autoupdatableBinary, baseUpda
 
 	// We rolled out TUF more broadly beginning in v1.4.1. Don't select versions earlier than that.
 	if binary == binaryLauncher && channel == "stable" {
-		recentVersion, err := semver.NewVersion(mostRecentVersionInLibraryRaw)
+		supportsTuf, err := launcherVersionSupportsTuf(mostRecentVersionInLibraryRaw)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse most recent version %s in launcher library: %w", recentVersion, err)
+			return nil, fmt.Errorf("could not determine if launcher version %s supports TUF: %w", mostRecentVersionInLibraryRaw, err)
 		}
-		startingVersion, err := semver.NewVersion("1.4.1")
-		if err != nil {
-			return nil, fmt.Errorf("could not parse required starting version for launcher binary: %w", err)
-		}
-		if recentVersion.LessThan(startingVersion) {
-			return nil, fmt.Errorf("most recent version %s for binary launcher is not newer than required v1.4.1", recentVersion)
+		if !supportsTuf {
+			return nil, fmt.Errorf("most recent version %s for binary launcher is not newer than required %s", mostRecentVersionInLibraryRaw, tufVersionMinimum.String())
 		}
 	}
 
 	versionDir := filepath.Join(updatesDirectory(binary, baseUpdateDirectory), mostRecentVersionInLibraryRaw)
 	return &BinaryUpdateInfo{
 		Path:    executableLocation(versionDir, binary),
-		Version: mostRecentVersionInLibraryRaw,
+		Version: trimVersionString(mostRecentVersionInLibraryRaw),
 	}, nil
+}
+
+func trimVersionString(version string) string {
+	parts := strings.Fields(version)
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return version
 }

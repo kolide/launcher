@@ -1,3 +1,5 @@
 # set line endings got go files. Mostly needed for golang-ci
 *.go text eol=lf
 
+# go.sum merges can just concat. Cuts down on merge conflicts
+go.sum merge=union

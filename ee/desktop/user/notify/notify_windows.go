@@ -4,18 +4,24 @@
 package notify
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/kolide/toast"
 )
 
 type windowsNotifier struct {
+	slogger      *slog.Logger
 	iconFilepath string
 	interrupt    chan struct{}
+	interrupted  atomic.Bool
 }
 
-func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
+func NewDesktopNotifier(slogger *slog.Logger, iconFilepath string) *windowsNotifier {
 	return &windowsNotifier{
+		slogger:      slogger.With("component", "desktop_notifier"),
 		iconFilepath: iconFilepath,
 		interrupt:    make(chan struct{}),
 	}
@@ -23,12 +29,19 @@ func NewDesktopNotifier(_ *slog.Logger, iconFilepath string) *windowsNotifier {
 
 // Listen doesn't do anything on Windows -- the `launch` variable in the notification XML
 // automatically handles opening URLs for us.
-func (w *windowsNotifier) Listen() error {
+func (w *windowsNotifier) Execute() error {
 	<-w.interrupt
 	return nil
 }
 
+// just make compiler happy, this is only needed on darwin
+func (w *windowsNotifier) Listen() {}
+
 func (w *windowsNotifier) Interrupt(err error) {
+	if w.interrupted.Swap(true) {
+		return
+	}
+
 	w.interrupt <- struct{}{}
 }
 
@@ -57,5 +70,14 @@ func (w *windowsNotifier) SendNotification(n Notification) error {
 		}
 	}
 
-	return notification.Push()
+	if err := notification.Push(); err != nil {
+		w.slogger.Log(context.TODO(), slog.LevelError,
+			"could not send toast notification",
+			"title", n.Title,
+			"err", err,
+		)
+		return fmt.Errorf("sending toast notification: %w", err)
+	}
+
+	return nil
 }

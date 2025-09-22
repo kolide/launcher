@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 const debugPrefix = "/debug/"
@@ -42,13 +43,14 @@ func startDebugServer(addrPath string, slogger *slog.Logger) (*http.Server, erro
 		return nil, fmt.Errorf("opening socket: %w", err)
 	}
 
-	go func() {
+	gowrapper.Go(context.TODO(), slogger, func() {
 		if err := serv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			slogger.Log(context.TODO(), slog.LevelInfo,
-				"debug server failed", "err", err,
+				"debug server failed",
+				"err", err,
 			)
 		}
-	}()
+	})
 
 	url := url.URL{
 		Scheme:   "http",

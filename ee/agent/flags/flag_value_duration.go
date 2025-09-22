@@ -24,15 +24,15 @@ func WithDefault(defaultVal time.Duration) durationOption {
 	}
 }
 
-func WithMin(min time.Duration) durationOption {
+func WithMin(minimum time.Duration) durationOption {
 	return func(d *durationFlagValue) {
-		d.min = int64(min)
+		d.min = int64(minimum)
 	}
 }
 
-func WithMax(max time.Duration) durationOption {
+func WithMax(maximum time.Duration) durationOption {
 	return func(d *durationFlagValue) {
-		d.max = int64(max)
+		d.max = int64(maximum)
 	}
 }
 
@@ -62,19 +62,9 @@ func NewDurationFlagValue(slogger *slog.Logger, key keys.FlagKey, opts ...durati
 
 func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 	int64Value := d.defaultVal
+
 	if controlServerValue != nil {
-		// Control server provided integers are stored as strings and need to be converted back
-		var err error
-		parsedInt, err := strconv.ParseInt(string(controlServerValue), 10, 64)
-		if err == nil {
-			int64Value = parsedInt
-		} else {
-			d.slogger.Log(context.TODO(), slog.LevelDebug,
-				"failed to convert stored duration flag value",
-				"key", d.key,
-				"err", err,
-			)
-		}
+		int64Value = d.parseControlServerValue(controlServerValue)
 	}
 
 	if d.override != nil && d.override.Value() != nil {
@@ -90,13 +80,36 @@ func (d *durationFlagValue) get(controlServerValue []byte) time.Duration {
 	return time.Duration(int64Value)
 }
 
+// parseControlServerValue attempts to parse the control server value as either a duration string or nanoseconds
+func (d *durationFlagValue) parseControlServerValue(controlServerValue []byte) int64 {
+	valueStr := string(controlServerValue)
+
+	// First try to parse as a duration string (e.g., "4s", "10m")
+	if parsedDuration, err := time.ParseDuration(valueStr); err == nil {
+		return int64(parsedDuration)
+	}
+
+	// Fall back to parsing as nanoseconds for backward compatibility
+	if parsedInt, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
+		return parsedInt
+	}
+
+	// Both parsing attempts failed, log and return default
+	d.slogger.Log(context.TODO(), slog.LevelDebug,
+		"failed to convert stored duration flag value",
+		"key", d.key,
+		"value", valueStr,
+	)
+	return d.defaultVal
+}
+
 // clampValue returns a value that is clamped to be within the range defined by min and max.
-func clampValue(value int64, min, max int64) int64 {
+func clampValue(value int64, minimum, maximum int64) int64 {
 	switch {
-	case value < min:
-		return min
-	case value > max:
-		return max
+	case value < minimum:
+		return minimum
+	case value > maximum:
+		return maximum
 	default:
 		return value
 	}

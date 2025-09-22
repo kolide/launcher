@@ -193,3 +193,27 @@ Note that the windows package will only install as `ALLUSERS`. You may
 need to use elevated privileges to install it. This will likely be
 confusing. `msiexec.exe` will either silently fail, or be
 inscrutable. But `start` will work.
+
+###### Windows Multi-Archecture MSI
+
+Package builder creates an MSI containing both amd64 & arm64 binaries. This is done putting both of binaries and their service installation in to the MSI with mutually exclusive conditions based on processor architecture.
+
+To accomplish we are using heat to harvest files set up like ...
+
+```
+└───pkg_root
+    └───Launcher-kolide-k2
+        ├───bin
+        │   ├───amd64
+        │   │       launcher.exe
+        │   │       osqueryd.exe
+        │   │
+        │   └───arm64
+        │           launcher.exe
+        │           osqueryd.exe
+        │
+        └───conf
+                ...
+```
+
+then post processing the generated xml to remove the amd64 and arm64 directory tags so that all the exe files are in the same directory in the xml, then add the mutually exclusive tags to the binary elements

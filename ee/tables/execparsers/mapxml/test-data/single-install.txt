@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="0" maxComparedVersion="2.49.0" name="git-2.49.0" outputName="" pname="git" system="aarch64-darwin" version="2.49.0" versionDiff="=">
+    <output name="out" />
+  </item>
+</items>

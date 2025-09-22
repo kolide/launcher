@@ -6,18 +6,25 @@ package powereventwatcher
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type noOpPowerEventWatcher struct {
 	interrupt   chan struct{}
-	interrupted bool
+	interrupted atomic.Bool
 }
 
-func New(ctx context.Context, _ types.Knapsack, _ *slog.Logger) (*noOpPowerEventWatcher, error) {
-	_, span := traces.StartSpan(ctx)
+type noOpKnapsackSleepStateUpdater struct{}
+
+func NewKnapsackSleepStateUpdater(_ *slog.Logger, _ types.Knapsack) *noOpKnapsackSleepStateUpdater {
+	return &noOpKnapsackSleepStateUpdater{}
+}
+
+func New(ctx context.Context, _ *slog.Logger, _ *noOpKnapsackSleepStateUpdater) (*noOpPowerEventWatcher, error) {
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	return &noOpPowerEventWatcher{
@@ -32,11 +39,9 @@ func (n *noOpPowerEventWatcher) Execute() error {
 
 func (n *noOpPowerEventWatcher) Interrupt(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if n.interrupted {
+	if n.interrupted.Swap(true) {
 		return
 	}
-
-	n.interrupted = true
 
 	n.interrupt <- struct{}{}
 }

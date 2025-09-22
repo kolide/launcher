@@ -2,8 +2,10 @@ package checkups
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
@@ -14,13 +16,10 @@ func writeInitLogs(ctx context.Context, logZip *zip.Writer) error {
 		return fmt.Errorf("creating journalctl command: %w", err)
 	}
 
-	outFile, err := logZip.Create("linux_journalctl_launcher_logs.json")
+	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("creating linux_journalctl_launcher_logs.json: %w", err)
 	}
 
-	cmd.Stderr = outFile
-	cmd.Stdout = outFile
-
-	return cmd.Run()
+	return addStreamToZip(logZip, "linux_journalctl_launcher_logs.json", time.Now(), bytes.NewReader(output))
 }

@@ -44,7 +44,7 @@ func main() {
 	)
 	if err := flagset.Parse(os.Args[1:]); err != nil {
 		level.Error(logger).Log("msg", "error parsing flags", "err", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 	// relevel with the debug flag
@@ -61,7 +61,7 @@ func main() {
 		}
 	}
 	if missingOpt {
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 	inDir = *flIndir
@@ -72,7 +72,7 @@ func main() {
 	files, err := filepath.Glob(inDir + "/*.png")
 	if err != nil {
 		level.Error(logger).Log("msg", "error globbing input files", "error", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 	for _, file := range files {
 		file = filepath.Base(file)
@@ -82,7 +82,7 @@ func main() {
 
 	if dir, err := os.MkdirTemp("", "icon-generator"); err != nil {
 		level.Error(logger).Log("msg", "error making tmpdir", "err", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	} else {
 		tmpDir = dir
 	}
@@ -95,7 +95,7 @@ func main() {
 				"msg", "error generating ico",
 				"name", name,
 				"err", err)
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 		}
 
 		if err := generatePng(ctx, logger, name); err != nil {
@@ -103,13 +103,13 @@ func main() {
 				"msg", "error generating png",
 				"name", name,
 				"err", err)
-			os.Exit(1)
+			os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 		}
 	}
 
 	if err := generateAssetGo(ctx, logger); err != nil {
 		level.Error(logger).Log("msg", "error expanding template", "error", err)
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit outside of launcher proper
 	}
 
 }

@@ -3,6 +3,6 @@
 
 package tuf
 
-func patchExecutable(executableLocation string) error {
+func patchExecutable(_ string) error {
 	return nil
 }

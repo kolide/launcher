@@ -66,38 +66,69 @@ var defaultArchMap = map[PlatformFlavor]ArchFlavor{
 	Linux:   Amd64,
 }
 
+var knownArchFlavors = [...]ArchFlavor{Arm64, Amd64, Universal}
+
 // Parse parses a string in the form platform-init-package and sets the target accordingly.
 func (t *Target) Parse(s string) error {
 	components := strings.Split(s, "-")
-	if len(components) != 3 {
-		return fmt.Errorf("unable to parse %s, should have exactly 3 components", s)
+	if len(components) != 3 && len(components) != 4 {
+		return fmt.Errorf("unable to parse %s, should have exactly 3 components (platform-init-package) or 4 components (platform-arch-init-package)", s)
 	}
 
-	if err := t.PlatformFromString(components[0]); err != nil {
+	var platform, init, packageFlavor, arch string
+
+	if len(components) == 3 {
+		platform = components[0]
+		init = components[1]
+		packageFlavor = components[2]
+	} else {
+		platform = components[0]
+		arch = components[1]
+		init = components[2]
+		packageFlavor = components[3]
+	}
+
+	if err := t.PlatformFromString(platform); err != nil {
 		return err
 	}
 
-	if err := t.InitFromString(components[1]); err != nil {
+	if err := t.InitFromString(init); err != nil {
 		return err
 	}
 
-	if err := t.PackageFromString(components[2]); err != nil {
+	if err := t.PackageFromString(packageFlavor); err != nil {
 		return err
 	}
 
-	// For now, set the default arch according to the given platform
-	defaultArch, ok := defaultArchMap[t.Platform]
-	if !ok {
-		return fmt.Errorf("cannot select default arch for unknown platform %s", t.Platform)
+	if arch == "" {
+		// Set the default arch according to the given platform
+		defaultArch, ok := defaultArchMap[t.Platform]
+		if !ok {
+			return fmt.Errorf("cannot select default arch for unknown platform %s", t.Platform)
+		}
+		t.Arch = defaultArch
+	} else {
+		if err := t.ArchFromString(arch); err != nil {
+			return err
+		}
 	}
-	t.Arch = defaultArch
 
 	return nil
 }
 
 // String returns the string representation
 func (t *Target) String() string {
-	return fmt.Sprintf("%s-%s-%s", t.Platform, t.Init, t.Package)
+	// If arch is not set, return platform-init-package
+	if t.Arch.String() == "" {
+		return fmt.Sprintf("%s-%s-%s", t.Platform, t.Init, t.Package)
+	}
+	// If the arch is default, return platform-init-package
+	if defaultArch, ok := defaultArchMap[t.Platform]; ok && defaultArch == t.Arch {
+		return fmt.Sprintf("%s-%s-%s", t.Platform, t.Init, t.Package)
+	}
+
+	// Arch is specified and non-default: return platform-arch-init-package
+	return fmt.Sprintf("%s-%s-%s-%s", t.Platform, t.Arch, t.Init, t.Package)
 }
 
 // Extension returns the extension that the resulting filesystem
@@ -170,7 +201,17 @@ func (t *Target) PackageFromString(s string) error {
 		}
 	}
 	return fmt.Errorf("unknown package %s", s)
+}
 
+// ArchFromString sets a target's arch flavor from string representation
+func (t *Target) ArchFromString(s string) error {
+	for _, testArch := range knownArchFlavors {
+		if testArch.String() == s {
+			t.Arch = testArch
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown package %s", s)
 }
 
 // String returns the string representation
@@ -185,6 +226,11 @@ func (i *PlatformFlavor) String() string {
 
 // String returns the string representation
 func (i *PackageFlavor) String() string {
+	return strings.ToLower(string(*i))
+}
+
+// String returns the string representation
+func (i *ArchFlavor) String() string {
 	return strings.ToLower(string(*i))
 }
 
@@ -207,6 +253,14 @@ func KnownPlatformFlavors() []string {
 func KnownPackageFlavors() []string {
 	out := make([]string, len(knownPackageFlavors))
 	for i, v := range knownPackageFlavors {
+		out[i] = v.String()
+	}
+	return out
+}
+
+func KnownArchFlavors() []string {
+	out := make([]string, len(knownArchFlavors))
+	for i, v := range knownArchFlavors {
 		out[i] = v.String()
 	}
 	return out

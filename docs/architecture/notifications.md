@@ -4,6 +4,8 @@
 
 2023-01-13: implemented, but not yet available to end users on the stable release channel.
 
+2023-04: notifications released to stable.
+
 ## Context
 
 Kolide, via the launcher application, would like to alert end users of potential issues
@@ -66,24 +68,26 @@ ultimately decided it was not ideal enough that it wasn't worth keeping.
 ```mermaid
 sequenceDiagram
     opt K2
-        control server->>+control server: Determines a new notification should be sent,<br>new hash for "desktop_notifier" subsystem
+        control server->>control server: Determines a new notification should be sent,<br>new hash for "actions" subsystem
     end
     opt Launcher root process
-        control service->>+control server: Request latest data for subsystem "desktop_notifier"<br>since the hash has changed
-        control server->>+control service: Return list of notifications
-        control service->>+notify consumer: Notify subscriber of updated data
-        notify consumer->>+notify consumer: Confirm that notification is valid, has not been sent before
-        notify consumer->>+desktop processes runner: Request to send notification
-        desktop processes runner->>+desktop server: Send notification
+        control service->>control server: Request latest data for subsystem "actions"<br>since the hash has changed
+        control server->>control service: Return current list of actions,<br>which includes an action with "type: desktop_notifier"
+        control service->>actionqueue: Notify actionqueue subscriber that we have new actions
+        actionqueue->>actionqueue: Confirm that notification action is valid,<br>has not been acted on by launcher before
+        actionqueue->>notification consumer: Forward notification action to consumer
+        notification consumer->>desktop processes runner: Forward notification action to desktop runner
+        desktop processes runner->>desktop server: Make HTTP request to send notification
     end
     opt Launcher desktop (user) process
-        desktop server->>+notifier service: Send notification to end user
-        notifier service->>+desktop server: Return error, or nil if successful
-        desktop server->>+desktop processes runner: Return 500 with error if not successful<br>or 200 if successful
+        desktop server->>notifier service: Send notification to end user
+        notifier service->>desktop server: Return error, or nil if successful
+        desktop server->>desktop processes runner: Return 500 with error if not successful<br>or 200 if successful
     end
     opt Launcher root process
-        desktop processes runner->>+notify consumer: Return error, or nil if successful
-        notify consumer->>+notify consumer: If successful, store record of sent notification in bucket
+        desktop processes runner->>notification consumer: Return error, or nil if successful
+        notification consumer->>actionqueue: Return success state
+        actionqueue->>actionqueue: If successful, store record of performed action
     end
 ```
 
@@ -97,3 +101,6 @@ per-notification, or action buttons.
 
 2023-01-13. Added documentation for notification methods chosen for initial implementation,
 and notes on methods that were not deemed ideal at this time.
+
+2024-10-10. Updated documentation to note release date, and to account for refactor that replaced
+the desktop_notifier subsystem with the actionqueue.

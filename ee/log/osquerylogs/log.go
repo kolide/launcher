@@ -10,14 +10,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/host"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // OsqueryLogAdapater creates an io.Writer implementation useful for attaching
 // to the osquery stdout/stderr
 type OsqueryLogAdapter struct {
-	slogger       slog.Logger
+	slogger       *slog.Logger
 	level         slog.Level
 	rootDirectory string
 }
@@ -30,9 +31,11 @@ func WithLevel(level slog.Level) Option {
 	}
 }
 
-var callerRegexp = regexp.MustCompile(`[\w.]+:\d+]`)
-
-var pidRegex = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+var (
+	callerRegexp  = regexp.MustCompile(`[\w.]+:\d+]`)
+	pidRegex      = regexp.MustCompile(`Refusing to kill non-osqueryd process (\d+)`)
+	logLevelRegex = regexp.MustCompile(`^[EWI]\d{4}`) // Looks like the log level followed by a two-digit month and two-digit date, e.g. E0801, I0804
+)
 
 func extractOsqueryCaller(msg string) string {
 	return strings.TrimSuffix(callerRegexp.FindString(msg), "]")
@@ -40,7 +43,7 @@ func extractOsqueryCaller(msg string) string {
 
 func NewOsqueryLogAdapter(slogger *slog.Logger, rootDirectory string, opts ...Option) *OsqueryLogAdapter {
 	l := &OsqueryLogAdapter{
-		slogger:       *slogger,
+		slogger:       slogger,
 		level:         slog.LevelInfo,
 		rootDirectory: rootDirectory,
 	}
@@ -54,13 +57,6 @@ func NewOsqueryLogAdapter(slogger *slog.Logger, rootDirectory string, opts ...Op
 }
 
 func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
-	// Work around osquery being overly verbose with it's logs
-	// see: https://github.com/osquery/osquery/pull/6271
-	level := l.level
-	if bytes.Contains(p, []byte("Executing scheduled query pack")) {
-		level = slog.LevelDebug
-	}
-
 	if bytes.Contains(p, []byte("Accelerating distributed query checkins")) {
 		// Skip writing this. But we still return len(p) so the caller thinks it was written
 		return len(p), nil
@@ -75,17 +71,38 @@ func (l *OsqueryLogAdapter) Write(p []byte) (int, error) {
 		l.slogger.Log(context.TODO(), slog.LevelError,
 			"detected non-osqueryd process using pidfile, logging info about process",
 		)
-		go l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		gowrapper.Go(context.TODO(), l.slogger, func() {
+			l.logInfoAboutUnrecognizedProcessLockingPidfile(p)
+		})
 	}
 
 	msg := strings.TrimSpace(string(p))
 	caller := extractOsqueryCaller(msg)
+	level := l.extractLogLevel(msg)
 	l.slogger.Log(context.TODO(), level, // nolint:sloglint // it's fine to not have a constant or literal here
 		msg,
 		"caller", caller,
 	)
 
 	return len(p), nil
+}
+
+func (l *OsqueryLogAdapter) extractLogLevel(msg string) slog.Level {
+	if !logLevelRegex.MatchString(msg) {
+		// Use default level
+		return l.level
+	}
+
+	switch msg[0] {
+	case 'E':
+		return slog.LevelError
+	case 'W':
+		return slog.LevelWarn
+	case 'I':
+		return slog.LevelInfo
+	default:
+		return l.level
+	}
 }
 
 // logInfoAboutUnrecognizedProcessLockingPidfile attempts to extract the PID of the process
@@ -195,7 +212,7 @@ func getIntStat(getFunc func() (int64, error)) string {
 // getSliceStat is a small wrapper around gopsutil/process functions
 // to return the stat if available, or an error message if not, so
 // that either way the info will be captured in the log.
-func getSliceStat(getFunc func() ([]int32, error)) string {
+func getSliceStat(getFunc func() ([]uint32, error)) string {
 	stat, err := getFunc()
 	if err != nil {
 		return fmt.Sprintf("could not get stat: %v", err)

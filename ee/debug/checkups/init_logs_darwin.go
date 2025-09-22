@@ -4,8 +4,6 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 )
 
@@ -17,20 +15,9 @@ func writeInitLogs(_ context.Context, logZip *zip.Writer) error {
 
 	var lastErr error
 	for _, f := range stdMatches {
-		out, err := logZip.Create(filepath.Base(f))
-		if err != nil {
+		if err := addFileToZip(logZip, f); err != nil {
 			lastErr = err
-			continue
 		}
-
-		in, err := os.Open(f)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		defer in.Close()
-
-		io.Copy(out, in)
 	}
 
 	return lastErr

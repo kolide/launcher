@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"os/user"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +24,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -52,6 +55,7 @@ type shipper struct {
 	uploadRequestErr     error
 	uploadResponse       *http.Response
 	uploadRequestWg      *sync.WaitGroup
+	uploadRequestCancel  context.CancelFunc
 
 	// note is intended to help humans identify the object being shipped
 	note string
@@ -106,11 +110,14 @@ func (s *shipper) Write(p []byte) (n int, err error) {
 	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
 	s.uploadRequestStarted = true
 	s.uploadRequestWg.Add(1)
-	go func() {
+	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
 		defer s.uploadRequestWg.Done()
-		// will close the body in the close function
-		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest) //nolint:bodyclose
-	}()
+
+		// will cancel and close the request body in the close function
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		s.uploadRequestCancel = cancel
+		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
+	})
 
 	return s.writer.Write(p)
 }
@@ -125,6 +132,9 @@ func (s *shipper) Close() error {
 	if !s.uploadRequestStarted {
 		return nil
 	}
+
+	// write has been called -- make sure we call cancel at the end
+	defer s.uploadRequestCancel()
 
 	// wait for upload request to finish
 	s.uploadRequestWg.Wait()
@@ -147,12 +157,15 @@ func (s *shipper) Close() error {
 }
 
 func (s *shipper) signedUrl() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	body, err := launcherData(s.knapsack, s.note)
 	if err != nil {
 		return "", fmt.Errorf("creating launcher data: %w", err)
 	}
 
-	signedUrlRequest, err := http.NewRequest(http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
+	signedUrlRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, s.uploadRequestURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("creating signed url request: %w", err)
 	}
@@ -191,7 +204,11 @@ func signHttpRequest(req *http.Request, body []byte) {
 			return
 		}
 
-		pub, err := echelper.PublicEcdsaToB64Der(signer.Public().(*ecdsa.PublicKey))
+		ecdsaPubKey, ok := signer.Public().(*ecdsa.PublicKey)
+		if !ok {
+			return
+		}
+		pub, err := echelper.PublicEcdsaToB64Der(ecdsaPubKey)
 		if err != nil {
 			return
 		}
@@ -206,7 +223,11 @@ func signHttpRequest(req *http.Request, body []byte) {
 	}
 
 	sign(agent.LocalDbKeys(), control.HeaderKey, control.HeaderSignature, req)
-	sign(agent.HardwareKeys(), control.HeaderKey2, control.HeaderSignature2, req)
+
+	// hardware signing is not implemented for darwin
+	if runtime.GOOS != "darwin" {
+		sign(agent.HardwareKeys(), control.HeaderKey2, control.HeaderSignature2, req)
+	}
 }
 
 func launcherData(k types.Knapsack, note string) ([]byte, error) {
@@ -243,6 +264,7 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 
 	b, err := json.Marshal(map[string]string{
 		"enroll_secret": enrollSecret(k),
+		"munemo":        munemo(k),
 		"console_users": consoleUsers,
 		"running_user":  runningUsername,
 		"hostname":      hostname,
@@ -263,10 +285,59 @@ func enrollSecret(k types.Knapsack) string {
 		return k.EnrollSecret()
 	}
 
+	if k != nil && k.EnrollSecretPath() != "" {
+		secret, err := os.ReadFile(k.EnrollSecretPath())
+		if err != nil {
+			return ""
+		}
+
+		return string(secret)
+	}
+
+	// TODO this will need to respect the identifier when determining the secret file location for dual-launcher installations
+	// this will specifically be an issue when flare is triggered standalone (without config path specified)
 	b, err := os.ReadFile(launcher.DefaultPath(launcher.SecretFile))
 	if err != nil {
 		return ""
 	}
 
 	return string(b)
+}
+
+// munemo fetches the registration's munemo from the knapsack. If that is not available,
+// it looks for the munemo stored in metadata.json.
+func munemo(k types.Knapsack) string {
+	if k == nil {
+		return munemoFromMetadataJson(launcher.DefaultRootDirectoryPath)
+	}
+
+	registrations, err := k.Registrations()
+	if err != nil {
+		return munemoFromMetadataJson(k.RootDirectory())
+	}
+
+	// For now, we can return the munemo for the default registration (also, the only registration currently)
+	for _, registration := range registrations {
+		if registration.RegistrationID == types.DefaultRegistrationID {
+			return registration.Munemo
+		}
+	}
+
+	return munemoFromMetadataJson(k.RootDirectory())
+}
+
+type metadataJson struct {
+	OrganizationMunemo string `json:"organization_munemo"`
+}
+
+func munemoFromMetadataJson(rootDirectory string) string {
+	rawMetadata, err := os.ReadFile(filepath.Join(rootDirectory, "metadata.json"))
+	if err != nil {
+		return ""
+	}
+	var m metadataJson
+	if err := json.Unmarshal(rawMetadata, &m); err != nil {
+		return ""
+	}
+	return m.OrganizationMunemo
 }

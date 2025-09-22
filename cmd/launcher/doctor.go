@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 )
 
-func runDoctor(args []string) error {
+func runDoctor(systemMultiSlogger *multislogger.MultiSlogger, args []string) error {
 	attachConsole()
 	defer detachConsole()
 
@@ -33,12 +33,13 @@ func runDoctor(args []string) error {
 		slogLevel = slog.LevelDebug
 	}
 
-	slogger := multislogger.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	// Add handler to write to stdout
+	systemMultiSlogger.AddHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level:     slogLevel,
 		AddSource: true,
-	})).Logger
+	}))
 
-	flagController := flags.NewFlagController(slogger, nil, fcOpts...)
+	flagController := flags.NewFlagController(systemMultiSlogger.Logger, nil, fcOpts...)
 	k := knapsack.New(nil, flagController, nil, nil, nil)
 
 	w := os.Stdout //tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)

@@ -18,7 +18,6 @@ import (
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 	"github.com/theupdateframework/go-tuf/client"
 	filejsonstore "github.com/theupdateframework/go-tuf/client/filejsonstore"
-	"go.opencensus.io/trace"
 )
 
 // FetchBinary will synchronously download a binary as per the
@@ -28,14 +27,21 @@ import (
 //
 // You must specify a localCacheDir, to reuse downloads
 func FetchBinary(ctx context.Context, localCacheDir, name, binaryName, channelOrVersion string, target Target) (string, error) {
-	ctx, span := trace.StartSpan(ctx, "packaging.fetchbinary")
-	defer span.End()
-
 	logger := ctxlog.FromContext(ctx)
 
 	// Create the cache directory if it doesn't already exist
 	if localCacheDir == "" {
 		return "", errors.New("empty cache dir argument")
+	}
+
+	// put binaries in arch specific directory for Windows to avoid naming collisions in wix msi building
+	// where a single destination will have multiple, mutally exclusive sources
+	if target.Platform == Windows {
+		localCacheDir = filepath.Join(localCacheDir, string(target.Arch))
+	}
+
+	if err := os.MkdirAll(localCacheDir, fsutil.DirMode); err != nil {
+		return "", fmt.Errorf("could not create cache directory: %w", err)
 	}
 
 	localBinaryPath := filepath.Join(localCacheDir, fmt.Sprintf("%s-%s-%s", name, target.Platform, channelOrVersion), binaryName)
@@ -190,5 +196,5 @@ func getReleaseVersionFromTufRepo(binaryName, channel, platform, arch string) (s
 	targetFilename := filepath.Base(custom.Target)
 
 	// Target looks like <binary>-<version>.tar.gz -- strip off extension and binary name to get version
-	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, fmt.Sprintf(binaryName+"-")), ".tar.gz"), nil
+	return strings.TrimSuffix(strings.TrimPrefix(targetFilename, binaryName+"-"), ".tar.gz"), nil
 }

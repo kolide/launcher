@@ -9,8 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kolide/launcher/ee/agent/storage"
-	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -55,9 +54,14 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("Registrations").Return([]types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         "test-munemo",
+				},
+			}, nil)
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -74,7 +78,7 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 				"query": tt.query,
 			})
 			require.NoError(t, err)
-			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
+			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes)) //nolint:noctx // Don't care about this in tests
 			require.NoError(t, err)
 
 			queryParams := req.URL.Query()
@@ -221,9 +225,14 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			t.Parallel()
 
 			mockKnapsack := typesMocks.NewKnapsack(t)
-			mockKnapsack.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 			mockKnapsack.On("KolideServerURL").Return("localhost")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+			mockKnapsack.On("Registrations").Return([]types.Registration{
+				{
+					RegistrationID: types.DefaultRegistrationID,
+					Munemo:         "test-munemo",
+				},
+			}, nil)
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
@@ -248,7 +257,7 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			// set up request
-			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes))
+			req, err := http.NewRequest("", "", bytes.NewBuffer(jsonBytes)) //nolint:noctx // Don't care about this in tests
 			require.NoError(t, err)
 
 			// set up handler

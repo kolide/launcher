@@ -138,7 +138,7 @@ func Flatten(data interface{}, opts ...FlattenOpts) ([]Row, error) {
 	fl := &Flattener{
 		rows:            []Row{},
 		logLevel:        levelFlattenDebug, // by default, log at a level below debug
-		slogger:         multislogger.New().Logger,
+		slogger:         multislogger.NewNopLogger(),
 		queryWildcard:   `*`,
 		queryKeyDenoter: `#`,
 	}
@@ -378,7 +378,7 @@ func (fl *Flattener) queryMatchArrayElement(data interface{}, arrIndex int, quer
 		"caller", "queryMatchArrayElement",
 		"rows_so_far", len(fl.rows),
 		"query", queryTerm,
-		"arrIndex", arrIndex,
+		"arr_index", arrIndex,
 	)
 
 	// strip off the key re-write denotation before trying to match

@@ -3,11 +3,8 @@ package locallogger
 import (
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -18,15 +15,16 @@ const (
 type localLogger struct {
 	logger log.Logger
 	writer io.Writer
+	lj     *lumberjack.Logger
 }
 
 func NewKitLogger(logFilePath string) localLogger {
 	// This is meant as an always available debug tool. Thus we hardcode these options
 	lj := &lumberjack.Logger{
 		Filename:   logFilePath,
-		MaxSize:    3, // megabytes
+		MaxSize:    5, // megabytes
 		Compress:   true,
-		MaxBackups: 5,
+		MaxBackups: 8,
 	}
 
 	writer := log.NewSyncWriter(lj)
@@ -37,10 +35,15 @@ func NewKitLogger(logFilePath string) localLogger {
 			"ts", log.DefaultTimestampUTC,
 			"caller", log.DefaultCaller, ///log.Caller(6),
 		),
+		lj:     lj, // keep a reference to lumberjack Logger so it can be closed if needed
 		writer: writer,
 	}
 
 	return ll
+}
+
+func (ll localLogger) Close() error {
+	return ll.lj.Close()
 }
 
 func (ll localLogger) Log(keyvals ...interface{}) error {
@@ -50,26 +53,6 @@ func (ll localLogger) Log(keyvals ...interface{}) error {
 
 func (ll localLogger) Writer() io.Writer {
 	return ll.writer
-}
-
-func CleanUpRenamedDebugLogs(cleanupPath string, logger log.Logger) {
-	// We renamed the debug log file from debug.log to debug.json for compatibility with support tools.
-	// Check to see if we have any of the old debug.log files still hanging around, and clean them up
-	// if so. The current one is always named debug.log, and rotated files are in the format
-	// `debug-<date>.log.gz`. We do not return an error if we can't clean up these files -- it's not
-	// a big deal.
-	legacyDebugLogPattern := filepath.Join(cleanupPath, "debug*.log*")
-	filesToCleanUp, err := filepath.Glob(legacyDebugLogPattern)
-	if err != nil {
-		level.Error(logger).Log("msg", "could not glob for legacy debug log files to clean up", "pattern", legacyDebugLogPattern, "err", err)
-		return
-	}
-
-	for _, fileToCleanUp := range filesToCleanUp {
-		if err := os.Remove(fileToCleanUp); err != nil {
-			level.Error(logger).Log("msg", "could not clean up legacy debug log file", "file", fileToCleanUp, "err", err)
-		}
-	}
 }
 
 // filterResults filteres out the osquery results,

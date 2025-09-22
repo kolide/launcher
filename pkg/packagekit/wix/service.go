@@ -90,6 +90,12 @@ type ServiceControl struct {
 // This is used needed to set DelayedAutoStart
 type ServiceConfig struct {
 	// TODO: this should need a namespace, and yet. See https://github.com/golang/go/issues/36813
+
+	// Id will be automaticlly set to the parent ServiceName attribute if not set.
+	// This will result in an error from wix if there are multiple services with the same name
+	// that occurs when we are creating an MSI with both arm64 and amd64 binaries.
+	// So we set Id in the heat post processing step.
+	Id               string    `xml:",attr,omitempty"`
 	XMLName          xml.Name  `xml:"http://schemas.microsoft.com/wix/2006/wi ServiceConfig"`
 	DelayedAutoStart YesNoType `xml:",attr,omitempty"`
 	OnInstall        YesNoType `xml:",attr,omitempty"`
@@ -215,6 +221,7 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	// probably better to specific a ServiceName, but this might be an
 	// okay default.
 	defaultName := cleanServiceName(strings.TrimSuffix(matchString, ".exe") + ".svc")
+
 	si := &ServiceInstall{
 		Name:              defaultName,
 		Id:                defaultName,
@@ -237,8 +244,9 @@ func NewService(matchString string, opts ...ServiceOpt) *Service {
 	}
 
 	s := &Service{
-		matchString:    matchString,
-		expectedCount:  1,
+		matchString: matchString,
+		// one count for arm64, one for amd64
+		expectedCount:  2,
 		count:          0,
 		serviceInstall: si,
 		serviceControl: sc,

@@ -4,6 +4,7 @@ package mock
 
 import (
 	"context"
+	"sync"
 
 	"github.com/kolide/launcher/pkg/service"
 	"github.com/osquery/osquery-go/plugin/distributed"
@@ -42,34 +43,48 @@ type KolideService struct {
 
 	CheckHealthFunc        CheckHealthFunc
 	CheckHealthFuncInvoked bool
+
+	invokedLock sync.Mutex
 }
 
 func (s *KolideService) RequestEnrollment(ctx context.Context, enrollSecret string, hostIdentifier string, enrollDetails service.EnrollmentDetails) (string, bool, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.RequestEnrollmentFuncInvoked = true
 	return s.RequestEnrollmentFunc(ctx, enrollSecret, hostIdentifier, enrollDetails)
 }
 
 func (s *KolideService) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.RequestConfigFuncInvoked = true
 	return s.RequestConfigFunc(ctx, nodeKey)
 }
 
 func (s *KolideService) PublishLogs(ctx context.Context, nodeKey string, logType logger.LogType, logs []string) (string, string, bool, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.PublishLogsFuncInvoked = true
 	return s.PublishLogsFunc(ctx, nodeKey, logType, logs)
 }
 
 func (s *KolideService) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.RequestQueriesFuncInvoked = true
 	return s.RequestQueriesFunc(ctx, nodeKey)
 }
 
 func (s *KolideService) PublishResults(ctx context.Context, nodeKey string, results []distributed.Result) (string, string, bool, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.PublishResultsFuncInvoked = true
 	return s.PublishResultsFunc(ctx, nodeKey, results)
 }
 
 func (s *KolideService) CheckHealth(ctx context.Context) (int32, error) {
+	s.invokedLock.Lock()
+	defer s.invokedLock.Unlock()
 	s.CheckHealthFuncInvoked = true
 	return s.CheckHealthFunc(ctx)
 }

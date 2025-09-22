@@ -37,13 +37,16 @@ import (
 	"fmt"
 	"log/slog"
 
+	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/scjalliance/comshim"
 )
 
-// S_FALSE is returned by CoInitializeEx if it was already called on this thread.
-const S_FALSE = 0x00000001
+const (
+	S_FALSE                        = 0x00000001 // S_FALSE is returned by CoInitializeEx if it was already called on this thread.
+	WBEM_FLAG_RETURN_WHEN_COMPLETE = 0          // https://learn.microsoft.com/en-us/windows/win32/wmisdk/swbemservices-execquery#parameters
+	WBEM_FLAG_FORWARD_ONLY         = 32
+)
 
 // querySettings contains various options. Mostly for the
 // connectServerArgs args. See
@@ -131,7 +134,10 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	queryString := fmt.Sprintf("SELECT * FROM %s%s", className, whereClause)
 
 	// Initialize the COM system.
-	comshim.Add(1)
+	if err := comshim.TryAdd(1); err != nil {
+		comshim.Done() // ensure we decrement the global shim counter that TryAdd increments immediately
+		return nil, fmt.Errorf("unable to init comshim: %w", err)
+	}
 	defer comshim.Done()
 
 	unknown, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
@@ -153,23 +159,46 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 	}
 	defer serviceRaw.Clear()
 
+	// In testing, we find we do not need to `service.Release()`. The memory of result is released
+	// by `defer serviceRaw.Clear()` above, furthermore on windows arm64 machines, calling
+	// `service.Clear()` after `serviceRaw.Release()` causes a panic.
+	//
+	// Looking at the `serviceRaw.ToIDispatch()` implementation, it's just a cast that returns
+	// a pointer to the same memory. Which would explain why calling `serviceRaw.Release()` after
+	// `service.Clear()` causes a panic. It's unclear why this causes a panic on arm64 machines and
+	// not on amd64 machines.
+	//
+	// This also applies to the `resultRaw` and `results` variables below.
 	service := serviceRaw.ToIDispatch()
-	defer service.Release()
 
 	slogger.Log(ctx, slog.LevelDebug,
 		"running WMI query",
 		"query", queryString,
 	)
 
-	// result is a SWBemObjectSet
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString)
+	// ExecQuery runs semi-synchronously by default. To ensure we aren't missing any results,
+	// we prefer synchronous mode, which we achieve by setting iFlags to wbemFlagForwardOnly+wbemFlagReturnWhenComplete
+	// instead of the default wbemFlagReturnImmediately. (wbemFlagReturnWhenComplete will make the call synchronous,
+	// and wbemFlagForwardOnly helps us avoid any potential performance issues.) The flags values are not
+	// incredibly well-documented and there are multiple zero-value flags. We assume that wbemFlagForwardOnly (32)
+	// and wbemFlagBidirectional (0) are mutually exclusive, and that wbemFlagReturnImmediately (16) and
+	// wbemFlagReturnWhenComplete (0) are mutually exclusive. We assume, therefore, that WMI correctly understands
+	// an `iFlags` value of 32 as wbemFlagForwardOnly+wbemFlagReturnWhenComplete. (It cannot be understood as
+	// wbemFlagForwardOnly+wbemFlagBidirectional, because that is not a possible combination. It cannot be understood
+	// as wbemFlagForwardOnly only, because the return behavior flag must be set as either wbemFlagReturnWhenComplete or
+	// wbemFlagReturnImmediately.)
+	// See
+	// * https://learn.microsoft.com/en-us/windows/win32/wmisdk/calling-a-method#semisynchronous-mode.
+	// * https://learn.microsoft.com/en-us/windows/win32/wmisdk/swbemservices-execquery#parameters
+	// The result is a SWBemObjectSet.
+	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", queryString, "WQL", WBEM_FLAG_FORWARD_ONLY+WBEM_FLAG_RETURN_WHEN_COMPLETE)
 	if err != nil {
-		return nil, fmt.Errorf("Running query %s: %w", queryString, err)
+		return nil, fmt.Errorf("running query `%s`: %w", queryString, err)
 	}
 	defer resultRaw.Clear()
 
+	// see above comment about `service.Release()` to explain why `result.Release()` isn't called
 	result := resultRaw.ToIDispatch()
-	defer result.Release()
 
 	if err := oleutil.ForEach(result, handler.HandleVariant); err != nil {
 		return nil, fmt.Errorf("ole foreach: %w", err)
@@ -199,7 +228,7 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 	result := make(map[string]interface{})
 
 	for _, p := range oh.properties {
-		val, err := oleutil.GetProperty(item, p)
+		prop, err := getProperty(item, p)
 		if err != nil {
 			oh.slogger.Log(context.TODO(), slog.LevelDebug,
 				"got error looking for property",
@@ -208,24 +237,7 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 			)
 			continue
 		}
-		defer val.Clear()
-
-		// Not sure if we need to special case the nil, or if Value() handles it.
-		if val.VT == 0x1 { //VT_NULL
-			result[p] = nil
-			continue
-		}
-
-		// Attempt to handle arrays
-		safeArray := val.ToArray()
-		if safeArray != nil {
-			// I would have expected to need
-			// `defersafeArray.Release()` here, if I add
-			// that, this routine stops working.
-			result[p] = safeArray.ToValueArray()
-		} else {
-			result[p] = val.Value()
-		}
+		result[p] = prop
 
 	}
 	if len(result) > 0 {
@@ -233,4 +245,28 @@ func (oh *oleHandler) HandleVariant(v *ole.VARIANT) error {
 	}
 
 	return nil
+}
+
+func getProperty(item *ole.IDispatch, property string) (any, error) {
+	val, err := oleutil.GetProperty(item, property)
+	if err != nil {
+		return nil, fmt.Errorf("looking for property %s: %w", property, err)
+	}
+	defer val.Clear()
+
+	// Not sure if we need to special case the nil, or if Value() handles it.
+	if val.VT == 0x1 { //VT_NULL
+		return nil, nil
+	}
+
+	// Attempt to handle arrays
+	safeArray := val.ToArray()
+	if safeArray != nil {
+		// I would have expected to need
+		// `defersafeArray.Release()` here, if I add
+		// that, this routine stops working.
+		return safeArray.ToValueArray(), nil
+	}
+
+	return val.Value(), nil
 }

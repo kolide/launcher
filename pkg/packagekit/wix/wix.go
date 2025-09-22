@@ -3,15 +3,18 @@ package wix
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"github.com/go-kit/kit/log/level"
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/pkg/contexts/ctxlog"
 )
 
@@ -161,6 +164,15 @@ func New(packageRoot string, identifier string, mainWxsContent []byte, wixOpts .
 // Cleanup removes temp directories. Meant to be called in a defer.
 func (wo *wixTool) Cleanup() {
 	if wo.skipCleanup {
+		// if the wix_skip_cleanup flag is set, we don't want to clean up the temp directories
+		// this is useful when debugging wix generation
+		// print the directories that would be cleaned up so they can be easily found
+		// and inspected
+		fmt.Print("skipping cleanup of temp directories\n")
+		for _, d := range wo.cleanDirs {
+			fmt.Printf("skipping cleanup of %s\n", d)
+		}
+
 		return
 	}
 
@@ -182,6 +194,10 @@ func (wo *wixTool) Package(ctx context.Context) (string, error) {
 
 	if err := wo.addServices(ctx); err != nil {
 		return "", fmt.Errorf("adding services: %w", err)
+	}
+
+	if err := wo.setSecretPermissions(ctx); err != nil {
+		return "", fmt.Errorf("setting file permissions: %w", err)
 	}
 
 	if err := wo.candle(ctx); err != nil {
@@ -223,21 +239,136 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 	}
 	defer heatWrite.Close()
 
+	type archSpecificBinDir string
+
+	const (
+		none  archSpecificBinDir = ""
+		amd64 archSpecificBinDir = "amd64"
+		arm64 archSpecificBinDir = "arm64"
+	)
+	currentArchSpecificBinDir := none
+
+	baseSvcName := wo.services[0].serviceInstall.Id
+
 	lines := strings.Split(string(heatContent), "\n")
 	for _, line := range lines {
+
+		if currentArchSpecificBinDir != none && strings.Contains(line, "</Directory>") {
+			// were in a arch specific bin dir that we want to remove, don't write closing tag
+			currentArchSpecificBinDir = none
+			continue
+		}
+
+		// the directory tag will look like "<Directory Id="xxxx"...>"
+		// so we just check for the first part of the string
+		if strings.Contains(line, "<Directory") {
+			if strings.Contains(line, string(amd64)) {
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
+				currentArchSpecificBinDir = amd64
+				continue
+			}
+
+			if strings.Contains(line, string(arm64)) {
+				// were in a arch specific bin dir that we want to remove, skip opening tag
+				// and set current arch specific bin dir so we'll skip closing tag as well
+				currentArchSpecificBinDir = arm64
+				continue
+			}
+		}
+
 		heatWrite.WriteString(line)
 		heatWrite.WriteString("\n")
+
 		for _, service := range wo.services {
+
 			isMatch, err := service.Match(line)
 			if err != nil {
 				return fmt.Errorf("match error: %w", err)
 			}
+
 			if isMatch {
+				if currentArchSpecificBinDir == none {
+					return errors.New("service found, but not in a bin directory")
+				}
+
+				// make sure elements are not duplicated in any service
+				serviceId := fmt.Sprintf("%s%s", baseSvcName, ulid.New())
+				service.serviceControl.Id = serviceId
+				service.serviceInstall.Id = serviceId
+				service.serviceInstall.ServiceConfig.Id = serviceId
+
+				// unfortunately, the UtilServiceConfig uses the name of the launcher service as a primary key
+				// since we have multiple services with the same name, we can't have multiple UtilServiceConfigs
+				// so we are skipping it for arm64 since it's a much smaller portion of our user base. The correct
+				// UtilServiceConfig will set when launcher starts up.
+				if currentArchSpecificBinDir == arm64 {
+					service.serviceInstall.UtilServiceConfig = nil
+				}
+
+				// create a condition based on architecture
+				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				heatWrite.WriteString("\n")
+
 				if err := service.Xml(heatWrite); err != nil {
 					return fmt.Errorf("adding service: %w", err)
 				}
+
+				continue
+			}
+
+			if strings.Contains(line, "osqueryd.exe") {
+				if currentArchSpecificBinDir == none {
+					return errors.New("osqueryd.exe found, but not in a bin directory")
+				}
+
+				// create a condition based on architecture
+				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				heatWrite.WriteString("\n")
 			}
 		}
+	}
+
+	return nil
+}
+
+// setSecretPermissions modifies the AppFiles.wxs file to add wix Permissions elements
+// to our File element for the enroll secret. Permissions elements are added
+// granting full access to LOCALSYSTEM and ADMINISTRATORS groups, while denying all access
+// to the regular USERS groups. See main.wxs for how the WIX_ACCOUNT_xyz properties are defined
+func (wo *wixTool) setSecretPermissions(ctx context.Context) error {
+	heatFile := filepath.Join(wo.buildDir, "AppFiles.wxs")
+	heatContent, err := os.ReadFile(heatFile)
+	if err != nil {
+		return fmt.Errorf("reading AppFiles.wxs: %w", err)
+	}
+
+	heatWrite, err := os.Create(heatFile)
+	if err != nil {
+		return fmt.Errorf("opening AppFiles.wxs for writing: %w", err)
+	}
+	defer heatWrite.Close()
+
+	lines := strings.Split(string(heatContent), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "<File") && strings.Contains(line, `\conf\secret`) {
+			// rewrite the line with an open end tag, we're going to inject some permissions before closing
+			line = strings.TrimRightFunc(line, unicode.IsSpace)           // trim trailing space to get at /> suffix
+			line = strings.TrimSuffix(line, `/>`)                         // remove closed tag suffix
+			heatWrite.WriteString(line + `>` + "\n")                      // replace with open ended tag
+			leadingSpaces := len(line) - len(strings.TrimLeft(line, " ")) // count the leading spaces
+			indent := strings.Repeat(" ", leadingSpaces+4)                // add some more indentation for our nested Permission entries
+			heatWrite.WriteString(indent + `<Permission User="[WIX_ACCOUNT_LOCALSYSTEM]" GenericAll="yes"/>` + "\n")
+			heatWrite.WriteString(indent + `<Permission User="[WIX_ACCOUNT_ADMINISTRATORS]" GenericAll="yes"/>` + "\n")
+			heatWrite.WriteString(indent + `<Permission User="[WIX_ACCOUNT_USERS]" GenericAll="no"/>` + "\n")
+			indent = strings.Repeat(" ", leadingSpaces) // reset indentation to close out our File object
+			heatWrite.WriteString(indent + "</File>\n")
+			continue
+		}
+
+		heatWrite.WriteString(line)
+		heatWrite.WriteString("\n")
 	}
 
 	return nil
@@ -263,19 +394,6 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 		return fmt.Errorf("create base data dir error for wix harvest: %w", err)
 	}
 
-	// touch these known file names before harvest to ensure they're cleaned up on uninstall
-	dataFilenames := []string{"launcher.db", "metadata.json", "kv.sqlite"}
-
-	for _, fname := range dataFilenames {
-		newPath := filepath.Join(dataFilesPath, fname)
-		newFile, err := os.Create(newPath)
-		if err != nil {
-			return err
-		}
-
-		newFile.Close()
-	}
-
 	_, err = wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "heat.exe"),
 		"dir", wo.packageDataRoot,
@@ -297,23 +415,20 @@ func (wo *wixTool) setupDataDir(ctx context.Context) error {
 // heat invokes wix's heat command. This examines a directory and
 // "harvests" the files into an xml structure. See
 // http://wixtoolset.org/documentation/manual/v3/overview/heat.html
-//
-// TODO split this into PROGDIR and DATADIR. Perhaps using options? Or
-// figuring out a way to invoke this multiple times with different dir
-// and -cg settings. Historically this used PROGDIR, and I haven't dug
-// into the auto-update code, so it's staying there for now.
+// note that heat.exe is also separately invoked by setupDataDir to generate
+// another wxs out file for our data directory
 func (wo *wixTool) heat(ctx context.Context) error {
 	_, err := wo.execOut(ctx,
 		filepath.Join(wo.wixPath, "heat.exe"),
 		"dir", wo.packageRoot,
 		"-nologo",
-		"-gg", "-g1",
-		"-srd",
-		"-sfrag",
-		"-ke",
-		"-cg", "AppFiles",
-		"-template", "fragment",
-		"-dr", "PROGDIR",
+		"-gg", "-g1", // -gg generate GUIDs now, -g1 generate component GUIDs without curly braces
+		"-srd",            // -srd suppress harvesting root directory as element
+		"-sfrag",          // -sfrag suppress generation of fragments for directories and components
+		"-ke",             // -ke keep empty directories
+		"-cg", "AppFiles", // -cg is Component Group Name
+		"-template", "fragment", // -template is use template of type <fragment|module|product>
+		"-dr", "PROGDIR", //  -dr Directory Name
 		"-var", "var.SourceDir",
 		"-out", "AppFiles.wxs",
 	)

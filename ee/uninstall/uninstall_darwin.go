@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/allowedcmd"
 )
 
-func disableAutoStart(ctx context.Context) error {
-	launchDaemonPList := "/Library/LaunchDaemons/com.kolide-k2.launcher.plist"
+func disableAutoStart(ctx context.Context, k types.Knapsack) error {
+	launchDaemonPList := fmt.Sprintf("/Library/LaunchDaemons/com.%s.launcher.plist", k.Identifier())
 	launchCtlArgs := []string{"unload", launchDaemonPList}
 
 	launchctlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)

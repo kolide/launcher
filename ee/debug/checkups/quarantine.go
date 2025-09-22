@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 // quarantine:
@@ -73,6 +73,9 @@ func (q *quarantine) Run(ctx context.Context, extraFh io.Writer) error {
 			`virus`,
 			`quarantine`,
 			`snitch`,
+			`action1`,
+			`nessus`,
+			`dnsfilter`,
 			// carbon black possible processes
 			`cbagent`,
 			`carbonblack`,

@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 	"github.com/osquery/osquery-go/plugin/distributed"
 )
 
@@ -20,6 +18,7 @@ type queriesRequest struct {
 }
 
 type queryCollectionResponse struct {
+	jsonRpcResponse
 	Queries     distributed.GetQueriesResult
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
@@ -39,13 +38,6 @@ func decodeJSONRPCQueryCollection(_ context.Context, res jsonrpc.Response) (inte
 	return result, nil
 }
 
-func decodeGRPCQueriesRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.AgentApiRequest)
-	return queriesRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
 func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
 	var req queriesRequest
 
@@ -56,46 +48,6 @@ func decodeJSONRPCQueriesRequest(_ context.Context, msg json.RawMessage) (interf
 		}
 	}
 	return req, nil
-}
-
-func encodeGRPCQueriesRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(queriesRequest)
-	return &pb.AgentApiRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
-func decodeGRPCQueryCollection(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.QueryCollection)
-	queries := distributed.GetQueriesResult{
-		Queries:   map[string]string{},
-		Discovery: map[string]string{},
-	}
-	for _, query := range req.Queries {
-		queries.Queries[query.Id] = query.Query
-	}
-	return queryCollectionResponse{
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCQueryCollection(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(queryCollectionResponse)
-	queries := make([]*pb.QueryCollection_Query, 0, len(req.Queries.Queries))
-	for id, query := range req.Queries.Queries {
-		queries = append(queries,
-			&pb.QueryCollection_Query{
-				Id:    id,
-				Query: query,
-			},
-		)
-	}
-	resp := &pb.QueryCollection{
-		Queries:     queries,
-		NodeInvalid: req.NodeInvalid,
-	}
-	return encodeResponse(resp, req.Err)
 }
 
 func encodeJSONRPCQueryCollection(_ context.Context, obj interface{}) (json.RawMessage, error) {
@@ -132,7 +84,7 @@ func MakeRequestQueriesEndpoint(svc KolideService) endpoint.Endpoint {
 
 // RequestQueries implements KolideService.RequestQueries
 func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
@@ -143,32 +95,33 @@ func (e Endpoints) RequestQueries(ctx context.Context, nodeKey string) (*distrib
 		return nil, false, err
 	}
 	resp := response.(queryCollectionResponse)
-	return &resp.Queries, resp.NodeInvalid, resp.Err
-}
 
-func (s *grpcServer) RequestQueries(ctx context.Context, req *pb.AgentApiRequest) (*pb.QueryCollection, error) {
-	_, rep, err := s.queries.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
+	if resp.DisableDevice {
+		return nil, false, ErrDeviceDisabled{}
 	}
-	return rep.(*pb.QueryCollection), nil
+
+	return &resp.Queries, resp.NodeInvalid, resp.Err
 }
 
 func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distributed.GetQueriesResult, reauth bool, err error) {
 	defer func(begin time.Time) {
 		resJSON, _ := json.Marshal(res)
 		uuid, _ := uuid.FromContext(ctx)
+
+		message := "success"
 		if err != nil {
-			mw.knapsack.Slogger().Log(ctx, slog.LevelError,
-				"failure",
-				"method", "RequestQueries",
-				"uuid", uuid,
-				"res", string(resJSON),
-				"reauth", reauth,
-				"err", err,
-				"took", time.Since(begin),
-			)
+			message = "failure requesting queries"
 		}
+
+		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here
+			message,
+			"method", "RequestQueries",
+			"uuid", uuid,
+			"res", string(resJSON),
+			"reauth", reauth,
+			"err", err,
+			"took", time.Since(begin),
+		)
 	}(time.Now())
 
 	res, reauth, err = mw.next.RequestQueries(ctx, nodeKey)

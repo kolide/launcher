@@ -1,0 +1,42 @@
+Number of trusted certs = 1
+Cert 0: Example Root CA
+   Number of trust settings : 10
+   Trust Setting 0:
+      Policy OID            : SSL
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 1:
+      Policy OID            : SSL
+      Allowed Error         : Host name mismatch
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 2:
+      Policy OID            : SMIME
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 3:
+      Policy OID            : SMIME
+      Allowed Error         : S/MIME Email address mismatch
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 4:
+      Policy OID            : EAP
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 5:
+      Policy OID            : IPSec
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 6:
+      Policy OID            : Code Signing
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 7:
+      Policy OID            : Unknown OID length 9, value { 2C 72 48 86 D7 63 62 01 14  }
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 8:
+      Policy OID            : Apple X509 Basic
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot
+   Trust Setting 9:
+      Allowed Error         : CSSMERR_TP_CERT_EXPIRED
+      Result Type           : kSecTrustSettingsResultTrustRoot

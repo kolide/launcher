@@ -19,7 +19,8 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 	logger := log.With(ctxlog.FromContext(ctx), "library", "detectLauncherVersion")
 	level.Debug(logger).Log("msg", "Attempting launcher autodetection")
 
-	launcherPath := p.launcherLocation(filepath.Join(p.packageRoot, p.binDir))
+	launcherPath := p.launcherLocation()
+
 	stdout, err := p.execOut(ctx, launcherPath, "-version")
 	if err != nil {
 		return fmt.Errorf("failed to exec -- possibly can't autodetect while cross compiling: out `%s`: %w", stdout, err)
@@ -48,16 +49,20 @@ func (p *PackageOptions) detectLauncherVersion(ctx context.Context) error {
 // launcherLocation returns the location of the launcher binary within `binDir`. For darwin,
 // it may be in an app bundle -- we check to see if the binary exists there first, and then
 // fall back to the common location if it doesn't.
-func (p *PackageOptions) launcherLocation(binDir string) string {
+func (p *PackageOptions) launcherLocation() string {
 	if p.target.Platform == Darwin {
 		// We want /usr/local/Kolide.app, not /usr/local/bin/Kolide.app, so we use Dir to strip out `bin`
-		appBundleBinaryPath := filepath.Join(filepath.Dir(binDir), "Kolide.app", "Contents", "MacOS", "launcher")
+		appBundleBinaryPath := filepath.Join(p.packageRoot, filepath.Dir(p.binDir), "Kolide.app", "Contents", "MacOS", "launcher")
 		if info, err := os.Stat(appBundleBinaryPath); err == nil && !info.IsDir() {
 			return appBundleBinaryPath
 		}
 	}
 
-	return filepath.Join(binDir, p.target.PlatformBinaryName("launcher"))
+	if p.target.Platform == Windows {
+		return filepath.Join(p.packageRoot, p.binDir, string(p.target.Arch), p.target.PlatformBinaryName("launcher"))
+	}
+
+	return filepath.Join(p.packageRoot, p.binDir, p.target.PlatformBinaryName("launcher"))
 }
 
 // formatVersion formats the version according to the packaging requirements of the target platform
@@ -109,7 +114,9 @@ func formatVersion(rawVersion string, platform PlatformFlavor) (string, error) {
 	case Darwin:
 		// Darwin expects a <major>.<minor>.<patch> packaging string
 		return fmt.Sprintf("%s.%s.%s", major, minor, patch), nil
+	case Linux:
+		return rawVersion, nil
+	default:
+		return "", fmt.Errorf("unsupported platform %v", platform)
 	}
-
-	return rawVersion, nil
 }

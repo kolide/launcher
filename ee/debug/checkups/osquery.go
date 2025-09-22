@@ -10,13 +10,15 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type osqueryCheckup struct {
-	k              types.Knapsack
-	status         Status
-	executionTimes map[string]any // maps command to how long it took to run, in ms
-	summary        string
+	k                types.Knapsack
+	status           Status
+	executionTimes   map[string]any // maps command to how long it took to run, in ms
+	instanceStatuses map[string]types.InstanceStatus
+	summary          string
 }
 
 func (o *osqueryCheckup) Name() string {
@@ -38,6 +40,8 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	if err := o.interactive(ctx); err != nil {
 		return fmt.Errorf("running launcher interactive: %w", err)
 	}
+
+	o.instanceStatuses = o.k.InstanceStatuses()
 
 	return nil
 }
@@ -66,10 +70,15 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 		return fmt.Errorf("getting current running executable: %w", err)
 	}
 
+	flagFilePath := launcher.DefaultPath(launcher.ConfigFile)
+	if o.k != nil && o.k.Identifier() != "" {
+		flagFilePath = strings.ReplaceAll(flagFilePath, launcher.DefaultLauncherIdentifier, o.k.Identifier())
+	}
+
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cmdCancel()
 
-	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--osqueryd_path", o.k.LatestOsquerydPath(ctx)) //nolint:forbidigo // It is safe to exec the current running executable
+	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--config", flagFilePath, "--osqueryd_path", o.k.LatestOsquerydPath(ctx)) //nolint:forbidigo // It is safe to exec the current running executable
 	hideWindow(cmd)
 	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
 
@@ -77,7 +86,7 @@ func (o *osqueryCheckup) interactive(ctx context.Context) error {
 	out, err := cmd.CombinedOutput()
 	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
 	if err != nil {
-		return fmt.Errorf("running %s interactive: err %w, output %s", launcherPath, err, string(out))
+		return fmt.Errorf("running %s interactive: err %w, output %s; ctx err: %+v", launcherPath, err, string(out), cmdCtx.Err())
 	}
 
 	return nil
@@ -96,5 +105,8 @@ func (o *osqueryCheckup) Summary() string {
 }
 
 func (o *osqueryCheckup) Data() any {
-	return o.executionTimes
+	return map[string]any{
+		"execution_time":    o.executionTimes,
+		"instance_statuses": o.instanceStatuses,
+	}
 }

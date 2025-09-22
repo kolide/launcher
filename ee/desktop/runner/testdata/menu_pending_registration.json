@@ -1,0 +1,69 @@
+{
+    "icon": "default",
+    "tooltip": "Kolide - Device Status: All Good",
+    "items": [
+        {
+            "label": "tester@example.test",
+            "tooltip": null,
+            "disabled": true,
+            "items": []
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://example.com/docs/about/overview"
+                }
+            },
+            "label": "About Kolide...",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        },
+        {
+            "separator": true
+        },
+        {
+            "label": "✔ All Good!",
+            "tooltip": null,
+            "disabled": true,
+            "items": []
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://app.example.com/1dsfsdfsdfsd"
+                }
+            },
+            "label": "View Details...",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        },
+        {
+            "separator": true
+        },
+        {
+            "action": {
+                "type": "open-url",
+                "action": {
+                    "url": "https://auth.example.com/device/registrations/sdihfosdfosidf"
+                }
+            },
+            "label": "❗ Pending Registration Request",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        },
+        {
+            "separator": true
+        },
+        {
+            "label": "Debug",
+            "tooltip": null,
+            "disabled": false,
+            "items": []
+        }
+    ]
+}

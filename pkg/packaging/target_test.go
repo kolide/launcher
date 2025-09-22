@@ -143,7 +143,7 @@ func TestTargetParse(t *testing.T) {
 	}{
 		{
 			in:  "darwin-launchd-pkg",
-			out: &Target{Platform: Darwin, Init: LaunchD, Package: Pkg},
+			out: &Target{Platform: Darwin, Init: LaunchD, Package: Pkg, Arch: Universal},
 		},
 		{
 			in:  "windows-none-msi",
@@ -151,7 +151,15 @@ func TestTargetParse(t *testing.T) {
 		},
 		{
 			in:  "linux-systemd-rpm",
-			out: &Target{Platform: Linux, Init: Systemd, Package: Rpm},
+			out: &Target{Platform: Linux, Init: Systemd, Package: Rpm, Arch: Amd64},
+		},
+		{
+			in:  "linux-arm64-systemd-rpm",
+			out: &Target{Platform: Linux, Init: Systemd, Package: Rpm, Arch: Arm64},
+		},
+		{
+			in:         "linux-not_a_valid_arch-systemd-deb",
+			shouldFail: true,
 		},
 		{
 			in:         "windows-msi",

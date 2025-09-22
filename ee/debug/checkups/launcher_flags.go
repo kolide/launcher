@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type launcherFlags struct {
+	k       types.Knapsack
 	status  Status
 	summary string
 }
@@ -39,6 +41,7 @@ func (lf *launcherFlags) Run(_ context.Context, extraFh io.Writer) error {
 		lf.summary = fmt.Sprintf("failed to open %s: %s", configFilePath, err)
 		return nil
 	}
+	defer file.Close()
 
 	fmt.Fprint(extraFh, "\nlauncher.flags contents:\n\n")
 
@@ -74,10 +77,14 @@ func (lf *launcherFlags) Data() any {
 }
 
 func (lf *launcherFlags) flagsFilePath() string {
+	identifier := launcher.DefaultLauncherIdentifier
+	if lf.k.Identifier() != "" {
+		identifier = lf.k.Identifier()
+	}
 	if runtime.GOOS == "windows" {
-		return filepath.Join(`C:\Program Files\Kolide\Launcher-kolide-k2\conf`, "launcher.flags")
+		return filepath.Join(fmt.Sprintf(`C:\Program Files\Kolide\Launcher-%s\conf`, identifier), "launcher.flags")
 	}
 
 	// non-windows
-	return "/etc/kolide-k2/launcher.flags"
+	return fmt.Sprintf("/etc/%s/launcher.flags", identifier)
 }

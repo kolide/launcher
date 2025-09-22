@@ -23,11 +23,11 @@ type IUpdateSession struct {
 func NewUpdateSession() (*IUpdateSession, error) {
 	unknown, err := oleutil.CreateObject("Microsoft.Update.Session")
 	if err != nil {
-		return nil, fmt.Errorf("create Microsoft.Update.Session: %w", err)
+		return nil, fmt.Errorf("creating Microsoft.Update.Session: %w", err)
 	}
 	disp, err := unknown.QueryInterface(ole.IID_IDispatch)
 	if err != nil {
-		return nil, fmt.Errorf("IID_IDispatch: %w", err)
+		return nil, fmt.Errorf("querying IID_IDispatch: %w", err)
 	}
 	return toIUpdateSession(disp)
 }
@@ -40,11 +40,11 @@ func toIUpdateSession(updateSessionDisp *ole.IDispatch) (*IUpdateSession, error)
 	}
 
 	if iUpdateSession.ClientApplicationID, err = oleconv.ToStringErr(oleutil.GetProperty(updateSessionDisp, "ClientApplicationID")); err != nil {
-		return nil, fmt.Errorf("ClientApplicationID: %w", err)
+		return nil, fmt.Errorf("getting property ClientApplicationID as string: %w", err)
 	}
 
 	if iUpdateSession.ReadOnly, err = oleconv.ToBoolErr(oleutil.GetProperty(updateSessionDisp, "ReadOnly")); err != nil {
-		return nil, fmt.Errorf("ReadOnly: %w", err)
+		return nil, fmt.Errorf("getting property ReadOnly as bool: %w", err)
 	}
 
 	return iUpdateSession, nil
@@ -62,11 +62,11 @@ func (iUpdateSession *IUpdateSession) SetLocal(locale uint32) error {
 }
 
 // CreateUpdateSearcher returns an IUpdateSearcher interface for this session.
-// https://docs.microsoft.com/zh-cn/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
+// https://docs.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
 func (iUpdateSession *IUpdateSession) CreateUpdateSearcher() (*IUpdateSearcher, error) {
 	updateSearcherDisp, err := oleconv.ToIDispatchErr(oleutil.CallMethod(iUpdateSession.disp, "CreateUpdateSearcher"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("calling CreateUpdateSearcher: %w", err)
 	}
 
 	return toIUpdateSearcher(updateSearcherDisp)

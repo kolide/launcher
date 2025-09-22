@@ -48,22 +48,13 @@ func (c *Logs) Run(_ context.Context, fullFH io.Writer) error {
 	matches, _ := filepath.Glob(filepath.Join(c.k.RootDirectory(), "debug*"))
 
 	for _, f := range matches {
-		out, err := logZip.Create(filepath.Base(f))
-		if err != nil {
-			continue
+		if err := addFileToZip(logZip, f); err != nil {
+			return fmt.Errorf("adding %s to zip: %w", f, err)
 		}
-
-		in, err := os.Open(f)
-		if err != nil {
-			fmt.Fprintf(out, "error reading file:\n%s", err)
-			continue
-		}
-		defer in.Close()
-
-		io.Copy(out, in)
 	}
 
 	return nil
+
 }
 
 func (c *Logs) Status() Status {

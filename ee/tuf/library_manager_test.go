@@ -3,6 +3,7 @@ package tuf
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/kolide/kit/ulid"
 	tufci "github.com/kolide/launcher/ee/tuf/ci"
-	"github.com/kolide/launcher/pkg/autoupdate"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"github.com/theupdateframework/go-tuf/data"
@@ -23,7 +24,7 @@ func Test_newUpdateLibraryManager(t *testing.T) {
 	t.Parallel()
 
 	testBaseDir := filepath.Join(t.TempDir(), "updates")
-	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.New().Logger)
+	testLibraryManager, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new update library manager")
 
 	baseDir, err := os.Stat(testBaseDir)
@@ -65,7 +66,7 @@ func TestAvailable(t *testing.T) {
 	testBaseDir := t.TempDir()
 
 	// Set up test library
-	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.New().Logger)
+	testLibrary, err := newUpdateLibraryManager("", nil, testBaseDir, multislogger.NewNopLogger())
 	require.NoError(t, err, "unexpected error creating new read-only library")
 
 	// Set up valid "osquery" executable
@@ -109,7 +110,7 @@ func TestAddToLibrary(t *testing.T) {
 			targetFile := fmt.Sprintf("%s-%s.tar.gz", b, testReleaseVersion)
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.New().Logger)
+			testLibraryManager, err := newUpdateLibraryManager(tufServerUrl, http.DefaultClient, testBaseDir, multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download -- make a couple concurrent requests to confirm that the lock works.
@@ -154,7 +155,7 @@ func TestAddToLibrary_alreadyRunning(t *testing.T) {
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
 				mirrorClient: http.DefaultClient,
-				slogger:      multislogger.New().Logger,
+				slogger:      multislogger.NewNopLogger(),
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
 			}
@@ -193,7 +194,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			testLibraryManager := &updateLibraryManager{
 				mirrorUrl:    testMirror.URL,
 				mirrorClient: http.DefaultClient,
-				slogger:      multislogger.New().Logger,
+				slogger:      multislogger.NewNopLogger(),
 				baseDir:      testBaseDir,
 				lock:         newLibraryLock(),
 			}
@@ -208,7 +209,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
-			require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+			require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
@@ -278,7 +279,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			defer testMaliciousMirror.Close()
 
 			// Set up test library manager
-			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, multislogger.New().Logger)
+			testLibraryManager, err := newUpdateLibraryManager(testMaliciousMirror.URL, http.DefaultClient, testBaseDir, multislogger.NewNopLogger())
 			require.NoError(t, err, "unexpected error creating new update library manager")
 
 			// Request download
@@ -288,6 +289,148 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 			updateMatches, err := filepath.Glob(filepath.Join(updatesDirectory(tt.binary, testBaseDir), "*"))
 			require.NoError(t, err, "checking that updates directory does not contain any updates")
 			require.Equal(t, 0, len(updateMatches), "unexpected files found in updates directory: %+v", updateMatches)
+		})
+	}
+}
+
+func Test_sanitizeExtractPath(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		filepath    string
+		destination string
+		expectError bool
+	}{
+		{
+			filepath:    "file",
+			destination: "/tmp",
+			expectError: false,
+		},
+		{
+			filepath:    "subdir/../subdir/file",
+			destination: "/tmp",
+			expectError: false,
+		},
+
+		{
+			filepath:    "../../../file",
+			destination: "/tmp",
+			expectError: true,
+		},
+		{
+			filepath:    "./././file",
+			destination: "/tmp",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.filepath, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.expectError {
+				require.Error(t, sanitizeExtractPath(tt.filepath, tt.destination), tt.filepath)
+			} else {
+				require.NoError(t, sanitizeExtractPath(tt.filepath, tt.destination), tt.filepath)
+			}
+		})
+	}
+}
+
+func Test_sanitizePermissions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		testCaseName         string
+		givenFilePermissions fs.FileMode
+	}{
+		{
+			testCaseName:         "directory, valid permissions",
+			givenFilePermissions: fs.ModeDir | 0755,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (group has write)",
+			givenFilePermissions: fs.ModeDir | 0775,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (public has write)",
+			givenFilePermissions: fs.ModeDir | 0757,
+		},
+		{
+			testCaseName:         "directory, invalid permissions (everyone has write)",
+			givenFilePermissions: fs.ModeDir | 0777,
+		},
+		{
+			testCaseName:         "executable file, valid permissions",
+			givenFilePermissions: 0755,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (group has write)",
+			givenFilePermissions: 0775,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (public has write)",
+			givenFilePermissions: 0757,
+		},
+		{
+			testCaseName:         "executable file, invalid permissions (everyone has write)",
+			givenFilePermissions: 0777,
+		},
+		{
+			testCaseName:         "non-executable file, valid permissions",
+			givenFilePermissions: 0644,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (group has write)",
+			givenFilePermissions: 0664,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (public has write)",
+			givenFilePermissions: 0646,
+		},
+		{
+			testCaseName:         "non-executable file, invalid permissions (everyone has write)",
+			givenFilePermissions: 0666,
+		},
+	}
+
+	for _, tt := range testCases {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a temp file to extract a FileInfo from it with tt.givenFilePermissions
+			tmpDir := t.TempDir()
+			pathUnderTest := filepath.Join(tmpDir, ulid.New())
+			if tt.givenFilePermissions.IsDir() {
+				require.NoError(t, os.MkdirAll(pathUnderTest, tt.givenFilePermissions))
+			} else {
+				f, err := os.OpenFile(pathUnderTest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, tt.givenFilePermissions)
+				require.NoError(t, err)
+				require.NoError(t, f.Close())
+			}
+			fileInfo, err := os.Stat(pathUnderTest)
+			require.NoError(t, err)
+
+			sanitizedPermissions := sanitizePermissions(fileInfo)
+
+			// Confirm no group write
+			require.True(t, sanitizedPermissions&0020 == 0)
+
+			// Confirm no public write
+			require.True(t, sanitizedPermissions&0002 == 0)
+
+			// Confirm type is set correctly
+			require.Equal(t, tt.givenFilePermissions.Type(), sanitizedPermissions.Type())
+
+			// Confirm owner permissions are unmodified
+			var ownerBits fs.FileMode = 0700
+			if runtime.GOOS == "windows" {
+				// Windows doesn't have executable bit
+				ownerBits = 0600
+			}
+			require.Equal(t, tt.givenFilePermissions&ownerBits, sanitizedPermissions&ownerBits)
 		})
 	}
 }
@@ -303,7 +446,7 @@ func TestTidyLibrary(t *testing.T) {
 		expectedRemovedVersions   []string
 	}{
 		{
-			testCaseName: "more than 3 versions, currently running executable is within 3 newest",
+			testCaseName: "more than 2 versions, currently running executable is within 2 newest",
 			existingVersions: map[string]bool{
 				"1.0.3":  true,
 				"1.0.1":  true,
@@ -315,15 +458,15 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"1.0.3",
 				"1.0.1",
-				"1.0.0",
 			},
 			expectedRemovedVersions: []string{
+				"1.0.0",
 				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, currently running executable is not within 3 newest",
+			testCaseName: "more than 2 versions, currently running executable is not within 2 newest",
 			existingVersions: map[string]bool{
 				"2.0.3":   true,
 				"2.0.1":   true,
@@ -334,16 +477,16 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.12.10",
 			expectedPreservedVersions: []string{
 				"2.0.3",
-				"2.0.1",
 				"1.12.10",
 			},
 			expectedRemovedVersions: []string{
+				"2.0.1",
 				"2.0.0",
 				"1.13.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, currently running executable is not in update directory",
+			testCaseName: "more than 2 versions, currently running executable is not in update directory",
 			existingVersions: map[string]bool{
 				"0.20.3": true,
 				"0.19.1": true,
@@ -354,16 +497,16 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.12.10",
 			expectedPreservedVersions: []string{
 				"0.20.3",
-				"0.19.1",
 			},
 			expectedRemovedVersions: []string{
+				"0.19.1",
 				"0.17.0",
 				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes invalid semver",
+			testCaseName: "more than 2 versions, includes invalid semver",
 			existingVersions: map[string]bool{
 				"5.8.0":        true,
 				"5.7.1":        true,
@@ -376,16 +519,16 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"5.8.0",
 				"5.7.1",
-				"5.6.2",
 			},
 			expectedRemovedVersions: []string{
 				"not_a_semver",
+				"5.6.2",
 				"5.5.5",
 				"5.2.0",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes invalid executable within 3 newest",
+			testCaseName: "more than 2 versions, includes invalid executable within 2 newest",
 			existingVersions: map[string]bool{
 				"1.0.3":  true,
 				"1.0.1":  false,
@@ -397,15 +540,15 @@ func TestTidyLibrary(t *testing.T) {
 			expectedPreservedVersions: []string{
 				"1.0.3",
 				"1.0.0",
-				"0.13.6",
 			},
 			expectedRemovedVersions: []string{
 				"1.0.1",
+				"0.13.6",
 				"0.12.4",
 			},
 		},
 		{
-			testCaseName: "more than 3 versions, includes dev versions",
+			testCaseName: "more than 2 versions, includes dev versions",
 			existingVersions: map[string]bool{
 				"1.0.3":             true,
 				"1.0.3-9-g9c4a5ee":  true,
@@ -416,24 +559,22 @@ func TestTidyLibrary(t *testing.T) {
 			currentlyRunningVersion: "1.0.1-13-deadbeef",
 			expectedPreservedVersions: []string{
 				"1.0.3",
-				"1.0.3-9-g9c4a5ee",
 				"1.0.1-13-deadbeef",
 			},
 			expectedRemovedVersions: []string{
+				"1.0.3-9-g9c4a5ee",
 				"1.0.1",
 				"1.0.0",
 			},
 		},
 		{
-			testCaseName: "fewer than 3 versions",
+			testCaseName: "fewer than 2 versions",
 			existingVersions: map[string]bool{
 				"1.0.3": true,
-				"1.0.1": true,
 			},
-			currentlyRunningVersion: "1.0.1",
+			currentlyRunningVersion: "1.0.3",
 			expectedPreservedVersions: []string{
 				"1.0.3",
-				"1.0.1",
 			},
 			expectedRemovedVersions: []string{},
 		},
@@ -449,7 +590,7 @@ func TestTidyLibrary(t *testing.T) {
 				// Set up test library manager
 				testBaseDir := t.TempDir()
 				testLibraryManager := &updateLibraryManager{
-					slogger: multislogger.New().Logger,
+					slogger: multislogger.NewNopLogger(),
 					baseDir: testBaseDir,
 					lock:    newLibraryLock(),
 				}
@@ -538,11 +679,11 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect
@@ -578,11 +719,11 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, autoupdate.CheckExecutable(context.TODO(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm we don't have any invalid versions
@@ -593,56 +734,4 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 	require.Equal(t, olderVersion, validVersions[0], "not sorted")
 	require.Equal(t, middleVersion, validVersions[1], "not sorted")
 	require.Equal(t, newerVersion, validVersions[2], "not sorted")
-}
-
-func Test_versionFromTarget(t *testing.T) {
-	t.Parallel()
-
-	testVersions := []struct {
-		target          string
-		binary          autoupdatableBinary
-		operatingSystem string
-		version         string
-	}{
-		{
-			target:          "launcher/darwin/launcher-0.10.1.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "darwin",
-			version:         "0.10.1",
-		},
-		{
-			target:          "launcher/windows/launcher-1.13.5.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "windows",
-			version:         "1.13.5",
-		},
-		{
-			target:          "launcher/linux/launcher-0.13.5-40-gefdc582.tar.gz",
-			binary:          binaryLauncher,
-			operatingSystem: "linux",
-			version:         "0.13.5-40-gefdc582",
-		},
-		{
-			target:          "osqueryd/darwin/osqueryd-5.8.1.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "darwin",
-			version:         "5.8.1",
-		},
-		{
-			target:          "osqueryd/windows/osqueryd-0.8.1.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "windows",
-			version:         "0.8.1",
-		},
-		{
-			target:          "osqueryd/linux/osqueryd-5.8.2.tar.gz",
-			binary:          binaryOsqueryd,
-			operatingSystem: "linux",
-			version:         "5.8.2",
-		},
-	}
-
-	for _, testVersion := range testVersions {
-		require.Equal(t, testVersion.version, versionFromTarget(testVersion.binary, filepath.Base(testVersion.target)))
-	}
 }

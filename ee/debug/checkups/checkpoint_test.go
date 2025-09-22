@@ -2,12 +2,14 @@ package checkups
 
 import (
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,11 +31,19 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Autoupdate").Return(true).Maybe()
 	mockKnapsack.On("LatestOsquerydPath").Return("").Maybe()
 	mockKnapsack.On("ServerProvidedDataStore").Return(nil).Maybe()
-	checkupLogger := NewCheckupLogger(multislogger.New().Logger, mockKnapsack)
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil).Maybe()
+	mockKnapsack.On("LauncherHistoryStore").Return(nil).Maybe()
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	checkupLogger := NewCheckupLogger(slogger, mockKnapsack)
 	mockKnapsack.AssertExpectations(t)
 
 	// Start and then interrupt
 	go checkupLogger.Run()
+	time.Sleep(3 * time.Second)
+	interruptStart := time.Now()
 	checkupLogger.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
@@ -57,7 +67,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 			receivedInterrupts += 1
 			continue
 		case <-time.After(5 * time.Second):
-			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- received %d interrupts before timeout", receivedInterrupts)
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBytes.String())
 			t.FailNow()
 		}
 	}

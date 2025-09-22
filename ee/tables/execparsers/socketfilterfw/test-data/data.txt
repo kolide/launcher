@@ -1,0 +1,7 @@
+Firewall is enabled. (State = 2)
+Firewall has block all state set to disabled.
+Automatically allow built-in signed software ENABLED.
+Automatically allow downloaded signed software ENABLED.
+Stealth mode enabled
+Log mode is on 
+Log Option is throttled 

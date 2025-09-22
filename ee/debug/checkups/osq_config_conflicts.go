@@ -62,13 +62,13 @@ func (occ *osqConfigConflictCheckup) Run(ctx context.Context, extraFH io.Writer)
 	}
 
 	if dirNotEmpty {
-		occ.status = Failing
+		occ.status = Warning
 		occ.summary = "At least one notable directory is present and non-empty"
 	} else if dirHasError {
 		occ.status = Erroring
 		occ.summary = "At least one notable directory is present and could not be read"
 	} else if dirExists {
-		occ.status = Warning
+		occ.status = Informational
 		occ.summary = "At least one notable directory is present, but empty"
 	} else {
 		occ.status = Passing

@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/kolide/launcher/ee/gowrapper"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -33,19 +35,23 @@ type (
 )
 
 const (
-	interruptTimeout     = 5 * time.Second // How long for all actors to return from their `interrupt` function
-	executeReturnTimeout = 5 * time.Second // After interrupted, how long for all actors to exit their `execute` functions
+	InterruptTimeout     = 10 * time.Second // How long for all actors to return from their `interrupt` function
+	executeReturnTimeout = 5 * time.Second  // After interrupted, how long for all actors to exit their `execute` functions
 )
 
-func NewRunGroup(slogger *slog.Logger) *Group {
+func NewRunGroup() *Group {
 	return &Group{
-		slogger: slogger.With("component", "run_group"),
+		slogger: multislogger.NewNopLogger(),
 		actors:  make([]rungroupActor, 0),
 	}
 }
 
 func (g *Group) Add(name string, execute func() error, interrupt func(error)) {
 	g.actors = append(g.actors, rungroupActor{name, execute, interrupt})
+}
+
+func (g *Group) SetSlogger(slogger *slog.Logger) {
+	g.slogger = slogger.With("component", "run_group")
 }
 
 func (g *Group) Run() error {
@@ -59,27 +65,41 @@ func (g *Group) Run() error {
 		"actor_count", len(g.actors),
 	)
 
-	errors := make(chan actorError, len(g.actors))
+	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
-		go func(a rungroupActor) {
+		a := a
+		gowrapper.GoWithRecoveryAction(context.TODO(), g.slogger, func() {
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"starting actor",
 				"actor", a.name,
 			)
 			err := a.execute()
-			errors <- actorError{
+			actorErrors <- actorError{
 				errorSourceName: a.name,
 				err:             err,
 			}
-		}(a)
+		}, func(r any) {
+			g.slogger.Log(context.TODO(), slog.LevelInfo,
+				"shutting down after actor panic",
+				"actor", a.name,
+			)
+
+			// Since execute panicked, the actor error won't get sent to our channel below --
+			// add it now.
+			actorErrors <- actorError{
+				errorSourceName: a.name,
+				err:             fmt.Errorf("executing rungroup actor %s panicked: %+v", a.name, r),
+			}
+		})
 	}
 
 	// Wait for the first actor to stop.
-	initialActorErr := <-errors
+	initialActorErr := <-actorErrors
 
 	g.slogger.Log(context.TODO(), slog.LevelInfo,
 		"received interrupt error from first actor -- shutting down other actors",
-		"err", initialActorErr,
+		"err", initialActorErr.err,
+		"error_source", initialActorErr.errorSourceName,
 	)
 
 	defer g.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -93,7 +113,7 @@ func (g *Group) Run() error {
 	interruptWait := semaphore.NewWeighted(numActors)
 	for _, a := range g.actors {
 		interruptWait.Acquire(context.Background(), 1)
-		go func(a rungroupActor) {
+		gowrapper.Go(context.TODO(), g.slogger, func() {
 			defer interruptWait.Release(1)
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"interrupting actor",
@@ -104,10 +124,10 @@ func (g *Group) Run() error {
 				"interrupt complete",
 				"actor", a.name,
 			)
-		}(a)
+		})
 	}
 
-	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), interruptTimeout)
+	interruptCtx, interruptCancel := context.WithTimeout(context.Background(), InterruptTimeout)
 	defer interruptCancel()
 
 	// Wait for interrupts to complete, but only until we hit our interruptCtx timeout
@@ -121,7 +141,7 @@ func (g *Group) Run() error {
 	// Wait for all other actors to stop, but only until we hit our executeReturnTimeout
 	timeoutTimer := time.NewTimer(executeReturnTimeout)
 	defer timeoutTimer.Stop()
-	for i := 1; i < cap(errors); i++ {
+	for i := 1; i < cap(actorErrors); i++ {
 		select {
 		case <-timeoutTimer.C:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -130,7 +150,7 @@ func (g *Group) Run() error {
 
 			// Return the original error so we can proceed with shutdown
 			return initialActorErr.err
-		case e := <-errors:
+		case e := <-actorErrors:
 			g.slogger.Log(context.TODO(), slog.LevelDebug,
 				"received error from actor",
 				"actor", e.errorSourceName,

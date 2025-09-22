@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +24,7 @@ func TestOpenRO_DatabaseExists(t *testing.T) {
 	require.NoError(t, s1.Close(), "closing database")
 
 	// Create RO-connection to database
-	s2, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s2, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s2.Close(), "closing database")
 }
@@ -32,7 +34,7 @@ func TestOpenRO_DatabaseDoesNotExist(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "no validation should be performed on RO connection")
 	require.NoFileExists(t, dbLocation(testRootDir), "database should not have been created")
 	require.NoError(t, s.Close(), "closing database")
@@ -66,6 +68,33 @@ func TestOpenRW_DatabaseIsCorrupt(t *testing.T) {
 	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected database to be deleted and re-created successfully when corrupt")
 	require.NoError(t, s.Close(), "closing test store")
+}
+
+func TestOpenRW_DatabaseIsDirty(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+
+	// Create the database
+	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error creating test store")
+
+	// Mark the migration as dirty
+	_, err = s.conn.Exec(fmt.Sprintf(`UPDATE %s SET dirty = 1;`, sqlite.DefaultMigrationsTable))
+	require.NoError(t, err, "marking migration as dirty")
+
+	// Close the connection
+	require.NoError(t, s.Close(), "expected no error closing test store")
+
+	// Open a new connection and expect that it succeeds, forcing the dirty migration
+	s2, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error opening test store with dirty migration")
+	require.NoError(t, s2.Close(), "expected no error closing test store")
+
+	// Open and close again successfully just to be sure
+	s3, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	require.NoError(t, err, "expected no error opening test store with dirty migration")
+	require.NoError(t, s3.Close(), "expected no error closing test store")
 }
 
 func TestOpenRW_InvalidTable(t *testing.T) {
@@ -172,7 +201,7 @@ func TestUpdate(t *testing.T) {
 				require.NoError(t, err, "expected no error on update")
 			}
 
-			rows, err := s.conn.Query(`SELECT name, value FROM startup_settings;`)
+			rows, err := s.conn.Query(`SELECT name, value FROM startup_settings;`) //nolint:rowserrcheck // Can't defer rows.Close() AND check rows.Err() in a way that's meaningful in a test
 			require.NoError(t, err, "querying kv pairs")
 			defer rows.Close()
 
@@ -199,7 +228,7 @@ func TestSetUpdate_RO(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 
 	require.Error(t, s.Set([]byte(keys.UpdateChannel.String()), []byte("beta")), "should not be able to perform set with RO connection")
@@ -233,4 +262,37 @@ func Test_Migrations(t *testing.T) {
 	srcErr, dbErr := m.Close()
 	require.NoError(t, srcErr, "source error closing migration")
 	require.NoError(t, dbErr, "database error closing migration")
+}
+
+func Test_MissingMigrations(t *testing.T) {
+	t.Parallel()
+
+	tempRootDir := t.TempDir()
+
+	conn, err := validatedDbConn(context.TODO(), tempRootDir)
+	require.NoError(t, err, "setting up db connection")
+	require.NoError(t, conn.Close(), "closing test db")
+
+	d, err := iofs.New(migrations, "migrations")
+	require.NoError(t, err, "loading migration files")
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, fmt.Sprintf("sqlite://%s?query", dbLocation(tempRootDir)))
+	require.NoError(t, err, "creating migrate instance")
+	require.NoError(t, m.Up(), "expected no error running all migrations")
+	currentVersion, dirty, err := m.Version()
+	require.NoError(t, err, "error looking for current version")
+	require.False(t, dirty, "did not expect dirty migration state")
+	missingMigrationVersion := int(currentVersion) + 1
+	forceVersionErr := m.Force(missingMigrationVersion)
+	require.NoError(t, forceVersionErr, "error forcing version")
+
+	srcErr, dbErr := m.Close()
+	require.NoError(t, srcErr, "source error closing migration")
+	require.NoError(t, dbErr, "database error closing migration")
+
+	// now re-open and re-attempt migrations, this will only work if we correctly ignore the missing
+	// migration file error
+	s, migrationError := OpenRW(context.TODO(), tempRootDir, StartupSettingsStore)
+	require.NoError(t, migrationError, "database error running missing migration")
+	require.NoError(t, s.Close(), "error closing sqliteStore conn")
 }

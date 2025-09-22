@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -21,20 +22,37 @@ import (
 //
 // It does this by calculating the body size, and applying a
 // ContentLength header. This triggers http.client to not chunk it.
-func forceNoChunkedEncoding(ctx context.Context, r *http.Request) context.Context {
-	r.TransferEncoding = []string{"identity"}
+func forceNoChunkedEncoding(slogger *slog.Logger) func(context.Context, *http.Request) context.Context {
+	return func(ctx context.Context, r *http.Request) context.Context {
+		r.TransferEncoding = []string{"identity"}
 
-	// read the body, set the content legth, and leave a new ReadCloser in Body
-	bodyBuf := &bytes.Buffer{}
-	bodyReadBytes, err := io.Copy(bodyBuf, r.Body)
-	if err != nil {
-		panic(err)
+		// read the body, set the content length, and leave a new ReadCloser in Body
+		bodyBuf := &bytes.Buffer{}
+
+		bodyReadBytes, err := io.Copy(bodyBuf, r.Body)
+		if err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"failed to copy request body for chunked encoding fix",
+				"err", err,
+			)
+		}
+
+		r.Body.Close()
+		r.ContentLength = bodyReadBytes
+		r.Body = io.NopCloser(bodyBuf)
+
+		return ctx
 	}
-	r.Body.Close()
-	r.ContentLength = bodyReadBytes
-	r.Body = io.NopCloser(bodyBuf)
+}
 
-	return ctx
+type ErrDeviceDisabled struct{}
+
+func (e ErrDeviceDisabled) Error() string {
+	return "device disabled"
+}
+
+type jsonRpcResponse struct {
+	DisableDevice bool `json:"disable_device"`
 }
 
 // New creates a new Kolide Client (implementation of the KolideService
@@ -70,7 +88,7 @@ func NewJSONRPCClient(
 	commonOpts := []jsonrpc.ClientOption{
 		jsonrpc.SetClient(httpClient),
 		jsonrpc.ClientBefore(
-			forceNoChunkedEncoding,
+			forceNoChunkedEncoding(k.Slogger()),
 		),
 	}
 

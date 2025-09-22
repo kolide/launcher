@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"hash/crc64"
 	"image/png"
+	"log/slog"
 	"os"
 
 	"strings"
 
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
 	"github.com/osquery/osquery-go/plugin/table"
@@ -24,26 +28,53 @@ type icon struct {
 	hash   uint64
 }
 
-func ProgramIcons() *table.Plugin {
+func ProgramIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 	columns := []table.ColumnDefinition{
 		table.TextColumn("name"),
 		table.TextColumn("version"),
 		table.TextColumn("icon"),
 		table.TextColumn("hash"),
 	}
-	return table.NewPlugin("kolide_program_icons", columns, generateProgramIcons)
+	return tablewrapper.New(flags, slogger, "kolide_program_icons", columns, generateProgramIcons)
+}
+
+func ProgramIconChecksums(flags types.Flags, slogger *slog.Logger) *table.Plugin {
+	columns := []table.ColumnDefinition{
+		table.TextColumn("name"),
+		table.TextColumn("version"),
+		table.TextColumn("hash"),
+	}
+	return tablewrapper.New(flags, slogger, "kolide_program_icon_checksums", columns, generateProgramIconChecksums)
 }
 
 func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icons")
+	defer span.End()
+
 	var results []map[string]string
 
-	results = append(results, generateUninstallerProgramIcons()...)
-	results = append(results, generateInstallersProgramIcons()...)
+	results = append(results, generateUninstallerProgramIcons(ctx, true)...)
+	results = append(results, generateInstallersProgramIcons(ctx, true)...)
 
 	return results, nil
 }
 
-func generateUninstallerProgramIcons() []map[string]string {
+func generateProgramIconChecksums(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
+	ctx, span := observability.StartSpan(ctx, "table_name", "kolide_program_icon_checksums")
+	defer span.End()
+
+	var results []map[string]string
+
+	results = append(results, generateUninstallerProgramIcons(ctx, false)...)
+	results = append(results, generateInstallersProgramIcons(ctx, false)...)
+
+	return results, nil
+}
+
+func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	var uninstallerIcons []map[string]string
 
 	uninstallRegPaths := map[registry.Key][]string{
@@ -54,38 +85,64 @@ func generateUninstallerProgramIcons() []map[string]string {
 
 	for key, paths := range uninstallRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.READ)
+			iconPath, name, version, err := getRegistryKeyDisplayData(ctx, key, path)
 			if err != nil {
 				continue
 			}
-			defer key.Close()
 
-			iconPath, _, err := key.GetStringValue("DisplayIcon")
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
 			if err != nil {
 				continue
 			}
-			icon, err := parseIcoFile(iconPath)
-			if err != nil {
-				continue
-			}
-			name, _, err := key.GetStringValue("DisplayName")
-			if err != nil {
-				continue
-			}
-			version, _, _ := key.GetStringValue("DisplayVersion")
 
-			uninstallerIcons = append(uninstallerIcons, map[string]string{
-				"icon":    icon.base64,
+			result := map[string]string{
 				"hash":    fmt.Sprintf("%x", icon.hash),
 				"name":    name,
 				"version": version,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			uninstallerIcons = append(uninstallerIcons, result)
 		}
 	}
 	return uninstallerIcons
 }
 
-func generateInstallersProgramIcons() []map[string]string {
+func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path string) (string, string, string, error) {
+	_, span := observability.StartSpan(ctx, "display_data_path", path)
+	defer span.End()
+
+	key, err := registry.OpenKey(key, path, registry.READ)
+	if err != nil {
+		return "", "", "", fmt.Errorf("opening key: %w", err)
+	}
+	defer key.Close()
+
+	iconPath, _, err := key.GetStringValue("DisplayIcon")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayIcon: %w", err)
+	}
+
+	name, _, err := key.GetStringValue("DisplayName")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayName: %w", err)
+	}
+
+	version, _, err := key.GetStringValue("DisplayVersion")
+	if err != nil {
+		return "", "", "", fmt.Errorf("getting DisplayVersion: %w", err)
+	}
+
+	return iconPath, name, version, nil
+}
+
+func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	var installerIcons []map[string]string
 
 	productRegPaths := map[registry.Key][]string{
@@ -95,62 +152,87 @@ func generateInstallersProgramIcons() []map[string]string {
 
 	for key, paths := range productRegPaths {
 		for _, path := range paths {
-			key, err := registry.OpenKey(key, path, registry.READ)
-			if err != nil {
-				continue
-			}
-			defer key.Close()
-
-			iconPath, _, err := key.GetStringValue("ProductIcon")
-			if err != nil {
-				continue
-			}
-			icon, err := parseIcoFile(iconPath)
-			if err != nil {
-				continue
-			}
-			name, _, _ := key.GetStringValue("ProductName")
+			iconPath, name, err := getRegistryKeyProductData(ctx, key, path)
 			if err != nil {
 				continue
 			}
 
-			installerIcons = append(installerIcons, map[string]string{
-				"icon": icon.base64,
+			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
+			if err != nil {
+				continue
+			}
+
+			result := map[string]string{
 				"hash": fmt.Sprintf("%x", icon.hash),
 				"name": name,
-			})
+			}
+
+			if includeIcon {
+				result["icon"] = icon.base64
+			}
+
+			installerIcons = append(installerIcons, result)
 		}
 	}
 
 	return installerIcons
 }
 
+func getRegistryKeyProductData(ctx context.Context, key registry.Key, path string) (string, string, error) {
+	_, span := observability.StartSpan(ctx, "product_data_path", path)
+	defer span.End()
+
+	key, err := registry.OpenKey(key, path, registry.READ)
+	if err != nil {
+		return "", "", fmt.Errorf("opening key: %w", err)
+	}
+	defer key.Close()
+
+	iconPath, _, err := key.GetStringValue("ProductIcon")
+	if err != nil {
+		return "", "", fmt.Errorf("getting ProductIcon: %w", err)
+	}
+
+	name, _, err := key.GetStringValue("ProductName")
+	if err != nil {
+		return "", "", fmt.Errorf("getting ProductName: %w", err)
+	}
+
+	return iconPath, name, nil
+}
+
 // parseIcoFile returns a base64 encoded version and a hash of the ico.
 //
 // This doesn't support extracting an icon from a exe. Windows stores some icon in
 // the exe like 'OneDriveSetup.exe,-101'
-func parseIcoFile(fullPath string) (icon, error) {
+func parseIcoFile(ctx context.Context, fullPath string, includeIcon bool) (icon, error) {
+	_, span := observability.StartSpan(ctx, "icon_path", fullPath)
+	defer span.End()
+
 	var programIcon icon
 	expandedPath, err := registry.ExpandString(fullPath)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("expanding path: %w", err)
 	}
 	icoReader, err := os.Open(expandedPath)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("opening path: %w", err)
 	}
+	defer icoReader.Close()
 	img, err := ico.Decode(icoReader)
 	if err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("decoding image: %w", err)
 	}
 	buf := new(bytes.Buffer)
 	img = resize.Resize(128, 128, img, resize.Bilinear)
 	if err := png.Encode(buf, img); err != nil {
-		return programIcon, err
+		return programIcon, fmt.Errorf("encoding image: %w", err)
 	}
-
 	checksum := crc64.Checksum(buf.Bytes(), crcTable)
-	return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	if includeIcon {
+		return icon{base64: base64.StdEncoding.EncodeToString(buf.Bytes()), hash: checksum}, nil
+	}
+	return icon{base64: "", hash: checksum}, nil
 }
 
 // expandRegistryKey takes a hive and path, and does a non-recursive glob expansion

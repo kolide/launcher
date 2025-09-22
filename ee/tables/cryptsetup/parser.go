@@ -61,7 +61,7 @@ var firstLineRegexp = regexp.MustCompile(`^(?:Device (.*) (not found))|(?:(.*?) 
 // examples)
 func parseFirstLine(line string) (map[string]interface{}, error) {
 	if line == "" {
-		return nil, fmt.Errorf("Invalid first line")
+		return nil, errors.New("Invalid first line")
 	}
 
 	m := firstLineRegexp.FindAllStringSubmatch(line, -1)

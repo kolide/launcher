@@ -10,8 +10,7 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type configRequest struct {
@@ -19,17 +18,11 @@ type configRequest struct {
 }
 
 type configResponse struct {
+	jsonRpcResponse
 	ConfigJSONBlob string `json:"config"`
 	NodeInvalid    bool   `json:"node_invalid"`
 	ErrorCode      string `json:"error_code,omitempty"`
 	Err            error  `json:"err,omitempty"`
-}
-
-func decodeGRPCConfigRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.AgentApiRequest)
-	return configRequest{
-		NodeKey: req.NodeKey,
-	}, nil
 }
 
 func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
@@ -42,30 +35,6 @@ func decodeJSONRPCConfigRequest(_ context.Context, msg json.RawMessage) (interfa
 		}
 	}
 	return req, nil
-}
-
-func encodeGRPCConfigRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(configRequest)
-	return &pb.AgentApiRequest{
-		NodeKey: req.NodeKey,
-	}, nil
-}
-
-func decodeGRPCConfigResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.ConfigResponse)
-	return configResponse{
-		ConfigJSONBlob: req.ConfigJsonBlob,
-		NodeInvalid:    req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCConfigResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(configResponse)
-	resp := &pb.ConfigResponse{
-		ConfigJsonBlob: req.ConfigJSONBlob,
-		NodeInvalid:    req.NodeInvalid,
-	}
-	return encodeResponse(resp, req.Err)
 }
 
 func encodeJSONRPCConfigResponse(_ context.Context, obj interface{}) (json.RawMessage, error) {
@@ -109,7 +78,7 @@ func MakeRequestConfigEndpoint(svc KolideService) endpoint.Endpoint {
 
 // RequestConfig implements KolideService.RequestConfig.
 func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
@@ -120,15 +89,12 @@ func (e Endpoints) RequestConfig(ctx context.Context, nodeKey string) (string, b
 		return "", false, err
 	}
 	resp := response.(configResponse)
-	return resp.ConfigJSONBlob, resp.NodeInvalid, resp.Err
-}
 
-func (s *grpcServer) RequestConfig(ctx context.Context, req *pb.AgentApiRequest) (*pb.ConfigResponse, error) {
-	_, rep, err := s.config.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
 	}
-	return rep.(*pb.ConfigResponse), nil
+
+	return resp.ConfigJSONBlob, resp.NodeInvalid, resp.Err
 }
 
 func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config string, reauth bool, err error) {
@@ -137,7 +103,7 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 
 		message := "success"
 		if err != nil {
-			message = "failure"
+			message = "failure requesting config"
 		}
 
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here

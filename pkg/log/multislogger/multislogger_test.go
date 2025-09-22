@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"log/slog"
 
@@ -46,10 +48,10 @@ func TestMultiSlogger(t *testing.T) {
 
 	// set shipper level to debug
 	shipperLogLevel.Set(slog.LevelDebug)
-	multislogger.Logger.DebugContext(context.TODO(), "debug_msg")
+	multislogger.Logger.DebugContext(context.TODO(), "debug_msg_2")
 
-	require.Contains(t, debugLogBuf.String(), "debug_msg", "should be in debug log since it's debug level")
-	require.Contains(t, shipperBuf.String(), "debug_msg", "should now be in shipper log since it's level was set to debug")
+	require.Contains(t, debugLogBuf.String(), "debug_msg_2", "should be in debug log since it's debug level")
+	require.Contains(t, shipperBuf.String(), "debug_msg_2", "should now be in shipper log since it's level was set to debug")
 	clearBufsFn()
 
 	// ensure that span_id gets added as an attribute when present in context
@@ -93,4 +95,48 @@ func jsonl(t *testing.T, reader io.Reader) []map[string]interface{} {
 	}
 
 	return result
+}
+
+func TestInterrupt_Multiple(t *testing.T) {
+	t.Parallel()
+
+	var logBuf bytes.Buffer
+	multislogger := New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	ctx := context.Background()
+	executeFunc := multislogger.ExecuteWithContext(ctx)
+
+	// Start and then interrupt
+	go executeFunc()
+	time.Sleep(100 * time.Millisecond) // Give it time to start
+	interruptStart := time.Now()
+	multislogger.Interrupt(errors.New("test error"))
+
+	// Confirm we can call Interrupt multiple times without blocking
+	interruptComplete := make(chan struct{})
+	expectedInterrupts := 3
+	for i := 0; i < expectedInterrupts; i += 1 {
+		go func() {
+			multislogger.Interrupt(nil)
+			interruptComplete <- struct{}{}
+		}()
+	}
+
+	receivedInterrupts := 0
+	for {
+		if receivedInterrupts >= expectedInterrupts {
+			break
+		}
+
+		select {
+		case <-interruptComplete:
+			receivedInterrupts += 1
+			continue
+		case <-time.After(5 * time.Second):
+			t.Errorf("could not call interrupt multiple times and return within 5 seconds -- interrupted at %s, received %d interrupts before timeout; logs: \n%s\n", interruptStart.String(), receivedInterrupts, logBuf.String())
+			t.FailNow()
+		}
+	}
+
+	require.Equal(t, expectedInterrupts, receivedInterrupts)
 }

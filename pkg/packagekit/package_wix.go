@@ -16,12 +16,11 @@ import (
 	"text/template"
 
 	"github.com/google/uuid"
+	"github.com/kolide/kit/version"
 	"github.com/kolide/launcher/pkg/packagekit/authenticode"
 	"github.com/kolide/launcher/pkg/packagekit/wix"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"go.opencensus.io/trace"
 )
 
 // We need to use variables to stub various parts of the wix
@@ -45,11 +44,15 @@ var assets embed.FS
 var signtoolVersionRegex = regexp.MustCompile(`^(.+)\/x64\/signtool\.exe$`)
 
 func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, includeService bool) error {
-	ctx, span := trace.StartSpan(ctx, "packagekit.PackageWixMSI")
-	defer span.End()
-
 	if err := isDirectory(po.Root); err != nil {
 		return err
+	}
+
+	// populate VersionNum if it isn't already set by the caller. we'll
+	// store this in the registry on install to give a comparable field
+	// for intune to drive upgrade behavior from
+	if po.VersionNum == 0 {
+		po.VersionNum = version.VersionNumFromSemver(po.Version)
 	}
 
 	// We include a random nonce as part of the ProductCode
@@ -72,13 +75,17 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 	}
 
 	var templateData = struct {
-		Opts        *PackageOptions
-		UpgradeCode string
-		ProductCode string
+		Opts            *PackageOptions
+		UpgradeCode     string
+		ProductCode     string
+		PermissionsGUID string
 	}{
 		Opts:        po,
 		UpgradeCode: generateMicrosoftProductCode("launcher" + po.Identifier),
 		ProductCode: generateMicrosoftProductCode("launcher"+po.Identifier, extraGuidIdentifiers...),
+		// our permissions component does not meet the criteria to have it's GUID automatically generated - but we should
+		// ensure it is unique for each build so we regenerate here alongside the product and upgrade codes
+		PermissionsGUID: generateMicrosoftProductCode("launcher_root_dir_permissions"+po.Identifier, extraGuidIdentifiers...),
 	}
 
 	wixTemplate, err := template.New("WixTemplate").Parse(string(wixTemplateBytes))
@@ -175,7 +182,7 @@ func PackageWixMSI(ctx context.Context, w io.Writer, po *PackageOptions, include
 		return fmt.Errorf("copying output: %w", err)
 	}
 
-	setInContext(ctx, ContextLauncherVersionKey, po.Version)
+	SetInContext(ctx, ContextLauncherVersionKey, po.Version)
 
 	return nil
 }

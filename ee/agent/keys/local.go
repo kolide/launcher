@@ -11,10 +11,13 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
-// This duplicates some of pkg/osquery/extension.go but that feels like the wrong place.
-// Really, we should have a simpler interface over a storage layer.
 const (
 	localKey = "localEccKey"
+
+	// These reference rsa keys used in the first iteration of local server comms
+	xPublicKeyKey_DeleteMe      = "publicKey"
+	xKeyFingerprintKey_DeleteMe = "keyFingerprint"
+	privateKeyKey_DeleteMe      = "privateKey"
 )
 
 // dbKey is keyInt over a key stored in the agent database. Its used in places where we don't want, or don't have, the hardware key.
@@ -26,7 +29,7 @@ func (k dbKey) Type() string {
 	return "local"
 }
 
-func SetupLocalDbKey(slogger *slog.Logger, store types.GetterSetter) (*dbKey, error) {
+func SetupLocalDbKey(slogger *slog.Logger, store types.GetterSetterDeleter) (*dbKey, error) {
 	if key, err := fetchKey(store); key != nil && err == nil {
 		slogger.Log(context.TODO(), slog.LevelInfo,
 			"found local key in database",
@@ -52,6 +55,17 @@ func SetupLocalDbKey(slogger *slog.Logger, store types.GetterSetter) (*dbKey, er
 	// Store the key in the database.
 	if err := storeKey(store, key); err != nil {
 		return nil, fmt.Errorf("storing new key: %w", err)
+	}
+
+	// delete unused keys
+	for _, storeKey := range []string{xPublicKeyKey_DeleteMe, xKeyFingerprintKey_DeleteMe, privateKeyKey_DeleteMe} {
+		if err := store.Delete([]byte(storeKey)); err != nil {
+			slogger.Log(context.TODO(), slog.LevelError,
+				"failed to delete old key",
+				"err", err,
+				"key", storeKey,
+			)
+		}
 	}
 
 	return &dbKey{key}, nil

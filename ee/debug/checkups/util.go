@@ -52,18 +52,20 @@ type fileInfo struct {
 
 // addFileToZip takes a file path, and a zip writer, and adds the file and some metadata.
 func addFileToZip(z *zip.Writer, location string) error {
+	// Create metadata file first, keeping existing pattern
 	metaout, err := z.Create(filepath.Join(".", location+".flaremeta"))
 	if err != nil {
 		return fmt.Errorf("creating %s in zip: %w", location+".flaremeta", err)
 	}
 
-	// Not totally clear if we should use Lstat or Stat here.
+	// Get file info
 	fi, err := os.Stat(location)
 	if os.IsNotExist(err) || os.IsPermission(err) {
 		fmt.Fprintf(metaout, `{ "error stating file": "%s" }`, err)
 		return nil
 	}
 
+	// Marshal metadata
 	b, err := json.Marshal(fileInfo{
 		Name:    fi.Name(),
 		Size:    fi.Size(),
@@ -80,9 +82,11 @@ func addFileToZip(z *zip.Writer, location string) error {
 	if err := json.Indent(&buf, b, "", "  "); err != nil {
 		// Structural error. Abort
 		return fmt.Errorf("indenting json: %w", err)
-
 	}
-	metaout.Write(buf.Bytes())
+
+	if _, err := metaout.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("writing metadata: %w", err)
+	}
 
 	//
 	// Done with metadata, and we know the file exists, and that we have permission to it.
@@ -95,13 +99,65 @@ func addFileToZip(z *zip.Writer, location string) error {
 	}
 	defer fh.Close()
 
-	dataout, err := z.Create(filepath.Join(".", location))
+	// Create zip header with metadata
+	header, err := zip.FileInfoHeader(fi)
+	if err != nil {
+		return fmt.Errorf("creating file header: %w", err)
+	}
+	header.Name = filepath.Join(".", location)
+
+	// Create file in zip with metadata
+	dataout, err := z.CreateHeader(header)
 	if err != nil {
 		return fmt.Errorf("creating %s in zip: %w", location, err)
 	}
 
 	if _, err := io.Copy(dataout, fh); err != nil {
 		return fmt.Errorf("copy data into zip file %s: %w", location, err)
+	}
+
+	return nil
+}
+
+func addStreamToZip(z *zip.Writer, name string, modTime time.Time, reader io.Reader) error {
+	// Create metadata file first
+	metaout, err := z.Create(name + ".flaremeta")
+	if err != nil {
+		return fmt.Errorf("creating %s in zip: %w", name+".flaremeta", err)
+	}
+
+	// Marshal metadata
+	b, err := json.Marshal(fileInfo{
+		Name:    filepath.Base(name),
+		ModTime: modTime,
+	})
+	if err != nil {
+		return fmt.Errorf("marshalling json: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, b, "", "  "); err != nil {
+		return fmt.Errorf("indenting json: %w", err)
+	}
+
+	if _, err := metaout.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("writing metadata: %w", err)
+	}
+
+	// Create the main file in zip
+	header := &zip.FileHeader{
+		Name:     name,
+		Method:   zip.Deflate,
+		Modified: modTime,
+	}
+
+	out, err := z.CreateHeader(header)
+	if err != nil {
+		return fmt.Errorf("creating %s in zip: %w", name, err)
+	}
+
+	if _, err := io.Copy(out, reader); err != nil {
+		return fmt.Errorf("copying data to zip: %w", err)
 	}
 
 	return nil

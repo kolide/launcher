@@ -22,7 +22,7 @@ type authedClient struct {
 
 // New returns a new authed client that will add the provided auth token as an
 // Authorization header to each request.
-func New(authToken string, timeout time.Duration) authedClient {
+func New(authToken string, timeout time.Duration) *authedClient {
 	transport := &transport{
 		authToken: authToken,
 	}
@@ -34,5 +34,5 @@ func New(authToken string, timeout time.Duration) authedClient {
 		},
 	}
 
-	return client
+	return &client
 }

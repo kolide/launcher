@@ -14,7 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v4/host"
 )
 
 type (
@@ -39,6 +39,7 @@ func (hc *hostInfoCheckup) Run(ctx context.Context, extraFH io.Writer) error {
 	hc.data["bbolt_db_size"] = hc.bboltDbSize()
 	desktopProcesses := runner.InstanceDesktopProcessRecords()
 	hc.data["user_desktop_processes"] = desktopProcesses
+	hc.data["enrollment_status"] = naIfError(hc.k.CurrentEnrollmentStatus())
 
 	uptimeRaw, err := host.Uptime()
 	if err != nil {

@@ -84,7 +84,7 @@ func TestFloat64FlagValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			d := NewFloat64FlagValue(multislogger.New().Logger, keys.ControlRequestInterval, tt.options...)
+			d := NewFloat64FlagValue(multislogger.NewNopLogger(), keys.ControlRequestInterval, tt.options...)
 			require.NotNil(t, d)
 
 			val := d.get(tt.controlServerValue)

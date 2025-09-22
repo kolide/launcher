@@ -1,6 +1,7 @@
 package launcher_db
 
 import (
+	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -63,7 +64,7 @@ func Test_generateLauncherDbTable(t *testing.T) {
 			t.Parallel()
 
 			store := setupStorage(t, tt.data)
-			kvps, err := dbKeyValueRows(storage.ServerProvidedDataStore.String(), store)
+			kvps, err := dbKeyValueRows(context.TODO(), storage.ServerProvidedDataStore.String(), store)
 			require.NoError(t, err)
 
 			assert.ElementsMatch(t, tt.want, kvps)

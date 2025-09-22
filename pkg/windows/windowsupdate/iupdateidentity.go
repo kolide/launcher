@@ -23,11 +23,11 @@ func toIUpdateIdentity(updateIdentityDisp *ole.IDispatch) (*IUpdateIdentity, err
 	}
 
 	if iUpdateIdentity.RevisionNumber, err = oleconv.ToInt32Err(oleutil.GetProperty(updateIdentityDisp, "RevisionNumber")); err != nil {
-		return nil, fmt.Errorf("RevisionNumber: %w", err)
+		return nil, fmt.Errorf("getting property RevisionNumber as int32: %w", err)
 	}
 
 	if iUpdateIdentity.UpdateID, err = oleconv.ToStringErr(oleutil.GetProperty(updateIdentityDisp, "UpdateID")); err != nil {
-		return nil, fmt.Errorf("UpdateID: %w", err)
+		return nil, fmt.Errorf("getting property UpdateID as string: %w", err)
 	}
 
 	return iUpdateIdentity, nil

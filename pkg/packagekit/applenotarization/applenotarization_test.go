@@ -57,9 +57,11 @@ func TestSubmit(t *testing.T) {
 	t.Parallel()
 	ctx := context.TODO()
 
-	tmpZipFile, err := os.CreateTemp("", "fake-for-submission.*.zip")
+	tmpZipFile, err := os.CreateTemp(t.TempDir(), "fake-for-submission.*.zip")
 	require.NoError(t, err)
-	defer os.Remove(tmpZipFile.Name())
+	t.Cleanup(func() {
+		tmpZipFile.Close()
+	})
 
 	var tests = []struct {
 		fakeFile     string
@@ -81,5 +83,4 @@ func TestSubmit(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tt.expectedUuid, returnedUuid, "Using fake data in %s", tt.fakeFile)
 	}
-
 }

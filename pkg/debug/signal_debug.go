@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
 const debugSignal = syscall.SIGUSR1
@@ -18,7 +20,7 @@ const debugSignal = syscall.SIGUSR1
 func AttachDebugHandler(addrPath string, slogger *slog.Logger) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, debugSignal)
-	go func() {
+	gowrapper.Go(context.TODO(), slogger, func() {
 		for {
 			// Start server on first signal
 			<-sig
@@ -45,5 +47,6 @@ func AttachDebugHandler(addrPath string, slogger *slog.Logger) {
 				"shutdown debug server",
 			)
 		}
-	}()
+	})
+
 }

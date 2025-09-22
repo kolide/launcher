@@ -35,3 +35,6 @@ scratch.*
 /debug
 
 go.work*
+
+# tuf root.json files
+ee/tuf/assets/tuf/root.json

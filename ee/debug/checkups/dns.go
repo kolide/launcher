@@ -2,6 +2,7 @@ package checkups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -96,7 +97,7 @@ func (dc *dnsCheckup) resolveHost(ctx context.Context, host string) (string, err
 	}
 
 	if len(ips) == 0 {
-		return "", fmt.Errorf("host was valid but did not resolve")
+		return "", errors.New("host was valid but did not resolve")
 	}
 
 	return strings.Join(ips, ","), nil

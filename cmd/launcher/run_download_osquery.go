@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/kolide/kit/fsutil"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/packaging"
 )
 
 // runDownloadOsquery downloads the stable osquery to the provided path. It's meant for use in out CI pipeline.
-func runDownloadOsquery(args []string) error {
+func runDownloadOsquery(_ *multislogger.MultiSlogger, args []string) error {
 	fs := flag.NewFlagSet("launcher download-osquery", flag.ExitOnError)
 
 	var (
@@ -32,6 +33,10 @@ func runDownloadOsquery(args []string) error {
 	target := packaging.Target{}
 	if err := target.PlatformFromString(runtime.GOOS); err != nil {
 		return fmt.Errorf("error parsing platform: %w, %s", err, runtime.GOOS)
+	}
+	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
+	if runtime.GOOS == "darwin" {
+		target.Arch = packaging.Universal
 	}
 
 	// We're reusing packaging code, which is based around having a persistent cache directory. It's not quite what

@@ -1,8 +1,10 @@
 package menu
 
 import (
+	"context"
 	"sync"
 
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/systray"
 )
 
@@ -21,7 +23,7 @@ var (
 func (m *menu) Init() {
 	// Build will be invoked after the menu has been initialized
 	// Before the menu exits, cleanup the goroutines
-	systray.Run(m.Build, m.cleanup, m.onAppearanceChanged)
+	systray.Run(m.Build, m.cleanup, m.onAppearanceChanged, m.urlInput)
 }
 
 // onAppearanceChanged is called by systray when the menu bar's effective appearance changes between dark and light
@@ -39,6 +41,11 @@ func (m *menu) Build() {
 	// Lock so the menu is never being modified by more than one goroutine at a time
 	buildMutex.Lock()
 	defer buildMutex.Unlock()
+
+	if !systray.IsReady() {
+		// if we never started the menu, don't do anything
+		return
+	}
 
 	// Remove all menu items each time we rebuild the menu
 	systray.ResetMenu()
@@ -115,7 +122,7 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 	done := make(chan struct{})
 	doneChans = append(doneChans, done)
 
-	go func() {
+	gowrapper.Go(context.TODO(), m.slogger, func() {
 		for {
 			select {
 			case <-item.ClickedCh:
@@ -126,5 +133,5 @@ func (m *menu) makeActionHandler(item *systray.MenuItem, ap ActionPerformer) {
 				return
 			}
 		}
-	}()
+	})
 }

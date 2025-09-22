@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type enrollSecretCheckup struct {
+	k       types.Knapsack
 	summary string
 	status  Status
 }
@@ -24,9 +26,26 @@ func (c *enrollSecretCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	secretStatus := make(map[string]Status, 0)
 	secretSummary := make(map[string]string, 0)
 
-	for _, secretPath := range getSecretPaths() {
-		// Later on, we want to fall back to the _first_ secrets status. Set it here
+	// Check registrations first -- will only be available if we're running in situ
+	if registrations, err := c.k.Registrations(); err == nil {
+		if len(registrations) == 0 {
+			fmt.Fprint(extraFH, "no registrations found in knapsack")
+		} else {
+			for i, registration := range registrations {
+				if registration.Munemo != "" {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): %s\n", i, registration.RegistrationID, registration.Munemo)
+				} else {
+					fmt.Fprintf(extraFH, "registration store (%d/%s): no munemo set\n", i, registration.RegistrationID)
+				}
 
+			}
+		}
+
+		fmt.Fprintf(extraFH, "\n\n")
+	}
+
+	for _, secretPath := range c.getSecretPaths() {
+		// Later on, we want to fall back to the _first_ secret's status. Set it here
 		st, summary := parseSecret(extraFH, secretPath)
 		secretStatus[secretPath] = st
 		secretSummary[secretPath] = summary
@@ -74,19 +93,21 @@ func (c *enrollSecretCheckup) Data() any {
 	return nil
 }
 
-// getSecretPaths returns potential platform default secret path. It should probably get folded into flags, but I'm not
-// quite sure how yet.
-func getSecretPaths() []string {
-	switch runtime.GOOS {
-	case "darwin":
-		return []string{"/etc/kolide-k2/secret"}
-	case "linux":
-		return []string{"/etc/kolide-k2/secret"}
-	case "windows":
-		return []string{"C:\\Program Files\\Kolide\\Launcher-kolide-k2\\conf\\secret"}
+// getSecretPaths returns the secret path configured via flags, if available; and the default
+// secret path, if available and different from the configured path.
+func (c *enrollSecretCheckup) getSecretPaths() []string {
+	enrollSecretPaths := make([]string, 0)
+
+	if c.k.EnrollSecretPath() != "" {
+		enrollSecretPaths = append(enrollSecretPaths, c.k.EnrollSecretPath())
 	}
 
-	return nil
+	defaultPath := launcher.DefaultPath(launcher.SecretFile)
+	if defaultPath != "" && c.k.EnrollSecretPath() != defaultPath {
+		enrollSecretPaths = append(enrollSecretPaths, defaultPath)
+	}
+
+	return enrollSecretPaths
 }
 
 func parseSecret(extraFH io.Writer, secretPath string) (Status, string) {

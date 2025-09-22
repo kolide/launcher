@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -18,13 +19,16 @@ import (
 	"github.com/kolide/launcher/ee/desktop/user/menu"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	userserver "github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/desktop/user/universallink"
+	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/authedclient"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/kolide/systray"
 	"github.com/peterbourgon/ff/v3"
 )
 
-func runDesktop(args []string) error {
+func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 	var (
 		flagset    = flag.NewFlagSet("kolide desktop", flag.ExitOnError)
 		flhostname = flagset.String(
@@ -66,6 +70,11 @@ func runDesktop(args []string) error {
 			"icon_path",
 			"",
 			"path to icon file",
+		)
+		flDesktopEnabled = flagset.Bool(
+			"desktop_enabled",
+			false,
+			"if desktop already enabled, show desktop immediately",
 		)
 	)
 
@@ -109,17 +118,14 @@ func runDesktop(args []string) error {
 		)
 	}
 
-	runGroup := rungroup.NewRunGroup(slogger)
+	runGroup := rungroup.NewRunGroup()
+	runGroup.SetSlogger(slogger)
 
 	// listen for signals
 	runGroup.Add("desktopSignalListener", func() error {
 		listenSignals(slogger)
 		return nil
 	}, func(error) {})
-
-	// Set up notification sending and listening
-	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
-	runGroup.Add("desktopNotifier", notifier.Listen, notifier.Interrupt)
 
 	// monitor parent
 	runGroup.Add("desktopMonitorParentProcess", func() error {
@@ -128,12 +134,31 @@ func runDesktop(args []string) error {
 	}, func(error) {})
 
 	shutdownChan := make(chan struct{})
-	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, notifier)
-	if err != nil {
-		return err
+
+	// if desktop is not enabled, we will wait for a signal to show it
+	// on this channel
+	var showDesktopChan chan struct{}
+	if !*flDesktopEnabled {
+		showDesktopChan = make(chan struct{})
 	}
 
-	m := menu.New(slogger, *flhostname, *flmenupath)
+	// Set up notification sending and listening
+	notifier := notify.NewDesktopNotifier(slogger, *flIconPath)
+	runGroup.Add("desktopNotifier", notifier.Execute, notifier.Interrupt)
+
+	server, err := userserver.New(slogger, *flUserServerAuthToken, *flUserServerSocketPath, shutdownChan, showDesktopChan, notifier)
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelError,
+			"could not create user server",
+			"err", err,
+		)
+		return fmt.Errorf("creating server: %w", err)
+	}
+
+	universalLinkHandler, urlInput := universallink.NewUniversalLinkHandler(slogger)
+	runGroup.Add("universalLinkHandler", universalLinkHandler.Execute, universalLinkHandler.Interrupt)
+	// Pass through channel so that systray can alert the link handler when it receives a universal link request
+	m := menu.New(slogger, *flhostname, *flmenupath, urlInput)
 	refreshMenu := func() {
 		m.Build()
 	}
@@ -166,7 +191,7 @@ func runDesktop(args []string) error {
 	}, func(err error) {})
 
 	// run run group
-	go func() {
+	gowrapper.Go(context.TODO(), slogger, func() {
 		// have to run this in a goroutine because menu needs the main thread
 		if err := runGroup.Run(); err != nil {
 			slogger.Log(context.TODO(), slog.LevelError,
@@ -174,11 +199,19 @@ func runDesktop(args []string) error {
 				"err", err,
 			)
 		}
-	}()
+	})
 
+	// if desktop is not enabled at start up, wait for send on show desktop channel
+	if !*flDesktopEnabled {
+		<-showDesktopChan
+	}
+
+	// on darwin, if notifier.Listen() is called on a blocked main thread, it causes a crash,
+	// so we wait until the main thread is unblocked to call it before initializing the menu.
+	// this is noop for non-darwin
+	notifier.Listen()
 	// blocks until shutdown called
 	m.Init()
-
 	return nil
 }
 
@@ -195,14 +228,35 @@ func listenSignals(slogger *slog.Logger) {
 	)
 }
 
+type desktopClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func makeGetRequest(client desktopClient, requestUrl string, timeout time.Duration) (*http.Response, error) {
+	if timeout == 0 {
+		// Make sure we have a reasonable default value
+		timeout = 5 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	return client.Do(req)
+}
+
 func notifyRunnerServerMenuOpened(slogger *slog.Logger, rootServerUrl, authToken string) {
 	client := authedclient.New(authToken, 2*time.Second)
-	menuOpendUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
+	menuOpenedUrl := fmt.Sprintf("%s%s", rootServerUrl, runnerserver.MenuOpenedEndpoint)
 
 	for {
 		<-systray.SystrayMenuOpened
 
-		response, err := client.Get(menuOpendUrl)
+		response, err := makeGetRequest(client, menuOpenedUrl, client.Timeout)
 		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelError,
 				"sending menu opened request to root server",
@@ -231,13 +285,13 @@ func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAut
 	for ; true; <-ticker.C {
 		// check to to ensure that the ppid is still legit
 		if os.Getppid() < 2 {
-			slogger.Log(context.TODO(), slog.LevelDebug,
+			slogger.Log(context.TODO(), slog.LevelError,
 				"ppid is 0 or 1, exiting",
 			)
 			break
 		}
 
-		response, err := client.Get(runnerHealthUrl)
+		response, err := makeGetRequest(client, runnerHealthUrl, client.Timeout)
 		if response != nil {
 			// This is the secret sauce to reusing a single connection, you have to read the body in full
 			// before closing, otherwise a new connection is established each time.
@@ -259,7 +313,7 @@ func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAut
 
 		// retry
 		if errCount < maxErrCount {
-			slogger.Log(context.TODO(), slog.LevelDebug,
+			slogger.Log(context.TODO(), slog.LevelWarn,
 				"could not connect to parent, will retry",
 				"err", err,
 				"attempts", errCount,
@@ -270,7 +324,7 @@ func monitorParentProcess(slogger *slog.Logger, runnerServerUrl, runnerServerAut
 		}
 
 		// errCount >= maxErrCount, exit
-		slogger.Log(context.TODO(), slog.LevelDebug,
+		slogger.Log(context.TODO(), slog.LevelError,
 			"could not connect to parent, max attempts reached, exiting",
 			"err", err,
 			"attempts", errCount,

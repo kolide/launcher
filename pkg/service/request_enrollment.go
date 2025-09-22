@@ -10,8 +10,8 @@ import (
 	"github.com/go-kit/kit/transport/http/jsonrpc"
 	"github.com/kolide/kit/contexts/uuid"
 
-	pb "github.com/kolide/launcher/pkg/pb/launcher"
-	"github.com/kolide/launcher/pkg/traces"
+	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 type enrollmentRequest struct {
@@ -20,58 +20,14 @@ type enrollmentRequest struct {
 	EnrollmentDetails EnrollmentDetails
 }
 
-type EnrollmentDetails struct {
-	OSVersion                 string `json:"os_version"`
-	OSBuildID                 string `json:"os_build_id"`
-	OSPlatform                string `json:"os_platform"`
-	Hostname                  string `json:"hostname"`
-	HardwareVendor            string `json:"hardware_vendor"`
-	HardwareModel             string `json:"hardware_model"`
-	HardwareSerial            string `json:"hardware_serial"`
-	OsqueryVersion            string `json:"osquery_version"`
-	LauncherHardwareKey       string `json:"launcher_hardware_key"`
-	LauncherHardwareKeySource string `json:"launcher_hardware_key_source"`
-	LauncherLocalKey          string `json:"launcher_local_key"`
-	LauncherVersion           string `json:"launcher_version"`
-	OSName                    string `json:"os_name"`
-	OSPlatformLike            string `json:"os_platform_like"`
-	GOOS                      string `json:"goos"`
-	GOARCH                    string `json:"goarch"`
-	HardwareUUID              string `json:"hardware_uuid"`
-}
+type EnrollmentDetails = types.EnrollmentDetails
 
 type enrollmentResponse struct {
+	jsonRpcResponse
 	NodeKey     string `json:"node_key"`
 	NodeInvalid bool   `json:"node_invalid"`
 	ErrorCode   string `json:"error_code,omitempty"`
 	Err         error  `json:"err,omitempty"`
-}
-
-func decodeGRPCEnrollmentRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.EnrollmentRequest)
-	pbEnrollDetails := req.GetEnrollmentDetails()
-	var enrollDetails EnrollmentDetails
-	if pbEnrollDetails != nil {
-		enrollDetails = EnrollmentDetails{
-			OSVersion:       pbEnrollDetails.OsVersion,
-			OSBuildID:       pbEnrollDetails.OsBuild,
-			OSPlatform:      pbEnrollDetails.OsPlatform,
-			Hostname:        pbEnrollDetails.Hostname,
-			HardwareVendor:  pbEnrollDetails.HardwareVendor,
-			HardwareModel:   pbEnrollDetails.HardwareModel,
-			HardwareSerial:  pbEnrollDetails.HardwareSerial,
-			OsqueryVersion:  pbEnrollDetails.OsqueryVersion,
-			LauncherVersion: pbEnrollDetails.LauncherVersion,
-			OSName:          pbEnrollDetails.OsName,
-			OSPlatformLike:  pbEnrollDetails.OsPlatformLike,
-			HardwareUUID:    pbEnrollDetails.HardwareUuid,
-		}
-	}
-	return enrollmentRequest{
-		EnrollSecret:      req.EnrollSecret,
-		HostIdentifier:    req.HostIdentifier,
-		EnrollmentDetails: enrollDetails,
-	}, nil
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
@@ -113,45 +69,6 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.R
 	return encodeJSONResponse(b, nil)
 }
 
-func encodeGRPCEnrollmentRequest(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(enrollmentRequest)
-	enrollDetails := &pb.EnrollmentDetails{
-		OsVersion:       req.EnrollmentDetails.OSVersion,
-		OsBuild:         req.EnrollmentDetails.OSBuildID,
-		OsPlatform:      req.EnrollmentDetails.OSPlatform,
-		Hostname:        req.EnrollmentDetails.Hostname,
-		HardwareVendor:  req.EnrollmentDetails.HardwareVendor,
-		HardwareModel:   req.EnrollmentDetails.HardwareModel,
-		HardwareSerial:  req.EnrollmentDetails.HardwareSerial,
-		OsqueryVersion:  req.EnrollmentDetails.OsqueryVersion,
-		LauncherVersion: req.EnrollmentDetails.LauncherVersion,
-		OsName:          req.EnrollmentDetails.OSName,
-		OsPlatformLike:  req.EnrollmentDetails.OSPlatformLike,
-	}
-	return &pb.EnrollmentRequest{
-		EnrollSecret:      req.EnrollSecret,
-		HostIdentifier:    req.HostIdentifier,
-		EnrollmentDetails: enrollDetails,
-	}, nil
-}
-
-func decodeGRPCEnrollmentResponse(_ context.Context, grpcReq interface{}) (interface{}, error) {
-	req := grpcReq.(*pb.EnrollmentResponse)
-	return enrollmentResponse{
-		NodeKey:     req.NodeKey,
-		NodeInvalid: req.NodeInvalid,
-	}, nil
-}
-
-func encodeGRPCEnrollmentResponse(_ context.Context, request interface{}) (interface{}, error) {
-	req := request.(enrollmentResponse)
-	resp := &pb.EnrollmentResponse{
-		NodeKey:     req.NodeKey,
-		NodeInvalid: req.NodeInvalid,
-	}
-	return encodeResponse(resp, req.Err)
-}
-
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
@@ -169,7 +86,7 @@ const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
 func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	newCtx, cancel := context.WithTimeout(ctx, requestTimeout)
@@ -177,19 +94,17 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 
 	request := enrollmentRequest{EnrollSecret: enrollSecret, HostIdentifier: hostIdentifier, EnrollmentDetails: details}
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
+
 	if err != nil {
 		return "", false, err
 	}
 	resp := response.(enrollmentResponse)
-	return resp.NodeKey, resp.NodeInvalid, resp.Err
-}
 
-func (s *grpcServer) RequestEnrollment(ctx context.Context, req *pb.EnrollmentRequest) (*pb.EnrollmentResponse, error) {
-	_, rep, err := s.enrollment.ServeGRPC(ctx, req)
-	if err != nil {
-		return nil, err
+	if resp.DisableDevice {
+		return "", false, ErrDeviceDisabled{}
 	}
-	return rep.(*pb.EnrollmentResponse), nil
+
+	return resp.NodeKey, resp.NodeInvalid, resp.Err
 }
 
 func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, err error) {
@@ -198,7 +113,7 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 
 		message := "success"
 		if err != nil {
-			message = "failure"
+			message = "failure requesting enrollment"
 		}
 
 		keyvals := []interface{}{

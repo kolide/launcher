@@ -1,4 +1,4 @@
-package make
+package make //nolint:predeclared
 
 import (
 	"context"
@@ -140,8 +140,7 @@ func TestExecOut(t *testing.T) {
 
 }
 
-func TestGetVersion(t *testing.T) {
-	t.Parallel()
+func TestGetVersion(t *testing.T) { //nolint:paralleltest
 	var tests = []struct {
 		in  string
 		out string
@@ -190,14 +189,12 @@ func TestGetVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.in, func(t *testing.T) {
-			t.Parallel()
-
+		t.Run(tt.in, func(t *testing.T) { //nolint:paralleltest
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			ctx = context.WithValue(ctx, contextKeyEnv, []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})
-			os.Setenv("FAKE_GIT_DESCRIBE", tt.in)
+			t.Setenv("FAKE_GIT_DESCRIBE", tt.in)
 			ver, err := b.getVersion(ctx)
 			if tt.err == true {
 				require.Error(t, err, tt.in)
@@ -221,10 +218,10 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	}
 
 	if os.Getenv("GO_WANT_HELPER_PROCESS_FORCE_ERROR") == "1" {
-		os.Exit(1)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
-	defer os.Exit(0)
+	defer os.Exit(0) //nolint:forbidigo // Fine to use os.Exit in tests
 
 	args := os.Args
 	for len(args) > 0 {
@@ -236,7 +233,7 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 	}
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "No command\n")
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 
 	cmd, args := args[0], args[1:]
@@ -249,7 +246,7 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 		fmt.Println(iargs...)
 	case cmd == "exit":
 		n, _ := strconv.Atoi(args[0])
-		os.Exit(n)
+		os.Exit(n) //nolint:forbidigo // Fine to use os.Exit in tests
 	case cmd == "go" && args[0] == "mod" && args[1] == "download":
 		return
 	case cmd == "git" && args[0] == "describe":
@@ -257,6 +254,6 @@ func TestHelperProcess(t *testing.T) { //nolint:paralleltest
 		return
 	default:
 		fmt.Fprintf(os.Stderr, "Can't mock, unknown command(%q) args(%q) -- Fix TestHelperProcess", cmd, args)
-		os.Exit(2)
+		os.Exit(2) //nolint:forbidigo // Fine to use os.Exit in tests
 	}
 }

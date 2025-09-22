@@ -22,6 +22,10 @@ func dnfParse(reader io.Reader) (any, error) {
 		}
 
 		splitIndex := strings.LastIndex(fields[0], ".")
+		if splitIndex == -1 {
+			// We assume this means the line is malformed or doesn't contain a valid update.
+			continue
+		}
 
 		row := make(map[string]string)
 		row["package"] = strings.TrimSpace(fields[0][:splitIndex])

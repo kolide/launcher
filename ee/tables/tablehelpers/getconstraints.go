@@ -51,7 +51,7 @@ func WithAllowedValues(allowed []string) GetConstraintOpts {
 func GetConstraints(queryContext table.QueryContext, columnName string, opts ...GetConstraintOpts) []string {
 
 	co := &constraintOptions{
-		slogger: multislogger.New().Logger,
+		slogger: multislogger.NewNopLogger(),
 	}
 
 	for _, opt := range opts {

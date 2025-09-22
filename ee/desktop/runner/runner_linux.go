@@ -19,9 +19,9 @@ import (
 	"syscall"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/shirou/gopsutil/v3/net"
-	"github.com/shirou/gopsutil/v3/process"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/shirou/gopsutil/v4/net"
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 const (
@@ -33,7 +33,7 @@ const (
 var displayRegex = regexp.MustCompile(`^[a-z]*:\d+.?\d*$`)
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	ctx, span := traces.StartSpan(ctx, "uid", uid)
+	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
 	currentUser, err := user.Current()
@@ -42,7 +42,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 	}
 
 	runningUser, err := user.LookupId(uid)
-	if err != nil {
+	if err != nil || runningUser == nil {
 		return fmt.Errorf("looking up user with uid %s: %w", uid, err)
 	}
 
@@ -240,7 +240,7 @@ func (r *DesktopUsersProcessesRunner) displayFromDisplayServerProcess(ctx contex
 		}
 		uidMatch := false
 		for _, procUid := range uids {
-			if procUid == uid {
+			if procUid == uint32(uid) {
 				uidMatch = true
 				break
 			}
@@ -386,4 +386,9 @@ func getXdgRuntimeDir(uid string) string {
 
 func osversion() (string, error) {
 	return "", errors.New("not implemented")
+}
+
+// logIndicatesSystrayNeedsRestart is Windows-only functionality
+func logIndicatesSystrayNeedsRestart(_ string) bool {
+	return false
 }

@@ -3,6 +3,7 @@ package startupsettings
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -12,8 +13,8 @@ type startupSettingsReader struct {
 	kvStore types.GetterCloser
 }
 
-func OpenReader(ctx context.Context, rootDirectory string) (*startupSettingsReader, error) {
-	store, err := agentsqlite.OpenRO(ctx, rootDirectory, agentsqlite.StartupSettingsStore)
+func OpenReader(ctx context.Context, slogger *slog.Logger, rootDirectory string) (*startupSettingsReader, error) {
+	store, err := agentsqlite.OpenRO(ctx, slogger, rootDirectory, agentsqlite.StartupSettingsStore)
 	if err != nil {
 		return nil, fmt.Errorf("opening startup db in %s: %w", rootDirectory, err)
 	}

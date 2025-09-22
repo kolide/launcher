@@ -10,6 +10,8 @@ import (
 type Flags interface {
 	// Registers an observer to receive messages when the specified keys change.
 	RegisterChangeObserver(observer FlagsChangeObserver, flagKeys ...keys.FlagKey)
+	// Deregisters an existing observer
+	DeregisterChangeObserver(observer FlagsChangeObserver)
 
 	// KolideServerURL is the URL of the management server to connect to.
 	SetKolideServerURL(url string) error
@@ -88,6 +90,12 @@ type Flags interface {
 	SetControlRequestIntervalOverride(value time.Duration, duration time.Duration)
 	ControlRequestInterval() time.Duration
 
+	// AllowOverlyBroadDt4aAcceleration enables acceleration via /v3/dt4a localserver endpoint. It is a test flag
+	// for development use; it should ultimately be replaced by a call to a new /v3 endpoint that only
+	// performs acceleration.
+	SetAllowOverlyBroadDt4aAcceleration(enable bool) error
+	AllowOverlyBroadDt4aAcceleration() bool
+
 	// DisableControlTLS disables TLS transport with the control server.
 	SetDisableControlTLS(disabled bool) error
 	DisableControlTLS() bool
@@ -118,6 +126,12 @@ type Flags interface {
 	SetOsqueryVerbose(verbose bool) error
 	OsqueryVerbose() bool
 
+	// DistributedForwardingInterval indicates the rate at which we forward osquery distributed requests
+	// to the cloud
+	SetDistributedForwardingInterval(interval time.Duration) error
+	SetDistributedForwardingIntervalOverride(value time.Duration, duration time.Duration)
+	DistributedForwardingInterval() time.Duration
+
 	// WatchdogEnabled enables the osquery watchdog
 	SetWatchdogEnabled(enable bool) error
 	WatchdogEnabled() bool
@@ -138,12 +152,9 @@ type Flags interface {
 	// overriding Launcher defaults)
 	OsqueryFlags() []string
 
-	// Osquery TLS options
-	OsqueryTlsConfigEndpoint() string
-	OsqueryTlsEnrollEndpoint() string
-	OsqueryTlsLoggerEndpoint() string
-	OsqueryTlsDistributedReadEndpoint() string
-	OsqueryTlsDistributedWriteEndpoint() string
+	// Osquery Version is the version of osquery that is being used.
+	SetCurrentRunningOsqueryVersion(version string) error
+	CurrentRunningOsqueryVersion() string
 
 	// Autoupdate enables the autoupdate functionality.
 	SetAutoupdate(enabled bool) error
@@ -172,6 +183,14 @@ type Flags interface {
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
 	SetUpdateDirectory(directory string) error
 	UpdateDirectory() string
+
+	// PinnedLauncherVersion is the launcher version to lock the autoupdater to, rather than autoupdating via the update channel.
+	SetPinnedLauncherVersion(version string) error
+	PinnedLauncherVersion() string
+
+	// PinnedOsquerydVersion is the osqueryd version to lock the autoupdater to, rather than autoupdating via the update channel.
+	SetPinnedOsquerydVersion(version string) error
+	PinnedOsquerydVersion() string
 
 	// ExportTraces enables exporting our traces
 	SetExportTraces(enabled bool) error
@@ -214,4 +233,44 @@ type Flags interface {
 
 	// LocalDevelopmentPath points to a local build of launcher to use instead of the one selected from the autoupdate library
 	LocalDevelopmentPath() string
+
+	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
+	SetLauncherWatchdogEnabled(enabled bool) error
+	LauncherWatchdogEnabled() bool
+
+	// SystrayRestartEnabled controls whether launcher's desktop runner will restart systray on error
+	SetSystrayRestartEnabled(enabled bool) error
+	SystrayRestartEnabled() bool
+
+	// Identifier is the package build identifier used to namespace our paths and service names
+	Identifier() string
+
+	// TableGenerateTimeout is the maximum time a Kolide extension table is permitted to take
+	SetTableGenerateTimeout(interval time.Duration) error
+	TableGenerateTimeout() time.Duration
+
+	// UseCachedDataForScheduledQueries controls whether launcher uses cached data for scheduled queries.
+	// Currently, we do this only for the kolide_windows_updates table, since that table can time out when
+	// querying for fresh data.
+	SetUseCachedDataForScheduledQueries(enabled bool) error
+	UseCachedDataForScheduledQueries() bool
+
+	// CachedQueryResultsTTL indicates how long cached query results are valid.
+	SetCachedQueryResultsTTL(ttl time.Duration) error
+	CachedQueryResultsTTL() time.Duration
+
+	// ResetOnHardwareChangeEnabled controls whether launcher will reset its database on hardware change detected
+	SetResetOnHardwareChangeEnabled(enabled bool) error
+	ResetOnHardwareChangeEnabled() bool
+
+	AutoupdateDownloadSplay() time.Duration
+	SetAutoupdateDownloadSplay(val time.Duration) error
+
+	// PerformanceMonitoringEnabled controls whether launcher self-monitors for performance issues
+	SetPerformanceMonitoringEnabled(enabled bool) error
+	PerformanceMonitoringEnabled() bool
+
+	// DuplicateLogWindow is the time window for deduplicating duplicate log records
+	SetDuplicateLogWindow(duration time.Duration) error
+	DuplicateLogWindow() time.Duration
 }

@@ -7,7 +7,12 @@ import (
 	"os"
 
 	"github.com/kolide/launcher/ee/agent"
+	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
 	"github.com/kolide/launcher/ee/agent/types"
+)
+
+const (
+	resetReasonUninstallRequested = "remote uninstall requested"
 )
 
 // Uninstall just removes the enroll secret file and wipes the database.
@@ -23,25 +28,35 @@ func Uninstall(ctx context.Context, k types.Knapsack, exitOnCompletion bool) {
 		)
 	}
 
-	if err := agent.WipeDatabase(ctx, k); err != nil {
+	if err := agent.ResetDatabase(ctx, k, slogger, resetReasonUninstallRequested); err != nil {
 		slogger.Log(ctx, slog.LevelError,
-			"wiping database",
+			"resetting database",
 			"err", err,
 		)
+	}
+
+	backupDbPaths := agentbbolt.BackupLauncherDbLocations(k.RootDirectory())
+	for _, db := range backupDbPaths {
+		if err := os.Remove(db); err != nil {
+			slogger.Log(ctx, slog.LevelError,
+				"removing backup database",
+				"err", err,
+			)
+		}
 	}
 
 	if !exitOnCompletion {
 		return
 	}
 
-	if err := disableAutoStart(ctx); err != nil {
+	if err := disableAutoStart(ctx, k); err != nil {
 		k.Slogger().Log(ctx, slog.LevelError,
 			"disabling auto start",
 			"err", err,
 		)
 	}
 
-	os.Exit(0)
+	os.Exit(0) //nolint:forbidigo // Since we're disabling launcher, it is probably fine to call os.Exit here and skip a graceful shutdown
 }
 
 func removeEnrollSecretFile(knapsack types.Knapsack) error {

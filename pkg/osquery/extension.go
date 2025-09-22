@@ -1,49 +1,57 @@
 package osquery
 
 import (
-	"bytes"
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
-	"github.com/kolide/launcher/pkg/osquery/runtime/history"
 	"github.com/kolide/launcher/pkg/service"
-	"github.com/kolide/launcher/pkg/traces"
-	"github.com/mixer/clock"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/osquery/osquery-go/plugin/logger"
 	"github.com/pkg/errors"
 
-	"go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// settingsStoreWriter writes to our startup settings store
+type settingsStoreWriter interface {
+	WriteSettings() error
+}
 
 // Extension is the implementation of the osquery extension
 // methods. It acts as a communication intermediary between osquery
 // and servers -- It provides a grpc and jsonrpc interface for
 // osquery. It does not provide any tables.
 type Extension struct {
-	NodeKey       string
-	Opts          ExtensionOpts
-	knapsack      types.Knapsack
-	serviceClient service.KolideService
-	enrollMutex   sync.Mutex
-	done          chan struct{}
-	interrupted   bool
-	slogger       *slog.Logger
+	NodeKey                       string
+	Opts                          ExtensionOpts
+	registrationId                string
+	knapsack                      types.Knapsack
+	serviceClient                 service.KolideService
+	settingsWriter                settingsStoreWriter
+	enrollMutex                   *sync.Mutex
+	done                          chan struct{}
+	interrupted                   atomic.Bool
+	slogger                       *slog.Logger
+	logPublicationState           *logPublicationState
+	lastRequestQueriesTimestamp   *atomic.Int64
+	distributedForwardingInterval *atomic.Int64 // how frequently to forward RequestQueries requests to the cloud, in seconds
+	forwardAllDistributedUntil    *atomic.Int64 // allows for accelerated distributed requests until given timestamp
 }
 
 const (
@@ -53,12 +61,6 @@ const (
 	nodeKeyKey = "nodeKey"
 	// DB key for last retrieved config
 	configKey = "config"
-	// DB keys for the rsa keys
-	privateKeyKey = "privateKey"
-
-	// Old things to delete
-	xPublicKeyKey      = "publicKey"
-	xKeyFingerprintKey = "keyFingerprint"
 
 	// Default maximum number of bytes per batch (used if not specified in
 	// options). This 3MB limit is chosen based on the default grpc-go
@@ -71,6 +73,29 @@ const (
 	// Default maximum number of logs to buffer before purging oldest logs
 	// (applies per log type).
 	defaultMaxBufferedLogs = 500000
+
+	// How frequently osquery should check for distributed queries to run.
+	// We set this to 5 seconds, which is more frequent than we think the
+	// server can comfortably handle, so we only forward these requests
+	// to the cloud once every 60 seconds.
+	osqueryDistributedInterval = 5
+)
+
+var (
+	// Osquery configuration options that we set during the osquery instance's startup period.
+	// These are the override, non-standard values.
+	startupOsqueryConfigOptions = map[string]any{
+		"verbose":              true, // receive as many osquery logs as we can, in case we need to troubleshoot an issue
+		"distributed_interval": osqueryDistributedInterval,
+	}
+
+	// Osquery configuration options that we set after the osquery instance has been up and running
+	// for at least 10 minutes. These are the "normal" values. We continue to override the distributed
+	// interval to 5 seconds.
+	postStartupOsqueryConfigOptions = map[string]any{
+		"verbose":              false,
+		"distributed_interval": osqueryDistributedInterval,
+	}
 )
 
 // ExtensionOpts is options to be passed in NewExtension
@@ -81,10 +106,6 @@ type ExtensionOpts struct {
 	// LoggingInterval is the interval at which logs should be flushed to
 	// the server.
 	LoggingInterval time.Duration
-	// Clock is the clock that should be used for time based operations. By
-	// default it will be a normal realtime clock, but a mock clock can be
-	// passed with clock.NewMockClock() for testing purposes.
-	Clock clock.Clock
 	// MaxBufferedLogs is the maximum number of logs to buffer before
 	// purging oldest logs (applies per log type).
 	MaxBufferedLogs int
@@ -93,14 +114,20 @@ type ExtensionOpts struct {
 	RunDifferentialQueriesImmediately bool
 }
 
+type iterationTerminatedError struct{}
+
+func (e iterationTerminatedError) Error() string {
+	return "ceasing kv store iteration"
+}
+
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, k types.Knapsack, opts ExtensionOpts) (*Extension, error) {
-	_, span := traces.StartSpan(ctx)
+func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	slogger := k.Slogger().With("component", "osquery_extension")
+	slogger := k.Slogger().With("component", "osquery_extension", "registration_id", registrationId)
 
 	if opts.MaxBytesPerBatch == 0 {
 		opts.MaxBytesPerBatch = defaultMaxBytesPerBatch
@@ -110,25 +137,13 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		opts.LoggingInterval = defaultLoggingInterval
 	}
 
-	if opts.Clock == nil {
-		opts.Clock = clock.DefaultClock{}
-	}
-
 	if opts.MaxBufferedLogs == 0 {
 		opts.MaxBufferedLogs = defaultMaxBufferedLogs
 	}
 
 	configStore := k.ConfigStore()
 
-	if err := SetupLauncherKeys(configStore); err != nil {
-		return nil, fmt.Errorf("setting up initial launcher keys: %w", err)
-	}
-
-	if err := agent.SetupKeys(slogger, configStore); err != nil {
-		return nil, fmt.Errorf("setting up agent keys: %w", err)
-	}
-
-	nodekey, err := NodeKey(configStore)
+	nodekey, err := NodeKey(configStore, registrationId)
 	if err != nil {
 		slogger.Log(ctx, slog.LevelDebug,
 			"NewExtension got error reading nodekey. Ignoring",
@@ -145,19 +160,38 @@ func NewExtension(ctx context.Context, client service.KolideService, k types.Kna
 		)
 	}
 
-	return &Extension{
-		slogger:       slogger,
-		serviceClient: client,
-		knapsack:      k,
-		NodeKey:       nodekey,
-		Opts:          opts,
-		done:          make(chan struct{}),
-	}, nil
+	initialTimestamp := &atomic.Int64{}
+	initialTimestamp.Store(0)
+
+	distributedForwardingInterval := &atomic.Int64{}
+	distributedForwardingInterval.Store(int64(k.DistributedForwardingInterval().Seconds()))
+
+	forwardAllDistributedUntil := &atomic.Int64{}
+	forwardAllDistributedUntil.Store(time.Now().Unix() + 120) // forward all queries for the first 2 minutes after startup
+
+	e := &Extension{
+		slogger:                       slogger,
+		serviceClient:                 client,
+		settingsWriter:                settingsWriter,
+		registrationId:                registrationId,
+		knapsack:                      k,
+		NodeKey:                       nodekey,
+		Opts:                          opts,
+		enrollMutex:                   &sync.Mutex{},
+		done:                          make(chan struct{}),
+		logPublicationState:           NewLogPublicationState(opts.MaxBytesPerBatch),
+		lastRequestQueriesTimestamp:   initialTimestamp,
+		distributedForwardingInterval: distributedForwardingInterval,
+		forwardAllDistributedUntil:    forwardAllDistributedUntil,
+	}
+	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
+
+	return e, nil
 }
 
 func (e *Extension) Execute() error {
 	// Process logs until shutdown
-	ticker := e.Opts.Clock.NewTicker(e.Opts.LoggingInterval)
+	ticker := time.NewTicker(e.Opts.LoggingInterval)
 	defer ticker.Stop()
 	for {
 		e.writeAndPurgeLogs()
@@ -165,8 +199,11 @@ func (e *Extension) Execute() error {
 		// select to either exit or write another batch of logs
 		select {
 		case <-e.done:
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"osquery extension received shutdown request",
+			)
 			return nil
-		case <-ticker.Chan():
+		case <-ticker.C:
 			// Resume loop
 		}
 	}
@@ -176,114 +213,38 @@ func (e *Extension) Execute() error {
 // with this extension.
 func (e *Extension) Shutdown(_ error) {
 	// Only perform shutdown tasks on first call to interrupt -- no need to repeat on potential extra calls.
-	if e.interrupted {
+	if e.interrupted.Swap(true) {
 		return
 	}
-	e.interrupted = true
 
+	e.knapsack.DeregisterChangeObserver(e)
 	close(e.done)
+}
+
+// FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
+// that we care about, which is DistributedForwardingInterval.
+func (e *Extension) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
+	for _, flagKey := range flagKeys {
+		if flagKey == keys.DistributedForwardingInterval {
+			e.distributedForwardingInterval.Store(int64(e.knapsack.DistributedForwardingInterval().Seconds()))
+			// That's the only flag we care about -- we can break here
+			break
+		}
+	}
 }
 
 // getHostIdentifier returns the UUID identifier associated with this host. If
 // there is an existing identifier, that should be returned. If not, the
 // identifier should be randomly generated and persisted.
 func (e *Extension) getHostIdentifier() (string, error) {
-	return IdentifierFromDB(e.knapsack.ConfigStore())
-}
-
-// SetupLauncherKeys configures the various keys used for communication.
-//
-// There are 3 keys:
-// 1. The RSA key. This is stored in the launcher DB, and was the first key used by krypto. We are deprecating it.
-// 2. The hardware keys -- these are in the secure enclave (TPM or Apple's thing) These are used to identify the device
-// 3. The launcher install key -- this is an ECC key that is sometimes used in conjunction with (2)
-func SetupLauncherKeys(configStore types.KVStore) error {
-	// Soon-to-be-deprecated RSA keys
-	if err := ensureRsaKey(configStore); err != nil {
-		return fmt.Errorf("ensuring rsa key: %w", err)
-	}
-
-	// Remove things we don't keep in the bucket any more
-	for _, k := range []string{xPublicKeyKey, xKeyFingerprintKey} {
-		if err := configStore.Delete([]byte(k)); err != nil {
-			return fmt.Errorf("deleting %s: %w", k, err)
-		}
-	}
-
-	return nil
-}
-
-// ensureRsaKey will create an RSA key in the launcher DB if one does not already exist. This is the old key that krypto used. We are moving away from it.
-func ensureRsaKey(configStore types.GetterSetter) error {
-	// If it exists, we're good
-	_, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil
-	}
-
-	// Create a random key
-	key, err := rsaRandomKey()
-	if err != nil {
-		return fmt.Errorf("generating private key: %w", err)
-	}
-
-	keyDer, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return fmt.Errorf("marshalling private key: %w", err)
-	}
-
-	if err := configStore.Set([]byte(privateKeyKey), keyDer); err != nil {
-		return fmt.Errorf("storing private key: %w", err)
-	}
-
-	return nil
-}
-
-// PrivateRSAKeyFromDB returns the private launcher key. This is the old key used to authenticate various launcher communications.
-func PrivateRSAKeyFromDB(configStore types.Getter) (*rsa.PrivateKey, error) {
-	privateKey, err := configStore.Get([]byte(privateKeyKey))
-	if err != nil {
-		return nil, fmt.Errorf("error reading private key info from db: %w", err)
-	}
-
-	key, err := x509.ParsePKCS8PrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
-	}
-
-	rsakey, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("Private key is not an rsa key")
-	}
-
-	return rsakey, nil
-}
-
-// PublicRSAKeyFromDB returns the public portions of the launcher key. This is exposed in various launcher info structures.
-func PublicRSAKeyFromDB(configStore types.Getter) (string, string, error) {
-	privateKey, err := PrivateRSAKeyFromDB(configStore)
-	if err != nil {
-		return "", "", fmt.Errorf("reading private key: %w", err)
-	}
-
-	fingerprint, err := rsaFingerprint(privateKey)
-	if err != nil {
-		return "", "", fmt.Errorf("generating fingerprint: %w", err)
-	}
-
-	var publicKey bytes.Buffer
-	if err := RsaPrivateKeyToPem(privateKey, &publicKey); err != nil {
-		return "", "", fmt.Errorf("marshalling pub: %w", err)
-	}
-
-	return publicKey.String(), fingerprint, nil
+	return IdentifierFromDB(e.knapsack.ConfigStore(), e.registrationId)
 }
 
 // IdentifierFromDB returns the built-in launcher identifier from the config bucket.
 // The function is exported to allow for building the kolide_launcher_info table.
-func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
+func IdentifierFromDB(configStore types.GetterSetter, registrationId string) (string, error) {
 	var identifier string
-	uuidBytes, _ := configStore.Get([]byte(uuidKey))
+	uuidBytes, _ := configStore.Get(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	gotID, err := uuid.ParseBytes(uuidBytes)
 
 	// Use existing UUID
@@ -300,7 +261,7 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 	identifier = gotID.String()
 
 	// Save new UUID
-	err = configStore.Set([]byte(uuidKey), []byte(identifier))
+	err = configStore.Set(storage.KeyByIdentifier([]byte(uuidKey), storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(identifier))
 	if err != nil {
 		return "", fmt.Errorf("saving new UUID: %w", err)
 	}
@@ -309,8 +270,8 @@ func IdentifierFromDB(configStore types.GetterSetter) (string, error) {
 }
 
 // NodeKey returns the device node key from the storage layer
-func NodeKey(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(nodeKeyKey))
+func NodeKey(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -322,8 +283,8 @@ func NodeKey(getter types.Getter) (string, error) {
 }
 
 // Config returns the device config from the storage layer
-func Config(getter types.Getter) (string, error) {
-	key, err := getter.Get([]byte(configKey))
+func Config(getter types.Getter, registrationId string) (string, error) {
+	key, err := getter.Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting config key: %w", err)
 	}
@@ -343,11 +304,106 @@ func isNodeInvalidErr(err error) bool {
 	}
 }
 
+// addRegistration should be called after enrollment to store enrollment/registration details
+// in our persistent store under e.registrationId. We frequently use the munemo associated with
+// the registration (e.g. in checkups), so we parse the enrollment secret in order to extract
+// the munemo from the claims and store it as well.
+func (e *Extension) addRegistration(nodeKey string, enrollmentSecret string) error {
+	// Extract munemo from enrollment secret.
+	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("parsing enrollment secret: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("no claims in enrollment secret")
+	}
+	munemo, munemoFound := claims["organization"]
+	if !munemoFound {
+		return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+	}
+
+	if err := e.knapsack.SaveRegistration(e.registrationId, fmt.Sprintf("%s", munemo), nodeKey, enrollmentSecret); err != nil {
+		return fmt.Errorf("saving registration: %w", err)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully stored new registration",
+		"munemo", munemo,
+	)
+
+	return nil
+}
+
+// ensureNodeKeyStored saves the provided nodeKey under the registration associated with
+// e.registrationId. Since storing registrations in the store is newer functionality,
+// we may not actually have a stored registration yet -- this will happen if this launcher
+// install enrolled before we started storing registrations in the store. In this case,
+// we fetch the enrollment secret and call `e.addRegistration` instead. ensureNodeKeyStored
+// does handle the case where there is an existing registration and the node key changed,
+// but we don't expect this use case at the moment. (On re-enroll, the registration is deleted,
+// then re-added via addRegistration instead.)
+func (e *Extension) ensureNodeKeyStored(nodeKey string) error {
+	// Get the existing registration in order to update it with the new node key
+	registrationStore := e.knapsack.RegistrationStore()
+	existingRegistrationRaw, err := registrationStore.Get([]byte(e.registrationId))
+	if err != nil {
+		return fmt.Errorf("getting existing registration: %w", err)
+	}
+
+	// If the registration doesn't already exist (launcher probably enrolled before we started
+	// storing registrations in the store), add it instead
+	if existingRegistrationRaw == nil {
+		// Grab the enroll secret, since we need that to create a new registration
+		enrollSecret, err := e.knapsack.ReadEnrollSecret()
+		if err != nil {
+			e.slogger.Log(context.TODO(), slog.LevelWarn,
+				"unable to read enroll secret to add new registration",
+				"err", err,
+			)
+			// don't return an error here, there is nothing we can do. this is the
+			// result of a bad/manual installation (or uninstallation) and any errors
+			// returned here are reported
+			return nil
+		}
+		return e.addRegistration(nodeKey, enrollSecret)
+	}
+
+	// We have an existing registration -- unmarshal it so we can update it appropriately
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		return fmt.Errorf("unmarshalling existing registration: %w", err)
+	}
+
+	// Check to see if node key changed -- if not, no need to do anything here
+	if existingRegistration.NodeKey == nodeKey {
+		return nil
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		return fmt.Errorf("marshalling updated registration: %w", err)
+	}
+
+	if err := e.knapsack.RegistrationStore().Set([]byte(e.registrationId), updatedRegistrationRaw); err != nil {
+		return fmt.Errorf("updating registration: %w", err)
+	}
+
+	e.slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+	)
+	return nil
+}
+
 // Enroll will attempt to enroll the host using the provided enroll secret for
 // identification. If the host is already enrolled, the existing node key will
 // be returned. To force re-enrollment, use RequireReenroll.
 func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	e.slogger.Log(ctx, slog.LevelInfo,
@@ -367,13 +423,19 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"node key exists, skipping enrollment",
 		)
 		span.AddEvent("node_key_already_exists")
+		if err := e.ensureNodeKeyStored(e.NodeKey); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update registration",
+				"err", err,
+			)
+		}
 		return e.NodeKey, false, nil
 	}
 
 	// Look up a node key cached in the local store
-	key, err := NodeKey(e.knapsack.ConfigStore())
+	key, err := NodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if err != nil {
-		traces.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
+		observability.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
 		return "", false, fmt.Errorf("error reading node key from db: %w", err)
 	}
 
@@ -383,6 +445,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		)
 		span.AddEvent("found_stored_node_key")
 		e.NodeKey = key
+		if err := e.ensureNodeKeyStored(key); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"could not update registration",
+				"err", err,
+			)
+		}
 		return e.NodeKey, false, nil
 	}
 
@@ -401,64 +469,68 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return "", true, fmt.Errorf("generating UUID: %w", err)
 	}
 
-	// We used to see the enrollment details fail, but now that we're running as an exec,
-	// it seems less likely. Try a couple times, but backoff fast.
-	var enrollDetails service.EnrollmentDetails
-	if osqPath := e.knapsack.LatestOsquerydPath(ctx); osqPath == "" {
-		e.slogger.Log(ctx, slog.LevelInfo,
-			"skipping enrollment details, no osqueryd path, this is probably CI",
-		)
-		span.AddEvent("skipping_enrollment_details")
-	} else {
-		if err := backoff.WaitFor(func() error {
-			enrollDetails, err = getEnrollDetails(ctx, osqPath)
-			if err != nil {
-				e.slogger.Log(ctx, slog.LevelDebug,
-					"getEnrollDetails failed in backoff",
-					"err", err,
-				)
-			}
-			return err
-		}, 30*time.Second, 5*time.Second); err != nil {
-			if os.Getenv("LAUNCHER_DEBUG_ENROLL_DETAILS_REQUIRED") == "true" {
-				return "", true, fmt.Errorf("query enrollment details: %w", err)
-			}
+	var enrollDetails types.EnrollmentDetails
 
-			e.slogger.Log(ctx, slog.LevelError,
-				"failed to get enrollment details with retries, moving on",
-				"err", err,
-			)
-			traces.SetError(span, fmt.Errorf("query enrollment details: %w", err))
-		} else {
-			span.AddEvent("got_enrollment_details")
+	if err := backoff.WaitFor(func() error {
+		details := e.knapsack.GetEnrollmentDetails()
+		if details.OSVersion == "" || details.Hostname == "" {
+			return fmt.Errorf("incomplete enrollment details (missing hostname or os version): %+v", details)
 		}
+		enrollDetails = details
+		span.AddEvent("got_complete_enrollment_details")
+		return nil
+	}, 60*time.Second, 5*time.Second); err != nil {
+		e.slogger.Log(ctx, slog.LevelWarn,
+			"could not fetch enrollment details before timeout",
+			"err", err,
+		)
+		span.AddEvent("enrollment_details_timeout")
+		// Get final details state even if incomplete, ie: the osquery details failed but we can still enroll using the Runtime details.
+		enrollDetails = e.knapsack.GetEnrollmentDetails()
 	}
+
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
 	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
-	if isNodeInvalidErr(err) {
+
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during enrollment, uninstalling",
+		)
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", true, fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		err := fmt.Errorf("transport error in enrollment: %w", err)
-		traces.SetError(span, err)
-		return "", true, err
+
+	case err != nil:
+		return "", true, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
+
 	if invalid {
 		if err == nil {
 			err = errors.New("no further error")
 		}
 		err = fmt.Errorf("enrollment invalid: %w", err)
-		traces.SetError(span, err)
+		observability.SetError(span, err)
 		return "", true, err
 	}
 
-	// Save newly acquired node key if successful
-	err = e.knapsack.ConfigStore().Set([]byte(nodeKeyKey), []byte(keyString))
-	if err != nil {
-		return "", true, fmt.Errorf("saving node key: %w", err)
-	}
-
+	// Save newly acquired node key if successful -- adding the registration
+	// will do this.
 	e.NodeKey = keyString
+	if err := e.addRegistration(keyString, enrollSecret); err != nil {
+		e.slogger.Log(ctx, slog.LevelError,
+			"could not add new registration to store",
+			"err", err,
+		)
+	}
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"completed enrollment",
@@ -469,7 +541,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 }
 
 func (e *Extension) enrolled() bool {
-	return e.NodeKey != ""
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	return nodeKey != ""
 }
 
 // RequireReenroll clears the existing node key information, ensuring that the
@@ -479,7 +556,8 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	e.NodeKey = ""
-	e.knapsack.ConfigStore().Delete([]byte(nodeKeyKey))
+	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
+	e.knapsack.RegistrationStore().Delete([]byte(e.registrationId))
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
@@ -495,7 +573,7 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		)
 		// Try to use cached config
 		var confBytes []byte
-		confBytes, _ = e.knapsack.ConfigStore().Get([]byte(configKey))
+		confBytes, _ = e.knapsack.ConfigStore().Get(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 
 		if len(confBytes) == 0 {
 			if !e.enrolled() {
@@ -506,11 +584,19 @@ func (e *Extension) GenerateConfigs(ctx context.Context) (map[string]string, err
 		}
 		config = string(confBytes)
 	} else {
-		// Store good config
-		e.knapsack.ConfigStore().Set([]byte(configKey), []byte(config))
-		// TODO log or record metrics when caching config fails? We
-		// would probably like to return the config and not an error in
-		// this case.
+		// Store good config in both the knapsack and our settings store
+		if err := e.knapsack.ConfigStore().Set(storage.KeyByIdentifier([]byte(configKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)), []byte(config)); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"writing config to config store",
+				"err", err,
+			)
+		}
+		if err := e.settingsWriter.WriteSettings(); err != nil {
+			e.slogger.Log(ctx, slog.LevelError,
+				"writing config to startup settings",
+				"err", err,
+			)
+		}
 	}
 
 	return map[string]string{"config": config}, nil
@@ -521,11 +607,30 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
-	config, invalid, err := e.serviceClient.RequestConfig(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during config request, uninstalling",
+		)
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return "", fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		return "", fmt.Errorf("transport error retrieving config: %w", err)
+
+	case err != nil:
+		return "", fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -551,24 +656,37 @@ func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bo
 	}
 
 	// If osquery has been running successfully for 10 minutes, then turn off verbose logs.
-	osqueryVerbose := true
-	if uptimeMins, err := history.LatestInstanceUptimeMinutes(); err == nil && uptimeMins >= 10 {
-		// Only log the state change once -- RequestConfig happens every 5 mins
-		if uptimeMins <= 15 {
-			e.slogger.Log(ctx, slog.LevelDebug,
-				"osquery has been up for more than 10 minutes, turning off verbose logging",
-				"uptime_mins", uptimeMins,
-			)
+	configOptsToSet := startupOsqueryConfigOptions
+	osqHistory := e.knapsack.OsqueryHistory()
+	if osqHistory != nil {
+		if uptimeMins, err := osqHistory.LatestInstanceUptimeMinutes(e.registrationId); err == nil && uptimeMins >= 10 {
+			// Only log the state change once -- RequestConfig happens every 5 mins
+			if uptimeMins <= 15 {
+				e.slogger.Log(ctx, slog.LevelDebug,
+					"osquery has been up for more than 10 minutes, switching from startup settings to post-startup settings",
+					"uptime_mins", uptimeMins,
+				)
+			}
+			configOptsToSet = postStartupOsqueryConfigOptions
 		}
-		osqueryVerbose = false
 	}
-	config = e.setVerbose(config, osqueryVerbose)
+
+	config = e.setOsqueryOptions(config, configOptsToSet)
+
+	// If this feature flag is set, we want to use cached data for scheduled queries that might otherwise
+	// time out. We achieve this by updating the config to point to the tables holding the cached data.
+	if e.knapsack.UseCachedDataForScheduledQueries() {
+		// The kolide_windows_updates table is currently the only table we use this feature for.
+		config = strings.ReplaceAll(config, "kolide_windows_updates", "kolide_windows_updates_cached")
+	}
 
 	return config, nil
 }
 
-// setVerbose modifies the given config to add the `verbose` option.
-func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
+// setOsqueryOptions modifies the given config to add the given options in `optsToSet`.
+// The values in `optsToSet` will override any existing and conflicting option values
+// within `config`.
+func (e *Extension) setOsqueryOptions(config string, optsToSet map[string]any) string {
 	var cfg map[string]any
 
 	if config != "" {
@@ -596,7 +714,10 @@ func (e *Extension) setVerbose(config string, osqueryVerbose bool) string {
 		opts = make(map[string]any)
 	}
 
-	opts["verbose"] = osqueryVerbose
+	for k, v := range optsToSet {
+		opts[k] = v
+	}
+
 	cfg["options"] = opts
 
 	cfgBytes, err := json.Marshal(cfg)
@@ -626,17 +747,17 @@ func uint64FromByteKey(k []byte) uint64 {
 	return binary.BigEndian.Uint64(k)
 }
 
-// bucketNameFromLogType returns the Bolt bucket name that stores logs of the
-// provided type.
-func bucketNameFromLogType(typ logger.LogType) (string, error) {
+// storeForLogType returns the store with the logs of the provided type.
+func storeForLogType(s types.Stores, typ logger.LogType) (types.KVStore, error) {
 	switch typ {
 	case logger.LogTypeString, logger.LogTypeSnapshot:
-		return storage.ResultLogsStore.String(), nil
+		return s.ResultLogsStore(), nil
 	case logger.LogTypeStatus:
-		return storage.StatusLogsStore.String(), nil
+		return s.StatusLogsStore(), nil
+	case logger.LogTypeHealth, logger.LogTypeInit:
+		return nil, fmt.Errorf("storing log type %v is unsupported", typ)
 	default:
-		return "", fmt.Errorf("unknown log type: %v", typ)
-
+		return nil, fmt.Errorf("unknown log type: %v", typ)
 	}
 }
 
@@ -647,12 +768,14 @@ func bucketNameFromLogType(typ logger.LogType) (string, error) {
 // buffers.
 func (e *Extension) writeAndPurgeLogs() {
 	for _, typ := range []logger.LogType{logger.LogTypeStatus, logger.LogTypeString} {
+		originalBatchState := e.logPublicationState.CurrentValues()
 		// Write logs
 		err := e.writeBufferedLogsForType(typ)
 		if err != nil {
 			e.slogger.Log(context.TODO(), slog.LevelInfo,
 				"sending logs",
 				"type", typ.String(),
+				"attempted_publication_state", originalBatchState,
 				"err", err,
 			)
 		}
@@ -669,31 +792,11 @@ func (e *Extension) writeAndPurgeLogs() {
 	}
 }
 
-// numberOfBufferedLogs returns the number of logs buffered for a given type.
-func (e *Extension) numberOfBufferedLogs(typ logger.LogType) (int, error) {
-	bucketName, err := bucketNameFromLogType(typ)
-	if err != nil {
-		return 0, err
-	}
-
-	var count int
-	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		count = b.Stats().KeyN
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("counting buffered logs: %w", err)
-	}
-
-	return count, nil
-}
-
 // writeBufferedLogs flushes the log buffers, writing up to
 // Opts.MaxBytesPerBatch bytes worth of logs in one run. If the logs write
 // successfully, they will be deleted from the buffer.
 func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		return err
 	}
@@ -701,53 +804,50 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	// Collect up logs to be sent
 	var logs []string
 	var logIDs [][]byte
-	err = e.knapsack.BboltDB().View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-
-		c := b.Cursor()
-		k, v := c.First()
-		for totalBytes := 0; k != nil; {
-			// A somewhat cumbersome if block...
-			//
-			// 1. If the log is too big, skip it and mark for deletion.
-			// 2. If the buffer would be too big with the log, break for
-			// 3. Else append it
-			//
-			// Note that (1) must come first, otherwise (2) will always trigger.
-			if len(v) > e.Opts.MaxBytesPerBatch {
-				// Discard logs that are too big
-				logheadSize := minInt(len(v), 100)
-				e.slogger.Log(context.TODO(), slog.LevelInfo,
-					"dropped log",
-					"log_id", k,
-					"size", len(v),
-					"limit", e.Opts.MaxBytesPerBatch,
-					"loghead", string(v)[0:logheadSize],
-				)
-			} else if totalBytes+len(v) > e.Opts.MaxBytesPerBatch {
-				// Buffer is filled. Break the loop and come back later.
-				break
-			} else {
-				logs = append(logs, string(v))
-				totalBytes += len(v)
-			}
-
-			// Note the logID for deletion. We do this by
-			// making a copy of k. It is retained in
-			// logIDs after the transaction is closed,
-			// when the goroutine ticks it zeroes out some
-			// of the IDs to delete below, causing logs to
-			// remain in the buffer and be sent again to
-			// the server.
-			logID := make([]byte, len(k))
-			copy(logID, k)
-			logIDs = append(logIDs, logID)
-
-			k, v = c.Next()
+	bufferFilled := false
+	totalBytes := 0
+	err = store.ForEach(func(k, v []byte) error {
+		// A somewhat cumbersome if block...
+		//
+		// 1. If the log is too big, skip it and mark for deletion.
+		// 2. If the buffer would be too big with the log, break for
+		// 3. Else append it
+		//
+		// Note that (1) must come first, otherwise (2) will always trigger.
+		if e.logPublicationState.ExceedsCurrentBatchThreshold(len(v)) {
+			// Discard logs that are too big
+			logheadSize := minInt(len(v), 100)
+			e.slogger.Log(context.TODO(), slog.LevelInfo,
+				"dropped log",
+				"log_id", k,
+				"size", len(v),
+				"limit", e.Opts.MaxBytesPerBatch,
+				"loghead", string(v)[0:logheadSize],
+			)
+		} else if e.logPublicationState.ExceedsCurrentBatchThreshold(totalBytes + len(v)) {
+			// Buffer is filled. Break the loop and come back later.
+			return iterationTerminatedError{}
+		} else {
+			logs = append(logs, string(v))
+			totalBytes += len(v)
 		}
+
+		// Note the logID for deletion. We do this by
+		// making a copy of k. It is retained in
+		// logIDs after the transaction is closed,
+		// when the goroutine ticks it zeroes out some
+		// of the IDs to delete below, causing logs to
+		// remain in the buffer and be sent again to
+		// the server.
+		logID := make([]byte, len(k))
+		copy(logID, k)
+		logIDs = append(logIDs, logID)
 		return nil
 	})
-	if err != nil {
+
+	if err != nil && errors.Is(err, iterationTerminatedError{}) {
+		bufferFilled = true
+	} else if err != nil {
 		return fmt.Errorf("reading buffered logs: %w", err)
 	}
 
@@ -756,19 +856,21 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 		return nil
 	}
 
-	err = e.writeLogsWithReenroll(context.Background(), typ, logs, true)
+	// inform the publication state tracking whether this batch should be used to
+	// determine the appropriate limit
+	e.logPublicationState.BeginBatch(time.Now(), bufferFilled)
+	publicationCtx := context.WithValue(context.Background(),
+		service.PublicationCtxKey,
+		e.logPublicationState.CurrentValues(),
+	)
+	err = e.writeLogsWithReenroll(publicationCtx, typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
 	}
 
 	// Delete logs that were successfully sent
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-		for _, k := range logIDs {
-			b.Delete(k)
-		}
-		return nil
-	})
+	err = store.Delete(logIDs...)
+
 	if err != nil {
 		return fmt.Errorf("deleting sent logs: %w", err)
 	}
@@ -778,71 +880,90 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
-	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, e.NodeKey, typ, logs)
-	if isNodeInvalidErr(err) {
-		invalid = true
-	} else if err != nil {
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
+
+	if errors.Is(err, service.ErrDeviceDisabled{}) {
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during log publish, uninstalling",
+		)
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
+	}
+
+	invalid = invalid || isNodeInvalidErr(err)
+	if !invalid && err == nil {
+		// publication was successful- update logPublicationState and move on
+		e.logPublicationState.EndBatch(logs, true)
+		return nil
+	}
+
+	if err != nil {
+		// logPublicationState will determine whether this failure should impact
+		// the batch size limit based on the elapsed time
+		e.logPublicationState.EndBatch(logs, false)
 		return fmt.Errorf("transport error sending logs: %w", err)
 	}
 
-	if invalid {
-		if !reenroll {
-			return errors.New("enrollment invalid, reenroll disabled")
-		}
-
-		e.RequireReenroll(ctx)
-		_, invalid, err := e.Enroll(ctx)
-		if err != nil {
-			return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
-		}
-		if invalid {
-			return errors.New("enrollment invalid, reenrollment invalid")
-		}
-
-		// Don't attempt reenroll after first attempt
-		return e.writeLogsWithReenroll(ctx, typ, logs, false)
+	if !reenroll {
+		return errors.New("enrollment invalid, reenroll disabled")
 	}
 
-	return nil
+	e.RequireReenroll(ctx)
+	_, invalid, err = e.Enroll(ctx)
+	if err != nil {
+		return fmt.Errorf("enrollment invalid, reenrollment errored: %w", err)
+	}
+	if invalid {
+		return errors.New("enrollment invalid, reenrollment invalid")
+	}
+
+	// Don't attempt reenroll after first attempt
+	return e.writeLogsWithReenroll(ctx, typ, logs, false)
 }
 
 // purgeBufferedLogsForType flushes the log buffers for the provided type,
 // ensuring that at most Opts.MaxBufferedLogs logs remain.
 func (e *Extension) purgeBufferedLogsForType(typ logger.LogType) error {
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		return err
 	}
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
 
-		logCount := b.Stats().KeyN
-		deleteCount := logCount - e.Opts.MaxBufferedLogs
-
-		if deleteCount <= 0 {
-			// Limit not exceeded
-			return nil
-		}
-
-		e.slogger.Log(context.TODO(), slog.LevelInfo,
-			"buffered logs limit exceeded, purging excess",
-			"limit", e.Opts.MaxBufferedLogs,
-			"purge_count", deleteCount,
-		)
-
-		c := b.Cursor()
-		k, _ := c.First()
-		for total := 0; k != nil && total < deleteCount; total++ {
-			c.Delete() // Note: This advances the cursor
-			k, _ = c.First()
-		}
-
-		return nil
-	})
+	totalCount, err := store.Count()
 	if err != nil {
-		return fmt.Errorf("deleting overflowed logs: %w", err)
+		return err
 	}
-	return nil
+
+	deleteCount := totalCount - e.Opts.MaxBufferedLogs
+	if deleteCount <= 0 { // Limit not exceeded
+		return nil
+	}
+
+	logIdsCollectedCount := 0
+	logIDsForDeletion := make([][]byte, deleteCount)
+	if err = store.ForEach(func(k, v []byte) error {
+		if logIdsCollectedCount >= deleteCount {
+			return iterationTerminatedError{}
+		}
+
+		logID := make([]byte, len(k))
+		copy(logID, k)
+		logIDsForDeletion = append(logIDsForDeletion, logID)
+		logIdsCollectedCount++
+		return nil
+	}); err != nil && !errors.Is(err, iterationTerminatedError{}) {
+		return fmt.Errorf("collecting overflowed log keys for deletion: %w", err)
+	}
+
+	return store.Delete(logIDsForDeletion...)
 }
 
 // LogString will buffer logs from osquery into the local BoltDB store. No
@@ -855,7 +976,7 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 		return nil
 	}
 
-	bucketName, err := bucketNameFromLogType(typ)
+	store, err := storeForLogType(e.knapsack, typ)
 	if err != nil {
 		e.slogger.Log(ctx, slog.LevelInfo,
 			"received unknown log type",
@@ -865,46 +986,75 @@ func (e *Extension) LogString(ctx context.Context, typ logger.LogType, logText s
 	}
 
 	// Buffer the log for sending later in a batch
-	err = e.knapsack.BboltDB().Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName))
-
-		// Log keys are generated with the auto-incrementing sequence
-		// number provided by BoltDB. These must be converted to []byte
-		// (which we do with byteKeyFromUint64 function).
-		key, err := b.NextSequence()
-		if err != nil {
-			return fmt.Errorf("generating key: %w", err)
-		}
-
-		return b.Put(byteKeyFromUint64(key), []byte(logText))
-	})
-
-	if err != nil {
-		return fmt.Errorf("buffering log: %w", err)
-	}
-
-	return nil
+	// note that AppendValues guarantees these logs are inserted with
+	// sequential keys for ordered retrieval later
+	return store.AppendValues([]byte(logText))
 }
 
 // GetQueries will request the distributed queries to execute from the server.
 func (e *Extension) GetQueries(ctx context.Context) (*distributed.GetQueriesResult, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	return e.getQueriesWithReenroll(ctx, true)
+	// Check to see whether we should forward this request --
+	// 1. Check to see if we currently want to forward all distributed query requests to the cloud.
+	// 2. Check to see if we forwarded a request to the cloud within the last minute.
+	now := time.Now().Unix()
+	if now >= e.forwardAllDistributedUntil.Load() && now < e.lastRequestQueriesTimestamp.Load()+e.distributedForwardingInterval.Load() {
+		// Return an empty result to osquery.
+		return &distributed.GetQueriesResult{}, nil
+	}
+
+	// We haven't requested queries from the cloud within the last minute --
+	// forward this request.
+	e.lastRequestQueriesTimestamp.Store(now)
+
+	queries, err := e.getQueriesWithReenroll(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the cloud wants us to accelerate distributed requests by forwarding
+	// all requests to the cloud for the next `queries.AccelerateSeconds` seconds.
+	if queries.AccelerateSeconds > 0 {
+		// Store the timestamp when the acceleration ends
+		e.forwardAllDistributedUntil.Store(time.Now().Unix() + int64(queries.AccelerateSeconds))
+	}
+
+	return queries, nil
 }
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (*distributed.GetQueriesResult, error) {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
-	queries, invalid, err := e.serviceClient.RequestQueries(ctx, e.NodeKey)
-	if isNodeInvalidErr(err) {
+	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
+
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during queries request, uninstalling",
+		)
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return nil, fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
+
+	case err != nil:
 		return nil, fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -935,7 +1085,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 // WriteResults will publish results of the executed distributed queries back
 // to the server.
 func (e *Extension) WriteResults(ctx context.Context, results []distributed.Result) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
 	return e.writeResultsWithReenroll(ctx, results, true)
@@ -943,14 +1093,33 @@ func (e *Extension) WriteResults(ctx context.Context, results []distributed.Resu
 
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []distributed.Result, reenroll bool) error {
-	ctx, span := traces.StartSpan(ctx)
+	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	_, _, invalid, err := e.serviceClient.PublishResults(ctx, e.NodeKey, results)
-	if isNodeInvalidErr(err) {
+	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
+	e.enrollMutex.Lock()
+	nodeKey := e.NodeKey
+	e.enrollMutex.Unlock()
+
+	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
+	switch {
+	case errors.Is(err, service.ErrDeviceDisabled{}):
+		e.slogger.Log(ctx, slog.LevelInfo,
+			"received device disabled error during results publish, uninstalling",
+		)
+		uninstall.Uninstall(ctx, e.knapsack, true)
+		// the uninstall call above will cause launcher to uninstall and exit
+		// so we are returning the err here just incase something somehow
+		// goes wrong with the uninstall
+		return fmt.Errorf("device disabled, should have uninstalled: %w", err)
+
+	case isNodeInvalidErr(err):
 		invalid = true
-	} else if err != nil {
-		return fmt.Errorf("transport error writing results: %w", err)
+
+	case err != nil:
+		return fmt.Errorf("transport error getting queries: %w", err)
+
+	default: // pass through no error
 	}
 
 	if invalid {
@@ -976,6 +1145,14 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 
 func minInt(a, b int) int {
 	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
 		return a
 	}
 
