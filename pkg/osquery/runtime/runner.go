@@ -37,7 +37,7 @@ type Runner struct {
 	shutdown        chan struct{}
 	interrupted     *atomic.Bool
 	needsRestart    *atomic.Bool
-	restartLock     sync.Mutex // use a restart lock to ensure we don't get multiple quick succesion restarts due to in modern standy flapping
+	restartLock     sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
 
 func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
