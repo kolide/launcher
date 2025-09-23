@@ -1,11 +1,10 @@
-//go:build darwin
-// +build darwin
+//go:build darwin && performance
+// +build darwin,performance
 
 package appicons
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -15,11 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func Test_AppIcons_MemoryImpact(t *testing.T) {
-	if os.Getenv("CI") == "true" {
-		t.Skip("test not supported in CI, only running standalone")
-	}
-
+func Test_AppIcons_MemoryImpact(t *testing.T) { //nolint:paralleltest
 	mockFlags := typesmocks.NewFlags(t)
 	mockFlags.On("TableGenerateTimeout").Return(4 * time.Minute)
 	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()

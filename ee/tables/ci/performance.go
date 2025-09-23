@@ -1,3 +1,6 @@
+//go:build performance
+// +build performance
+
 package ci
 
 import (
