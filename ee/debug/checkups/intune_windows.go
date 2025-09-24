@@ -27,12 +27,20 @@ func (i *intuneCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	zipWriter := zip.NewWriter(extraWriter)
 	defer zipWriter.Close()
 
-	if err := agentLogs(zipWriter); err != nil {
+	if found, err := agentLogs(zipWriter); err != nil {
 		i.summary += fmt.Sprintf("Failed to collect Intune agent logs: %v. ", err)
+	} else if !found {
+		i.summary += "Intune agent logs not found. "
+	} else {
+		i.summary += "Intune agent logs found. "
 	}
 
-	if err := installLogs(zipWriter); err != nil {
+	if found, err := installLogs(zipWriter); err != nil {
 		i.summary += fmt.Sprintf("Failed to collect Intune install logs: %v. ", err)
+	} else if !found {
+		i.summary += "Intune install logs not found. "
+	} else {
+		i.summary += "Intune install logs found. "
 	}
 
 	i.summary = strings.TrimSpace(i.summary)
@@ -40,44 +48,44 @@ func (i *intuneCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	return nil
 }
 
-func agentLogs(zipWriter *zip.Writer) error {
+func agentLogs(zipWriter *zip.Writer) (bool, error) {
 	agentLogsPathPattern := filepath.Join(os.Getenv("SYSTEMROOT"), "ProgramData", "Microsoft", "IntuneManagementExtension", "Logs", "*")
 	matches, err := filepath.Glob(agentLogsPathPattern)
 	if err != nil {
-		return fmt.Errorf("globbing for agent logs at %s: %w", agentLogsPathPattern, err)
+		return false, fmt.Errorf("globbing for agent logs at %s: %w", agentLogsPathPattern, err)
 	}
 	if len(matches) == 0 {
 		// Probably a non-Intune machine!
-		return nil
+		return false, nil
 	}
 
 	for _, match := range matches {
 		if err := addFileToZip(zipWriter, match); err != nil {
-			return fmt.Errorf("adding %s to zip: %w", match, err)
+			return true, fmt.Errorf("adding %s to zip: %w", match, err)
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
-func installLogs(zipWriter *zip.Writer) error {
+func installLogs(zipWriter *zip.Writer) (bool, error) {
 	installLogsPathPattern := filepath.Join(os.Getenv("WINDIR"), "System32", "config", "systemprofile", "AppData", "Local", "mdm", "*.log")
 	matches, err := filepath.Glob(installLogsPathPattern)
 	if err != nil {
-		return fmt.Errorf("globbing for install logs at %s: %w", installLogsPathPattern, err)
+		return false, fmt.Errorf("globbing for install logs at %s: %w", installLogsPathPattern, err)
 	}
 	if len(matches) == 0 {
 		// Probably a non-Intune machine!
-		return nil
+		return false, nil
 	}
 
 	for _, match := range matches {
 		if err := addFileToZip(zipWriter, match); err != nil {
-			return fmt.Errorf("adding %s to zip: %w", match, err)
+			return true, fmt.Errorf("adding %s to zip: %w", match, err)
 		}
 	}
 
-	return nil
+	return true, nil
 }
 
 func (i *intuneCheckup) ExtraFileName() string {
