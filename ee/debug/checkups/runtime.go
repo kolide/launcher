@@ -16,7 +16,6 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/desktop/user/client"
 	"github.com/kolide/launcher/ee/desktop/user/server"
 )
 
@@ -256,13 +255,6 @@ func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken strin
 }
 
 func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketPath, authToken string, processIndex int) error {
-	// Create a client to communicate with the desktop server
-	c := client.New(authToken, socketPath, client.WithTimeout(30*time.Second))
-
-	// Try to ping first to see if the server is responsive
-	if err := c.Ping(); err != nil {
-		return fmt.Errorf("desktop server not responsive: %w", err)
-	}
 
 	// Request CPU profile
 	cpuProfilePath, err := requestDesktopProfile(socketPath, authToken, "cpuprofile")
