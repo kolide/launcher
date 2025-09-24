@@ -105,6 +105,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&osqConfigConflictCheckup{}, doctorSupported | flareSupported},
 		{&serverDataCheckup{k: k}, flareSupported | logSupported | startupLogSupported},
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
+		{&intuneCheckup{}, flareSupported},
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
 		{&uninstallHistoryCheckup{k: k}, flareSupported},
 		{&desktopMenu{k: k}, flareSupported},
