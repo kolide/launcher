@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -263,7 +264,7 @@ func (s *UserServer) cpuProfileHandler(w http.ResponseWriter, req *http.Request)
 	ctx := req.Context()
 
 	// Create temp file for CPU profile
-	tempFile, err := os.CreateTemp("", "desktop_cpu_profile_*.prof")
+	tempFile, err := os.CreateTemp(agent.TempPath(), "desktop_cpu_profile_*.prof")
 	if err != nil {
 		s.respondWithError(w, "failed to create temp file", err)
 		return
@@ -291,7 +292,7 @@ func (s *UserServer) memProfileHandler(w http.ResponseWriter, req *http.Request)
 	ctx := req.Context()
 
 	// Create temp file for memory profile
-	tempFile, err := os.CreateTemp("", "desktop_mem_profile_*.prof")
+	tempFile, err := os.CreateTemp(agent.TempPath(), "desktop_mem_profile_*.prof")
 	if err != nil {
 		s.respondWithError(w, "failed to create temp file", err)
 		return
