@@ -5,6 +5,8 @@ package appicons
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -24,29 +26,34 @@ func BenchmarkAppIcons(b *testing.B) {
 	// Set up table
 	appIconsTable := AppIcons(mockFlags, slogger)
 
+	// Get some filepaths to query
+	appPaths, err := filepath.Glob("/System/Applications/*.app")
+	require.NoError(b, err)
+
 	// Report memory allocations
 	b.ReportAllocs()
 
 	for range b.N {
 		// Confirm we can call the table successfully
-		response := appIconsTable.Call(context.TODO(), map[string]string{
-			"action": "generate",
-			"context": `{
+		for _, appPath := range appPaths {
+			response := appIconsTable.Call(context.TODO(), map[string]string{
+				"action": "generate",
+				"context": fmt.Sprintf(`{
 	"constraints": [
 		{
 			"name": "path",
 			"list": [
 				{
 					"op": 2,
-					"expr": "not a real path"
+					"expr": "%s"
 				}
 			]
 		}
 	]
-}`,
-		})
+}`, appPath),
+			})
 
-		// Briefly query worked
-		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+			require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+		}
 	}
 }
