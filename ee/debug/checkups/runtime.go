@@ -16,7 +16,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
-	"github.com/kolide/launcher/ee/desktop/user/server"
+	"github.com/kolide/launcher/ee/desktop/user/client"
 )
 
 type runtimeCheckup struct {
@@ -255,16 +255,18 @@ func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken strin
 }
 
 func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketPath, authToken string, processIndex int) error {
+	// Create desktop client for profile requests
+	desktopClient := client.New(authToken, socketPath)
 
 	// Request CPU profile
-	cpuProfilePath, err := requestDesktopProfile(socketPath, authToken, "cpuprofile")
+	cpuProfilePath, err := desktopClient.RequestProfile(ctx, "cpuprofile")
 	if err != nil {
 		return fmt.Errorf("requesting CPU profile: %w", err)
 	}
 	defer os.Remove(cpuProfilePath) // Clean up temp file
 
 	// Request memory profile
-	memProfilePath, err := requestDesktopProfile(socketPath, authToken, "memprofile")
+	memProfilePath, err := desktopClient.RequestProfile(ctx, "memprofile")
 	if err != nil {
 		return fmt.Errorf("requesting memory profile: %w", err)
 	}
@@ -281,52 +283,4 @@ func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketP
 	}
 
 	return nil
-}
-
-func requestDesktopProfile(socketPath, authToken, profileType string) (string, error) {
-	// Create HTTP client configured for Unix socket communication
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
-			},
-		},
-		Timeout: 30 * time.Second,
-	}
-
-	// Make POST request to profile endpoint
-	url := fmt.Sprintf("http://unix/%s", profileType)
-	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-
-	// Parse response
-	var profileResp server.ProfileResponse
-	if err := json.NewDecoder(resp.Body).Decode(&profileResp); err != nil {
-		return "", fmt.Errorf("decoding response: %w", err)
-	}
-
-	if profileResp.Error != "" {
-		return "", fmt.Errorf("server error: %s", profileResp.Error)
-	}
-
-	if profileResp.FilePath == "" {
-		return "", errors.New("server did not return file path")
-	}
-
-	return profileResp.FilePath, nil
 }
