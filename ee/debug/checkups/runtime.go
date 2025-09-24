@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/desktop/user/client"
+	"github.com/kolide/launcher/ee/desktop/user/server"
 )
 
 type runtimeCheckup struct {
@@ -146,12 +147,6 @@ func gatherPprofCpu(z *zip.Writer) error {
 	}
 }
 
-// ProfileResponse matches the response from desktop server profile endpoints
-type ProfileResponse struct {
-	FilePath string `json:"file_path"`
-	Error    string `json:"error,omitempty"`
-}
-
 func (c *runtimeCheckup) gatherDesktopProfiles(ctx context.Context, z *zip.Writer) error {
 	// Smart discovery: try runner instance first, then system-wide discovery
 	sockets, err := c.discoverDesktopSockets()
@@ -231,15 +226,6 @@ type desktopProcessInfo struct {
 }
 
 func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken string) bool {
-	// Quick test to see if this desktop process supports profiling endpoints
-	// We'll try a simple ping first to avoid auth errors on old processes
-	client := client.New(authToken, socketPath, client.WithTimeout(5*time.Second))
-
-	// Test with a simple ping first
-	if err := client.Ping(); err != nil {
-		return false // Can't even ping, skip this process
-	}
-
 	// Now test if profiling endpoints exist by making a quick HTTP request
 	// We'll check if the endpoint exists without actually generating a profile
 	testClient := &http.Client{
@@ -337,7 +323,7 @@ func requestDesktopProfile(socketPath, authToken, profileType string) (string, e
 	}
 
 	// Parse response
-	var profileResp ProfileResponse
+	var profileResp server.ProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&profileResp); err != nil {
 		return "", fmt.Errorf("decoding response: %w", err)
 	}
