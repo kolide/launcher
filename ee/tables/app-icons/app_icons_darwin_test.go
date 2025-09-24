@@ -29,16 +29,21 @@ func BenchmarkAppIcons(b *testing.B) {
 	// Get some filepaths to query
 	appPaths, err := filepath.Glob("/System/Applications/*.app")
 	require.NoError(b, err)
+	require.Greater(b, len(appPaths), 0)
 
 	// Report memory allocations
 	b.ReportAllocs()
 
-	for range b.N {
+	for i := range b.N {
+		appPathIdx := i
+		if len(appPaths) < b.N {
+			appPathIdx = i % len(appPaths)
+		}
+
 		// Confirm we can call the table successfully
-		for _, appPath := range appPaths {
-			response := appIconsTable.Call(context.TODO(), map[string]string{
-				"action": "generate",
-				"context": fmt.Sprintf(`{
+		response := appIconsTable.Call(context.TODO(), map[string]string{
+			"action": "generate",
+			"context": fmt.Sprintf(`{
 	"constraints": [
 		{
 			"name": "path",
@@ -50,10 +55,9 @@ func BenchmarkAppIcons(b *testing.B) {
 			]
 		}
 	]
-}`, appPath),
-			})
+}`, appPaths[appPathIdx]),
+		})
 
-			require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
-		}
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
 	}
 }
