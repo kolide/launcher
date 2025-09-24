@@ -271,12 +271,12 @@ func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketP
 	defer os.Remove(memProfilePath) // Clean up temp file
 
 	// Add CPU profile to zip
-	if err := addFileToZipFromPath(z, cpuProfilePath, fmt.Sprintf("desktop_%d_cpuprofile", processIndex)); err != nil {
+	if err := addFileToZip(z, cpuProfilePath, fmt.Sprintf("desktop_%d_cpuprofile", processIndex)); err != nil {
 		return fmt.Errorf("adding desktop CPU profile to zip: %w", err)
 	}
 
 	// Add memory profile to zip
-	if err := addFileToZipFromPath(z, memProfilePath, fmt.Sprintf("desktop_%d_memprofile", processIndex)); err != nil {
+	if err := addFileToZip(z, memProfilePath, fmt.Sprintf("desktop_%d_memprofile", processIndex)); err != nil {
 		return fmt.Errorf("adding desktop memory profile to zip: %w", err)
 	}
 
@@ -329,26 +329,4 @@ func requestDesktopProfile(socketPath, authToken, profileType string) (string, e
 	}
 
 	return profileResp.FilePath, nil
-}
-
-func addFileToZipFromPath(z *zip.Writer, filePath, zipEntryName string) error {
-	// Open the source file
-	srcFile, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("opening source file: %w", err)
-	}
-	defer srcFile.Close()
-
-	// Create entry in zip
-	dst, err := z.Create(zipEntryName)
-	if err != nil {
-		return fmt.Errorf("creating zip entry: %w", err)
-	}
-
-	// Copy file contents to zip
-	if _, err := io.Copy(dst, srcFile); err != nil {
-		return fmt.Errorf("copying file to zip: %w", err)
-	}
-
-	return nil
 }
