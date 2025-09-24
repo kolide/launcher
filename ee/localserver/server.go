@@ -159,8 +159,9 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
-		WriteTimeout:   30 * time.Second,
-		MaxHeaderBytes: 1024,
+		WriteTimeout: 30 * time.Second,
+		// MaxHeaderBytes size chosen intentionally to allow for tools that add to header
+		MaxHeaderBytes: 8192,
 	}
 
 	ls.srv = srv
