@@ -163,8 +163,17 @@ func (pr processRecord) String() string {
 	)
 }
 
+// SocketPath implements types.DesktopProcessRecord
 func (pr processRecord) SocketPath() string {
 	return pr.socketPath
+}
+
+// Pid implements types.DesktopProcessRecord
+func (pr processRecord) Pid() int {
+	if pr.Process == nil {
+		return 0
+	}
+	return pr.Process.Pid
 }
 
 // New creates and returns a new DesktopUsersProcessesRunner runner and initializes all required fields
@@ -1193,4 +1202,23 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 		r.osVersion = currentOsVersion
 		r.killDesktopProcesses(context.Background())
 	}
+}
+
+// GetDesktopProcessRecords implements types.DesktopRunner
+func (r *DesktopUsersProcessesRunner) GetDesktopProcessRecords() []types.DesktopProcessRecord {
+	var records []types.DesktopProcessRecord
+	for _, proc := range r.uidProcs {
+		records = append(records, proc)
+	}
+	return records
+}
+
+// GetDesktopAuthToken implements types.DesktopRunner
+func (r *DesktopUsersProcessesRunner) GetDesktopAuthToken() string {
+	return r.userServerAuthToken
+}
+
+// SetDesktopRunner implements types.DesktopRunner (no-op since this is the runner itself)
+func (r *DesktopUsersProcessesRunner) SetDesktopRunner(runner types.DesktopRunner) {
+	// No-op: this method is only used by the knapsack to store the runner reference
 }

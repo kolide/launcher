@@ -621,6 +621,44 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
+// GetDesktopAuthToken provides a mock function with no fields
+func (_m *Knapsack) GetDesktopAuthToken() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDesktopAuthToken")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// GetDesktopProcessRecords provides a mock function with no fields
+func (_m *Knapsack) GetDesktopProcessRecords() []types.DesktopProcessRecord {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDesktopProcessRecords")
+	}
+
+	var r0 []types.DesktopProcessRecord
+	if rf, ok := ret.Get(0).(func() []types.DesktopProcessRecord); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.DesktopProcessRecord)
+		}
+	}
+
+	return r0
+}
+
 // GetEnrollmentDetails provides a mock function with no fields
 func (_m *Knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
 	ret := _m.Called()
@@ -1692,6 +1730,11 @@ func (_m *Knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error 
 	}
 
 	return r0
+}
+
+// SetDesktopRunner provides a mock function with given fields: runner
+func (_m *Knapsack) SetDesktopRunner(runner types.DesktopRunner) {
+	_m.Called(runner)
 }
 
 // SetDesktopUpdateInterval provides a mock function with given fields: interval

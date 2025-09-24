@@ -7,15 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/desktop/runner"
 	"github.com/kolide/launcher/ee/desktop/user/client"
 )
 
@@ -147,116 +144,39 @@ func gatherPprofCpu(z *zip.Writer) error {
 }
 
 func (c *runtimeCheckup) gatherDesktopProfiles(ctx context.Context, z *zip.Writer) error {
-	// Smart discovery: try runner instance first, then system-wide discovery
-	sockets, err := c.discoverDesktopSockets()
-	if err != nil {
-		return fmt.Errorf("discovering desktop sockets: %w", err)
+	// Get desktop process records from knapsack
+	processRecords := c.k.GetDesktopProcessRecords()
+	if len(processRecords) == 0 {
+		// No desktop processes running, this is not an error
+		return nil
 	}
 
-	if len(sockets) == 0 {
-		// No desktop processes found or none support profiling, this is not an error
+	authToken := c.k.GetDesktopAuthToken()
+	if authToken == "" {
+		// No auth token available, cannot profile desktop processes
 		return nil
 	}
 
 	// Gather profiles from each desktop process
-	for i, socketInfo := range sockets {
-		if err := gatherDesktopProfilesFromSocket(ctx, z, socketInfo.socketPath, socketInfo.authToken, i); err != nil {
+	for i, processRecord := range processRecords {
+		socketPath := processRecord.SocketPath()
+		if socketPath == "" {
+			continue // Skip processes without socket paths
+		}
+
+		if err := gatherDesktopProfilesFromSocket(ctx, z, socketPath, authToken, i); err != nil {
 			// Log the error but continue with other processes
-			fmt.Printf("Error gathering profiles from desktop socket %s (%s): %v\n",
-				socketInfo.socketPath, socketInfo.source, err)
+			fmt.Printf("Error gathering profiles from desktop process %d (socket %s): %v\n",
+				processRecord.Pid(), socketPath, err)
 		}
 	}
 
 	return nil
 }
 
-type desktopSocketInfo struct {
-	socketPath string
-	authToken  string
-	source     string // "runner_instance" or "system_discovery"
-}
-
-func (c *runtimeCheckup) discoverDesktopSockets() ([]desktopSocketInfo, error) {
-	// Try runner instance first (when flare is run by managing launcher)
-	if processes := runner.InstanceDesktopProcessRecords(); len(processes) > 0 {
-		authToken := runner.InstanceDesktopAuthToken()
-		var sockets []desktopSocketInfo
-		for _, processRecord := range processes {
-			if socketPath := processRecord.SocketPath(); socketPath != "" {
-				sockets = append(sockets, desktopSocketInfo{
-					socketPath: socketPath,
-					authToken:  authToken,
-					source:     "runner_instance",
-				})
-			}
-		}
-		return sockets, nil
-	}
-
-	// Fall back to system-wide discovery (when flare runs standalone)
-	return c.discoverDesktopSocketsSystemWide()
-}
-
-func (c *runtimeCheckup) discoverDesktopSocketsSystemWide() ([]desktopSocketInfo, error) {
-	processes, err := c.findDesktopProcessesWithLsof()
-	if err != nil {
-		// System-wide discovery not available (e.g., on Windows)
-		return nil, nil
-	}
-
-	var validSockets []desktopSocketInfo
-	for _, proc := range processes {
-		// Test if this socket supports profiling endpoints
-		if c.testDesktopProfilingSupport(proc.socketPath, proc.authToken) {
-			validSockets = append(validSockets, desktopSocketInfo{
-				socketPath: proc.socketPath,
-				authToken:  proc.authToken,
-				source:     "system_discovery",
-			})
-		}
-	}
-
-	return validSockets, nil
-}
-
-type desktopProcessInfo struct {
-	socketPath string
-	authToken  string
-}
-
-func (c *runtimeCheckup) testDesktopProfilingSupport(socketPath, authToken string) bool {
-	// Now test if profiling endpoints exist by making a quick HTTP request
-	// We'll check if the endpoint exists without actually generating a profile
-	testClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
-			},
-		},
-		Timeout: 5 * time.Second,
-	}
-
-	// Test cpuprofile endpoint with OPTIONS to see if it exists
-	req, err := http.NewRequestWithContext(context.Background(), "OPTIONS", "http://unix/cpuprofile", nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-
-	resp, err := testClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	// If we get anything other than 404, the profiling endpoints likely exist
-	// 404 = endpoint doesn't exist, others suggest profiling support exists
-	return resp.StatusCode != http.StatusNotFound
-}
-
 func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketPath, authToken string, processIndex int) error {
 	// Create desktop client for profile requests
-	desktopClient := client.New(authToken, socketPath)
+	desktopClient := client.New(authToken, socketPath, client.WithTimeout(30*time.Second))
 
 	// Request CPU profile
 	cpuProfilePath, err := desktopClient.RequestProfile(ctx, "cpuprofile")
