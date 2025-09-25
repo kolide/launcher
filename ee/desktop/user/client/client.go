@@ -252,6 +252,53 @@ func (c *client) get(path string) error {
 	return c.getWithContext(context.Background(), path)
 }
 
+// RequestProfile requests a desktop profile of the specified type (e.g., "cpuprofile", "memprofile")
+// and returns the file path where the profile was saved.
+func (c *client) RequestProfile(ctx context.Context, profileType string) (string, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	timeout := c.base.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://unix/%s", profileType), nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.base.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	// Parse response
+	var profileResp server.ProfileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&profileResp); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	if profileResp.Error != "" {
+		return "", fmt.Errorf("server error: %s", profileResp.Error)
+	}
+
+	if profileResp.FilePath == "" {
+		return "", errors.New("server did not return file path")
+	}
+
+	return profileResp.FilePath, nil
+}
+
 func (c *client) getWithContext(ctx context.Context, path string) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()

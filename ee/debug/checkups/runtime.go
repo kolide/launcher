@@ -7,12 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/kolide/launcher/ee/agent/types"
 )
 
 type runtimeCheckup struct {
+	k types.Knapsack
 }
 
 func (c *runtimeCheckup) Name() string {
@@ -37,6 +41,10 @@ func (c *runtimeCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	if err := gatherPprofCpu(extraZip); err != nil {
 		return fmt.Errorf("gathering cpu profile: %w", err)
+	}
+
+	if err := c.gatherDesktopProfiles(ctx, extraZip); err != nil {
+		return fmt.Errorf("gathering desktop profiles: %w", err)
 	}
 
 	return nil
@@ -132,4 +140,44 @@ func gatherPprofCpu(z *zip.Writer) error {
 	case <-time.After(10 * time.Second):
 		return errors.New("timeout waiting for CPU profile to complete")
 	}
+}
+
+func (c *runtimeCheckup) gatherDesktopProfiles(ctx context.Context, z *zip.Writer) error {
+	// Request CPU profiles from all desktop processes
+	cpuProfilePaths, err := c.k.RequestProfile(ctx, "cpuprofile")
+	if err != nil {
+		return fmt.Errorf("requesting CPU profiles: %w", err)
+	}
+
+	// Request memory profiles from all desktop processes
+	memProfilePaths, err := c.k.RequestProfile(ctx, "memprofile")
+	if err != nil {
+		return fmt.Errorf("requesting memory profiles: %w", err)
+	}
+
+	// Add CPU profiles to zip
+	for i, profilePath := range cpuProfilePaths {
+		if err := addFileToZip(z, profilePath, fmt.Sprintf("desktop_%d_cpuprofile", i)); err != nil {
+			fmt.Printf("Error adding desktop CPU profile to zip: %v\n", err)
+			continue
+		}
+		// Clean up temp file after adding to zip
+		if err := os.Remove(profilePath); err != nil {
+			fmt.Printf("Warning: failed to clean up temp CPU profile file %s: %v\n", profilePath, err)
+		}
+	}
+
+	// Add memory profiles to zip
+	for i, profilePath := range memProfilePaths {
+		if err := addFileToZip(z, profilePath, fmt.Sprintf("desktop_%d_memprofile", i)); err != nil {
+			fmt.Printf("Error adding desktop memory profile to zip: %v\n", err)
+			continue
+		}
+		// Clean up temp file after adding to zip
+		if err := os.Remove(profilePath); err != nil {
+			fmt.Printf("Warning: failed to clean up temp memory profile file %s: %v\n", profilePath, err)
+		}
+	}
+
+	return nil
 }
