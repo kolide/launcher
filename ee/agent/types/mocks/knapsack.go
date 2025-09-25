@@ -621,44 +621,6 @@ func (_m *Knapsack) ForceControlSubsystems() bool {
 	return r0
 }
 
-// GetDesktopAuthToken provides a mock function with no fields
-func (_m *Knapsack) GetDesktopAuthToken() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetDesktopAuthToken")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// GetDesktopProcessRecords provides a mock function with no fields
-func (_m *Knapsack) GetDesktopProcessRecords() []types.DesktopProcessRecord {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetDesktopProcessRecords")
-	}
-
-	var r0 []types.DesktopProcessRecord
-	if rf, ok := ret.Get(0).(func() []types.DesktopProcessRecord); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DesktopProcessRecord)
-		}
-	}
-
-	return r0
-}
-
 // GetEnrollmentDetails provides a mock function with no fields
 func (_m *Knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
 	ret := _m.Called()
@@ -1354,6 +1316,36 @@ func (_m *Knapsack) Registrations() ([]types.Registration, error) {
 
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RequestProfile provides a mock function with given fields: ctx, profileType
+func (_m *Knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	ret := _m.Called(ctx, profileType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequestProfile")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, profileType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, profileType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, profileType)
 	} else {
 		r1 = ret.Error(1)
 	}

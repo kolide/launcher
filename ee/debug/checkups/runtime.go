@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/ee/desktop/user/client"
 )
 
 type runtimeCheckup struct {
@@ -144,62 +143,40 @@ func gatherPprofCpu(z *zip.Writer) error {
 }
 
 func (c *runtimeCheckup) gatherDesktopProfiles(ctx context.Context, z *zip.Writer) error {
-	// Get desktop process records from knapsack
-	processRecords := c.k.GetDesktopProcessRecords()
-	if len(processRecords) == 0 {
-		// No desktop processes running, this is not an error
-		return nil
+	// Request CPU profiles from all desktop processes
+	cpuProfilePaths, err := c.k.RequestProfile(ctx, "cpuprofile")
+	if err != nil {
+		return fmt.Errorf("requesting CPU profiles: %w", err)
 	}
 
-	authToken := c.k.GetDesktopAuthToken()
-	if authToken == "" {
-		// No auth token available, cannot profile desktop processes
-		return nil
+	// Request memory profiles from all desktop processes
+	memProfilePaths, err := c.k.RequestProfile(ctx, "memprofile")
+	if err != nil {
+		return fmt.Errorf("requesting memory profiles: %w", err)
 	}
 
-	// Gather profiles from each desktop process
-	for i, processRecord := range processRecords {
-		socketPath := processRecord.SocketPath()
-		if socketPath == "" {
-			continue // Skip processes without socket paths
+	// Add CPU profiles to zip
+	for i, profilePath := range cpuProfilePaths {
+		if err := addFileToZip(z, profilePath, fmt.Sprintf("desktop_%d_cpuprofile", i)); err != nil {
+			fmt.Printf("Error adding desktop CPU profile to zip: %v\n", err)
+			continue
 		}
-
-		if err := gatherDesktopProfilesFromSocket(ctx, z, socketPath, authToken, i); err != nil {
-			// Log the error but continue with other processes
-			fmt.Printf("Error gathering profiles from desktop process %d (socket %s): %v\n",
-				processRecord.Pid(), socketPath, err)
+		// Clean up temp file after adding to zip
+		if err := os.Remove(profilePath); err != nil {
+			fmt.Printf("Warning: failed to clean up temp CPU profile file %s: %v\n", profilePath, err)
 		}
 	}
 
-	return nil
-}
-
-func gatherDesktopProfilesFromSocket(ctx context.Context, z *zip.Writer, socketPath, authToken string, processIndex int) error {
-	// Create desktop client for profile requests
-	desktopClient := client.New(authToken, socketPath, client.WithTimeout(30*time.Second))
-
-	// Request CPU profile
-	cpuProfilePath, err := desktopClient.RequestProfile(ctx, "cpuprofile")
-	if err != nil {
-		return fmt.Errorf("requesting CPU profile: %w", err)
-	}
-	defer os.Remove(cpuProfilePath) // Clean up temp file
-
-	// Request memory profile
-	memProfilePath, err := desktopClient.RequestProfile(ctx, "memprofile")
-	if err != nil {
-		return fmt.Errorf("requesting memory profile: %w", err)
-	}
-	defer os.Remove(memProfilePath) // Clean up temp file
-
-	// Add CPU profile to zip
-	if err := addFileToZip(z, cpuProfilePath, fmt.Sprintf("desktop_%d_cpuprofile", processIndex)); err != nil {
-		return fmt.Errorf("adding desktop CPU profile to zip: %w", err)
-	}
-
-	// Add memory profile to zip
-	if err := addFileToZip(z, memProfilePath, fmt.Sprintf("desktop_%d_memprofile", processIndex)); err != nil {
-		return fmt.Errorf("adding desktop memory profile to zip: %w", err)
+	// Add memory profiles to zip
+	for i, profilePath := range memProfilePaths {
+		if err := addFileToZip(z, profilePath, fmt.Sprintf("desktop_%d_memprofile", i)); err != nil {
+			fmt.Printf("Error adding desktop memory profile to zip: %v\n", err)
+			continue
+		}
+		// Clean up temp file after adding to zip
+		if err := os.Remove(profilePath); err != nil {
+			fmt.Printf("Warning: failed to clean up temp memory profile file %s: %v\n", profilePath, err)
+		}
 	}
 
 	return nil

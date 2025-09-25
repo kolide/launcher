@@ -419,18 +419,11 @@ func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 }
 
 // DesktopRunner interface methods
-func (k *knapsack) GetDesktopProcessRecords() []types.DesktopProcessRecord {
+func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
 	if k.desktopRunner == nil {
-		return nil
+		return nil, nil
 	}
-	return k.desktopRunner.GetDesktopProcessRecords()
-}
-
-func (k *knapsack) GetDesktopAuthToken() string {
-	if k.desktopRunner == nil {
-		return ""
-	}
-	return k.desktopRunner.GetDesktopAuthToken()
+	return k.desktopRunner.RequestProfile(ctx, profileType)
 }
 
 func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
