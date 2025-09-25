@@ -37,3 +37,28 @@ func TestFindMyDevice(t *testing.T) {
 	require.Equal(t, 1, len(response.Response), "unexpected number of rows returned")
 	require.Contains(t, response.Response[0], "find_my_mac_enabled")
 }
+
+func BenchmarkFindMyDevice(b *testing.B) {
+	// Set up table dependencies
+	mockFlags := typesmocks.NewFlags(b)
+	mockFlags.On("TableGenerateTimeout").Return(1 * time.Minute)
+	mockFlags.On("RegisterChangeObserver", mock.Anything, mock.Anything).Return()
+	slogger := multislogger.NewNopLogger()
+
+	// Set up table
+	findMyTable := FindMyDevice(mockFlags, slogger)
+
+	// Report memory allocations
+	b.ReportAllocs()
+
+	for range b.N {
+		// Confirm we can call the table successfully
+		response := findMyTable.Call(context.TODO(), map[string]string{
+			"action":  "generate",
+			"context": "{}",
+		})
+
+		// Briefly query worked
+		require.Equal(b, int32(0), response.Status.Code, response.Status.Message) // 0 means success
+	}
+}
