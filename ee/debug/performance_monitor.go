@@ -109,7 +109,7 @@ func (p *performanceMonitor) checkPerformance() {
 		return
 	}
 
-	if err := checkups.RunFlare(ctx, p.knapsack, flareShipper, checkups.InSituEnvironment); err != nil {
+	if err := checkups.RunFlare(ctx, p.knapsack, flareShipper, checkups.InSituPerformanceEnvironment); err != nil {
 		p.slogger.Log(ctx, slog.LevelError,
 			"could not run and ship flare to capture high Golang memory and/or CPU usage",
 			"err", err,

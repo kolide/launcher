@@ -118,6 +118,26 @@ func gatherPprofCpu(z *zip.Writer) error {
 		return fmt.Errorf("creating cpuprofile: %w", err)
 	}
 
+	// A digression on CPU profiling in Go...
+	//
+	// We are not experts, and this might be wrong. But as I understand it, go will sample what the
+	// CPU is doing N times per second. The default value is 100Hz, but it is very unclear if this
+	// is correct.
+	//
+	// One theory, is that this is too low on modern CPUs, and it's easy to miss things. There is
+	// a lot of discussion on this in https://github.com/golang/go/issues/40094 and
+	// linked issues.
+	//
+	// However, there is another school of thought, that, at least on windows, it's too high. The windows
+	// default timer is 15.6ms (about 64Hz) which is well below that 100Hz. See discussion in https://github.com/golang/go/issues/61665#issuecomment-1659714314
+	// However that also links to a CL where go starts using the high resolution timers -- https://go-review.googlesource.com/c/go/+/514375
+	//
+	// Because we don't understand, we are leaving it alone for now. If we do choose to change it, we
+	// can use the `runtime.SetCPUProfileRate(rate int)` function to do so.
+	//
+	// Also, note that changing this will cause profiling to produce a spurious
+	// error -- "runtime: cannot set cpu profile rate until previous profile has finished"
+
 	if err := pprof.StartCPUProfile(out); err != nil {
 		return fmt.Errorf("starting CPU profile: %w", err)
 	}
@@ -128,7 +148,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	// Move the sleep and StopCPUProfile into a goroutine
 	go func() {
 		// cpu profile is really meant to run over a period of time, capturing background information
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 		pprof.StopCPUProfile()
 		close(done)
 	}()
@@ -137,7 +157,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	select {
 	case <-done:
 		return nil
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		return errors.New("timeout waiting for CPU profile to complete")
 	}
 }
