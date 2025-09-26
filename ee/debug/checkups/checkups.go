@@ -75,7 +75,7 @@ const (
 func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 	// This encodes what checkups run in which contexts. This could be pushed down into the checkups directly,
 	// but it seems nice to have it here. TBD
-	  	var runEverywhere targetBits = 255
+	var runEverywhere targetBits = 255
 
 	var potentialCheckups = []struct {
 		c       checkupInt
@@ -91,7 +91,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&InitLogs{}, flareSupported},
 		{&BinaryDirectory{k: k}, doctorSupported | flareSupported},
 		{&launchdCheckup{k: k}, doctorSupported | flareSupported},
-		{&runtimeCheckup{k: k}, flareSupported | flarePerformanceSupported },
+		{&runtimeCheckup{k: k}, flareSupported | flarePerformanceSupported},
 		{&enrollSecretCheckup{k: k}, doctorSupported | flareSupported},
 		{&bboltdbCheckup{k: k}, flareSupported},
 		{&networkCheckup{}, doctorSupported | flareSupported},
@@ -263,8 +263,8 @@ func runDoctorCheckup(ctx context.Context, c checkupInt, w io.Writer) Status {
 type runtimeEnvironmentType string
 
 const (
-	StandaloneEnviroment runtimeEnvironmentType = "standalone"
-	InSituEnvironment    runtimeEnvironmentType = "in situ"
+	StandaloneEnviroment         runtimeEnvironmentType = "standalone"
+	InSituEnvironment            runtimeEnvironmentType = "in situ"
 	InSituPerformanceEnvironment runtimeEnvironmentType = "in situ performance"
 )
 
@@ -304,11 +304,11 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 
 	for _, c := range checkupsFor(k, flareType) {
 		// Log that we're doing this, because sometimes we seem to hang, and we want to debug it.
-		k.Slogger().Log(ctx, slog.LevelDebug, 
+		k.Slogger().Log(ctx, slog.LevelDebug,
 			"running flare checkup",
-			 "name", c.Name(),
-			 "runtimeEnvironment", runtimeEnvironment,
-			)
+			"name", c.Name(),
+			"runtimeEnvironment", runtimeEnvironment,
+		)
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
 			return errors.Join(fmt.Errorf("writing flare zip: %w", err), finalize())
