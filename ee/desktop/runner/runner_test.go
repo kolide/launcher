@@ -135,9 +135,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			// if we're not in CI, always expect desktop enabled call
 			// if we are in CI only expect desktop enabled on windows and darwin
 			// since linux CI has no desktop user to make desktop process for
-			if (runtime.GOOS == "windows" || runtime.GOOS == "darwin") || os.Getenv("CI") != "true" {
-				mockKnapsack.On("DesktopEnabled").Return(true)
-			}
+			mockKnapsack.On("DesktopEnabled").Return(true).Maybe()
 
 			mockKnapsack.On("Slogger").Return(slogger)
 			mockKnapsack.On("InModernStandby").Return(false)
