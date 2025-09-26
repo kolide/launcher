@@ -1,10 +1,15 @@
-version: "2"
+run:
+  timeout: 5m
+
 linters:
   enable:
     - bodyclose
     - containedctx
     - exhaustive
     - forbidigo
+    - gofmt
+    - govet
+    - ineffassign
     - misspell
     - nakedret
     - noctx
@@ -15,111 +20,89 @@ linters:
     - rowserrcheck
     - sloglint
     - sqlclosecheck
+    - staticcheck
     - unconvert
+    - unused
     - usetesting
   disable:
     - errcheck
     - gosec
-  settings:
-    errcheck:
-      exclude-functions:
-        - github.com/go-kit/kit/log:Log
-    forbidigo:
-      forbid:
-        - pattern: ^exec\.Command.*$
-          msg: use ee/allowedcmd functions instead
-        - pattern: ^os\.Exit.*$
-          msg: do not use os.Exit so that launcher can shut down gracefully
-        - pattern: ^logutil\.Fatal.*$
-          msg: do not use logutil.Fatal so that launcher can shut down gracefully
-        - pattern: ^panic.*$
-          msg: do not use panic so that launcher can shut down gracefully
-        - pattern: ^go func.*$
-          msg: use gowrapper.Go() instead of raw goroutines for proper panic handling
-        - pattern: \.Cmd\.(Run|Start|Output|CombinedOutput)
-          msg: Do not call embedded exec.Cmd methods directly on TracedCmd; call TracedCmd.Run(), TracedCmd.Start(), etc. instead
-        - pattern: ^table\.NewPlugin.*$
-          msg: use ee/tables/tablewrapper to enforce timeouts on table queries
-    revive:
-      rules:
-        - name: superfluous-else
-          arguments:
-            - preserveScope
-          severity: warning
-          disabled: false
-        - name: package-comments
-          disabled: false
-        - name: context-as-argument
-          disabled: false
-        - name: context-keys-type
-          disabled: false
-        - name: error-return
-          disabled: false
-        - name: errorf
-          disabled: false
-        - name: unreachable-code
-          disabled: false
-        - name: early-return
-          disabled: false
-        - name: confusing-naming
-          disabled: false
-        - name: defer
-          disabled: false
-    sloglint:
-      kv-only: true
-      context: all
-      static-msg: true
-      key-naming-case: snake
-    staticcheck:
-      checks:
-        - all
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
+    - gosimple
+
+linters-settings:
+  errcheck:
+    exclude-functions: [github.com/go-kit/kit/log:Log]
+  gofmt:
+    simplify: false
+  forbidigo:
+    forbid:
+      - p: ^exec\.Command.*$
+        msg: use ee/allowedcmd functions instead
+      - p: ^os\.Exit.*$
+        msg: do not use os.Exit so that launcher can shut down gracefully
+      - p: ^logutil\.Fatal.*$
+        msg: do not use logutil.Fatal so that launcher can shut down gracefully
+      - p: ^panic.*$
+        msg: do not use panic so that launcher can shut down gracefully
+      - p: ^go func.*$
+        msg: use gowrapper.Go() instead of raw goroutines for proper panic handling
+      - p: \.Cmd\.(Run|Start|Output|CombinedOutput)
+        msg: "Do not call embedded exec.Cmd methods directly on TracedCmd; call TracedCmd.Run(), TracedCmd.Start(), etc. instead"
+      - p: ^table\.NewPlugin.*$
+        msg: use ee/tables/tablewrapper to enforce timeouts on table queries
+  sloglint:
+    kv-only: true
+    context: "all"
+    key-naming-case: snake
+    static-msg: true
+  revive:
     rules:
-      - linters:
-          - paralleltest
-        text: does not use range value in test Run
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with string concatenation
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with faster hex.EncodeToString
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with faster strconv.FormatBool
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with faster strconv.FormatInt
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with faster strconv.FormatUint
-      - linters:
-          - perfsprint
-        text: fmt.Sprintf can be replaced with faster strconv.Itoa
-      - linters:
-          - perfsprint
-        text: fmt.Sprint can be replaced with faster strconv.Itoa
-    paths:
-      - test-cmds
-      - third_party$
-      - builtin$
-      - examples$
-formatters:
-  enable:
-    - gofmt
-  settings:
-    gofmt:
-      simplify: false
-  exclusions:
-    generated: lax
-    paths:
-      - test-cmds
-      - third_party$
-      - builtin$
-      - examples$
+      - name: superfluous-else
+        severity: warning
+        disabled: false
+        arguments:
+          - "preserveScope"
+      - name: package-comments
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: context-keys-type
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: errorf
+        disabled: false
+      - name: unreachable-code
+        disabled: false
+      - name: early-return
+        disabled: false
+      - name: confusing-naming
+        disabled: false
+      - name: defer
+        disabled: false
+  staticcheck:
+    checks: ["all"]
+
+issues:
+  exclude-rules:
+    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
+    - linters:
+        - paralleltest
+      text: "does not use range value in test Run"
+    # We prefer fmt.Sprintf over string concatenation for readability
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with string concatenation"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster hex.EncodeToString"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatBool"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatInt"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.FormatUint"
+    - linters: [perfsprint]
+      text: "fmt.Sprintf can be replaced with faster strconv.Itoa"
+    - linters: [perfsprint]
+      text: "fmt.Sprint can be replaced with faster strconv.Itoa"
+  exclude-dirs:
+    - test-cmds
