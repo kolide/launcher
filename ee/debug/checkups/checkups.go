@@ -307,7 +307,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 		k.Slogger().Log(ctx, slog.LevelDebug,
 			"running flare checkup",
 			"name", c.Name(),
-			"runtimeEnvironment", runtimeEnvironment,
+			"runtime_environment", runtimeEnvironment,
 		)
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
