@@ -607,6 +607,8 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 		}
 	}
 
+	// comment
+
 	if r.knapsack.InModernStandby() {
 		r.slogger.Log(context.TODO(), slog.LevelDebug,
 			"modern standby detected, skipping menu refresh",
