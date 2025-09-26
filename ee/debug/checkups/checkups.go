@@ -304,7 +304,7 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 
 	for _, c := range checkupsFor(k, flareType) {
 		// Log that we're doing this, because sometimes we seem to hang, and we want to debug it.
-		k.Slogger().Log(ctx, slog.LevelDebug,
+		k.Slogger().Log(ctx, slog.LevelInfo,
 			"running flare checkup",
 			"name", c.Name(),
 			"runtime_environment", runtimeEnvironment,
