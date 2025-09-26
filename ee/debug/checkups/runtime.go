@@ -118,6 +118,12 @@ func gatherPprofCpu(z *zip.Writer) error {
 		return fmt.Errorf("creating cpuprofile: %w", err)
 	}
 
+	// Increase the CPU profiling rate, in the hopes we can capture more / better detail. This
+	// is quite unclear, there's a long discussion at https://github.com/golang/go/issues/40094 and
+	// linked issues. But my takeaway is that in _some_ cases, there's value in raising this. But it
+	// does produce a spurious error -- "runtime: cannot set cpu profile rate until previous profile has finished"
+	runtime.SetCPUProfileRate(200)
+
 	if err := pprof.StartCPUProfile(out); err != nil {
 		return fmt.Errorf("starting CPU profile: %w", err)
 	}
@@ -128,7 +134,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	// Move the sleep and StopCPUProfile into a goroutine
 	go func() {
 		// cpu profile is really meant to run over a period of time, capturing background information
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 		pprof.StopCPUProfile()
 		close(done)
 	}()
@@ -137,7 +143,7 @@ func gatherPprofCpu(z *zip.Writer) error {
 	select {
 	case <-done:
 		return nil
-	case <-time.After(10 * time.Second):
+	case <-time.After(20 * time.Second):
 		return errors.New("timeout waiting for CPU profile to complete")
 	}
 }
