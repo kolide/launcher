@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/carlpett/winlsa"
 	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
@@ -208,4 +209,22 @@ func usernameToSIDMap(ctx context.Context) (map[string]string, error) {
 	}
 
 	return usernameMap, nil
+}
+
+func CurrentUidsViaLsa(ctx context.Context) ([]string, error) {
+	luids, err := winlsa.GetLogonSessions()
+	if err != nil {
+		return nil, fmt.Errorf("getting logon sessions: %w", err)
+	}
+
+	activeSids := make([]string, 0)
+	for _, luid := range luids {
+		sessionData, err := winlsa.GetLogonSessionData(&luid)
+		if err != nil {
+			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
+		}
+		activeSids = append(activeSids, sessionData.Sid.String())
+	}
+
+	return activeSids, nil
 }

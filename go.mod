@@ -62,6 +62,7 @@ require (
 )
 
 require (
+	github.com/carlpett/winlsa v0.0.0-20220501061136-2c123da6f9a0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
