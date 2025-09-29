@@ -4,54 +4,57 @@
 package consoleuser
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/carlpett/winlsa"
-	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
 	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/sys/windows"
 )
 
+// CurrentUids returns actual SIDs, but we've historically used usernames rather than SIDs on Windows.
+// It is a trivial change to swap from sessionData.Sid.String() to sessionData.UserName here.
 func CurrentUids(ctx context.Context) ([]string, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	explorerProcs, err := explorerProcesses(ctx)
+	luids, err := winlsa.GetLogonSessions()
 	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
+		return nil, fmt.Errorf("getting logon sessions: %w", err)
 	}
 
-	// unclear if windows will ever have more than one explorer process for a single user
-	// guard against this by forcing uniqueness
-
-	// first store uids in a map to prevent duplicates
-	// most of the time it will be just 1 user, so start map at 1
-	uidsMap := make(map[string]struct{}, 1)
-
-	for _, explorerProc := range explorerProcs {
-		uid, err := processOwnerUid(ctx, explorerProc)
+	activeSids := make([]string, 0)
+	for _, luid := range luids {
+		sessionData, err := winlsa.GetLogonSessionData(&luid)
 		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid (for pid %d): %w", explorerProc.Pid, err)
+			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
 		}
-		uidsMap[uid] = struct{}{}
+
+		// We get duplicates -- ignore those.
+		if slices.Contains(activeSids, sessionData.Sid.String()) {
+			continue
+		}
+
+		// Only look at sessions associated with users. We can filter first by interactive-type logons,
+		// to avoid extra syscalls.
+		if sessionData.LogonType != winlsa.LogonTypeInteractive && sessionData.LogonType != winlsa.LogonTypeRemoteInteractive {
+			continue
+		}
+
+		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
+		_, _, accountType, err := sessionData.Sid.LookupAccount("")
+		if err != nil {
+			return nil, fmt.Errorf("getting account type for LUID: %w", err)
+		}
+		if accountType != windows.SidTypeUser {
+			continue
+		}
+
+		// We've got a real user -- add them to our list.
+		activeSids = append(activeSids, sessionData.Sid.String())
 	}
 
-	// convert map keys to slice
-	uids := make([]string, len(uidsMap))
-	uidCount := 0
-	for uid := range uidsMap {
-		uids[uidCount] = uid
-		uidCount++
-	}
-
-	return uids, nil
+	return activeSids, nil
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
@@ -117,94 +120,4 @@ func processOwnerUid(ctx context.Context, proc *process.Process) (string, error)
 	// can fail for reasons we don't quite understand. We just need something to uniquely
 	// identify the user, so on Windows we use the username instead of numeric UID.
 	return username, nil
-}
-
-func CurrentUidsViaQuser(ctx context.Context) ([]string, error) {
-	activeUsernames, err := currentUsernames(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting current usernames: %w", err)
-	}
-
-	// We use username, not SID, on Windows.
-	return activeUsernames, nil
-}
-
-func currentUsernames(ctx context.Context) ([]string, error) {
-	queryUsersCmd, err := allowedcmd.Quser(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating quser cmd: %w", err)
-	}
-
-	usersRaw, err := queryUsersCmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("running quser: output `%s`: %w", string(usersRaw), err)
-	}
-
-	usersParser := data_table.NewParser()
-	parsedUsers, err := usersParser.Parse(bytes.NewReader(usersRaw))
-	if err != nil {
-		return nil, fmt.Errorf("parsing quser output: %w", err)
-	}
-	parsedUsersList, ok := parsedUsers.([]map[string]string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected return format %T from parsing quser output", parsedUsers)
-	}
-
-	activeUserList := make([]string, 0)
-	for _, user := range parsedUsersList {
-		if state, stateFound := user["STATE"]; !stateFound || state != "Active" {
-			continue
-		}
-
-		// Found an active user
-		if username, usernameFound := user["USERNAME"]; usernameFound {
-			// Per https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/query-user:
-			// A greater than (>) symbol is displayed before the current session. We want to remove this symbol if present.
-			activeUserList = append(activeUserList, strings.TrimPrefix(username, ">"))
-		}
-	}
-
-	return activeUserList, nil
-}
-
-// CurrentUidsViaLsa returns actual SIDs, but we've historically used usernames rather than SIDs on Windows.
-// It is a trivial change to swap from sessionData.Sid.String() to sessionData.UserName here.
-func CurrentUidsViaLsa(ctx context.Context) ([]string, error) {
-	luids, err := winlsa.GetLogonSessions()
-	if err != nil {
-		return nil, fmt.Errorf("getting logon sessions: %w", err)
-	}
-
-	activeSids := make([]string, 0)
-	for _, luid := range luids {
-		sessionData, err := winlsa.GetLogonSessionData(&luid)
-		if err != nil {
-			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
-		}
-
-		// We get duplicates -- ignore those.
-		if slices.Contains(activeSids, sessionData.Sid.String()) {
-			continue
-		}
-
-		// Only look at sessions associated with users. We can filter first by interactive-type logons,
-		// to avoid extra syscalls.
-		if sessionData.LogonType != winlsa.LogonTypeInteractive && sessionData.LogonType != winlsa.LogonTypeRemoteInteractive {
-			continue
-		}
-
-		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
-		_, _, accountType, err := sessionData.Sid.LookupAccount("")
-		if err != nil {
-			return nil, fmt.Errorf("getting account type for LUID: %w", err)
-		}
-		if accountType != windows.SidTypeUser {
-			continue
-		}
-
-		// We've got a real user -- add them to our list.
-		activeSids = append(activeSids, sessionData.Sid.String())
-	}
-
-	return activeSids, nil
 }
