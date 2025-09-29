@@ -15,6 +15,7 @@ import (
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
 	"github.com/shirou/gopsutil/v4/process"
+	"golang.org/x/sys/windows"
 )
 
 func CurrentUids(ctx context.Context) ([]string, error) {
@@ -223,6 +224,23 @@ func CurrentUidsViaLsa(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
 		}
+
+		// Only look at sessions associated with users. We can filter first by interactive-type logons,
+		// to avoid extra syscalls.
+		if sessionData.LogonType != winlsa.LogonTypeInteractive && sessionData.LogonType != winlsa.LogonTypeRemoteInteractive {
+			continue
+		}
+
+		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
+		_, _, accountType, err := sessionData.Sid.LookupAccount("")
+		if err != nil {
+			return nil, fmt.Errorf("getting account type for LUID: %w", err)
+		}
+		if accountType != windows.SidTypeUser {
+			continue
+		}
+
+		// We've got a real user -- add them to our list.
 		activeSids = append(activeSids, sessionData.Sid.String())
 	}
 
