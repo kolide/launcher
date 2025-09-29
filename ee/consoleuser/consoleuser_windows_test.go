@@ -29,3 +29,13 @@ func BenchmarkCurrentUidsViaQuser(b *testing.B) {
 		assert.NoError(b, err)
 	}
 }
+
+func Benchmark_usernameToSIDMap(b *testing.B) {
+	// Report memory allocations
+	b.ReportAllocs()
+
+	for range b.N {
+		_, err := usernameToSIDMap(context.Background())
+		assert.NoError(b, err)
+	}
+}
