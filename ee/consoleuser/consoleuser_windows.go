@@ -4,11 +4,15 @@
 package consoleuser
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/tables/execparsers/data_table"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -110,4 +114,98 @@ func processOwnerUid(ctx context.Context, proc *process.Process) (string, error)
 	// can fail for reasons we don't quite understand. We just need something to uniquely
 	// identify the user, so on Windows we use the username instead of numeric UID.
 	return username, nil
+}
+
+func CurrentUidsViaQuser(ctx context.Context) ([]string, error) {
+	activeUsernames, err := currentUsernames(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting current usernames: %w", err)
+	}
+
+	usernameMap, err := usernameToSIDMap(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting map from username to SID: %w", err)
+	}
+
+	currentUids := make([]string, 0)
+	for _, activeUsername := range activeUsernames {
+		if sid, sidFound := usernameMap[activeUsername]; sidFound {
+			currentUids = append(currentUids, sid)
+		}
+	}
+
+	return currentUids, nil
+}
+
+func currentUsernames(ctx context.Context) ([]string, error) {
+	queryUsersCmd, err := allowedcmd.Quser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating quser cmd: %w", err)
+	}
+
+	usersRaw, err := queryUsersCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running quser: output `%s`: %w", string(usersRaw), err)
+	}
+
+	usersParser := data_table.NewParser()
+	parsedUsers, err := usersParser.Parse(bytes.NewReader(usersRaw))
+	if err != nil {
+		return nil, fmt.Errorf("parsing quser output: %w", err)
+	}
+	parsedUsersList, ok := parsedUsers.([]map[string]string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return format %T from parsing quser output", parsedUsers)
+	}
+
+	activeUserList := make([]string, 0)
+	for _, user := range parsedUsersList {
+		if state, stateFound := user["STATE"]; !stateFound || state != "Active" {
+			continue
+		}
+
+		// Found an active user
+		if username, usernameFound := user["USERNAME"]; usernameFound {
+			// Per https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/query-user:
+			// A greater than (>) symbol is displayed before the current session. We want to remove this symbol if present.
+			activeUserList = append(activeUserList, strings.ToLower(strings.TrimPrefix(username, ">")))
+		}
+	}
+
+	return activeUserList, nil
+}
+
+func usernameToSIDMap(ctx context.Context) (map[string]string, error) {
+	wmicCmd, err := allowedcmd.Wmic(ctx, "useraccount", "get", "name,sid")
+	if err != nil {
+		return nil, fmt.Errorf("creating wmic cmd: %w", err)
+	}
+
+	userListRaw, err := wmicCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("running wmic useraccount get name,sid: output `%s`: %w", string(userListRaw), err)
+	}
+
+	userListParser := data_table.NewParser()
+	parsedUsers, err := userListParser.Parse(bytes.NewReader(userListRaw))
+	if err != nil {
+		return nil, fmt.Errorf("parsing wmic output: %w", err)
+	}
+	parsedUsersList, ok := parsedUsers.([]map[string]string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return format %T from parsing wmic output", parsedUsers)
+	}
+
+	usernameMap := make(map[string]string)
+	for _, user := range parsedUsersList {
+		username, usernameFound := user["Name"]
+		sid, sidFound := user["SID"]
+
+		if !usernameFound || !sidFound {
+			continue
+		}
+		usernameMap[username] = sid
+	}
+
+	return usernameMap, nil
 }

@@ -19,3 +19,13 @@ func BenchmarkCurrentUids(b *testing.B) {
 		assert.NoError(b, err)
 	}
 }
+
+func BenchmarkCurrentUidsViaQuser(b *testing.B) {
+	// Report memory allocations
+	b.ReportAllocs()
+
+	for range b.N {
+		_, err := CurrentUidsViaQuser(context.Background())
+		assert.NoError(b, err)
+	}
+}

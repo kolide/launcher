@@ -38,6 +38,10 @@ func Powershell(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), arg...)
 }
 
+func Quser(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "quser.exe"), arg...)
+}
+
 func Repcli(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("PROGRAMFILES"), "Confer", "repcli"), arg...)
 }
@@ -48,6 +52,10 @@ func Secedit(ctx context.Context, arg ...string) (*TracedCmd, error) {
 
 func Taskkill(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "taskkill.exe"), arg...)
+}
+
+func Wmic(ctx context.Context, arg ...string) (*TracedCmd, error) {
+	return validatedCommand(ctx, filepath.Join(os.Getenv("WINDIR"), "System32", "wbem", "WMIC.exe"), arg...)
 }
 
 func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
