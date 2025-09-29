@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/carlpett/winlsa"
@@ -223,6 +224,11 @@ func CurrentUidsViaLsa(ctx context.Context) ([]string, error) {
 		sessionData, err := winlsa.GetLogonSessionData(&luid)
 		if err != nil {
 			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
+		}
+
+		// We get duplicates -- ignore those.
+		if slices.Contains(activeSids, sessionData.Sid.String()) {
+			continue
 		}
 
 		// Only look at sessions associated with users. We can filter first by interactive-type logons,
