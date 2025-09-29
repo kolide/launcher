@@ -43,6 +43,7 @@ require (
 
 require (
 	github.com/apache/thrift v0.20.0
+	github.com/carlpett/winlsa v0.0.0-20220501061136-2c123da6f9a0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
@@ -62,7 +63,6 @@ require (
 )
 
 require (
-	github.com/carlpett/winlsa v0.0.0-20220501061136-2c123da6f9a0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
