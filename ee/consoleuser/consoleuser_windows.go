@@ -204,7 +204,7 @@ func usernameToSIDMap(ctx context.Context) (map[string]string, error) {
 		if !usernameFound || !sidFound {
 			continue
 		}
-		usernameMap[username] = sid
+		usernameMap[strings.ToLower(username)] = sid
 	}
 
 	return usernameMap, nil
