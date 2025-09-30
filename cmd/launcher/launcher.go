@@ -93,6 +93,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 	slogger := multiSlogger.Logger
 
+	// FIXME(seph): I'm not sure what the right place to call this is.
+	gomaxprocsLimiter(ctx, slogger)
+
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
 		slogger.Log(ctx, slog.LevelDebug,
@@ -735,4 +738,26 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 		"osqueryd_version", osquerydVersion,
 		"osqueryd_path", osquerydPath,
 	)
+}
+
+
+// gomaxprocsLimiter sets a limit on the number of OS threads that can be used at a given time.
+func gomaxprocsLimiter(ctx context.Context,  slogger *slog.Logger) {
+	const MAX = 10 // FIXME(seph): Not sure what this should be, or if we need remote control functionality
+	cur := runtime.GOMAXPROCS(0)
+	if cur <= MAX {
+		slogger.Log(ctx, slog.LevelDebug,
+			"GOMAXPROCS within acceptable range, not changing",
+			"current", cur,
+			"max", MAX,
+		)
+		return
+	}
+
+	slogger.Log(ctx, slog.LevelDebug,
+		"limiting GOMAXPROCS",
+		"from", cur,
+		"to", MAX,
+	)
+	runtime.GOMAXPROCS(MAX)
 }
