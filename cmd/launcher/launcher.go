@@ -94,7 +94,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	slogger := multiSlogger.Logger
 
 	// FIXME(seph): I'm not sure what the right place to call this is, or what the right
-	// integer is. If we like this, we should consider moving it to knapsack and making a flag.
+	// integer is. On seph's m3, the default is 16, so I'm arbitrarily picking half that.
+	// If we like this, we should consider moving it to knapsack and making a flag.
 	// (As well as adding it to various metrics)
 	gomaxprocsLimiter(ctx, slogger, 8)
 
@@ -746,7 +747,7 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) {
 	cur := runtime.GOMAXPROCS(0)
 	if cur <= maxProcs {
-		slogger.Log(ctx, slog.LevelDebug,
+		slogger.Log(ctx, slog.LevelInfo,
 			"GOMAXPROCS within acceptable range, not changing",
 			"current", cur,
 			"max", maxProcs,
@@ -754,7 +755,7 @@ func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) 
 		return
 	}
 
-	slogger.Log(ctx, slog.LevelDebug,
+	slogger.Log(ctx, slog.LevelInfo,
 		"limiting GOMAXPROCS",
 		"from", cur,
 		"to", maxProcs,
