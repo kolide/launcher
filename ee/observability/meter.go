@@ -15,6 +15,8 @@ const (
 	// Custom units
 	unitRestart = "{restart}"
 	unitFailure = "{failure}"
+	unitReads   = "{reads}"
+	unitWrites  = "{writes}"
 
 	// Define our meter names and descriptions. All meter names should have "launcher." prepended.
 	goMemoryUsageGaugeName                       = "launcher.memory.golang"
@@ -49,6 +51,10 @@ const (
 	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
 	checkupErrorCounterName                      = "launcher.checkup.error"
 	checkupErrorCounterDescription               = "The number of errors when running checkups"
+	ioReadsCounterName                           = "launcher.io.reads"
+	ioReadsCounterDescription                    = "IO read counter for launcher"
+	ioWritesCounterName                          = "launcher.io.writes"
+	ioWritesCounterDescription                   = "IO write counter for launcher"
 )
 
 var (
@@ -73,6 +79,8 @@ var (
 	TablewrapperTimeoutCounter        metric.Int64Counter
 	AutoupdateFailureCounter          metric.Int64Counter
 	CheckupErrorCounter               metric.Int64Counter
+	IOReadsCounter                    metric.Int64Counter
+	IOWritesCounter                   metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -138,6 +146,12 @@ func ReinitializeMetrics() {
 	CheckupErrorCounter = int64CounterOrNoop(checkupErrorCounterName,
 		metric.WithDescription(checkupErrorCounterDescription),
 		metric.WithUnit(unitFailure))
+	IOReadsCounter = int64CounterOrNoop(ioReadsCounterName,
+		metric.WithDescription(ioReadsCounterDescription),
+		metric.WithUnit(unitReads))
+	IOWritesCounter = int64CounterOrNoop(ioWritesCounterName,
+		metric.WithDescription(ioWritesCounterDescription),
+		metric.WithUnit(unitWrites))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create
