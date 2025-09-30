@@ -149,7 +149,7 @@ func ReinitializeMetrics() {
 	IOReadsCounter = int64CounterOrNoop(ioReadsCounterName,
 		metric.WithDescription(ioReadsCounterDescription),
 		metric.WithUnit(unitReads))
-	IOReadsCounter = int64CounterOrNoop(ioWritesCounterName,
+	IOWritesCounter = int64CounterOrNoop(ioWritesCounterName,
 		metric.WithDescription(ioWritesCounterDescription),
 		metric.WithUnit(unitWrites))
 }
