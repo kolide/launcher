@@ -299,7 +299,7 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 				"arch", b.arch,
 			)
 			// also include the following gcflags to -N (disable optimizations) and -l (disable inlining) for improved debugging
-			baseArgs = append(baseArgs, `-gcflags=all=-N -l`)
+			// baseArgs = append(baseArgs, `-gcflags=all=-N -l`)
 		}
 
 		if b.os == "windows" {
