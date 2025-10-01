@@ -27,11 +27,19 @@ type (
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) *LogPublisherClient {
+func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
 	return &LogPublisherClient{
 		logger:   logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
 		client:   client,
+	}
+}
+
+// helper method to allow us to make any http client tweaks as we learn realistic
+// parameters for interacting with the agent-ingester service
+func NewPublisherHTTPClient() PublisherHTTPClient {
+	return &http.Client{
+		Timeout: 60 * time.Second,
 	}
 }
 

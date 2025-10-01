@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"sort"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/osquerylogpublisher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -60,6 +62,15 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	return m
 }
 
+func makeTestOsqLogPublisher(t *testing.T, k types.Knapsack) osquerylogpublisher.Publisher {
+	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
+	// tests. that logic is tested separately and we can add more logic to test here if needed once
+	// we've settled on a cutover plan and desired behaviors
+	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	slogger := multislogger.NewNopLogger()
+	return osquerylogpublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+}
+
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m := mocks.NewKnapsack(t)
 	m.On("OsquerydPath").Maybe().Return("")
@@ -71,9 +82,10 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	logPublishClient := makeTestOsqLogPublisher(t, m)
 
 	// We should be able to make an extension despite an empty enroll secret
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, logPublishClient, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
 	assert.Nil(t, err)
 	assert.NotNil(t, e)
 }
@@ -99,10 +111,11 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	m.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	logPublishClient := makeTestOsqLogPublisher(t, m)
 
 	// close the DB connection here to trigger the error
 	require.NoError(t, db.Close())
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(context.TODO(), &mock.KolideService{}, logPublishClient, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
@@ -122,7 +135,8 @@ func TestGetHostIdentifier(t *testing.T) {
 	assert.Equal(t, oldIdent, ident)
 
 	k = makeKnapsack(t)
-	e, err = NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	logPublishClient := makeTestOsqLogPublisher(t, k)
+	e, err = NewExtension(context.TODO(), &mock.KolideService{}, logPublishClient, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	ident, err = e.getHostIdentifier()

@@ -14,7 +14,7 @@ type (
 		// status logs or result logs from scheduled queries.
 		PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error)
 		// PublishResults publishes the results of executed distributed queries.
-		//PublishResults(ctx context.Context, results []distributed.Result) (bool, error)
+		//PublishResults(ctx context.Context, results []distributed.Result) (*PublishResultsResponse, error)
 	}
 
 	PublisherHTTPClient interface {
