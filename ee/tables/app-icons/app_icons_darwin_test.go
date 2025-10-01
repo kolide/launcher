@@ -58,6 +58,7 @@ func Test_generateAppIcons(t *testing.T) {
 			require.NotEmpty(t, results[0]["hash"])
 
 			// code blow is a good for sanity check if you want to ensure the files are being decoded properly
+			// will save images to ./test_images and you can look and see how pretty they are
 
 			/*
 
