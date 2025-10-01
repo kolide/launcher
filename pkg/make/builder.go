@@ -292,6 +292,14 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if !b.notStripped {
 			ldFlags = append(ldFlags, "-w -s")
+		} else {
+			level.Info(logger).Log(
+				"msg", "compiling debug build without stripping symbols",
+				"os", b.os,
+				"arch", b.arch,
+			)
+			// also include the following gcflags to -N (disable optimizations) and -l (disable inlining) for improved debugging
+			baseArgs = append(baseArgs, `-gcflags=all=-N -l`)
 		}
 
 		if b.os == "windows" {

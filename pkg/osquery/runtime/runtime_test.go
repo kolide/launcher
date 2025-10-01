@@ -123,7 +123,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return("") // bad binary path
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -174,7 +174,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -225,7 +225,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -235,7 +235,6 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -254,6 +253,9 @@ func TestFlagsChanged(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+
+	// set to false initially so osq can start
+	k.On("InModernStandby").Return(false).Twice()
 
 	// Start the runner
 	runner := New(k, mockServiceClient(t), s)
@@ -275,9 +277,24 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
-	// Now, WatchdogEnabled should return true
+	// should start off false
+	require.False(t, runner.needsRestart.Load(), "runner should not be flagged as needing restart since it just started")
+
+	// change just the InModernStandby flag -- this should not trigger a restart, since no changes need to be applied
+	k.On("InModernStandby").Return(true).Once()
+	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
+	require.False(t, runner.needsRestart.Load(), "runner should not be marked as needing a restart when only InModernStandby changed")
+
+	// change both the InModernStandby and WatchdogEnabled flags -- this should trigger a restart, but not until InModernStandby is false again
 	k.On("WatchdogEnabled").Return(true).Once()
-	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled)
+	k.On("InModernStandby").Return(true).Twice()
+	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled, keys.InModernStandby)
+
+	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
+
+	// no simulate coming out of modern standby -- this should trigger a restart
+	k.On("InModernStandby").Return(false)
+	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
@@ -285,6 +302,8 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Now confirm that the instance is new
 	require.NotEqual(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance not replaced")
+
+	require.False(t, runner.needsRestart.Load(), "runner should no longer be marked as needing a restart after restart completed")
 
 	// Confirm osquery watchdog is now enabled
 	watchdogMemoryLimitMBFound := false
@@ -331,7 +350,7 @@ func TestPing(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -596,7 +615,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -647,7 +666,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID, extraRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -731,7 +750,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -810,7 +829,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -861,7 +880,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory)
@@ -934,7 +953,7 @@ func TestNotStarted(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
 	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
@@ -1034,7 +1053,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()

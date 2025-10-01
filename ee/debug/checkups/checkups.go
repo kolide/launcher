@@ -65,6 +65,7 @@ type targetBits uint8
 const (
 	doctorSupported targetBits = 1 << iota
 	flareSupported
+	flarePerformanceSupported
 	logSupported
 	startupLogSupported
 )
@@ -74,21 +75,23 @@ const (
 func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 	// This encodes what checkups run in which contexts. This could be pushed down into the checkups directly,
 	// but it seems nice to have it here. TBD
+	var runEverywhere targetBits = 255
+
 	var potentialCheckups = []struct {
 		c       checkupInt
 		targets targetBits
 	}{
-		{&Platform{}, doctorSupported | flareSupported | logSupported | startupLogSupported},
+		{&Platform{}, runEverywhere},
 		{&hostInfoCheckup{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
-		{&Version{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
+		{&Version{k: k}, runEverywhere},
 		{&Processes{}, doctorSupported | flareSupported},
 		{&RootDirectory{k: k}, doctorSupported | flareSupported},
 		{&Connectivity{k: k}, doctorSupported | flareSupported | logSupported | startupLogSupported},
-		{&Logs{k: k}, doctorSupported | flareSupported},
+		{&Logs{k: k}, doctorSupported | flareSupported | flarePerformanceSupported},
 		{&InitLogs{}, flareSupported},
 		{&BinaryDirectory{k: k}, doctorSupported | flareSupported},
 		{&launchdCheckup{k: k}, doctorSupported | flareSupported},
-		{&runtimeCheckup{}, flareSupported},
+		{&runtimeCheckup{k: k}, flareSupported | flarePerformanceSupported},
 		{&enrollSecretCheckup{k: k}, doctorSupported | flareSupported},
 		{&bboltdbCheckup{k: k}, flareSupported},
 		{&networkCheckup{}, doctorSupported | flareSupported},
@@ -105,6 +108,7 @@ func checkupsFor(k types.Knapsack, target targetBits) []checkupInt {
 		{&osqConfigConflictCheckup{}, doctorSupported | flareSupported},
 		{&serverDataCheckup{k: k}, flareSupported | logSupported | startupLogSupported},
 		{&osqDataCollector{k: k}, doctorSupported | flareSupported},
+		{&intuneCheckup{}, flareSupported},
 		{&osqRestartCheckup{k: k}, doctorSupported | flareSupported},
 		{&uninstallHistoryCheckup{k: k}, flareSupported},
 		{&desktopMenu{k: k}, flareSupported},
@@ -259,13 +263,20 @@ func runDoctorCheckup(ctx context.Context, c checkupInt, w io.Writer) Status {
 type runtimeEnvironmentType string
 
 const (
-	StandaloneEnviroment runtimeEnvironmentType = "standalone"
-	InSituEnvironment    runtimeEnvironmentType = "in situ"
+	StandaloneEnviroment         runtimeEnvironmentType = "standalone"
+	InSituEnvironment            runtimeEnvironmentType = "in situ"
+	InSituPerformanceEnvironment runtimeEnvironmentType = "in situ performance"
 )
 
 func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser, runtimeEnvironment runtimeEnvironmentType) error {
 	flare := zip.NewWriter(flareStream)
 	combinedSummary := bytes.Buffer{}
+
+	// If this is trigger for performance reasons, we run a limited set of checkups
+	flareType := flareSupported
+	if runtimeEnvironment == InSituPerformanceEnvironment {
+		flareType = flarePerformanceSupported
+	}
 
 	finalize := func() error {
 		closeFlares := func() error {
@@ -291,7 +302,13 @@ func RunFlare(ctx context.Context, k types.Knapsack, flareStream io.WriteCloser,
 		return errors.Join(fmt.Errorf("writing flare environment: %w", err), finalize())
 	}
 
-	for _, c := range checkupsFor(k, flareSupported) {
+	for _, c := range checkupsFor(k, flareType) {
+		// Log that we're doing this, because sometimes we seem to hang, and we want to debug it.
+		k.Slogger().Log(ctx, slog.LevelInfo,
+			"running flare checkup",
+			"name", c.Name(),
+			"runtime_environment", runtimeEnvironment,
+		)
 		flareCheckup(ctx, c, &combinedSummary, flare)
 		if err := flare.Flush(); err != nil {
 			return errors.Join(fmt.Errorf("writing flare zip: %w", err), finalize())

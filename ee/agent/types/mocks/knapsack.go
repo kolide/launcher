@@ -1377,6 +1377,36 @@ func (_m *Knapsack) Registrations() ([]types.Registration, error) {
 	return r0, r1
 }
 
+// RequestProfile provides a mock function with given fields: ctx, profileType
+func (_m *Knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	ret := _m.Called(ctx, profileType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequestProfile")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, profileType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, profileType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, profileType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ResetOnHardwareChangeEnabled provides a mock function with no fields
 func (_m *Knapsack) ResetOnHardwareChangeEnabled() bool {
 	ret := _m.Called()
@@ -1746,6 +1776,11 @@ func (_m *Knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error 
 	}
 
 	return r0
+}
+
+// SetDesktopRunner provides a mock function with given fields: runner
+func (_m *Knapsack) SetDesktopRunner(runner types.DesktopRunner) {
+	_m.Called(runner)
 }
 
 // SetDesktopUpdateInterval provides a mock function with given fields: interval

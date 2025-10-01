@@ -13,10 +13,12 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -70,6 +72,8 @@ func New(slogger *slog.Logger,
 	authedMux.HandleFunc("/detect_presence", userServer.detectPresence)
 	authedMux.HandleFunc("POST /secure_enclave_key", userServer.createSecureEnclaveKey)
 	authedMux.HandleFunc("GET /secure_enclave_key", userServer.getSecureEnclaveKey)
+	authedMux.HandleFunc("POST /cpuprofile", userServer.cpuProfileHandler)
+	authedMux.HandleFunc("POST /memprofile", userServer.memProfileHandler)
 
 	userServer.server = &http.Server{
 		Handler: userServer.authMiddleware(authedMux),
@@ -249,6 +253,84 @@ func (s *UserServer) notifyRefreshListeners() {
 	for _, listener := range s.refreshListeners {
 		listener()
 	}
+}
+
+type ProfileResponse struct {
+	FilePath string `json:"file_path"`
+	Error    string `json:"error,omitempty"`
+}
+
+func (s *UserServer) cpuProfileHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
+	// Create temp file for CPU profile
+	tempFile, err := os.CreateTemp(agent.TempPath(), "desktop_cpu_profile_*.prof")
+	if err != nil {
+		s.respondWithError(w, "failed to create temp file", err)
+		return
+	}
+	defer tempFile.Close()
+
+	if err := pprof.StartCPUProfile(tempFile); err != nil {
+		s.respondWithError(w, "failed to start CPU profile", err)
+		return
+	}
+
+	s.slogger.Log(ctx, slog.LevelInfo, "started CPU profiling", "file", tempFile.Name())
+
+	// Profile for 15 seconds to capture more activity including periodic tasks
+	time.Sleep(15 * time.Second)
+	pprof.StopCPUProfile()
+
+	s.slogger.Log(ctx, slog.LevelInfo, "stopped CPU profiling", "file", tempFile.Name())
+
+	response := ProfileResponse{FilePath: tempFile.Name()}
+	s.respondWithJSON(w, response)
+}
+
+func (s *UserServer) memProfileHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
+	// Create temp file for memory profile
+	tempFile, err := os.CreateTemp(agent.TempPath(), "desktop_mem_profile_*.prof")
+	if err != nil {
+		s.respondWithError(w, "failed to create temp file", err)
+		return
+	}
+	defer tempFile.Close()
+
+	s.slogger.Log(ctx, slog.LevelInfo, "generating memory profile", "file", tempFile.Name())
+
+	// Force garbage collection for more accurate memory stats
+	runtime.GC()
+
+	// Write heap profile
+	if err := pprof.WriteHeapProfile(tempFile); err != nil {
+		s.respondWithError(w, "failed to write memory profile", err)
+		return
+	}
+
+	s.slogger.Log(ctx, slog.LevelInfo, "generated memory profile", "file", tempFile.Name())
+
+	response := ProfileResponse{FilePath: tempFile.Name()}
+	s.respondWithJSON(w, response)
+}
+
+func (s *UserServer) respondWithJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		s.slogger.Log(context.TODO(), slog.LevelError, "failed to encode JSON response", "err", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *UserServer) respondWithError(w http.ResponseWriter, message string, err error) {
+	s.slogger.Log(context.TODO(), slog.LevelError, "profile request error", "message", message, "err", err)
+	response := ProfileResponse{Error: fmt.Sprintf("%s: %s", message, err.Error())}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *UserServer) authMiddleware(next http.Handler) http.Handler {

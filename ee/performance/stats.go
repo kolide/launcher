@@ -39,11 +39,19 @@ type MemInfo struct {
 	MemPercent    float32 `json:"mem_percent"`      // percent of memory in use (RSS) vs available on machine
 }
 
+type IO struct {
+	ReadCount  uint64 `json:"read_count"`
+	WriteCount uint64 `json:"write_count"`
+	ReadBytes  uint64 `json:"read_bytes"`
+	WriteBytes uint64 `json:"write_bytes"`
+}
+
 type PerformanceStats struct {
 	Pid        int      `json:"pid"`
 	Exe        string   `json:"exe"`
 	Cmdline    string   `json:"cmdline"`
 	MemInfo    *MemInfo `json:"mem_info"`
+	IO         *IO      `json:"io,omitempty"` // Not available everywhere
 	CPUPercent float64  `json:"cpu_percent"`
 }
 
@@ -86,6 +94,10 @@ func ProcessStatsForPid(ctx context.Context, pid int) (*PerformanceStats, error)
 	observability.MemoryPercentGauge.Record(ctx, int64(ps.MemInfo.MemPercent))
 	observability.CpuPercentGauge.Record(ctx, int64(ps.CPUPercent))
 	observability.RSSHistogram.Record(ctx, int64(ps.MemInfo.RSS))
+	if ps.IO != nil {
+		observability.IOReadsCounter.Add(ctx, int64(ps.IO.ReadCount))
+		observability.IOWritesCounter.Add(ctx, int64(ps.IO.WriteCount))
+	}
 
 	return ps, nil
 }
@@ -205,6 +217,21 @@ func statsForProcess(ctx context.Context, proc *process.Process) (*PerformanceSt
 		return nil, nil, fmt.Errorf("gathering cpu percent: %w", err)
 	} else {
 		ps.CPUPercent = cpuPercent
+	}
+
+	if ioCounters, err := proc.IOCountersWithContext(ctx); err != nil {
+		// We know this is only available on Linux/Windows, but not Darwin --
+		// so we suppress the error here for darwin.
+		if runtime.GOOS != "darwin" {
+			return nil, nil, fmt.Errorf("gathering I/O counters: %w", err)
+		}
+	} else {
+		ps.IO = &IO{
+			ReadCount:  ioCounters.ReadCount,
+			WriteCount: ioCounters.WriteCount,
+			ReadBytes:  ioCounters.ReadBytes,
+			WriteBytes: ioCounters.WriteBytes,
+		}
 	}
 
 	return ps, memInfo, nil

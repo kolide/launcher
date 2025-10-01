@@ -49,6 +49,8 @@ type knapsack struct {
 	querier types.InstanceQuerier
 
 	osqHistory types.OsqueryHistorian
+
+	desktopRunner types.DesktopRunner
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -414,4 +416,16 @@ func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
 
 func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	k.osqHistory = osqHistory
+}
+
+// DesktopRunner interface methods
+func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	if k.desktopRunner == nil {
+		return nil, nil
+	}
+	return k.desktopRunner.RequestProfile(ctx, profileType)
+}
+
+func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
+	k.desktopRunner = runner
 }

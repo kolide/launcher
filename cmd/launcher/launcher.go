@@ -94,6 +94,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 	slogger := multiSlogger.Logger
 
+	// FIXME(seph): I'm not sure what the right place to call this is, or what the right
+	// integer is. On seph's m3, the default is 16, so I'm arbitrarily picking half that.
+	// If we like this, we should consider moving it to knapsack and making a flag.
+	// (As well as adding it to various metrics)
+	gomaxprocsLimiter(ctx, slogger, 8)
+
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
 		slogger.Log(ctx, slog.LevelDebug,
@@ -459,6 +465,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
 
+		// Inject the desktop runner into the knapsack for profiling access
+		k.SetDesktopRunner(runner)
+
 		execute, interrupt, err := agent.SetHardwareKeysRunner(ctx, k.Slogger(), k.ConfigStore(), runner)
 		if err != nil {
 			return fmt.Errorf("setting up hardware keys: %w", err)
@@ -737,4 +746,24 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 		"osqueryd_version", osquerydVersion,
 		"osqueryd_path", osquerydPath,
 	)
+}
+
+// gomaxprocsLimiter sets a limit on the number of OS threads that can be used at a given time.
+func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) {
+	cur := runtime.GOMAXPROCS(0)
+	if cur <= maxProcs {
+		slogger.Log(ctx, slog.LevelInfo,
+			"GOMAXPROCS within acceptable range, not changing",
+			"current", cur,
+			"max", maxProcs,
+		)
+		return
+	}
+
+	slogger.Log(ctx, slog.LevelInfo,
+		"limiting GOMAXPROCS",
+		"from", cur,
+		"to", maxProcs,
+	)
+	runtime.GOMAXPROCS(maxProcs)
 }
