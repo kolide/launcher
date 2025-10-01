@@ -14,6 +14,8 @@ import (
 )
 
 func Test_generateAppIcons(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		queryContext table.QueryContext
@@ -37,6 +39,8 @@ func Test_generateAppIcons(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			results, err := generateAppIcons(context.Background(), tt.queryContext)
 			require.NoError(t, err)
 			require.Len(t, results, 1)
@@ -52,6 +56,29 @@ func Test_generateAppIcons(t *testing.T) {
 			require.Equal(t, 128, img.Bounds().Dy())
 
 			require.NotEmpty(t, results[0]["hash"])
+
+			// code blow is a good for sanity check if you want to ensure the files are being decoded properly
+
+			/*
+
+				// Save the decoded PNG under ./test_images using the app name from the query constraint
+				err = os.MkdirAll("./test_images", 0o755)
+				require.NoError(t, err)
+
+				// derive a file name from the provided path constraint if present
+				appPath := ""
+				if cl, ok := tt.queryContext.Constraints["path"]; ok && len(cl.Constraints) > 0 {
+					appPath = cl.Constraints[0].Expression
+				}
+				if appPath == "" {
+					appPath = "icon"
+				}
+				name := strings.TrimSuffix(filepath.Base(appPath), ".app")
+				outPath := filepath.Join("./test_images", name+".png")
+
+				err = os.WriteFile(outPath, iconBytes, 0o644)
+				require.NoError(t, err)
+			*/
 		})
 	}
 }

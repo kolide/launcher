@@ -29,11 +29,14 @@ void Icon(CFDataRef *iconDataRef, char* path) {
 		bytesPerRow:0
 		bitsPerPixel:0];
 
-	NSGraphicsContext *gctx = [NSGraphicsContext graphicsContextWithBitmapImageRep:brep];
-	[NSGraphicsContext saveGraphicsState];
-	[NSGraphicsContext setCurrentContext:gctx];
-	[img drawInRect:targetFrame fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0];
-	[NSGraphicsContext restoreGraphicsState];
+    NSGraphicsContext *gctx = [NSGraphicsContext graphicsContextWithBitmapImageRep:brep];
+    @try {
+        [NSGraphicsContext saveGraphicsState];
+        [NSGraphicsContext setCurrentContext:gctx];
+        [img drawInRect:targetFrame fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0];
+    } @finally {
+        [NSGraphicsContext restoreGraphicsState];
+    }
 
 	NSData *imageData = [brep TIFFRepresentation];
 	*iconDataRef = (CFDataRef)imageData;
