@@ -62,6 +62,7 @@ jobs:
 
     - name: Build (debug)
       if: github.ref_type != 'tag'
+      shell: bash
       run: MAKE_debugsymbols=true make -j2 github-build
     
     - name: Build
