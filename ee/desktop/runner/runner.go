@@ -715,6 +715,11 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return nil
 	}
 
+	if !r.knapsack.DesktopEnabled() {
+		// Desktop not enabled -- this is a temporary change for testing silent mode
+		return nil
+	}
+
 	executablePath, err := r.determineExecutablePath()
 	if err != nil {
 		return fmt.Errorf("determining executable path: %w", err)

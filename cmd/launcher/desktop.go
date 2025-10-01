@@ -95,6 +95,9 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		"session_pid", os.Getpid(),
 	)
 
+	// FIXME(seph): This should move to being a command line flag, and plumbed through the caller.
+	gomaxprocsLimiter(context.TODO(), slogger, 2)
+
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
 	if err != nil {
