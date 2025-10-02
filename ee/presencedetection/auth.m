@@ -3,6 +3,7 @@
 
 #import <LocalAuthentication/LocalAuthentication.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "auth.h"
 
 struct AuthResult Authenticate(char const* reason, int64_t timeout_ns) {
@@ -12,7 +13,10 @@ struct AuthResult Authenticate(char const* reason, int64_t timeout_ns) {
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     NSString *nsReason = [NSString stringWithUTF8String:reason];
     __block bool success = false;
-    __block NSString *errorMessage = nil;
+    // Use a C-allocated string to hold the error message. This avoids
+    // referencing autoreleased/Objective-C managed NSString objects outside
+    // the block's lifetime which can lead to use-after-free crashes.
+    __block char *errorMessage = NULL;
     __block int errorCode = 0;
 
     // Use LAPolicyDeviceOwnerAuthentication to allow biometrics and password fallback
@@ -25,14 +29,20 @@ struct AuthResult Authenticate(char const* reason, int64_t timeout_ns) {
                 } else {
                     success = false;
                     errorCode = (int)[error code];
-                    errorMessage = [error localizedDescription];
+                    const char *cstr = [[error localizedDescription] UTF8String];
+                    if (cstr != NULL) {
+                        errorMessage = strdup(cstr);
+                    }
                 }
                 dispatch_semaphore_signal(sema);
             }];
     } else {
         success = false; // Cannot evaluate policy
         errorCode = (int)[authError code];
-        errorMessage = [authError localizedDescription];
+        const char *cstr = [[authError localizedDescription] UTF8String];
+        if (cstr != NULL) {
+            errorMessage = strdup(cstr);
+        }
     }
 
     // wait for the authentication to complete or timeout
@@ -43,15 +53,21 @@ struct AuthResult Authenticate(char const* reason, int64_t timeout_ns) {
         [myContext invalidate]; // dismiss presence detection dialog
         success = false;
         errorCode = -1;
-        errorMessage = @"presence detection timed out";
+        const char *cstr = [@"presence detection timed out" UTF8String];
+        if (cstr != NULL) {
+            // Only set if we haven't already set an error message
+            if (errorMessage == NULL) {
+                errorMessage = strdup(cstr);
+            }
+        }
     }
 
     dispatch_release(sema);
 
     authResult.success = success;
     authResult.error_code = errorCode;
-    if (errorMessage != nil) {
-        authResult.error_msg = strdup([errorMessage UTF8String]); // Copy error message to C string
+    if (errorMessage != NULL) {
+        authResult.error_msg = errorMessage; // already strdup'd
     } else {
         authResult.error_msg = NULL;
     }
