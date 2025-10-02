@@ -242,3 +242,63 @@ func TestSaveRegistration(t *testing.T) {
 		})
 	}
 }
+
+func TestSetGetEnrollmentDetails(t *testing.T) {
+	t.Parallel()
+
+	// Set up the enrollment details store
+	enrollmentDetailsStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.EnrollmentDetailsStore.String())
+	require.NoError(t, err)
+
+	// Set up our knapsack
+	testKnapsack := New(map[storage.Store]types.KVStore{
+		storage.EnrollmentDetailsStore: enrollmentDetailsStore,
+	}, nil, nil, multislogger.New(), multislogger.New())
+
+	// Initially, should return empty details
+	details := testKnapsack.GetEnrollmentDetails()
+	require.Equal(t, types.EnrollmentDetails{}, details)
+
+	// Set initial enrollment details
+	initialDetails := types.EnrollmentDetails{
+		OSPlatform:     "darwin",
+		OSVersion:      "10.15.7",
+		Hostname:       "test-host",
+		OsqueryVersion: "5.0.1",
+		HardwareModel:  "MacBookPro16,1",
+	}
+	testKnapsack.SetEnrollmentDetails(initialDetails)
+
+	// Get and verify
+	storedDetails := testKnapsack.GetEnrollmentDetails()
+	require.Equal(t, initialDetails.OSPlatform, storedDetails.OSPlatform)
+	require.Equal(t, initialDetails.OSVersion, storedDetails.OSVersion)
+	require.Equal(t, initialDetails.Hostname, storedDetails.Hostname)
+	require.Equal(t, initialDetails.HardwareModel, storedDetails.HardwareModel)
+
+	// Update with partial details (merge behavior)
+	updateDetails := types.EnrollmentDetails{
+		Hostname:       "new-host",
+		OsqueryVersion: "5.0.2",
+		GOOS:           "darwin",
+	}
+	testKnapsack.SetEnrollmentDetails(updateDetails)
+
+	// Get and verify merge worked
+	mergedDetails := testKnapsack.GetEnrollmentDetails()
+	require.Equal(t, "darwin", mergedDetails.OSPlatform)            // from initial
+	require.Equal(t, "10.15.7", mergedDetails.OSVersion)            // from initial
+	require.Equal(t, "new-host", mergedDetails.Hostname)            // updated
+	require.Equal(t, "MacBookPro16,1", mergedDetails.HardwareModel) // from initial
+	require.Equal(t, "darwin", mergedDetails.GOOS)                  // newly added
+
+	// Verify data persists in store
+	rawData, err := enrollmentDetailsStore.Get(enrollmentDetailsKey)
+	require.NoError(t, err)
+	require.NotNil(t, rawData)
+
+	var persistedDetails types.EnrollmentDetails
+	require.NoError(t, json.Unmarshal(rawData, &persistedDetails))
+	require.Equal(t, "new-host", persistedDetails.Hostname)
+	require.Equal(t, "darwin", persistedDetails.OSPlatform)
+}

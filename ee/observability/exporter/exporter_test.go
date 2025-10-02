@@ -39,7 +39,6 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	serverProvidedDataStore.Set([]byte("device_id"), []byte("500"))
 	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
 	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
-	serverProvidedDataStore.Set([]byte("serial_number"), []byte("abcdabcd"))
 
 	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
@@ -55,6 +54,7 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 		OSName:         runtime.GOOS,
 		OSVersion:      "3.4.5",
 		Hostname:       "Test-Hostname2",
+		HardwareSerial: "abcdabcd",
 	})
 
 	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, NewInitialTraceBuffer())
@@ -195,7 +195,9 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	s.Set([]byte("organization_id"), []byte(expectedOrganizationId))
 
 	expectedSerialNumber := "abcd"
-	s.Set([]byte("serial_number"), []byte(expectedSerialNumber))
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: expectedSerialNumber,
+	})
 
 	expectedUpdateChannel := "stable"
 	mockKnapsack.On("UpdateChannel").Return(expectedUpdateChannel)
