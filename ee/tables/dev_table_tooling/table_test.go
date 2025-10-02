@@ -3,7 +3,6 @@ package dev_table_tooling
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/base64"
 	"testing"
 
@@ -44,7 +43,7 @@ func Test_generate(t *testing.T) {
 			constraints := make(map[string][]string)
 			constraints["name"] = []string{tt.commandName}
 
-			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
+			got, _ := table.generate(t.Context(), tablehelpers.MockQueryContext(constraints))
 
 			if len(tt.expectedResult) <= 0 {
 				assert.Empty(t, got)

@@ -249,7 +249,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
-	require.Error(t, i.healthcheckWithRetries(context.TODO(), 5, 100*time.Millisecond))
+	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
 }
 
 func TestHealthy(t *testing.T) {
@@ -312,7 +312,7 @@ func TestHealthy(t *testing.T) {
 
 	// Now, shut down our new server
 	i.emsLock.Lock()
-	require.NoError(t, i.extensionManagerServers[testAdditionalServerName].Shutdown(context.TODO()))
+	require.NoError(t, i.extensionManagerServers[testAdditionalServerName].Shutdown(t.Context()))
 	i.emsLock.Unlock()
 
 	// Expect that the healthcheck begins to fail soon
@@ -331,7 +331,7 @@ func TestHealthy(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {
@@ -417,7 +417,7 @@ func TestLaunch(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {
@@ -522,7 +522,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Call ReloadKatcExtension with no changes -- it shouldn't do anything.
 	// We still shouldn't have a KATC server or be able to query for the table.
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 	i.emsLock.Lock()
 	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
 	i.emsLock.Unlock()
@@ -540,12 +540,12 @@ func TestReloadKatcExtension(t *testing.T) {
 	tableConfigRaw, err := json.Marshal(tableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), tableConfigRaw))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should have an extension manager server for KATC, and it should know about our table
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
+	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(t.Context(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)
@@ -572,12 +572,12 @@ func TestReloadKatcExtension(t *testing.T) {
 	updatedTableConfigRaw, err := json.Marshal(updatedTableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), updatedTableConfigRaw))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should still have an extension manager server for KATC
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
+	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(t.Context(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)
@@ -595,7 +595,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Delete KATC configuration entirely
 	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName)))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should no longer have an extension manager server for KATC
 	i.emsLock.Lock()
@@ -610,7 +610,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {

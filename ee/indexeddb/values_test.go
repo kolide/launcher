@@ -1,7 +1,6 @@
 package indexeddb
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -33,7 +32,7 @@ func Test_deserializeIndexeddbValue(t *testing.T) {
 		0x01, // properties_written
 	}
 
-	obj, err := DeserializeChrome(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
+	obj, err := DeserializeChrome(t.Context(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
 	require.NoError(t, err, "deserializing object")
 
 	// Confirm we got an id property for the object
@@ -60,6 +59,6 @@ func Test_deserializeIndexeddbValue_InvalidType(t *testing.T) {
 		0x00, // properties_written
 	}
 
-	_, err := DeserializeChrome(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
+	_, err := DeserializeChrome(t.Context(), multislogger.NewNopLogger(), map[string][]byte{"data": testBytes})
 	require.Error(t, err, "should not have been able to deserialize malformed object")
 }

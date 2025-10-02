@@ -1,7 +1,6 @@
 package table
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -53,7 +52,7 @@ func TestGDriveSyncHistoryInfo(t *testing.T) { //nolint:paralleltest // We need 
 	require.Equal(t, "kolide_gdrive_sync_history", gdriveHistoryTable.Name())
 
 	// Confirm we can call the table successfully
-	response := gdriveHistoryTable.Call(context.TODO(), map[string]string{
+	response := gdriveHistoryTable.Call(t.Context(), map[string]string{
 		"action":  "generate",
 		"context": "{}",
 	})

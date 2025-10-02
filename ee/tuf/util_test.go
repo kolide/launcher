@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -101,7 +100,7 @@ func TestCheckExecutable(t *testing.T) {
 	for _, tt := range tests { // nolint:paralleltest
 		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
-			err := CheckExecutable(context.TODO(), multislogger.NewNopLogger(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
+			err := CheckExecutable(t.Context(), multislogger.NewNopLogger(), targetExe, "-test.run=TestHelperProcess", "--", tt.testName)
 			if tt.expectedErr {
 				require.Error(t, err, tt.testName)
 
@@ -110,7 +109,7 @@ func TestCheckExecutable(t *testing.T) {
 				// trigger the match against os.Executable and don't
 				// invoked. This is here, and not a dedicated test,
 				// because we ensure the same test arguments.
-				require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
+				require.NoError(t, CheckExecutable(t.Context(), multislogger.NewNopLogger(), os.Args[0], "-test.run=TestHelperProcess", "--", tt.testName), "calling self with %s", tt.testName)
 			} else {
 				require.NoError(t, err, tt.testName)
 			}
@@ -131,7 +130,7 @@ func TestCheckExecutableTruncated(t *testing.T) {
 	require.NoError(t, os.Chmod(truncatedBinary.Name(), 0755))
 
 	require.Error(t,
-		CheckExecutable(context.TODO(), multislogger.NewNopLogger(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
+		CheckExecutable(t.Context(), multislogger.NewNopLogger(), truncatedBinary.Name(), "-test.run=TestHelperProcess", "--", "exit0"),
 		"truncated binary")
 }
 
@@ -198,13 +197,13 @@ func windowsAddExe(in string) string {
 func Test_checkExecutablePermissions(t *testing.T) {
 	t.Parallel()
 
-	require.Error(t, checkExecutablePermissions(context.TODO(), ""), "passing empty string")
-	require.Error(t, checkExecutablePermissions(context.TODO(), "/random/path/should/not/exist"), "passing non-existent file path")
+	require.Error(t, checkExecutablePermissions(t.Context(), ""), "passing empty string")
+	require.Error(t, checkExecutablePermissions(t.Context(), "/random/path/should/not/exist"), "passing non-existent file path")
 
 	// Setup the tests
 	tmpDir := t.TempDir()
 
-	require.Error(t, checkExecutablePermissions(context.TODO(), tmpDir), "directory should not be executable")
+	require.Error(t, checkExecutablePermissions(t.Context(), tmpDir), "directory should not be executable")
 
 	dotExe := ""
 	if runtime.GOOS == "windows" {
@@ -224,17 +223,17 @@ func Test_checkExecutablePermissions(t *testing.T) {
 
 	// windows doesn't have an executable bit
 	if runtime.GOOS == "windows" {
-		require.NoError(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
-		require.NoError(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
-		require.NoError(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
+		require.NoError(t, checkExecutablePermissions(t.Context(), fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(t.Context(), hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(t.Context(), symLink), "symlink")
 	} else {
-		require.Error(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
-		require.Error(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
-		require.Error(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
+		require.Error(t, checkExecutablePermissions(t.Context(), fileName), "plain file")
+		require.Error(t, checkExecutablePermissions(t.Context(), hardLink), "hard link")
+		require.Error(t, checkExecutablePermissions(t.Context(), symLink), "symlink")
 
 		require.NoError(t, os.Chmod(fileName, 0755))
-		require.NoError(t, checkExecutablePermissions(context.TODO(), fileName), "plain file")
-		require.NoError(t, checkExecutablePermissions(context.TODO(), hardLink), "hard link")
-		require.NoError(t, checkExecutablePermissions(context.TODO(), symLink), "symlink")
+		require.NoError(t, checkExecutablePermissions(t.Context(), fileName), "plain file")
+		require.NoError(t, checkExecutablePermissions(t.Context(), hardLink), "hard link")
+		require.NoError(t, checkExecutablePermissions(t.Context(), symLink), "symlink")
 	}
 }

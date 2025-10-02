@@ -1,7 +1,6 @@
 package packagekit
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/kit/ulid"
@@ -11,14 +10,14 @@ import (
 func TestContextError(t *testing.T) {
 	t.Parallel()
 
-	_, err := GetFromContext(context.Background(), ContextNotarizationUuidKey)
+	_, err := GetFromContext(t.Context(), ContextNotarizationUuidKey)
 	require.Error(t, err)
 }
 
 func TestContextBlanks(t *testing.T) {
 	t.Parallel()
 
-	ctx := InitContext(context.Background())
+	ctx := InitContext(t.Context())
 
 	actual, err := GetFromContext(ctx, ContextNotarizationUuidKey)
 	require.NoError(t, err)
@@ -29,7 +28,7 @@ func TestContextBlanks(t *testing.T) {
 func TestContext(t *testing.T) {
 	t.Parallel()
 
-	ctx := InitContext(context.Background())
+	ctx := InitContext(t.Context())
 
 	var contextPairs = []struct {
 		name string

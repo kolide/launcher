@@ -2,7 +2,6 @@ package katc
 
 import (
 	"archive/zip"
-	"context"
 	_ "embed"
 	"fmt"
 	"io"
@@ -124,7 +123,7 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			}
 
 			// At long last: run a query
-			results, err := testTable.generate(context.TODO(), queryContext)
+			results, err := testTable.generate(t.Context(), queryContext)
 			require.NoError(t, err)
 
 			// We should have the expected number of results in the row
@@ -308,7 +307,7 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			}
 
 			// At long last: run a query
-			results, err := testTable.generate(context.TODO(), queryContext)
+			results, err := testTable.generate(t.Context(), queryContext)
 			require.NoError(t, err)
 
 			// We should have the expected number of results in the row
@@ -411,7 +410,7 @@ func TestQueryLevelDB(t *testing.T) {
 	}
 
 	// At long last: run a query
-	results, err := testTable.generate(context.TODO(), queryContext)
+	results, err := testTable.generate(t.Context(), queryContext)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(results))

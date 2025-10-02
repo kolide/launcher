@@ -1,7 +1,6 @@
 package uninstall
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -91,7 +90,7 @@ func TestUninstall(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			Uninstall(context.TODO(), k, false)
+			Uninstall(t.Context(), k, false)
 
 			// check that file was deleted
 			_, err = os.Stat(enrollSecretPath)
@@ -111,7 +110,7 @@ func TestUninstall(t *testing.T) {
 			// the expectation of 1 here is coming from the single remaining reset_records key
 			// see agent.ResetDatabase for additional context
 			require.Equal(t, 1, itemsFound)
-			resetRecords, err := agent.GetResetRecords(context.TODO(), k)
+			resetRecords, err := agent.GetResetRecords(t.Context(), k)
 			require.NoError(t, err, "could not get reset records from test store")
 			require.Equal(t, 1, len(resetRecords), "expected reset records to contain exactly 1 uninstallation record")
 			// now check the individual bits we want to ensure are migrated to the reset record

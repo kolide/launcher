@@ -1,7 +1,6 @@
 package debug
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -164,7 +163,7 @@ func Test_shouldTriggerFlareUpload(t *testing.T) {
 				},
 			}
 
-			performUpload, uploadReason := p.shouldTriggerFlareUpload(context.TODO(), testStats)
+			performUpload, uploadReason := p.shouldTriggerFlareUpload(t.Context(), testStats)
 
 			require.Equal(t, tt.expectFlareUpload, performUpload)
 			require.Equal(t, tt.expectedReason, uploadReason)

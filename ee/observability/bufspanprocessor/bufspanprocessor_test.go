@@ -34,8 +34,8 @@ func TestBufSpanProcessor(t *testing.T) {
 			bsp := NewBufSpanProcessor(maxBufSpans)
 
 			// callling these for shameless code coverage
-			require.NoError(t, bsp.ForceFlush(context.TODO()))
-			require.NoError(t, bsp.Shutdown(context.TODO()))
+			require.NoError(t, bsp.ForceFlush(t.Context()))
+			require.NoError(t, bsp.Shutdown(t.Context()))
 
 			require.False(t, bsp.HasProcessor(), "should not have a processor")
 
@@ -74,8 +74,8 @@ func TestBufSpanProcessor(t *testing.T) {
 			secondChildProcessor.On("ForceFlush", mock.Anything).Return(nil).Once()
 			secondChildProcessor.On("Shutdown", mock.Anything).Return(nil).Once()
 
-			require.NoError(t, bsp.ForceFlush(context.TODO()))
-			require.NoError(t, bsp.Shutdown(context.TODO()))
+			require.NoError(t, bsp.ForceFlush(t.Context()))
+			require.NoError(t, bsp.Shutdown(t.Context()))
 		})
 	}
 }

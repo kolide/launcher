@@ -2,7 +2,6 @@ package localserver
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -61,7 +60,7 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 }
 
 func testServer(t *testing.T, k types.Knapsack) *localServer {
-	server, err := New(context.TODO(), k, nil)
+	server, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
 	return server
 }

@@ -26,7 +26,7 @@ func TestWixPackage(t *testing.T) {
 		t.Skip("No docker")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// TODO this should be able to be t.Log or t or something
 	logger := log.NewLogfmtLogger(os.Stderr)

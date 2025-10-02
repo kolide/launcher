@@ -38,7 +38,7 @@ func TestCall(t *testing.T) {
 	require.Equal(t, expectedName, w.Name())
 
 	// The generate function must work
-	resp := w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+	resp := w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 	require.Equal(t, int32(0), resp.Status.Code) // success
 	require.Equal(t, 1, len(resp.Response))
 	require.Equal(t, expectedRow, resp.Response[0])
@@ -72,7 +72,7 @@ func TestCall_handlesTimeout(t *testing.T) {
 	// The call to generate must return by the time we hit `overrideTimeout`
 	resultChan := make(chan osquery.ExtensionResponse)
 	go func() {
-		resultChan <- w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+		resultChan <- w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 	}()
 
 	select {
@@ -116,7 +116,7 @@ func TestCall_allowsConcurrentRequests(t *testing.T) {
 	resultChan := make(chan osquery.ExtensionResponse)
 	for i := 0; i < numWorkers; i += 1 {
 		go func() {
-			resultChan <- w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+			resultChan <- w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 		}()
 	}
 
@@ -166,14 +166,14 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 	gotWorkerChan := make(chan osquery.ExtensionResponse, numWorkers)
 	for i := 0; i < numWorkers; i += 1 {
 		go func() {
-			gotWorkerChan <- w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+			gotWorkerChan <- w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 		}()
 		time.Sleep(100 * time.Millisecond) // small sleep to make it easier to enforce ordering of calls
 	}
 	noWorkersAvailableChan := make(chan osquery.ExtensionResponse, numWorkers)
 	for i := 0; i < numWorkers; i += 1 {
 		go func() {
-			noWorkersAvailableChan <- w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+			noWorkersAvailableChan <- w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 		}()
 		time.Sleep(100 * time.Millisecond) // small sleep to make it easier to enforce ordering of calls
 	}
@@ -205,7 +205,7 @@ func TestCall_limitsExcessiveConcurrentRequests(t *testing.T) {
 
 	// Sleep to ensure the workers are now all available -- make another request and see it hit the regular timeout
 	time.Sleep(overrideTimeout) // 1 second should be sufficient, but we sleep the full override timeout to avoid test flakiness
-	resp := w.Call(context.TODO(), map[string]string{"action": "generate", "context": "{}"})
+	resp := w.Call(t.Context(), map[string]string{"action": "generate", "context": "{}"})
 	require.Equal(t, int32(1), resp.Status.Code)                // failure
 	require.Contains(t, resp.Status.Message, "timed out after") // matches `querying %s timed out after %s (queried columns: %v)`
 
@@ -243,7 +243,7 @@ func TestFlagsChanged(t *testing.T) {
 	// Simulate TableGenerateTimeout changing via control server
 	controlServerOverrideTimeout := 30 * time.Second
 	mockFlags.On("TableGenerateTimeout").Return(controlServerOverrideTimeout).Once()
-	w.FlagsChanged(context.TODO(), keys.TableGenerateTimeout)
+	w.FlagsChanged(t.Context(), keys.TableGenerateTimeout)
 
 	// The timeout should have been updated
 	w.genTimeoutLock.Lock()

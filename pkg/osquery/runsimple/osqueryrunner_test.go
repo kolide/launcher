@@ -50,7 +50,7 @@ func Test_OsqueryRunSqlNoIO(t *testing.T) {
 	osq, err := NewOsqueryProcess(testOsqueryBinary)
 	require.NoError(t, err)
 
-	require.NoError(t, osq.RunSql(context.TODO(), []byte("select 1")))
+	require.NoError(t, osq.RunSql(t.Context(), []byte("select 1")))
 }
 
 func Test_OsqueryRunSql(t *testing.T) {
@@ -111,12 +111,12 @@ func Test_OsqueryRunSql(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.expectErr {
-				require.Error(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
+				require.Error(t, osq.RunSql(t.Context(), []byte(tt.sql)))
 				require.Contains(t, stderr.String(), "Error")
 				return
 			}
 
-			require.NoError(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
+			require.NoError(t, osq.RunSql(t.Context(), []byte(tt.sql)))
 
 			for _, s := range tt.contains {
 				require.Contains(t, stdout.String(), s, "Output should contain %s", s)

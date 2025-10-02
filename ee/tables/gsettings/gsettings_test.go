@@ -63,7 +63,7 @@ func TestGsettingsValues(t *testing.T) {
 		t.Run(tt.filename, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.TODO()
+			ctx := t.Context()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
 				"username": {"tester"},
 			})
@@ -138,7 +138,7 @@ func TestPerUser(t *testing.T) {
 			"key":      tt.keyNames,
 		})
 
-		rows, err := table.generate(context.TODO(), mockQC)
+		rows, err := table.generate(t.Context(), mockQC)
 		require.NoError(t, err, "generating results")
 		require.Contains(t, rows, tt.expected, "generated rows should contain the expected result")
 		require.NotContains(t, rows, tt.unexpected, "generated rows should not contain the unexpected result")
@@ -187,7 +187,7 @@ func TestListKeys(t *testing.T) {
 		t.Run(tt.filename, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			results, err := table.listKeys(ctx, "org.gnome.Mines", "faketmpdir")
 			require.NoError(t, err, "generating results from %s", tt.filename)
@@ -239,7 +239,7 @@ func TestGetType(t *testing.T) {
 		t.Run(tt.expected, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.TODO()
+			ctx := t.Context()
 
 			result, err := table.getType(ctx, "key", "schema", "fake-tmp-dir")
 			require.NoError(t, err, "getting type", tt.expected)

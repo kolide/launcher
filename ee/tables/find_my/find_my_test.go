@@ -4,7 +4,6 @@
 package find_my
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -27,7 +26,7 @@ func TestFindMyDevice(t *testing.T) {
 	findMyTable := FindMyDevice(mockFlags, slogger)
 
 	// Query table
-	response := findMyTable.Call(context.TODO(), map[string]string{
+	response := findMyTable.Call(t.Context(), map[string]string{
 		"action":  "generate",
 		"context": "{}",
 	})

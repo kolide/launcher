@@ -4,7 +4,6 @@
 package table
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/kit/env"
@@ -18,6 +17,6 @@ func TestMDMProfileStatus(t *testing.T) {
 		t.Skip("Skipping MDM Test")
 	}
 
-	_, err := getMDMProfileStatus(context.TODO())
+	_, err := getMDMProfileStatus(t.Context())
 	require.Nil(t, err)
 }

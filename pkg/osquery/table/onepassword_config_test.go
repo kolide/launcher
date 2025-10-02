@@ -1,7 +1,6 @@
 package table
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -49,7 +48,7 @@ func TestOnePasswordAccounts(t *testing.T) { //nolint:paralleltest // We need to
 	require.Equal(t, "kolide_onepassword_accounts", accountsTable.Name())
 
 	// Confirm we can call the table successfully
-	response := accountsTable.Call(context.TODO(), map[string]string{
+	response := accountsTable.Call(t.Context(), map[string]string{
 		"action":  "generate",
 		"context": "{}",
 	})

@@ -1,7 +1,6 @@
 package dataflattentable
 
 import (
-	"context"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -57,7 +56,7 @@ func TestPlist(t *testing.T) {
 			"query": tt.queries,
 		})
 
-		rows, err := plistTable.generate(context.TODO(), mockQC)
+		rows, err := plistTable.generate(t.Context(), mockQC)
 		if tt.err {
 			require.Error(t, err)
 			continue

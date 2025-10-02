@@ -73,7 +73,7 @@ func TestNewExtensionEmptyEnrollSecret(t *testing.T) {
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 
 	// We should be able to make an extension despite an empty enroll secret
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
 	assert.Nil(t, err)
 	assert.NotNil(t, e)
 }
@@ -93,7 +93,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	}
 
 	m := mocks.NewKnapsack(t)
-	confStore, err := agentbbolt.NewStore(context.TODO(), multislogger.NewNopLogger(), db, storage.ConfigStore.String())
+	confStore, err := agentbbolt.NewStore(t.Context(), multislogger.NewNopLogger(), db, storage.ConfigStore.String())
 	require.NoError(t, err)
 	m.On("ConfigStore").Return(confStore)
 	m.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
@@ -102,14 +102,14 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 
 	// close the DB connection here to trigger the error
 	require.NoError(t, db.Close())
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), m, ulid.New(), ExtensionOpts{})
 	assert.NotNil(t, err)
 	assert.Nil(t, e)
 }
 
 func TestGetHostIdentifier(t *testing.T) {
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	ident, err := e.getHostIdentifier()
@@ -122,7 +122,7 @@ func TestGetHostIdentifier(t *testing.T) {
 	assert.Equal(t, oldIdent, ident)
 
 	k = makeKnapsack(t)
-	e, err = NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err = NewExtension(t.Context(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	ident, err = e.getHostIdentifier()
@@ -134,7 +134,7 @@ func TestGetHostIdentifier(t *testing.T) {
 func TestGetHostIdentifierCorruptedData(t *testing.T) {
 	// Put bad data in the DB and ensure we can still generate a fresh UUID
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), &mock.KolideService{}, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	// Put garbage UUID in DB
@@ -160,10 +160,10 @@ func TestExtensionEnrollTransportError(t *testing.T) {
 
 	k := makeKnapsack(t)
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
-	key, invalid, err := e.Enroll(context.Background())
+	key, invalid, err := e.Enroll(t.Context())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.Equal(t, "", key)
 	assert.True(t, invalid)
@@ -177,10 +177,10 @@ func TestExtensionEnrollSecretInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	key, invalid, err := e.Enroll(context.Background())
+	key, invalid, err := e.Enroll(t.Context())
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.Equal(t, "", key)
 	assert.True(t, invalid)
@@ -249,10 +249,10 @@ func TestExtensionEnroll(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, s, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
-	key, invalid, err := e.Enroll(context.Background())
+	key, invalid, err := e.Enroll(t.Context())
 	require.Nil(t, err)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.False(t, invalid)
@@ -274,17 +274,17 @@ func TestExtensionEnroll(t *testing.T) {
 
 	// Should not re-enroll with stored secret
 	m.RequestEnrollmentFuncInvoked = false
-	key, invalid, err = e.Enroll(context.Background())
+	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
 	assert.False(t, invalid)
 	assert.Equal(t, expectedNodeKey, key)
 	assert.Equal(t, expectedEnrollSecret, gotEnrollSecret)
 
-	e, err = NewExtension(context.TODO(), m, s, k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err = NewExtension(t.Context(), m, s, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 	// Still should not re-enroll (because node key stored in DB)
-	key, invalid, err = e.Enroll(context.Background())
+	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	assert.False(t, m.RequestEnrollmentFuncInvoked) // Note False here.
 	assert.False(t, invalid)
@@ -294,9 +294,9 @@ func TestExtensionEnroll(t *testing.T) {
 	// Re-enroll for new node key
 	expectedNodeKey = "new_node_key"
 	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
-	e.RequireReenroll(context.Background())
+	e.RequireReenroll(t.Context())
 	assert.Empty(t, e.NodeKey)
-	key, invalid, err = e.Enroll(context.Background())
+	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	// Now enroll func should be called again
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
@@ -315,10 +315,10 @@ func TestExtensionGenerateConfigsTransportError(t *testing.T) {
 	}
 	k := makeKnapsack(t)
 	k.ConfigStore().Set([]byte(nodeKeyKey), []byte("some_node_key"))
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
-	configs, err := e.GenerateConfigs(context.Background())
+	configs, err := e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.Nil(t, configs)
 	// An error with the cache empty should be returned
@@ -335,10 +335,10 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 	k := makeKnapsack(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
-	e, err := NewExtension(context.TODO(), m, s, k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, s, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	configs, err := e.GenerateConfigs(context.Background())
+	configs, err := e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.Equal(t, map[string]string{"config": configVal}, configs)
 	assert.Nil(t, err)
@@ -349,7 +349,7 @@ func TestExtensionGenerateConfigsCaching(t *testing.T) {
 	m.RequestConfigFunc = func(ctx context.Context, nodeKey string) (string, bool, error) {
 		return "", false, errors.New("foobar")
 	}
-	configs, err = e.GenerateConfigs(context.Background())
+	configs, err = e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.Equal(t, map[string]string{"config": configVal}, configs)
 	// No error because config came from the cache.
@@ -369,11 +369,11 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
-	configs, err := e.GenerateConfigs(context.Background())
+	configs, err := e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.Nil(t, configs)
@@ -400,10 +400,10 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), s, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	configs, err := e.GenerateConfigs(context.Background())
+	configs, err := e.GenerateConfigs(t.Context())
 	assert.NotNil(t, configs)
 	assert.Equal(t, map[string]string{"config": "{}"}, configs)
 	assert.Nil(t, err)
@@ -428,10 +428,10 @@ func TestExtensionGenerateConfigs(t *testing.T) {
 	k := makeKnapsack(t)
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
-	e, err := NewExtension(context.TODO(), m, s, k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, s, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	configs, err := e.GenerateConfigs(context.Background())
+	configs, err := e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
 	assert.Equal(t, map[string]string{"config": configVal}, configs)
 	assert.Nil(t, err)
@@ -444,10 +444,10 @@ func TestExtensionWriteLogsTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.NotNil(t, err)
 }
@@ -465,11 +465,11 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
-	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeString, []string{"foobar"}, true)
+	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeString, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.NotNil(t, err)
@@ -491,11 +491,11 @@ func TestExtensionWriteLogs(t *testing.T) {
 
 	expectedNodeKey := "node_key"
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = expectedNodeKey
 
-	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeStatus, []string{"foobar"}, true)
+	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeStatus, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedNodeKey, gotNodeKey)
@@ -570,7 +570,7 @@ func TestExtensionWriteBufferedLogsEmpty(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	// No buffered logs should result in success and no remote action being
@@ -616,14 +616,14 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
-	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
+	e.LogString(t.Context(), logger.LogTypeStatus, "status foo")
+	e.LogString(t.Context(), logger.LogTypeStatus, "status bar")
 
-	e.LogString(context.Background(), logger.LogTypeString, "result foo")
-	e.LogString(context.Background(), logger.LogTypeString, "result bar")
+	e.LogString(t.Context(), logger.LogTypeString, "result foo")
+	e.LogString(t.Context(), logger.LogTypeString, "result bar")
 
 	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
@@ -647,7 +647,7 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	assert.Nil(t, gotStatusLogs)
 	assert.Nil(t, gotResultLogs)
 
-	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
+	e.LogString(t.Context(), logger.LogTypeStatus, "status foo")
 
 	err = e.writeBufferedLogsForType(logger.LogTypeStatus)
 	assert.Nil(t, err)
@@ -690,11 +690,11 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	e.LogString(context.Background(), logger.LogTypeStatus, "status foo")
-	e.LogString(context.Background(), logger.LogTypeStatus, "status bar")
+	e.LogString(t.Context(), logger.LogTypeStatus, "status foo")
+	e.LogString(t.Context(), logger.LogTypeStatus, "status bar")
 
 	// long timeout is due to github actions runners IO slowness
 	testutil.FatalAfterFunc(t, 7*time.Second, func() {
@@ -741,7 +741,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: 100,
 	})
 	require.Nil(t, err)
@@ -751,11 +751,11 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		status := fmt.Sprintf("status_%3d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
-		e.LogString(context.Background(), logger.LogTypeStatus, status)
+		e.LogString(t.Context(), logger.LogTypeStatus, status)
 
 		result := fmt.Sprintf("result_%3d", i)
 		expectedResultLogs = append(expectedResultLogs, result)
-		e.LogString(context.Background(), logger.LogTypeString, result)
+		e.LogString(t.Context(), logger.LogTypeString, result)
 	}
 
 	// Should write first 10 logs
@@ -817,7 +817,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: 15,
 	})
 	require.Nil(t, err)
@@ -827,14 +827,14 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	require.Equal(t, 0, startLogCount, "start with no buffered logs")
 
 	expectedResultLogs := []string{"res1", "res2", "res3", "res4"}
-	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! oh noes")
-	e.LogString(context.Background(), logger.LogTypeString, "res1")
-	e.LogString(context.Background(), logger.LogTypeString, "res2")
-	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! wow")
-	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! scheiße")
-	e.LogString(context.Background(), logger.LogTypeString, "res3")
-	e.LogString(context.Background(), logger.LogTypeString, "res4")
-	e.LogString(context.Background(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
+	e.LogString(t.Context(), logger.LogTypeString, "this_result_is_tooooooo_big! oh noes")
+	e.LogString(t.Context(), logger.LogTypeString, "res1")
+	e.LogString(t.Context(), logger.LogTypeString, "res2")
+	e.LogString(t.Context(), logger.LogTypeString, "this_result_is_tooooooo_big! wow")
+	e.LogString(t.Context(), logger.LogTypeString, "this_result_is_tooooooo_big! scheiße")
+	e.LogString(t.Context(), logger.LogTypeString, "res3")
+	e.LogString(t.Context(), logger.LogTypeString, "res4")
+	e.LogString(t.Context(), logger.LogTypeString, "this_result_is_tooooooo_big! darn")
 
 	queuedLogCount, err := e.knapsack.ResultLogsStore().Count()
 	require.NoError(t, err)
@@ -908,7 +908,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
 	expectedLoggingInterval := 5 * time.Second
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: 200,
 		LoggingInterval:  expectedLoggingInterval,
 	})
@@ -919,11 +919,11 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		status := fmt.Sprintf("status_%013d", i)
 		expectedStatusLogs = append(expectedStatusLogs, status)
-		e.LogString(context.Background(), logger.LogTypeStatus, status)
+		e.LogString(t.Context(), logger.LogTypeStatus, status)
 
 		result := fmt.Sprintf("result_%013d", i)
 		expectedResultLogs = append(expectedResultLogs, result)
-		e.LogString(context.Background(), logger.LogTypeString, result)
+		e.LogString(t.Context(), logger.LogTypeString, result)
 	}
 
 	// Should write first 10 logs
@@ -1037,7 +1037,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
 	maximum := 10
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBufferedLogs: maximum,
 	})
 	require.Nil(t, err)
@@ -1048,11 +1048,11 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 		gotResultLogs = nil
 		statusLog := fmt.Sprintf("status %d", i)
 		expectedStatusLogs = append(expectedStatusLogs, statusLog)
-		e.LogString(context.Background(), logger.LogTypeStatus, statusLog)
+		e.LogString(t.Context(), logger.LogTypeStatus, statusLog)
 
 		resultLog := fmt.Sprintf("result %d", i)
 		expectedResultLogs = append(expectedResultLogs, resultLog)
-		e.LogString(context.Background(), logger.LogTypeString, resultLog)
+		e.LogString(t.Context(), logger.LogTypeString, resultLog)
 
 		e.writeAndPurgeLogs()
 
@@ -1073,10 +1073,10 @@ func TestExtensionGetQueriesTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	queries, err := e.GetQueries(context.Background())
+	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
 	assert.NotNil(t, err)
 	assert.Nil(t, queries)
@@ -1108,11 +1108,11 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
-	queries, err := e.GetQueries(context.Background())
+	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.NotNil(t, err)
@@ -1133,10 +1133,10 @@ func TestExtensionGetQueries(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	queries, err := e.GetQueries(context.Background())
+	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
 	require.Nil(t, err)
 	assert.Equal(t, expectedQueries, queries.Queries)
@@ -1155,7 +1155,7 @@ func TestGetQueries_Forwarding(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	// Shorten our accelerated startup period so we aren't waiting for a full two minutes for the test
@@ -1167,7 +1167,7 @@ func TestGetQueries_Forwarding(t *testing.T) {
 
 	// Request queries -- this first time, since we're requesting queries right after startup,
 	// the request should go through.
-	queries, err := e.GetQueries(context.TODO())
+	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
 	require.Nil(t, err)
 	assert.Equal(t, expectedQueries, queries.Queries)
@@ -1177,14 +1177,14 @@ func TestGetQueries_Forwarding(t *testing.T) {
 
 	// Request queries -- this time, the request should go through because we haven't made a request
 	// within the last `e.distributedForwardingInterval` seconds.
-	queries, err = e.GetQueries(context.TODO())
+	queries, err = e.GetQueries(t.Context())
 	require.Nil(t, err)
 	require.Equal(t, expectedQueries, queries.Queries)
 
 	// Immediately request queries again. This time, the request should NOT go through, because
 	// we made a request within the last `e.distributedForwardingInterval` seconds.
 	// We should get back an empty response.
-	queries, err = e.GetQueries(context.TODO())
+	queries, err = e.GetQueries(t.Context())
 	require.Nil(t, err)
 	require.Nil(t, queries.Queries)
 }
@@ -1203,7 +1203,7 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	// Shorten our accelerated startup period so we aren't waiting for a full two minutes to start the test
@@ -1211,7 +1211,7 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 
 	// Request queries -- this first time, since we're requesting queries right after startup,
 	// the request should go through.
-	queries, err := e.GetQueries(context.TODO())
+	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
 	require.Nil(t, err)
 	assert.Equal(t, expectedQueries, queries.Queries)
@@ -1222,11 +1222,11 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 
 	// Request queries twice more -- this will be before e.distributedForwardingInterval seconds have passed,
 	// but we should be in accelerated mode and should therefore see the request go through to the cloud.
-	queries, err = e.GetQueries(context.TODO())
+	queries, err = e.GetQueries(t.Context())
 	require.Nil(t, err)
 	require.Equal(t, expectedQueries, queries.Queries)
 
-	queries, err = e.GetQueries(context.TODO())
+	queries, err = e.GetQueries(t.Context())
 	require.Nil(t, err)
 	require.Equal(t, expectedQueries, queries.Queries)
 }
@@ -1238,10 +1238,10 @@ func TestExtensionWriteResultsTransportError(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
-	err = e.WriteResults(context.Background(), []distributed.Result{})
+	err = e.WriteResults(t.Context(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.NotNil(t, err)
 }
@@ -1259,11 +1259,11 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 	e.NodeKey = "bad_node_key"
 
-	err = e.WriteResults(context.Background(), []distributed.Result{})
+	err = e.WriteResults(t.Context(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.True(t, m.RequestEnrollmentFuncInvoked)
 	assert.NotNil(t, err)
@@ -1279,7 +1279,7 @@ func TestExtensionWriteResults(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
 	expectedResults := []distributed.Result{
@@ -1290,7 +1290,7 @@ func TestExtensionWriteResults(t *testing.T) {
 		},
 	}
 
-	err = e.WriteResults(context.Background(), expectedResults)
+	err = e.WriteResults(t.Context(), expectedResults)
 	assert.True(t, m.PublishResultsFuncInvoked)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedResults, gotResults)

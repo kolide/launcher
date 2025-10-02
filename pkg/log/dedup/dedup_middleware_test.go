@@ -68,11 +68,11 @@ func TestDedupSuppressesAndRelogsWithCount(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First log: allowed through
 	if err := mw(ctx, makeRecord(slog.LevelInfo, "hello", slog.String("k", "v")), next.next); err != nil {
@@ -122,11 +122,11 @@ func TestDebugLevelIsDedupedLikeOthers(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(500*time.Millisecond),
 	)
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First debug log passes
 	if err := mw(ctx, makeRecord(slog.LevelDebug, "debug msg"), next.next); err != nil {
@@ -160,11 +160,11 @@ func TestZeroWindowShortCircuitsDedup(t *testing.T) {
 	engine := New(
 		WithDuplicateLogWindow(0), // disabled
 	)
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First log
 	if err := mw(ctx, makeRecord(slog.LevelInfo, "x", slog.String("k", "v")), next.next); err != nil {
@@ -194,11 +194,11 @@ func TestCleanupEmitsSummaryRecordOnlyForDuplicates(t *testing.T) {
 		WithCleanupInterval(10*time.Millisecond),
 		WithCacheExpiry(50*time.Millisecond),
 	)
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Log a single record; should NOT emit a summary because count == 1
 	if err := mw(ctx, makeRecord(slog.LevelInfo, "single msg", slog.String("a", "b")), next.next); err != nil {
@@ -269,10 +269,10 @@ func TestStopHaltsCleanupAndPreventsEmission(t *testing.T) {
 		WithCleanupInterval(30*time.Millisecond),
 		WithCacheExpiry(80*time.Millisecond),
 	)
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a duplicate set which would normally lead to a summary emission after expiry
 	if err := mw(ctx, makeRecord(slog.LevelInfo, "stop-test", slog.String("k", "v")), next.next); err != nil {
@@ -322,11 +322,11 @@ func TestSetDuplicateLogWindowAffectsMiddleware(t *testing.T) {
 
 	next := &nextCapture{}
 	engine := New(WithDuplicateLogWindow(0)) // Start disabled
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// With dedup disabled, duplicates should pass through
 	if err := mw(ctx, makeRecord(slog.LevelInfo, "test", slog.String("k", "v")), next.next); err != nil {
@@ -365,12 +365,12 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
 	engine := New(WithDuplicateLogWindow(50 * time.Millisecond))
-	engine.Start(context.Background())
+	engine.Start(t.Context())
 	defer engine.Stop()
 
 	next := &nextCapture{}
 	mw := engine.Middleware
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Start multiple goroutines that concurrently update the window and process logs
 	var wg sync.WaitGroup

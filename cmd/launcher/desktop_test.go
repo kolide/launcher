@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -50,7 +49,7 @@ func Test_desktopMonitorParentProcess(t *testing.T) { //nolint:paralleltest
 	require.Empty(t, logBytes.String())
 
 	// stop the server -- we should now start getting errors
-	require.NoError(t, runnerServer.Shutdown(context.Background()))
+	require.NoError(t, runnerServer.Shutdown(t.Context()))
 	time.Sleep(monitorInterval * 8)
 
 	// `monitorParentProcess` should perform some retries during this time

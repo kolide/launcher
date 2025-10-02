@@ -1,7 +1,6 @@
 package table
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -54,7 +53,7 @@ func TestChromeLoginDataEmails(t *testing.T) { //nolint:paralleltest // We need 
 	require.Equal(t, "kolide_chrome_login_data_emails", chromeLoginDataEmailsTable.Name())
 
 	// Confirm we can call the table successfully
-	response := chromeLoginDataEmailsTable.Call(context.TODO(), map[string]string{
+	response := chromeLoginDataEmailsTable.Call(t.Context(), map[string]string{
 		"action":  "generate",
 		"context": "{}",
 	})

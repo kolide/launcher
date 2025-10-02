@@ -1,7 +1,6 @@
 package applenotarization
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -11,7 +10,7 @@ import (
 func TestCheckSuccess(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	var tests = []struct {
 		fakeFile       string
@@ -55,7 +54,7 @@ func TestCheckSuccess(t *testing.T) {
 
 func TestSubmit(t *testing.T) {
 	t.Parallel()
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	tmpZipFile, err := os.CreateTemp(t.TempDir(), "fake-for-submission.*.zip")
 	require.NoError(t, err)
