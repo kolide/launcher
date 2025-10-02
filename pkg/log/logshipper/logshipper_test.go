@@ -76,6 +76,9 @@ func TestLogShipper(t *testing.T) {
 			require.NoError(t, err)
 
 			knapsack.On("ServerProvidedDataStore").Return(testKVStore(t, storage.ServerProvidedDataStore.String()))
+			knapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+				HardwareSerial: testSerialNumber,
+			})
 			ls.Ping()
 			require.True(t, ls.isShippingStarted, "shipping should now be enabled")
 			require.Equal(t, authToken, ls.sender.authtoken)
@@ -90,6 +93,7 @@ func TestLogShipper(t *testing.T) {
 				for k, v := range deviceIdentifyingAttributes {
 					require.Equal(t, v, data[k], "device identifying attributes should be in the send buffer")
 				}
+				require.Equal(t, testSerialNumber, data["serial_number"], "serial number from enrollment details should be in the send buffer")
 
 				// write data back to out
 				err = json.NewEncoder(out).Encode(data)
@@ -147,6 +151,9 @@ func TestStop_Multiple(t *testing.T) {
 	}))
 	knapsack.On("Slogger").Return(slogger)
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
+	knapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: testSerialNumber,
+	})
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -204,6 +211,9 @@ func TestStopWithoutRun(t *testing.T) {
 	knapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 	knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
+	knapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: testSerialNumber,
+	})
 
 	ls := New(knapsack, log.NewNopLogger())
 
@@ -214,8 +224,9 @@ var deviceIdentifyingAttributes = map[string]string{
 	"device_id":       ulid.New(),
 	"munemo":          ulid.New(),
 	"organization_id": ulid.New(),
-	"serial_number":   ulid.New(),
 }
+
+var testSerialNumber = ulid.New()
 
 func testKVStore(t *testing.T, name string) types.KVStore {
 	s, err := storageci.NewStore(t, multislogger.NewNopLogger(), name)
@@ -248,6 +259,9 @@ func TestUpdateLogShippingLevel(t *testing.T) {
 	knapsack.On("RegisterChangeObserver", mock.Anything, keys.LogShippingLevel, keys.LogIngestServerURL)
 	knapsack.On("CurrentRunningOsqueryVersion").Return("5.12.3")
 	knapsack.On("LogShippingLevel").Return("warn").Once()
+	knapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: testSerialNumber,
+	})
 
 	ls := New(knapsack, log.NewNopLogger())
 	// new immediately calls Ping -> updateLogShippingLevel, expect that we are initialized with correct log level
