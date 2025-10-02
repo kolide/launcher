@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/carlpett/winlsa"
+	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/sys/windows"
