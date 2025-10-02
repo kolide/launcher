@@ -21,6 +21,7 @@ const (
 	Dt4aInfoStore               Store = "zta_info"                 // The store used for storing dt4a info about this device
 	WindowsUpdatesCacheStore    Store = "windows_updates_cache"    // The store used for caching the results of recent searches against the Windows Update Agent API
 	RegistrationStore           Store = "registrations"            // The store used for persisting launcher's enrollments/registrations
+	EnrollmentDetailsStore      Store = "enrollment_details"       // The store used for persisting enrollment details
 )
 
 func (storeType Store) String() string {
