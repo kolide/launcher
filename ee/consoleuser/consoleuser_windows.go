@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"slices"
 
 	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
@@ -23,15 +22,19 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("getting logon sessions: %w", err)
 	}
 
-	activeSids := make([]string, 0)
+	activeSids := make(map[string]any)
 	for _, luid := range luids {
 		sessionData, err := winlsa.GetLogonSessionData(&luid)
 		if err != nil {
 			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
 		}
 
+		if sessionData.Sid == nil {
+			continue
+		}
+
 		// We get duplicates -- ignore those.
-		if slices.Contains(activeSids, sessionData.Sid.String()) {
+		if _, alreadyFound := activeSids[sessionData.Sid.String()]; alreadyFound {
 			continue
 		}
 
@@ -51,10 +54,17 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We've got a real user -- add them to our list.
-		activeSids = append(activeSids, sessionData.Sid.String())
+		activeSids[sessionData.Sid.String()] = struct{}{}
 	}
 
-	return activeSids, nil
+	activeSidsList := make([]string, len(activeSids))
+	i := 0
+	for sid := range activeSids {
+		activeSidsList[i] = sid
+		i += 1
+	}
+
+	return activeSidsList, nil
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
