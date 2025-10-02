@@ -158,13 +158,14 @@ func (t *TelemetryExporter) addDeviceIdentifyingAttributes() {
 		t.attrs = append(t.attrs, attribute.String("k2.organization_id", string(orgId)))
 	}
 
-	if serialNumber, err := t.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
-		t.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get serial number for attributes",
-			"err", err,
-		)
+	// Get serial number from enrollment details
+	enrollmentDetails := t.knapsack.GetEnrollmentDetails()
+	if enrollmentDetails.HardwareSerial != "" {
+		t.attrs = append(t.attrs, attribute.String("launcher.serial", enrollmentDetails.HardwareSerial))
 	} else {
-		t.attrs = append(t.attrs, attribute.String("launcher.serial", string(serialNumber)))
+		t.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get serial number from enrollment details",
+		)
 	}
 
 	t.attrs = append(t.attrs, attribute.String("launcher.update_channel", t.knapsack.UpdateChannel()))
