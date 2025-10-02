@@ -1,7 +1,6 @@
 package tufinfo
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -39,7 +38,7 @@ func TestTufReleaseVersionTable(t *testing.T) {
 
 	// Call table generate func and validate that our data matches what exists in the filesystem
 	testTable := TufReleaseVersionTable(multislogger.NewNopLogger(), mockFlags)
-	resp := testTable.Call(context.Background(), osquery.ExtensionPluginRequest{
+	resp := testTable.Call(t.Context(), osquery.ExtensionPluginRequest{
 		"action":  "generate",
 		"context": "{}",
 	})

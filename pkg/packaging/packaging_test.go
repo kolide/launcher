@@ -26,7 +26,7 @@ func helperCommandContext(ctx context.Context, command string, args ...string) (
 
 func TestExecOut(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	p := &PackageOptions{}
@@ -46,7 +46,7 @@ func TestExecOut(t *testing.T) {
 func TestInitStuff(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	initOptions := &packagekit.InitOptions{

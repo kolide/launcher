@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -65,7 +64,7 @@ func TestUserServer_authMiddleware(t *testing.T) {
 				assert.Contains(t, logBytes.String(), tt.loggedErr)
 			}
 
-			require.NoError(t, server.Shutdown(context.Background()))
+			require.NoError(t, server.Shutdown(t.Context()))
 		})
 	}
 }
@@ -102,7 +101,7 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 			assert.Empty(t, logBytes.String())
 			assert.Equal(t, http.StatusOK, rr.Code)
 
-			require.NoError(t, server.Shutdown(context.Background()))
+			require.NoError(t, server.Shutdown(t.Context()))
 		})
 	}
 }

@@ -56,7 +56,7 @@ func TestMultiSlogger(t *testing.T) {
 
 	// ensure that span_id gets added as an attribute when present in context
 	spanId := ulid.New()
-	ctx := context.WithValue(context.Background(), SpanIdKey, spanId)
+	ctx := context.WithValue(t.Context(), SpanIdKey, spanId)
 	multislogger.Logger.Log(ctx, slog.LevelDebug, "info_with_interesting_ctx_value")
 
 	require.Contains(t, debugLogBuf.String(), "info_with_interesting_ctx_value", "should be in debug log since it's debug level")
@@ -103,7 +103,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	var logBuf bytes.Buffer
 	multislogger := New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	ctx := context.Background()
+	ctx := t.Context()
 	executeFunc := multislogger.ExecuteWithContext(ctx)
 
 	// Start and then interrupt

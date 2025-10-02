@@ -5,7 +5,6 @@
 package debug
 
 import (
-	"context"
 	"net/http"
 	"os"
 	"syscall"
@@ -40,7 +39,7 @@ func TestStartDebugServer(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
-	err = serv.Shutdown(context.Background())
+	err = serv.Shutdown(t.Context())
 	require.Nil(t, err)
 }
 
@@ -61,7 +60,7 @@ func TestDebugServerUnauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	resp.Body.Close()
 
-	err = serv.Shutdown(context.Background())
+	err = serv.Shutdown(t.Context())
 	require.Nil(t, err)
 }
 

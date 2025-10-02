@@ -2,7 +2,6 @@ package sendbuffer
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -188,7 +187,7 @@ func TestSendBufferConcurrent(t *testing.T) {
 			)
 
 			go func() {
-				sb.Run(context.Background())
+				sb.Run(t.Context())
 			}()
 
 			var wg sync.WaitGroup

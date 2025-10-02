@@ -1160,7 +1160,7 @@ func Test_findReleasePromoteTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			promoteTime := findReleasePromoteTime(context.Background(), tt.binary, targets, tt.channel)
+			promoteTime := findReleasePromoteTime(t.Context(), tt.binary, targets, tt.channel)
 			require.Equal(t, tt.expectedPromoteTime, promoteTime)
 		})
 	}

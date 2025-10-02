@@ -1,7 +1,6 @@
 package osquery
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +41,7 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 	t.Parallel()
 	k := typesmocks.NewKnapsack(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	slogger := multislogger.NewNopLogger()
 
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
@@ -62,7 +61,7 @@ func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
 	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Twice()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := multislogger.NewNopLogger()
 
 	collectTimeout := 5 * time.Second

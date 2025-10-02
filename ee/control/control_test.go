@@ -566,7 +566,7 @@ func Test_knownSubsystem(t *testing.T) {
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	k := typesMocks.NewKnapsack(t)
