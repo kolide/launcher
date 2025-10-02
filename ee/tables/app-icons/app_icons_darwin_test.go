@@ -4,7 +4,6 @@ package appicons
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"image/png"
 	"testing"
@@ -41,7 +40,7 @@ func Test_generateAppIcons(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			results, err := generateAppIcons(context.Background(), tt.queryContext)
+			results, err := generateAppIcons(t.Context(), tt.queryContext)
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			iconB64 := results[0]["icon"]
