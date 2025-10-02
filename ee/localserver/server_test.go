@@ -1,7 +1,6 @@
 package localserver
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -33,7 +32,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	recalculateInterval = 100 * time.Millisecond
 
 	// Create the localserver
-	ls, err := New(context.TODO(), k, nil)
+	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
 
 	// Let the server run for a bit

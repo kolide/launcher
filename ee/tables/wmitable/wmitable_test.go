@@ -4,7 +4,6 @@
 package wmitable
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -122,7 +121,7 @@ func TestQueries(t *testing.T) {
 				"whereclause": {tt.whereClause},
 			})
 
-			rows, err := wmiTable.generate(context.TODO(), mockQC)
+			rows, err := wmiTable.generate(t.Context(), mockQC)
 
 			if tt.err {
 				require.Error(t, err)

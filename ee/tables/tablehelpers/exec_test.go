@@ -5,7 +5,6 @@ package tablehelpers
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/allowedcmd"
@@ -62,7 +61,7 @@ func TestRun(t *testing.T) {
 
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
-			tt.assertion(t, Run(context.TODO(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.execCmd, tt.args, stdout, stderr))
+			tt.assertion(t, Run(t.Context(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.execCmd, tt.args, stdout, stderr))
 
 			if tt.wantStdout {
 				require.NotEmpty(t, stdout.String())
@@ -113,7 +112,7 @@ func TestRunSimple(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := RunSimple(context.TODO(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.cmd, tt.args, tt.opts...)
+			got, err := RunSimple(t.Context(), multislogger.NewNopLogger(), tt.timeoutSeconds, tt.cmd, tt.args, tt.opts...)
 			tt.assertion(t, err)
 			require.Equal(t, tt.want, got)
 		})

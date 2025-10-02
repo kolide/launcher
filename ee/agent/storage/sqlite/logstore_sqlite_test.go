@@ -1,7 +1,6 @@
 package agentsqlite
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -15,7 +14,7 @@ func TestAppendAndIterateValues(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRW(context.TODO(), testRootDir, WatchdogLogStore)
+	s, err := OpenRW(t.Context(), testRootDir, WatchdogLogStore)
 	require.NoError(t, err, "creating test store")
 
 	startTime := time.Now()

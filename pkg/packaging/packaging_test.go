@@ -167,7 +167,7 @@ func Test_getBinary(t *testing.T) {
 	}
 
 	// Verify we found the non-app bundle binary and copied it to the expected location
-	err = p.getBinary(context.TODO(), binaryName, binaryName, cachedBinaryPath)
+	err = p.getBinary(t.Context(), binaryName, binaryName, cachedBinaryPath)
 	assert.NoError(t, err, "expected to find binary but did not")
 
 	_, err = os.Stat(filepath.Join(binDir, binaryName))
@@ -228,7 +228,7 @@ func Test_getBinary_AppBundle(t *testing.T) {
 			}
 
 			// Verify we found the app bundle and copied over the entire directory to the expected location
-			require.NoError(t, p.getBinary(context.TODO(), a.binaryName, a.binaryName, filepath.Join(localBinaryDir, a.binaryName)), "expected to find app bundle but did not")
+			require.NoError(t, p.getBinary(t.Context(), a.binaryName, a.binaryName, filepath.Join(localBinaryDir, a.binaryName)), "expected to find app bundle but did not")
 			require.NoError(t, err, "expected to find app bundle but did not")
 
 			appBundleInfo, err := os.Stat(filepath.Join(tmpPkgRoot, a.appBundleName))

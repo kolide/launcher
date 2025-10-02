@@ -1,7 +1,6 @@
 package katc
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -31,7 +30,7 @@ func Test_camelToSnake(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			outputRows, err := camelToSnake(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{
+			outputRows, err := camelToSnake(t.Context(), multislogger.NewNopLogger(), map[string][]byte{
 				tt.input: nil,
 			})
 			require.NoError(t, err)

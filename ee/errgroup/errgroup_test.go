@@ -50,7 +50,7 @@ func TestWait(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			ctx, cancel := context.WithCancel(context.TODO())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
@@ -80,7 +80,7 @@ func TestWait(t *testing.T) {
 func TestShutdown(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
@@ -107,7 +107,7 @@ func TestShutdown(t *testing.T) {
 func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -152,7 +152,7 @@ func TestShutdown_ReturnsOnTimeout(t *testing.T) {
 func TestStartGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
@@ -178,7 +178,7 @@ func TestStartGoroutine_HandlesPanic(t *testing.T) {
 func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())
@@ -207,7 +207,7 @@ func TestStartRepeatedGoroutine_HandlesPanic(t *testing.T) {
 func TestAddShutdownGoroutine_HandlesPanic(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	eg := NewLoggedErrgroup(ctx, multislogger.NewNopLogger())

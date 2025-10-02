@@ -25,14 +25,14 @@ func TestDeviceDisabled(t *testing.T) {
 		{
 			name: "RequestEnrollment",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestEnrollment(context.TODO(), "enroll_secret", "host_identifier", EnrollmentDetails{})
+				_, _, err := client.RequestEnrollment(t.Context(), "enroll_secret", "host_identifier", EnrollmentDetails{})
 				return err
 			},
 		},
 		{
 			name: "RequestConfig",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestConfig(context.TODO(), "node_key")
+				_, _, err := client.RequestConfig(t.Context(), "node_key")
 				return err
 			},
 		},

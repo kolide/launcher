@@ -4,7 +4,6 @@
 package tpmrunner
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -24,7 +23,7 @@ func Test_tpmRunner_windows(t *testing.T) {
 		t.Parallel()
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		tpmRunner, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// we should never try again after getting TPMNotFound err
@@ -46,7 +45,7 @@ func Test_tpmRunner_windows(t *testing.T) {
 		t.Parallel()
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		tpmRunner, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// we should never try again after getting TPMNotFound err

@@ -2,7 +2,6 @@ package katc
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"io"
 	"testing"
@@ -14,7 +13,7 @@ import (
 func Test_deserializeFirefox_missingTopLevelDataKey(t *testing.T) {
 	t.Parallel()
 
-	_, err := deserializeFirefox(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{
+	_, err := deserializeFirefox(t.Context(), multislogger.NewNopLogger(), map[string][]byte{
 		"not_a_data_key": nil,
 	})
 	require.Error(t, err, "expect deserializeFirefox requires top-level data key")
@@ -50,7 +49,7 @@ func Test_deserializeFirefox_malformedData(t *testing.T) {
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := deserializeFirefox(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{
+			_, err := deserializeFirefox(t.Context(), multislogger.NewNopLogger(), map[string][]byte{
 				"data": tt.data,
 			})
 			require.Error(t, err, "expect deserializeFirefox rejects malformed data")

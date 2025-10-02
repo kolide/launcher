@@ -1,7 +1,6 @@
 package startupsettings
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -39,7 +38,7 @@ func TestOpenWriter_NewDatabase(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := OpenWriter(context.TODO(), k)
+	s, err := OpenWriter(t.Context(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
@@ -61,7 +60,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 
 	// Set up preexisting database
 	testRootDir := setupTestDb(t)
-	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.StartupSettingsStore)
+	store, err := agentsqlite.OpenRW(t.Context(), testRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(keys.UpdateChannel.String()), []byte("some_old_value")), "setting key")
 	require.NoError(t, store.Set([]byte(keys.PinnedLauncherVersion.String()), []byte("")), "setting key")
@@ -103,7 +102,7 @@ func TestOpenWriter_DatabaseAlreadyExists(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := OpenWriter(context.TODO(), k)
+	s, err := OpenWriter(t.Context(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
@@ -157,7 +156,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("ConfigStore").Return(configStore)
 
 	// Set up storage db, which should create the database and set all flags
-	s, err := OpenWriter(context.TODO(), k)
+	s, err := OpenWriter(t.Context(), k)
 	require.NoError(t, err, "expected no error setting up storage db")
 
 	require.NoError(t, s.WriteSettings(), "should be able to writing settings")
@@ -188,7 +187,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("PinnedOsquerydVersion").Return(newPinnedOsquerydVersion).Once()
 
 	// Call FlagsChanged and expect that all flag values are updated
-	s.FlagsChanged(context.TODO(), keys.UpdateChannel)
+	s.FlagsChanged(t.Context(), keys.UpdateChannel)
 	v1, err = s.kvStore.Get([]byte(keys.UpdateChannel.String()))
 	require.NoError(t, err, "getting startup value")
 	require.Equal(t, newFlagValue, string(v1), "incorrect flag value")
@@ -207,7 +206,7 @@ func TestFlagsChanged(t *testing.T) {
 func setupTestDb(t *testing.T) string {
 	tempRootDir := t.TempDir()
 
-	store, err := agentsqlite.OpenRW(context.TODO(), tempRootDir, agentsqlite.StartupSettingsStore)
+	store, err := agentsqlite.OpenRW(t.Context(), tempRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, store.Close(), "closing test db")
 

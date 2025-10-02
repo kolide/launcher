@@ -1,7 +1,6 @@
 package storageci
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -57,7 +56,7 @@ func makeBboltStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB, storeName
 	stores := make(map[storage.Store]types.KVStore)
 
 	for _, storeName := range storeNames {
-		store, err := agentbbolt.NewStore(context.TODO(), slogger, db, storeName.String())
+		store, err := agentbbolt.NewStore(t.Context(), slogger, db, storeName.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create '%s' KVStore: %w", storeName, err)
 		}

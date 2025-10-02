@@ -318,7 +318,7 @@ func TestPing(t *testing.T) {
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
 		traceSamplingRate:         1.0,
-		ctx:                       context.TODO(),
+		ctx:                       t.Context(),
 	}
 
 	// Simulate a new token being set by updating the data store
