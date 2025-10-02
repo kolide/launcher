@@ -1,7 +1,6 @@
 package multislogger
 
 import (
-	"context"
 	"log/slog"
 	"sync"
 	"testing"
@@ -16,7 +15,7 @@ func TestMultiSlogger_FlagsChanged_DuplicateLogWindow(t *testing.T) {
 
 	// Create a multislogger with dedup enabled
 	ms := NewWithDedup(50 * time.Millisecond)
-	ms.Start(context.Background())
+	ms.Start(t.Context())
 	defer ms.Stop()
 
 	// Create a mock flags interface
@@ -27,7 +26,7 @@ func TestMultiSlogger_FlagsChanged_DuplicateLogWindow(t *testing.T) {
 	ms.SetFlags(mockFlags)
 
 	// Call FlagsChanged with DuplicateLogWindow flag
-	ctx := context.Background()
+	ctx := t.Context()
 	ms.FlagsChanged(ctx, keys.DuplicateLogWindow)
 
 	// Verify that the mock was called
@@ -43,7 +42,7 @@ func TestMultiSlogger_FlagsChanged_OtherFlags(t *testing.T) {
 
 	// Create a multislogger with dedup enabled
 	ms := NewWithDedup(50 * time.Millisecond)
-	ms.Start(context.Background())
+	ms.Start(t.Context())
 	defer ms.Stop()
 
 	// Create a mock flags interface
@@ -53,7 +52,7 @@ func TestMultiSlogger_FlagsChanged_OtherFlags(t *testing.T) {
 	ms.SetFlags(mockFlags)
 
 	// Call FlagsChanged with non-DuplicateLogWindow flags
-	ctx := context.Background()
+	ctx := t.Context()
 	ms.FlagsChanged(ctx, keys.Debug, keys.LoggingInterval)
 
 	// Verify that DuplicateLogWindow() was NOT called since we didn't pass that flag
@@ -65,11 +64,11 @@ func TestMultiSlogger_FlagsChanged_NilFlags(t *testing.T) {
 
 	// Create a multislogger without setting flags
 	ms := NewWithDedup(50 * time.Millisecond)
-	ms.Start(context.Background())
+	ms.Start(t.Context())
 	defer ms.Stop()
 
 	// Call FlagsChanged without setting flags - should not panic
-	ctx := context.Background()
+	ctx := t.Context()
 	ms.FlagsChanged(ctx, keys.DuplicateLogWindow)
 	// Test passes if no panic occurs
 }
@@ -86,7 +85,7 @@ func TestMultiSlogger_SetFlags(t *testing.T) {
 	// Verify flags are set by testing FlagsChanged behavior
 	mockFlags.On("DuplicateLogWindow").Return(100 * time.Millisecond)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ms.FlagsChanged(ctx, keys.DuplicateLogWindow)
 
 	mockFlags.AssertCalled(t, "DuplicateLogWindow")
@@ -106,7 +105,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 
 	// Create a multislogger with dedup enabled
 	ms := NewWithDedup(50 * time.Millisecond)
-	ms.Start(context.Background())
+	ms.Start(t.Context())
 	defer ms.Stop()
 
 	// Create a mock flags interface with thread-safe mock
@@ -124,7 +123,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ctx := context.Background()
+		ctx := t.Context()
 		for {
 			select {
 			case <-done:
@@ -164,7 +163,7 @@ func TestMultiSlogger_FlagsChanged_ConcurrentAccess(t *testing.T) {
 				return
 			default:
 				// Create a test log record and process it through the multislogger
-				ms.Log(context.Background(), slog.LevelInfo, "concurrent test", "iteration", i)
+				ms.Log(t.Context(), slog.LevelInfo, "concurrent test", "iteration", i)
 				time.Sleep(5 * time.Millisecond)
 			}
 		}
@@ -182,7 +181,7 @@ func TestMultiSlogger_UpdateDuplicateLogWindow(t *testing.T) {
 	t.Parallel()
 
 	ms := NewWithDedup(50 * time.Millisecond)
-	ms.Start(context.Background())
+	ms.Start(t.Context())
 	defer ms.Stop()
 
 	// Test updating the window
@@ -190,7 +189,7 @@ func TestMultiSlogger_UpdateDuplicateLogWindow(t *testing.T) {
 
 	// We can't directly verify the internal state, but we can verify the method doesn't panic
 	// and that the multislogger continues to function
-	ms.Log(context.Background(), slog.LevelInfo, "test message after update")
+	ms.Log(t.Context(), slog.LevelInfo, "test message after update")
 }
 
 func TestMultiSlogger_UpdateDuplicateLogWindow_NilEngine(t *testing.T) {

@@ -2,7 +2,6 @@ package actionqueue
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -215,7 +214,7 @@ func TestCleanup(t *testing.T) {
 		mockKnapsack,
 		WithStore(store),
 		WithCleanupInterval(100*time.Millisecond),
-		WithContext(context.Background()),
+		WithContext(t.Context()),
 	)
 	actionQueue.RegisterActor(testActorType, mockActor)
 
@@ -281,7 +280,7 @@ func TestStopCleanup_Multiple(t *testing.T) {
 		mockKnapsack,
 		WithStore(store),
 		WithCleanupInterval(100*time.Millisecond),
-		WithContext(context.Background()),
+		WithContext(t.Context()),
 	)
 	actionQueue.RegisterActor(testActorType, mockActor)
 

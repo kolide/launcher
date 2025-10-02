@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,7 +56,7 @@ func TestRecordLauncherVersion(t *testing.T) {
 			}
 
 			// Now, test!
-			require.NoError(t, RecordLauncherVersion(context.TODO(), tempDir), "recording launcher version")
+			require.NoError(t, RecordLauncherVersion(t.Context(), tempDir), "recording launcher version")
 			files, err := filepath.Glob(filepath.Join(tempDir, "*"))
 			require.NoError(t, err, "calling RecordLauncherVersion")
 			require.Equal(t, tt.unrelatedFiles+1, len(files), "expected number of files")

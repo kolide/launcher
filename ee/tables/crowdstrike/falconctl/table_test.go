@@ -74,7 +74,7 @@ func TestOptionRestrictions(t *testing.T) {
 				"options": tt.options,
 			})
 
-			_, err := testTable.generate(context.TODO(), mockQC)
+			_, err := testTable.generate(t.Context(), mockQC)
 			require.NoError(t, err)
 
 			// test the number of times exec was called

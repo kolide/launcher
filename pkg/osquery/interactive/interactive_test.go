@@ -178,7 +178,7 @@ func TestProc(t *testing.T) {
 
 			// Set up the startup settings store -- opening RW ensures that the db exists
 			// with the appropriate migrations.
-			startupSettingsStore, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			startupSettingsStore, err := agentsqlite.OpenRW(t.Context(), rootDir, agentsqlite.StartupSettingsStore)
 			require.NoError(t, err, "initializing startup settings store")
 			require.NoError(t, startupSettingsStore.Close())
 

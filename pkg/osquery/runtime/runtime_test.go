@@ -282,19 +282,19 @@ func TestFlagsChanged(t *testing.T) {
 
 	// change just the InModernStandby flag -- this should not trigger a restart, since no changes need to be applied
 	k.On("InModernStandby").Return(true).Once()
-	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 	require.False(t, runner.needsRestart.Load(), "runner should not be marked as needing a restart when only InModernStandby changed")
 
 	// change both the InModernStandby and WatchdogEnabled flags -- this should trigger a restart, but not until InModernStandby is false again
 	k.On("WatchdogEnabled").Return(true).Once()
 	k.On("InModernStandby").Return(true).Twice()
-	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled, keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.WatchdogEnabled, keys.InModernStandby)
 
 	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
 
 	// no simulate coming out of modern standby -- this should trigger a restart
 	k.On("InModernStandby").Return(false)
-	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
@@ -590,10 +590,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	// Instance is not healthy -- gather info about osquery proc, then fail
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
 	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
 
-	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
 	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
 
 	if isRunning {
@@ -921,7 +921,7 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(t.Context())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -1009,10 +1009,10 @@ func TestRestart(t *testing.T) {
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	allStats, err := osqHistory.GetHistory()

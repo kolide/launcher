@@ -4,7 +4,6 @@
 package powereventwatcher
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -23,7 +22,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 		Level: slog.LevelDebug,
 	}))
 	ksubscriber := NewKnapsackSleepStateUpdater(slogger, typesmocks.NewKnapsack(t))
-	p, err := New(context.TODO(), slogger, ksubscriber)
+	p, err := New(t.Context(), slogger, ksubscriber)
 	require.NoError(t, err)
 
 	// Start and then interrupt

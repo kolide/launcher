@@ -2,7 +2,6 @@ package packagekit
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,7 @@ func TestRenderSystemdEmpty(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	err := RenderSystemd(context.TODO(), &output, emptyInitOptions())
+	err := RenderSystemd(t.Context(), &output, emptyInitOptions())
 	require.NoError(t, err)
 	require.True(t, len(output.String()) > 100)
 
@@ -34,7 +33,7 @@ func TestRenderSystemdComplex(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	err := RenderSystemd(context.TODO(), &output, complexInitOptions())
+	err := RenderSystemd(t.Context(), &output, complexInitOptions())
 	require.NoError(t, err)
 	require.True(t, len(output.String()) > 100)
 

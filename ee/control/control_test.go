@@ -187,7 +187,7 @@ func TestControlServiceUpdate(t *testing.T) {
 				cs.RegisterSubscriber(tt.subsystem, ss)
 			}
 
-			err = cs.update(context.TODO(), tt.subsystem, nil)
+			err = cs.update(t.Context(), tt.subsystem, nil)
 			require.NoError(t, err)
 
 			// Expect consumer to have gotten exactly one update
@@ -227,7 +227,7 @@ func TestControlServiceUpdateErr(t *testing.T) {
 	require.NoError(t, err)
 
 	// Trigger fetch which should cause update error
-	err = cs.Fetch(context.TODO())
+	err = cs.Fetch(t.Context())
 	require.NoError(t, err)
 
 	// Verify error consumer was called
@@ -264,7 +264,7 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 	require.NoError(t, err)
 
 	// First fetch - should fail and not store hash
-	err = cs.Fetch(context.TODO())
+	err = cs.Fetch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 1, errConsumer.updates)
 
@@ -276,7 +276,7 @@ func TestControlServiceRetryAfterUpdateErr(t *testing.T) {
 
 	// Second fetch with new hash - should succeed
 	errConsumer.updateErr = nil
-	err = cs.Fetch(context.TODO())
+	err = cs.Fetch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 2, errConsumer.updates)
 
@@ -335,7 +335,7 @@ func TestControlServiceFetch(t *testing.T) {
 
 			// Repeat fetches to verify no changes
 			for i := 0; i < tt.fetches; i++ {
-				err = cs.Fetch(context.TODO())
+				err = cs.Fetch(t.Context())
 				require.NoError(t, err)
 
 				// Expect consumer to have gotten exactly one update
@@ -377,7 +377,7 @@ func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
 	cs.RegisterSubscriber("desktop", desktopSubscriber)
 
 	// Run fetch for the first time
-	require.NoError(t, cs.Fetch(context.TODO()))
+	require.NoError(t, cs.Fetch(t.Context()))
 
 	// Expect desktop consumer to have gotten exactly one update
 	assert.Equal(t, 1, desktopConsumer.updates)
@@ -389,7 +389,7 @@ func TestControlServiceFetch_IgnoresUnknownSubsystems(t *testing.T) {
 	require.NotContains(t, data.hashRequestCounts, unknownSubsystemHash)
 
 	// Run fetch again. This time, data should be cached, so there should be no updates or pings.
-	require.NoError(t, cs.Fetch(context.TODO()))
+	require.NoError(t, cs.Fetch(t.Context()))
 	assert.Equal(t, 1, desktopConsumer.updates)
 	assert.Equal(t, 1, desktopSubscriber.pings)
 
@@ -430,7 +430,7 @@ func TestControlServiceFetch_WithControlRequestIntervalUpdate(t *testing.T) {
 	require.NoError(t, service.RegisterConsumer("agent_flags", keyvalueconsumer.New(flagController)))
 
 	// Start running and wait at least a couple request intervals for the change to be applied
-	go service.Start(context.TODO())
+	go service.Start(t.Context())
 	time.Sleep(2 * startingRequestInterval)
 
 	// Stop the service
@@ -488,7 +488,7 @@ func TestControlServicePersistLastFetched(t *testing.T) {
 				err := cs.RegisterConsumer(tt.subsystem, tt.c)
 				require.NoError(t, err)
 
-				err = cs.Fetch(context.TODO())
+				err = cs.Fetch(t.Context())
 				require.NoError(t, err)
 			}
 
@@ -566,7 +566,7 @@ func Test_knownSubsystem(t *testing.T) {
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	k := typesMocks.NewKnapsack(t)

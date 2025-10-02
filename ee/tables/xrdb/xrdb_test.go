@@ -99,7 +99,7 @@ func TestXrdbParse(t *testing.T) {
 		}
 		t.Run(tt.filename, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.TODO()
+			ctx := t.Context()
 			qCon := tablehelpers.MockQueryContext(map[string][]string{
 				"username": {"tester"},
 				"display":  {":0"},

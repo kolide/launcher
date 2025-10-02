@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -95,7 +94,7 @@ func TestAddToLibrary(t *testing.T) {
 			testBaseDir := t.TempDir()
 			testReleaseVersion := "1.2.4"
 			tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-			metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
+			metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, http.DefaultClient)
 			require.NoError(t, err, "creating metadata client")
 
 			// Re-initialize the metadata client with our test root JSON
@@ -209,7 +208,7 @@ func TestAddToLibrary_alreadyAdded(t *testing.T) {
 			require.NoError(t, os.Chmod(executablePath, 0755))
 			_, err := os.Stat(executablePath)
 			require.NoError(t, err, "did not create binary for test")
-			require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
+			require.NoError(t, CheckExecutable(t.Context(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 
 			// Ask the library manager to perform the download
 			targetFilename := fmt.Sprintf("%s-%s.tar.gz", binary, testVersion)
@@ -231,7 +230,7 @@ func TestAddToLibrary_verifyStagedUpdate_handlesInvalidFiles(t *testing.T) {
 	testBaseDir := t.TempDir()
 	testReleaseVersion := "0.3.5"
 	tufServerUrl, rootJson := tufci.InitRemoteTufServer(t, testReleaseVersion)
-	metadataClient, err := initMetadataClient(context.TODO(), testBaseDir, tufServerUrl, http.DefaultClient)
+	metadataClient, err := initMetadataClient(t.Context(), testBaseDir, tufServerUrl, http.DefaultClient)
 	require.NoError(t, err, "creating metadata client")
 	// Re-initialize the metadata client with our test root JSON
 	require.NoError(t, metadataClient.Init(rootJson), "could not initialize metadata client with test root JSON")
@@ -679,11 +678,11 @@ func Test_sortedVersionsInLibrary(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(t.Context(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(t.Context(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm invalid versions are the ones we expect
@@ -719,11 +718,11 @@ func Test_sortedVersionsInLibrary_devBuilds(t *testing.T) {
 		require.NoError(t, os.Chmod(executablePath, 0755))
 		_, err := os.Stat(executablePath)
 		require.NoError(t, err, "did not create binary for test")
-		require.NoError(t, CheckExecutable(context.TODO(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
+		require.NoError(t, CheckExecutable(t.Context(), multislogger.NewNopLogger(), executablePath, "--version"), "binary created for test is corrupt")
 	}
 
 	// Get sorted versions
-	validVersions, invalidVersions, err := sortedVersionsInLibrary(context.TODO(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
+	validVersions, invalidVersions, err := sortedVersionsInLibrary(t.Context(), multislogger.NewNopLogger(), binaryLauncher, testBaseDir)
 	require.NoError(t, err, "expected no error on sorting versions in library")
 
 	// Confirm we don't have any invalid versions

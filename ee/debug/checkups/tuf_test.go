@@ -2,7 +2,6 @@ package checkups
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -35,7 +34,7 @@ func TestRun_Tuf(t *testing.T) {
 
 	output := &bytes.Buffer{}
 
-	require.NoError(t, testTufCheckup.Run(context.TODO(), output), "did not expect error running checkup")
+	require.NoError(t, testTufCheckup.Run(t.Context(), output), "did not expect error running checkup")
 
 	// Validate status
 	require.Equal(t, Passing, testTufCheckup.status, "expected passing status")

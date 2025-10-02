@@ -11,10 +11,33 @@ void Icon(CFDataRef *iconDataRef, char* path) {
 	NSString *appPath = [[NSString stringWithUTF8String:path] stringByStandardizingPath];
 	NSImage *img = [[NSWorkspace sharedWorkspace] iconForFile:appPath];
 
-	//request 128x128 since we are going to resize the icon
+	// request 128x128 since we are going to resize the icon
 	NSRect targetFrame = NSMakeRect(0, 0, 128, 128);
-	CGImageRef cgref = [img CGImageForProposedRect:&targetFrame context:nil hints:nil];
-	NSBitmapImageRep *brep = [[NSBitmapImageRep alloc] initWithCGImage:cgref];
+
+	// Create an 8-bit-per-sample RGBA bitmap and draw the image into it. This
+	// ensures TIFFRepresentation uses a supported sample format for decoding
+	// in Go's tiff decoder.
+	NSBitmapImageRep *brep = [[NSBitmapImageRep alloc]
+		initWithBitmapDataPlanes:NULL
+		pixelsWide:128
+		pixelsHigh:128
+		bitsPerSample:8
+		samplesPerPixel:4
+		hasAlpha:YES
+		isPlanar:NO
+		colorSpaceName:NSDeviceRGBColorSpace
+		bytesPerRow:0
+		bitsPerPixel:0];
+
+    NSGraphicsContext *gctx = [NSGraphicsContext graphicsContextWithBitmapImageRep:brep];
+    @try {
+        [NSGraphicsContext saveGraphicsState];
+        [NSGraphicsContext setCurrentContext:gctx];
+        [img drawInRect:targetFrame fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1.0];
+    } @finally {
+        [NSGraphicsContext restoreGraphicsState];
+    }
+
 	NSData *imageData = [brep TIFFRepresentation];
 	*iconDataRef = (CFDataRef)imageData;
 }
@@ -64,7 +87,7 @@ func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]m
 		return nil, errors.New("The kolide_app_icons table requires that you specify a constraint WHERE path =")
 	}
 	path := q.Constraints[0].Expression
-	img, hash, err := getAppIcon(path, queryContext)
+	img, hash, err := getAppIcon(path)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +107,7 @@ func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]m
 	return results, nil
 }
 
-func getAppIcon(appPath string, queryContext table.QueryContext) (image.Image, uint64, error) {
+func getAppIcon(appPath string) (image.Image, uint64, error) {
 	var data C.CFDataRef = 0
 	C.Icon(&data, C.CString(appPath))
 	defer C.CFRelease(C.CFTypeRef(data))

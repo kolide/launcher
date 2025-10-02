@@ -39,7 +39,6 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	serverProvidedDataStore.Set([]byte("device_id"), []byte("500"))
 	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
 	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
-	serverProvidedDataStore.Set([]byte("serial_number"), []byte("abcdabcd"))
 
 	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
@@ -55,9 +54,10 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 		OSName:         runtime.GOOS,
 		OSVersion:      "3.4.5",
 		Hostname:       "Test-Hostname2",
+		HardwareSerial: "abcdabcd",
 	})
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
@@ -93,7 +93,7 @@ func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, nil)
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, nil)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -139,7 +139,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	}))
 	mockKnapsack.On("Slogger").Return(slogger)
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
@@ -195,7 +195,9 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	s.Set([]byte("organization_id"), []byte(expectedOrganizationId))
 
 	expectedSerialNumber := "abcd"
-	s.Set([]byte("serial_number"), []byte(expectedSerialNumber))
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: expectedSerialNumber,
+	})
 
 	expectedUpdateChannel := "stable"
 	mockKnapsack.On("UpdateChannel").Return(expectedUpdateChannel)
@@ -318,7 +320,7 @@ func TestPing(t *testing.T) {
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
 		traceSamplingRate:         1.0,
-		ctx:                       context.TODO(),
+		ctx:                       t.Context(),
 	}
 
 	// Simulate a new token being set by updating the data store
@@ -393,7 +395,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				})
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -467,7 +469,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -539,7 +541,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -616,7 +618,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -692,7 +694,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),

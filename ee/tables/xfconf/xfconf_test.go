@@ -4,7 +4,6 @@
 package xfconf
 
 import (
-	"context"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -105,7 +104,7 @@ func Test_getUserConfig(t *testing.T) { //nolint:paralleltest
 			"username": fakeUserConstraintList,
 		},
 	}
-	fakeUserNoConfig, err := xfconf.generate(context.TODO(), fakeUserQuery)
+	fakeUserNoConfig, err := xfconf.generate(t.Context(), fakeUserQuery)
 	require.NoError(t, err, "expected no error fetching xfconf config")
 	require.Equal(t, 0, len(fakeUserNoConfig), "expected no rows")
 }

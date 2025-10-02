@@ -384,7 +384,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			var actualSerial, actualHardwareUUID string
 			if tt.osquerySuccess {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(context.TODO(), mockKnapsack)
+				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(t.Context(), mockKnapsack)
 				require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
 			} else {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
@@ -392,7 +392,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				actualHardwareUUID = "test-hardware-uuid"
 			}
 
-			actualMachineGUID, err := currentMachineGuid(context.TODO(), mockKnapsack)
+			actualMachineGUID, err := currentMachineGuid(t.Context(), mockKnapsack)
 			require.NoError(t, err, "expected to be able to read machine GUID")
 
 			if tt.serialSetInStore {
@@ -464,7 +464,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger)
+			remediationOccurred := detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger)
 			require.Equal(t, tt.expectDatabaseWipe, remediationOccurred, "expected remediation to occur when database should be wiped")
 
 			// Confirm backup occurred, if database got wiped
@@ -590,7 +590,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make first test call
-	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -615,7 +615,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make second test call
-	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)

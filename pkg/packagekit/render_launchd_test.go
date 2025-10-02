@@ -5,7 +5,6 @@ package packagekit
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ func TestRenderLaunchdEmpty(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	err := RenderLaunchd(context.TODO(), &output, emptyInitOptions())
+	err := RenderLaunchd(t.Context(), &output, emptyInitOptions())
 	require.NoError(t, err)
 	require.True(t, len(output.String()) > 100)
 
@@ -34,7 +33,7 @@ func TestRenderLaunchdComplex(t *testing.T) {
 	t.Parallel()
 
 	var output bytes.Buffer
-	err := RenderLaunchd(context.TODO(), &output, complexInitOptions())
+	err := RenderLaunchd(t.Context(), &output, complexInitOptions())
 	require.NoError(t, err)
 
 	expectedData, err := expectedComplex()

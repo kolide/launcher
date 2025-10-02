@@ -60,7 +60,13 @@ jobs:
     - name: Get dependencies
       run: make deps
 
+    - name: Build (debug)
+      if: github.ref_type != 'tag'
+      shell: bash
+      run: MAKE_debugsymbols=true make -j2 github-build
+    
     - name: Build
+      if: github.ref_type == 'tag'
       run: make -j2 github-build
 
     - name: Check macOS build target
@@ -138,7 +144,12 @@ jobs:
     - name: Set up zig
       uses: mlugg/setup-zig@v2
 
+    - name: Build (debug)
+      if: github.ref_type != 'tag'
+      run: MAKE_debugsymbols=true make -j2 github-build
+
     - name: Build
+      if: github.ref_type == 'tag'
       run: make -j2 github-build
 
     - name: Cache build output

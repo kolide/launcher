@@ -2,7 +2,6 @@ package service
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -22,7 +21,7 @@ func TestForceNoChunkedEncoding(t *testing.T) {
 	// Check no ContentLength
 	require.Equal(t, int64(0), req.ContentLength)
 
-	forceNoChunkedEncoding(multislogger.NewNopLogger())(context.TODO(), req)
+	forceNoChunkedEncoding(multislogger.NewNopLogger())(t.Context(), req)
 
 	// Check that we _now_ have ContentLength
 	require.Equal(t, int64(11), req.ContentLength)

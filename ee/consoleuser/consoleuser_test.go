@@ -1,7 +1,6 @@
 package consoleuser
 
 import (
-	"context"
 	"os"
 	"runtime"
 	"testing"
@@ -12,7 +11,7 @@ import (
 func TestCurrentUids(t *testing.T) {
 	t.Parallel()
 
-	uids, err := CurrentUids(context.Background())
+	uids, err := CurrentUids(t.Context())
 	assert.NoError(t, err)
 
 	// in the current CI environment (GitHub Actions) the linux runner
