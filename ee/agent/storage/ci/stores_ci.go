@@ -34,6 +34,7 @@ func MakeStores(t *testing.T, slogger *slog.Logger, db *bbolt.DB) (map[storage.S
 		storage.Dt4aInfoStore,
 		storage.WindowsUpdatesCacheStore,
 		storage.RegistrationStore,
+		storage.EnrollmentDetailsStore,
 	}
 
 	if os.Getenv("CI") == "true" {
