@@ -78,31 +78,29 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			},
 			cleanShutdown: true,
 		},
-		/*
-			{
-				name: "new process started if old one gone",
-				setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
-					// in the current CI environment (GitHub Actions) the linux runner
-					// does not have a console user, so we don't expect any processes
-					// to be started.
-					if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
-						return
-					}
-					user, err := user.Current()
-					require.NoError(t, err)
-					r.uidProcs[user.Uid] = processRecord{
-						Process: &os.Process{},
-						path:    "test",
-					}
-				},
-				logContains: []string{
-					"found existing desktop process dead for console user",
-					"interrupt received, exiting desktop execute loop",
-					"all desktop processes shutdown successfully",
-				},
-				cleanShutdown: true,
+		{
+			name: "new process started if old one gone",
+			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
+				// in the current CI environment (GitHub Actions) the linux runner
+				// does not have a console user, so we don't expect any processes
+				// to be started.
+				if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+					return
+				}
+				user, err := user.Current()
+				require.NoError(t, err)
+				r.uidProcs[user.Uid] = processRecord{
+					Process: &os.Process{},
+					path:    "test",
+				}
 			},
-		*/
+			logContains: []string{
+				"found existing desktop process dead for console user",
+				"interrupt received, exiting desktop execute loop",
+				"all desktop processes shutdown successfully",
+			},
+			cleanShutdown: true,
+		},
 		{
 			name: "procs waitgroup times out",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
