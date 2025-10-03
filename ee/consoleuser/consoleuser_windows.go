@@ -14,15 +14,16 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// CurrentUids returns actual SIDs, but we've historically used usernames rather than SIDs on Windows.
-// It is a trivial change to swap from sessionData.Sid.String() to sessionData.UserName here.
+// CurrentUids is able to actual SIDs, but we've historically used usernames rather than SIDs on Windows.
+// Therefore, we continue to return the usernames here. If we change our mind, it is a trivial change to swap
+// from sessionData.UserName to sessionData.Sid.String() here.
 func CurrentUids(ctx context.Context) ([]string, error) {
 	luids, err := winlsa.GetLogonSessions()
 	if err != nil {
 		return nil, fmt.Errorf("getting logon sessions: %w", err)
 	}
 
-	activeSids := make(map[string]any)
+	activeUsernames := make(map[string]any)
 	for _, luid := range luids {
 		sessionData, err := winlsa.GetLogonSessionData(&luid)
 		if err != nil {
@@ -34,7 +35,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We get duplicates -- ignore those.
-		if _, alreadyFound := activeSids[sessionData.Sid.String()]; alreadyFound {
+		if _, alreadyFound := activeUsernames[sessionData.UserName]; alreadyFound {
 			continue
 		}
 
@@ -54,17 +55,17 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We've got a real user -- add them to our list.
-		activeSids[sessionData.Sid.String()] = struct{}{}
+		activeUsernames[sessionData.UserName] = struct{}{}
 	}
 
-	activeSidsList := make([]string, len(activeSids))
+	activeUsernameList := make([]string, len(activeUsernames))
 	i := 0
-	for sid := range activeSids {
-		activeSidsList[i] = sid
+	for sid := range activeUsernames {
+		activeUsernameList[i] = sid
 		i += 1
 	}
 
-	return activeSidsList, nil
+	return activeUsernameList, nil
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
