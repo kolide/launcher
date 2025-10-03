@@ -189,7 +189,8 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				if runtime.GOOS == "windows" {
 					currentUids, err := consoleuser.CurrentUids(ctx)
 					require.NoError(t, err)
-					assert.Contains(t, r.uidProcs, user.Username, currentUids)
+					require.Equal(t, 1, len(currentUids))
+					assert.Contains(t, r.uidProcs, currentUids[0], "process not found for expected user, logs: ", logBytes.String())
 				} else {
 					assert.Contains(t, r.uidProcs, user.Uid)
 				}
