@@ -68,6 +68,8 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	return activeUsernameList, nil
 }
 
+// usernameFromSessionData constructs a username in the format compatible with e.g.
+// ExplorerProcess.
 func usernameFromSessionData(sessionData *winlsa.LogonSessionData) string {
 	return fmt.Sprintf("%s\\%s", sessionData.LogonDomain, sessionData.UserName)
 }
