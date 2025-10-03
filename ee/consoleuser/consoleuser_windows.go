@@ -35,7 +35,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We get duplicates -- ignore those.
-		if _, alreadyFound := activeUsernames[sessionData.UserName]; alreadyFound {
+		if _, alreadyFound := activeUsernames[usernameFromSessionData(sessionData)]; alreadyFound {
 			continue
 		}
 
@@ -55,7 +55,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We've got a real user -- add them to our list.
-		activeUsernames[sessionData.UserName] = struct{}{}
+		activeUsernames[usernameFromSessionData(sessionData)] = struct{}{}
 	}
 
 	activeUsernameList := make([]string, len(activeUsernames))
@@ -66,6 +66,10 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	}
 
 	return activeUsernameList, nil
+}
+
+func usernameFromSessionData(sessionData *winlsa.LogonSessionData) string {
+	return fmt.Sprintf("%s\\%s", sessionData.LogonDomain, sessionData.UserName)
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
