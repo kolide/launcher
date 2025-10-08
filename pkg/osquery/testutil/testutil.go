@@ -54,21 +54,25 @@ func DownloadOsquery(version string) (binaryPath string, cleanup func() error, e
 	// Download the binary if it doesn't exist
 	if _, err := os.Stat(binaryPath); err != nil {
 		// Binary doesn't exist, download it
+		// Create a separate temp directory for the download (FetchBinary creates subdirectories)
+		downloadDir, err := os.MkdirTemp("", "osquery-download-")
+		if err != nil {
+			return "", nil, fmt.Errorf("creating download directory: %w", err)
+		}
+		defer os.RemoveAll(downloadDir)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		dlPath, err := packaging.FetchBinary(ctx, cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), version, target)
+		dlPath, err := packaging.FetchBinary(ctx, downloadDir, "osqueryd", target.PlatformBinaryName("osqueryd"), version, target)
 		if err != nil {
 			return "", nil, fmt.Errorf("fetching osqueryd binary: %w", err)
 		}
 
-		// Copy to our standardized location
+		// Copy to our standardized cache location
 		if err := fsutil.CopyFile(dlPath, binaryPath); err != nil {
-			return "", nil, fmt.Errorf("copying osqueryd binary: %w", err)
+			return "", nil, fmt.Errorf("copying osqueryd binary from %s to %s: %w", dlPath, binaryPath, err)
 		}
-
-		// Clean up the download path (FetchBinary downloads to a temp location)
-		os.Remove(dlPath)
 	}
 
 	// Always ensure the binary is executable and has no quarantine attributes,

@@ -14,6 +14,11 @@ import (
 // prepareBinaryForExecution removes extended attributes and ad-hoc signs a binary on macOS
 // to allow it to execute without Gatekeeper interference.
 func prepareBinaryForExecution(binaryPath string) error {
+	// Verify the binary exists before trying to sign it
+	if _, err := os.Stat(binaryPath); err != nil {
+		return fmt.Errorf("binary does not exist at %s: %w", binaryPath, err)
+	}
+
 	// Clear extended attributes (best effort)
 	_ = removeAllExtendedAttributes(binaryPath)
 
@@ -24,7 +29,7 @@ func prepareBinaryForExecution(binaryPath string) error {
 		return fmt.Errorf("failed to create codesign command: %w", err)
 	}
 	if err := signCmd.Run(); err != nil {
-		return fmt.Errorf("failed to ad-hoc sign binary (required for macOS Gatekeeper): %w", err)
+		return fmt.Errorf("failed to ad-hoc sign binary at %s (required for macOS Gatekeeper): %w", binaryPath, err)
 	}
 
 	return nil
