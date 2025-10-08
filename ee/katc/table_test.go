@@ -360,7 +360,7 @@ func TestQueryLevelDB(t *testing.T) {
 
 	// Create a level db to query
 	tempDir := t.TempDir()
-	db, err := indexeddb.OpenLeveldb(tempDir)
+	db, err := indexeddb.OpenLeveldb(multislogger.NewNopLogger(), tempDir)
 	require.NoError(t, err)
 
 	// Add some data

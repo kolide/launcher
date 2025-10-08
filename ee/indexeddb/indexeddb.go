@@ -2,20 +2,22 @@
 package indexeddb
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/kolide/goleveldb/leveldb"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
+	leveldbutil "github.com/kolide/goleveldb/leveldb/util"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/indexeddbcomparator"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -27,12 +29,9 @@ import (
 // bounds.)
 const maxNumberOfObjectStoresToCheck = 100
 
-// indexeddbComparer can be used when opening any IndexedDB instance.
-var indexeddbComparer = newChromeComparer()
-
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
 	defer span.End()
 
@@ -49,7 +48,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 
 	objs := make([]map[string][]byte, 0)
 
-	db, err := OpenLeveldb(tempDbCopyLocation)
+	db, err := OpenLeveldb(slogger, tempDbCopyLocation)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
@@ -100,13 +99,9 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
 	// Now, we can read all records, keeping only the ones with our matching key prefix.
-	iter := db.NewIterator(nil, nil)
+	byteRange := leveldbutil.BytesPrefix(keyPrefix)
+	iter := db.NewIterator(byteRange, nil)
 	for iter.Next() {
-		key := iter.Key()
-		if !bytes.HasPrefix(key, keyPrefix) {
-			continue
-		}
-
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
 		objs = append(objs, map[string][]byte{
@@ -182,9 +177,10 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-func OpenLeveldb(dbLocation string) (*leveldb.DB, error) {
+func OpenLeveldb(slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+	comparer := indexeddbcomparator.NewChromeComparer(slogger)
 	opts := &opt.Options{
-		Comparer:               indexeddbComparer,
+		Comparer:               comparer,
 		DisableSeeksCompaction: true,               // no need to perform compaction
 		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
