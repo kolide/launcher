@@ -20,10 +20,6 @@ func Bputil(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/bin/bputil", arg...)
 }
 
-func Codesign(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/codesign", arg...)
-}
-
 func Brew(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
 		validatedCmd, err := validatedCommand(ctx, p, arg...)
@@ -149,10 +145,6 @@ func SystemProfiler(ctx context.Context, arg ...string) (*TracedCmd, error) {
 
 func Tmutil(ctx context.Context, arg ...string) (*TracedCmd, error) {
 	return validatedCommand(ctx, "/usr/bin/tmutil", arg...)
-}
-
-func Xattr(ctx context.Context, arg ...string) (*TracedCmd, error) {
-	return validatedCommand(ctx, "/usr/bin/xattr", arg...)
 }
 
 func ZerotierCli(ctx context.Context, arg ...string) (*TracedCmd, error) {
