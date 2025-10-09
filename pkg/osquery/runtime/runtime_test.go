@@ -51,7 +51,12 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	testOsqueryBinary, _ = testutil.DownloadOsqueryOrDie("stable")
+	var err error
+	testOsqueryBinary, _, err = testutil.DownloadOsquery("stable")
+	if err != nil {
+		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
+	}
 
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
 

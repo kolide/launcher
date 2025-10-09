@@ -30,7 +30,12 @@ var testOsqueryBinary string
 // TestMain allows us to download osquery once, for use in all tests, instead of
 // downloading once per test case.
 func TestMain(m *testing.M) {
-	testOsqueryBinary, _ = testutil.DownloadOsqueryOrDie("nightly")
+	var err error
+	testOsqueryBinary, _, err = testutil.DownloadOsquery("nightly")
+	if err != nil {
+		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
+	}
 
 	// Run the tests
 	retCode := m.Run()

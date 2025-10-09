@@ -18,7 +18,12 @@ var testOsqueryBinary string
 
 // TestMain overrides the default test main function. This allows us to share setup/teardown.
 func TestMain(m *testing.M) {
-	testOsqueryBinary, _ = testutil.DownloadOsqueryOrDie("stable")
+	var err error
+	testOsqueryBinary, _, err = testutil.DownloadOsquery("stable")
+	if err != nil {
+		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
+		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
+	}
 
 	// Run the tests!
 	retCode := m.Run()

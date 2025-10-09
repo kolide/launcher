@@ -89,21 +89,3 @@ func DownloadOsquery(version string) (binaryPath string, cleanup func() error, e
 
 	return binaryPath, cleanupFunc, nil
 }
-
-// DownloadOsqueryOrDie downloads an osquery binary for testing purposes, calling os.Exit(1)
-// if the download fails. This is useful in TestMain functions where error handling is awkward.
-//
-// Parameters:
-//   - version: The osquery version to download (e.g., "nightly", "stable", "5.17.0")
-//
-// Returns:
-//   - The path to the osquery binary
-//   - A cleanup function that can be called to remove the binary (optional)
-func DownloadOsqueryOrDie(version string) (binaryPath string, cleanup func() error) {
-	binaryPath, cleanup, err := DownloadOsquery(version)
-	if err != nil {
-		fmt.Printf("failed to download osqueryd binary for tests: %v\n", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-	return binaryPath, cleanup
-}
