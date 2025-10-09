@@ -2,6 +2,7 @@
 package indexeddb
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -14,7 +15,6 @@ import (
 	"github.com/kolide/goleveldb/leveldb"
 	leveldberrors "github.com/kolide/goleveldb/leveldb/errors"
 	"github.com/kolide/goleveldb/leveldb/opt"
-	leveldbutil "github.com/kolide/goleveldb/leveldb/util"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/pkg/indexeddbcomparator"
@@ -99,9 +99,13 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 	keyPrefix := objectDataKeyPrefix(databaseId, objectStoreId)
 
 	// Now, we can read all records, keeping only the ones with our matching key prefix.
-	byteRange := leveldbutil.BytesPrefix(keyPrefix)
-	iter := db.NewIterator(byteRange, nil)
+	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
+		key := iter.Key()
+		if !bytes.HasPrefix(key, keyPrefix) {
+			continue
+		}
+
 		tmp := make([]byte, len(iter.Value()))
 		copy(tmp, iter.Value())
 		objs = append(objs, map[string][]byte{
@@ -178,7 +182,7 @@ func copyFile(ctx context.Context, src string, dest string) error {
 }
 
 func OpenLeveldb(slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
-	comparer := indexeddbcomparator.NewChromeComparer(slogger)
+	comparer := indexeddbcomparator.NewIdbCmp1Comparer(slogger)
 	opts := &opt.Options{
 		Comparer:               comparer,
 		DisableSeeksCompaction: true,               // no need to perform compaction

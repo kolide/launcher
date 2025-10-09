@@ -90,7 +90,7 @@ const (
 )
 
 type (
-	chromeComparer struct {
+	idbCmp1Comparer struct {
 		slogger *slog.Logger
 	}
 
@@ -99,9 +99,9 @@ type (
 	}
 )
 
-func NewChromeComparer(slogger *slog.Logger) comparer.Comparer {
-	return &chromeComparer{
-		slogger: slogger.With("component", "chrome_indexeddb_comparer"),
+func NewIdbCmp1Comparer(slogger *slog.Logger) comparer.Comparer {
+	return &idbCmp1Comparer{
+		slogger: slogger.With("component", "idb_cmp1_comparer"),
 	}
 }
 
@@ -124,7 +124,7 @@ func (prefix *keyPrefix) Type() int {
 	}
 }
 
-func (c *chromeComparer) Compare(a, b []byte) int {
+func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 	slogger := c.slogger.With(
 		"key_a", fmt.Sprintf("%x", a),
 		"key_b", fmt.Sprintf("%x", b),
@@ -447,21 +447,21 @@ func (c *chromeComparer) Compare(a, b []byte) int {
 	}
 }
 
-func (c *chromeComparer) Name() string {
+func (c *idbCmp1Comparer) Name() string {
 	return "idb_cmp1"
 }
 
-func (c *chromeComparer) Separator(dst, a, b []byte) []byte {
+func (c *idbCmp1Comparer) Separator(dst, a, b []byte) []byte {
 	return nil
 }
 
-func (c *chromeComparer) Successor(dst, b []byte) []byte {
+func (c *idbCmp1Comparer) Successor(dst, b []byte) []byte {
 	return nil
 }
 
 // decodeVarInt - see https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#primitive-types
 // int64_t >= 0; variable-width, little-endian, 7 bits per byte with high bit set until last
-func (c *chromeComparer) decodeVarInt(a []byte) ([]byte, int64, error) {
+func (c *idbCmp1Comparer) decodeVarInt(a []byte) ([]byte, int64, error) {
 	v := uint64(0)
 	for i := 0; i < len(a) && i < 9; i++ {
 		v |= uint64(a[i]&0x7f) << (7 * i)
@@ -478,7 +478,7 @@ func (c *chromeComparer) decodeVarInt(a []byte) ([]byte, int64, error) {
 	return nil, 0, errors.New("invalid key provided for decodeVarInt")
 }
 
-func (c *chromeComparer) compareBinary(a, b []byte) ([]byte, []byte, int, error) {
+func (c *idbCmp1Comparer) compareBinary(a, b []byte) ([]byte, []byte, int, error) {
 	a, len1, err := c.decodeVarInt(a)
 	if err != nil {
 		return nil, nil, 0, err
@@ -500,7 +500,7 @@ func (c *chromeComparer) compareBinary(a, b []byte) ([]byte, []byte, int, error)
 	return a[len1:], b[len2:], bytes.Compare(a[:len1], b[:len2]), nil
 }
 
-func (c *chromeComparer) compareDouble(a, b []byte) ([]byte, []byte, int, error) {
+func (c *idbCmp1Comparer) compareDouble(a, b []byte) ([]byte, []byte, int, error) {
 	if len(a) < 8 || len(b) < 8 {
 		c.slogger.Log(context.TODO(), slog.LevelError,
 			"invalid keys provided for compareDouble (must be at least 8 bytes)",
@@ -516,7 +516,7 @@ func (c *chromeComparer) compareDouble(a, b []byte) ([]byte, []byte, int, error)
 	return a[8:], b[8:], cmp.Compare(f1, f2), nil
 }
 
-func (c *chromeComparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, int, error) {
+func (c *idbCmp1Comparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, int, error) {
 	if len(a) == 0 || len(b) == 0 {
 		return a, b, cmp.Compare(len(a), len(b)), nil
 	}
@@ -577,7 +577,7 @@ func (c *chromeComparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, int
 	}
 }
 
-func (c *chromeComparer) compareStringWithLength(a, b []byte) ([]byte, []byte, int, error) {
+func (c *idbCmp1Comparer) compareStringWithLength(a, b []byte) ([]byte, []byte, int, error) {
 	a, v1, err := c.decodeVarInt(a)
 	if err != nil {
 		return nil, nil, 0, err
