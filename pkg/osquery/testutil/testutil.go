@@ -83,14 +83,6 @@ func DownloadOsquery(version string) (binaryPath string, cleanup func() error, e
 		}
 	}
 
-	// Remove ALL extended attributes on macOS that might prevent execution
-	// and ad-hoc sign the binary to bypass Gatekeeper restrictions
-	if runtime.GOOS == "darwin" {
-		if err := prepareBinaryForExecution(binaryPath); err != nil {
-			return "", nil, fmt.Errorf("preparing binary for execution: %w", err)
-		}
-	}
-
 	cleanupFunc := func() error {
 		return os.Remove(binaryPath)
 	}
