@@ -6,7 +6,9 @@ package consoleuser
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 
 	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
@@ -58,12 +60,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		activeUsernames[usernameFromSessionData(sessionData)] = struct{}{}
 	}
 
-	activeUsernameList := make([]string, len(activeUsernames))
-	i := 0
-	for sid := range activeUsernames {
-		activeUsernameList[i] = sid
-		i += 1
-	}
+	activeUsernameList := slices.Collect(maps.Keys(activeUsernames))
 
 	return activeUsernameList, nil
 }
