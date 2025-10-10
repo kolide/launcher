@@ -446,7 +446,7 @@ func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
 	}
 	// verify that all 9 have been seen
 	for i, seen := range resultsSeen {
-		require.True(t, seen, "number %d was not seen", i)
+		require.True(t, seen, "test number %d was not seen during iteration", i)
 	}
 }
 
