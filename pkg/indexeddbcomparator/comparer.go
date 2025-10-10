@@ -1,3 +1,6 @@
+// Copyright (c) 2021-2025 cions
+// Licensed under the MIT License.
+//
 // Package indexdbcomparator provides an implementation of the chrome indexeddb comparator, idb_cmp1. This contains
 // the logic for comparing indexeddb keys so they can be properly iterated. idb_cmp1 is a more complex comparison mechanism
 // than the default leveldb bytewiseComparator, taking into account key data types before determining
