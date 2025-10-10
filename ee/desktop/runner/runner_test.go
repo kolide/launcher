@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -186,7 +187,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				}, 30*time.Second, 1*time.Second))
 			} else {
 				if runtime.GOOS == "windows" {
-					assert.Contains(t, r.uidProcs, user.Username)
+					currentUids, err := consoleuser.CurrentUids(ctx)
+					require.NoError(t, err)
+					require.Equal(t, 1, len(currentUids))
+					assert.Contains(t, r.uidProcs, currentUids[0], "process not found for expected user, logs: ", logBytes.String())
 				} else {
 					assert.Contains(t, r.uidProcs, user.Uid)
 				}

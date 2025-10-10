@@ -6,45 +6,69 @@ package consoleuser
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 
+	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
+	"golang.org/x/sys/windows"
 )
 
+// CurrentUids is able to actual SIDs, but we've historically used usernames rather than SIDs on Windows.
+// Therefore, we continue to return the usernames here. If we change our mind, it is a trivial change to swap
+// from sessionData.UserName to sessionData.Sid.String() here.
 func CurrentUids(ctx context.Context) ([]string, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	explorerProcs, err := explorerProcesses(ctx)
+	luids, err := winlsa.GetLogonSessions()
 	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
+		return nil, fmt.Errorf("getting logon sessions: %w", err)
 	}
 
-	// unclear if windows will ever have more than one explorer process for a single user
-	// guard against this by forcing uniqueness
-
-	// first store uids in a map to prevent duplicates
-	// most of the time it will be just 1 user, so start map at 1
-	uidsMap := make(map[string]struct{}, 1)
-
-	for _, explorerProc := range explorerProcs {
-		uid, err := processOwnerUid(ctx, explorerProc)
+	activeUsernames := make(map[string]any)
+	for _, luid := range luids {
+		sessionData, err := winlsa.GetLogonSessionData(&luid)
 		if err != nil {
-			return nil, fmt.Errorf("getting process owner uid (for pid %d): %w", explorerProc.Pid, err)
+			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
 		}
-		uidsMap[uid] = struct{}{}
+
+		if sessionData.Sid == nil {
+			continue
+		}
+
+		// We get duplicates -- ignore those.
+		if _, alreadyFound := activeUsernames[usernameFromSessionData(sessionData)]; alreadyFound {
+			continue
+		}
+
+		// Only look at sessions associated with users. We can filter first by interactive-type logons,
+		// to avoid extra syscalls.
+		if sessionData.LogonType != winlsa.LogonTypeInteractive && sessionData.LogonType != winlsa.LogonTypeRemoteInteractive {
+			continue
+		}
+
+		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
+		_, _, accountType, err := sessionData.Sid.LookupAccount("")
+		if err != nil {
+			return nil, fmt.Errorf("getting account type for LUID: %w", err)
+		}
+		if accountType != windows.SidTypeUser {
+			continue
+		}
+
+		// We've got a real user -- add them to our list.
+		activeUsernames[usernameFromSessionData(sessionData)] = struct{}{}
 	}
 
-	// convert map keys to slice
-	uids := make([]string, len(uidsMap))
-	uidCount := 0
-	for uid := range uidsMap {
-		uids[uidCount] = uid
-		uidCount++
-	}
+	activeUsernameList := slices.Collect(maps.Keys(activeUsernames))
 
-	return uids, nil
+	return activeUsernameList, nil
+}
+
+// usernameFromSessionData constructs a username in the format compatible with e.g.
+// ExplorerProcess.
+func usernameFromSessionData(sessionData *winlsa.LogonSessionData) string {
+	return fmt.Sprintf("%s\\%s", sessionData.LogonDomain, sessionData.UserName)
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
