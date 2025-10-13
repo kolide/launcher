@@ -22,6 +22,7 @@ const (
 	DesktopUpdateInterval            FlagKey = "desktop_update_interval"
 	DesktopMenuRefreshInterval       FlagKey = "desktop_menu_refresh_interval"
 	DesktopGoMaxProcs                FlagKey = "desktop_go_max_procs"
+	LauncherGoMaxProcs               FlagKey = "launcher_go_max_procs"
 	DebugServerData                  FlagKey = "debug_server_data"
 	ForceControlSubsystems           FlagKey = "force_control_subsystems"
 	ControlServerURL                 FlagKey = "control_server_url"

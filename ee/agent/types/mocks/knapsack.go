@@ -917,6 +917,24 @@ func (_m *Knapsack) LatestOsquerydPath(ctx context.Context) string {
 	return r0
 }
 
+// LauncherGoMaxProcs provides a mock function with no fields
+func (_m *Knapsack) LauncherGoMaxProcs() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LauncherGoMaxProcs")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
 // LauncherHistoryStore provides a mock function with no fields
 func (_m *Knapsack) LauncherHistoryStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -2014,6 +2032,24 @@ func (_m *Knapsack) SetKolideServerURL(url string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetLauncherGoMaxProcs provides a mock function with given fields: maxProcs
+func (_m *Knapsack) SetLauncherGoMaxProcs(maxProcs int) error {
+	ret := _m.Called(maxProcs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetLauncherGoMaxProcs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(maxProcs)
 	} else {
 		r0 = ret.Error(0)
 	}

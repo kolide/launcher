@@ -76,6 +76,10 @@ type Flags interface {
 	SetDesktopGoMaxProcs(maxProcs int) error
 	DesktopGoMaxProcs() int
 
+	// LauncherGoMaxProcs is the maximum number of OS threads that can be used by the launcher process.
+	SetLauncherGoMaxProcs(maxProcs int) error
+	LauncherGoMaxProcs() int
+
 	// DebugServerData causes logging and diagnostics related to control server error handling to be enabled.
 	SetDebugServerData(debug bool) error
 	DebugServerData() bool

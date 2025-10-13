@@ -93,12 +93,6 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	logger = log.With(logger, "caller", log.DefaultCaller, "session_pid", os.Getpid())
 	slogger := multiSlogger.Logger
 
-	// FIXME(seph): I'm not sure what the right place to call this is, or what the right
-	// integer is. On seph's m3, the default is 16, so I'm arbitrarily picking half that.
-	// If we like this, we should consider moving it to knapsack and making a flag.
-	// (As well as adding it to various metrics)
-	gomaxprocsLimiter(ctx, slogger, 8)
-
 	// If delay_start is configured, wait before running launcher.
 	if opts.DelayStart > 0*time.Second {
 		slogger.Log(ctx, slog.LevelDebug,
@@ -208,6 +202,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
+
+	// Apply GOMAXPROCS limit from control flag
+	gomaxprocsLimiter(ctx, slogger, k.LauncherGoMaxProcs())
+
+	// Set up GOMAXPROCS observer to watch for flag changes and apply them at runtime
+	gomaxprocsObs := newGomaxprocsObserver(slogger, k)
+	flagController.RegisterChangeObserver(gomaxprocsObs, keys.LauncherGoMaxProcs)
 
 	// Set up flag-driven dedup configuration on the main slogger
 	// (following the user's preference that early logs and system logs don't need deduplication)
