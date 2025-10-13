@@ -129,8 +129,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 
 			// if we're not in CI, always expect desktop enabled call
@@ -374,8 +376,10 @@ func TestUpdate(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
@@ -408,8 +412,10 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 
 	mockKnapsack := mocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
