@@ -171,6 +171,10 @@ func (c *idbCmp1Comparer) Compare(a, b []byte) int {
 		typeByte := aWithoutPrefix[0]
 		aWithoutPrefix, bWithoutPrefix = aWithoutPrefix[1:], bWithoutPrefix[1:]
 
+		// this flow seems kind of odd but it does align with the chromium implementation here:
+		// https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/indexed_db_leveldb_coding.cc#1365.
+		// best guess is that by this point we already know that key prefixes are equal, and that the type byte is equal,
+		// so maybe simple global metadata types are just considered equal for comparison purposes and there'd be no reason to go further here.
 		if typeByte < maxSimpleGlobalMetaDataTypeByte {
 			return 0
 		}
