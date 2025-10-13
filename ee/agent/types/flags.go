@@ -72,6 +72,10 @@ type Flags interface {
 	SetDesktopMenuRefreshInterval(interval time.Duration) error
 	DesktopMenuRefreshInterval() time.Duration
 
+	// DesktopGoMaxProcs is the maximum number of OS threads that can be used by the desktop process.
+	SetDesktopGoMaxProcs(maxProcs int) error
+	DesktopGoMaxProcs() int
+
 	// DebugServerData causes logging and diagnostics related to control server error handling to be enabled.
 	SetDebugServerData(debug bool) error
 	DebugServerData() bool

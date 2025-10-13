@@ -275,6 +275,24 @@ func (_m *Flags) DesktopEnabled() bool {
 	return r0
 }
 
+// DesktopGoMaxProcs provides a mock function with no fields
+func (_m *Flags) DesktopGoMaxProcs() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DesktopGoMaxProcs")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
 // DesktopMenuRefreshInterval provides a mock function with no fields
 func (_m *Flags) DesktopMenuRefreshInterval() time.Duration {
 	ret := _m.Called()
@@ -1151,6 +1169,24 @@ func (_m *Flags) SetDesktopEnabled(enabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(enabled)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetDesktopGoMaxProcs provides a mock function with given fields: maxProcs
+func (_m *Flags) SetDesktopGoMaxProcs(maxProcs int) error {
+	ret := _m.Called(maxProcs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDesktopGoMaxProcs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(maxProcs)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"os/user"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -95,8 +96,22 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		"session_pid", os.Getpid(),
 	)
 
-	// FIXME(seph): This should move to being a command line flag, and plumbed through the caller.
-	gomaxprocsLimiter(context.TODO(), slogger, 2)
+	// Get the GOMAXPROCS limit from the environment variable set by the runner
+	desktopGoMaxProcs := 2 // default value
+	if envValue := os.Getenv("DESKTOP_GO_MAX_PROCS"); envValue != "" {
+		if parsedValue, err := strconv.Atoi(envValue); err == nil {
+			desktopGoMaxProcs = parsedValue
+		} else {
+			slogger.Log(context.TODO(), slog.LevelWarn,
+				"failed to parse DESKTOP_GO_MAX_PROCS environment variable, using default",
+				"env_value", envValue,
+				"err", err,
+				"default", desktopGoMaxProcs,
+			)
+		}
+	}
+
+	gomaxprocsLimiter(context.TODO(), slogger, desktopGoMaxProcs)
 
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
