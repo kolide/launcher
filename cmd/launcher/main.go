@@ -123,6 +123,20 @@ func runMain() int {
 		return 0
 	}
 
+	// If desktop mode is enabled, run desktop instead of launcher
+	if opts.Desktop {
+		// Filter out the --desktop flag from args since runDesktop has its own flagset
+		desktopArgs := filterDesktopFlag(os.Args[1:])
+		if err := runDesktop(systemSlogger, desktopArgs); err != nil {
+			systemSlogger.Log(ctx, slog.LevelError,
+				"running desktop",
+				"err", err,
+			)
+			return 1
+		}
+		return 0
+	}
+
 	// recreate the logger with  the appropriate level.
 	logger = logutil.NewServerLogger(opts.Debug)
 
@@ -218,8 +232,6 @@ func runSubcommands(systemMultiSlogger *multislogger.MultiSlogger) error {
 		run = runCompactDb
 	case "interactive":
 		run = runInteractive
-	case "desktop":
-		run = runDesktop
 	case "download-osquery":
 		run = runDownloadOsquery
 	case "uninstall":
@@ -326,4 +338,18 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	detachConsole()
 
 	return nil
+}
+
+// filterDesktopFlag removes the --desktop flag from args since runDesktop has its own flagset
+func filterDesktopFlag(args []string) []string {
+	filtered := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		// Skip --desktop flag in any form
+		if arg == "--desktop" || arg == "-desktop" || strings.HasPrefix(arg, "--desktop=") || strings.HasPrefix(arg, "-desktop=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	return filtered
 }

@@ -61,6 +61,8 @@ type Options struct {
 	Control bool
 	// ControlServerURL URL for control server.
 	ControlServerURL string
+	// Desktop enables running launcher in desktop mode
+	Desktop bool
 	// ControlRequestInterval is the interval at which control client
 	// will check for updates from the control server.
 	ControlRequestInterval time.Duration
@@ -246,6 +248,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flDelayStart           = flagset.Duration("delay_start", 0*time.Second, "How much time to wait before starting launcher")
 		flLocalDevelopmentPath = flagset.String("localdev_path", "", "Path to local launcher build")
 		flPackageIdentifier    = flagset.String("identifier", DefaultLauncherIdentifier, "packaging identifier used to determine service names, paths, etc. (default: kolide-k2)")
+		flDesktop              = flagset.Bool("desktop", false, "Run launcher in desktop mode")
 
 		// deprecated options, kept for any kind of config file compatibility
 		_ = flagset.String("debug_log_file", "", "DEPRECATED")
@@ -385,6 +388,7 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		ControlRequestInterval:          *flControlRequestInterval,
 		Debug:                           *flDebug,
 		DelayStart:                      *flDelayStart,
+		Desktop:                         *flDesktop,
 		DisableControlTLS:               disableControlTLS,
 		Identifier:                      *flPackageIdentifier,
 		InsecureControlTLS:              insecureControlTLS,
