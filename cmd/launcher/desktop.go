@@ -96,22 +96,21 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 		"session_pid", os.Getpid(),
 	)
 
-	// Get the GOMAXPROCS limit from the environment variable set by the runner
-	desktopGoMaxProcs := 2 // default value
-	if envValue := os.Getenv("DESKTOP_GO_MAX_PROCS"); envValue != "" {
-		if parsedValue, err := strconv.Atoi(envValue); err == nil {
-			desktopGoMaxProcs = parsedValue
-		} else {
+	// GOMAXPROCS is set via environment variable by the desktop runner.
+	// Go respects this natively, but we still apply gomaxprocsLimiter to get the logging.
+	// If GOMAXPROCS env var is not set, Go uses the number of CPUs.
+	if envValue := os.Getenv("GOMAXPROCS"); envValue != "" {
+		parsedValue, err := strconv.Atoi(envValue)
+		if err != nil {
 			slogger.Log(context.TODO(), slog.LevelWarn,
-				"failed to parse DESKTOP_GO_MAX_PROCS environment variable, using default",
+				"failed to parse GOMAXPROCS environment variable",
 				"env_value", envValue,
 				"err", err,
-				"default", desktopGoMaxProcs,
 			)
+		} else {
+			gomaxprocsLimiter(context.TODO(), slogger, parsedValue)
 		}
 	}
-
-	gomaxprocsLimiter(context.TODO(), slogger, desktopGoMaxProcs)
 
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
