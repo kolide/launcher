@@ -77,10 +77,8 @@ func DownloadOsquery(version string) (binaryPath string, cleanup func() error, e
 
 	// Always ensure the binary is executable and has no quarantine attributes,
 	// even when reusing a cached binary (these attributes might get re-applied)
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(binaryPath, 0755); err != nil {
-			return "", nil, fmt.Errorf("setting executable permissions: %w", err)
-		}
+	if err := os.Chmod(binaryPath, 0755); err != nil {
+		return "", nil, fmt.Errorf("setting executable permissions: %w", err)
 	}
 
 	cleanupFunc := func() error {
