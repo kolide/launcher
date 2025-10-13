@@ -630,6 +630,10 @@ func decodeInt(a []byte) (int64, error) {
 	return int64(v), nil
 }
 
+// decodeKeyPrefix extracts and decodes the key prefix from an IndexedDB key byte slice.
+// It parses the first byte to determine the lengths of database ID, object store ID, and index ID fields,
+// then decodes each field and returns the remaining bytes along with the decoded keyPrefix struct.
+// Returns an error if the input is empty or has insufficient length for the expected prefix structure.
 func decodeKeyPrefix(a []byte) ([]byte, *keyPrefix, error) {
 	if len(a) == 0 {
 		return nil, nil, errors.New("invalid empty key provided to decodeKeyPrefix")
@@ -638,8 +642,13 @@ func decodeKeyPrefix(a []byte) ([]byte, *keyPrefix, error) {
 	firstByte := a[0]
 	a = a[1:]
 
+	// see here for chromium implementation: https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/indexed_db_leveldb_coding.cc#1775
+	// and here for documentation: https://chromium.googlesource.com/chromium/src/+/main/content/browser/indexed_db/docs/leveldb_coding_scheme.md#key-prefix
+	// the top 3 bits are the length of the database id - 1. so here bits 5-7 store a 3-bit length value, add 1 to get the byte count (from 1-8 bytes)
 	databaseIdBytes := int((((firstByte >> 5) & 0x07) + 1))
+	// the next 3 bits are the length of the object store id - 1. so here bits 2-4 again store a 3-bit length value, add 1 to get the total byte count
 	objectStoreIdBytes := int(((firstByte >> 2) & 0x07) + 1)
+	// the last 2 are the same story but for the index id - 1
 	indexIdBytes := int((firstByte & 0x03) + 1)
 
 	if len(a) < databaseIdBytes+objectStoreIdBytes+indexIdBytes {
