@@ -478,7 +478,7 @@ func (c *idbCmp1Comparer) decodeVarInt(a []byte) ([]byte, int64, error) {
 		"invalid_key", fmt.Sprintf("%x", a),
 	)
 
-	return nil, 0, errors.New("invalid key provided for decodeVarInt")
+	return nil, 0, fmt.Errorf("invalid key provided for decodeVarInt: %x", a)
 }
 
 func (c *idbCmp1Comparer) compareBinary(a, b []byte) ([]byte, []byte, int, error) {
@@ -541,11 +541,11 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, in
 		}
 		a, len1, err := c.decodeVarInt(a)
 		if err != nil {
-			return nil, nil, 0, err
+			return nil, nil, 0, fmt.Errorf("decoding key a (%x) as varInt: %w", a, err)
 		}
 		b, len2, err := c.decodeVarInt(b)
 		if err != nil {
-			return nil, nil, 0, err
+			return nil, nil, 0, fmt.Errorf("decoding key b (%x) as varInt: %w", b, err)
 		}
 		for range min(len1, len2) {
 			if len(a) == 0 || len(b) == 0 {
@@ -553,7 +553,7 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, in
 			}
 			a, b, ret, err = c.compareEncodedIDBKeys(a, b)
 			if err != nil {
-				return nil, nil, 0, err
+				return nil, nil, 0, fmt.Errorf("recursively comparing encodedIdbKeys: %w", err)
 			}
 			if ret != 0 {
 				return a, b, ret, nil
@@ -583,13 +583,13 @@ func (c *idbCmp1Comparer) compareEncodedIDBKeys(a, b []byte) ([]byte, []byte, in
 func (c *idbCmp1Comparer) compareStringWithLength(a, b []byte) ([]byte, []byte, int, error) {
 	a, v1, err := c.decodeVarInt(a)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, 0, fmt.Errorf("decoding key a (%x) as varInt: %w", a, err)
 	}
 
 	len1 := 2 * uint64(v1)
 	b, v2, err := c.decodeVarInt(b)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, 0, fmt.Errorf("decoding key b (%x) as varInt: %w", b, err)
 	}
 
 	len2 := 2 * uint64(v2)
@@ -652,24 +652,30 @@ func decodeKeyPrefix(a []byte) ([]byte, *keyPrefix, error) {
 	indexIdBytes := int((firstByte & 0x03) + 1)
 
 	if len(a) < databaseIdBytes+objectStoreIdBytes+indexIdBytes {
-		return nil, nil, errors.New("invalid key provided to decodeKeyPrefix (insufficient length for prefix bytes)")
+		return nil, nil, fmt.Errorf(
+			"invalid key provided to decodeKeyPrefix (insufficient length for prefix bytes): key length %d, expected at least %d + %d + %d",
+			len(a),
+			databaseIdBytes,
+			objectStoreIdBytes,
+			indexIdBytes,
+		)
 	}
 
 	databaseId, err := decodeInt(a[:databaseIdBytes])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("decoding database ID as int: %w", err)
 	}
 	a = a[databaseIdBytes:]
 
 	objectStoreId, err := decodeInt(a[:objectStoreIdBytes])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("decoding object store ID as int: %w", err)
 	}
 	a = a[objectStoreIdBytes:]
 
 	indexId, err := decodeInt(a[:indexIdBytes])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("decoding index ID as int: %w", err)
 	}
 	a = a[indexIdBytes:]
 
