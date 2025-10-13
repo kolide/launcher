@@ -203,12 +203,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
 
-	// Apply GOMAXPROCS limit from control flag
-	gomaxprocsLimiter(ctx, slogger, k.LauncherGoMaxProcs())
-
 	// Set up GOMAXPROCS observer to watch for flag changes and apply them at runtime
 	gomaxprocsObs := newGomaxprocsObserver(slogger, k)
 	flagController.RegisterChangeObserver(gomaxprocsObs, keys.LauncherGoMaxProcs)
+
+	// Apply GOMAXPROCS limit from control flag
+	gomaxprocsLimiter(ctx, slogger, k.LauncherGoMaxProcs())
 
 	// Set up flag-driven dedup configuration on the main slogger
 	// (following the user's preference that early logs and system logs don't need deduplication)
@@ -743,24 +743,4 @@ func runOsqueryVersionCheckAndAddToKnapsack(ctx context.Context, slogger *slog.L
 		"osqueryd_version", osquerydVersion,
 		"osqueryd_path", osquerydPath,
 	)
-}
-
-// gomaxprocsLimiter sets a limit on the number of OS threads that can be used at a given time.
-func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) {
-	cur := runtime.GOMAXPROCS(0)
-	if cur <= maxProcs {
-		slogger.Log(ctx, slog.LevelInfo,
-			"GOMAXPROCS within acceptable range, not changing",
-			"current", cur,
-			"max", maxProcs,
-		)
-		return
-	}
-
-	slogger.Log(ctx, slog.LevelInfo,
-		"limiting GOMAXPROCS",
-		"from", cur,
-		"to", maxProcs,
-	)
-	runtime.GOMAXPROCS(maxProcs)
 }

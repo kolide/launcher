@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"runtime"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -36,4 +37,24 @@ func (g *gomaxprocsObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.
 			return
 		}
 	}
+}
+
+// gomaxprocsLimiter sets a limit on the number of OS threads that can be used at a given time.
+func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) {
+	cur := runtime.GOMAXPROCS(0)
+	if cur <= maxProcs {
+		slogger.Log(ctx, slog.LevelInfo,
+			"GOMAXPROCS within acceptable range, not changing",
+			"current", cur,
+			"max", maxProcs,
+		)
+		return
+	}
+
+	slogger.Log(ctx, slog.LevelInfo,
+		"limiting GOMAXPROCS",
+		"from", cur,
+		"to", maxProcs,
+	)
+	runtime.GOMAXPROCS(maxProcs)
 }
