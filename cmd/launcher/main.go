@@ -110,6 +110,21 @@ func runMain() int {
 		return 0
 	}
 
+	// Check for --desktop flag before calling ParseOptions to avoid conflicts with desktop-specific env vars.
+	// The runner sets env vars like RUNNER_SERVER_URL which would be parsed by launcher's flagset and cause errors.
+	if hasDesktopFlag(os.Args[1:]) {
+		// Filter out the --desktop flag from args since runDesktop has its own flagset
+		desktopArgs := filterDesktopFlag(os.Args[1:])
+		if err := runDesktop(systemSlogger, desktopArgs); err != nil {
+			systemSlogger.Log(ctx, slog.LevelError,
+				"running desktop",
+				"err", err,
+			)
+			return 1
+		}
+		return 0
+	}
+
 	// Fall back to running launcher
 	opts, err := launcher.ParseOptions("", os.Args[1:])
 	if err != nil {
@@ -120,20 +135,6 @@ func runMain() int {
 			"could not parse options",
 			"err", err,
 		)
-		return 0
-	}
-
-	// If desktop mode is enabled, run desktop instead of launcher
-	if opts.Desktop {
-		// Filter out the --desktop flag from args since runDesktop has its own flagset
-		desktopArgs := filterDesktopFlag(os.Args[1:])
-		if err := runDesktop(systemSlogger, desktopArgs); err != nil {
-			systemSlogger.Log(ctx, slog.LevelError,
-				"running desktop",
-				"err", err,
-			)
-			return 1
-		}
 		return 0
 	}
 
@@ -338,6 +339,16 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	detachConsole()
 
 	return nil
+}
+
+// hasDesktopFlag checks if the --desktop flag is present in args
+func hasDesktopFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--desktop" || arg == "-desktop" || strings.HasPrefix(arg, "--desktop=") || strings.HasPrefix(arg, "-desktop=") {
+			return true
+		}
+	}
+	return false
 }
 
 // filterDesktopFlag removes the --desktop flag from args since runDesktop has its own flagset
