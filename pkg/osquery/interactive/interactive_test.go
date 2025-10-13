@@ -27,23 +27,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	testOsqueryBinary   string
-	downloadOsqueryOnce sync.Once
-	downloadOsqueryErr  error
-)
+var testOsqueryBinary string
+
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+})
 
 // copyBinary ensures we've downloaded a test osquery binary, then creates a symlink
 // to it at the expected `executablePath` location. The cached binary is already signed,
 // so the symlink will point to an executable binary.
 func copyBinary(t *testing.T, executablePath string) {
-	// Download osquery binary once, but fail the test if download fails
-	downloadOsqueryOnce.Do(func() {
-		testOsqueryBinary, _, downloadOsqueryErr = testutil.DownloadOsquery("nightly")
-	})
-	if downloadOsqueryErr != nil {
-		t.Fatalf("failed to download osquery binary: %v", downloadOsqueryErr)
-	}
+	downloadOnceFunc()
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(executablePath), 0755))
 	require.NoError(t, os.Symlink(testOsqueryBinary, executablePath))
