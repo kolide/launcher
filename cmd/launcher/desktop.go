@@ -98,19 +98,7 @@ func runDesktop(_ *multislogger.MultiSlogger, args []string) error {
 
 	// GOMAXPROCS is set via environment variable by the desktop runner.
 	// Go respects this natively, but we still apply gomaxprocsLimiter to get the logging.
-	// If GOMAXPROCS env var is not set, Go uses the number of CPUs.
-	if envValue := os.Getenv("GOMAXPROCS"); envValue != "" {
-		parsedValue, err := strconv.Atoi(envValue)
-		if err != nil {
-			slogger.Log(context.TODO(), slog.LevelWarn,
-				"failed to parse GOMAXPROCS environment variable",
-				"env_value", envValue,
-				"err", err,
-			)
-		} else {
-			gomaxprocsLimiter(context.TODO(), slogger, parsedValue)
-		}
-	}
+	applyGomaxprocs(slogger)
 
 	// Try to get the current user, so we can use the UID for logging. Not a fatal error if we can't, though
 	user, err := user.Current()
@@ -360,4 +348,26 @@ func defaultUserServerSocketPath() string {
 	}
 
 	return agent.TempPath(fmt.Sprintf("%s_%d", socketBaseName, os.Getpid()))
+}
+
+// applyGomaxprocs reads the GOMAXPROCS environment variable and applies it via gomaxprocsLimiter
+// to ensure proper logging. If GOMAXPROCS is not set, Go will use the number of CPUs by default.
+func applyGomaxprocs(slogger *slog.Logger) {
+	envValue := os.Getenv("GOMAXPROCS")
+	if envValue == "" {
+		// GOMAXPROCS not set, Go will use default (number of CPUs)
+		return
+	}
+
+	parsedValue, err := strconv.Atoi(envValue)
+	if err != nil {
+		slogger.Log(context.TODO(), slog.LevelWarn,
+			"failed to parse GOMAXPROCS environment variable, using Go default",
+			"env_value", envValue,
+			"err", err,
+		)
+		return
+	}
+
+	gomaxprocsLimiter(context.TODO(), slogger, parsedValue)
 }
