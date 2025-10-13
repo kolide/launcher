@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"sync"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/osquery/testutil"
@@ -16,22 +16,16 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain overrides the default test main function. This allows us to share setup/teardown.
-func TestMain(m *testing.M) {
-	var err error
-	testOsqueryBinary, _, err = testutil.DownloadOsquery("stable")
-	if err != nil {
-		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
-	// Run the tests!
-	retCode := m.Run()
-
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
-}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+})
 
 func Test_OsqueryRunSqlNoIO(t *testing.T) {
+	downloadOnceFunc()
+
 	osq, err := NewOsqueryProcess(testOsqueryBinary)
 	require.NoError(t, err)
 
@@ -39,6 +33,8 @@ func Test_OsqueryRunSqlNoIO(t *testing.T) {
 }
 
 func Test_OsqueryRunSql(t *testing.T) {
+	downloadOnceFunc()
+
 	tests := []struct {
 		name      string
 		sql       string

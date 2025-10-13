@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,30 +45,32 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain overrides the default test main function. This allows us to share setup/teardown.
-func TestMain(m *testing.M) {
-	if !hasPermissionsToRunTest() {
-		fmt.Println("these tests must be run as an administrator on windows")
-		return
-	}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+})
 
-	var err error
-	testOsqueryBinary, _, err = testutil.DownloadOsquery("stable")
-	if err != nil {
-		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
+// setupOnceFunc sets up test configuration that should only happen once.
+var setupOnceFunc = sync.OnceFunc(func() {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+})
 
-	// Run the tests!
-	retCode := m.Run()
-
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit in tests
+// requirePermissions checks if the current process has the necessary permissions to run
+// tests (elevated permissions on Windows). If not, it skips the test.
+func requirePermissions(t *testing.T) {
+	if !hasPermissionsToRunTest() {
+		t.Skip("these tests must be run as an administrator on windows")
+	}
 }
 
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -119,6 +122,10 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -166,6 +173,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -295,6 +305,9 @@ func TestFlagsChanged(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	// Set up all dependencies
 	rootDirectory := testRootDirectory(t)
@@ -560,6 +573,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -608,6 +625,10 @@ func TestSimplePath(t *testing.T) {
 
 func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -695,6 +716,10 @@ func TestMultipleInstances(t *testing.T) {
 
 func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -774,6 +799,10 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -825,6 +854,10 @@ func TestMultipleShutdowns(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -900,6 +933,10 @@ func TestOsqueryDies(t *testing.T) {
 
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
@@ -930,6 +967,9 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
@@ -959,6 +999,10 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 

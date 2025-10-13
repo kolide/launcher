@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,24 +27,16 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain allows us to download osquery once, for use in all tests, instead of
-// downloading once per test case.
-func TestMain(m *testing.M) {
-	var err error
-	testOsqueryBinary, _, err = testutil.DownloadOsquery("nightly")
-	if err != nil {
-		fmt.Printf("failed to download osquery binary for tests: %v\n", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	// Run the tests
-	retCode := m.Run()
-
-	os.Exit(retCode) //nolint:forbidigo // Fine to use os.Exit inside tests
-}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+})
 
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	testCases := []struct {
 		name                         string
@@ -503,6 +495,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 
 func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	slogger := multislogger.NewNopLogger()
 
@@ -599,6 +592,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 
 func TestExecute(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -654,6 +648,7 @@ func TestExecute(t *testing.T) {
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
