@@ -318,6 +318,28 @@ func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
 	).get(fc.getControlServerValue(keys.DesktopMenuRefreshInterval))
 }
 
+func (fc *FlagController) SetDesktopGoMaxProcs(maxProcs int) error {
+	return fc.setControlServerValue(keys.DesktopGoMaxProcs, intToBytes(maxProcs))
+}
+func (fc *FlagController) DesktopGoMaxProcs() int {
+	return NewIntFlagValue(fc.slogger, keys.DesktopGoMaxProcs,
+		WithIntValueDefault(2),
+		WithIntValueMin(1),
+		WithIntValueMax(16),
+	).get(fc.getControlServerValue(keys.DesktopGoMaxProcs))
+}
+
+func (fc *FlagController) SetLauncherGoMaxProcs(maxProcs int) error {
+	return fc.setControlServerValue(keys.LauncherGoMaxProcs, intToBytes(maxProcs))
+}
+func (fc *FlagController) LauncherGoMaxProcs() int {
+	return NewIntFlagValue(fc.slogger, keys.LauncherGoMaxProcs,
+		WithIntValueDefault(8),
+		WithIntValueMin(1),
+		WithIntValueMax(32),
+	).get(fc.getControlServerValue(keys.LauncherGoMaxProcs))
+}
+
 func (fc *FlagController) SetDebugServerData(debug bool) error {
 	return fc.setControlServerValue(keys.DebugServerData, boolToBytes(debug))
 }

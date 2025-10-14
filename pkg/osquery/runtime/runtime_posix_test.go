@@ -38,6 +38,9 @@ func hasPermissionsToRunTest() bool {
 // out how to suspend and resume a process on Windows via golang.
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -104,6 +107,9 @@ func TestOsquerySlowStart(t *testing.T) {
 // This is only run on non-windows platforms because the extension socket path is semi random on windows.
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 

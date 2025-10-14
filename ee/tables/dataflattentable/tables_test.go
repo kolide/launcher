@@ -1,7 +1,6 @@
 package dataflattentable
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -65,7 +64,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 				"query": tt.queries,
 			})
 
-			rows, err := tableFunc.generate(context.TODO(), mockPathQC)
+			rows, err := tableFunc.generate(t.Context(), mockPathQC)
 			require.NoError(t, err)
 
 			// delete the path and query keys, so we don't need to enumerate them in the test case
@@ -89,7 +88,7 @@ func TestDataFlattenTablePlist_Animals(t *testing.T) {
 				"query":    tt.queries,
 			})
 
-			rows, err = tableFunc.generate(context.TODO(), mockBytesQC)
+			rows, err = tableFunc.generate(t.Context(), mockBytesQC)
 			require.NoError(t, err)
 
 			// delete the query keys, so we don't need to enumerate them in the test case
@@ -172,7 +171,7 @@ func TestDataFlattenTables(t *testing.T) {
 					"query": tt.queries,
 				})
 
-				rows, err := testTable.generate(context.TODO(), mockQC)
+				rows, err := testTable.generate(t.Context(), mockQC)
 				require.NoError(t, err)
 
 				if tt.expectNoData {

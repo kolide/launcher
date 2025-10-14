@@ -190,6 +190,8 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
+	// Observe DesktopGoMaxProcs changes to restart processes with new GOMAXPROCS limit
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
 
 	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
@@ -544,6 +546,19 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// Handle DesktopGoMaxProcs changes
+	if slices.Contains(flagKeys, keys.DesktopGoMaxProcs) {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"desktop go max procs changed by control server, restarting desktop processes",
+			"new_value", r.knapsack.DesktopGoMaxProcs(),
+		)
+		// Kill existing processes so they restart with the new GOMAXPROCS limit
+		r.killDesktopProcesses(ctx)
+		// Note: processes will automatically restart on the next update interval
+		return
+	}
+
+	// Handle DesktopEnabled changes
 	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
 		return
 	}
@@ -1015,6 +1030,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
+		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively)
+		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
 		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}
 

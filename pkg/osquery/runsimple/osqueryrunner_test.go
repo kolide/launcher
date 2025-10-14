@@ -3,57 +3,38 @@ package runsimple
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
-	"runtime"
+	"sync"
 	"testing"
 
-	"github.com/kolide/kit/fsutil"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/stretchr/testify/require"
 )
 
 var testOsqueryBinary string
 
-// TestMain overrides the default test main function. This allows us to share setup/teardown.
-func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "osquery-runsimple")
-	if err != nil {
-		fmt.Println("Failed to make temp dir for test binaries")
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
-	if err := downloadOsqueryInBinDir(dir); err != nil {
-		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.RemoveAll(dir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)        //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
-	testOsqueryBinary = filepath.Join(dir, "osqueryd")
-	if runtime.GOOS == "windows" {
-		testOsqueryBinary += ".exe"
-	}
-
-	// Run the tests!
-	retCode := m.Run()
-
-	os.RemoveAll(dir) // explicit removal as defer will not run when os.Exit is called
-	os.Exit(retCode)  //nolint:forbidigo // Fine to use os.Exit in tests
-}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+})
 
 func Test_OsqueryRunSqlNoIO(t *testing.T) {
+	downloadOnceFunc()
+
 	osq, err := NewOsqueryProcess(testOsqueryBinary)
 	require.NoError(t, err)
 
-	require.NoError(t, osq.RunSql(context.TODO(), []byte("select 1")))
+	require.NoError(t, osq.RunSql(t.Context(), []byte("select 1")))
 }
 
 func Test_OsqueryRunSql(t *testing.T) {
+	downloadOnceFunc()
+
 	tests := []struct {
 		name      string
 		sql       string
@@ -111,12 +92,12 @@ func Test_OsqueryRunSql(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.expectErr {
-				require.Error(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
+				require.Error(t, osq.RunSql(t.Context(), []byte(tt.sql)))
 				require.Contains(t, stderr.String(), "Error")
 				return
 			}
 
-			require.NoError(t, osq.RunSql(context.TODO(), []byte(tt.sql)))
+			require.NoError(t, osq.RunSql(t.Context(), []byte(tt.sql)))
 
 			for _, s := range tt.contains {
 				require.Contains(t, stdout.String(), s, "Output should contain %s", s)
@@ -153,31 +134,4 @@ func decodeJsonL(data io.Reader) ([]any, error) {
 			return nil, errors.New("stuck in a loop. Count exceeds 50")
 		}
 	}
-}
-
-// downloadOsqueryInBinDir downloads osqueryd. This allows the test
-// suite to run on hosts lacking osqueryd.
-func downloadOsqueryInBinDir(binDirectory string) error {
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
-	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	outputFile := filepath.Join(binDirectory, target.PlatformBinaryName("osqueryd"))
-	cacheDir := binDirectory
-
-	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
-	if err != nil {
-		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
-	}
-
-	if err := fsutil.CopyFile(path, outputFile); err != nil {
-		return fmt.Errorf("Couldn't copy file to %s: %w", outputFile, err)
-	}
-
-	return nil
 }

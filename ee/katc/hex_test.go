@@ -1,7 +1,6 @@
 package katc
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -17,7 +16,7 @@ func Test_hexDecode(t *testing.T) {
 	encodedStr := hex.EncodeToString(originalValue)
 	encodedStrQuoted := fmt.Sprintf("X'%s'", encodedStr)
 
-	results, err := hexDecode(context.TODO(), multislogger.NewNopLogger(), map[string][]byte{
+	results, err := hexDecode(t.Context(), multislogger.NewNopLogger(), map[string][]byte{
 		"data": []byte(encodedStrQuoted),
 	})
 	require.NoError(t, err)

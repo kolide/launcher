@@ -1,7 +1,6 @@
 package storageci
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -23,7 +22,7 @@ func NewStore(t *testing.T, slogger *slog.Logger, bucketName string) (types.KVSt
 		return inmemory.NewStore(), nil
 	}
 
-	return agentbbolt.NewStore(context.TODO(), slogger, SetupDB(t), bucketName)
+	return agentbbolt.NewStore(t.Context(), slogger, SetupDB(t), bucketName)
 }
 
 // SetupDB is used for creating bbolt databases for testing

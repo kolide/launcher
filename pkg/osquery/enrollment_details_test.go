@@ -1,7 +1,6 @@
 package osquery
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,10 +18,10 @@ func Test_getEnrollDetails_binaryNotExist(t *testing.T) {
 
 	var details service.EnrollmentDetails
 
-	err1 := getOsqEnrollDetails(context.TODO(), filepath.Join("some", "fake", "path", "to", "osqueryd"), &details)
+	err1 := getOsqEnrollDetails(t.Context(), filepath.Join("some", "fake", "path", "to", "osqueryd"), &details)
 	require.Error(t, err1, "expected error when path does not exist")
 
-	err2 := getOsqEnrollDetails(context.TODO(), t.TempDir(), &details)
+	err2 := getOsqEnrollDetails(t.Context(), t.TempDir(), &details)
 	require.Error(t, err2, "expected error when path is directory")
 }
 
@@ -35,14 +34,14 @@ func Test_getEnrollDetails_executionError(t *testing.T) {
 	require.NoError(t, err, "could not get current executable for test")
 
 	// We expect getEnrollDetails to fail when called against an executable that is not osquery
-	err = getOsqEnrollDetails(context.TODO(), currentExecutable, &details)
+	err = getOsqEnrollDetails(t.Context(), currentExecutable, &details)
 	require.Error(t, err, "should not have been able to get enroll details with non-osqueryd executable")
 }
 
 func TestCollectAndSetEnrollmentDetails_EmptyPath(t *testing.T) {
 	t.Parallel()
 	k := typesmocks.NewKnapsack(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	slogger := multislogger.NewNopLogger()
 
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
@@ -62,7 +61,7 @@ func TestCollectAndSetEnrollmentDetails_Success(t *testing.T) {
 	k.On("LatestOsquerydPath", mock.Anything).Return(expectedOsquerydPath)
 	k.On("SetEnrollmentDetails", mock.AnythingOfType("types.EnrollmentDetails")).Twice()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := multislogger.NewNopLogger()
 
 	collectTimeout := 5 * time.Second

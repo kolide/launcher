@@ -4,7 +4,6 @@
 package tpmrunner
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -36,7 +35,7 @@ func Test_tpmRunner(t *testing.T) {
 		t.Parallel()
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		tpmRunner, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// force the runner to think the machine has a TPM
@@ -70,7 +69,7 @@ func Test_tpmRunner(t *testing.T) {
 		store.Set([]byte(publicEccData), fakePubData)
 
 		tpmSignerCreatorMock := mocks.NewTpmSignerCreator(t)
-		tpmRunner, err := New(context.TODO(), multislogger.NewNopLogger(), store, withTpmSignerCreator(tpmSignerCreatorMock))
+		tpmRunner, err := New(t.Context(), multislogger.NewNopLogger(), store, withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// force the runner to think the machine has a TPM
@@ -101,7 +100,7 @@ func Test_tpmRunner(t *testing.T) {
 		slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}))
-		tpmRunner, err := New(context.TODO(), slogger, inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
+		tpmRunner, err := New(t.Context(), slogger, inmemory.NewStore(), withTpmSignerCreator(tpmSignerCreatorMock))
 		require.NoError(t, err)
 
 		// force the runner to think the machine has a TPM

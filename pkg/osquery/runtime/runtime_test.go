@@ -14,13 +14,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -31,7 +30,7 @@ import (
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/service"
 	servicemock "github.com/kolide/launcher/pkg/service/mock"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -46,75 +45,32 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain overrides the default test main function. This allows us to share setup/teardown.
-func TestMain(m *testing.M) {
-	if !hasPermissionsToRunTest() {
-		fmt.Println("these tests must be run as an administrator on windows")
-		return
-	}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+})
 
-	binDirectory, err := agent.MkdirTemp("")
-	if err != nil {
-		fmt.Println("Failed to make temp dir for test binaries")
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
-	testOsqueryBinary = filepath.Join(binDirectory, "osqueryd")
-	if runtime.GOOS == "windows" {
-		testOsqueryBinary += ".exe"
-	}
-
+// setupOnceFunc sets up test configuration that should only happen once.
+var setupOnceFunc = sync.OnceFunc(func() {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+})
 
-	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
-		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)              //nolint:forbidigo // Fine to use os.Exit in tests
+// requirePermissions checks if the current process has the necessary permissions to run
+// tests (elevated permissions on Windows). If not, it skips the test.
+func requirePermissions(t *testing.T) {
+	if !hasPermissionsToRunTest() {
+		t.Skip("these tests must be run as an administrator on windows")
 	}
-
-	// Run the tests!
-	retCode := m.Run()
-
-	os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-	os.Exit(retCode)        //nolint:forbidigo // Fine to use os.Exit in tests
-}
-
-// downloadOsqueryInBinDir downloads osqueryd. This allows the test
-// suite to run on hosts lacking osqueryd. We could consider moving this into a deps step.
-func downloadOsqueryInBinDir(binDirectory string) error {
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
-	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	outputFile := filepath.Join(binDirectory, "osqueryd")
-	if runtime.GOOS == "windows" {
-		outputFile += ".exe"
-	}
-
-	cacheDir := "/tmp"
-	if runtime.GOOS == "windows" {
-		cacheDir = os.Getenv("TEMP")
-	}
-
-	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
-	if err != nil {
-		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
-	}
-
-	if err := fsutil.CopyFile(path, outputFile); err != nil {
-		return fmt.Errorf("Couldn't copy file to %s: %w", outputFile, err)
-	}
-
-	return nil
 }
 
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -166,6 +122,10 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -213,6 +173,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -282,19 +245,19 @@ func TestFlagsChanged(t *testing.T) {
 
 	// change just the InModernStandby flag -- this should not trigger a restart, since no changes need to be applied
 	k.On("InModernStandby").Return(true).Once()
-	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 	require.False(t, runner.needsRestart.Load(), "runner should not be marked as needing a restart when only InModernStandby changed")
 
 	// change both the InModernStandby and WatchdogEnabled flags -- this should trigger a restart, but not until InModernStandby is false again
 	k.On("WatchdogEnabled").Return(true).Once()
 	k.On("InModernStandby").Return(true).Twice()
-	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled, keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.WatchdogEnabled, keys.InModernStandby)
 
 	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
 
 	// no simulate coming out of modern standby -- this should trigger a restart
 	k.On("InModernStandby").Return(false)
-	runner.FlagsChanged(context.TODO(), keys.InModernStandby)
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
@@ -342,6 +305,9 @@ func TestFlagsChanged(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	// Set up all dependencies
 	rootDirectory := testRootDirectory(t)
@@ -590,10 +556,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	// Instance is not healthy -- gather info about osquery proc, then fail
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
 	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
 
-	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
 	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
 
 	if isRunning {
@@ -607,6 +573,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -655,6 +625,10 @@ func TestSimplePath(t *testing.T) {
 
 func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -742,6 +716,10 @@ func TestMultipleInstances(t *testing.T) {
 
 func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -821,6 +799,10 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -872,6 +854,10 @@ func TestMultipleShutdowns(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -921,7 +907,7 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(t.Context())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -947,6 +933,10 @@ func TestOsqueryDies(t *testing.T) {
 
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
@@ -977,6 +967,9 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
@@ -1006,13 +999,17 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	allStats, err := osqHistory.GetHistory()

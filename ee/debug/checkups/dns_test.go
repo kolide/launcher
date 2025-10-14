@@ -1,7 +1,6 @@
 package checkups
 
 import (
-	"context"
 	"errors"
 	"io"
 	"strings"
@@ -124,7 +123,7 @@ func Test_dnsCheckup_Run(t *testing.T) {
 				data:     tt.fields.data,
 				resolver: tt.fields.resolver,
 			}
-			if err := dc.Run(context.Background(), io.Discard); err != nil {
+			if err := dc.Run(t.Context(), io.Discard); err != nil {
 				t.Errorf("dnsCheckup.Run() error = %v", err)
 				return
 			}

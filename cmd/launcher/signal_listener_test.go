@@ -16,7 +16,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
 	sigChannel := make(chan os.Signal, 1)
-	_, cancel := context.WithCancel(context.TODO())
+	_, cancel := context.WithCancel(t.Context())
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,

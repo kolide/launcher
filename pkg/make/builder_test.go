@@ -112,7 +112,7 @@ func TestGoVersionCompatible(t *testing.T) {
 
 func TestDepsGo(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	b := Builder{goVer: "1.11"}
@@ -123,7 +123,7 @@ func TestDepsGo(t *testing.T) {
 
 func TestExecOut(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	b := &Builder{}
@@ -190,7 +190,7 @@ func TestGetVersion(t *testing.T) { //nolint:paralleltest
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.in, func(t *testing.T) { //nolint:paralleltest
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			ctx = context.WithValue(ctx, contextKeyEnv, []string{fmt.Sprintf("FAKE_GIT_DESCRIBE=%s", tt.in)})

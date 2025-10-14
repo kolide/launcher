@@ -1,7 +1,6 @@
 package observability
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -33,9 +32,9 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		GoMemoryUsageGauge.Record(context.TODO(), int64(i))
-		RSSHistogram.Record(context.TODO(), int64(i))
-		LauncherRestartCounter.Add(context.TODO(), int64(i))
+		GoMemoryUsageGauge.Record(t.Context(), int64(i))
+		RSSHistogram.Record(t.Context(), int64(i))
+		LauncherRestartCounter.Add(t.Context(), int64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -43,7 +42,7 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 	require.Greater(t, len(meterOutBytes.String()), 0)
 
 	// Now, shut down the provider
-	require.NoError(t, testProvider.Shutdown(context.TODO()))
+	require.NoError(t, testProvider.Shutdown(t.Context()))
 
 	// Meters should still be non-nil
 	require.NotNil(t, GoMemoryUsageGauge)
@@ -69,9 +68,9 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our new exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		GoMemoryUsageGauge.Record(context.TODO(), int64(i))
-		RSSHistogram.Record(context.TODO(), int64(i))
-		LauncherRestartCounter.Add(context.TODO(), int64(i))
+		GoMemoryUsageGauge.Record(t.Context(), int64(i))
+		RSSHistogram.Record(t.Context(), int64(i))
+		LauncherRestartCounter.Add(t.Context(), int64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -79,7 +78,7 @@ func TestReinitializeMetrics(t *testing.T) { //nolint:paralleltest
 	require.Greater(t, len(secondMeterOutBytes.String()), 0)
 
 	// Confirm we can shut down the new provider.
-	require.NoError(t, secondTestProvider.Shutdown(context.TODO()))
+	require.NoError(t, secondTestProvider.Shutdown(t.Context()))
 }
 
 // Test_int64GaugeOrNoop does not run in parallel to avoid setting a global meter provider
@@ -88,7 +87,7 @@ func Test_int64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	// Before we set up the meter provider, we should still get a usable int64 gauge
 	testGauge := int64GaugeOrNoop("launcher.test.gauge", metric.WithUnit(unitByte))
 	require.NotNil(t, testGauge)
-	testGauge.Record(context.TODO(), 5)
+	testGauge.Record(t.Context(), 5)
 
 	// Set up a meter provider that writes to a buffer every 100 milliseconds
 	writeInterval := 100 * time.Millisecond
@@ -102,7 +101,7 @@ func Test_int64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		testGauge.Record(context.TODO(), int64(i))
+		testGauge.Record(t.Context(), int64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -116,7 +115,7 @@ func Test_float64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	// Before we set up the meter provider, we should still get a usable float64 gauge
 	testGauge := float64GaugeOrNoop("launcher.test.gauge", metric.WithUnit(unitPercent))
 	require.NotNil(t, testGauge)
-	testGauge.Record(context.TODO(), 5)
+	testGauge.Record(t.Context(), 5)
 
 	// Set up a meter provider that writes to a buffer every 100 milliseconds
 	writeInterval := 100 * time.Millisecond
@@ -130,7 +129,7 @@ func Test_float64GaugeOrNoop(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := range 3 {
 		time.Sleep(writeInterval)
-		testGauge.Record(context.TODO(), float64(i))
+		testGauge.Record(t.Context(), float64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -144,7 +143,7 @@ func Test_int64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	// Before we set up the meter provider, we should still get a usable int64 gauge
 	testHist := int64HistogramOrNoop("launcher.test.histogram", metric.WithUnit(unitByte))
 	require.NotNil(t, testHist)
-	testHist.Record(context.TODO(), 5)
+	testHist.Record(t.Context(), 5)
 
 	// Set up a meter provider that writes to a buffer every 100 milliseconds
 	writeInterval := 100 * time.Millisecond
@@ -158,7 +157,7 @@ func Test_int64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		testHist.Record(context.TODO(), int64(i))
+		testHist.Record(t.Context(), int64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -172,7 +171,7 @@ func Test_float64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	// Before we set up the meter provider, we should still get a usable int64 gauge
 	testHist := float64HistogramOrNoop("launcher.test.histogram", metric.WithUnit(unitByte))
 	require.NotNil(t, testHist)
-	testHist.Record(context.TODO(), 5)
+	testHist.Record(t.Context(), 5)
 
 	// Set up a meter provider that writes to a buffer every 100 milliseconds
 	writeInterval := 100 * time.Millisecond
@@ -186,7 +185,7 @@ func Test_float64HistogramOrNoop(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		testHist.Record(context.TODO(), float64(i))
+		testHist.Record(t.Context(), float64(i))
 	}
 	time.Sleep(writeInterval)
 
@@ -200,7 +199,7 @@ func Test_int64CounterOrNoop(t *testing.T) { //nolint:paralleltest
 	// Before we set up the meter provider, we should still get a usable int64 counter
 	testCounter := int64CounterOrNoop("launcher.test.gauge", metric.WithUnit(unitByte))
 	require.NotNil(t, testCounter)
-	testCounter.Add(context.TODO(), 1)
+	testCounter.Add(t.Context(), 1)
 
 	// Set up a meter provider that writes to a buffer every 100 milliseconds
 	writeInterval := 100 * time.Millisecond
@@ -214,7 +213,7 @@ func Test_int64CounterOrNoop(t *testing.T) { //nolint:paralleltest
 	// for it to be written to our exporter.
 	for i := 0; i < 3; i++ {
 		time.Sleep(writeInterval)
-		testCounter.Add(context.TODO(), int64(i))
+		testCounter.Add(t.Context(), int64(i))
 	}
 	time.Sleep(writeInterval)
 

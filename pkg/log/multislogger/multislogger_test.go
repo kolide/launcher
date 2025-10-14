@@ -26,7 +26,7 @@ func TestMultiSlogger(t *testing.T) {
 	}
 
 	multislogger := New()
-	multislogger.Logger.DebugContext(context.TODO(), "dont panic")
+	multislogger.Logger.DebugContext(t.Context(), "dont panic")
 
 	multislogger = New(slog.NewJSONHandler(&debugLogBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
@@ -34,13 +34,13 @@ func TestMultiSlogger(t *testing.T) {
 	shipperLogLevel.Set(slog.LevelInfo)
 	multislogger.AddHandler(slog.NewJSONHandler(&shipperBuf, &slog.HandlerOptions{Level: shipperLogLevel}))
 
-	multislogger.Logger.DebugContext(context.TODO(), "debug_msg")
+	multislogger.Logger.DebugContext(t.Context(), "debug_msg")
 
 	require.Contains(t, debugLogBuf.String(), "debug_msg", "should be in debug log since it's debug level")
 	require.Empty(t, shipperBuf.String(), "should not be in shipper log since it's debug level")
 	clearBufsFn()
 
-	multislogger.Logger.InfoContext(context.TODO(), "info_msg")
+	multislogger.Logger.InfoContext(t.Context(), "info_msg")
 
 	require.Contains(t, debugLogBuf.String(), "info_msg", "should be in debug log since it's info level and that's higher than debug level")
 	require.Contains(t, shipperBuf.String(), "info_msg", "should be in shipper log since it's info level")
@@ -48,7 +48,7 @@ func TestMultiSlogger(t *testing.T) {
 
 	// set shipper level to debug
 	shipperLogLevel.Set(slog.LevelDebug)
-	multislogger.Logger.DebugContext(context.TODO(), "debug_msg_2")
+	multislogger.Logger.DebugContext(t.Context(), "debug_msg_2")
 
 	require.Contains(t, debugLogBuf.String(), "debug_msg_2", "should be in debug log since it's debug level")
 	require.Contains(t, shipperBuf.String(), "debug_msg_2", "should now be in shipper log since it's level was set to debug")
@@ -56,7 +56,7 @@ func TestMultiSlogger(t *testing.T) {
 
 	// ensure that span_id gets added as an attribute when present in context
 	spanId := ulid.New()
-	ctx := context.WithValue(context.Background(), SpanIdKey, spanId)
+	ctx := context.WithValue(t.Context(), SpanIdKey, spanId)
 	multislogger.Logger.Log(ctx, slog.LevelDebug, "info_with_interesting_ctx_value")
 
 	require.Contains(t, debugLogBuf.String(), "info_with_interesting_ctx_value", "should be in debug log since it's debug level")
@@ -103,7 +103,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	var logBuf bytes.Buffer
 	multislogger := New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	ctx := context.Background()
+	ctx := t.Context()
 	executeFunc := multislogger.ExecuteWithContext(ctx)
 
 	// Start and then interrupt
