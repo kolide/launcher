@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/pprof"
 	"time"
 
 	"github.com/kolide/launcher/ee/gowrapper"
@@ -68,28 +69,32 @@ func (g *Group) Run() error {
 	actorErrors := make(chan actorError, len(g.actors))
 	for _, a := range g.actors {
 		a := a
-		gowrapper.GoWithRecoveryAction(context.TODO(), g.slogger, func() {
-			g.slogger.Log(context.TODO(), slog.LevelDebug,
-				"starting actor",
-				"actor", a.name,
-			)
-			err := a.execute()
-			actorErrors <- actorError{
-				errorSourceName: a.name,
-				err:             err,
-			}
-		}, func(r any) {
-			g.slogger.Log(context.TODO(), slog.LevelInfo,
-				"shutting down after actor panic",
-				"actor", a.name,
-			)
+		// Launch goroutine with pprof labels for profiling purposes
+		labels := pprof.Labels("actor", a.name)
+		pprof.Do(context.TODO(), labels, func(ctx context.Context) {
+			gowrapper.GoWithRecoveryAction(ctx, g.slogger, func() {
+				g.slogger.Log(ctx, slog.LevelDebug,
+					"starting actor",
+					"actor", a.name,
+				)
+				err := a.execute()
+				actorErrors <- actorError{
+					errorSourceName: a.name,
+					err:             err,
+				}
+			}, func(r any) {
+				g.slogger.Log(ctx, slog.LevelInfo,
+					"shutting down after actor panic",
+					"actor", a.name,
+				)
 
-			// Since execute panicked, the actor error won't get sent to our channel below --
-			// add it now.
-			actorErrors <- actorError{
-				errorSourceName: a.name,
-				err:             fmt.Errorf("executing rungroup actor %s panicked: %+v", a.name, r),
-			}
+				// Since execute panicked, the actor error won't get sent to our channel below --
+				// add it now.
+				actorErrors <- actorError{
+					errorSourceName: a.name,
+					err:             fmt.Errorf("executing rungroup actor %s panicked: %+v", a.name, r),
+				}
+			})
 		})
 	}
 
