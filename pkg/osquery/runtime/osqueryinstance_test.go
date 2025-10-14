@@ -60,7 +60,6 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		extensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	osquerydPath := testOsqueryBinary
 	rootDir := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
@@ -77,7 +76,7 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
-	_, err := i.createOsquerydCommand(osquerydPath)
+	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	k.AssertExpectations(t)
@@ -101,7 +100,7 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	// count of flags that cannot be overridden with this option
@@ -135,7 +134,7 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	watchdogMemoryLimitMBFound := false
@@ -185,7 +184,7 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	disableWatchdogFound := false
@@ -254,6 +253,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 
 func TestHealthy(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	// Set up instance dependencies
 	logBytes, slogger := setUpTestSlogger()
@@ -347,6 +347,7 @@ func TestHealthy(t *testing.T) {
 
 func TestLaunch(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	logBytes, slogger := setUpTestSlogger()
 	rootDirectory := testRootDirectory(t)
@@ -433,6 +434,7 @@ func TestLaunch(t *testing.T) {
 
 func TestReloadKatcExtension(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	// Set up all million dependencies
 	logBytes, slogger := setUpTestSlogger()
