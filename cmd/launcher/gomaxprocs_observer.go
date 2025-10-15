@@ -60,26 +60,21 @@ func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) 
 
 	current := runtime.GOMAXPROCS(0)
 
-	// If maxProcs is 0 or exceeds the initial value, reset to initial
+	// Determine target: reset to initial if invalid or exceeds initial, otherwise use maxProcs
+	target := maxProcs
 	if maxProcs <= 0 || maxProcs > initialGOMAXPROCS {
-		if current != initialGOMAXPROCS {
-			slogger.Log(ctx, slog.LevelInfo,
-				"resetting GOMAXPROCS to initial value",
-				"from", current,
-				"to", initialGOMAXPROCS,
-			)
-			runtime.GOMAXPROCS(initialGOMAXPROCS)
-		}
+		target = initialGOMAXPROCS
+	}
+
+	// Early return if already at target
+	if current == target {
 		return
 	}
 
-	// Apply the limit if it differs from current
-	if current != maxProcs {
-		slogger.Log(ctx, slog.LevelInfo,
-			"changing GOMAXPROCS",
-			"from", current,
-			"to", maxProcs,
-		)
-		runtime.GOMAXPROCS(maxProcs)
-	}
+	slogger.Log(ctx, slog.LevelInfo,
+		"changing GOMAXPROCS",
+		"from", current,
+		"to", target,
+	)
+	runtime.GOMAXPROCS(target)
 }
