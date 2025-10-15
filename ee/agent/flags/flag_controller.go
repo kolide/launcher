@@ -324,7 +324,7 @@ func (fc *FlagController) SetDesktopGoMaxProcs(maxProcs int) error {
 func (fc *FlagController) DesktopGoMaxProcs() int {
 	return NewIntFlagValue(fc.slogger, keys.DesktopGoMaxProcs,
 		WithIntValueDefault(2),
-		WithIntValueMin(1),
+		WithIntValueMin(0),
 		WithIntValueMax(16),
 	).get(fc.getControlServerValue(keys.DesktopGoMaxProcs))
 }
@@ -335,7 +335,7 @@ func (fc *FlagController) SetLauncherGoMaxProcs(maxProcs int) error {
 func (fc *FlagController) LauncherGoMaxProcs() int {
 	return NewIntFlagValue(fc.slogger, keys.LauncherGoMaxProcs,
 		WithIntValueDefault(8),
-		WithIntValueMin(1),
+		WithIntValueMin(0),
 		WithIntValueMax(32),
 	).get(fc.getControlServerValue(keys.LauncherGoMaxProcs))
 }
