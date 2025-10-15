@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,7 +29,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-const applicationName = "launcher"
+const (
+	applicationName   = "launcher"
+	gomaxprocsAttrKey = "launcher.gomaxprocs"
+)
 
 var archAttributeMap = map[string]attribute.KeyValue{
 	"amd64": semconv.HostArchAMD64,
@@ -54,6 +58,7 @@ type TelemetryExporter struct {
 	disableIngestTLS          bool
 	enabled                   bool
 	traceSamplingRate         float64
+	gomaxprocsAttrValue       *atomic.Int64
 	batchTimeout              time.Duration
 	ctx                       context.Context // nolint:containedctx
 	cancel                    context.CancelFunc
@@ -80,6 +85,7 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 		disableIngestTLS:          k.DisableTraceIngestTLS(),
 		enabled:                   k.ExportTraces(),
 		traceSamplingRate:         k.TraceSamplingRate(),
+		gomaxprocsAttrValue:       &atomic.Int64{},
 		batchTimeout:              k.TraceBatchTimeout(),
 		ctx:                       ctx,
 		cancel:                    cancel,
@@ -97,7 +103,7 @@ func NewTelemetryExporter(ctx context.Context, k types.Knapsack, initialTraceBuf
 
 	// Observe changes to trace configuration to know when to start/stop exporting, and when
 	// to adjust exporting behavior
-	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout)
+	t.knapsack.RegisterChangeObserver(t, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout, keys.LauncherGoMaxProcs)
 
 	if !t.enabled {
 		return t, nil
@@ -247,10 +253,17 @@ func (t *TelemetryExporter) setNewGlobalProvider(rebuildExporter bool) {
 	t.attrLock.RLock()
 	defer t.attrLock.RUnlock()
 
+	// Make sure we have the most up-to-date gomaxprocs attr -- fetch it fresh every time.
+	// Calling GOMAXPROCS with value `0` does not change the value of this variable;
+	// it just returns the current value.
+	currentGomaxprocs := int64(runtime.GOMAXPROCS(0))
+	t.gomaxprocsAttrValue.Store(currentGomaxprocs)
+	allAttrs := append(t.attrs, attribute.Int64(gomaxprocsAttrKey, currentGomaxprocs))
+
 	defaultResource := resource.Default()
 	r, err := resource.Merge(
 		defaultResource,
-		resource.NewWithAttributes(defaultResource.SchemaURL(), t.attrs...),
+		resource.NewWithAttributes(defaultResource.SchemaURL(), allAttrs...),
 	)
 	if err != nil {
 		t.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -536,6 +549,20 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating trace batch timeout",
 				"new_batch_timeout", t.batchTimeout,
+			)
+		}
+	}
+
+	// If keys.LauncherGoMaxProcs changes, we want to update our relevant attr.
+	if slices.Contains(flagKeys, keys.LauncherGoMaxProcs) {
+		if t.gomaxprocsAttrValue.Load() != int64(t.knapsack.LauncherGoMaxProcs()) {
+			// Sleep just a couple seconds to give the gomaxprocsObserver a chance to actually update the runtime value.
+			time.Sleep(2 * time.Second)
+
+			needsNewProvider = true
+			t.slogger.Log(ctx, slog.LevelDebug,
+				"updating gomaxprocs attr after flag change",
+				"new_gomaxprocs", t.knapsack.LauncherGoMaxProcs(),
 			)
 		}
 	}
