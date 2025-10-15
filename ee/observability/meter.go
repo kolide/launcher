@@ -39,6 +39,10 @@ const (
 	desktopCpuHistogramDescription               = "Desktop process CPU percent"
 	desktopRssHistogramName                      = "launcher.desktop.memory.rss"
 	desktopRssHistogramDescription               = "Desktop process RSS bytes"
+	ioReadsHistogramName                         = "launcher.io.reads"
+	ioReadsHistogramDescription                  = "IO reads for launcher"
+	ioWritesHistogramName                        = "launcher.io.writes"
+	ioWritesHistogramDescription                 = "IO writes for launcher"
 	launcherRestartCounterName                   = "launcher.restart"
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
@@ -51,10 +55,6 @@ const (
 	autoupdateFailureCounterDescription          = "The number of TUF autoupdate failures"
 	checkupErrorCounterName                      = "launcher.checkup.error"
 	checkupErrorCounterDescription               = "The number of errors when running checkups"
-	ioReadsCounterName                           = "launcher.io.reads"
-	ioReadsCounterDescription                    = "IO read counter for launcher"
-	ioWritesCounterName                          = "launcher.io.writes"
-	ioWritesCounterDescription                   = "IO write counter for launcher"
 )
 
 var (
@@ -71,6 +71,8 @@ var (
 	OsqueryRssHistogram        metric.Int64Histogram
 	DesktopCpuPercentHistogram metric.Float64Histogram
 	DesktopRssHistogram        metric.Int64Histogram
+	IOReadsHistogram           metric.Int64Histogram
+	IOWritesHistogram          metric.Int64Histogram
 
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
@@ -79,8 +81,6 @@ var (
 	TablewrapperTimeoutCounter        metric.Int64Counter
 	AutoupdateFailureCounter          metric.Int64Counter
 	CheckupErrorCounter               metric.Int64Counter
-	IOReadsCounter                    metric.Int64Counter
-	IOWritesCounter                   metric.Int64Counter
 )
 
 // Initialize all of our meters. All meter names should have "launcher." prepended,
@@ -126,6 +126,12 @@ func ReinitializeMetrics() {
 	DesktopRssHistogram = int64HistogramOrNoop(desktopRssHistogramName,
 		metric.WithDescription(desktopRssHistogramDescription),
 		metric.WithUnit(unitByteGCP))
+	IOReadsHistogram = int64HistogramOrNoop(ioReadsHistogramName,
+		metric.WithDescription(ioReadsHistogramDescription),
+		metric.WithUnit(unitReads))
+	IOWritesHistogram = int64HistogramOrNoop(ioWritesHistogramName,
+		metric.WithDescription(ioWritesHistogramDescription),
+		metric.WithUnit(unitWrites))
 
 	// Counters
 	LauncherRestartCounter = int64CounterOrNoop(launcherRestartCounterName,
@@ -146,12 +152,6 @@ func ReinitializeMetrics() {
 	CheckupErrorCounter = int64CounterOrNoop(checkupErrorCounterName,
 		metric.WithDescription(checkupErrorCounterDescription),
 		metric.WithUnit(unitFailure))
-	IOReadsCounter = int64CounterOrNoop(ioReadsCounterName,
-		metric.WithDescription(ioReadsCounterDescription),
-		metric.WithUnit(unitReads))
-	IOWritesCounter = int64CounterOrNoop(ioWritesCounterName,
-		metric.WithDescription(ioWritesCounterDescription),
-		metric.WithUnit(unitWrites))
 }
 
 // int64GaugeOrNoop is guaranteed to return an Int64Gauge -- if we cannot create
