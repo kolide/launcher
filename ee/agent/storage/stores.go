@@ -22,6 +22,7 @@ const (
 	WindowsUpdatesCacheStore    Store = "windows_updates_cache"    // The store used for caching the results of recent searches against the Windows Update Agent API
 	RegistrationStore           Store = "registrations"            // The store used for persisting launcher's enrollments/registrations
 	EnrollmentDetailsStore      Store = "enrollment_details"       // The store used for persisting enrollment details
+	OsqueryVariablesStore       Store = "osquery_variables"        // The store used for osquery variables sent by control server.
 )
 
 func (storeType Store) String() string {
