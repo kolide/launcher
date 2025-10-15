@@ -556,14 +556,14 @@ func (t *TelemetryExporter) FlagsChanged(ctx context.Context, flagKeys ...keys.F
 	// If keys.LauncherGoMaxProcs changes, we want to update our relevant attr.
 	if slices.Contains(flagKeys, keys.LauncherGoMaxProcs) {
 		if t.gomaxprocsAttrValue.Load() != int64(t.knapsack.LauncherGoMaxProcs()) {
+			// Sleep just a couple seconds to give the gomaxprocsObserver a chance to actually update the runtime value.
+			time.Sleep(2 * time.Second)
+
 			needsNewProvider = true
 			t.slogger.Log(ctx, slog.LevelDebug,
 				"updating gomaxprocs attr after flag change",
 				"new_gomaxprocs", t.knapsack.LauncherGoMaxProcs(),
 			)
-
-			// Sleep just a couple seconds to give the gomaxprocsObserver a chance to actually update the runtime value.
-			time.Sleep(2 * time.Second)
 		}
 	}
 
