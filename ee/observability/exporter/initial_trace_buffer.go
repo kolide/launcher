@@ -59,6 +59,9 @@ func initialAttrs() []attribute.KeyValue {
 		semconv.ServiceName(applicationName),
 		semconv.ServiceVersion(version.Version().Version),
 		attribute.String("launcher.goos", runtime.GOOS),
+		// Calling GOMAXPROCS with value `0` does not change the value of this variable;
+		// it just returns the current value.
+		attribute.Int("launcher.gomaxprocs", runtime.GOMAXPROCS(0)),
 	}
 
 	if archAttr, ok := archAttributeMap[runtime.GOARCH]; ok {
