@@ -4,9 +4,17 @@ import (
 	"context"
 	"log/slog"
 	"runtime"
+	"sync"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
+)
+
+var (
+	// initialGOMAXPROCS captures the starting GOMAXPROCS value at process startup.
+	// This serves as the upper bound when resetting or increasing GOMAXPROCS.
+	initialGOMAXPROCS     int
+	initialGOMAXPROCSOnce sync.Once
 )
 
 // gomaxprocsObserver watches for changes to the LauncherGoMaxProcs flag
@@ -41,20 +49,37 @@ func (g *gomaxprocsObserver) FlagsChanged(ctx context.Context, flagKeys ...keys.
 
 // gomaxprocsLimiter sets a limit on the number of OS threads that can be used at a given time.
 func gomaxprocsLimiter(ctx context.Context, slogger *slog.Logger, maxProcs int) {
-	cur := runtime.GOMAXPROCS(0)
-	if cur <= maxProcs {
-		slogger.Log(ctx, slog.LevelInfo,
-			"GOMAXPROCS within acceptable range, not changing",
-			"current", cur,
-			"max", maxProcs,
+	// Capture the initial GOMAXPROCS value once at first call
+	initialGOMAXPROCSOnce.Do(func() {
+		initialGOMAXPROCS = runtime.GOMAXPROCS(0)
+		slogger.Log(ctx, slog.LevelDebug,
+			"captured initial GOMAXPROCS",
+			"value", initialGOMAXPROCS,
 		)
+	})
+
+	current := runtime.GOMAXPROCS(0)
+
+	// If maxProcs is 0 or exceeds the initial value, reset to initial
+	if maxProcs <= 0 || maxProcs > initialGOMAXPROCS {
+		if current != initialGOMAXPROCS {
+			slogger.Log(ctx, slog.LevelInfo,
+				"resetting GOMAXPROCS to initial value",
+				"from", current,
+				"to", initialGOMAXPROCS,
+			)
+			runtime.GOMAXPROCS(initialGOMAXPROCS)
+		}
 		return
 	}
 
-	slogger.Log(ctx, slog.LevelInfo,
-		"limiting GOMAXPROCS",
-		"from", cur,
-		"to", maxProcs,
-	)
-	runtime.GOMAXPROCS(maxProcs)
+	// Apply the limit if it differs from current
+	if current != maxProcs {
+		slogger.Log(ctx, slog.LevelInfo,
+			"changing GOMAXPROCS",
+			"from", current,
+			"to", maxProcs,
+		)
+		runtime.GOMAXPROCS(maxProcs)
+	}
 }
