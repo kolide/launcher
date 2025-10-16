@@ -18,6 +18,8 @@ import (
 	"github.com/kolide/launcher/ee/observability"
 )
 
+const cmdGoMaxProcs = 2
+
 type AllowedCommand func(ctx context.Context, arg ...string) (*TracedCmd, error)
 
 type TracedCmd struct {
@@ -58,9 +60,11 @@ func (t *TracedCmd) CombinedOutput() ([]byte, error) {
 }
 
 func newCmd(ctx context.Context, fullPathToCmd string, arg ...string) *TracedCmd {
+	cmd := exec.CommandContext(ctx, fullPathToCmd, arg...) //nolint:forbidigo // This is our approved usage of exec.CommandContext
+	cmd.Env = append(cmd.Environ(), fmt.Sprintf("GOMAXPROCS=%d", cmdGoMaxProcs))
 	return &TracedCmd{
 		Ctx: ctx,
-		Cmd: exec.CommandContext(ctx, fullPathToCmd, arg...), //nolint:forbidigo // This is our approved usage of exec.CommandContext
+		Cmd: cmd,
 	}
 }
 

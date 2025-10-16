@@ -1007,6 +1007,9 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
+	// allowedcmd automatically setting some env vars already for us, including GOMAXPROCS.
+	// We may need to update or override some of them.
 	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
 
 	cmd.Env = []string{
