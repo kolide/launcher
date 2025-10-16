@@ -4,7 +4,6 @@
 package timemachine
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -93,7 +92,7 @@ func TestAddExclusions(t *testing.T) {
 	knapsack := mocks.NewKnapsack(t)
 	knapsack.On("RootDirectory").Return(testDir)
 
-	AddExclusions(context.TODO(), knapsack)
+	AddExclusions(t.Context(), knapsack)
 
 	// we've seen some flake in CI here where the exclusions have not been
 	// updated by the time we perform assertions, so sleep for a bit to give
@@ -102,7 +101,7 @@ func TestAddExclusions(t *testing.T) {
 
 	// ensure the files are included / excluded as expected
 	for fileName, shouldBeExcluded := range shouldBeExcluded {
-		cmd, err := allowedcmd.Tmutil(context.TODO(), "isexcluded", filepath.Join(testDir, fileName))
+		cmd, err := allowedcmd.Tmutil(t.Context(), "isexcluded", filepath.Join(testDir, fileName))
 		require.NoError(t, err)
 
 		out, err := cmd.CombinedOutput()

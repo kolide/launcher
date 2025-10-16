@@ -1,7 +1,6 @@
 package startupsettings
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
@@ -18,12 +17,12 @@ func TestGet(t *testing.T) {
 	// Set flag value
 	flagKey := keys.UpdateChannel.String()
 	flagVal := "test value"
-	store, err := agentsqlite.OpenRW(context.TODO(), testRootDir, agentsqlite.StartupSettingsStore)
+	store, err := agentsqlite.OpenRW(t.Context(), testRootDir, agentsqlite.StartupSettingsStore)
 	require.NoError(t, err, "getting connection to test db")
 	require.NoError(t, store.Set([]byte(flagKey), []byte(flagVal)), "setting key")
 	require.NoError(t, store.Close(), "closing setup connection")
 
-	r, err := OpenReader(context.TODO(), multislogger.NewNopLogger(), testRootDir)
+	r, err := OpenReader(t.Context(), multislogger.NewNopLogger(), testRootDir)
 	require.NoError(t, err, "creating reader")
 
 	returnedVal, err := r.Get(flagKey)
@@ -39,7 +38,7 @@ func TestGet_DbNotExist(t *testing.T) {
 	testRootDir := t.TempDir()
 	flagKey := keys.UpdateChannel.String()
 
-	r, err := OpenReader(context.TODO(), multislogger.NewNopLogger(), testRootDir)
+	r, err := OpenReader(t.Context(), multislogger.NewNopLogger(), testRootDir)
 	require.NoError(t, err, "creating reader")
 	_, err = r.Get(flagKey)
 	require.Error(t, err, "expected error getting startup value when database does not exist")

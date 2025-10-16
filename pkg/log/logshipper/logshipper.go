@@ -203,7 +203,7 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 
 	ls.shippingLogger = log.With(ls.shippingLogger, "launcher_version", versionInfo.Version)
 
-	for _, key := range []string{"device_id", "munemo", "organization_id", "serial_number"} {
+	for _, key := range []string{"device_id", "munemo", "organization_id"} {
 		v, err := ls.knapsack.ServerProvidedDataStore().Get([]byte(key))
 		if err != nil {
 			return fmt.Errorf("could not get %s from server provided data: %w", key, err)
@@ -215,6 +215,13 @@ func (ls *LogShipper) updateDevideIdentifyingAttributes() error {
 
 		deviceInfo[key] = string(v)
 	}
+
+	// Get serial number from enrollment details
+	enrollmentDetails := ls.knapsack.GetEnrollmentDetails()
+	if enrollmentDetails.HardwareSerial == "" {
+		return errors.New("no serial_number in enrollment details")
+	}
+	deviceInfo["serial_number"] = enrollmentDetails.HardwareSerial
 
 	var deviceInfoKvps []any
 	for k, v := range deviceInfo {

@@ -23,7 +23,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
@@ -31,7 +31,7 @@ func TestExtensionLogPublicationHappyPath(t *testing.T) {
 	// issue a few successful calls, expect that the batch limit is unchanged from the original opts
 	for i := 0; i < 3; i++ {
 		e.logPublicationState.BeginBatch(time.Now(), true)
-		err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, e.logPublicationState.currentMaxBytesPerBatch, startingBatchLimitBytes)
 		// always expect that these values are reset between runs
@@ -57,7 +57,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
@@ -67,7 +67,7 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 	for i := 0; i < numberOfPublicationRounds; i++ {
 		// set the batch state to have started earlier than the 20 seconds threshold ago
 		e.logPublicationState.BeginBatch(time.Now().Add(-21*time.Second), true)
-		err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		assert.NotNil(t, err)
 		assert.Less(t, e.logPublicationState.currentMaxBytesPerBatch, expectedMaxValue)
 		// always expect that these values are reset between runs
@@ -78,14 +78,14 @@ func TestExtensionLogPublicationRespondsToNetworkTimeouts(t *testing.T) {
 
 	// now run a successful publication loop without filling the buffer - we expect
 	// this should have no effect on the current batch size
-	err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedMaxValue, e.logPublicationState.currentMaxBytesPerBatch)
 
 	// this time mark the buffer as filled for subsequent successful calls and expect that we move back up towards the original batch limit
 	for i := 0; i < numberOfPublicationRounds; i++ {
 		e.logPublicationState.BeginBatch(time.Now(), true)
-		err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		assert.Nil(t, err)
 		assert.Greater(t, e.logPublicationState.currentMaxBytesPerBatch, expectedMaxValue)
 		// always expect that these values are reset between runs
@@ -106,7 +106,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 		},
 	}
 	k := makeKnapsack(t)
-	e, err := NewExtension(context.TODO(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
+	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: startingBatchLimitBytes,
 	})
 	require.Nil(t, err)
@@ -114,7 +114,7 @@ func TestExtensionLogPublicationIgnoresNonTimeoutErrors(t *testing.T) {
 	// issue a few calls that error immediately, expect that the batch limit is unchanged from the original opts
 	for i := 0; i < 3; i++ {
 		e.logPublicationState.BeginBatch(time.Now(), true)
-		err = e.writeLogsWithReenroll(context.Background(), logger.LogTypeSnapshot, []string{"foobar"}, true)
+		err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeSnapshot, []string{"foobar"}, true)
 		// we still expect an error, but the batch limitation should not have changed
 		assert.NotNil(t, err)
 		assert.Equal(t, e.logPublicationState.currentMaxBytesPerBatch, startingBatchLimitBytes)

@@ -1,7 +1,6 @@
 package firefox_preferences
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path"
@@ -61,7 +60,7 @@ func Test_generate(t *testing.T) {
 				constraints["query"] = append(constraints["query"], tt.query)
 			}
 
-			got, _ := table.generate(context.Background(), tablehelpers.MockQueryContext(constraints))
+			got, _ := table.generate(t.Context(), tablehelpers.MockQueryContext(constraints))
 
 			var want []map[string]string
 

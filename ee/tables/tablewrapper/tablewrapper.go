@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/pprof"
 	"slices"
 	"sync"
 	"time"
@@ -123,17 +124,22 @@ func (wt *wrappedTable) generate(ctx context.Context, queryContext table.QueryCo
 		return nil, fmt.Errorf("no workers available (limit %d)", numWorkers)
 	}
 
+	// Prepare pprof labels
+	labels := pprof.Labels("table_name", wt.name)
+
 	// Kick off running the query
 	queryStartTime := time.Now()
 	resultChan := make(chan *generateResult)
-	gowrapper.Go(ctx, wt.slogger, func() {
-		rows, err := wt.gen(ctx, queryContext)
-		wt.workers.Release(1)
-		span.AddEvent("generate_returned")
-		resultChan <- &generateResult{
-			rows: rows,
-			err:  err,
-		}
+	pprof.Do(ctx, labels, func(ctx context.Context) {
+		gowrapper.Go(ctx, wt.slogger, func() {
+			rows, err := wt.gen(ctx, queryContext)
+			wt.workers.Release(1)
+			span.AddEvent("generate_returned")
+			resultChan <- &generateResult{
+				rows: rows,
+				err:  err,
+			}
+		})
 	})
 
 	// Wait for results up until the timeout

@@ -32,7 +32,7 @@ func TestSign(t *testing.T) {
 		execCC: exec.CommandContext, //nolint:forbidigo // Fine to use exec.CommandContext in test
 	}
 
-	ctx, ctxCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, ctxCancel := context.WithTimeout(t.Context(), 120*time.Second)
 	defer ctxCancel()
 
 	tmpDir := t.TempDir()

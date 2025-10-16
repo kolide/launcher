@@ -46,7 +46,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 
-	_, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient)
+	_, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Confirm we pulled all config items as expected
@@ -102,7 +102,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient)
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -201,7 +201,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	autoupdater.osqueryTimeout = 5 * time.Second
 
@@ -290,7 +290,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -374,7 +374,7 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(slogger.Logger)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient,
 		WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
@@ -437,7 +437,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient,
 		WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	autoupdater.osqueryTimeout = 5 * time.Second
@@ -503,7 +503,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient,
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient,
 		WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	autoupdater.osqueryTimeout = 5 * time.Second
@@ -641,7 +641,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
 			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath).Maybe()
 			// Set up autoupdater
-			autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+			autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 			require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 			// Update the metadata client with our test root JSON
@@ -713,7 +713,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -796,7 +796,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Update the metadata client with our test root JSON
@@ -877,7 +877,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "beta", autoupdater.updateChannel)
 
@@ -897,7 +897,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockLibraryManager.On("AddToLibrary", binaryLauncher, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Notify that flags changed
-	autoupdater.FlagsChanged(context.TODO(), keys.UpdateChannel)
+	autoupdater.FlagsChanged(t.Context(), keys.UpdateChannel)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -942,7 +942,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return(pinnedOsquerydVersion)
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, "", autoupdater.pinnedVersions[binaryOsqueryd])
 
@@ -960,7 +960,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockLibraryManager.On("AddToLibrary", binaryOsqueryd, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Notify that flags changed
-	autoupdater.FlagsChanged(context.TODO(), keys.PinnedOsquerydVersion)
+	autoupdater.FlagsChanged(t.Context(), keys.PinnedOsquerydVersion)
 
 	// Assert expectation that we added the expected `testReleaseVersion` to the updates library
 	mockLibraryManager.AssertExpectations(t)
@@ -996,14 +996,14 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 
 	// Set up autoupdater
-	autoupdater, err := NewTufAutoupdater(context.TODO(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 	require.Equal(t, pinnedLauncherVersion, autoupdater.pinnedVersions[binaryLauncher])
 
 	// Start the autoupdater, then notify flag change right away, during the initial delay
 	go autoupdater.Execute()
 	time.Sleep(100 * time.Millisecond)
-	autoupdater.FlagsChanged(context.TODO(), keys.PinnedLauncherVersion)
+	autoupdater.FlagsChanged(t.Context(), keys.PinnedLauncherVersion)
 
 	// Stop the autoupdater
 	autoupdater.Interrupt(errors.New("test error"))
@@ -1160,7 +1160,7 @@ func Test_findReleasePromoteTime(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			promoteTime := findReleasePromoteTime(context.Background(), tt.binary, targets, tt.channel)
+			promoteTime := findReleasePromoteTime(t.Context(), tt.binary, targets, tt.channel)
 			require.Equal(t, tt.expectedPromoteTime, promoteTime)
 		})
 	}
@@ -1292,7 +1292,7 @@ func Test_FlagsChangedAutoupdateDownloadSplayResetsCalculatedSplay(t *testing.T)
 	require.GreaterOrEqual(t, initialDelay, int64(1))
 	require.LessOrEqual(t, initialDelay, int64(downloadSplayDuration.Seconds()))
 
-	autoupdater.FlagsChanged(context.TODO(), keys.AutoupdateDownloadSplay)
+	autoupdater.FlagsChanged(t.Context(), keys.AutoupdateDownloadSplay)
 	// verify that it was reset
 	require.Equal(t, int64(0), autoupdater.calculatedSplayDelay.Load())
 

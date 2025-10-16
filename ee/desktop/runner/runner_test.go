@@ -17,6 +17,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/desktop/user/notify"
 	"github.com/kolide/launcher/ee/presencedetection"
 	"github.com/kolide/launcher/pkg/backoff"
@@ -44,7 +45,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 	// due to flakey tests we are tracking the time it takes to build and attempting emit a meaningful error if we time out
 	timeout := time.Minute * 2
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
 
 	// We may already have a built binary available -- check for that first
@@ -78,31 +79,29 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			},
 			cleanShutdown: true,
 		},
-		/*
-			{
-				name: "new process started if old one gone",
-				setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
-					// in the current CI environment (GitHub Actions) the linux runner
-					// does not have a console user, so we don't expect any processes
-					// to be started.
-					if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
-						return
-					}
-					user, err := user.Current()
-					require.NoError(t, err)
-					r.uidProcs[user.Uid] = processRecord{
-						Process: &os.Process{},
-						path:    "test",
-					}
-				},
-				logContains: []string{
-					"found existing desktop process dead for console user",
-					"interrupt received, exiting desktop execute loop",
-					"all desktop processes shutdown successfully",
-				},
-				cleanShutdown: true,
+		{
+			name: "new process started if old one gone",
+			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
+				// in the current CI environment (GitHub Actions) the linux runner
+				// does not have a console user, so we don't expect any processes
+				// to be started.
+				if os.Getenv("CI") == "true" && runtime.GOOS == "linux" {
+					return
+				}
+				user, err := user.Current()
+				require.NoError(t, err)
+				r.uidProcs[user.Uid] = processRecord{
+					Process: &os.Process{},
+					path:    "test",
+				}
 			},
-		*/
+			logContains: []string{
+				"found existing desktop process dead for console user",
+				"interrupt received, exiting desktop execute loop",
+				"all desktop processes shutdown successfully",
+			},
+			cleanShutdown: true,
+		},
 		{
 			name: "procs waitgroup times out",
 			setup: func(t *testing.T, r *DesktopUsersProcessesRunner) {
@@ -128,8 +127,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 
 			// if we're not in CI, always expect desktop enabled call
@@ -186,7 +187,10 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 				}, 30*time.Second, 1*time.Second))
 			} else {
 				if runtime.GOOS == "windows" {
-					assert.Contains(t, r.uidProcs, user.Username)
+					currentUids, err := consoleuser.CurrentUids(ctx)
+					require.NoError(t, err)
+					require.Equal(t, 1, len(currentUids))
+					assert.Contains(t, r.uidProcs, currentUids[0], "process not found for expected user, logs: ", logBytes.String())
 				} else {
 					assert.Contains(t, r.uidProcs, user.Uid)
 				}
@@ -370,8 +374,10 @@ func TestUpdate(t *testing.T) {
 
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 			mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
@@ -404,8 +410,10 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 
 	mockKnapsack := mocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
+	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
 	mockKnapsack.On("KolideServerURL").Return("somewhere-over-the-rainbow.example.com")
 	mockKnapsack.On("DesktopEnabled").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())

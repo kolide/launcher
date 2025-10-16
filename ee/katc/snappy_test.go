@@ -1,7 +1,6 @@
 package katc
 
 import (
-	"context"
 	"testing"
 
 	"github.com/golang/snappy"
@@ -22,7 +21,7 @@ func Test_snappyDecode(t *testing.T) {
 		"some_key_b": snappy.Encode(nil, expectedRow["some_key_b"]),
 	}
 
-	results, err := snappyDecode(context.TODO(), multislogger.NewNopLogger(), encodedRow)
+	results, err := snappyDecode(t.Context(), multislogger.NewNopLogger(), encodedRow)
 	require.NoError(t, err)
 
 	// Validate that the keys are unchanged, and that the data was correctly decoded

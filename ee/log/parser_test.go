@@ -157,7 +157,7 @@ func TestLogRawLogRecord(t *testing.T) {
 			slogger := slog.New(newTestHandler(t, tt.expectedLogMessage, tt.expectedLogLevel, tt.expectedLogAttributes))
 
 			// Process raw log record and allow the test handler to validate the outcome.
-			LogRawLogRecord(context.TODO(), tt.rawLogRecord, slogger)
+			LogRawLogRecord(t.Context(), tt.rawLogRecord, slogger)
 		})
 	}
 }

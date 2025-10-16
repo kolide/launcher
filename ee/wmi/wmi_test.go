@@ -4,7 +4,6 @@
 package wmi
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -15,7 +14,7 @@ import (
 func TestQuery(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 
 	var tests = []struct {
 		name       string

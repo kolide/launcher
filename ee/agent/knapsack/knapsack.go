@@ -21,14 +21,14 @@ import (
 // Package-level runID variable
 var runID string
 
-// Package-level enrollmentDetails variable
-var enrollmentDetails *types.EnrollmentDetails
-
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
 
 // nodeKeyKey is the key that we store the node key under in the config store.
 var nodeKeyKey = []byte("nodeKey")
+
+// enrollmentDetailsKey is the key that we store the enrollment details under in the enrollment details store.
+var enrollmentDetailsKey = []byte("current_enrollment_details")
 
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
@@ -250,6 +250,10 @@ func (k *knapsack) RegistrationStore() types.KVStore {
 	return k.getKVStore(storage.RegistrationStore)
 }
 
+func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
+	return k.getKVStore(storage.EnrollmentDetailsStore)
+}
+
 func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
 	return k.flags.SetLauncherWatchdogEnabled(enabled)
 }
@@ -316,25 +320,45 @@ func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
 
 // SetEnrollmentDetails updates the enrollment details, merging with existing details
 func (k *knapsack) SetEnrollmentDetails(newDetails types.EnrollmentDetails) {
-	// Get current details or empty struct if nil
-	// capture old values for logging
-	var oldDetails types.EnrollmentDetails
-	if enrollmentDetails != nil {
-		oldDetails = *enrollmentDetails
+	store := k.EnrollmentDetailsStore()
+	if store == nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"enrollment details store not available",
+		)
+		return
 	}
+
+	// Get existing details
+	oldDetails := k.GetEnrollmentDetails()
 
 	// Merge the new details with existing ones
 	mergedDetails := mergeEnrollmentDetails(oldDetails, newDetails)
 
-	// Log old and merged details - simpler approach
+	// Marshal to JSON
+	data, err := json.Marshal(mergedDetails)
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to marshal enrollment details",
+			"err", err,
+		)
+		return
+	}
+
+	// Save to store
+	if err := store.Set(enrollmentDetailsKey, data); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to save enrollment details to store",
+			"err", err,
+		)
+		return
+	}
+
+	// Log old and merged details
 	k.Slogger().Log(context.Background(), slog.LevelDebug,
-		"updating enrollment details",
+		"updated enrollment details in store",
 		"old_details", fmt.Sprintf("%+v", oldDetails),
 		"new_details", fmt.Sprintf("%+v", mergedDetails),
 	)
-
-	// Update the global enrollment details
-	enrollmentDetails = &mergedDetails
 }
 
 // mergeEnrollmentDetails combines old and new details, only updating non-empty fields
@@ -399,15 +423,46 @@ func mergeEnrollmentDetails(oldDetails, newDetails types.EnrollmentDetails) type
 }
 
 func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
-	if enrollmentDetails == nil {
+	store := k.EnrollmentDetailsStore()
+	if store == nil {
+		k.Slogger().Log(context.Background(), slog.LevelDebug,
+			"enrollment details store not available",
+		)
 		return types.EnrollmentDetails{}
 	}
 
-	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
-	osqueryVersion := k.CurrentRunningOsqueryVersion()
-	enrollmentDetails.OsqueryVersion = osqueryVersion
+	// Read from store
+	data, err := store.Get(enrollmentDetailsKey)
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to get enrollment details from store",
+			"err", err,
+		)
+		return types.EnrollmentDetails{}
+	}
 
-	return *enrollmentDetails
+	if data == nil {
+		return types.EnrollmentDetails{}
+	}
+
+	// Unmarshal
+	var details types.EnrollmentDetails
+	if err := json.Unmarshal(data, &details); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to unmarshal enrollment details",
+			"err", err,
+		)
+		return types.EnrollmentDetails{}
+	}
+
+	// Refresh osquery version, covers the case where the osquery version is updated without launcher restart
+	// Only attempt this if flags is available
+	if k.flags != nil {
+		osqueryVersion := k.CurrentRunningOsqueryVersion()
+		details.OsqueryVersion = osqueryVersion
+	}
+
+	return details
 }
 
 func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {

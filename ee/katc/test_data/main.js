@@ -1,7 +1,9 @@
 (function () {
     const databaseName = "launchertestdb";
     const objectStoreName = "launchertestobjstore";
+    const mixedKeysObjectStoreName = "launchertestobjstore-mixedkeys";
     const objectStoreKeyPath = "uuid";
+    const databaseVersion = 1;
 
     // In case the database already exists -- delete it so we can refresh the data.
     const deleteReq = window.indexedDB.deleteDatabase(databaseName);
@@ -14,7 +16,8 @@
 
     // Open database. Second arg is database version. We're not dealing with
     // migrations at the moment, so just leave it at 1.
-    const request = window.indexedDB.open(databaseName, 1);
+    // we will need to reopen the database with a newer version to add the second object store.
+    const request = window.indexedDB.open(databaseName, databaseVersion);
     request.onupgradeneeded = (event) => {
         // Create an object store. We're going to skip creating indices for now
         // because this package doesn't make use of them.
@@ -74,10 +77,10 @@
                 version: 35, // Integer: int32
                 preferences: null, // Null
                 flags: // Nested object
-                    {
-                        someFeatureEnabled: true, // Boolean: true
-                        betaEnabled: false, // Boolean: false
-                    },
+                {
+                    someFeatureEnabled: true, // Boolean: true
+                    betaEnabled: false, // Boolean: false
+                },
                 aliases: // Dense array of strings
                     [
                         "alias1",
@@ -139,10 +142,10 @@
                 version: 100000, // Integer: int32
                 preferences: null, // Null
                 flags: // Nested object
-                    {
-                        someFeatureEnabled: false, // Boolean: false
-                        betaEnabled: true, // Boolean: true
-                    },
+                {
+                    someFeatureEnabled: false, // Boolean: false
+                    betaEnabled: true, // Boolean: true
+                },
                 aliases: // Dense array of strings
                     [
                         "anotheralias1"
@@ -173,7 +176,7 @@
                     [3, "three"],
                 ]), // Map object, not empty
                 someComplexMap: new Map([
-                    [1726096500, [{"id": 2}]],
+                    [1726096500, [{ "id": 2 }]],
                     [new Map([["someNestedMapKey", false]]), null],
                 ]), // Map object with complex items
                 someSet: new Set(["a", "b", "c"]), // Set object
@@ -221,6 +224,57 @@
         console.log("Error creating database", request.error);
     };
     request.onsuccess = (event) => {
+        event.target.result.close();
         console.log("Successfully created database");
+    };
+
+    // this does not seem intuitive but apparently you need to open the database again to create a new object store
+    // see https://stackoverflow.com/questions/20097662/how-to-create-multiple-object-stores-in-indexeddb
+    const secondRequest = window.indexedDB.open(databaseName, databaseVersion + 1);
+    secondRequest.onupgradeneeded = (event) => {
+        const db2 = event.target.result;
+        // you can create an object store without a key path, and provide the keys manually as part of the
+        // put/add operations later instead of providing a keyPath at creation time.
+        // This is what we'll use to test ordering/iteration of mixed key types within
+        // an object store via our idb_cmp1 comparator
+        const mixedKeysObjectStore = db2.createObjectStore(mixedKeysObjectStoreName);
+
+        mixedKeysObjectStore.transaction.oncomplete = (event) => {
+            const mixedKeysTransaction = db2
+                .transaction(mixedKeysObjectStoreName, "readwrite")
+                .objectStore(mixedKeysObjectStoreName);
+
+            // for testing purposes, we don't care as much about the variety of values here as we do
+            // the different key types, and ensuring we see each of the values. we'll add some with
+            // int keys, some with string keys, some with array keys, and some with mixed array type keys
+            mixedKeysTransaction.add({ test: 1 }, "plainString1")
+            mixedKeysTransaction.add({ test: 2 }, 12345)
+            mixedKeysTransaction.add({ test: 3 }, [1, 2, 3])
+
+            mixedKeysTransaction.add({ test: 4 }, "plainString2")
+            mixedKeysTransaction.add({ test: 5 }, 67890)
+            mixedKeysTransaction.add({ test: 6 }, [4, "five", 6])
+
+            mixedKeysTransaction.add({ test: 7 }, "plainString3")
+            mixedKeysTransaction.add({ test: 8 }, 111222)
+            mixedKeysTransaction.add({ test: 9 }, ["seven", 8, 9])
+
+            mixedKeysTransaction.onsuccess = (event) => {
+                console.log("Added all mixed key data to IndexedDB");
+            };
+            mixedKeysTransaction.onerror = (event) => {
+                console.log("Error adding mixed key data to database", event.error);
+            };
+        };
+        mixedKeysObjectStore.transaction.onerror = (event) => {
+            console.log("Error creating mixed key object store", event.error);
+        };
+    };
+    secondRequest.onerror = (event) => {
+        console.log("Error creating database with second object store", request.error);
+    };
+    secondRequest.onsuccess = (event) => {
+        event.target.result.close();
+        console.log("Successfully created database with second object store");
     };
 })();

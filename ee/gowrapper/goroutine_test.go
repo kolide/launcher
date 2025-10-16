@@ -1,7 +1,6 @@
 package gowrapper
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -38,7 +37,7 @@ func TestGo_WithPanic(t *testing.T) {
 	}))
 
 	// Kick off goroutine
-	GoWithRecoveryAction(context.TODO(), slogger, g, p)
+	GoWithRecoveryAction(t.Context(), slogger, g, p)
 	timeoutGracePeriod := 200 * time.Millisecond
 
 	goroutineExecuted := false
@@ -86,7 +85,7 @@ func TestGo_WithoutPanic(t *testing.T) {
 	}
 
 	// Kick off goroutine
-	GoWithRecoveryAction(context.TODO(), multislogger.NewNopLogger(), g, p)
+	GoWithRecoveryAction(t.Context(), multislogger.NewNopLogger(), g, p)
 	timeoutGracePeriod := 200 * time.Millisecond
 	goroutineEndTime := time.Now().Add(funcDelay + funcDelay + timeoutGracePeriod)
 

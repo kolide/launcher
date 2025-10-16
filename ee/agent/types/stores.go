@@ -20,4 +20,5 @@ type Stores interface {
 	Dt4aInfoStore() KVStore
 	WindowsUpdatesCacheStore() KVStore
 	RegistrationStore() KVStore
+	EnrollmentDetailsStore() KVStore
 }

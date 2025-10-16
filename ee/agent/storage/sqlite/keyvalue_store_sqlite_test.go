@@ -1,7 +1,6 @@
 package agentsqlite
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -19,12 +18,12 @@ func TestOpenRO_DatabaseExists(t *testing.T) {
 
 	// Create database
 	testRootDir := t.TempDir()
-	s1, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s1, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s1.Close(), "closing database")
 
 	// Create RO-connection to database
-	s2, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
+	s2, err := OpenRO(t.Context(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "setting up database")
 	require.NoError(t, s2.Close(), "closing database")
 }
@@ -34,7 +33,7 @@ func TestOpenRO_DatabaseDoesNotExist(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(t.Context(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "no validation should be performed on RO connection")
 	require.NoFileExists(t, dbLocation(testRootDir), "database should not have been created")
 	require.NoError(t, s.Close(), "closing database")
@@ -51,7 +50,7 @@ func TestOpenRW_EmptyFileExists(t *testing.T) {
 	require.NoError(t, err, "creating empty file")
 	require.NoError(t, f.Close(), "closing empty db file")
 
-	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -65,7 +64,7 @@ func TestOpenRW_DatabaseIsCorrupt(t *testing.T) {
 	// Create corrupt db file
 	require.NoError(t, os.WriteFile(dbFile, []byte("not a database"), 0666), "creating corrupt db")
 
-	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected database to be deleted and re-created successfully when corrupt")
 	require.NoError(t, s.Close(), "closing test store")
 }
@@ -76,7 +75,7 @@ func TestOpenRW_DatabaseIsDirty(t *testing.T) {
 	testRootDir := t.TempDir()
 
 	// Create the database
-	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected no error creating test store")
 
 	// Mark the migration as dirty
@@ -87,12 +86,12 @@ func TestOpenRW_DatabaseIsDirty(t *testing.T) {
 	require.NoError(t, s.Close(), "expected no error closing test store")
 
 	// Open a new connection and expect that it succeeds, forcing the dirty migration
-	s2, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s2, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected no error opening test store with dirty migration")
 	require.NoError(t, s2.Close(), "expected no error closing test store")
 
 	// Open and close again successfully just to be sure
-	s3, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s3, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "expected no error opening test store with dirty migration")
 	require.NoError(t, s3.Close(), "expected no error closing test store")
 }
@@ -102,7 +101,7 @@ func TestOpenRW_InvalidTable(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	_, err := OpenRW(context.TODO(), testRootDir, 10001)
+	_, err := OpenRW(t.Context(), testRootDir, 10001)
 	require.Error(t, err, "expected error when passing in table not on allowlist")
 }
 
@@ -111,7 +110,7 @@ func TestGetSet(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+	s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 
 	flagKey := []byte(keys.UpdateChannel.String())
@@ -193,7 +192,7 @@ func TestUpdate(t *testing.T) {
 
 			testRootDir := t.TempDir()
 
-			s, err := OpenRW(context.TODO(), testRootDir, StartupSettingsStore)
+			s, err := OpenRW(t.Context(), testRootDir, StartupSettingsStore)
 			require.NoError(t, err, "creating test store")
 
 			for _, update := range tt.updates {
@@ -228,7 +227,7 @@ func TestSetUpdate_RO(t *testing.T) {
 
 	testRootDir := t.TempDir()
 
-	s, err := OpenRO(context.TODO(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
+	s, err := OpenRO(t.Context(), multislogger.NewNopLogger(), testRootDir, StartupSettingsStore)
 	require.NoError(t, err, "creating test store")
 
 	require.Error(t, s.Set([]byte(keys.UpdateChannel.String()), []byte("beta")), "should not be able to perform set with RO connection")
@@ -245,7 +244,7 @@ func Test_Migrations(t *testing.T) {
 
 	tempRootDir := t.TempDir()
 
-	conn, err := validatedDbConn(context.TODO(), tempRootDir)
+	conn, err := validatedDbConn(t.Context(), tempRootDir)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, conn.Close(), "closing test db")
 
@@ -269,7 +268,7 @@ func Test_MissingMigrations(t *testing.T) {
 
 	tempRootDir := t.TempDir()
 
-	conn, err := validatedDbConn(context.TODO(), tempRootDir)
+	conn, err := validatedDbConn(t.Context(), tempRootDir)
 	require.NoError(t, err, "setting up db connection")
 	require.NoError(t, conn.Close(), "closing test db")
 
@@ -292,7 +291,7 @@ func Test_MissingMigrations(t *testing.T) {
 
 	// now re-open and re-attempt migrations, this will only work if we correctly ignore the missing
 	// migration file error
-	s, migrationError := OpenRW(context.TODO(), tempRootDir, StartupSettingsStore)
+	s, migrationError := OpenRW(t.Context(), tempRootDir, StartupSettingsStore)
 	require.NoError(t, migrationError, "database error running missing migration")
 	require.NoError(t, s.Close(), "error closing sqliteStore conn")
 }

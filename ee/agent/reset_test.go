@@ -1,27 +1,25 @@
 package agent
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -29,58 +27,16 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain allows us to download osquery once, for use in all tests, instead of
-// downloading once per test case.
-func TestMain(m *testing.M) {
-	downloadDir, err := os.MkdirTemp("", "osquery-runsimple")
-	if err != nil {
-		fmt.Printf("failed to make temp dir for test osquery binary: %v", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		fmt.Printf("error parsing platform %s: %v", runtime.GOOS, err)
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	dlPath, err := packaging.FetchBinary(ctx, downloadDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "nightly", target)
-	if err != nil {
-		fmt.Printf("error fetching binary osqueryd binary: %v", err)
-		cancel()                  // explicit cancel as defer will not run when os.Exit is called
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
-	if runtime.GOOS == "windows" {
-		testOsqueryBinary += ".exe"
-	}
-
-	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
-		fmt.Printf("error copying osqueryd binary: %v", err)
-		cancel()                  // explicit cancel as defer will not run when os.Exit is called
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	// Run the tests
-	retCode := m.Run()
-
-	cancel()                  // explicit cancel as defer will not run when os.Exit is called
-	os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-	os.Exit(retCode)          //nolint:forbidigo // Fine to use os.Exit inside tests
-}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
+})
 
 func TestDetectAndRemediateHardwareChange(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	testCases := []struct {
 		name                         string
@@ -384,7 +340,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			var actualSerial, actualHardwareUUID string
 			if tt.osquerySuccess {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
-				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(context.TODO(), mockKnapsack)
+				actualSerial, actualHardwareUUID, err = currentSerialAndHardwareUUID(t.Context(), mockKnapsack)
 				require.NoError(t, err, "expected no error querying osquery at ", testOsqueryBinary)
 			} else {
 				mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(filepath.Join("not", "a", "real", "osqueryd", "binary"))
@@ -392,7 +348,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 				actualHardwareUUID = "test-hardware-uuid"
 			}
 
-			actualMachineGUID, err := currentMachineGuid(context.TODO(), mockKnapsack)
+			actualMachineGUID, err := currentMachineGuid(t.Context(), mockKnapsack)
 			require.NoError(t, err, "expected to be able to read machine GUID")
 
 			if tt.serialSetInStore {
@@ -464,7 +420,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 			require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 			// Make test call
-			remediationOccurred := detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger)
+			remediationOccurred := detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger)
 			require.Equal(t, tt.expectDatabaseWipe, remediationOccurred, "expected remediation to occur when database should be wiped")
 
 			// Confirm backup occurred, if database got wiped
@@ -539,6 +495,7 @@ func TestDetectAndRemediateHardwareChange(t *testing.T) {
 
 func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	slogger := multislogger.NewNopLogger()
 
@@ -590,7 +547,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make first test call
-	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	dataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -615,7 +572,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 	require.NoError(t, testConfigStore.Set([]byte("localEccKey"), testLocalEccKeyRaw))
 
 	// Make second test call
-	require.True(t, detectAndRemediateHardwareChange(context.TODO(), mockKnapsack, slogger))
+	require.True(t, detectAndRemediateHardwareChange(t.Context(), mockKnapsack, slogger))
 
 	// Confirm the old_host_data key exists in the data store
 	newDataRaw, err := testHostDataStore.Get(hostDataKeyResetRecords)
@@ -635,6 +592,7 @@ func TestDetectAndRemediateHardwareChange_SavesDataOverMultipleResets(t *testing
 
 func TestExecute(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
@@ -690,6 +648,7 @@ func TestExecute(t *testing.T) {
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{

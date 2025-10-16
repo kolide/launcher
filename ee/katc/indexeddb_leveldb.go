@@ -49,7 +49,7 @@ func indexeddbLeveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths
 				continue
 			}
 
-			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(ctx, db, dbName, objectStoreName)
+			rowsFromDb, err := indexeddb.QueryIndexeddbObjectStore(ctx, slogger, db, dbName, objectStoreName)
 			if err != nil {
 				return nil, fmt.Errorf("querying %s: %w", db, err)
 			}

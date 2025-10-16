@@ -4,7 +4,6 @@
 package watchdog
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
@@ -29,7 +28,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
 	mockKnapsack.On("LauncherWatchdogEnabled").Return(false).Maybe()
 
-	controller, _ := NewController(context.TODO(), mockKnapsack, "")
+	controller, _ := NewController(t.Context(), mockKnapsack, "")
 
 	// Let the handler run for a bit
 	go controller.Run()

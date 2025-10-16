@@ -2,13 +2,13 @@ package katc
 
 import (
 	"archive/zip"
-	"context"
 	_ "embed"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -124,7 +124,7 @@ func TestQueryFirefoxIndexedDB(t *testing.T) {
 			}
 
 			// At long last: run a query
-			results, err := testTable.generate(context.TODO(), queryContext)
+			results, err := testTable.generate(t.Context(), queryContext)
 			require.NoError(t, err)
 
 			// We should have the expected number of results in the row
@@ -308,7 +308,7 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 			}
 
 			// At long last: run a query
-			results, err := testTable.generate(context.TODO(), queryContext)
+			results, err := testTable.generate(t.Context(), queryContext)
 			require.NoError(t, err)
 
 			// We should have the expected number of results in the row
@@ -356,12 +356,106 @@ func TestQueryChromeIndexedDB(t *testing.T) {
 	}
 }
 
+func TestQueryChromeIndexedDBMixedKeyIteration(t *testing.T) {
+	t.Parallel()
+
+	levelDBZipFileName := "file__0.indexeddb.leveldb.zip"
+	// Write zip bytes to file
+	tempDir := t.TempDir()
+	zipFile := filepath.Join(tempDir, levelDBZipFileName)
+	require.NoError(t, os.WriteFile(zipFile, basicChromeIndexeddb, 0755), "writing zip to temp dir")
+
+	// Prepare indexeddb dir
+	indexeddbDest := strings.TrimSuffix(zipFile, ".zip")
+	require.NoError(t, os.MkdirAll(indexeddbDest, 0755), "creating indexeddb dir")
+
+	// Unzip to temp dir
+	zipReader, err := zip.OpenReader(zipFile)
+	require.NoError(t, err, "opening reader to zip file")
+	defer zipReader.Close()
+	for _, fileInZip := range zipReader.File {
+		unzipFile(t, fileInZip, tempDir)
+	}
+
+	// the mixed keys are in a different object store than the other tests in this file
+	databaseName := "launchertestdb"
+	objectStoreName := "launchertestobjstore-mixedkeys"
+	sourceQuery := fmt.Sprintf("%s.%s", databaseName, objectStoreName)
+	// Construct table
+	cfg := katcTableConfig{
+		Columns: []string{
+			"test",
+		},
+		katcTableDefinition: katcTableDefinition{
+			SourceType: &katcSourceType{
+				name:     indexeddbLeveldbSourceType,
+				dataFunc: indexeddbLeveldbData,
+			},
+			SourcePaths: &[]string{indexeddbDest},
+			SourceQuery: &sourceQuery,
+			RowTransformSteps: &[]rowTransformStep{
+				{
+					name:          deserializeChromeTransformStep,
+					transformFunc: indexeddb.DeserializeChrome,
+				},
+			},
+		},
+		Overlays: []katcTableConfigOverlay{
+			{
+				Filters: map[string]string{
+					"goos": runtime.GOOS,
+				},
+				katcTableDefinition: katcTableDefinition{
+					SourcePaths: &[]string{indexeddbDest}, // All indexeddb files in the test directory
+				},
+			},
+		},
+	}
+	testTable, _ := newKatcTable("test_katc_table", cfg, multislogger.NewNopLogger())
+
+	// Make a query context restricting the source to our exact source indexeddb database
+	queryContext := table.QueryContext{
+		Constraints: map[string]table.ConstraintList{
+			pathColumnName: {
+				Constraints: []table.Constraint{
+					{
+						Operator:   table.OperatorEquals,
+						Expression: indexeddbDest,
+					},
+				},
+			},
+		},
+	}
+
+	results, err := testTable.generate(t.Context(), queryContext)
+	require.NoError(t, err)
+	// we expect exactly 9 rows added to the mixed keys object store. see test_data/main.js for details
+	// on how this is created with various key types
+	require.Equal(t, 9, len(results))
+
+	resultsSeen := make([]bool, len(results))
+	// all rows are a simple json object in the format {"test": "<insertionNumber>"}
+	// we do not expect these to come out in the order they were inserted (it is done with mixed key types),
+	// but we do expect to see a row with each individual number 1-9, ensuring no corruption during iteration
+	for _, result := range results {
+		require.Contains(t, result, "test")
+		insertionNumber, err := strconv.Atoi(result["test"])
+		require.NoError(t, err)
+		require.Less(t, insertionNumber-1, len(resultsSeen)) // sanity check
+		resultsSeen[insertionNumber-1] = true
+	}
+	// verify that all 9 have been seen
+	for i, seen := range resultsSeen {
+		require.True(t, seen, "test number %d was not seen during iteration", i)
+	}
+}
+
 func TestQueryLevelDB(t *testing.T) {
 	t.Parallel()
 
 	// Create a level db to query
 	tempDir := t.TempDir()
-	db, err := indexeddb.OpenLeveldb(tempDir)
+	db, err := indexeddb.OpenLeveldb(multislogger.NewNopLogger(), tempDir)
 	require.NoError(t, err)
 
 	// Add some data
@@ -411,7 +505,7 @@ func TestQueryLevelDB(t *testing.T) {
 	}
 
 	// At long last: run a query
-	results, err := testTable.generate(context.TODO(), queryContext)
+	results, err := testTable.generate(t.Context(), queryContext)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(results))

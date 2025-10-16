@@ -1,7 +1,6 @@
 package jwt
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"strconv"
@@ -150,7 +149,7 @@ func TestTransformOutput(t *testing.T) {
 				"include_raw_jwt": tt.raw,
 			})
 
-			rows, err := jwtTable.generate(context.TODO(), mockQC)
+			rows, err := jwtTable.generate(t.Context(), mockQC)
 
 			require.NoError(t, err)
 
