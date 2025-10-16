@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -166,20 +164,8 @@ func (w *windowsUpdatesCacher) queryAndStoreData(ctx context.Context) error {
 	ctx, w.queryCancel = context.WithTimeout(ctx, 20*time.Minute)
 	defer w.queryCancel()
 
-	launcherPath, err := os.Executable()
-	if err != nil {
-		err = fmt.Errorf("getting path to launcher: %w", err)
-		observability.SetError(span, err)
-		return err
-	}
-	if !strings.HasSuffix(launcherPath, "launcher.exe") {
-		err = fmt.Errorf("cannot run generate for non-launcher executable %s (is this running in a test context?)", launcherPath)
-		observability.SetError(span, err)
-		return err
-	}
-
 	queryTime := time.Now()
-	res, err := callQueryWindowsUpdatesSubcommand(ctx, launcherPath, defaultLocale, UpdatesTable)
+	res, err := callQueryWindowsUpdatesSubcommand(ctx, defaultLocale, UpdatesTable)
 	if err != nil {
 		err = fmt.Errorf("running query windows updates subcommand: %w", err)
 		observability.SetError(span, err)

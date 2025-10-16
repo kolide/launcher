@@ -6,16 +6,14 @@ package windowsupdatetable
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/ee/allowedcmd"
 	"github.com/kolide/launcher/ee/dataflatten"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/tables/dataflattentable"
@@ -97,18 +95,9 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 	ctx, span := observability.StartSpan(ctx, "table_name", t.name)
 	defer span.End()
 
-	launcherPath, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("getting path to launcher: %w", err)
-	}
-	if !strings.HasSuffix(launcherPath, "launcher.exe") {
-		return nil, errors.New("cannot run generate for non-launcher executable (is this running in a test context?)")
-	}
-
 	var results []map[string]string
-
 	for _, locale := range tablehelpers.GetConstraints(queryContext, "locale", tablehelpers.WithDefaults(defaultLocale)) {
-		res, err := callQueryWindowsUpdatesSubcommand(ctx, launcherPath, locale, t.mode)
+		res, err := callQueryWindowsUpdatesSubcommand(ctx, locale, t.mode)
 		if err != nil {
 			t.slogger.Log(ctx, slog.LevelWarn,
 				"error running query windows updates subcommand",
@@ -147,7 +136,7 @@ func (t *Table) generateWithLauncherExec(ctx context.Context, queryContext table
 // callQueryWindowsUpdatesSubcommand performs the required query by execing `launcher.exe query-windowsupdates`;
 // it unmarshals the results into the expected format. We perform the exec to handle a memory leak in the Search
 // function. If a timeout has been set on `ctx`, it will be respected by the underlying exec.
-func callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string, locale string, mode tableMode) (*QueryResults, error) {
+func callQueryWindowsUpdatesSubcommand(ctx context.Context, locale string, mode tableMode) (*QueryResults, error) {
 	ctx, span := observability.StartSpan(ctx, "locale", locale, "table_mode", int(mode))
 	defer span.End()
 
@@ -157,8 +146,17 @@ func callQueryWindowsUpdatesSubcommand(ctx context.Context, launcherPath string,
 		"-table_mode", strconv.Itoa(int(mode)),
 	}
 
-	cmd := exec.CommandContext(ctx, launcherPath, args...) //nolint:forbidigo // We can exec the current executable safely
-	cmd.Env = append(cmd.Env, "LAUNCHER_SKIP_UPDATES=TRUE")
+	cmd, err := allowedcmd.Launcher(ctx, args...)
+	if err != nil {
+		err = fmt.Errorf("creating launcher query-windowsupdates cmd: %w", err)
+		observability.SetError(span, err)
+		return nil, err
+	}
+	if !strings.HasSuffix(cmd.Path, "launcher.exe") {
+		err = fmt.Errorf("cannot run generate for non-launcher executable %s (is this running in a test context?)", cmd.Path)
+		observability.SetError(span, err)
+		return nil, err
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("running query-windowsupdates: output `%s`: %w", string(out), err)
