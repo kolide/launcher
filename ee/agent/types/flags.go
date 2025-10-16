@@ -242,9 +242,15 @@ type Flags interface {
 	// LocalDevelopmentPath points to a local build of launcher to use instead of the one selected from the autoupdate library
 	LocalDevelopmentPath() string
 
-	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
+	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service.
+	// note that this was a temporary flag and will be removed in favor of LauncherWatchdogDisabled
+	// when we fully cut over, installation behavior will be based purely on the disabled flag
 	SetLauncherWatchdogEnabled(enabled bool) error
 	LauncherWatchdogEnabled() bool
+
+	// LauncherWatchdogDisabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
+	SetLauncherWatchdogDisabled(disabled bool) error
+	LauncherWatchdogDisabled() bool
 
 	// SystrayRestartEnabled controls whether launcher's desktop runner will restart systray on error
 	SetSystrayRestartEnabled(enabled bool) error

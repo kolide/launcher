@@ -955,6 +955,24 @@ func (_m *Knapsack) LauncherHistoryStore() types.GetterSetterDeleterIteratorUpda
 	return r0
 }
 
+// LauncherWatchdogDisabled provides a mock function with no fields
+func (_m *Knapsack) LauncherWatchdogDisabled() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LauncherWatchdogDisabled")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // LauncherWatchdogEnabled provides a mock function with no fields
 func (_m *Knapsack) LauncherWatchdogEnabled() bool {
 	ret := _m.Called()
@@ -2050,6 +2068,24 @@ func (_m *Knapsack) SetLauncherGoMaxProcs(maxProcs int) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(int) error); ok {
 		r0 = rf(maxProcs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetLauncherWatchdogDisabled provides a mock function with given fields: disabled
+func (_m *Knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
+	ret := _m.Called(disabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetLauncherWatchdogDisabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(disabled)
 	} else {
 		r0 = ret.Error(0)
 	}
