@@ -29,6 +29,10 @@ const (
 	cpuPercentGaugeDescription                   = "Process CPU percent"
 	checkupScoreGaugeName                        = "launcher.checkup.score"
 	checkupScoreGaugeDescription                 = "Computed checkup score"
+	ioReadsGaugeName                             = "launcher.io.reads"
+	ioReadsGaugeDescription                      = "IO reads for launcher"
+	ioWritesGaugeName                            = "launcher.io.writes"
+	ioWritesGaugeDescription                     = "IO writes for launcher"
 	rssHistogramName                             = "launcher.memory.rss"
 	rssHistogramDescription                      = "launcher process RSS bytes"
 	osqueryCpuHistogramName                      = "launcher.osquery.cpu.percent"
@@ -39,10 +43,6 @@ const (
 	desktopCpuHistogramDescription               = "Desktop process CPU percent"
 	desktopRssHistogramName                      = "launcher.desktop.memory.rss"
 	desktopRssHistogramDescription               = "Desktop process RSS bytes"
-	ioReadsHistogramName                         = "launcher.io.reads"
-	ioReadsHistogramDescription                  = "IO reads for launcher"
-	ioWritesHistogramName                        = "launcher.io.writes"
-	ioWritesHistogramDescription                 = "IO writes for launcher"
 	launcherRestartCounterName                   = "launcher.restart"
 	launcherRestartCounterDescription            = "The number of launcher restarts"
 	osqueryRestartCounterName                    = "launcher.osquery.restart"
@@ -64,6 +64,8 @@ var (
 	MemoryPercentGauge    metric.Int64Gauge
 	CpuPercentGauge       metric.Int64Gauge
 	CheckupScoreGauge     metric.Float64Gauge
+	IOReadsGauge          metric.Int64Gauge
+	IOWritesGauge         metric.Int64Gauge
 
 	// Histograms
 	RSSHistogram               metric.Int64Histogram
@@ -71,8 +73,6 @@ var (
 	OsqueryRssHistogram        metric.Int64Histogram
 	DesktopCpuPercentHistogram metric.Float64Histogram
 	DesktopRssHistogram        metric.Int64Histogram
-	IOReadsHistogram           metric.Int64Histogram
-	IOWritesHistogram          metric.Int64Histogram
 
 	// Counters
 	LauncherRestartCounter            metric.Int64Counter
@@ -109,6 +109,12 @@ func ReinitializeMetrics() {
 	CheckupScoreGauge = float64GaugeOrNoop(checkupScoreGaugeName,
 		metric.WithDescription(checkupScoreGaugeDescription),
 		metric.WithUnit(unitPercent))
+	IOReadsGauge = int64GaugeOrNoop(ioReadsGaugeName,
+		metric.WithDescription(ioReadsGaugeDescription),
+		metric.WithUnit(unitReads))
+	IOWritesGauge = int64GaugeOrNoop(ioWritesGaugeName,
+		metric.WithDescription(ioWritesGaugeDescription),
+		metric.WithUnit(unitWrites))
 
 	// Histograms
 	RSSHistogram = int64HistogramOrNoop(rssHistogramName,
@@ -126,12 +132,6 @@ func ReinitializeMetrics() {
 	DesktopRssHistogram = int64HistogramOrNoop(desktopRssHistogramName,
 		metric.WithDescription(desktopRssHistogramDescription),
 		metric.WithUnit(unitByteGCP))
-	IOReadsHistogram = int64HistogramOrNoop(ioReadsHistogramName,
-		metric.WithDescription(ioReadsHistogramDescription),
-		metric.WithUnit(unitReads))
-	IOWritesHistogram = int64HistogramOrNoop(ioWritesHistogramName,
-		metric.WithDescription(ioWritesHistogramDescription),
-		metric.WithUnit(unitWrites))
 
 	// Counters
 	LauncherRestartCounter = int64CounterOrNoop(launcherRestartCounterName,
