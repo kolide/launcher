@@ -60,7 +60,8 @@ const (
 	DisableTraceIngestTLS            FlagKey = "disable_trace_ingest_tls"
 	InModernStandby                  FlagKey = "in_modern_standby"
 	LocalDevelopmentPath             FlagKey = "localdev_path"
-	LauncherWatchdogEnabled          FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
+	LauncherWatchdogEnabled          FlagKey = "launcher_watchdog_enabled"  // note that this was a temporary flag and will be removed in favor of launcher_watchdog_disabled
+	LauncherWatchdogDisabled         FlagKey = "launcher_watchdog_disabled" // note that this will only impact windows deployments for now
 	SystrayRestartEnabled            FlagKey = "systray_restart_enabled"
 	CurrentRunningOsqueryVersion     FlagKey = "osquery_version"
 	TableGenerateTimeout             FlagKey = "table_generate_timeout"
