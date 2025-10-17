@@ -129,7 +129,11 @@ type managedInstall struct {
 }
 
 func (m *MunkiInfo) loadReport() error {
-	if !fileExists(m.reportPath) {
+	reportExists, err := fileExists(m.reportPath)
+	if err != nil {
+		return fmt.Errorf("checking for report: %w", err)
+	}
+	if !reportExists {
 		return nil
 	}
 
@@ -148,10 +152,13 @@ func (m *MunkiInfo) loadReport() error {
 	return nil
 }
 
-func fileExists(path string) bool {
+func fileExists(path string) (bool, error) {
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		return false
+		return false, nil
 	}
-	return !info.IsDir()
+	if err != nil {
+		return false, fmt.Errorf("statting %s: %w", path, err)
+	}
+	return !info.IsDir(), nil
 }
