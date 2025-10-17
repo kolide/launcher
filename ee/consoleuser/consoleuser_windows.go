@@ -9,6 +9,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
@@ -86,7 +87,7 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", proc.Pid, err)
 		}
 
-		if uid == procOwnerUid {
+		if strings.EqualFold(uid, procOwnerUid) {
 			return proc, nil
 		}
 	}
