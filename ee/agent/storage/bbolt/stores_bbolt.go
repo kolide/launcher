@@ -37,6 +37,7 @@ func MakeStores(ctx context.Context, slogger *slog.Logger, db *bbolt.DB) (map[st
 		storage.WindowsUpdatesCacheStore,
 		storage.RegistrationStore,
 		storage.EnrollmentDetailsStore,
+		storage.OsqueryVariablesStore,
 	}
 
 	for _, storeName := range storeNames {

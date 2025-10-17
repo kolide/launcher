@@ -71,13 +71,14 @@ import (
 
 const (
 	// Subsystems that launcher listens for control server updates on
-	agentFlagsSubsystemName  = "agent_flags"
-	serverDataSubsystemName  = "kolide_server_data"
-	desktopMenuSubsystemName = "kolide_desktop_menu"
-	authTokensSubsystemName  = "auth_tokens"
-	katcSubsystemName        = "katc_config" // Kolide ATC
-	ztaInfoSubsystemName     = "zta_info"    // legacy name for dt4aInfo subsystem
-	dt4aInfoSubsystemName    = "dt4a_info"
+	agentFlagsSubsystemName       = "agent_flags"
+	serverDataSubsystemName       = "kolide_server_data"
+	desktopMenuSubsystemName      = "kolide_desktop_menu"
+	authTokensSubsystemName       = "auth_tokens"
+	katcSubsystemName             = "katc_config" // Kolide ATC
+	ztaInfoSubsystemName          = "zta_info"    // legacy name for dt4aInfo subsystem
+	dt4aInfoSubsystemName         = "dt4a_info"
+	osqueryVariablesSubsystemName = "osquery_variables"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -451,6 +452,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(katcSubsystemName, keyvalueconsumer.NewConfigConsumer(k.KatcConfigStore()))
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
+		controlService.RegisterConsumer(osqueryVariablesSubsystemName, keyvalueconsumer.NewConfigConsumer(k.OsqueryVariablesStore()))
 
 		runner, err = desktopRunner.New(
 			k,

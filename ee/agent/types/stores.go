@@ -21,4 +21,5 @@ type Stores interface {
 	WindowsUpdatesCacheStore() KVStore
 	RegistrationStore() KVStore
 	EnrollmentDetailsStore() KVStore
+	OsqueryVariablesStore() KVStore
 }
