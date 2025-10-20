@@ -1103,6 +1103,7 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
+	k.On("OsqueryVariablesStore").Return(inmemory.NewStore()).Maybe()
 }
 
 func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {
