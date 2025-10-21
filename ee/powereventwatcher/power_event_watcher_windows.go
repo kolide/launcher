@@ -20,12 +20,22 @@ import (
 
 type (
 	eventLogEntry struct {
-		XMLName xml.Name `xml:"Event"`
-		System  System   `xml:"System"`
+		XMLName   xml.Name   `xml:"Event"`
+		System    System     `xml:"System"`
+		EventData *EventData `xml:"EventData,omitempty"`
 	}
 
 	System struct {
 		EventID int `xml:"EventID"`
+	}
+
+	EventData struct {
+		Data []EventDataItem `xml:"Data"`
+	}
+
+	EventDataItem struct {
+		Name  string `xml:"Name,attr,omitempty"`
+		Value string `xml:",chardata"`
 	}
 
 	powerEventWatcher struct {
@@ -43,7 +53,7 @@ type (
 	// implementers are provided to New, and the interface methods below are called as described during relevant updates
 	powerEventSubscriber interface {
 		// OnPowerEvent will be called for the provided subscriber whenever any watched event is observed
-		OnPowerEvent(eventID int) error
+		OnPowerEvent(e *eventLogEntry) error
 		// OnStartup will be called when the powerEventWatcher is initially set up, allowing subscribers
 		// to perform any setup behavior (e.g. cache clearing, state resetting)
 		OnStartup() error
@@ -102,11 +112,11 @@ func (ims *InMemorySleepStateUpdater) InModernStandby() bool {
 	return ims.inModernStandby
 }
 
-func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
+func (ims *InMemorySleepStateUpdater) OnPowerEvent(e *eventLogEntry) error {
 	ims.Lock()
 	defer ims.Unlock()
 
-	switch eventID {
+	switch e.System.EventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		ims.inModernStandby = true
 	case EventIdExitingModernStandby, EventIdResumedFromSleep:
@@ -114,19 +124,27 @@ func (ims *InMemorySleepStateUpdater) OnPowerEvent(eventID int) error {
 	default:
 		ims.slogger.Log(context.TODO(), slog.LevelWarn,
 			"received unexpected event ID in log",
-			"event_id", eventID,
+			"event_id", e.System.EventID,
 		)
 	}
 
 	return nil
 }
 
-func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
-	switch eventID {
+func (ks *knapsackSleepStateUpdater) OnPowerEvent(e *eventLogEntry) error {
+	powerEventReason := ""
+	for _, d := range e.EventData.Data {
+		if d.Name == "Reason" {
+			powerEventReason = d.Value
+		}
+	}
+
+	switch e.System.EventID {
 	case eventIdEnteringModernStandby, eventIdEnteringSleep:
 		ks.slogger.Log(context.TODO(), slog.LevelDebug,
 			"system is sleeping",
-			"event_id", eventID,
+			"event_id", e.System.EventID,
+			"reason", powerEventReason,
 		)
 		if err := ks.knapsack.SetInModernStandby(true); err != nil {
 			ks.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -138,7 +156,8 @@ func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
 	case EventIdExitingModernStandby, EventIdResumedFromSleep:
 		ks.slogger.Log(context.TODO(), slog.LevelDebug,
 			"system is waking",
-			"event_id", eventID,
+			"event_id", e.System.EventID,
+			"reason", powerEventReason,
 		)
 		if err := ks.knapsack.SetInModernStandby(false); err != nil {
 			ks.slogger.Log(context.TODO(), slog.LevelWarn,
@@ -150,7 +169,8 @@ func (ks *knapsackSleepStateUpdater) OnPowerEvent(eventID int) error {
 	default:
 		ks.slogger.Log(context.TODO(), slog.LevelWarn,
 			"received unexpected event ID in log",
-			"event_id", eventID,
+			"event_id", e.System.EventID,
+			"reason", powerEventReason,
 		)
 	}
 
@@ -315,7 +335,7 @@ func (p *powerEventWatcher) onPowerEvent(action uint32, _ uintptr, eventHandle u
 		return ret
 	}
 
-	if err := p.powerEventSubscriber.OnPowerEvent(e.System.EventID); err != nil {
+	if err := p.powerEventSubscriber.OnPowerEvent(&e); err != nil {
 		p.slogger.Log(context.TODO(), slog.LevelWarn,
 			"subscriber encountered error OnPowerEvent update",
 			"err", err,
