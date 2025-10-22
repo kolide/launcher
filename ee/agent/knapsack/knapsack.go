@@ -485,6 +485,6 @@ func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
 	k.desktopRunner = runner
 }
 
-func (k *knapsack) OsqueryVariablesStore() types.KVStore {
-	return k.getKVStore(storage.OsqueryVariablesStore)
+func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
+	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
 }

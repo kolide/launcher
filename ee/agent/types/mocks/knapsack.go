@@ -1159,12 +1159,12 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
-// OsqueryVariablesStore provides a mock function with no fields
-func (_m *Knapsack) OsqueryVariablesStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+// ServerReleaseTrackerDataStore provides a mock function with no fields
+func (_m *Knapsack) ServerReleaseTrackerDataStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryVariablesStore")
+		panic("no return value specified for ServerReleaseTrackerDataStore")
 	}
 
 	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
