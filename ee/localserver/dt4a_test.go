@@ -43,6 +43,9 @@ func Test_requestDt4aInfoHandler(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -97,6 +100,9 @@ func Test_requestDt4aInfoHandlerWithDt4aIds(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -141,6 +147,9 @@ func Test_requestDt4aInfoHandlerWithDt4aIdsNoData(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -201,6 +210,9 @@ func Test_requestDt4aInfoHandler_allowsAllSafariWebExtensionOrigins(t *testing.T
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -245,6 +257,9 @@ func Test_requestDt4aInfoHandler_allowsMissingOrigin(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -288,6 +303,9 @@ func Test_requestDt4aInfoHandler_allowsEmptyOrigin(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -341,6 +359,9 @@ func Test_requestDt4aInfoHandler_badRequest(t *testing.T) {
 					Munemo:         "test-munemo",
 				},
 			}, nil)
+			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err, "could not create test config store")
+			k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 			// Set up localserver
 			ls, err := New(t.Context(), k, nil)
@@ -380,6 +401,9 @@ func Test_requestDt4aInfoHandler_noDataAvailable(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)
@@ -414,6 +438,9 @@ func Test_requestDt4aAccelerationHandler(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Set up localserver
 	ls, err := New(t.Context(), k, nil)

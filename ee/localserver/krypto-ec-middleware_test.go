@@ -25,6 +25,8 @@ import (
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/localserver/mocks"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -675,6 +677,9 @@ func TestMunemoCheck(t *testing.T) {
 
 			k := typesmocks.NewKnapsack(t)
 			k.On("Registrations").Return(tt.registrations, nil)
+			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err, "could not create test config store")
+			k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 			munemo, err := getMunemoFromKnapsack(k)
 			if tt.expectMunemoExtractionErr {

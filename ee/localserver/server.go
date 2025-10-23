@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -21,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 )
 
@@ -43,6 +43,7 @@ type localServer struct {
 	knapsack               types.Knapsack
 	srv                    *http.Server
 	identifiers            identifiers
+	hostIdentifier         *atomic.String
 	ecLimiter, dt4aLimiter *rate.Limiter
 	kryptoMiddleware       *kryptoEcMiddleware
 	tlsCerts               []tls.Certificate
@@ -71,6 +72,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	ls := &localServer{
 		slogger:         k.Slogger().With("component", "localserver"),
 		knapsack:        k,
+		hostIdentifier:  atomic.NewString(""),
 		ecLimiter:       rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		dt4aLimiter:     rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:    k.KolideServerURL(),
