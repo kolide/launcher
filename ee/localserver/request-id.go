@@ -13,6 +13,7 @@ import (
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/runsimple"
 )
 
@@ -30,6 +31,7 @@ type (
 		Timestamp         time.Time
 		Status            status
 		Origin            string
+		HostIdentifier    string
 		EnrollmentDetails types.EnrollmentDetails
 	}
 
@@ -106,6 +108,16 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 	enrollmentStatus, _ := ls.knapsack.CurrentEnrollmentStatus()
 	enrollmentDetails := ls.knapsack.GetEnrollmentDetails()
 
+	hostIdentifier := ls.hostIdentifier.Load()
+	if hostIdentifier == "" {
+		// Make a best-effort attempt to fetch the identifier.
+		// Until we tackle multitenancy, we'll use the default registration ID.
+		if updatedHostIdentifier, err := osquery.IdentifierFromDB(ls.knapsack.ConfigStore(), types.DefaultRegistrationID); err == nil {
+			hostIdentifier = updatedHostIdentifier
+			ls.hostIdentifier.Store(updatedHostIdentifier)
+		}
+	}
+
 	response := requestIdsResponse{
 		Nonce:     ulid.New(),
 		Timestamp: time.Now(),
@@ -113,6 +125,7 @@ func (ls *localServer) requestIdHandlerFunc(w http.ResponseWriter, r *http.Reque
 		Status: status{
 			EnrollmentStatus: string(enrollmentStatus),
 		},
+		HostIdentifier:    hostIdentifier,
 		EnrollmentDetails: enrollmentDetails,
 	}
 	response.identifiers = ls.identifiers
