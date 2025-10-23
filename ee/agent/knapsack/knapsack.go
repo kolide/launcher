@@ -491,3 +491,7 @@ func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]st
 func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
 	k.desktopRunner = runner
 }
+
+func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
+	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
+}
