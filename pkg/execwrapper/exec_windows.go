@@ -33,6 +33,7 @@ func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string
 	slogger.Log(ctx, slog.LevelError,
 		"command terminated",
 		"exit_code", cmd.ProcessState.ExitCode(),
+		"process_state", cmd.ProcessState.String(),
 		"err", err,
 	)
 
