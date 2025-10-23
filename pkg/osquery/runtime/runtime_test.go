@@ -355,6 +355,7 @@ func TestPing(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 
 	// Start the runner
 	runner := New(k, mockServiceClient(t), s)
@@ -1103,6 +1104,7 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 }
 
 func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {

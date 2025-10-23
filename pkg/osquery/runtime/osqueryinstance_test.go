@@ -484,6 +484,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	osqHistory := setupHistory(t, k)
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 
 	// Create an instance and launch it
 	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
