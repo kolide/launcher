@@ -186,6 +186,20 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 	}
 	k.RegisterChangeObserver(e, keys.DistributedForwardingInterval)
 
+	// Ensure host identifier is set as early as possible
+	identifier, err := e.getHostIdentifier()
+	if err != nil {
+		slogger.Log(ctx, slog.LevelWarn,
+			"unable to get host identifier",
+			"err", err,
+		)
+	} else {
+		slogger.Log(ctx, slog.LevelDebug,
+			"got host identifier",
+			"host_identifier", identifier,
+		)
+	}
+
 	return e, nil
 }
 
