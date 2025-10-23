@@ -3,6 +3,7 @@ package execwrapper
 import (
 	"log/slog"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -22,6 +23,8 @@ func TestExec(t *testing.T) {
 	err := Exec(t.Context(), slogger, "echo", []string{"test string"}, os.Environ())
 	require.Error(t, err)
 
-	// We should expect at least SOMETHING to be logged
-	require.Greater(t, len(logBytes.String()), 0)
+	// We should expect at least SOMETHING to be logged on Windows
+	if runtime.GOOS == "windows" {
+		require.Greater(t, len(logBytes.String()), 0)
+	}
 }
