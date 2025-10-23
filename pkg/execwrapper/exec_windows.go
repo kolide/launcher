@@ -30,16 +30,15 @@ func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string
 	// between a failure to execute, and a failure in the called program.
 	// I think https://github.com/golang/go/issues/26539 adds this functionality.
 	err := cmd.Run()
+	slogger.Log(ctx, slog.LevelError,
+		"command terminated",
+		"exit_code", cmd.ProcessState.ExitCode(),
+		"err", err,
+	)
 
 	if cmd.ProcessState.ExitCode() == -1 {
 		return fmt.Errorf("execing %s returned exit code -1 and state %s: %w", fullCmd, cmd.ProcessState.String(), err)
 	}
 
-	if err != nil {
-		slogger.Log(ctx, slog.LevelError,
-			"got error on exec",
-			"err", err,
-		)
-	}
 	return fmt.Errorf("exec completed with exit code %d", cmd.ProcessState.ExitCode())
 }
