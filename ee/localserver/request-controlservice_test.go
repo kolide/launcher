@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -26,6 +28,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 		m.On("Registrations").Return([]types.Registration{
 			{Munemo: "test-munemo"},
 		}, nil)
+		testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+		require.NoError(t, err, "could not create test config store")
+		m.On("ConfigStore").Return(testConfigStore).Maybe()
 		return m
 	}
 
@@ -54,6 +59,9 @@ func Test_localServer_requestAccelerateControlFunc(t *testing.T) {
 				m.On("Registrations").Return([]types.Registration{
 					{Munemo: "test-munemo"},
 				}, nil)
+				testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+				require.NoError(t, err, "could not create test config store")
+				m.On("ConfigStore").Return(testConfigStore).Maybe()
 				return m
 			},
 		},

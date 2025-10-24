@@ -261,6 +261,13 @@ func (k *knapsack) LauncherWatchdogEnabled() bool {
 	return k.flags.LauncherWatchdogEnabled()
 }
 
+func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
+	return k.flags.SetLauncherWatchdogDisabled(disabled)
+}
+func (k *knapsack) LauncherWatchdogDisabled() bool {
+	return k.flags.LauncherWatchdogDisabled()
+}
+
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
 	if k == nil {
 		return nil
@@ -483,4 +490,8 @@ func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]st
 
 func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
 	k.desktopRunner = runner
+}
+
+func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
+	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
 }

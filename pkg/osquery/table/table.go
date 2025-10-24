@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/tables/jwt"
 	"github.com/kolide/launcher/ee/tables/launcher_db"
 	"github.com/kolide/launcher/ee/tables/osquery_instance_history"
+	"github.com/kolide/launcher/ee/tables/release_tracker_data"
 	"github.com/kolide/launcher/ee/tables/sleeper"
 	"github.com/kolide/launcher/ee/tables/tdebug"
 	"github.com/kolide/launcher/ee/tables/tufinfo"
@@ -39,6 +40,7 @@ func LauncherTables(k types.Knapsack, slogger *slog.Logger) []osquery.OsqueryPlu
 		launcher_db.TablePlugin(k, slogger, "kolide_control_flags", k.AgentFlagsStore()),
 		LauncherAutoupdateConfigTable(slogger, k),
 		osquery_instance_history.TablePlugin(k, slogger),
+		release_tracker_data.TablePlugin(k, slogger, k.ServerReleaseTrackerDataStore()),
 		tufinfo.TufReleaseVersionTable(slogger, k),
 		desktopprocs.TablePlugin(k, slogger),
 	}

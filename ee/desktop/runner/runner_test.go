@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -435,7 +436,9 @@ func TestDesktopUsersProcessesRunner_setupSocketPath(t *testing.T) {
 		t.Skip("windows sockets differently, test does not apply")
 	}
 
-	runner := DesktopUsersProcessesRunner{}
+	runner := DesktopUsersProcessesRunner{
+		uidProcsLock: &sync.Mutex{},
+	}
 
 	u, err := user.Current()
 	require.NoError(t, err)
@@ -510,7 +513,9 @@ func TestDesktopUsersProcessesRunner_DetectPresence(t *testing.T) {
 	t.Run("no user procs", func(t *testing.T) {
 		t.Parallel()
 
-		runner := DesktopUsersProcessesRunner{}
+		runner := DesktopUsersProcessesRunner{
+			uidProcsLock: &sync.Mutex{},
+		}
 		d, err := runner.DetectPresence("whatevs", time.Second)
 		require.Error(t, err)
 		require.Equal(t, presencedetection.DetectionFailedDurationValue, d)
@@ -526,6 +531,7 @@ func TestDesktopUsersProcessesRunner_DetectPresence(t *testing.T) {
 			uidProcs: map[string]processRecord{
 				u.Uid: {},
 			},
+			uidProcsLock: &sync.Mutex{},
 		}
 
 		d, err := runner.DetectPresence("whatevs", time.Second)

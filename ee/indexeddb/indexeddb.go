@@ -190,6 +190,15 @@ func OpenLeveldb(slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
 	}
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
+		// ensure we log this error so we can investigate. we don't think we're seeing any non-idb_cmp1
+		// leveldbs, but when that is the case we still get a valid db returned, and then no errors from
+		// the RecoverFile call, so it is possible that this is a valid corruption error which recovery wouldn't have actually fixed.
+		// we can track this error and see if there are other comparer types in the wild that should be accounted for
+		slogger.Log(context.TODO(), slog.LevelError,
+			"error opening leveldb, will attempt recovery",
+			"err", dbOpenErr.Error(),
+		)
+
 		// Perform recover in case we missed something while copying
 		var dbRecoverErr error
 		db, dbRecoverErr = leveldb.RecoverFile(dbLocation, opts)

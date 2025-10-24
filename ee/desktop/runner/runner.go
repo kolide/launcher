@@ -115,7 +115,8 @@ type DesktopUsersProcessesRunner struct {
 	interrupt           chan struct{}
 	interrupted         atomic.Bool
 	// uidProcs is a map of uid to desktop process
-	uidProcs map[string]processRecord
+	uidProcs     map[string]processRecord
+	uidProcsLock *sync.Mutex
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
 	// interruptTimeout how long to wait for desktop proccesses to finish on interrupt
@@ -168,6 +169,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner := &DesktopUsersProcessesRunner{
 		interrupt:           make(chan struct{}),
 		uidProcs:            make(map[string]processRecord),
+		uidProcsLock:        &sync.Mutex{},
 		updateInterval:      k.DesktopUpdateInterval(),
 		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
 		procsWg:             &sync.WaitGroup{},
@@ -297,7 +299,10 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 }
 
 func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return presencedetection.DetectionFailedDurationValue, errors.New("no desktop processes running")
 	}
 
@@ -319,7 +324,10 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 }
 
 func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return nil, errors.New("no desktop processes running")
 	}
 
@@ -348,7 +356,10 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context
 // false, nil if the key does not exist;
 // false, error don't know if key exists because of some other error
 func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return false, errors.New("no desktop processes running")
 	}
 
@@ -365,6 +376,9 @@ func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 
 	wgDone := make(chan struct{})
 	gowrapper.Go(context.TODO(), r.slogger, func() {
@@ -430,6 +444,9 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 
 // killDesktopProcess kills the existing desktop process for the given uid
 func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) error {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	proc, ok := r.uidProcs[uid]
 	if !ok {
 		return fmt.Errorf("could not find desktop proc for uid %s, cannot kill process", uid)
@@ -488,6 +505,9 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 	if !r.knapsack.DesktopEnabled() {
 		return errors.New("desktop is not enabled, cannot send notification")
 	}
+
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
@@ -577,6 +597,8 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 
 	// DesktopEnabled() == true
 	// Tell any running desktop user processes that they should show the menu
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.ShowDesktop(); err != nil {
@@ -630,6 +652,8 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
@@ -849,6 +873,9 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 		return fmt.Errorf("getting process path: %w", err)
 	}
 
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	r.uidProcs[uid] = processRecord{
 		Process:    osProcess,
 		StartTime:  time.Now().UTC(),
@@ -897,6 +924,9 @@ func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) 
 }
 
 func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	// have no record of process
 	proc, ok := r.uidProcs[uid]
 	if !ok {
@@ -1007,6 +1037,9 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
+	// allowedcmd automatically setting some env vars already for us, including GOMAXPROCS.
+	// We may need to update or override some of them.
 	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
 
 	cmd.Env = []string{
@@ -1210,6 +1243,9 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 
 // RequestProfile implements types.DesktopRunner
 func (r *DesktopUsersProcessesRunner) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	if len(r.uidProcs) == 0 {
 		// No desktop processes running, this is not an error
 		return nil, nil

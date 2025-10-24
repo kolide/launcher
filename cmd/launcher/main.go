@@ -173,7 +173,7 @@ func runMain() int {
 		// Autoupdate asked for a restart to run the newly-downloaded version of launcher -- run that newer version
 		if tuf.IsLauncherReloadNeededErr(err) {
 			level.Debug(logger).Log("msg", "runLauncher exited to load newer version of launcher after autoupdate", "err", err.Error())
-			if err := runNewerLauncherIfAvailable(ctx, slogger.Logger); err != nil {
+			if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
 				return 1
 			}
 		}
@@ -187,7 +187,7 @@ func runMain() int {
 			level.Debug(logger).Log("msg", "could not get current executable to perform restart", "err", err.Error())
 			return 1
 		}
-		if err := execwrapper.Exec(ctx, currentExecutable, os.Args, os.Environ()); err != nil {
+		if err := execwrapper.Exec(ctx, systemSlogger.Logger, currentExecutable, os.Args, os.Environ()); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"error execing launcher after restart was requested",
 				"binary", currentExecutable,
@@ -266,7 +266,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 		"new_binary", newerBinary,
 	)
 
-	if err := execwrapper.Exec(ctx, newerBinary, os.Args, os.Environ()); err != nil {
+	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ()); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"error execing newer version of launcher",
 			"new_binary", newerBinary,

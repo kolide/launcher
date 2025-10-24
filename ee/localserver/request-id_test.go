@@ -9,8 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +31,9 @@ func Test_localServer_requestIdHandler(t *testing.T) {
 			Munemo:         "test-munemo",
 		},
 	}, nil)
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	var logBytes bytes.Buffer
 	slogger := slog.New(slog.NewJSONHandler(&logBytes, &slog.HandlerOptions{

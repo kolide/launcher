@@ -134,11 +134,13 @@ func (d *dbusNotifier) Interrupt(err error) {
 
 	d.interrupt <- struct{}{}
 
-	d.conn.RemoveSignal(d.signal)
-	d.conn.RemoveMatchSignal(
-		dbus.WithMatchObjectPath(notificationServiceObj),
-		dbus.WithMatchInterface(notificationServiceInterface),
-	)
+	if d.conn != nil {
+		d.conn.RemoveSignal(d.signal)
+		d.conn.RemoveMatchSignal(
+			dbus.WithMatchObjectPath(notificationServiceObj),
+			dbus.WithMatchInterface(notificationServiceInterface),
+		)
+	}
 }
 
 // just make compiler happy, this is only needed on darwin

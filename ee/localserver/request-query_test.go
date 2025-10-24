@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
@@ -62,6 +64,9 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 					Munemo:         "test-munemo",
 				},
 			}, nil)
+			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err, "could not create test config store")
+			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -233,6 +238,9 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 					Munemo:         "test-munemo",
 				},
 			}, nil)
+			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err, "could not create test config store")
+			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
