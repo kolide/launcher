@@ -19,7 +19,7 @@ func TestExec(t *testing.T) {
 	}))
 
 	// by not setting command and args on non-windows, we will trigger an error in syscall.Exec
-	// otherwise we'll never return from Exec on non-windows becuase syscall.Exec replaces the current process
+	// otherwise we'll never return from Exec on non-windows because syscall.Exec replaces the current process
 	command := ""
 	args := []string{}
 
