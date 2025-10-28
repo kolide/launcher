@@ -9,6 +9,6 @@ import (
 	"syscall"
 )
 
-func Exec(ctx context.Context, _ *slog.Logger, argv0 string, argv []string, envv []string, _ bool) (err error) {
+func Exec(_ context.Context, _ *slog.Logger, argv0 string, argv []string, envv []string, _ bool) (err error) {
 	return syscall.Exec(argv0, argv, envv)
 }
