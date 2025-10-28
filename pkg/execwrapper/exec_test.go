@@ -26,15 +26,14 @@ func TestExec(t *testing.T) {
 		// Exec removes the first argument, so add a blank to make sure our args get processed
 		args = []string{"", "/c", "echo", "test string"}
 	} else {
-		command = "/bin/echo"
-		args = []string{"echo", "test string"}
+		// by not setting command and args on non-windows, we will trigger an error in syscall.Exec
+		command = ""
+		args = []string{}
 	}
 
 	// Exec expects the process to continue running (because it expects to be running launcher),
 	// so any exit that is not a subcommand or the windows "svc" subcommand, will be an error. Therefore, we expect an error here.
 	err := Exec(t.Context(), slogger, command, args, os.Environ(), false)
-
-	// on non-windows, we never actually get to this line, because syscall.Exec replaces the current process
 	require.Error(t, err)
 
 	// your eyes do not decive you, we expect an exit status 0 in the logs even though Exec returned an error
