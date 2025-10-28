@@ -29,10 +29,7 @@ func TestExec(t *testing.T) {
 		args = []string{"-c", "echo test string"}
 	}
 
-	if runtime.GOOS == "windows" {
-		// Exec removes the first argument, so add a blank to make sure our args get processed
-		args = append([]string{""}, args...)
-	}
+	args = append([]string{""}, args...)
 
 	// Exec expects the process to continue running (because it expects to be running launcher),
 	// so any exit that is not a subcommand or the windows "svc" subcommand, will be an error. Therefore, we expect an error here.
@@ -70,10 +67,8 @@ func TestExecSubcommand(t *testing.T) {
 		args = []string{"-c", "echo test string"}
 	}
 
-	if runtime.GOOS == "windows" {
-		// Exec removes the first argument, so add a blank to make sure our args get processed
-		args = append([]string{""}, args...)
-	}
+	// Exec removes the first argument, so add a blank to make sure our args get processed
+	args = append([]string{""}, args...)
 
 	// flag this call as a non-svc subcommand so if it exist with out error, we do not return an error
 	err := Exec(t.Context(), slogger, command, args, os.Environ(), true)
