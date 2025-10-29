@@ -35,6 +35,22 @@ func Test_shouldIgnoreSession(t *testing.T) {
 			shouldIgnore: true,
 		},
 		{
+			testCaseName: "Okta Verify but OVSvc",
+			sessionData: &winlsa.LogonSessionData{
+				UserName:    "OVSvc-327820240-8998",
+				LogonDomain: "SOMEDOMAIN",
+			},
+			shouldIgnore: true,
+		},
+		{
+			testCaseName: "Okta Verify but OVSvc, no hyphen",
+			sessionData: &winlsa.LogonSessionData{
+				UserName:    "OVSvc2137621967-1628",
+				LogonDomain: "SOMEDOMAIN",
+			},
+			shouldIgnore: true,
+		},
+		{
 			testCaseName: "WsiAccount",
 			sessionData: &winlsa.LogonSessionData{
 				UserName:    "WsiAccount",
@@ -55,6 +71,14 @@ func Test_shouldIgnoreSession(t *testing.T) {
 			sessionData: &winlsa.LogonSessionData{
 				UserName:    "DWM-10",
 				LogonDomain: "Window Manager",
+			},
+			shouldIgnore: true,
+		},
+		{
+			testCaseName: "defaultuser0",
+			sessionData: &winlsa.LogonSessionData{
+				UserName:    "defaultuser0",
+				LogonDomain: "SOMEDOMAIN",
 			},
 			shouldIgnore: true,
 		},
