@@ -116,7 +116,10 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			slogger := multislogger.NewNopLogger()
 
 			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(tt.percentEnabled)
-			client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
+			client := &LogPublisherClient{
+				logger:   slogger.With("component", "osquery_log_publisher"),
+				knapsack: mockKnapsack,
+			}
 
 			assert.Equal(t, tt.shouldPublishLogs, client.shouldPublishLogs())
 			mockHTTPClient.AssertExpectations(t)
