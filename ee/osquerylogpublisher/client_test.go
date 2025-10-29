@@ -2,7 +2,6 @@ package osquerylogpublisher
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -72,7 +71,7 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
 
 			logs := []string{"log1", "log2", "log3"}
-			result, err := client.PublishLogs(context.Background(), osqlog.LogTypeStatus, logs)
+			result, err := client.PublishLogs(t.Context(), osqlog.LogTypeStatus, logs)
 
 			mockHTTPClient.AssertExpectations(t)
 
