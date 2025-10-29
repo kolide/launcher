@@ -102,6 +102,9 @@ func TestPing(t *testing.T) {
 			_, err = os.Stat(metadataFile)
 			require.True(t, errors.Is(err, os.ErrNotExist), "metadata file should not exist yet")
 
+			// Set blank data in file
+			testMetadataWriter.Ping()
+
 			// Set up existing metadata file, if required
 			if tt.startingMetadata != nil {
 				// Set starting data in store

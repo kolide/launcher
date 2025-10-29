@@ -57,7 +57,8 @@ func (mw *metadataWriter) Ping() {
 		)
 	}
 
-	if preUpdateMetadata == nil {
+	if preUpdateMetadata == nil ||
+		(preUpdateMetadata.DeviceId == "" && preUpdateMetadata.OrganizationId == "" && preUpdateMetadata.OrganizationMunemo == "") {
 		// No prior metadata to compare to, nothing more to do here
 		return
 	}
