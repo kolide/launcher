@@ -40,6 +40,8 @@ func NewMetadataWriter(slogger *slog.Logger, k types.Knapsack) *metadataWriter {
 }
 
 func (mw *metadataWriter) Ping() {
+	preUpdateMetadata := mw.currentRecordedMetadata()
+
 	metadata := newMetadataTemplate()
 	if err := mw.populateLatestServerData(metadata); err != nil {
 		mw.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -52,6 +54,25 @@ func (mw *metadataWriter) Ping() {
 		mw.slogger.Log(context.TODO(), slog.LevelDebug,
 			"unable to write out metadata files",
 			"err", err,
+		)
+	}
+
+	if preUpdateMetadata == nil {
+		// No prior metadata to compare to, nothing more to do here
+		return
+	}
+
+	if preUpdateMetadata.DeviceId != metadata.DeviceId ||
+		preUpdateMetadata.OrganizationId != metadata.OrganizationId ||
+		preUpdateMetadata.OrganizationMunemo != metadata.OrganizationMunemo {
+		mw.slogger.Log(context.TODO(), slog.LevelInfo,
+			"server metadata changed",
+			"old_device_id", preUpdateMetadata.DeviceId,
+			"old_organization_id", preUpdateMetadata.OrganizationId,
+			"old_organization_munemo", preUpdateMetadata.OrganizationMunemo,
+			"new_device_id", metadata.DeviceId,
+			"new_organization_id", metadata.OrganizationId,
+			"new_organization_munemo", metadata.OrganizationMunemo,
 		)
 	}
 }
@@ -106,6 +127,35 @@ func (mw *metadataWriter) recordMetadata(metadata *metadata) error {
 	}
 
 	return nil
+}
+
+func (mw *metadataWriter) currentRecordedMetadata() *metadata {
+	metadataJSONFile := filepath.Join(mw.k.RootDirectory(), "metadata.json")
+	if _, err := os.Stat(metadataJSONFile); err != nil && errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	metadataRaw, err := os.ReadFile(metadataJSONFile)
+	if err != nil {
+		mw.slogger.Log(context.TODO(), slog.LevelError,
+			"could not read current metadata file, though it exists",
+			"metadata_file_path", metadataJSONFile,
+			"err", err,
+		)
+		return nil
+	}
+
+	var currentMetadata metadata
+	if err := json.Unmarshal(metadataRaw, &currentMetadata); err != nil {
+		mw.slogger.Log(context.TODO(), slog.LevelError,
+			"could not unmarshal current metadata file",
+			"metadata_file_path", metadataJSONFile,
+			"err", err,
+		)
+		return nil
+	}
+
+	return &currentMetadata
 }
 
 func (mw *metadataWriter) getServerDataValue(store types.KVStore, key string) string {
