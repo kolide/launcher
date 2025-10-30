@@ -88,12 +88,34 @@ func runMain() int {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
-		if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
-			systemSlogger.Log(ctx, slog.LevelInfo,
-				"could not run newer version of launcher",
+		lastestLauncherPath, err := latestLauncherPath(ctx, systemSlogger.Logger)
+
+		if err != nil {
+			systemSlogger.Log(ctx, slog.LevelError,
+				"could not check out latest launcher",
 				"err", err,
 			)
 			return 1
+		}
+
+		if lastestLauncherPath != "" {
+			systemSlogger.Log(ctx, slog.LevelInfo,
+				"found newer version of launcher to run",
+				"new_binary", lastestLauncherPath,
+			)
+
+			if err := execwrapper.Exec(ctx, systemSlogger.Logger, lastestLauncherPath, os.Args, os.Environ(), isNonSvcSubcommand()); err != nil {
+				systemSlogger.Log(ctx, slog.LevelError,
+					"error execing newer version of launcher",
+					"new_binary", lastestLauncherPath,
+					"err", err,
+				)
+
+				// launcher exited with an error, return non-zero exit code
+				return 1
+			}
+
+			return 0
 		}
 	}
 
