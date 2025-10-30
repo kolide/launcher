@@ -161,6 +161,11 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 	defer span.End()
 
 	for {
+		// Never attempt to launch an instance if shutdown has already been initiated
+		if r.interrupted.Load() {
+			return nil, fmt.Errorf("runner received shutdown, halting before initiating launching instance for %s", registrationId)
+		}
+
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
