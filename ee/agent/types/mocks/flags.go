@@ -1063,6 +1063,11 @@ func (_m *Flags) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return r0
 }
 
+// SetAutoupdateInitialDelayOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetAutoupdateInterval provides a mock function with given fields: interval
 func (_m *Flags) SetAutoupdateInterval(interval time.Duration) error {
 	ret := _m.Called(interval)
@@ -1079,6 +1084,11 @@ func (_m *Flags) SetAutoupdateInterval(interval time.Duration) error {
 	}
 
 	return r0
+}
+
+// SetAutoupdateIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Flags) SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetCachedQueryResultsTTL provides a mock function with given fields: ttl

@@ -1177,26 +1177,6 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
-// ServerReleaseTrackerDataStore provides a mock function with no fields
-func (_m *Knapsack) ServerReleaseTrackerDataStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ServerReleaseTrackerDataStore")
-	}
-
-	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
-	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
-		}
-	}
-
-	return r0
-}
-
 // OsqueryVerbose provides a mock function with no fields
 func (_m *Knapsack) OsqueryVerbose() bool {
 	ret := _m.Called()
@@ -1579,6 +1559,26 @@ func (_m *Knapsack) ServerProvidedDataStore() types.GetterSetterDeleterIteratorU
 	return r0
 }
 
+// ServerReleaseTrackerDataStore provides a mock function with no fields
+func (_m *Knapsack) ServerReleaseTrackerDataStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ServerReleaseTrackerDataStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
+	}
+
+	return r0
+}
+
 // SetAllowOverlyBroadDt4aAcceleration provides a mock function with given fields: enable
 func (_m *Knapsack) SetAllowOverlyBroadDt4aAcceleration(enable bool) error {
 	ret := _m.Called(enable)
@@ -1651,6 +1651,11 @@ func (_m *Knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return r0
 }
 
+// SetAutoupdateInitialDelayOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetAutoupdateInterval provides a mock function with given fields: interval
 func (_m *Knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	ret := _m.Called(interval)
@@ -1667,6 +1672,11 @@ func (_m *Knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	}
 
 	return r0
+}
+
+// SetAutoupdateIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetCachedQueryResultsTTL provides a mock function with given fields: ttl

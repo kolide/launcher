@@ -44,7 +44,7 @@ func TestNewTufAutoupdater(t *testing.T) {
 	mockKnapsack.On("AutoupdateInitialDelay").Return(0 * time.Second)
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 
 	_, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient)
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
@@ -93,7 +93,7 @@ func TestExecute_launcherUpdate(t *testing.T) {
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
 	// Set logger so that we can capture output
@@ -191,7 +191,7 @@ func TestExecute_osquerydUpdate(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
@@ -281,7 +281,7 @@ func TestExecute_downgrade(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set logger so that we can capture output
@@ -366,7 +366,7 @@ func TestExecute_withInitialDelay(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 
 	// Set logger so that we can capture output
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -433,7 +433,7 @@ func TestExecute_inModernStandby(t *testing.T) {
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("InModernStandby").Return(true)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
@@ -499,7 +499,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
@@ -638,7 +638,7 @@ func TestDo(t *testing.T) {
 			mockKnapsack.On("LocalDevelopmentPath").Return("").Maybe()
 			mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 			mockKnapsack.On("InModernStandby").Return(false)
-			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 			mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath).Maybe()
 			// Set up autoupdater
 			autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient, WithOsqueryRestart(func(context.Context) error { return nil }))
@@ -708,7 +708,7 @@ func TestDo_HandlesSimultaneousUpdates(t *testing.T) {
 	mockKnapsack.On("LocalDevelopmentPath").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 	mockKnapsack.On("AutoupdateDownloadSplay").Return(0 * time.Second)
 
@@ -792,7 +792,7 @@ func TestDo_WillNotExecuteDuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Set up autoupdater
@@ -869,7 +869,7 @@ func TestFlagsChanged_UpdateChannelChanged(t *testing.T) {
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("PinnedOsquerydVersion").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Start out on beta channel, then swap to nightly
@@ -934,7 +934,7 @@ func TestFlagsChanged_PinnedVersionChanged(t *testing.T) {
 	mockKnapsack.On("UpdateChannel").Return("nightly")
 	mockKnapsack.On("PinnedLauncherVersion").Return("")
 	mockKnapsack.On("InModernStandby").Return(false)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 	mockKnapsack.On("LatestOsquerydPath", mock.Anything).Return(osqBinaryPath)
 
 	// Start out with no pinned version, then set a pinned version
@@ -988,7 +988,7 @@ func TestFlagsChanged_DuringInitialDelay(t *testing.T) {
 	mockKnapsack.On("UpdateDirectory").Return("")
 	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay).Return()
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
 
 	// Start out with a pinned version, then unset the pinned version
 	pinnedLauncherVersion := "1.7.3"
