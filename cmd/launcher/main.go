@@ -89,7 +89,6 @@ func runMain() int {
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
 		lastestLauncherPath, err := latestLauncherPath(ctx, systemSlogger.Logger)
-
 		if err != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
 				"could not check out latest launcher",
@@ -111,7 +110,6 @@ func runMain() int {
 					"err", err,
 				)
 
-				// launcher exited with an error, return non-zero exit code
 				return 1
 			}
 
