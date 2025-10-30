@@ -254,13 +254,6 @@ func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
 	return k.getKVStore(storage.EnrollmentDetailsStore)
 }
 
-func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
-	return k.flags.SetLauncherWatchdogEnabled(enabled)
-}
-func (k *knapsack) LauncherWatchdogEnabled() bool {
-	return k.flags.LauncherWatchdogEnabled()
-}
-
 func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
 	return k.flags.SetLauncherWatchdogDisabled(disabled)
 }

@@ -65,8 +65,8 @@ func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	if slices.Contains(flagKeys, keys.LauncherWatchdogEnabled) {
-		wc.ServiceEnabledChanged(wc.knapsack.LauncherWatchdogEnabled())
+	if slices.Contains(flagKeys, keys.LauncherWatchdogDisabled) {
+		wc.ServiceEnabledChanged(!wc.knapsack.LauncherWatchdogDisabled())
 	}
 }
 
@@ -105,7 +105,7 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
 	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
 	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
-	if !wc.knapsack.LauncherWatchdogEnabled() {
+	if wc.knapsack.LauncherWatchdogDisabled() {
 		return
 	}
 
