@@ -48,6 +48,11 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 			continue
 		}
 
+		// Check for a couple well-known accounts that we know we don't want to create desktop processes for.
+		if shouldIgnoreSession(sessionData) {
+			continue
+		}
+
 		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
 		_, _, accountType, err := sessionData.Sid.LookupAccount("")
 		if err != nil {
@@ -64,6 +69,24 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 	activeUsernameList := slices.Collect(maps.Keys(activeUsernames))
 
 	return activeUsernameList, nil
+}
+
+// shouldIgnoreSession will check the given session data's username and logon domain
+// to see whether it's an account that we know we should not count as a current console user.
+// We check for:
+// 1. Okta Verify's user account (https://support.okta.com/help/s/article/Why-is-an-OVService-Account-Created-on-Windows-When-Installing-Okta-Verify?language=en_US)
+// 2. The WsiAccount (https://learn.microsoft.com/en-us/windows/security/identity-protection/web-sign-in/?tabs=intune)
+// 3. Any Desktop Windows Manager users
+// 4. Any defaultuser0 that should have been cleaned up by Windows already but wasn't
+func shouldIgnoreSession(sessionData *winlsa.LogonSessionData) bool {
+	if strings.HasPrefix(sessionData.UserName, "OVService-") ||
+		strings.HasPrefix(sessionData.UserName, "OVSvc") ||
+		sessionData.UserName == "WsiAccount" ||
+		(sessionData.LogonDomain == "Window Manager" && strings.HasPrefix(sessionData.UserName, "DWM-")) ||
+		strings.EqualFold(sessionData.UserName, "defaultuser0") {
+		return true
+	}
+	return false
 }
 
 // usernameFromSessionData constructs a username in the format compatible with e.g.
