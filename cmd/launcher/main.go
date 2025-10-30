@@ -88,12 +88,32 @@ func runMain() int {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
-		if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
-			systemSlogger.Log(ctx, slog.LevelInfo,
-				"could not run newer version of launcher",
+		lastestLauncherPath, err := latestLauncherPath(ctx, systemSlogger.Logger)
+		if err != nil {
+			systemSlogger.Log(ctx, slog.LevelError,
+				"could not check out latest launcher",
 				"err", err,
 			)
 			return 1
+		}
+
+		if lastestLauncherPath != "" {
+			systemSlogger.Log(ctx, slog.LevelInfo,
+				"found newer version of launcher to run",
+				"new_binary", lastestLauncherPath,
+			)
+
+			if err := execwrapper.Exec(ctx, systemSlogger.Logger, lastestLauncherPath, os.Args, os.Environ(), isNonSvcSubcommand()); err != nil {
+				systemSlogger.Log(ctx, slog.LevelError,
+					"error execing newer version of launcher",
+					"new_binary", lastestLauncherPath,
+					"err", err,
+				)
+
+				return 1
+			}
+
+			return 0
 		}
 	}
 
@@ -187,7 +207,8 @@ func runMain() int {
 			level.Debug(logger).Log("msg", "could not get current executable to perform restart", "err", err.Error())
 			return 1
 		}
-		if err := execwrapper.Exec(ctx, systemSlogger.Logger, currentExecutable, os.Args, os.Environ()); err != nil {
+
+		if err := execwrapper.Exec(ctx, systemSlogger.Logger, currentExecutable, os.Args, os.Environ(), isNonSvcSubcommand()); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"error execing launcher after restart was requested",
 				"binary", currentExecutable,
@@ -266,7 +287,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 		"new_binary", newerBinary,
 	)
 
-	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ()); err != nil {
+	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ(), isNonSvcSubcommand()); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"error execing newer version of launcher",
 			"new_binary", newerBinary,
@@ -326,4 +347,11 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	detachConsole()
 
 	return nil
+}
+
+// isNonSvcSubcommand determines if we're running a subcommand (excluding those starting with "svc")
+// svc is used on windows to run as a service and we need a non-zero exit code for those despite
+// the reason for the exit so the service manager will auto restart launcher
+func isNonSvcSubcommand() bool {
+	return len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") && !strings.HasPrefix(os.Args[1], "svc")
 }
