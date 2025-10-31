@@ -17,7 +17,7 @@ import (
 )
 
 func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, consoleUser *consoleuser.ConsoleUser, cmd *exec.Cmd) error {
-	ctx, span := observability.StartSpan(ctx, "uid", consoleUser.Uid)
+	_, span := observability.StartSpan(ctx, "uid", consoleUser.Uid)
 	defer span.End()
 
 	// get the access token of the user that owns the explorer process
