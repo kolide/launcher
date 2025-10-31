@@ -16,21 +16,13 @@ import (
 	"github.com/kolide/systray"
 )
 
-func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string, cmd *exec.Cmd) error {
-	ctx, span := observability.StartSpan(ctx, "uid", uid)
+func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, consoleUser *consoleuser.ConsoleUser, cmd *exec.Cmd) error {
+	ctx, span := observability.StartSpan(ctx, "uid", consoleUser.Uid)
 	defer span.End()
-
-	explorerProc, err := consoleuser.ExplorerProcess(ctx, uid)
-	if err != nil {
-		return fmt.Errorf("getting user explorer process: %w", err)
-	}
-	if explorerProc == nil {
-		return fmt.Errorf("no user explorer process found for %s", uid)
-	}
 
 	// get the access token of the user that owns the explorer process
 	// and use it to spawn a new process as that user
-	accessToken, err := processAccessToken(explorerProc.Pid)
+	accessToken, err := processAccessToken(consoleUser.UserProcessPid)
 	if err != nil {
 		return fmt.Errorf("getting explorer process token: %w", err)
 	}

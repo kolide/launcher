@@ -91,7 +91,7 @@ const (
 	minConsoleUserUid = 501
 )
 
-func CurrentUids(ctx context.Context) ([]string, error) {
+func CurrentUids(ctx context.Context) ([]*ConsoleUser, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -106,7 +106,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("executing scutil cmd: %w", err)
 	}
 
-	var uids []string
+	var uids []*ConsoleUser
 
 	kCGSSessionOnConsole := ""
 	kCGSSessionUserID := ""
@@ -155,7 +155,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		if kCGSSessionOnConsole == "TRUE" {
-			uids = append(uids, kCGSSessionUserID)
+			uids = append(uids, &ConsoleUser{Uid: kCGSSessionUserID})
 			lastkCGSSessionUserID = kCGSSessionUserID
 		}
 

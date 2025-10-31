@@ -7,13 +7,12 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-func CurrentUids(ctx context.Context) ([]string, error) {
+func CurrentUids(ctx context.Context) ([]*ConsoleUser, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -27,48 +26,28 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 
 	// first store uids in a map to prevent duplicates
 	// most of the time it will be just 1 user, so start map at 1
-	uidsMap := make(map[string]struct{}, 1)
+	uidsMap := make(map[string]*ConsoleUser, 1)
 
 	for _, explorerProc := range explorerProcs {
 		uid, err := processOwnerUid(ctx, explorerProc)
 		if err != nil {
 			return nil, fmt.Errorf("getting process owner uid (for pid %d): %w", explorerProc.Pid, err)
 		}
-		uidsMap[uid] = struct{}{}
+		uidsMap[uid] = &ConsoleUser{
+			Uid:            uid,
+			UserProcessPid: explorerProc.Pid,
+		}
 	}
 
 	// convert map keys to slice
-	uids := make([]string, len(uidsMap))
+	uids := make([]*ConsoleUser, len(uidsMap))
 	uidCount := 0
-	for uid := range uidsMap {
-		uids[uidCount] = uid
+	for _, consoleUser := range uidsMap {
+		uids[uidCount] = consoleUser
 		uidCount++
 	}
 
 	return uids, nil
-}
-
-func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
-	ctx, span := observability.StartSpan(ctx, "uid", uid)
-	defer span.End()
-
-	explorerProcs, err := explorerProcesses(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
-	}
-
-	for _, proc := range explorerProcs {
-		procOwnerUid, err := processOwnerUid(ctx, proc)
-		if err != nil {
-			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", proc.Pid, err)
-		}
-
-		if strings.EqualFold(uid, procOwnerUid) {
-			return proc, nil
-		}
-	}
-
-	return nil, nil
 }
 
 // explorerProcesses returns a list of explorer processes whose
