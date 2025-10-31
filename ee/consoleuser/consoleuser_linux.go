@@ -20,7 +20,7 @@ type listSessionsResult []struct {
 	Seat     string `json:"seat"`
 }
 
-func CurrentUids(ctx context.Context) ([]string, error) {
+func CurrentUids(ctx context.Context) ([]*ConsoleUser, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -29,7 +29,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("listing sessions: %w", err)
 	}
 
-	var uids []string
+	var uids []*ConsoleUser
 	for _, s := range sessions {
 		// generally human users start at 1000 on linux. 65534 is reserved for https://wiki.ubuntu.com/nobody,
 		// which we don't want to count as a current user.
@@ -61,7 +61,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		// local: remote=no
 		// rdp: remote=no
 		if strings.Contains(string(output), "Remote=no") && strings.Contains(string(output), "Active=yes") {
-			uids = append(uids, fmt.Sprintf("%d", s.UID))
+			uids = append(uids, &ConsoleUser{Uid: fmt.Sprintf("%d", s.UID)})
 		}
 	}
 

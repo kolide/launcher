@@ -767,21 +767,22 @@ func (r *DesktopUsersProcessesRunner) runConsoleUserDesktop() error {
 		return fmt.Errorf("getting console users: %w", err)
 	}
 
-	for _, uid := range consoleUsers {
-		if r.userHasDesktopProcess(uid) {
+	for _, consoleUser := range consoleUsers {
+		if r.userHasDesktopProcess(consoleUser.Uid) {
 			continue
 		}
 
 		// we've decided to spawn a new desktop user process for this user
-		if err := r.spawnForUser(ctx, uid, executablePath); err != nil {
-			return fmt.Errorf("spawning new desktop user process for %s: %w", uid, err)
+		if err := r.spawnForUser(ctx, consoleUser, executablePath); err != nil {
+			return fmt.Errorf("spawning new desktop user process for %s: %w", consoleUser.Uid, err)
 		}
 	}
 
 	return nil
 }
 
-func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid string, executablePath string) error {
+func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, consoleUser *consoleuser.ConsoleUser, executablePath string) error {
+	uid := consoleUser.Uid
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
@@ -801,7 +802,7 @@ func (r *DesktopUsersProcessesRunner) spawnForUser(ctx context.Context, uid stri
 		return fmt.Errorf("creating desktop command: %w", err)
 	}
 
-	if err := r.runAsUser(ctx, uid, cmd); err != nil {
+	if err := r.runAsUser(ctx, consoleUser, cmd); err != nil {
 		observability.SetError(span, fmt.Errorf("running desktop command as user: %w", err))
 		return fmt.Errorf("running desktop command as user: %w", err)
 	}
