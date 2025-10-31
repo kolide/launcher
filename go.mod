@@ -46,7 +46,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/snappy v0.0.4
-	github.com/kolide/go-winlsa v0.0.0-20251002154611-3c83cd484052
 	github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de
 	github.com/kolide/systray v1.10.5-0.20241021175748-13aef6380bdb
 	github.com/kolide/toast v1.0.2

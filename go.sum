@@ -147,8 +147,6 @@ github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc h1:g2S0GQ
 github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc/go.mod h1:5e34JEkxWsOeAd9jvcxkz01tAY/JAGFuabGnNBJ6TT4=
 github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767 h1:kcLxfX6wdtztSwpgzgrjUaC9kfyihXBUNnOIfoN5u4Y=
 github.com/kolide/go-ole v0.0.0-20241008210444-65130153c767/go.mod h1:5LS6F96DhAwUc7C+1HLexzMXY1xGRSryjyPPKW6zv78=
-github.com/kolide/go-winlsa v0.0.0-20251002154611-3c83cd484052 h1:BDutyKwo4PyNTcysboqGE1e1loP5Yh40+9WE55IK1PU=
-github.com/kolide/go-winlsa v0.0.0-20251002154611-3c83cd484052/go.mod h1:cpsG7mqg6b/AkweoMtZ6gFZj1KImw1EL+3eeF90RHL8=
 github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de h1:uOqIPplWbS6Lf2VxMJqhkiJj9Z23U2oeR6tHKe/o7ss=
 github.com/kolide/goleveldb v0.0.0-20250731160947-c6b056c282de/go.mod h1:/ABgvSu1vZfgbLb1B9IwnFGv0xgoHSyCrTXiWX1UAQQ=
 github.com/kolide/kit v0.0.0-20250324140823-36d978ef488c h1:Bfea0JIcUHJ+r0+FHtOk/Q0pZa7VadkAKwV6zHc2JLw=
