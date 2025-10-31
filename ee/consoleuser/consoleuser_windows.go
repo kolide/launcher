@@ -6,93 +6,46 @@ package consoleuser
 import (
 	"context"
 	"fmt"
-	"maps"
 	"path/filepath"
-	"slices"
 	"strings"
 
-	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
-	"golang.org/x/sys/windows"
 )
 
-// CurrentUids is able to actual SIDs, but we've historically used usernames rather than SIDs on Windows.
-// Therefore, we continue to return the usernames here. If we change our mind, it is a trivial change to swap
-// from sessionData.UserName to sessionData.Sid.String() here.
 func CurrentUids(ctx context.Context) ([]string, error) {
-	luids, err := winlsa.GetLogonSessions()
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	explorerProcs, err := explorerProcesses(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting logon sessions: %w", err)
+		return nil, fmt.Errorf("getting explorer processes: %w", err)
 	}
 
-	activeUsernames := make(map[string]any)
-	for _, luid := range luids {
-		sessionData, err := winlsa.GetLogonSessionData(&luid)
+	// unclear if windows will ever have more than one explorer process for a single user
+	// guard against this by forcing uniqueness
+
+	// first store uids in a map to prevent duplicates
+	// most of the time it will be just 1 user, so start map at 1
+	uidsMap := make(map[string]struct{}, 1)
+
+	for _, explorerProc := range explorerProcs {
+		uid, err := processOwnerUid(ctx, explorerProc)
 		if err != nil {
-			return nil, fmt.Errorf("getting logon session data for LUID: %w", err)
+			return nil, fmt.Errorf("getting process owner uid (for pid %d): %w", explorerProc.Pid, err)
 		}
-
-		if sessionData.Sid == nil {
-			continue
-		}
-
-		// We get duplicates -- ignore those.
-		if _, alreadyFound := activeUsernames[usernameFromSessionData(sessionData)]; alreadyFound {
-			continue
-		}
-
-		// Only look at sessions associated with users. We can filter first by interactive-type logons,
-		// to avoid extra syscalls.
-		if sessionData.LogonType != winlsa.LogonTypeInteractive && sessionData.LogonType != winlsa.LogonTypeRemoteInteractive {
-			continue
-		}
-
-		// Check for a couple well-known accounts that we know we don't want to create desktop processes for.
-		if shouldIgnoreSession(sessionData) {
-			continue
-		}
-
-		// We are left with a couple other non-user sessions. Check the account type now (requires a syscall).
-		_, _, accountType, err := sessionData.Sid.LookupAccount("")
-		if err != nil {
-			return nil, fmt.Errorf("getting account type for LUID: %w", err)
-		}
-		if accountType != windows.SidTypeUser {
-			continue
-		}
-
-		// We've got a real user -- add them to our list.
-		activeUsernames[usernameFromSessionData(sessionData)] = struct{}{}
+		uidsMap[uid] = struct{}{}
 	}
 
-	activeUsernameList := slices.Collect(maps.Keys(activeUsernames))
-
-	return activeUsernameList, nil
-}
-
-// shouldIgnoreSession will check the given session data's username and logon domain
-// to see whether it's an account that we know we should not count as a current console user.
-// We check for:
-// 1. Okta Verify's user account (https://support.okta.com/help/s/article/Why-is-an-OVService-Account-Created-on-Windows-When-Installing-Okta-Verify?language=en_US)
-// 2. The WsiAccount (https://learn.microsoft.com/en-us/windows/security/identity-protection/web-sign-in/?tabs=intune)
-// 3. Any Desktop Windows Manager users
-// 4. Any defaultuser0 that should have been cleaned up by Windows already but wasn't
-func shouldIgnoreSession(sessionData *winlsa.LogonSessionData) bool {
-	if strings.HasPrefix(sessionData.UserName, "OVService-") ||
-		strings.HasPrefix(sessionData.UserName, "OVSvc") ||
-		sessionData.UserName == "WsiAccount" ||
-		(sessionData.LogonDomain == "Window Manager" && strings.HasPrefix(sessionData.UserName, "DWM-")) ||
-		strings.EqualFold(sessionData.UserName, "defaultuser0") {
-		return true
+	// convert map keys to slice
+	uids := make([]string, len(uidsMap))
+	uidCount := 0
+	for uid := range uidsMap {
+		uids[uidCount] = uid
+		uidCount++
 	}
-	return false
-}
 
-// usernameFromSessionData constructs a username in the format compatible with e.g.
-// ExplorerProcess.
-func usernameFromSessionData(sessionData *winlsa.LogonSessionData) string {
-	return fmt.Sprintf("%s\\%s", sessionData.LogonDomain, sessionData.UserName)
+	return uids, nil
 }
 
 func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) {
