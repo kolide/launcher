@@ -47,6 +47,10 @@ func TestExec(t *testing.T) {
 func TestExecSubcommand(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS != "windows" {
+		t.Skip("skiping on non-windows, because syscall.Exec replaces the current process and the test never completes")
+	}
+
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -63,8 +67,6 @@ func TestExecSubcommand(t *testing.T) {
 
 	// flag this call as a non-svc subcommand so if it exist with out error, we do not return an error
 	err := Exec(t.Context(), slogger, command, args, os.Environ(), true)
-
-	// on non-windows, we never actually get to this line, because syscall.Exec replaces the current process
 	require.NoError(t, err)
 
 	// We should expect at least SOMETHING to be logged on Windows
