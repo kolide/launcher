@@ -145,12 +145,12 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 	}
 
 	// We didn't find an explorer.exe process for the uid, so it's potentially an invalid username.
-	updateInvalidUsernameMaps(uid)
+	updateInvalidUsernameMaps(uid, invalidUsernameLookupWindowSeconds)
 
 	return nil, nil
 }
 
-func updateInvalidUsernameMaps(username string) {
+func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 	// First, save the current timestamp to our potentialInvalidUsernamesMap.
 	lookupTimestamp := time.Now().Unix()
 	potentialInvalidUsernamesMapLock.Lock()
@@ -165,7 +165,7 @@ func updateInvalidUsernameMaps(username string) {
 
 	// We know we've seen this username before. Check to see if we have maxUsernameLookupFailureCount failures
 	// within the lookup window.
-	lookupWindowStart := lookupTimestamp - invalidUsernameLookupWindowSeconds
+	lookupWindowStart := lookupTimestamp - windowSeconds
 	failureCount := 0
 	for _, ts := range potentialInvalidUsernamesMap[username] {
 		if ts >= lookupWindowStart {
@@ -174,7 +174,7 @@ func updateInvalidUsernameMaps(username string) {
 	}
 
 	// Too many failures -- add to knownInvalidUsernamesMap.
-	if failureCount > maxUsernameLookupFailureCount {
+	if failureCount >= maxUsernameLookupFailureCount {
 		knownInvalidUsernamesMapLock.Lock()
 		knownInvalidUsernamesMap[username] = struct{}{}
 		knownInvalidUsernamesMapLock.Unlock()

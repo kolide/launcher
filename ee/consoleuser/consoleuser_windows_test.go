@@ -136,7 +136,7 @@ func Test_updateInvalidUsernameMaps(t *testing.T) {
 		knownInvalidUsernamesMapLock.Unlock()
 
 		// Record a lookup failure
-		updateInvalidUsernameMaps(invalidTestUsername)
+		updateInvalidUsernameMaps(invalidTestUsername, invalidUsernameLookupWindowSeconds)
 	}
 
 	// Confirm that username is now in knownInvalidUsernamesMap
@@ -155,11 +155,11 @@ func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
 		require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
 		knownInvalidUsernamesMapLock.Unlock()
 
-		// Record a lookup failure
-		updateInvalidUsernameMaps(invalidTestUsername)
+		// Record a lookup failure, with window of length 1 second
+		updateInvalidUsernameMaps(invalidTestUsername, 1)
 
 		// Now, sleep for the length of the failure window, to ensure that failures don't land in the same window
-		time.Sleep(invalidUsernameLookupWindowSeconds * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	// Confirm that username is still not in knownInvalidUsernamesMap
