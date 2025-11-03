@@ -10,11 +10,30 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	winlsa "github.com/kolide/go-winlsa"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/sys/windows"
+)
+
+var (
+	// knownInvalidUsernamesMap tracks usernames that we are repeatedly unable to find explorer.exe processes for,
+	// indicating that we should not include them in the return for `CurrentUids`.
+	knownInvalidUsernamesMap     = make(map[string]struct{})
+	knownInvalidUsernamesMapLock = &sync.Mutex{}
+
+	// potentialInvalidUsernamesMap tracks usernames that we are currently unable to find explorer.exe processes for.
+	// If a username accrues too many invalid lookups in potentialInvalidUsernamesMap, it will move to knownInvalidUsernamesMap.
+	potentialInvalidUsernamesMap     = make(map[string][]int64) // maps username to timestamps where we failed to find explorer.exe for that username
+	potentialInvalidUsernamesMapLock = &sync.Mutex{}
+)
+
+const (
+	invalidUsernameLookupWindowSeconds = 60
+	maxUsernameLookupFailureCount      = 3
 )
 
 // CurrentUids is able to actual SIDs, but we've historically used usernames rather than SIDs on Windows.
@@ -49,7 +68,8 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// Check for a couple well-known accounts that we know we don't want to create desktop processes for.
-		if shouldIgnoreSession(sessionData) {
+		sessionUsername := usernameFromSessionData(sessionData)
+		if shouldIgnoreSession(sessionData, sessionUsername) {
 			continue
 		}
 
@@ -63,7 +83,7 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 		}
 
 		// We've got a real user -- add them to our list.
-		activeUsernames[usernameFromSessionData(sessionData)] = struct{}{}
+		activeUsernames[sessionUsername] = struct{}{}
 	}
 
 	activeUsernameList := slices.Collect(maps.Keys(activeUsernames))
@@ -78,7 +98,9 @@ func CurrentUids(ctx context.Context) ([]string, error) {
 // 2. The WsiAccount (https://learn.microsoft.com/en-us/windows/security/identity-protection/web-sign-in/?tabs=intune)
 // 3. Any Desktop Windows Manager users
 // 4. Any defaultuser0 that should have been cleaned up by Windows already but wasn't
-func shouldIgnoreSession(sessionData *winlsa.LogonSessionData) bool {
+// 5. Any account that we've repeatedly failed to find explorer.exe processes for
+func shouldIgnoreSession(sessionData *winlsa.LogonSessionData, sessionUsername string) bool {
+	// First, check for known account types
 	if strings.HasPrefix(sessionData.UserName, "OVService-") ||
 		strings.HasPrefix(sessionData.UserName, "OVSvc") ||
 		sessionData.UserName == "WsiAccount" ||
@@ -86,6 +108,13 @@ func shouldIgnoreSession(sessionData *winlsa.LogonSessionData) bool {
 		strings.EqualFold(sessionData.UserName, "defaultuser0") {
 		return true
 	}
+	// Now, check for account types that we've flagged as missing explorer.exe processes
+	knownInvalidUsernamesMapLock.Lock()
+	defer knownInvalidUsernamesMapLock.Unlock()
+	if _, found := knownInvalidUsernamesMap[sessionUsername]; found {
+		return true
+	}
+
 	return false
 }
 
@@ -115,7 +144,53 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 		}
 	}
 
+	// We didn't find an explorer.exe process for the uid, so it's potentially an invalid username.
+	updateInvalidUsernameMaps(uid, invalidUsernameLookupWindowSeconds)
+
 	return nil, nil
+}
+
+func updateInvalidUsernameMaps(username string, windowSeconds int64) {
+	// First, save the current timestamp to our potentialInvalidUsernamesMap.
+	lookupTimestamp := time.Now().Unix()
+	potentialInvalidUsernamesMapLock.Lock()
+	defer potentialInvalidUsernamesMapLock.Unlock()
+	if _, found := potentialInvalidUsernamesMap[username]; !found {
+		// First failure -- add it to the map and return
+		potentialInvalidUsernamesMap[username] = []int64{lookupTimestamp}
+		return
+	} else {
+		potentialInvalidUsernamesMap[username] = append(potentialInvalidUsernamesMap[username], lookupTimestamp)
+	}
+
+	// We know we've seen this username before. Check to see if we have maxUsernameLookupFailureCount failures
+	// within the lookup window.
+	lookupWindowStart := lookupTimestamp - windowSeconds
+	failureCount := 0
+	for _, ts := range potentialInvalidUsernamesMap[username] {
+		if ts >= lookupWindowStart {
+			failureCount += 1
+			continue
+		}
+	}
+
+	// Too many failures -- move to knownInvalidUsernamesMap.
+	if failureCount >= maxUsernameLookupFailureCount {
+		knownInvalidUsernamesMapLock.Lock()
+		knownInvalidUsernamesMap[username] = struct{}{}
+		knownInvalidUsernamesMapLock.Unlock()
+
+		delete(potentialInvalidUsernamesMap, username)
+		return
+	}
+
+	// We haven't yet hit maxUsernameLookupFailureCount failures within the lookup window.
+	// Make sure we don't accumulate a bunch of entries outside of the window --
+	// we can safely keep just the last maxUsernameLookupFailureCount entries.
+	if len(potentialInvalidUsernamesMap[username]) > maxUsernameLookupFailureCount {
+		newStartIdx := len(potentialInvalidUsernamesMap[username]) - maxUsernameLookupFailureCount
+		potentialInvalidUsernamesMap[username] = potentialInvalidUsernamesMap[username][newStartIdx:]
+	}
 }
 
 // explorerProcesses returns a list of explorer processes whose
