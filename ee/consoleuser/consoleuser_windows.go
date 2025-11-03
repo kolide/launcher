@@ -167,17 +167,11 @@ func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 	// within the lookup window.
 	lookupWindowStart := lookupTimestamp - windowSeconds
 	failureCount := 0
-	lastTimestampOutsideWindowIdx := -1
-	for i, ts := range potentialInvalidUsernamesMap[username] {
+	for _, ts := range potentialInvalidUsernamesMap[username] {
 		if ts >= lookupWindowStart {
 			failureCount += 1
 			continue
 		}
-		lastTimestampOutsideWindowIdx = i
-	}
-	// Remove old timestamps outside of window, if any
-	if lastTimestampOutsideWindowIdx > -1 {
-		potentialInvalidUsernamesMap[username] = potentialInvalidUsernamesMap[username][lastTimestampOutsideWindowIdx+1:]
 	}
 
 	// Too many failures -- move to knownInvalidUsernamesMap.
@@ -187,6 +181,15 @@ func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 		knownInvalidUsernamesMapLock.Unlock()
 
 		delete(potentialInvalidUsernamesMap, username)
+		return
+	}
+
+	// We haven't yet hit maxUsernameLookupFailureCount failures within the lookup window.
+	// Make sure we don't accumulate a bunch of entries outside of the window --
+	// we can safely keep just the last maxUsernameLookupFailureCount entries.
+	if len(potentialInvalidUsernamesMap[username]) > maxUsernameLookupFailureCount {
+		newStartIdx := len(potentialInvalidUsernamesMap[username]) - maxUsernameLookupFailureCount
+		potentialInvalidUsernamesMap[username] = potentialInvalidUsernamesMap[username][newStartIdx:]
 	}
 }
 

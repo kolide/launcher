@@ -175,6 +175,6 @@ func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
 	// Confirm that we do still have some timestamps recorded
 	potentialInvalidUsernamesMapLock.Lock()
 	require.Contains(t, potentialInvalidUsernamesMap, invalidTestUsername)
-	require.Greater(t, len(potentialInvalidUsernamesMap[invalidTestUsername]), 0)
+	require.Equal(t, maxUsernameLookupFailureCount, len(potentialInvalidUsernamesMap[invalidTestUsername]))
 	potentialInvalidUsernamesMapLock.Unlock()
 }
