@@ -14,9 +14,10 @@ func Test_shouldIgnoreSession(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
-		testCaseName string
-		sessionData  *winlsa.LogonSessionData
-		shouldIgnore bool
+		testCaseName                       string
+		sessionData                        *winlsa.LogonSessionData
+		usernameInKnownInvalidUsernamesMap bool
+		shouldIgnore                       bool
 	}{
 		{
 			testCaseName: "Okta Verify",
@@ -24,7 +25,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "OVService-86103-8588",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "Okta Verify but slightly different",
@@ -32,7 +34,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "OVService-38046-0708",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "Okta Verify but OVSvc",
@@ -40,7 +43,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "OVSvc-327820240-8998",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "Okta Verify but OVSvc, no hyphen",
@@ -48,7 +52,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "OVSvc2137621967-1628",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "WsiAccount",
@@ -56,7 +61,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "WsiAccount",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "Desktop Windows Manager",
@@ -64,7 +70,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "DWM-3",
 				LogonDomain: "Window Manager",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "Desktop Windows Manager but slightly different",
@@ -72,7 +79,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "DWM-10",
 				LogonDomain: "Window Manager",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "defaultuser0",
@@ -80,7 +88,8 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "defaultuser0",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: true,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       true,
 		},
 		{
 			testCaseName: "legitimate user",
@@ -88,13 +97,29 @@ func Test_shouldIgnoreSession(t *testing.T) {
 				UserName:    "SomeUser",
 				LogonDomain: "SOMEDOMAIN",
 			},
-			shouldIgnore: false,
+			usernameInKnownInvalidUsernamesMap: false,
+			shouldIgnore:                       false,
+		},
+		{
+			testCaseName: "tracked invalid username",
+			sessionData: &winlsa.LogonSessionData{
+				UserName:    "SomeUser2",
+				LogonDomain: "SOMEDOMAIN",
+			},
+			usernameInKnownInvalidUsernamesMap: true,
+			shouldIgnore:                       true,
 		},
 	} {
 		tt := tt
 		t.Run(tt.testCaseName, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tt.shouldIgnore, shouldIgnoreSession(tt.sessionData))
+			username := usernameFromSessionData(tt.sessionData)
+			if tt.usernameInKnownInvalidUsernamesMap {
+				knownInvalidUsernamesMapLock.Lock()
+				knownInvalidUsernamesMap[username] = struct{}{}
+				knownInvalidUsernamesMapLock.Unlock()
+			}
+			require.Equal(t, tt.shouldIgnore, shouldIgnoreSession(tt.sessionData, username))
 		})
 	}
 }
