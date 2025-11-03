@@ -563,6 +563,31 @@ func (e *Extension) enrolled() bool {
 	return nodeKey != ""
 }
 
+// nodeKey returns the current node key for this registration. It ensures that if the
+// node key is set in the database but not in the extension, we will pull it. We should therefore
+// always use this function when we need the node key to make requests to the device server,
+// to avoid making requests with an empty node key and attempting to reenroll instead.
+func (e *Extension) nodeKey() string {
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
+
+	nodeKey := e.NodeKey
+	if nodeKey != "" {
+		return nodeKey
+	}
+
+	// Not yet set on the extension, but may be available from the database
+	nodeKey, _ = NodeKey(e.knapsack.ConfigStore(), e.registrationId)
+	if nodeKey != "" {
+		// Set it on the extension so we don't have to fetch it from the database in the future
+		e.enrollMutex.Lock()
+		e.NodeKey = nodeKey
+		e.enrollMutex.Unlock()
+	}
+
+	return nodeKey
+}
+
 // RequireReenroll clears the existing node key information, ensuring that the
 // next call to Enroll will cause the enrollment process to take place.
 func (e *Extension) RequireReenroll(ctx context.Context) {
@@ -626,9 +651,7 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
-	e.enrollMutex.Lock()
-	nodeKey := e.NodeKey
-	e.enrollMutex.Unlock()
+	nodeKey := e.nodeKey()
 
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
@@ -899,9 +922,7 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 // Helper to allow for a single attempt at re-enrollment
 func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogType, logs []string, reenroll bool) error {
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
-	e.enrollMutex.Lock()
-	nodeKey := e.NodeKey
-	e.enrollMutex.Unlock()
+	nodeKey := e.nodeKey()
 
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
@@ -1048,9 +1069,7 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	defer span.End()
 
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
-	e.enrollMutex.Lock()
-	nodeKey := e.NodeKey
-	e.enrollMutex.Unlock()
+	nodeKey := e.nodeKey()
 
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
@@ -1115,9 +1134,7 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 	defer span.End()
 
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
-	e.enrollMutex.Lock()
-	nodeKey := e.NodeKey
-	e.enrollMutex.Unlock()
+	nodeKey := e.nodeKey()
 
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
