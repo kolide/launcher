@@ -37,12 +37,13 @@ const (
 //
 // This controller is intended for use by the main launcher service invocation
 type WatchdogController struct {
-	slogger        *slog.Logger
-	knapsack       types.Knapsack
-	interrupt      chan struct{}
-	interrupted    atomic.Bool
-	logPublisher   types.LogStore
-	configFilePath string
+	slogger                    *slog.Logger
+	knapsack                   types.Knapsack
+	interrupt                  chan struct{}
+	interrupted                atomic.Bool
+	logPublisher               types.LogStore
+	configFilePath             string
+	watchdogPreviouslyDisabled atomic.Bool
 }
 
 func NewController(ctx context.Context, k types.Knapsack, configFilePath string) (*WatchdogController, error) {
@@ -52,22 +53,37 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 		return nil, fmt.Errorf("opening log db in %s: %w", k.RootDirectory(), err)
 	}
 
-	return &WatchdogController{
+	wc := &WatchdogController{
 		slogger:        k.Slogger().With("component", "watchdog_controller"),
 		knapsack:       k,
 		interrupt:      make(chan struct{}, 1),
 		logPublisher:   logPublisher,
 		configFilePath: configFilePath,
-	}, nil
+	}
+
+	wc.watchdogPreviouslyDisabled.Store(k.LauncherWatchdogDisabled())
+
+	return wc, nil
 }
 
 func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	if slices.Contains(flagKeys, keys.LauncherWatchdogDisabled) {
-		wc.ServiceEnabledChanged(!wc.knapsack.LauncherWatchdogDisabled())
+	if !slices.Contains(flagKeys, keys.LauncherWatchdogDisabled) {
+		return
 	}
+
+	nowDisabled := wc.knapsack.LauncherWatchdogDisabled()
+
+	// check that we're observing a true change event here, we don't want to reinstall
+	// watchdog every time the flag is sent down
+	if nowDisabled == wc.watchdogPreviouslyDisabled.Load() {
+		return
+	}
+
+	wc.watchdogPreviouslyDisabled.Store(nowDisabled)
+	wc.ServiceEnabledChanged(!nowDisabled)
 }
 
 // Run starts a log publication routine. The purpose of this is to
