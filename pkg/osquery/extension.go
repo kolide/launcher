@@ -580,9 +580,7 @@ func (e *Extension) nodeKey() string {
 	nodeKey, _ = NodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if nodeKey != "" {
 		// Set it on the extension so we don't have to fetch it from the database in the future
-		e.enrollMutex.Lock()
 		e.NodeKey = nodeKey
-		e.enrollMutex.Unlock()
 	}
 
 	return nodeKey
