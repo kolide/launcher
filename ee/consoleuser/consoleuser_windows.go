@@ -27,7 +27,7 @@ var (
 
 	// potentialInvalidUsernamesMap tracks usernames that we are currently unable to find explorer.exe processes for.
 	// If a username accrues too many invalid lookups in potentialInvalidUsernamesMap, it will move to knownInvalidUsernamesMap.
-	potentialInvalidUsernamesMap     = make(map[string][]int64)
+	potentialInvalidUsernamesMap     = make(map[string][]int64) // maps username to timestamps where we failed to find explorer.exe for that username
 	potentialInvalidUsernamesMapLock = &sync.Mutex{}
 )
 
