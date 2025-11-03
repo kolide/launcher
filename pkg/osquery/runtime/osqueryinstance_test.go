@@ -254,6 +254,7 @@ func Test_healthcheckWithRetries(t *testing.T) {
 func TestHealthy(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	setupOnceFunc()
 
 	// Set up instance dependencies
 	logBytes, slogger := setUpTestSlogger()
@@ -276,6 +277,7 @@ func TestHealthy(t *testing.T) {
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
@@ -348,6 +350,7 @@ func TestHealthy(t *testing.T) {
 func TestLaunch(t *testing.T) {
 	t.Parallel()
 	downloadOnceFunc()
+	setupOnceFunc()
 
 	logBytes, slogger := setUpTestSlogger()
 	rootDirectory := testRootDirectory(t)
@@ -368,6 +371,7 @@ func TestLaunch(t *testing.T) {
 	k.On("ReadEnrollSecret").Return("", nil)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
