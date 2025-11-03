@@ -196,6 +196,11 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return nil
 			}
 
+			e.slogger.Log(req.Context(), slog.LevelInfo,
+				"launcher received new node key -- proceeding with secretless enrollment",
+				"munemo", r.Munemo,
+			)
+
 			if r.Munemo != "" {
 				e.tenantMunemo.Store(r.Munemo)
 			}
