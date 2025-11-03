@@ -154,7 +154,7 @@ func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
 	t.Parallel()
 
 	invalidTestUsername := "username-Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow"
-	for range maxUsernameLookupFailureCount {
+	for range maxUsernameLookupFailureCount * 2 {
 		// Confirm username is not yet in knownInvalidUsernamesMap
 		knownInvalidUsernamesMapLock.Lock()
 		require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
@@ -172,9 +172,9 @@ func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
 	require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
 	knownInvalidUsernamesMapLock.Unlock()
 
-	// Confirm that we do still have all the timestamps recorded
+	// Confirm that we do still have some timestamps recorded
 	potentialInvalidUsernamesMapLock.Lock()
 	require.Contains(t, potentialInvalidUsernamesMap, invalidTestUsername)
-	require.Equal(t, maxUsernameLookupFailureCount, len(potentialInvalidUsernamesMap[invalidTestUsername]))
+	require.Greater(t, len(potentialInvalidUsernamesMap[invalidTestUsername]), 0)
 	potentialInvalidUsernamesMapLock.Unlock()
 }
