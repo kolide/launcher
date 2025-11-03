@@ -205,6 +205,11 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("saving registration: %w", err)
 			}
 
+			e.slogger.Log(req.Context(), slog.LevelInfo,
+				"launcher performed secretless enrollment",
+				"munemo", r.Munemo,
+			)
+
 			return nil
 		}(); err != nil {
 			e.slogger.Log(context.TODO(), slog.LevelError,
