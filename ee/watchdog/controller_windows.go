@@ -83,7 +83,7 @@ func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys
 	}
 
 	wc.watchdogPreviouslyDisabled.Store(nowDisabled)
-	wc.ServiceEnabledChanged(!nowDisabled)
+	wc.serviceEnabledChanged(!nowDisabled)
 }
 
 // Run starts a log publication routine. The purpose of this is to
@@ -157,7 +157,7 @@ func (wc *WatchdogController) Interrupt(_ error) {
 	wc.interrupt <- struct{}{}
 }
 
-func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
+func (wc *WatchdogController) serviceEnabledChanged(enabled bool) {
 	ctx := context.TODO()
 	// we don't alter watchdog installation (install or remove) if this is a non-prod deployment
 	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
