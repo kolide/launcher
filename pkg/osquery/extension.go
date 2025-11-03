@@ -572,6 +572,10 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	e.NodeKey = ""
 	e.knapsack.ConfigStore().Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(e.registrationId)))
 	e.knapsack.RegistrationStore().Delete([]byte(e.registrationId))
+
+	e.slogger.Log(ctx, slog.LevelWarn,
+		"required reeenroll by removing node key and registration",
+	)
 }
 
 // GenerateConfigs will request the osquery configuration from the server. If
