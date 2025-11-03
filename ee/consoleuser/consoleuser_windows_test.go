@@ -5,6 +5,7 @@ package consoleuser
 
 import (
 	"testing"
+	"time"
 
 	winlsa "github.com/kolide/go-winlsa"
 	"github.com/stretchr/testify/require"
@@ -122,4 +123,53 @@ func Test_shouldIgnoreSession(t *testing.T) {
 			require.Equal(t, tt.shouldIgnore, shouldIgnoreSession(tt.sessionData, username))
 		})
 	}
+}
+
+func Test_updateInvalidUsernameMaps(t *testing.T) {
+	t.Parallel()
+
+	invalidTestUsername := "username-Test_updateInvalidUsernameMaps"
+	for range maxUsernameLookupFailureCount {
+		// Confirm username is not yet in knownInvalidUsernamesMap
+		knownInvalidUsernamesMapLock.Lock()
+		require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
+		knownInvalidUsernamesMapLock.Unlock()
+
+		// Record a lookup failure
+		updateInvalidUsernameMaps(invalidTestUsername)
+	}
+
+	// Confirm that username is now in knownInvalidUsernamesMap
+	knownInvalidUsernamesMapLock.Lock()
+	require.Contains(t, knownInvalidUsernamesMap, invalidTestUsername)
+	knownInvalidUsernamesMapLock.Unlock()
+}
+
+func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
+	t.Parallel()
+
+	invalidTestUsername := "username-Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow"
+	for range maxUsernameLookupFailureCount {
+		// Confirm username is not yet in knownInvalidUsernamesMap
+		knownInvalidUsernamesMapLock.Lock()
+		require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
+		knownInvalidUsernamesMapLock.Unlock()
+
+		// Record a lookup failure
+		updateInvalidUsernameMaps(invalidTestUsername)
+
+		// Now, sleep for the length of the failure window, to ensure that failures don't land in the same window
+		time.Sleep(invalidUsernameLookupWindowSeconds * time.Second)
+	}
+
+	// Confirm that username is still not in knownInvalidUsernamesMap
+	knownInvalidUsernamesMapLock.Lock()
+	require.NotContains(t, knownInvalidUsernamesMap, invalidTestUsername)
+	knownInvalidUsernamesMapLock.Unlock()
+
+	// Confirm that we do still have all the timestamps recorded
+	potentialInvalidUsernamesMapLock.Lock()
+	require.Contains(t, potentialInvalidUsernamesMap, invalidTestUsername)
+	require.Equal(t, maxUsernameLookupFailureCount, len(potentialInvalidUsernamesMap[invalidTestUsername]))
+	potentialInvalidUsernamesMapLock.Unlock()
 }
