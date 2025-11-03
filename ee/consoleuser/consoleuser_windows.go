@@ -173,11 +173,13 @@ func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 		}
 	}
 
-	// Too many failures -- add to knownInvalidUsernamesMap.
+	// Too many failures -- move to knownInvalidUsernamesMap.
 	if failureCount >= maxUsernameLookupFailureCount {
 		knownInvalidUsernamesMapLock.Lock()
 		knownInvalidUsernamesMap[username] = struct{}{}
 		knownInvalidUsernamesMapLock.Unlock()
+
+		delete(potentialInvalidUsernamesMap, username)
 	}
 }
 

@@ -143,6 +143,11 @@ func Test_updateInvalidUsernameMaps(t *testing.T) {
 	knownInvalidUsernamesMapLock.Lock()
 	require.Contains(t, knownInvalidUsernamesMap, invalidTestUsername)
 	knownInvalidUsernamesMapLock.Unlock()
+
+	// Confirm that username is no longer in potentialInvalidUsernamesMap
+	potentialInvalidUsernamesMapLock.Lock()
+	require.NotContains(t, potentialInvalidUsernamesMap, invalidTestUsername)
+	potentialInvalidUsernamesMapLock.Unlock()
 }
 
 func Test_updateInvalidUsernameMaps_RequiresFailuresWithinWindow(t *testing.T) {
