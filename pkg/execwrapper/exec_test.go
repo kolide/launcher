@@ -31,7 +31,7 @@ func TestExec(t *testing.T) {
 	}
 
 	// non-windows will give us an error here because syscall.Exec will fail
-	// echo on windows will exit cleanly, but we expect an error because we set isNonSvcSubCommand to false
+	// echo on windows will exit cleanly, but we expect an error because we set commandExpectedToExit to false
 	err := Exec(t.Context(), slogger, command, args, os.Environ(), false)
 	require.Error(t, err)
 
