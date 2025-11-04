@@ -91,7 +91,7 @@ func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys
 		return
 	}
 
-	currentInstallState := installState(wc.currentInstallState.Load())
+	currentInstallState := wc.currentInstallState.Load()
 	nowDisabled := wc.knapsack.LauncherWatchdogDisabled()
 
 	if currentInstallState == installStateUnset {
