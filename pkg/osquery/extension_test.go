@@ -295,7 +295,7 @@ func TestExtensionEnroll(t *testing.T) {
 	expectedNodeKey = "new_node_key"
 	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, expectedEnrollSecret).Return(nil).Once()
 	e.RequireReenroll(t.Context())
-	assert.Empty(t, e.NodeKey)
+	assert.Empty(t, e.cachedNodeKey)
 	key, invalid, err = e.Enroll(t.Context())
 	require.Nil(t, err)
 	// Now enroll func should be called again
@@ -371,7 +371,7 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 	k := makeKnapsack(t)
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
-	e.NodeKey = "bad_node_key"
+	e.cachedNodeKey = "bad_node_key"
 
 	configs, err := e.GenerateConfigs(t.Context())
 	assert.True(t, m.RequestConfigFuncInvoked)
@@ -530,7 +530,7 @@ func TestExtensionWriteLogsEnrollmentInvalid(t *testing.T) {
 	k := makeKnapsack(t)
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
-	e.NodeKey = "bad_node_key"
+	e.cachedNodeKey = "bad_node_key"
 
 	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeString, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
@@ -556,7 +556,7 @@ func TestExtensionWriteLogs(t *testing.T) {
 	k := makeKnapsack(t)
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
-	e.NodeKey = expectedNodeKey
+	e.cachedNodeKey = expectedNodeKey
 
 	err = e.writeLogsWithReenroll(t.Context(), logger.LogTypeStatus, []string{"foobar"}, true)
 	assert.True(t, m.PublishLogsFuncInvoked)
@@ -1173,7 +1173,7 @@ func TestExtensionGetQueriesEnrollmentInvalid(t *testing.T) {
 
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
-	e.NodeKey = "bad_node_key"
+	e.cachedNodeKey = "bad_node_key"
 
 	queries, err := e.GetQueries(t.Context())
 	assert.True(t, m.RequestQueriesFuncInvoked)
@@ -1324,7 +1324,7 @@ func TestExtensionWriteResultsEnrollmentInvalid(t *testing.T) {
 	k := makeKnapsack(t)
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
-	e.NodeKey = "bad_node_key"
+	e.cachedNodeKey = "bad_node_key"
 
 	err = e.WriteResults(t.Context(), []distributed.Result{})
 	assert.True(t, m.PublishResultsFuncInvoked)
