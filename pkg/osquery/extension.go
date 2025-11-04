@@ -449,7 +449,8 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		return e.cachedNodeKey, false, nil
 	}
 
-	// Look up a node key cached in the local store
+	// Look up a node key cached in the local store -- maybe we enrolled via secretless enrollment,
+	// and the node key was stored but not yet cached in the extension.
 	key, err := storedNodeKey(e.knapsack.ConfigStore(), e.registrationId)
 	if err != nil {
 		observability.SetError(span, fmt.Errorf("error reading node key from db: %w", err))
