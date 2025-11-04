@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockTaskManager is a testing helper which adheres to the taskManager.
+// mockTaskManager is a testing helper which adheres to the taskManager interface.
 // this allows us to unit test a bunch of the Controller logic without actually
 // attempting task removal or installation
 type mockTaskManager struct {
