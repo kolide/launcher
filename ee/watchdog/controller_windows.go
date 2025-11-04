@@ -672,7 +672,7 @@ func RemoveWatchdogTask(identifier string) error {
 
 // watchdogTaskExists connects with the scheduler service to determine whether
 // a watchdog task for the given identifier is installed on the device
-func watchdogTaskExists(identifier string) (bool, error) { // nolint:unused
+func watchdogTaskExists(identifier string) (bool, error) {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
 	}
