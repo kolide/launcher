@@ -153,12 +153,20 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	}
 
 	// Now, store our data
-	if err := nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(nodeKey)); err != nil {
+	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
+	if err := nodeKeyStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)); err != nil {
 		return fmt.Errorf("setting node key in store: %w", err)
 	}
 	if err := registrationStore.Set([]byte(registrationId), rawRegistration); err != nil {
 		return fmt.Errorf("adding registration to store: %w", err)
 	}
+
+	k.Slogger().Log(context.Background(), slog.LevelInfo,
+		"successfully saved registration",
+		"node_key_key", string(nodeKeyKeyForRegistration),
+		"registration_id", registrationId,
+		"munemo", munemo,
+	)
 
 	return nil
 }

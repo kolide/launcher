@@ -196,6 +196,11 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return nil
 			}
 
+			e.slogger.Log(req.Context(), slog.LevelInfo,
+				"launcher received new node key -- proceeding with secretless enrollment",
+				"munemo", r.Munemo,
+			)
+
 			if r.Munemo != "" {
 				e.tenantMunemo.Store(r.Munemo)
 			}
@@ -204,6 +209,11 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			if err := e.registrationTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
 				return fmt.Errorf("saving registration: %w", err)
 			}
+
+			e.slogger.Log(req.Context(), slog.LevelInfo,
+				"launcher performed secretless enrollment",
+				"munemo", r.Munemo,
+			)
 
 			return nil
 		}(); err != nil {

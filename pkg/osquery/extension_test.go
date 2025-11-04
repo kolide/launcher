@@ -418,6 +418,69 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	assert.False(t, s.RequestEnrollmentFuncInvoked)
 }
 
+func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
+	nodeKeyFromSecretlessEnrollment := "new_node_key_from_secretless_enrollment"
+	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
+	s := &mock.KolideService{
+		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
+			if nodeKey != nodeKeyFromSecretlessEnrollment {
+				// Returns node_invalid
+				return "", true, nil
+			}
+			return configVal, false, nil
+		},
+	}
+
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, configStore)
+	k.On("ConfigStore").Return(configStore, nil)
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	store := inmemory.NewStore()
+	osqHistory, err := history.InitHistory(store)
+	require.NoError(t, err)
+	k.On("OsqueryHistory").Return(osqHistory).Maybe()
+	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
+	settingsStore.On("WriteSettings").Return(nil)
+
+	e, err := NewExtension(t.Context(), s, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	require.Nil(t, err)
+
+	// First request to generate configs -- we shouldn't be able to get anything yet,
+	// since we haven't enrolled.
+	configs, err := e.GenerateConfigs(t.Context())
+	assert.NotNil(t, configs)
+	assert.Equal(t, map[string]string{"config": "{}"}, configs)
+	assert.Nil(t, err)
+
+	// Should have tried to request config
+	assert.True(t, s.RequestConfigFuncInvoked)
+
+	// Now, set the node key
+	require.NoError(t, configStore.Set([]byte(nodeKeyKey), []byte(nodeKeyFromSecretlessEnrollment)))
+
+	// Try to generate configs again. This time, we should use the correct node key.
+	newConfigs, err := e.GenerateConfigs(t.Context())
+	assert.True(t, s.RequestConfigFuncInvoked)
+	assert.Equal(t, map[string]string{"config": configVal}, newConfigs)
+	assert.Nil(t, err)
+
+	// On node invalid response, should attempt to retrieve enroll secret
+	k.AssertExpectations(t)
+
+	// Since we can't retrieve the enroll secret, we shouldn't attempt to enroll yet
+	assert.False(t, s.RequestEnrollmentFuncInvoked)
+}
+
 func TestExtensionGenerateConfigs(t *testing.T) {
 	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	m := &mock.KolideService{
