@@ -99,6 +99,7 @@ func TestNewExtensionDatabaseError(t *testing.T) {
 	m.On("Slogger").Return(multislogger.NewNopLogger()).Maybe()
 	m.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	m.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	m.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	// close the DB connection here to trigger the error
 	require.NoError(t, db.Close())
@@ -454,6 +455,7 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 
 	e, err := NewExtension(t.Context(), s, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
+	require.True(t, e.isSecretless)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
 	// since we haven't enrolled.
@@ -477,7 +479,7 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	// On node invalid response, should attempt to retrieve enroll secret
 	k.AssertExpectations(t)
 
-	// Since we can't retrieve the enroll secret, we shouldn't attempt to enroll yet
+	// Since we don't have an enroll secret, we shouldn't attempt to enroll
 	assert.False(t, s.RequestEnrollmentFuncInvoked)
 }
 
@@ -803,6 +805,7 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: 100,
@@ -879,6 +882,7 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
 		MaxBytesPerBatch: 15,
@@ -969,6 +973,7 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	expectedLoggingInterval := 5 * time.Second
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
@@ -1098,6 +1103,7 @@ func TestExtensionPurgeBufferedLogs(t *testing.T) {
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
 	maximum := 10
 	e, err := NewExtension(t.Context(), m, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
@@ -1292,6 +1298,91 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 	queries, err = e.GetQueries(t.Context())
 	require.Nil(t, err)
 	require.Equal(t, expectedQueries, queries.Queries)
+}
+
+func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
+	nodeKeyFromSecretlessEnrollment := "another_node_key_from_secretless_enrollment"
+	expectedQueries := map[string]string{
+		"time":    "select * from time",
+		"version": "select version from osquery_info",
+	}
+	s := &mock.KolideService{
+		RequestQueriesFunc: func(ctx context.Context, nodeKey string) (*distributed.GetQueriesResult, bool, error) {
+			if nodeKey == nodeKeyFromSecretlessEnrollment {
+				return &distributed.GetQueriesResult{
+					Queries: expectedQueries,
+				}, false, nil
+			}
+
+			return nil, true, nil
+		},
+	}
+
+	k := mocks.NewKnapsack(t)
+	k.On("OsquerydPath").Maybe().Return("")
+	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
+	configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, configStore)
+	k.On("ConfigStore").Return(configStore, nil)
+	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
+	k.On("Slogger").Return(multislogger.NewNopLogger())
+	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
+	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
+	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	store := inmemory.NewStore()
+	osqHistory, err := history.InitHistory(store)
+	require.NoError(t, err)
+	k.On("OsqueryHistory").Return(osqHistory).Maybe()
+	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
+
+	e, err := NewExtension(t.Context(), s, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
+	require.Nil(t, err)
+	require.True(t, e.isSecretless)
+
+	// First request to generate configs -- we shouldn't be able to get anything yet,
+	// since we haven't enrolled.
+	_, err = e.GetQueries(t.Context())
+	require.Error(t, err, "should not have been able to get queries while unenrolled")
+
+	// Should have tried to request queries
+	assert.True(t, s.RequestQueriesFuncInvoked)
+
+	// Now, fire off a bunch of sequential GetQueries requests, so that we'll (probably) have one
+	// processing while we simulate secretless enrollment completing
+	resultChan := make(chan struct{}, 100)
+	go func() {
+		for range 100 {
+			_, _ = e.GetQueries(t.Context())
+			resultChan <- struct{}{}
+		}
+	}()
+
+	// Now, set the node key
+	require.NoError(t, configStore.Set([]byte(nodeKeyKey), []byte(nodeKeyFromSecretlessEnrollment)))
+
+	// Wait for our previous queries to complete
+	for range 100 {
+		select {
+		case <-resultChan:
+			// Nothing to do here
+		case <-time.After(1 * time.Minute):
+			t.FailNow()
+		}
+	}
+
+	// Now, try to get queries -- we should be enrolled, so we should be able to get
+	// queries with the correct node key now.
+	newQueries, err := e.GetQueries(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, expectedQueries, newQueries.Queries)
+
+	// Since we don't have an enroll secret, we shouldn't ever attempt to enroll
+	assert.False(t, s.RequestEnrollmentFuncInvoked)
+
+	k.AssertExpectations(t)
 }
 
 func TestExtensionWriteResultsTransportError(t *testing.T) {

@@ -41,6 +41,7 @@ type Extension struct {
 	NodeKey                       string
 	Opts                          ExtensionOpts
 	registrationId                string
+	isSecretless                  bool
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
 	settingsWriter                settingsStoreWriter
@@ -160,6 +161,9 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		)
 	}
 
+	enrollSecret, err := k.ReadEnrollSecret()
+	isSecretless := enrollSecret == "" || err != nil
+
 	initialTimestamp := &atomic.Int64{}
 	initialTimestamp.Store(0)
 
@@ -174,6 +178,7 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		serviceClient:                 client,
 		settingsWriter:                settingsWriter,
 		registrationId:                registrationId,
+		isSecretless:                  isSecretless,
 		knapsack:                      k,
 		NodeKey:                       nodekey,
 		Opts:                          opts,
@@ -589,6 +594,15 @@ func (e *Extension) nodeKey() string {
 // RequireReenroll clears the existing node key information, ensuring that the
 // next call to Enroll will cause the enrollment process to take place.
 func (e *Extension) RequireReenroll(ctx context.Context) {
+	// We cannot perform reenrollment via this extension for secretless installations,
+	// because reenrollment requires an enroll secret. Instead, launcher will have to reenroll
+	// via localserver.
+	if e.isSecretless {
+		e.slogger.Log(ctx, slog.LevelWarn,
+			"RequireReenroll called for secretless installation, will not reenroll",
+		)
+		return
+	}
 	e.enrollMutex.Lock()
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
