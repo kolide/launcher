@@ -383,10 +383,18 @@ func TestExtensionGenerateConfigsEnrollmentInvalid(t *testing.T) {
 }
 
 func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
+	expectedNodeKey := "new_node_key"
+	configVal := `{"foo":"bar","options":{"distributed_interval":5,"verbose":true}}`
 	s := &mock.KolideService{
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
+			if nodeKey == expectedNodeKey {
+				return configVal, false, nil
+			}
 			// Returns node_invalid
 			return "", true, nil
+		},
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
+			return expectedNodeKey, false, nil
 		},
 	}
 
@@ -396,27 +404,47 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("RegistrationStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())).Maybe()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Maybe().Return("", errors.New("test"))
+	k.On("ReadEnrollSecret").Return("", errors.New("test")).Times(3) // checked once in NewExtension, once in RequireReenroll, and once in Enroll
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
+	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
+	settingsStore.On("WriteSettings").Return(nil)
 
-	e, err := NewExtension(t.Context(), s, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, settingsStore, k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
 
+	// First, simulate no enrollment secret being available yet
 	configs, err := e.GenerateConfigs(t.Context())
 	assert.NotNil(t, configs)
 	assert.Equal(t, map[string]string{"config": "{}"}, configs)
 	assert.Nil(t, err)
+
+	// Since we can't retrieve the enroll secret, we shouldn't attempt to enroll yet
+	require.False(t, s.RequestEnrollmentFuncInvoked)
+
+	// Now, make an enrollment secret available, and prepare for enrollment
+	k.On("ReadEnrollSecret").Return("test_enrollment_secret", nil).Once()
+	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
+	store := inmemory.NewStore()
+	osqHistory, err := history.InitHistory(store)
+	require.NoError(t, err)
+	k.On("OsqueryHistory").Return(osqHistory).Maybe()
+	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+
+	// Make a config request again -- we should, this time, successfully attempt a reenroll
+	updatedConfigs, err := e.GenerateConfigs(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"config": configVal}, updatedConfigs)
+
+	// We should have enrolled
+	require.True(t, s.RequestEnrollmentFuncInvoked)
 
 	// Should have tried to request config
 	assert.True(t, s.RequestConfigFuncInvoked)
 
 	// On node invalid response, should attempt to retrieve enroll secret
 	k.AssertExpectations(t)
-
-	// Since we can't retrieve the enroll secret, we shouldn't attempt to enroll yet
-	assert.False(t, s.RequestEnrollmentFuncInvoked)
 }
 
 func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
@@ -455,7 +483,6 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 
 	e, err := NewExtension(t.Context(), s, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
-	require.True(t, e.isSecretless)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
 	// since we haven't enrolled.
@@ -1340,7 +1367,6 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 
 	e, err := NewExtension(t.Context(), s, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
-	require.True(t, e.isSecretless)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
 	// since we haven't enrolled.

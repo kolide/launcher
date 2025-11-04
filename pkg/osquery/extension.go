@@ -41,7 +41,6 @@ type Extension struct {
 	NodeKey                       string
 	Opts                          ExtensionOpts
 	registrationId                string
-	isSecretless                  bool
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
 	settingsWriter                settingsStoreWriter
@@ -161,9 +160,6 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		)
 	}
 
-	enrollSecret, err := k.ReadEnrollSecret()
-	isSecretless := enrollSecret == "" || err != nil
-
 	initialTimestamp := &atomic.Int64{}
 	initialTimestamp.Store(0)
 
@@ -178,7 +174,6 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 		serviceClient:                 client,
 		settingsWriter:                settingsWriter,
 		registrationId:                registrationId,
-		isSecretless:                  isSecretless,
 		knapsack:                      k,
 		NodeKey:                       nodekey,
 		Opts:                          opts,
@@ -478,9 +473,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("starting_enrollment")
 
+	// We cannot perform reenrollment via this extension for secretless installations,
+	// because reenrollment requires an enroll secret. Instead, launcher will have to reenroll
+	// via localserver.
 	enrollSecret, err := e.knapsack.ReadEnrollSecret()
 	if err != nil {
-		return "", true, fmt.Errorf("could not read enroll secret: %w", err)
+		return "", true, fmt.Errorf("could not read enroll secret, assuming launcher secretless installation, cannot enroll: %w", err)
 	}
 
 	identifier, err := e.getHostIdentifier()
@@ -597,7 +595,9 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 	// We cannot perform reenrollment via this extension for secretless installations,
 	// because reenrollment requires an enroll secret. Instead, launcher will have to reenroll
 	// via localserver.
-	if e.isSecretless {
+	enrollSecret, err := e.knapsack.ReadEnrollSecret()
+	isSecretless := enrollSecret == "" || err != nil
+	if isSecretless {
 		e.slogger.Log(ctx, slog.LevelWarn,
 			"RequireReenroll called for secretless installation, will not reenroll",
 		)
