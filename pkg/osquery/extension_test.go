@@ -1301,7 +1301,7 @@ func TestGetQueries_Forwarding_RespondsToAccelerationRequest(t *testing.T) {
 }
 
 func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
-	nodeKeyFromSecretlessEnrollment := "another_node_key_from_secretless_enrollment"
+	nodeKeyFromSecretlessEnrollment := "another_new_node_key_from_secretless_enrollment"
 	expectedQueries := map[string]string{
 		"time":    "select * from time",
 		"version": "select version from osquery_info",
