@@ -129,6 +129,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
@@ -168,7 +169,7 @@ func TestDesktopUserProcessRunner_Execute(t *testing.T) {
 			}()
 
 			// let it run a few intervals
-			time.Sleep(r.updateInterval * 6)
+			time.Sleep(r.updateInterval.Load() * 6)
 			interruptStart := time.Now()
 			r.Interrupt(nil)
 
@@ -376,6 +377,7 @@ func TestUpdate(t *testing.T) {
 			mockKnapsack := mocks.NewKnapsack(t)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
 			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+			mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 			mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 			mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
@@ -412,6 +414,7 @@ func TestSendNotification_NoProcessesYet(t *testing.T) {
 	mockKnapsack := mocks.NewKnapsack(t)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopEnabled)
 	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopGoMaxProcs)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.DesktopUpdateInterval)
 	mockKnapsack.On("DesktopUpdateInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopMenuRefreshInterval").Return(time.Millisecond * 250)
 	mockKnapsack.On("DesktopGoMaxProcs").Return(2).Maybe()
