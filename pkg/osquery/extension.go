@@ -477,9 +477,12 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	)
 	span.AddEvent("starting_enrollment")
 
+	// We cannot perform reenrollment via this extension for secretless installations,
+	// because reenrollment requires an enroll secret. Instead, launcher will have to reenroll
+	// via localserver.
 	enrollSecret, err := e.knapsack.ReadEnrollSecret()
 	if err != nil {
-		return "", true, fmt.Errorf("could not read enroll secret: %w", err)
+		return "", true, fmt.Errorf("could not read enroll secret, assuming launcher secretless installation, cannot enroll: %w", err)
 	}
 
 	identifier, err := e.getHostIdentifier()
@@ -594,6 +597,17 @@ func (e *Extension) nodeKey() string {
 // RequireReenroll clears the existing node key information, ensuring that the
 // next call to Enroll will cause the enrollment process to take place.
 func (e *Extension) RequireReenroll(ctx context.Context) {
+	// We cannot perform reenrollment via this extension for secretless installations,
+	// because reenrollment requires an enroll secret. Instead, launcher will have to reenroll
+	// via localserver.
+	enrollSecret, err := e.knapsack.ReadEnrollSecret()
+	isSecretless := enrollSecret == "" || err != nil
+	if isSecretless {
+		e.slogger.Log(ctx, slog.LevelWarn,
+			"RequireReenroll called for secretless installation, will not reenroll",
+		)
+		return
+	}
 	e.enrollMutex.Lock()
 	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
