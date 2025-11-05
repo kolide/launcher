@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -40,6 +39,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/shirou/gopsutil/v4/process"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
@@ -109,7 +109,9 @@ func InstanceDesktopAuthToken() string {
 type DesktopUsersProcessesRunner struct {
 	slogger *slog.Logger
 	// updateInterval is the interval on which desktop processes will be spawned, if necessary
-	updateInterval time.Duration
+	updateInterval *atomic.Duration
+	// updateTicker is the ticker for the update interval, stored so it can be reset when interval changes
+	updateTicker *time.Ticker
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
@@ -170,7 +172,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 		interrupt:           make(chan struct{}),
 		uidProcs:            make(map[string]processRecord),
 		uidProcsLock:        &sync.Mutex{},
-		updateInterval:      k.DesktopUpdateInterval(),
+		updateInterval:      atomic.NewDuration(k.DesktopUpdateInterval()),
 		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
 		procsWg:             &sync.WaitGroup{},
 		interruptTimeout:    time.Second * 5,
@@ -190,8 +192,13 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner.writeDefaultMenuTemplateFile()
 	runner.refreshMenu()
 
+	// Initialize the update ticker
+	runner.updateTicker = time.NewTicker(runner.updateInterval.Load())
+
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
+	// Observe DesktopUpdateInterval changes to adjust the update interval
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopUpdateInterval)
 	// Observe DesktopGoMaxProcs changes to restart processes with new GOMAXPROCS limit
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
 
@@ -227,8 +234,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	updateTicker := time.NewTicker(r.updateInterval)
-	defer updateTicker.Stop()
+	defer r.updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()
 	osUpdateCheckTicker := time.NewTicker(1 * time.Minute)
@@ -244,7 +250,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		}
 
 		select {
-		case <-updateTicker.C:
+		case <-r.updateTicker.C:
 			continue
 		case <-menuRefreshTicker.C:
 			r.refreshMenu()
@@ -566,6 +572,11 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// Handle DesktopUpdateInterval changes
+	if slices.Contains(flagKeys, keys.DesktopUpdateInterval) {
+		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
+	}
+
 	// Handle DesktopGoMaxProcs changes
 	if slices.Contains(flagKeys, keys.DesktopGoMaxProcs) {
 		r.slogger.Log(ctx, slog.LevelInfo,
@@ -611,6 +622,34 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 			)
 		}
 	}
+}
+
+func (r *DesktopUsersProcessesRunner) updateIntervalChanged(ctx context.Context, newInterval time.Duration) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	currentUpdateInterval := r.updateInterval.Load()
+	if newInterval == currentUpdateInterval {
+		return
+	}
+
+	if newInterval < currentUpdateInterval {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"accelerating desktop update interval",
+			"new_interval", newInterval.String(),
+			"old_interval", currentUpdateInterval.String(),
+		)
+	} else {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"resetting desktop update interval after acceleration",
+			"new_interval", newInterval.String(),
+			"old_interval", currentUpdateInterval.String(),
+		)
+	}
+
+	// Update the interval atomically and reset the ticker
+	r.updateInterval.Store(newInterval)
+	r.updateTicker.Reset(newInterval)
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
