@@ -16,7 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 )
 
-func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string, envv []string) error {
+func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string, envv []string, commandExpectedToExit bool) error {
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...) //nolint:forbidigo // execwrapper is used exclusively to exec launcher, and we trust the autoupdate library to find the correct path.
 	cmd.Env = envv
 
@@ -54,6 +54,14 @@ func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string
 		return fmt.Errorf("execing %s returned exit code -1 and state %s: %w", fullCmd, cmd.ProcessState.String(), err)
 	}
 
+	// if we're running a subcommand such as version and we did not get an error, return nil
+	// the svc* subcommands are used on windows to run as a service and we need a non-zero exit code for those despite
+	// the reason for the exit so the service manager will auto restart launcher
+	if commandExpectedToExit {
+		return nil
+	}
+
+	// not a sub command, this is launcher running it's main command or svc* subcommand
 	return fmt.Errorf("exec completed with exit code %d", cmd.ProcessState.ExitCode())
 }
 

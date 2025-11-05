@@ -88,12 +88,34 @@ func runMain() int {
 	// fork-bombing itself. This is an ENV, because there's no
 	// good way to pass it through the flags.
 	if !env.Bool("LAUNCHER_SKIP_UPDATES", false) && !inBuildDir {
-		if err := runNewerLauncherIfAvailable(ctx, systemSlogger.Logger); err != nil {
-			systemSlogger.Log(ctx, slog.LevelInfo,
-				"could not run newer version of launcher",
+		// not using the runNewerLauncherIfAvailable helper here because we need to distinguish between
+		// commands that are expected to exit (like subcommands) and those that are not (like the main launcher run / svc* commands)
+		lastestLauncherPath, err := latestLauncherPath(ctx, systemSlogger.Logger)
+		if err != nil {
+			systemSlogger.Log(ctx, slog.LevelError,
+				"could not check out latest launcher",
 				"err", err,
 			)
 			return 1
+		}
+
+		if lastestLauncherPath != "" {
+			systemSlogger.Log(ctx, slog.LevelInfo,
+				"found newer version of launcher to run",
+				"new_binary", lastestLauncherPath,
+			)
+
+			if err := execwrapper.Exec(ctx, systemSlogger.Logger, lastestLauncherPath, os.Args, os.Environ(), commandExpectedToExit()); err != nil {
+				systemSlogger.Log(ctx, slog.LevelError,
+					"error execing newer version of launcher",
+					"new_binary", lastestLauncherPath,
+					"err", err,
+				)
+
+				return 1
+			}
+
+			return 0
 		}
 	}
 
@@ -187,7 +209,8 @@ func runMain() int {
 			level.Debug(logger).Log("msg", "could not get current executable to perform restart", "err", err.Error())
 			return 1
 		}
-		if err := execwrapper.Exec(ctx, systemSlogger.Logger, currentExecutable, os.Args, os.Environ()); err != nil {
+
+		if err := execwrapper.Exec(ctx, systemSlogger.Logger, currentExecutable, os.Args, os.Environ(), false); err != nil {
 			slogger.Log(ctx, slog.LevelError,
 				"error execing launcher after restart was requested",
 				"binary", currentExecutable,
@@ -266,7 +289,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 		"new_binary", newerBinary,
 	)
 
-	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ()); err != nil {
+	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ(), commandExpectedToExit()); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"error execing newer version of launcher",
 			"new_binary", newerBinary,
@@ -326,4 +349,11 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 	detachConsole()
 
 	return nil
+}
+
+// commandExpectedToExit determines if we're running a subcommand that is expected to exit (excluding those starting with "svc")
+// svc is used on windows to run as a service and we need a non-zero exit code for those no matter
+// the reason for the exit so the service manager will auto restart launcher
+func commandExpectedToExit() bool {
+	return len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") && !strings.HasPrefix(os.Args[1], "svc")
 }
