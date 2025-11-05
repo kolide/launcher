@@ -126,7 +126,14 @@ func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys
 
 	if currentInstallState == installStateUnset {
 		taskExists, err := watchdogTaskExists(wc.knapsack.Identifier())
-		if !taskExists || err != nil { // if we err for any reason assume not installed
+		if err != nil {
+			wc.slogger.Log(ctx, slog.LevelWarn,
+				"encountered error checking for watchdog task installation",
+				"err", err,
+			)
+			// if we err for any reason assume not installed
+			currentInstallState = installStateRemoved
+		} else if !taskExists {
 			currentInstallState = installStateRemoved
 		} else {
 			currentInstallState = installStateInstalled
