@@ -504,10 +504,9 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	k.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{OSVersion: "1", Hostname: "test"}, nil).Maybe()
 	settingsStore := settingsstoremock.NewSettingsStoreWriter(t)
 	settingsStore.On("WriteSettings").Return(nil)
-
 	lpc := makeTestOsqLogPublisher(k)
 
-	e, err := NewExtension(t.Context(), s, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
+	e, err := NewExtension(t.Context(), s, lpc, settingsStore, k, types.DefaultRegistrationID, ExtensionOpts{})
 	require.Nil(t, err)
 
 	// First request to generate configs -- we shouldn't be able to get anything yet,
