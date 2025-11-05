@@ -89,7 +89,7 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 		configFilePath: configFilePath,
 	}
 
-	tm.taskInstallState.Store(installStateUnset)
+	tm.setCurrentInstallState(installStateUnset)
 
 	wc := &WatchdogController{
 		slogger:      slogger,
