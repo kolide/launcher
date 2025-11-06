@@ -632,18 +632,6 @@ func (fc *FlagController) ExportTraces() bool {
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
 
-// note that the LauncherWatchdogDisabled flag is the primary flag for controlling watchdog behavior
-// this is a temporary flag that will be removed in favor of LauncherWatchdogDisabled once the cutover is complete
-func (fc *FlagController) SetLauncherWatchdogEnabled(enabled bool) error {
-	return fc.setControlServerValue(keys.LauncherWatchdogEnabled, boolToBytes(enabled))
-}
-
-func (fc *FlagController) LauncherWatchdogEnabled() bool {
-	return NewBoolFlagValue(
-		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.LauncherWatchdogEnabled))
-}
-
 func (fc *FlagController) SetLauncherWatchdogDisabled(disabled bool) error {
 	return fc.setControlServerValue(keys.LauncherWatchdogDisabled, boolToBytes(disabled))
 }

@@ -973,24 +973,6 @@ func (_m *Knapsack) LauncherWatchdogDisabled() bool {
 	return r0
 }
 
-// LauncherWatchdogEnabled provides a mock function with no fields
-func (_m *Knapsack) LauncherWatchdogEnabled() bool {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for LauncherWatchdogEnabled")
-	}
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // LocalDevelopmentPath provides a mock function with no fields
 func (_m *Knapsack) LocalDevelopmentPath() string {
 	ret := _m.Called()
@@ -2160,24 +2142,6 @@ func (_m *Knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
 		r0 = rf(disabled)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetLauncherWatchdogEnabled provides a mock function with given fields: enabled
-func (_m *Knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
-	ret := _m.Called(enabled)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetLauncherWatchdogEnabled")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enabled)
 	} else {
 		r0 = ret.Error(0)
 	}

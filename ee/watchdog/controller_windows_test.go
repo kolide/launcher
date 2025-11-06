@@ -4,15 +4,46 @@
 package watchdog
 
 import (
+	"context"
 	"errors"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/flags/keys"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
+
+// mockTaskManager is a testing helper which adheres to the taskManager interface.
+// this allows us to unit test a bunch of the Controller logic without actually
+// attempting task removal or installation
+type mockTaskManager struct {
+	taskInstallState atomic.Int32
+	slogger          *slog.Logger
+}
+
+func (mtm *mockTaskManager) currentInstallState() installState {
+	return mtm.taskInstallState.Load()
+}
+
+func (mtm *mockTaskManager) setCurrentInstallState(state installState) {
+	mtm.taskInstallState.Store(state)
+}
+
+func (mtm *mockTaskManager) installTask() error {
+	mtm.slogger.Log(context.TODO(), slog.LevelDebug, "install task called")
+	mtm.setCurrentInstallState(installStateInstalled)
+	return nil
+}
+
+func (mtm *mockTaskManager) removeTask() error {
+	mtm.slogger.Log(context.TODO(), slog.LevelDebug, "remove task called")
+	mtm.setCurrentInstallState(installStateRemoved)
+	return nil
+}
 
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
@@ -26,7 +57,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(testSlogger)
 	mockKnapsack.On("Identifier").Return("kolide-k2").Maybe()
 	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
-	mockKnapsack.On("LauncherWatchdogEnabled").Return(false).Maybe()
+	mockKnapsack.On("LauncherWatchdogDisabled").Return(true).Maybe()
 
 	controller, _ := NewController(t.Context(), mockKnapsack, "")
 
@@ -63,4 +94,85 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+}
+
+func TestFlagsChanged(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		testCaseName        string
+		watchdogDisabled    bool
+		initialInstallState installState
+		finalInstallState   installState
+		// we use expectRemoval/expectInstallation to assert the removal actually happened
+		// (wasn't bypassed due to cached installState values). this is checked via slogger bytes
+		expectRemoval      bool
+		expectInstallation bool
+	}{
+		{
+			testCaseName:        "triggering removal after already being installed",
+			watchdogDisabled:    true,
+			initialInstallState: installStateInstalled,
+			finalInstallState:   installStateRemoved,
+			expectRemoval:       true,
+			expectInstallation:  false,
+		},
+		{
+			testCaseName:        "triggering install after already being removed",
+			watchdogDisabled:    false,
+			initialInstallState: installStateRemoved,
+			finalInstallState:   installStateInstalled,
+			expectRemoval:       false,
+			expectInstallation:  true,
+		},
+		{
+			testCaseName:        "requesting install after already being installed",
+			watchdogDisabled:    false,
+			initialInstallState: installStateInstalled,
+			finalInstallState:   installStateInstalled,
+			expectRemoval:       false,
+			expectInstallation:  false,
+		},
+		{
+			testCaseName:        "requesting removal after already being removed",
+			watchdogDisabled:    true,
+			initialInstallState: installStateRemoved,
+			finalInstallState:   installStateRemoved,
+			expectRemoval:       false,
+			expectInstallation:  false,
+		},
+	} {
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+			var logBytes threadsafebuffer.ThreadSafeBuffer
+			testSlogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+				Level: slog.LevelDebug,
+			}))
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("Identifier").Return("test-identifier").Maybe()
+			mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
+			mockKnapsack.On("LauncherWatchdogDisabled").Return(tt.watchdogDisabled).Maybe()
+
+			controller := &WatchdogController{
+				slogger:     testSlogger,
+				knapsack:    mockKnapsack,
+				interrupt:   make(chan struct{}, 1),
+				taskManager: &mockTaskManager{slogger: testSlogger},
+			}
+
+			controller.taskManager.setCurrentInstallState(tt.initialInstallState)
+			controller.FlagsChanged(t.Context(), keys.LauncherWatchdogDisabled)
+			require.Equal(t, tt.finalInstallState, controller.taskManager.currentInstallState())
+			if tt.expectInstallation {
+				require.Contains(t, logBytes.String(), "install task called")
+			} else {
+				require.NotContains(t, logBytes.String(), "install task called")
+			}
+
+			if tt.expectRemoval {
+				require.Contains(t, logBytes.String(), "remove task called")
+			} else {
+				require.NotContains(t, logBytes.String(), "remove task called")
+			}
+		})
+	}
 }

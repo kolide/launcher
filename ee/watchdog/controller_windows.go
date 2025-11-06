@@ -31,19 +31,48 @@ const (
 	watchdogTaskType string = "watchdog"
 )
 
-// WatchdogController is responsible for:
-//  1. adding/enabling and disabling/removing the watchdog task according to the agent flag
-//  2. publishing any watchdog_logs written out by the watchdog task
-//
-// This controller is intended for use by the main launcher service invocation
-type WatchdogController struct {
-	slogger        *slog.Logger
-	knapsack       types.Knapsack
-	interrupt      chan struct{}
-	interrupted    atomic.Bool
-	logPublisher   types.LogStore
-	configFilePath string
-}
+// installState functions as an enum to prevent excessive installation/removal attempts.
+// because installing, removing, and checking for the task all require COM initialization,
+// we want to avoid doing so unnecessarily. Whenever a known state is reached, we'll cache
+// this state on the watchdog controller and use it to decide what actions are required
+// from FlagsChanged
+type installState = int32
+
+const (
+	installStateUnset     installState = iota
+	installStateInstalled installState = 1
+	installStateRemoved   installState = 2
+)
+
+type (
+	// WatchdogController is responsible for:
+	//  1. adding/enabling and disabling/removing the watchdog task according to the agent flag
+	//  2. publishing any watchdog_logs written out by the watchdog task
+	//
+	// This controller is intended for use by the main launcher service invocation
+	WatchdogController struct {
+		slogger      *slog.Logger
+		knapsack     types.Knapsack
+		interrupt    chan struct{}
+		interrupted  atomic.Bool
+		logPublisher types.LogStore
+		taskManager  taskManager
+	}
+
+	taskManager interface {
+		installTask() error
+		removeTask() error
+		currentInstallState() installState
+		setCurrentInstallState(state installState)
+	}
+
+	watchdogTaskManager struct {
+		slogger          *slog.Logger
+		knapsack         types.Knapsack
+		configFilePath   string
+		taskInstallState atomic.Int32
+	}
+)
 
 func NewController(ctx context.Context, k types.Knapsack, configFilePath string) (*WatchdogController, error) {
 	// set up the log publisher, if watchdog is enabled we will need to pull those logs from sqlite periodically
@@ -52,21 +81,83 @@ func NewController(ctx context.Context, k types.Knapsack, configFilePath string)
 		return nil, fmt.Errorf("opening log db in %s: %w", k.RootDirectory(), err)
 	}
 
-	return &WatchdogController{
-		slogger:        k.Slogger().With("component", "watchdog_controller"),
+	slogger := k.Slogger().With("component", "watchdog_controller")
+
+	tm := watchdogTaskManager{
+		slogger:        slogger,
 		knapsack:       k,
-		interrupt:      make(chan struct{}, 1),
-		logPublisher:   logPublisher,
 		configFilePath: configFilePath,
-	}, nil
+	}
+
+	tm.setCurrentInstallState(installStateUnset)
+
+	wc := &WatchdogController{
+		slogger:      slogger,
+		knapsack:     k,
+		interrupt:    make(chan struct{}, 1),
+		logPublisher: logPublisher,
+		taskManager:  &tm,
+	}
+
+	return wc, nil
 }
 
+// FlagsChanged is called when the LauncherWatchdogDisabled flag is seen from our control server.
+// It checks if the watchdog disabled flag has changed and enables or disables the watchdog task accordingly.
+// This is currently the only production path into watchdog installation or removal, so agents will not
+// install watchdog until they've received this flag.
 func (wc *WatchdogController) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
-	if slices.Contains(flagKeys, keys.LauncherWatchdogEnabled) {
-		wc.ServiceEnabledChanged(wc.knapsack.LauncherWatchdogEnabled())
+	if !slices.Contains(flagKeys, keys.LauncherWatchdogDisabled) {
+		return
+	}
+
+	if !wc.shouldManageWatchdog() {
+		wc.slogger.Log(ctx, slog.LevelDebug,
+			"skipping watchdog manipulation for either non-prod setup or lack of admin privileges",
+		)
+		return
+	}
+
+	currentInstallState := wc.taskManager.currentInstallState()
+	nowDisabled := wc.knapsack.LauncherWatchdogDisabled()
+
+	if currentInstallState == installStateUnset {
+		taskExists, err := watchdogTaskExists(wc.knapsack.Identifier())
+		if err != nil {
+			wc.slogger.Log(ctx, slog.LevelWarn,
+				"encountered error checking for watchdog task installation",
+				"err", err,
+			)
+			// if we err for any reason assume not installed
+			currentInstallState = installStateRemoved
+		} else if !taskExists {
+			currentInstallState = installStateRemoved
+		} else {
+			currentInstallState = installStateInstalled
+		}
+
+		wc.taskManager.setCurrentInstallState(currentInstallState)
+	}
+
+	switch currentInstallState {
+	case installStateInstalled:
+		// we know we're currently installed but should be disabled, trigger removal
+		if nowDisabled {
+			wc.taskManager.removeTask() // all errors are logged already, nothing we can do except try again next time
+		}
+	case installStateRemoved:
+		// we know we're not currently installed but should be, trigger installation
+		if !nowDisabled {
+			wc.taskManager.installTask() // all errors are logged already, nothing we can do except try again next time
+		}
+	default:
+		// should never get here
+		wc.slogger.Log(ctx, slog.LevelError, "unknown install state",
+			"state", currentInstallState,
+		)
 	}
 }
 
@@ -105,7 +196,7 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 	// note that there is a small window here where there could be pending logs before the watchdog task is removed -
 	// there is no harm in leaving them and we could recover these with the original timestamps if we ever needed.
 	// to avoid endlessly re-processing empty logs while we are disabled, we accept this possibility and exit early here
-	if !wc.knapsack.LauncherWatchdogEnabled() {
+	if wc.knapsack.LauncherWatchdogDisabled() {
 		return
 	}
 
@@ -141,53 +232,60 @@ func (wc *WatchdogController) Interrupt(_ error) {
 	wc.interrupt <- struct{}{}
 }
 
-func (wc *WatchdogController) ServiceEnabledChanged(enabled bool) {
-	ctx := context.TODO()
+func (wc *WatchdogController) shouldManageWatchdog() bool {
 	// we don't alter watchdog installation (install or remove) if this is a non-prod deployment
 	if !launcher.IsKolideHostedServerURL(wc.knapsack.KolideServerURL()) {
-		wc.slogger.Log(ctx, slog.LevelDebug,
-			"skipping ServiceEnabledChanged for launcher watchdog in non-prod environment",
-			"server_url", wc.knapsack.KolideServerURL(),
-			"enabled", enabled,
-		)
-
-		return
+		return false
 	}
 
 	// we also don't alter watchdog installation if we're running without elevated permissions
 	if !windows.GetCurrentProcessToken().IsElevated() {
-		wc.slogger.Log(ctx, slog.LevelDebug,
-			"skipping ServiceEnabledChanged for launcher watchdog running without elevated permissions",
-			"enabled", enabled,
-		)
-
-		return
+		return false
 	}
 
-	if !enabled {
-		if err := RemoveWatchdogTask(wc.knapsack.Identifier()); err != nil {
-			wc.slogger.Log(ctx, slog.LevelWarn,
-				"encountered error removing watchdog task",
-				"err", err,
-			)
+	return true
+}
 
-			return
-		}
+func (tm *watchdogTaskManager) currentInstallState() installState {
+	return tm.taskInstallState.Load()
+}
 
-		wc.slogger.Log(ctx, slog.LevelInfo, "removed watchdog task")
+func (tm *watchdogTaskManager) setCurrentInstallState(state installState) {
+	tm.taskInstallState.Store(state)
+}
 
-		return
-	}
-
-	// we're enabling the watchdog task- we can safely always reinstall our latest version here
-	if err := installWatchdogTask(wc.knapsack.Identifier(), wc.configFilePath); err != nil {
-		wc.slogger.Log(ctx, slog.LevelError,
+func (tm *watchdogTaskManager) installTask() error {
+	if err := installWatchdogTask(tm.knapsack.Identifier(), tm.configFilePath); err != nil {
+		tm.slogger.Log(context.TODO(), slog.LevelError,
 			"encountered error installing watchdog task",
 			"err", err,
 		)
+
+		// if we encounter an error reset our state so we will check again next time
+		tm.setCurrentInstallState(installStateUnset)
+		return err
 	}
 
-	wc.slogger.Log(ctx, slog.LevelInfo, "completed watchdog scheduled task installation")
+	tm.setCurrentInstallState(installStateInstalled)
+	tm.slogger.Log(context.TODO(), slog.LevelInfo, "completed watchdog scheduled task installation")
+	return nil
+}
+
+func (tm *watchdogTaskManager) removeTask() error {
+	if err := RemoveWatchdogTask(tm.knapsack.Identifier()); err != nil {
+		tm.slogger.Log(context.TODO(), slog.LevelWarn,
+			"encountered error removing watchdog task",
+			"err", err,
+		)
+
+		// if we encounter an error reset our state so we will check again next time
+		tm.setCurrentInstallState(installStateUnset)
+		return err
+	}
+
+	tm.setCurrentInstallState(installStateRemoved)
+	tm.slogger.Log(context.TODO(), slog.LevelInfo, "removed watchdog task")
+	return nil
 }
 
 // installWatchdogTask registers our watchdog subcommand as a scheduled task.
@@ -581,7 +679,7 @@ func RemoveWatchdogTask(identifier string) error {
 
 // watchdogTaskExists connects with the scheduler service to determine whether
 // a watchdog task for the given identifier is installed on the device
-func watchdogTaskExists(identifier string) (bool, error) { // nolint:unused
+func watchdogTaskExists(identifier string) (bool, error) {
 	if strings.TrimSpace(identifier) == "" {
 		identifier = launcher.DefaultLauncherIdentifier
 	}

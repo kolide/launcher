@@ -354,7 +354,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
-		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
+		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogDisabled)
 		runGroup.Add("watchdogController", watchdogController.Run, watchdogController.Interrupt)
 	}
 
