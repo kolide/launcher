@@ -356,8 +356,18 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 // svc is used on windows to run as a service and we need a non-zero exit code for those no matter
 // the reason for the exit so the service manager will auto restart launcher
 func commandExpectedToExit(osArgs []string) bool {
-	return len(osArgs) > 1 &&
-		// Either first arg is not a flag, OR the flag is `--version` or `-version`
-		(!strings.HasPrefix(osArgs[1], "-") || slices.Contains(osArgs, "--version") || slices.Contains(osArgs, "-version")) &&
-		!strings.HasPrefix(osArgs[1], "svc")
+	// We don't expect naked launcher call to exit -- it should be running runLauncher
+	if len(osArgs) <= 1 {
+		return false
+	}
+	// Similarly, the Windows service should be running without exiting
+	if strings.HasPrefix(osArgs[1], "svc") {
+		return false
+	}
+	// Version calls should exit
+	if slices.Contains(osArgs, "--version") || slices.Contains(osArgs, "-version") {
+		return true
+	}
+	// All other subcommands should exit
+	return !strings.HasPrefix(osArgs[1], "-")
 }
