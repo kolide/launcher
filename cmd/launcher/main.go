@@ -92,12 +92,15 @@ func runMain() int {
 		// not using the runNewerLauncherIfAvailable helper here because we need to distinguish between
 		// commands that are expected to exit (like subcommands) and those that are not (like the main launcher run / svc* commands)
 		lastestLauncherPath, err := latestLauncherPath(ctx, systemSlogger.Logger)
+
+		// If we can't get the latest version of launcher, this is probably a new install that doesn't yet
+		// have any TUF metadata downloaded. Log the error in case it's relevant, and then we'll proceed to
+		// continue running this version of launcher, rather than execing a new one.
 		if err != nil {
 			systemSlogger.Log(ctx, slog.LevelError,
-				"could not check out latest launcher",
+				"could not check out latest launcher (likely new install that has not yet downloaded any updates)",
 				"err", err,
 			)
-			return 1
 		}
 
 		if lastestLauncherPath != "" {
