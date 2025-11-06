@@ -171,6 +171,54 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	return nil
 }
 
+func (k *knapsack) NodeKey(registrationId string) (string, error) {
+	// First, get the store we'll need. For now, we continue to pull the node key from
+	// the config store, but in the future, we will be able to pull it from the registrations
+	// store instead.
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return "", errors.New("no config store")
+	}
+
+	// Retrieve the key from the store
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	if err != nil {
+		return "", fmt.Errorf("error getting node key: %w", err)
+	}
+
+	if key != nil {
+		return string(key), nil
+	}
+
+	return "", nil
+}
+
+func (k *knapsack) DeleteRegistration(registrationId string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store")
+	}
+
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
+		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
+	}
+	if err := registrationStore.Delete([]byte(registrationId)); err != nil {
+		return fmt.Errorf("deleting registration for %s: %w", registrationId, err)
+	}
+
+	k.Slogger().Log(context.Background(), slog.LevelInfo,
+		"deleted registration",
+		"registration_id", registrationId,
+	)
+
+	return nil
+}
+
 // InstanceStatuses returns the current status of each osquery instance.
 // It performs a healthcheck against each existing instance.
 func (k *knapsack) InstanceStatuses() map[string]types.InstanceStatus {

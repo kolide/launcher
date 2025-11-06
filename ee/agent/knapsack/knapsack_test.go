@@ -243,6 +243,143 @@ func TestSaveRegistration(t *testing.T) {
 	}
 }
 
+func TestNodeKey(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName    string
+		registrationId  string
+		expectedNodeKey string
+	}{
+		{
+			testCaseName:    "default registration id",
+			registrationId:  types.DefaultRegistrationID,
+			expectedNodeKey: "test_node_key",
+		},
+		{
+			testCaseName:    "non-default registration id",
+			registrationId:  ulid.New(),
+			expectedNodeKey: "test_node_key_2",
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up our stores
+			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err)
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			require.NoError(t, err)
+
+			// Set up our knapsack
+			testKnapsack := New(map[storage.Store]types.KVStore{
+				storage.ConfigStore:       configStore,
+				storage.RegistrationStore: registrationStore,
+			}, nil, nil, multislogger.New(), multislogger.New())
+
+			// Set up our registration
+			require.NoError(t, testKnapsack.SaveRegistration(tt.registrationId, "test_munemo", tt.expectedNodeKey, ""))
+
+			// Confirm that the node key was stored
+			expectedNodeKeyKey := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(tt.registrationId))
+			storedKey, err := configStore.Get(expectedNodeKeyKey)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedNodeKey, string(storedKey))
+
+			// Fetch the node key
+			nodeKey, err := testKnapsack.NodeKey(tt.registrationId)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedNodeKey, nodeKey)
+		})
+	}
+}
+
+func TestDeleteRegistration(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName           string
+		expectedRegistrationId string
+		expectedMunemo         string
+		expectedNodeKey        string
+		expectedEnrollSecret   string
+	}{
+		{
+			testCaseName:           "all data set, default registration id",
+			expectedRegistrationId: types.DefaultRegistrationID,
+			expectedMunemo:         "test_munemo",
+			expectedNodeKey:        "test_node_key",
+			expectedEnrollSecret:   "test_jwt",
+		},
+		{
+			testCaseName:           "all data set, non-default registration id",
+			expectedRegistrationId: ulid.New(),
+			expectedMunemo:         "test_munemo",
+			expectedNodeKey:        "test_node_key",
+			expectedEnrollSecret:   "test_jwt",
+		},
+		{
+			testCaseName:           "no enroll secret, default registration ID",
+			expectedRegistrationId: types.DefaultRegistrationID,
+			expectedMunemo:         "test_munemo",
+			expectedNodeKey:        "test_node_key",
+			expectedEnrollSecret:   "",
+		},
+		{
+			testCaseName:           "no enroll secret, non-default registration ID",
+			expectedRegistrationId: ulid.New(),
+			expectedMunemo:         "test_munemo",
+			expectedNodeKey:        "test_node_key",
+			expectedEnrollSecret:   "",
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up our stores
+			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err)
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			require.NoError(t, err)
+
+			// Set up our knapsack
+			testKnapsack := New(map[storage.Store]types.KVStore{
+				storage.ConfigStore:       configStore,
+				storage.RegistrationStore: registrationStore,
+			}, nil, nil, multislogger.New(), multislogger.New())
+
+			// Save the registration
+			require.NoError(t, testKnapsack.SaveRegistration(tt.expectedRegistrationId, tt.expectedMunemo, tt.expectedNodeKey, tt.expectedEnrollSecret))
+
+			// Confirm we have the registration
+			registrationsAfterSave, err := testKnapsack.Registrations()
+			require.NoError(t, err)
+			require.Equal(t, 1, len(registrationsAfterSave))
+			require.Equal(t, tt.expectedRegistrationId, registrationsAfterSave[0].RegistrationID)
+
+			// Confirm we have the node key
+			nodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedNodeKey, nodeKey)
+
+			// Now, delete the registration
+			require.NoError(t, testKnapsack.DeleteRegistration(tt.expectedRegistrationId))
+
+			// Confirm the registration is gone
+			registrationsAfterDelete, err := testKnapsack.Registrations()
+			require.NoError(t, err)
+			require.Equal(t, 0, len(registrationsAfterDelete))
+
+			// Confirm the node key was deleted
+			newNodeKey, err := testKnapsack.NodeKey(tt.expectedRegistrationId)
+			require.NoError(t, err)
+			require.Equal(t, "", newNodeKey)
+		})
+	}
+}
+
 func TestSetGetEnrollmentDetails(t *testing.T) {
 	t.Parallel()
 

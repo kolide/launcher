@@ -380,6 +380,24 @@ func (_m *Knapsack) DebugServerData() bool {
 	return r0
 }
 
+// DeleteRegistration provides a mock function with given fields: registrationId
+func (_m *Knapsack) DeleteRegistration(registrationId string) error {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteRegistration")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeregisterChangeObserver provides a mock function with given fields: observer
 func (_m *Knapsack) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
 	_m.Called(observer)
@@ -1079,6 +1097,34 @@ func (_m *Knapsack) MirrorServerURL() string {
 	}
 
 	return r0
+}
+
+// NodeKey provides a mock function with given fields: registrationId
+func (_m *Knapsack) NodeKey(registrationId string) (string, error) {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NodeKey")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return rf(registrationId)
+	}
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(registrationId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // OsqueryFlags provides a mock function with no fields
