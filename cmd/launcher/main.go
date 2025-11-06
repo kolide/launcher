@@ -105,7 +105,7 @@ func runMain() int {
 				"new_binary", lastestLauncherPath,
 			)
 
-			if err := execwrapper.Exec(ctx, systemSlogger.Logger, lastestLauncherPath, os.Args, os.Environ(), commandExpectedToExit()); err != nil {
+			if err := execwrapper.Exec(ctx, systemSlogger.Logger, lastestLauncherPath, os.Args, os.Environ(), commandExpectedToExit(os.Args)); err != nil {
 				systemSlogger.Log(ctx, slog.LevelError,
 					"error execing newer version of launcher",
 					"new_binary", lastestLauncherPath,
@@ -289,7 +289,7 @@ func runNewerLauncherIfAvailable(ctx context.Context, slogger *slog.Logger) erro
 		"new_binary", newerBinary,
 	)
 
-	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ(), commandExpectedToExit()); err != nil {
+	if err := execwrapper.Exec(ctx, slogger, newerBinary, os.Args, os.Environ(), commandExpectedToExit(os.Args)); err != nil {
 		slogger.Log(ctx, slog.LevelError,
 			"error execing newer version of launcher",
 			"new_binary", newerBinary,
@@ -354,6 +354,6 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 // commandExpectedToExit determines if we're running a subcommand that is expected to exit (excluding those starting with "svc")
 // svc is used on windows to run as a service and we need a non-zero exit code for those no matter
 // the reason for the exit so the service manager will auto restart launcher
-func commandExpectedToExit() bool {
-	return len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") && !strings.HasPrefix(os.Args[1], "svc")
+func commandExpectedToExit(osArgs []string) bool {
+	return len(osArgs) > 1 && !strings.HasPrefix(osArgs[1], "-") && !strings.HasPrefix(osArgs[1], "svc")
 }
