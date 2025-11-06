@@ -231,6 +231,9 @@ generate: deps-go
 test: generate
 	go test -cover -coverprofile=coverage.out -race ./...
 
+test-performance: generate
+	go test -tags=performance -p 1 ./ee/tables/...
+
 ##
 ## Lint
 ##
