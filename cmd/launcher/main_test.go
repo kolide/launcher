@@ -66,11 +66,29 @@ func Test_commandExpectedToExit(t *testing.T) {
 			expectedExit: true,
 		},
 		{
+			testCaseName: "launcher subcommand version flag",
+			osArgs: []string{
+				"/some/path/to/launcher",
+				"--version",
+				"--config",
+				"/some/path/to/config",
+			},
+			expectedExit: true,
+		},
+		{
+			testCaseName: "launcher subcommand version flag, single dash",
+			osArgs: []string{
+				"/some/path/to/launcher",
+				"-version",
+			},
+			expectedExit: true,
+		},
+		{
 			testCaseName: "launcher subcommand interactive",
 			osArgs: []string{
 				"/some/path/to/launcher",
 				"interactive",
-				"-config",
+				"--config",
 				"/some/path/to/config",
 			},
 			expectedExit: true,

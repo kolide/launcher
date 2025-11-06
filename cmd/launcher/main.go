@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -355,5 +356,8 @@ func runVersion(_ *multislogger.MultiSlogger, args []string) error {
 // svc is used on windows to run as a service and we need a non-zero exit code for those no matter
 // the reason for the exit so the service manager will auto restart launcher
 func commandExpectedToExit(osArgs []string) bool {
-	return len(osArgs) > 1 && !strings.HasPrefix(osArgs[1], "-") && !strings.HasPrefix(osArgs[1], "svc")
+	return len(osArgs) > 1 &&
+		// Either first arg is not a flag, OR the flag is `--version` or `-version`
+		(!strings.HasPrefix(osArgs[1], "-") || slices.Contains(osArgs, "--version") || slices.Contains(osArgs, "-version")) &&
+		!strings.HasPrefix(osArgs[1], "svc")
 }
