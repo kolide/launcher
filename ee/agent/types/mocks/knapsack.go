@@ -642,8 +642,21 @@ func (_m *Knapsack) EnrollmentDetailsStore() types.GetterSetterDeleterIteratorUp
 }
 
 // EnsureRegistrationStored provides a mock function with given fields: registrationId
-func (_m *Knapsack) EnsureRegistrationStored(registrationId string) {
-	_m.Called(registrationId)
+func (_m *Knapsack) EnsureRegistrationStored(registrationId string) error {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureRegistrationStored")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // ExportTraces provides a mock function with no fields

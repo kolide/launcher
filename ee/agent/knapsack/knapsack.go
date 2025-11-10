@@ -204,23 +204,15 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 // EnsureRegistrationStored creates a registration under the given registration ID,
 // if it does not already exist. Since registrations are a newer concept, older launcher
 // installations may not have them saved yet.
-func (k *knapsack) EnsureRegistrationStored(registrationId string) {
-	slogger := k.Slogger().With("registration_id", registrationId)
-
+func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
 	if nodeKeyStore == nil {
-		slogger.Log(context.Background(), slog.LevelWarn,
-			"no config store, cannot ensure registration is stored",
-		)
-		return
+		return errors.New("no config store, cannot ensure registration is stored")
 	}
 	registrationStore := k.getKVStore(storage.RegistrationStore)
 	if registrationStore == nil {
-		slogger.Log(context.Background(), slog.LevelWarn,
-			"no registration store, cannot ensure registration is stored",
-		)
-		return
+		return errors.New("no registration store, cannot ensure registration is stored")
 	}
 
 	// Get the existing node key from the config store. If we can't get this, then
@@ -229,28 +221,17 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) {
 	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
 	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForRegistration)
 	if err != nil {
-		slogger.Log(context.Background(), slog.LevelError,
-			"could not get node key",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("retrieving node key: %w", err)
 	}
 	nodeKey := string(keyRaw)
 	if nodeKey == "" {
-		slogger.Log(context.Background(), slog.LevelDebug,
-			"empty node key, no need to store registration",
-		)
-		return
+		return errors.New("no node key stored, cannot store registration")
 	}
 
 	// Check to see if we have an existing registration first
 	existingRegistrationRaw, err := registrationStore.Get([]byte(registrationId))
 	if err != nil {
-		slogger.Log(context.Background(), slog.LevelError,
-			"could not get existing registration",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("getting existing registration: %w", err)
 	}
 
 	// No registration exists yet -- add it if we can
@@ -259,60 +240,43 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) {
 		enrollSecret, err := k.ReadEnrollSecret()
 		if err != nil {
 			// The enroll secret doesn't exist -- likely, this is a bad manual installation.
-			slogger.Log(context.Background(), slog.LevelError,
-				"no enrollment secret, cannot save registration",
-				"err", err,
-			)
-			return
+			return fmt.Errorf("reading enrollment secret to create new registration: %w", err)
 		}
 		// SaveRegistration will extract the munemo from the enrollment secret for us.
 		if err := k.SaveRegistration(registrationId, "", nodeKey, enrollSecret); err != nil {
-			slogger.Log(context.Background(), slog.LevelError,
-				"could not create registration from enroll secret",
-				"err", err,
-			)
+			return fmt.Errorf("saving new registration: %w", err)
 		}
-		return
+		return nil
 	}
 
 	// We have an existing registration, which may or may not have the node key set on it yet --
 	// unmarshal it so we can update it appropriately with the node key.
 	var existingRegistration types.Registration
 	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
-		slogger.Log(context.Background(), slog.LevelError,
-			"could not unmarshal existing registration",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("unmarshalling existing registration: %w", err)
 	}
 
 	// Registration already exists, and the node key is correct -- nothing to do here!
 	if nodeKey == existingRegistration.NodeKey {
-		return
+		return nil
 	}
 
 	// Make update
 	existingRegistration.NodeKey = nodeKey
 	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
 	if err != nil {
-		slogger.Log(context.Background(), slog.LevelError,
-			"could not marshal updated registration",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("marshalling updated registration: %w", err)
 	}
 	if err := registrationStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
-		slogger.Log(context.Background(), slog.LevelError,
-			"could not update registration in store",
-			"err", err,
-		)
-		return
+		return fmt.Errorf("updating registration in store: %w", err)
 	}
 
-	slogger.Log(context.TODO(), slog.LevelInfo,
+	k.Slogger().Log(context.TODO(), slog.LevelInfo,
 		"successfully updated registration's node key",
 		"munemo", existingRegistration.Munemo,
+		"registration_id", registrationId,
 	)
+	return nil
 }
 
 func (k *knapsack) NodeKey(registrationId string) (string, error) {

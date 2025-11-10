@@ -425,7 +425,12 @@ func TestEnsureRegistrationStored(t *testing.T) {
 
 			// Now we're ready to test -- call the function, then check to make sure the registration
 			// looks how we expect.
-			testKnapsack.EnsureRegistrationStored(tt.registrationId)
+			err = testKnapsack.EnsureRegistrationStored(tt.registrationId)
+			if tt.successExpected {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
 
 			rawUpdatedRegistration, err := registrationStore.Get([]byte(tt.registrationId))
 			require.NoError(t, err)
