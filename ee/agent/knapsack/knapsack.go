@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"log/slog"
-
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -171,6 +171,142 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	return nil
 }
 
+// EnsureRegistrationStored creates a registration under the given registration ID,
+// if it does not already exist. Since registrations are a newer concept, older launcher
+// installations may not have them saved yet.
+func (k *knapsack) EnsureRegistrationStored(registrationId string) {
+	slogger := k.Slogger().With("registration_id", registrationId)
+
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		slogger.Log(context.Background(), slog.LevelWarn,
+			"no config store, cannot ensure registration is stored",
+		)
+		return
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		slogger.Log(context.Background(), slog.LevelWarn,
+			"no registration store, cannot ensure registration is stored",
+		)
+		return
+	}
+
+	// Get the existing node key from the config store. If we can't get this, then
+	// there's nothing more we can do here -- we won't save a registration without
+	// a node key.
+	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
+	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForRegistration)
+	if err != nil {
+		slogger.Log(context.Background(), slog.LevelError,
+			"could not get node key",
+			"err", err,
+		)
+		return
+	}
+	nodeKey := string(keyRaw)
+	if nodeKey == "" {
+		slogger.Log(context.Background(), slog.LevelDebug,
+			"empty node key, no need to store registration",
+		)
+		return
+	}
+
+	// Check to see if we have an existing registration first
+	existingRegistrationRaw, err := registrationStore.Get([]byte(registrationId))
+	if err != nil {
+		slogger.Log(context.Background(), slog.LevelError,
+			"could not get existing registration",
+			"err", err,
+		)
+		return
+	}
+
+	// No registration exists yet -- add it if we can
+	if existingRegistrationRaw == nil {
+		if err := k.createRegistrationFromEnrollSecret(registrationId, nodeKey); err != nil {
+			slogger.Log(context.Background(), slog.LevelError,
+				"could not create registration from enroll secret",
+				"err", err,
+			)
+		}
+		return
+	}
+
+	// We have an existing registration, which may or may not have the node key set on it yet --
+	// unmarshal it so we can update it appropriately with the node key.
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		slogger.Log(context.Background(), slog.LevelError,
+			"could not unmarshal existing registration",
+			"err", err,
+		)
+		return
+	}
+
+	// Registration already exists, and the node key is correct -- nothing to do here!
+	if nodeKey == existingRegistration.NodeKey {
+		return
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		slogger.Log(context.Background(), slog.LevelError,
+			"could not marshal updated registration",
+			"err", err,
+		)
+		return
+	}
+	if err := registrationStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
+		slogger.Log(context.Background(), slog.LevelError,
+			"could not update registration in store",
+			"err", err,
+		)
+		return
+	}
+
+	slogger.Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+	)
+}
+
+// createRegistration fetches the information necessary to call SaveRegistration from
+// this launcher installation's enrollment secret.
+func (k *knapsack) createRegistrationFromEnrollSecret(registrationId string, nodeKey string) error {
+	// Grab the enroll secret, since we need that to create a new registration.
+	enrollSecret, err := k.ReadEnrollSecret()
+	if err != nil {
+		// The enroll secret doesn't exist -- likely, this is a bad manual installation.
+		return fmt.Errorf("unable to read enroll secret to ensure registration exists: %w", err)
+	}
+
+	// Extract the munemo from the enroll secret.
+	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("parsing enrollment secret: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("no claims in enrollment secret")
+	}
+	munemo, munemoFound := claims["organization"]
+	if !munemoFound {
+		return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+	}
+
+	// Finally, save the new registration
+	if err := k.SaveRegistration(registrationId, fmt.Sprintf("%s", munemo), nodeKey, enrollSecret); err != nil {
+		return fmt.Errorf("saving registration: %w", err)
+	}
+
+	return nil
+}
+
 func (k *knapsack) NodeKey(registrationId string) (string, error) {
 	// First, get the store we'll need. For now, we continue to pull the node key from
 	// the config store, but in the future, we will be able to pull it from the registrations
@@ -181,7 +317,7 @@ func (k *knapsack) NodeKey(registrationId string) (string, error) {
 	}
 
 	// Retrieve the key from the store
-	key, err := nodeKeyStore.Get(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId)))
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)))
 	if err != nil {
 		return "", fmt.Errorf("error getting node key: %w", err)
 	}
@@ -204,7 +340,7 @@ func (k *knapsack) DeleteRegistration(registrationId string) error {
 		return errors.New("no registration store")
 	}
 
-	if err := nodeKeyStore.Delete(storage.KeyByIdentifier([]byte(nodeKeyKey), storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
 		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
 	}
 	if err := registrationStore.Delete([]byte(registrationId)); err != nil {

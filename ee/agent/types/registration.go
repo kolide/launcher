@@ -11,6 +11,7 @@ type RegistrationTracker interface {
 	RegistrationIDs() []string
 	Registrations() ([]Registration, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
+	EnsureRegistrationStored(registrationId string)
 	NodeKey(registrationId string) (string, error)
 	DeleteRegistration(registrationId string) error
 }
