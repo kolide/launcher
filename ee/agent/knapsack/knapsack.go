@@ -129,6 +129,8 @@ func (k *knapsack) Registrations() ([]types.Registration, error) {
 // SaveRegistration creates a new registration using the given information and stores it
 // in our registration store; it also stores the node key separately in the config store.
 // It is permissible for the enrollment secret to be empty, in the case of a secretless enrollment.
+// It is permissible for the munemo to be empty, if the enrollment secret is not -- we can
+// extract the munemo from the enrollment secret.
 func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
@@ -138,6 +140,34 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	registrationStore := k.getKVStore(storage.RegistrationStore)
 	if registrationStore == nil {
 		return errors.New("no registration store")
+	}
+
+	// Ensure we have the minimum information required to save a registration
+	if munemo == "" && enrollmentSecret == "" {
+		return errors.New("munemo and enrollment secret cannot both be empty")
+	}
+	if nodeKey == "" {
+		return errors.New("node key cannot be empty")
+	}
+
+	// If we don't have a munemo, but do have an enrollment secret, attempt to extract the munemo
+	// from the enrollment secret.
+	if munemo == "" && enrollmentSecret != "" {
+		// Extract the munemo from the enroll secret.
+		// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+		token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+		if err != nil {
+			return fmt.Errorf("parsing enrollment secret: %w", err)
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return errors.New("no claims in enrollment secret")
+		}
+		munemoClaim, munemoFound := claims["organization"]
+		if !munemoFound {
+			return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+		}
+		munemo = fmt.Sprintf("%s", munemoClaim)
 	}
 
 	// Prepare the new registration for storage
@@ -225,7 +255,18 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) {
 
 	// No registration exists yet -- add it if we can
 	if existingRegistrationRaw == nil {
-		if err := k.createRegistrationFromEnrollSecret(registrationId, nodeKey); err != nil {
+		// Grab the enroll secret, since we need that to create a new registration.
+		enrollSecret, err := k.ReadEnrollSecret()
+		if err != nil {
+			// The enroll secret doesn't exist -- likely, this is a bad manual installation.
+			slogger.Log(context.Background(), slog.LevelError,
+				"no enrollment secret, cannot save registration",
+				"err", err,
+			)
+			return
+		}
+		// SaveRegistration will extract the munemo from the enrollment secret for us.
+		if err := k.SaveRegistration(registrationId, "", nodeKey, enrollSecret); err != nil {
 			slogger.Log(context.Background(), slog.LevelError,
 				"could not create registration from enroll secret",
 				"err", err,
@@ -272,39 +313,6 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) {
 		"successfully updated registration's node key",
 		"munemo", existingRegistration.Munemo,
 	)
-}
-
-// createRegistration fetches the information necessary to call SaveRegistration from
-// this launcher installation's enrollment secret.
-func (k *knapsack) createRegistrationFromEnrollSecret(registrationId string, nodeKey string) error {
-	// Grab the enroll secret, since we need that to create a new registration.
-	enrollSecret, err := k.ReadEnrollSecret()
-	if err != nil {
-		// The enroll secret doesn't exist -- likely, this is a bad manual installation.
-		return fmt.Errorf("unable to read enroll secret to ensure registration exists: %w", err)
-	}
-
-	// Extract the munemo from the enroll secret.
-	// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
-	token, _, err := new(jwt.Parser).ParseUnverified(enrollSecret, jwt.MapClaims{})
-	if err != nil {
-		return fmt.Errorf("parsing enrollment secret: %w", err)
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return errors.New("no claims in enrollment secret")
-	}
-	munemo, munemoFound := claims["organization"]
-	if !munemoFound {
-		return errors.New("no claim for organization in enrollment secret, cannot get munemo")
-	}
-
-	// Finally, save the new registration
-	if err := k.SaveRegistration(registrationId, fmt.Sprintf("%s", munemo), nodeKey, enrollSecret); err != nil {
-		return fmt.Errorf("saving registration: %w", err)
-	}
-
-	return nil
 }
 
 func (k *knapsack) NodeKey(registrationId string) (string, error) {
