@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"log/slog"
-
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -129,6 +129,8 @@ func (k *knapsack) Registrations() ([]types.Registration, error) {
 // SaveRegistration creates a new registration using the given information and stores it
 // in our registration store; it also stores the node key separately in the config store.
 // It is permissible for the enrollment secret to be empty, in the case of a secretless enrollment.
+// It is permissible for the munemo to be empty, if the enrollment secret is not -- we can
+// extract the munemo from the enrollment secret.
 func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
@@ -138,6 +140,34 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	registrationStore := k.getKVStore(storage.RegistrationStore)
 	if registrationStore == nil {
 		return errors.New("no registration store")
+	}
+
+	// Ensure we have the minimum information required to save a registration
+	if munemo == "" && enrollmentSecret == "" {
+		return errors.New("munemo and enrollment secret cannot both be empty")
+	}
+	if nodeKey == "" {
+		return errors.New("node key cannot be empty")
+	}
+
+	// If we don't have a munemo, but do have an enrollment secret, attempt to extract the munemo
+	// from the enrollment secret.
+	if munemo == "" && enrollmentSecret != "" {
+		// Extract the munemo from the enroll secret.
+		// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+		token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+		if err != nil {
+			return fmt.Errorf("parsing enrollment secret: %w", err)
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return errors.New("no claims in enrollment secret")
+		}
+		munemoClaim, munemoFound := claims["organization"]
+		if !munemoFound {
+			return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+		}
+		munemo = fmt.Sprintf("%s", munemoClaim)
 	}
 
 	// Prepare the new registration for storage
@@ -166,6 +196,132 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 		"node_key_key", string(nodeKeyKeyForRegistration),
 		"registration_id", registrationId,
 		"munemo", munemo,
+	)
+
+	return nil
+}
+
+// EnsureRegistrationStored creates a registration under the given registration ID,
+// if it does not already exist. Since registrations are a newer concept, older launcher
+// installations may not have them saved yet.
+func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store, cannot ensure registration is stored")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store, cannot ensure registration is stored")
+	}
+
+	// Get the existing node key from the config store. If we can't get this, then
+	// there's nothing more we can do here -- we won't save a registration without
+	// a node key.
+	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
+	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForRegistration)
+	if err != nil {
+		return fmt.Errorf("retrieving node key: %w", err)
+	}
+	nodeKey := string(keyRaw)
+	if nodeKey == "" {
+		return errors.New("no node key stored, cannot store registration")
+	}
+
+	// Check to see if we have an existing registration first
+	existingRegistrationRaw, err := registrationStore.Get([]byte(registrationId))
+	if err != nil {
+		return fmt.Errorf("getting existing registration: %w", err)
+	}
+
+	// No registration exists yet -- add it if we can
+	if existingRegistrationRaw == nil {
+		// Grab the enroll secret, since we need that to create a new registration.
+		enrollSecret, err := k.ReadEnrollSecret()
+		if err != nil {
+			// The enroll secret doesn't exist -- likely, this is a bad manual installation.
+			return fmt.Errorf("reading enrollment secret to create new registration: %w", err)
+		}
+		// SaveRegistration will extract the munemo from the enrollment secret for us.
+		if err := k.SaveRegistration(registrationId, "", nodeKey, enrollSecret); err != nil {
+			return fmt.Errorf("saving new registration: %w", err)
+		}
+		return nil
+	}
+
+	// We have an existing registration, which may or may not have the node key set on it yet --
+	// unmarshal it so we can update it appropriately with the node key.
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		return fmt.Errorf("unmarshalling existing registration: %w", err)
+	}
+
+	// Registration already exists, and the node key is correct -- nothing to do here!
+	if nodeKey == existingRegistration.NodeKey {
+		return nil
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		return fmt.Errorf("marshalling updated registration: %w", err)
+	}
+	if err := registrationStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
+		return fmt.Errorf("updating registration in store: %w", err)
+	}
+
+	k.Slogger().Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+		"registration_id", registrationId,
+	)
+	return nil
+}
+
+func (k *knapsack) NodeKey(registrationId string) (string, error) {
+	// First, get the store we'll need. For now, we continue to pull the node key from
+	// the config store, but in the future, we will be able to pull it from the registrations
+	// store instead.
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return "", errors.New("no config store")
+	}
+
+	// Retrieve the key from the store
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)))
+	if err != nil {
+		return "", fmt.Errorf("error getting node key: %w", err)
+	}
+
+	if key != nil {
+		return string(key), nil
+	}
+
+	return "", nil
+}
+
+func (k *knapsack) DeleteRegistration(registrationId string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store")
+	}
+
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
+		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
+	}
+	if err := registrationStore.Delete([]byte(registrationId)); err != nil {
+		return fmt.Errorf("deleting registration for %s: %w", registrationId, err)
+	}
+
+	k.Slogger().Log(context.Background(), slog.LevelInfo,
+		"deleted registration",
+		"registration_id", registrationId,
 	)
 
 	return nil
