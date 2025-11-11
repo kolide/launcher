@@ -11,6 +11,9 @@ type RegistrationTracker interface {
 	RegistrationIDs() []string
 	Registrations() ([]Registration, error)
 	SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error
+	EnsureRegistrationStored(registrationId string) error
+	NodeKey(registrationId string) (string, error)
+	DeleteRegistration(registrationId string) error
 }
 
 // Registration represents a launcher installation's association with a given tenant.
