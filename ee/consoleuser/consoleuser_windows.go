@@ -128,12 +128,23 @@ func ExplorerProcess(ctx context.Context, uid string) (*process.Process, error) 
 	ctx, span := observability.StartSpan(ctx, "uid", uid)
 	defer span.End()
 
-	explorerProcs, err := explorerProcesses(ctx)
+	procs, err := process.ProcessesWithContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting explorer processes: %w", err)
+		return nil, fmt.Errorf("getting processes: %w", err)
 	}
 
-	for _, proc := range explorerProcs {
+	for _, proc := range procs {
+		// First, check to see if this is an explorer process. This is a cheaper check
+		// than checking the process owner, so we do this check first.
+		exe, err := proc.ExeWithContext(ctx)
+		if err != nil {
+			continue
+		}
+		if filepath.Base(exe) != "explorer.exe" {
+			continue
+		}
+
+		// We know we have an explorer process -- now, check to see if it belongs to the given user.
 		procOwnerUid, err := processOwnerUid(ctx, proc)
 		if err != nil {
 			return nil, fmt.Errorf("getting explorer process owner uid (for pid %d): %w", proc.Pid, err)
@@ -191,33 +202,6 @@ func updateInvalidUsernameMaps(username string, windowSeconds int64) {
 		newStartIdx := len(potentialInvalidUsernamesMap[username]) - maxUsernameLookupFailureCount
 		potentialInvalidUsernamesMap[username] = potentialInvalidUsernamesMap[username][newStartIdx:]
 	}
-}
-
-// explorerProcesses returns a list of explorer processes whose
-// filepath base is "explorer.exe".
-func explorerProcesses(ctx context.Context) ([]*process.Process, error) {
-	ctx, span := observability.StartSpan(ctx)
-	defer span.End()
-
-	var explorerProcs []*process.Process
-
-	procs, err := process.ProcessesWithContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting processes: %w", err)
-	}
-
-	for _, proc := range procs {
-		exe, err := proc.ExeWithContext(ctx)
-		if err != nil {
-			continue
-		}
-
-		if filepath.Base(exe) == "explorer.exe" {
-			explorerProcs = append(explorerProcs, proc)
-		}
-	}
-
-	return explorerProcs, nil
 }
 
 func processOwnerUid(ctx context.Context, proc *process.Process) (string, error) {
