@@ -12,7 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/osquerylogpublisher"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
@@ -32,17 +32,17 @@ type Runner struct {
 	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
 	slogger          *slog.Logger
 	knapsack         types.Knapsack
-	serviceClient    service.KolideService         // shared service client for communication between osquery instance and Kolide SaaS
-	logPublishClient osquerylogpublisher.Publisher // client used for cutting over to new osquery log publication service (agent-ingester)
-	settingsWriter   settingsStoreWriter           // writes to startup settings store
-	opts             []OsqueryInstanceOption       // global options applying to all osquery instances
+	serviceClient    service.KolideService      // shared service client for communication between osquery instance and Kolide SaaS
+	logPublishClient osquerypublisher.Publisher // client used for cutting over to new osquery log publication service (agent-ingester)
+	settingsWriter   settingsStoreWriter        // writes to startup settings store
+	opts             []OsqueryInstanceOption    // global options applying to all osquery instances
 	shutdown         chan struct{}
 	interrupted      *atomic.Bool
 	needsRestart     *atomic.Bool
 	restartLock      sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
 
-func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient osquerylogpublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
 		registrationIds:  k.RegistrationIDs(),
 		instances:        make(map[string]*OsqueryInstance),

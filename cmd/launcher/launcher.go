@@ -46,7 +46,7 @@ import (
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/observability/exporter"
-	"github.com/kolide/launcher/ee/osquerylogpublisher"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tuf"
@@ -414,8 +414,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetOsqueryHistory(osqHistory)
 	}
 
-	logPublisherHTTPClient := osquerylogpublisher.NewPublisherHTTPClient()
-	logPublishClient := osquerylogpublisher.NewLogPublisherClient(slogger, k, logPublisherHTTPClient)
+	logPublisherHTTPClient := osquerypublisher.NewPublisherHTTPClient()
+	logPublishClient := osquerypublisher.NewLogPublisherClient(slogger, k, logPublisherHTTPClient)
 
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(

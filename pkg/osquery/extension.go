@@ -17,7 +17,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/osquerylogpublisher"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
@@ -44,7 +44,7 @@ type Extension struct {
 	registrationId                string
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
-	logPublishClient              osquerylogpublisher.Publisher
+	logPublishClient              osquerypublisher.Publisher
 	settingsWriter                settingsStoreWriter
 	enrollMutex                   *sync.Mutex
 	done                          chan struct{}
@@ -125,7 +125,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, logPublishClient osquerylogpublisher.Publisher, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 

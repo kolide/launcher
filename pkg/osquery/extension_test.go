@@ -27,7 +27,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/osquerylogpublisher"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
@@ -68,9 +68,9 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	return m
 }
 
-func makeTestOsqLogPublisher(k types.Knapsack) osquerylogpublisher.Publisher {
+func makeTestOsqLogPublisher(k types.Knapsack) osquerypublisher.Publisher {
 	slogger := multislogger.NewNopLogger()
-	return osquerylogpublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	return osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
 }
 
 func TestNewExtensionEmptyEnrollSecret(t *testing.T) {

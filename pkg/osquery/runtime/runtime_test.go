@@ -27,7 +27,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/ee/osquerylogpublisher"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
@@ -67,7 +67,7 @@ func requirePermissions(t *testing.T) {
 	}
 }
 
-func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerylogpublisher.Publisher {
+func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerypublisher.Publisher {
 	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors
@@ -75,7 +75,7 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerylogpu
 	mk.On("OsqueryLogPublishAPIKey").Return("").Maybe()
 	mk.On("OsqueryLogPublishURL").Return("").Maybe()
 	slogger := multislogger.NewNopLogger()
-	return osquerylogpublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
+	return osquerypublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
 }
 
 func TestBadBinaryPath(t *testing.T) {

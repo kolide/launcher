@@ -1,4 +1,4 @@
-package osquerylogpublisher
+package osquerypublisher
 
 import (
 	"context"
