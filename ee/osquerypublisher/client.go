@@ -22,12 +22,12 @@ type (
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
 		logger   *slog.Logger
-		knapsack types.Knapsack
+		knapsack types.Flags
 		client   PublisherHTTPClient
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
+func NewLogPublisherClient(logger *slog.Logger, k types.Flags, client PublisherHTTPClient) Publisher {
 	return &LogPublisherClient{
 		logger:   logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
