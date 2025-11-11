@@ -72,6 +72,8 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerylogpu
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors
 	mk.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	mk.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	mk.On("OsqueryLogPublishURL").Return("").Maybe()
 	slogger := multislogger.NewNopLogger()
 	return osquerylogpublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
 }

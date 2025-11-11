@@ -148,6 +148,11 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 }
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
+	// make sure we're fully configured to publish logs
+	if lpc.knapsack.OsqueryLogPublishAPIKey() == "" || lpc.knapsack.OsqueryLogPublishURL() == "" {
+		return false
+	}
+
 	dualPublicationPercentEnabled := lpc.knapsack.OsqueryLogPublishPercentEnabled()
 	if dualPublicationPercentEnabled == 0 {
 		return false

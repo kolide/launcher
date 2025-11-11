@@ -93,17 +93,37 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 	tests := []struct {
 		name              string
 		percentEnabled    int
+		url               string
+		apiKey            string
 		shouldPublishLogs bool
 	}{
 		{
 			name:              "default disabled",
 			percentEnabled:    0,
+			url:               "https://example.com",
+			apiKey:            "test-api-key",
 			shouldPublishLogs: false,
 		},
 		{
 			name:              "full cutover enabled",
 			percentEnabled:    100,
+			url:               "https://example.com",
+			apiKey:            "test-api-key",
 			shouldPublishLogs: true,
+		},
+		{
+			name:              "full cutover enabled without api key",
+			percentEnabled:    100,
+			url:               "https://example.com",
+			apiKey:            "",
+			shouldPublishLogs: false,
+		},
+		{
+			name:              "full cutover enabled without url",
+			percentEnabled:    100,
+			url:               "",
+			apiKey:            "test-api-key",
+			shouldPublishLogs: false,
 		},
 	}
 
@@ -114,7 +134,10 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			mockHTTPClient := &mockHTTPClient{}
 			slogger := multislogger.NewNopLogger()
 
-			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(tt.percentEnabled)
+			// these mocks are all set to maybe because the order of what is set will impact what is actually checked
+			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(tt.percentEnabled).Maybe()
+			mockKnapsack.On("OsqueryLogPublishAPIKey").Return(tt.apiKey).Maybe()
+			mockKnapsack.On("OsqueryLogPublishURL").Return(tt.url).Maybe()
 			client := &LogPublisherClient{
 				logger:   slogger.With("component", "osquery_log_publisher"),
 				knapsack: mockKnapsack,

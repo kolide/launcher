@@ -63,6 +63,8 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors
 	m.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	m.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	m.On("OsqueryLogPublishURL").Return("").Maybe()
 	return m
 }
 
@@ -740,6 +742,8 @@ func TestExtensionWriteBufferedLogs(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	k.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	k.On("OsqueryLogPublishURL").Return("").Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 
 	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
@@ -816,6 +820,8 @@ func TestExtensionWriteBufferedLogsEnrollmentInvalid(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	k.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	k.On("OsqueryLogPublishURL").Return("").Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{})
 	require.Nil(t, err)
@@ -868,6 +874,8 @@ func TestExtensionWriteBufferedLogsLimit(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	k.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	k.On("OsqueryLogPublishURL").Return("").Maybe()
 	lpc := makeTestOsqLogPublisher(k)
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 
@@ -947,6 +955,8 @@ func TestExtensionWriteBufferedLogsDropsBigLog(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	k.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	k.On("OsqueryLogPublishURL").Return("").Maybe()
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	lpc := makeTestOsqLogPublisher(k)
 	e, err := NewExtension(t.Context(), m, lpc, settingsstoremock.NewSettingsStoreWriter(t), k, ulid.New(), ExtensionOpts{
@@ -1039,6 +1049,8 @@ func TestExtensionWriteLogsLoop(t *testing.T) {
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
 	k.On("OsqueryLogPublishPercentEnabled").Return(0).Maybe()
+	k.On("OsqueryLogPublishAPIKey").Return("").Maybe()
+	k.On("OsqueryLogPublishURL").Return("").Maybe()
 	k.On("ReadEnrollSecret").Maybe().Return("enroll_secret", nil)
 	lpc := makeTestOsqLogPublisher(k)
 
