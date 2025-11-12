@@ -225,7 +225,7 @@ func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
 	}
 	nodeKey := string(keyRaw)
 	if nodeKey == "" {
-		return errors.New("no node key stored, cannot store registration")
+		return errors.New("no node key stored, cannot store registration (probably a new install)")
 	}
 
 	// Check to see if we have an existing registration first
