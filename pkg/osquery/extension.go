@@ -42,7 +42,7 @@ type Extension struct {
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
 	settingsWriter                settingsStoreWriter
-	enrollMutex                   *sync.Mutex
+	enrollMutex                   *sync.Mutex // ensures that for non-secretless installations, we never have simultaneous RequestEnrollment requests
 	done                          chan struct{}
 	interrupted                   atomic.Bool
 	slogger                       *slog.Logger
