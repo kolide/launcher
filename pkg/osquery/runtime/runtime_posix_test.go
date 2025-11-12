@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -60,6 +61,8 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -130,6 +133,8 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
