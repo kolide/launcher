@@ -1223,12 +1223,12 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
-// OsqueryLogPublishAPIKey provides a mock function with no fields
-func (_m *Knapsack) OsqueryLogPublishAPIKey() string {
+// OsqueryPublisherAPIKey provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherAPIKey() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogPublishAPIKey")
+		panic("no return value specified for OsqueryPublisherAPIKey")
 	}
 
 	var r0 string
@@ -1241,12 +1241,12 @@ func (_m *Knapsack) OsqueryLogPublishAPIKey() string {
 	return r0
 }
 
-// OsqueryLogPublishPercentEnabled provides a mock function with no fields
-func (_m *Knapsack) OsqueryLogPublishPercentEnabled() int {
+// OsqueryPublisherPercentEnabled provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherPercentEnabled() int {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogPublishPercentEnabled")
+		panic("no return value specified for OsqueryPublisherPercentEnabled")
 	}
 
 	var r0 int
@@ -1259,12 +1259,12 @@ func (_m *Knapsack) OsqueryLogPublishPercentEnabled() int {
 	return r0
 }
 
-// OsqueryLogPublishURL provides a mock function with no fields
-func (_m *Knapsack) OsqueryLogPublishURL() string {
+// OsqueryPublisherURL provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherURL() string {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for OsqueryLogPublishURL")
+		panic("no return value specified for OsqueryPublisherURL")
 	}
 
 	var r0 string
@@ -2313,12 +2313,12 @@ func (_m *Knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	_m.Called(osqHistory)
 }
 
-// SetOsqueryLogPublishAPIKey provides a mock function with given fields: key
-func (_m *Knapsack) SetOsqueryLogPublishAPIKey(key string) error {
+// SetOsqueryPublisherAPIKey provides a mock function with given fields: key
+func (_m *Knapsack) SetOsqueryPublisherAPIKey(key string) error {
 	ret := _m.Called(key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogPublishAPIKey")
+		panic("no return value specified for SetOsqueryPublisherAPIKey")
 	}
 
 	var r0 error
@@ -2331,12 +2331,12 @@ func (_m *Knapsack) SetOsqueryLogPublishAPIKey(key string) error {
 	return r0
 }
 
-// SetOsqueryLogPublishPercentEnabled provides a mock function with given fields: percent
-func (_m *Knapsack) SetOsqueryLogPublishPercentEnabled(percent int) error {
+// SetOsqueryPublisherPercentEnabled provides a mock function with given fields: percent
+func (_m *Knapsack) SetOsqueryPublisherPercentEnabled(percent int) error {
 	ret := _m.Called(percent)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogPublishPercentEnabled")
+		panic("no return value specified for SetOsqueryPublisherPercentEnabled")
 	}
 
 	var r0 error
@@ -2349,12 +2349,12 @@ func (_m *Knapsack) SetOsqueryLogPublishPercentEnabled(percent int) error {
 	return r0
 }
 
-// SetOsqueryLogPublishURL provides a mock function with given fields: url
-func (_m *Knapsack) SetOsqueryLogPublishURL(url string) error {
+// SetOsqueryPublisherURL provides a mock function with given fields: url
+func (_m *Knapsack) SetOsqueryPublisherURL(url string) error {
 	ret := _m.Called(url)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryLogPublishURL")
+		panic("no return value specified for SetOsqueryPublisherURL")
 	}
 
 	var r0 error

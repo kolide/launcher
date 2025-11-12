@@ -70,9 +70,9 @@ const (
 	PerformanceMonitoringEnabled     FlagKey = "performance_monitoring_enabled"
 	DuplicateLogWindow               FlagKey = "duplicate_log_window"
 	// Osquery log publication cutover flags
-	OsqueryLogPublishURL            FlagKey = "osquery_log_publish_url"
-	OsqueryLogPublishAPIKey         FlagKey = "osquery_log_publish_api_key"
-	OsqueryLogPublishPercentEnabled FlagKey = "osquery_log_publish_percent_enabled"
+	OsqueryPublisherURL            FlagKey = "osquery_publisher_url"
+	OsqueryPublisherAPIKey         FlagKey = "osquery_publisher_api_key"
+	OsqueryPublisherPercentEnabled FlagKey = "osquery_publisher_percent_enabled"
 )
 
 func (key FlagKey) String() string {

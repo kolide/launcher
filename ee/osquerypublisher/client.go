@@ -89,7 +89,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, fmt.Errorf("marshaling request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/logs", lpc.knapsack.OsqueryLogPublishURL())
+	url := fmt.Sprintf("%s/logs", lpc.knapsack.OsqueryPublisherURL())
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -101,7 +101,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 	// set required headers and issue the request
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryLogPublishAPIKey()))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryPublisherAPIKey()))
 	resp, err = lpc.client.Do(req)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -149,11 +149,11 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	// make sure we're fully configured to publish logs
-	if lpc.knapsack.OsqueryLogPublishAPIKey() == "" || lpc.knapsack.OsqueryLogPublishURL() == "" {
+	if lpc.knapsack.OsqueryPublisherAPIKey() == "" || lpc.knapsack.OsqueryPublisherURL() == "" {
 		return false
 	}
 
-	dualPublicationPercentEnabled := lpc.knapsack.OsqueryLogPublishPercentEnabled()
+	dualPublicationPercentEnabled := lpc.knapsack.OsqueryPublisherPercentEnabled()
 	if dualPublicationPercentEnabled == 0 {
 		return false
 	}

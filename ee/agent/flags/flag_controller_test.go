@@ -147,9 +147,9 @@ func TestControllerStringFlags(t *testing.T) {
 				assert.Equal(t, expectedValue, value)
 				value = fc.UpdateDirectory()
 				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryLogPublishURL()
+				value = fc.OsqueryPublisherURL()
 				assert.Equal(t, expectedValue, value)
-				value = fc.OsqueryLogPublishAPIKey()
+				value = fc.OsqueryPublisherAPIKey()
 				assert.Equal(t, expectedValue, value)
 			}
 
@@ -165,9 +165,9 @@ func TestControllerStringFlags(t *testing.T) {
 			require.NoError(t, err)
 			err = fc.SetUpdateDirectory(tt.valueToSet)
 			require.NoError(t, err)
-			err = fc.SetOsqueryLogPublishURL(tt.valueToSet)
+			err = fc.SetOsqueryPublisherURL(tt.valueToSet)
 			require.NoError(t, err)
-			err = fc.SetOsqueryLogPublishAPIKey(tt.valueToSet)
+			err = fc.SetOsqueryPublisherAPIKey(tt.valueToSet)
 			require.NoError(t, err)
 
 			assertValues(tt.valueToSet)

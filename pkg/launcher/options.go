@@ -134,9 +134,9 @@ type Options struct {
 	Identifier string
 
 	// Osquery log ingest configuration for dual publication cutover
-	OsqueryLogPublishURL            string
-	OsqueryLogPublishAPIKey         string
-	OsqueryLogPublishPercentEnabled int
+	OsqueryPublisherURL            string
+	OsqueryPublisherAPIKey         string
+	OsqueryPublisherPercentEnabled int
 }
 
 // ConfigFilePath returns the path to launcher's launcher.flags file. If the path
@@ -231,9 +231,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flTraceIngestServerURL            = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 		// Osquery log ingest configuration for dual publication cutover
-		flOsqueryLogPublishURL            = flagset.String("osquery_log_publish_url", "", "URL base for publishing osquery logs and status")
-		flOsqueryLogPublishAPIKey         = flagset.String("osquery_log_publish_api_key", "", "TEMPORARY- API key for osquery log ingest")
-		flOsqueryLogPublishPercentEnabled = flagset.Int("osquery_log_publish_percent_enabled", 0, "Percent of logs to publish to new ingest server. Default 0 is disabled.")
+		flOsqueryPublisherURL            = flagset.String("osquery_publisher_url", "", "URL base for publishing osquery logs and status")
+		flOsqueryPublisherAPIKey         = flagset.String("osquery_publisher_api_key", "", "TEMPORARY- API key for osquery log ingest")
+		flOsqueryPublisherPercentEnabled = flagset.Int("osquery_publisher_percent_enabled", 0, "Percent of logs to publish to new ingest server. Default 0 is disabled.")
 
 		// Autoupdate options
 		flAutoupdate              = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
@@ -428,9 +428,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		WatchdogDelaySec:                *flWatchdogDelaySec,
 		WatchdogMemoryLimitMB:           *flWatchdogMemoryLimitMB,
 		WatchdogUtilizationLimitPercent: *flWatchdogUtilizationLimitPercent,
-		OsqueryLogPublishURL:            *flOsqueryLogPublishURL,
-		OsqueryLogPublishAPIKey:         *flOsqueryLogPublishAPIKey,
-		OsqueryLogPublishPercentEnabled: *flOsqueryLogPublishPercentEnabled,
+		OsqueryPublisherURL:             *flOsqueryPublisherURL,
+		OsqueryPublisherAPIKey:          *flOsqueryPublisherAPIKey,
+		OsqueryPublisherPercentEnabled:  *flOsqueryPublisherPercentEnabled,
 	}
 
 	return opts, nil

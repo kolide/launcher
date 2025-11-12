@@ -57,9 +57,9 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			mockHTTPClient := &mockHTTPClient{}
 			slogger := multislogger.NewNopLogger()
 
-			mockKnapsack.On("OsqueryLogPublishURL").Return("https://example.com")
-			mockKnapsack.On("OsqueryLogPublishAPIKey").Return("test-api-key")
-			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(100)
+			mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com")
+			mockKnapsack.On("OsqueryPublisherAPIKey").Return("test-api-key")
+			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
 
 			resp := &http.Response{
 				StatusCode: tt.responseStatus,
@@ -135,9 +135,9 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			slogger := multislogger.NewNopLogger()
 
 			// these mocks are all set to maybe because the order of what is set will impact what is actually checked
-			mockKnapsack.On("OsqueryLogPublishPercentEnabled").Return(tt.percentEnabled).Maybe()
-			mockKnapsack.On("OsqueryLogPublishAPIKey").Return(tt.apiKey).Maybe()
-			mockKnapsack.On("OsqueryLogPublishURL").Return(tt.url).Maybe()
+			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(tt.percentEnabled).Maybe()
+			mockKnapsack.On("OsqueryPublisherAPIKey").Return(tt.apiKey).Maybe()
+			mockKnapsack.On("OsqueryPublisherURL").Return(tt.url).Maybe()
 			client := &LogPublisherClient{
 				logger:   slogger.With("component", "osquery_log_publisher"),
 				knapsack: mockKnapsack,

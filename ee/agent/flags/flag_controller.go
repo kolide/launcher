@@ -852,34 +852,34 @@ func (fc *FlagController) DuplicateLogWindow() time.Duration {
 }
 
 // OsqueryLogPublish helpers
-func (fc *FlagController) OsqueryLogPublishURL() string {
+func (fc *FlagController) OsqueryPublisherURL() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.OsqueryLogPublishURL),
-	).get(fc.getControlServerValue(keys.OsqueryLogPublishURL))
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherURL),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherURL))
 }
 
-func (fc *FlagController) SetOsqueryLogPublishURL(url string) error {
-	return fc.setControlServerValue(keys.OsqueryLogPublishURL, []byte(url))
+func (fc *FlagController) SetOsqueryPublisherURL(url string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherURL, []byte(url))
 }
 
-func (fc *FlagController) OsqueryLogPublishAPIKey() string {
+func (fc *FlagController) OsqueryPublisherAPIKey() string {
 	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.OsqueryLogPublishAPIKey),
-	).get(fc.getControlServerValue(keys.OsqueryLogPublishAPIKey))
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherAPIKey),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherAPIKey))
 }
 
-func (fc *FlagController) SetOsqueryLogPublishAPIKey(key string) error {
-	return fc.setControlServerValue(keys.OsqueryLogPublishAPIKey, []byte(key))
+func (fc *FlagController) SetOsqueryPublisherAPIKey(key string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherAPIKey, []byte(key))
 }
 
-func (fc *FlagController) OsqueryLogPublishPercentEnabled() int {
-	return NewIntFlagValue(fc.slogger, keys.OsqueryLogPublishPercentEnabled,
-		WithIntValueDefault(fc.cmdLineOpts.OsqueryLogPublishPercentEnabled),
+func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
+	return NewIntFlagValue(fc.slogger, keys.OsqueryPublisherPercentEnabled,
+		WithIntValueDefault(fc.cmdLineOpts.OsqueryPublisherPercentEnabled),
 		WithIntValueMin(0), // 0 is also default, and disables the cutover to our new ingest endpoint
 		WithIntValueMax(100),
-	).get(fc.getControlServerValue(keys.OsqueryLogPublishPercentEnabled))
+	).get(fc.getControlServerValue(keys.OsqueryPublisherPercentEnabled))
 }
 
-func (fc *FlagController) SetOsqueryLogPublishPercentEnabled(percent int) error {
-	return fc.setControlServerValue(keys.OsqueryLogPublishPercentEnabled, intToBytes(percent))
+func (fc *FlagController) SetOsqueryPublisherPercentEnabled(percent int) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherPercentEnabled, intToBytes(percent))
 }
