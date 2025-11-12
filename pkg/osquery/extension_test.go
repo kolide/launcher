@@ -423,7 +423,7 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	k.On("LatestOsquerydPath", testifymock.Anything).Maybe().Return("")
 	k.On("ConfigStore").Return(storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String()))
 	k.On("Slogger").Return(multislogger.NewNopLogger())
-	k.On("ReadEnrollSecret").Return("", errors.New("test")).Times(2) // checked once in RequireReenroll, and once in Enroll
+	k.On("ReadEnrollSecret").Return("", errors.New("test")).Once() // checked once in Enroll
 	k.On("DistributedForwardingInterval").Maybe().Return(60 * time.Second)
 	k.On("RegisterChangeObserver", testifymock.Anything, testifymock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", testifymock.Anything).Maybe().Return()
@@ -458,9 +458,6 @@ func TestGenerateConfigs_CannotEnrollYet(t *testing.T) {
 	// We need NodeKey to return empty twice more to trigger reenrollment:
 	// once on the initial call to RequestConfigs, and once at the top of Enroll.
 	k.On("NodeKey", testifymock.Anything).Return("", nil).Times(2)
-
-	// We expect that we'll attempt to delete any existing enrollment before attempting reenroll.
-	k.On("DeleteRegistration", testifymock.Anything).Return(nil)
 
 	// Post-enrollment, we should now have the new node key available.
 	k.On("NodeKey", testifymock.Anything).Return(expectedNodeKey, nil)
@@ -524,8 +521,10 @@ func TestGenerateConfigs_WorksAfterSecretlessEnrollment(t *testing.T) {
 	assert.Equal(t, map[string]string{"config": "{}"}, configs)
 	assert.Nil(t, err)
 
-	// Should have tried to request config
-	assert.True(t, s.RequestConfigFuncInvoked)
+	// We should not have tried to request enrollment, since this is a secretless installation;
+	// we should not have tried to call RequestConfig, since we don't have a node key yet.
+	assert.False(t, s.RequestEnrollmentFuncInvoked)
+	assert.False(t, s.RequestConfigFuncInvoked)
 
 	// Now, set the node key, to simulate secretless enrollment completing in a different thread.
 	k.On("NodeKey", testifymock.Anything).Return(nodeKeyFromSecretlessEnrollment, nil)
@@ -1506,8 +1505,10 @@ func TestGetQueries_WorksWithSecretlessEnrollment(t *testing.T) {
 	_, err = e.GetQueries(t.Context())
 	require.Error(t, err, "should not have been able to get queries while unenrolled")
 
-	// Should have tried to request queries
-	assert.True(t, s.RequestQueriesFuncInvoked)
+	// Should not have tried to enroll, since we don't have a secret;
+	// should not have tried to call RequestQueries, since we don't have a node key.
+	assert.False(t, s.RequestEnrollmentFuncInvoked)
+	assert.False(t, s.RequestQueriesFuncInvoked)
 
 	// Now, fire off a bunch of sequential GetQueries requests, so that we'll (probably) have one
 	// processing while we simulate secretless enrollment completing

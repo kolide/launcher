@@ -299,6 +299,11 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// Only one thread should ever be allowed to attempt enrollment at the
+	// same time.
+	e.enrollMutex.Lock()
+	defer e.enrollMutex.Unlock()
+
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"checking enrollment",
 	)
@@ -318,11 +323,6 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 		}
 		return currentNodeKey, false, nil
 	}
-
-	// Only one thread should ever be allowed to attempt enrollment at the
-	// same time.
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
 
 	e.slogger.Log(ctx, slog.LevelInfo,
 		"no node key found, starting enrollment",
@@ -419,9 +419,6 @@ func (e *Extension) enrolled() bool {
 
 // nodeKey returns the current node key for this registration.
 func (e *Extension) nodeKey() string {
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
-
 	nodeKey, _ := e.knapsack.NodeKey(e.registrationId)
 	return nodeKey
 }
@@ -440,8 +437,6 @@ func (e *Extension) RequireReenroll(ctx context.Context) {
 		)
 		return
 	}
-	e.enrollMutex.Lock()
-	defer e.enrollMutex.Unlock()
 	// Clear the node key such that reenrollment is required.
 	if err := e.knapsack.DeleteRegistration(e.registrationId); err != nil {
 		e.slogger.Log(ctx, slog.LevelError,
@@ -504,6 +499,16 @@ var reenrollmentInvalidErr = errors.New("enrollment invalid, reenrollment invali
 func (e *Extension) generateConfigsWithReenroll(ctx context.Context, reenroll bool) (string, error) {
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
 	nodeKey := e.nodeKey()
+
+	// If we aren't yet enrolled, attempt an enrollment immediately.
+	if nodeKey == "" {
+		newNodeKey, invalid, err := e.Enroll(ctx)
+		// If we can't get a node key, there is no point in attempting a call to RequestConfig.
+		if newNodeKey == "" || invalid || err != nil {
+			return "", fmt.Errorf("enrolling: key empty: %v; node invalid: %v; err: %w", newNodeKey == "", invalid, err)
+		}
+		nodeKey = newNodeKey
+	}
 
 	config, invalid, err := e.serviceClient.RequestConfig(ctx, nodeKey)
 	switch {
@@ -776,6 +781,16 @@ func (e *Extension) writeLogsWithReenroll(ctx context.Context, typ logger.LogTyp
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
 	nodeKey := e.nodeKey()
 
+	// If we aren't yet enrolled, attempt an enrollment immediately.
+	if nodeKey == "" {
+		newNodeKey, invalid, err := e.Enroll(ctx)
+		// If we can't get a node key, there is no point in attempting a call to PublishLogs.
+		if newNodeKey == "" || invalid || err != nil {
+			return fmt.Errorf("enrolling: key empty: %v; node invalid: %v; err: %w", newNodeKey == "", invalid, err)
+		}
+		nodeKey = newNodeKey
+	}
+
 	_, _, invalid, err := e.serviceClient.PublishLogs(ctx, nodeKey, typ, logs)
 
 	if errors.Is(err, service.ErrDeviceDisabled{}) {
@@ -923,6 +938,16 @@ func (e *Extension) getQueriesWithReenroll(ctx context.Context, reenroll bool) (
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
 	nodeKey := e.nodeKey()
 
+	// If we aren't yet enrolled, attempt an enrollment immediately.
+	if nodeKey == "" {
+		newNodeKey, invalid, err := e.Enroll(ctx)
+		// If we can't get a node key, there is no point in attempting a call to RequestQueries.
+		if newNodeKey == "" || invalid || err != nil {
+			return nil, fmt.Errorf("enrolling: key empty: %v; node invalid: %v; err: %w", newNodeKey == "", invalid, err)
+		}
+		nodeKey = newNodeKey
+	}
+
 	// Note that we set invalid two ways -- in the return, and via isNodeinvaliderr
 	queries, invalid, err := e.serviceClient.RequestQueries(ctx, nodeKey)
 
@@ -987,6 +1012,16 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 
 	// grab a reference to the existing nodekey to prevent data races with any re-enrollments
 	nodeKey := e.nodeKey()
+
+	// If we aren't yet enrolled, attempt an enrollment immediately.
+	if nodeKey == "" {
+		newNodeKey, invalid, err := e.Enroll(ctx)
+		// If we can't get a node key, there is no point in attempting a call to PublishResults.
+		if newNodeKey == "" || invalid || err != nil {
+			return fmt.Errorf("enrolling: key empty: %v; node invalid: %v; err: %w", newNodeKey == "", invalid, err)
+		}
+		nodeKey = newNodeKey
+	}
 
 	_, _, invalid, err := e.serviceClient.PublishResults(ctx, nodeKey, results)
 	switch {
