@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,32 +27,34 @@ type settingsStoreWriter interface {
 }
 
 type Runner struct {
-	registrationIds []string                    // we expect to run one instance per registration ID
-	instances       map[string]*OsqueryInstance // maps registration ID to currently-running instance
-	instanceLock    sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
-	slogger         *slog.Logger
-	knapsack        types.Knapsack
-	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
-	settingsWriter  settingsStoreWriter     // writes to startup settings store
-	opts            []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown        chan struct{}
-	interrupted     *atomic.Bool
-	needsRestart    *atomic.Bool
-	restartLock     sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
+	registrationIds  []string                    // we expect to run one instance per registration ID
+	instances        map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
+	slogger          *slog.Logger
+	knapsack         types.Knapsack
+	serviceClient    service.KolideService      // shared service client for communication between osquery instance and Kolide SaaS
+	logPublishClient osquerypublisher.Publisher // client used for cutting over to new osquery log publication service (agent-ingester)
+	settingsWriter   settingsStoreWriter        // writes to startup settings store
+	opts             []OsqueryInstanceOption    // global options applying to all osquery instances
+	shutdown         chan struct{}
+	interrupted      *atomic.Bool
+	needsRestart     *atomic.Bool
+	restartLock      sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
 
-func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds: k.RegistrationIDs(),
-		instances:       make(map[string]*OsqueryInstance),
-		slogger:         k.Slogger().With("component", "osquery_runner"),
-		knapsack:        k,
-		serviceClient:   serviceClient,
-		settingsWriter:  settingsWriter,
-		shutdown:        make(chan struct{}),
-		opts:            opts,
-		interrupted:     &atomic.Bool{},
-		needsRestart:    &atomic.Bool{},
+		registrationIds:  k.RegistrationIDs(),
+		instances:        make(map[string]*OsqueryInstance),
+		slogger:          k.Slogger().With("component", "osquery_runner"),
+		knapsack:         k,
+		serviceClient:    serviceClient,
+		logPublishClient: logPublishClient,
+		settingsWriter:   settingsWriter,
+		shutdown:         make(chan struct{}),
+		opts:             opts,
+		interrupted:      &atomic.Bool{},
+		needsRestart:     &atomic.Bool{},
 	}
 
 	k.RegisterChangeObserver(runner,
@@ -169,7 +172,7 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
-		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.settingsWriter, r.opts...)
+		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.logPublishClient, r.settingsWriter, r.opts...)
 		r.instances[registrationId] = instance
 		r.instanceLock.Unlock()
 		err := instance.Launch()

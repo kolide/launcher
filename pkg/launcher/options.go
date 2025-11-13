@@ -132,6 +132,11 @@ type Options struct {
 
 	// Identifier is the key used to identify/namespace a single launcher installation (e.g. kolide-k2)
 	Identifier string
+
+	// Osquery log ingest configuration for dual publication cutover
+	OsqueryPublisherURL            string
+	OsqueryPublisherAPIKey         string
+	OsqueryPublisherPercentEnabled int
 }
 
 // ConfigFilePath returns the path to launcher's launcher.flags file. If the path
@@ -225,6 +230,10 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flLogIngestServerURL              = flagset.String("log_ingest_url", "", "Where to export logs")
 		flTraceIngestServerURL            = flagset.String("trace_ingest_url", "", "Where to export traces")
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
+		// Osquery log ingest configuration for dual publication cutover
+		flOsqueryPublisherURL            = flagset.String("osquery_publisher_url", "", "URL base for publishing osquery logs and status")
+		flOsqueryPublisherAPIKey         = flagset.String("osquery_publisher_api_key", "", "TEMPORARY- API key for osquery log ingest")
+		flOsqueryPublisherPercentEnabled = flagset.Int("osquery_publisher_percent_enabled", 0, "Percent of logs to publish to new ingest server. Default 0 is disabled.")
 
 		// Autoupdate options
 		flAutoupdate              = flagset.Bool("autoupdate", DefaultAutoupdate, "Whether or not the osquery autoupdater is enabled (default: false)")
@@ -419,6 +428,9 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		WatchdogDelaySec:                *flWatchdogDelaySec,
 		WatchdogMemoryLimitMB:           *flWatchdogMemoryLimitMB,
 		WatchdogUtilizationLimitPercent: *flWatchdogUtilizationLimitPercent,
+		OsqueryPublisherURL:             *flOsqueryPublisherURL,
+		OsqueryPublisherAPIKey:          *flOsqueryPublisherAPIKey,
+		OsqueryPublisherPercentEnabled:  *flOsqueryPublisherPercentEnabled,
 	}
 
 	return opts, nil

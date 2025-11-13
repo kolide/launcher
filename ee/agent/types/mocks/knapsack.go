@@ -1223,6 +1223,60 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
+// OsqueryPublisherAPIKey provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherAPIKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherAPIKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// OsqueryPublisherPercentEnabled provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherPercentEnabled() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherPercentEnabled")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// OsqueryPublisherURL provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherURL() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherURL")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // OsqueryVerbose provides a mock function with no fields
 func (_m *Knapsack) OsqueryVerbose() bool {
 	ret := _m.Called()
@@ -2257,6 +2311,60 @@ func (_m *Knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
 // SetOsqueryHistory provides a mock function with given fields: osqHistory
 func (_m *Knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	_m.Called(osqHistory)
+}
+
+// SetOsqueryPublisherAPIKey provides a mock function with given fields: key
+func (_m *Knapsack) SetOsqueryPublisherAPIKey(key string) error {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherAPIKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(key)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryPublisherPercentEnabled provides a mock function with given fields: percent
+func (_m *Knapsack) SetOsqueryPublisherPercentEnabled(percent int) error {
+	ret := _m.Called(percent)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherPercentEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(percent)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryPublisherURL provides a mock function with given fields: url
+func (_m *Knapsack) SetOsqueryPublisherURL(url string) error {
+	ret := _m.Called(url)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherURL")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetOsqueryVerbose provides a mock function with given fields: verbose

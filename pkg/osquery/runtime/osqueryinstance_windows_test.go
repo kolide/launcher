@@ -27,8 +27,9 @@ func TestCreateOsqueryCommandEnvVars(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return("")
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{
 		pidfilePath:           "/foo/bar/osquery-abcd.pid",
 		databasePath:          "/foo/bar/osquery.db",
