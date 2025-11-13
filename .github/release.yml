@@ -6,6 +6,9 @@ changelog:
     - title: Table Changes
       labels:
         - "component:table"
+    - title: Performance Improvements
+      labels:
+        - "performance"
     - title: Build and Package
       labels:
         - "component:build&packaging"
