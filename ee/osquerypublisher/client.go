@@ -35,7 +35,7 @@ func NewLogPublisherClient(logger *slog.Logger, k types.Flags, client PublisherH
 	}
 }
 
-// helper method to allow us to make any http client tweaks as we learn realistic
+// NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
 // parameters for interacting with the agent-ingester service
 func NewPublisherHTTPClient() PublisherHTTPClient {
 	return &http.Client{
