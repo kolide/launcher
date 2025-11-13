@@ -6,18 +6,21 @@ changelog:
     - title: Table Changes
       labels:
         - "component:table"
-    - title: Build and Package
-      labels:
-        - "component:build&packaging"
     - title: Features and Improvements
       labels:
         - "features-improvements"
     - title: Bug Fixes
       labels:
         - "bug-fixes"
+    - title: Performance Improvements
+      labels:
+        - "performance"
     - title: Observability
       labels:
         - "observability"
+    - title: Build and Package
+      labels:
+        - "component:build&packaging"
     - title: Tests, Docs, and Other No-op Changes
       labels:
         - "tests-docs"
