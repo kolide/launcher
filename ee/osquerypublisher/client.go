@@ -134,10 +134,6 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Log(ctx, slog.LevelError, "received non-200 response from agent-ingester",
-			"status_code", resp.StatusCode,
-		)
-
 		// in the future we can pivot on StatusCode to determine if this is something that will need the
 		// equivalent of reauth (e.g. a new mTLS cert)
 		// reauth := resp.StatusCode == http.StatusUnauthorized
