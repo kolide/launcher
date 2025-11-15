@@ -178,6 +178,7 @@ type Flags interface {
 
 	// AutoupdateInterval is the interval at which Launcher will check for updates.
 	SetAutoupdateInterval(interval time.Duration) error
+	SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration)
 	AutoupdateInterval() time.Duration
 
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
@@ -186,6 +187,7 @@ type Flags interface {
 
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	SetAutoupdateInitialDelay(delay time.Duration) error
+	SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration)
 	AutoupdateInitialDelay() time.Duration
 
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher

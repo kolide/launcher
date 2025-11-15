@@ -93,6 +93,7 @@ type TufAutoupdater struct {
 	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
 	initialDelayEnd      time.Time
 	updateLock           *sync.Mutex
+	checkTicker          *time.Ticker
 	interrupt            chan struct{}
 	interrupted          atomic.Bool
 	signalRestart        chan error
@@ -159,7 +160,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	}
 
 	// Subscribe to changes in update-related flags
-	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay)
+	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay)
 
 	return ta, nil
 }
@@ -241,8 +242,8 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.tidyLibrary()
 
-	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
-	defer checkTicker.Stop()
+	ta.checkTicker = time.NewTicker(ta.knapsack.AutoupdateInterval())
+	defer ta.checkTicker.Stop()
 
 	for {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -272,7 +273,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 				"received interrupt to restart launcher after update, stopping",
 			)
 			return signalRestartErr
-		case <-checkTicker.C:
+		case <-ta.checkTicker.C:
 			continue
 		}
 	}
@@ -425,6 +426,38 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
 		"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
 	)
+
+	// Check for AutoupdateInterval changes
+	if slices.Contains(flagKeys, keys.AutoupdateInterval) {
+		newInterval := ta.knapsack.AutoupdateInterval()
+		if ta.checkTicker != nil {
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate interval changed, resetting ticker",
+				"new_interval", newInterval,
+			)
+			ta.checkTicker.Reset(newInterval)
+
+			// Perform immediate check when interval changes
+			if err := ta.checkForUpdate(ctx, binaries, true); err != nil {
+				ta.slogger.Log(ctx, slog.LevelWarn,
+					"error during immediate check after interval change",
+					"err", err,
+				)
+			}
+		}
+	}
+
+	// Check for AutoupdateInitialDelay changes
+	if slices.Contains(flagKeys, keys.AutoupdateInitialDelay) {
+		if time.Now().Before(ta.initialDelayEnd) {
+			newDelay := ta.knapsack.AutoupdateInitialDelay()
+			ta.initialDelayEnd = time.Now().Add(newDelay)
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate initial delay changed while in delay period",
+				"new_delay_end", ta.initialDelayEnd,
+			)
+		}
+	}
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)

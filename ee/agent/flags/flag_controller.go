@@ -546,8 +546,18 @@ func (fc *FlagController) MirrorServerURL() string {
 func (fc *FlagController) SetAutoupdateInterval(interval time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInterval, durationToBytes(interval))
 }
+func (fc *FlagController) SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration) {
+	ctx, span := observability.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.AutoupdateInterval, duration, value)
+}
 func (fc *FlagController) AutoupdateInterval() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInterval,
+		WithOverride(fc.overrides[keys.AutoupdateInterval]),
 		WithDefault(fc.cmdLineOpts.AutoupdateInterval),
 		WithMin(1*time.Minute),
 		WithMax(24*time.Hour),
@@ -567,8 +577,18 @@ func (fc *FlagController) UpdateChannel() string {
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
+func (fc *FlagController) SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration) {
+	ctx, span := observability.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.AutoupdateInitialDelay, duration, value)
+}
 func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInitialDelay,
+		WithOverride(fc.overrides[keys.AutoupdateInitialDelay]),
 		WithDefault(fc.cmdLineOpts.AutoupdateInitialDelay),
 		WithMin(5*time.Second),
 		WithMax(12*time.Hour),
