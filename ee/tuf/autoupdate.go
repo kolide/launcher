@@ -218,20 +218,27 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
-	// Delay startup, if initial delay is set
-	select {
-	case <-ta.interrupt:
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"received external interrupt during initial delay, stopping",
-		)
-		return nil
-	case signalRestartErr := <-ta.signalRestart:
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"received interrupt to restart launcher after update during initial delay, stopping",
-		)
-		return signalRestartErr
-	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
-		break
+	// Delay startup, if initial delay is set. We use a ticker-based approach
+	// so that we can respect changes to ta.initialDelayEnd from FlagsChanged.
+	initialDelayTicker := time.NewTicker(100 * time.Millisecond)
+	defer initialDelayTicker.Stop()
+
+	for time.Now().Before(ta.initialDelayEnd) {
+		select {
+		case <-ta.interrupt:
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received external interrupt during initial delay, stopping",
+			)
+			return nil
+		case signalRestartErr := <-ta.signalRestart:
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received interrupt to restart launcher after update during initial delay, stopping",
+			)
+			return signalRestartErr
+		case <-initialDelayTicker.C:
+			// Check if we've passed the initial delay period in the next loop iteration
+			continue
+		}
 	}
 
 	ta.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -371,6 +378,32 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		ta.calculatedSplayDelay.Store(0)
 	}
 
+	// Check for AutoupdateInitialDelay changes
+	if slices.Contains(flagKeys, keys.AutoupdateInitialDelay) {
+		if time.Now().Before(ta.initialDelayEnd) {
+			newDelay := ta.knapsack.AutoupdateInitialDelay()
+			ta.initialDelayEnd = time.Now().Add(newDelay)
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate initial delay changed while in delay period",
+				"new_delay_end", ta.initialDelayEnd,
+			)
+		}
+	}
+
+	// Check for AutoupdateInterval changes
+	autoupdateIntervalChanged := false
+	if slices.Contains(flagKeys, keys.AutoupdateInterval) {
+		newInterval := ta.knapsack.AutoupdateInterval()
+		if ta.checkTicker != nil {
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate interval changed, resetting ticker",
+				"new_interval", newInterval,
+			)
+			ta.checkTicker.Reset(newInterval)
+			autoupdateIntervalChanged = true
+		}
+	}
+
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
 
 	// Check to see if update channel has changed
@@ -401,12 +434,22 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		}
 	}
 
-	// No updates, or we're in the initial delay
-	if len(binariesToCheckForUpdate) == 0 || time.Now().Before(ta.initialDelayEnd) {
+	// No updates, or interval did not change
+	if len(binariesToCheckForUpdate) == 0 && !autoupdateIntervalChanged {
 		return
 	}
 
-	// At least one binary requires a recheck -- perform that now
+	// We're in the initial delay -- don't perform an update yet
+	if time.Now().Before(ta.initialDelayEnd) {
+		return
+	}
+
+	// If only the interval changed and no binaries need updating, check all binaries
+	if len(binariesToCheckForUpdate) == 0 && autoupdateIntervalChanged {
+		binariesToCheckForUpdate = binaries
+	}
+
+	// At least one binary requires a recheck or the interval changed -- perform that now
 	// do not allow AutoupdateDownloadSplay delay when responding to flag changes
 	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
@@ -426,38 +469,6 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		"pinned_launcher_version", ta.knapsack.PinnedLauncherVersion(),
 		"pinned_osqueryd_version", ta.knapsack.PinnedOsquerydVersion(),
 	)
-
-	// Check for AutoupdateInterval changes
-	if slices.Contains(flagKeys, keys.AutoupdateInterval) {
-		newInterval := ta.knapsack.AutoupdateInterval()
-		if ta.checkTicker != nil {
-			ta.slogger.Log(ctx, slog.LevelInfo,
-				"autoupdate interval changed, resetting ticker",
-				"new_interval", newInterval,
-			)
-			ta.checkTicker.Reset(newInterval)
-
-			// Perform immediate check when interval changes
-			if err := ta.checkForUpdate(ctx, binaries, true); err != nil {
-				ta.slogger.Log(ctx, slog.LevelWarn,
-					"error during immediate check after interval change",
-					"err", err,
-				)
-			}
-		}
-	}
-
-	// Check for AutoupdateInitialDelay changes
-	if slices.Contains(flagKeys, keys.AutoupdateInitialDelay) {
-		if time.Now().Before(ta.initialDelayEnd) {
-			newDelay := ta.knapsack.AutoupdateInitialDelay()
-			ta.initialDelayEnd = time.Now().Add(newDelay)
-			ta.slogger.Log(ctx, slog.LevelInfo,
-				"autoupdate initial delay changed while in delay period",
-				"new_delay_end", ta.initialDelayEnd,
-			)
-		}
-	}
 }
 
 // tidyLibrary gets the current running version for each binary (so that the current version is not removed)
