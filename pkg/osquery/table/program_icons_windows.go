@@ -14,6 +14,7 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/tables/tablehelpers"
 	"github.com/kolide/launcher/ee/tables/tablewrapper"
 	"github.com/mat/besticon/ico"
 	"github.com/nfnt/resize"
@@ -52,9 +53,10 @@ func generateProgramIcons(ctx context.Context, queryContext table.QueryContext) 
 	defer span.End()
 
 	var results []map[string]string
+	programNames := programNameLookup(queryContext)
 
-	results = append(results, generateUninstallerProgramIcons(ctx, true)...)
-	results = append(results, generateInstallersProgramIcons(ctx, true)...)
+	results = append(results, generateUninstallerProgramIcons(ctx, programNames, true)...)
+	results = append(results, generateInstallersProgramIcons(ctx, programNames, true)...)
 
 	return results, nil
 }
@@ -64,14 +66,26 @@ func generateProgramIconChecksums(ctx context.Context, queryContext table.QueryC
 	defer span.End()
 
 	var results []map[string]string
+	programNames := programNameLookup(queryContext)
 
-	results = append(results, generateUninstallerProgramIcons(ctx, false)...)
-	results = append(results, generateInstallersProgramIcons(ctx, false)...)
+	results = append(results, generateUninstallerProgramIcons(ctx, programNames, false)...)
+	results = append(results, generateInstallersProgramIcons(ctx, programNames, false)...)
 
 	return results, nil
 }
 
-func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
+// programNameLookup retrieves the query constraints for the "name" column,
+// and transforms them into a map for easy lookup.
+func programNameLookup(queryContext table.QueryContext) map[string]struct{} {
+	programNames := tablehelpers.GetConstraints(queryContext, "name")
+	programNamesMap := make(map[string]struct{})
+	for _, programName := range programNames {
+		programNamesMap[programName] = struct{}{}
+	}
+	return programNamesMap
+}
+
+func generateUninstallerProgramIcons(ctx context.Context, programNames map[string]struct{}, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -88,6 +102,13 @@ func generateUninstallerProgramIcons(ctx context.Context, includeIcon bool) []ma
 			iconPath, name, version, err := getRegistryKeyDisplayData(ctx, key, path)
 			if err != nil {
 				continue
+			}
+
+			// If we're filtering on program names, check for that
+			if len(programNames) > 0 {
+				if _, found := programNames[name]; !found {
+					continue
+				}
 			}
 
 			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
@@ -139,7 +160,7 @@ func getRegistryKeyDisplayData(ctx context.Context, key registry.Key, path strin
 	return iconPath, name, version, nil
 }
 
-func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map[string]string {
+func generateInstallersProgramIcons(ctx context.Context, programNames map[string]struct{}, includeIcon bool) []map[string]string {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -155,6 +176,13 @@ func generateInstallersProgramIcons(ctx context.Context, includeIcon bool) []map
 			iconPath, name, err := getRegistryKeyProductData(ctx, key, path)
 			if err != nil {
 				continue
+			}
+
+			// If we're filtering on program names, check for that
+			if len(programNames) > 0 {
+				if _, found := programNames[name]; !found {
+					continue
+				}
 			}
 
 			icon, err := parseIcoFile(ctx, iconPath, includeIcon)
