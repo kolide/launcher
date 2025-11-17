@@ -1208,8 +1208,9 @@ func TestFlagsChanged_AutoupdateInitialDelayChanged(t *testing.T) {
 	require.NoError(t, err, "could not initialize new TUF autoupdater")
 
 	// Verify we're in the initial delay period
-	require.True(t, time.Now().Before(autoupdater.initialDelayEnd))
-	originalDelayEnd := autoupdater.initialDelayEnd
+	initialDelayEnd := autoupdater.initialDelayEnd.Load().(time.Time)
+	require.True(t, time.Now().Before(initialDelayEnd))
+	originalDelayEnd := initialDelayEnd
 
 	// Change the initial delay to a longer period
 	newDelay := 10 * time.Second
@@ -1219,8 +1220,9 @@ func TestFlagsChanged_AutoupdateInitialDelayChanged(t *testing.T) {
 	autoupdater.FlagsChanged(t.Context(), keys.AutoupdateInitialDelay)
 
 	// Verify the delay end was updated
-	require.True(t, autoupdater.initialDelayEnd.After(originalDelayEnd), "initial delay end should have been extended")
-	require.True(t, time.Now().Before(autoupdater.initialDelayEnd), "should still be in initial delay period")
+	newDelayEnd := autoupdater.initialDelayEnd.Load().(time.Time)
+	require.True(t, newDelayEnd.After(originalDelayEnd), "initial delay end should have been extended")
+	require.True(t, time.Now().Before(newDelayEnd), "should still be in initial delay period")
 
 	// Confirm we pulled all config items as expected
 	mockKnapsack.AssertExpectations(t)
@@ -1259,7 +1261,7 @@ func TestFlagsChanged_AutoupdateIntervalChangedDuringInitialDelay(t *testing.T) 
 	defer autoupdater.checkTicker.Stop()
 
 	// Verify we're in the initial delay period
-	require.True(t, time.Now().Before(autoupdater.initialDelayEnd))
+	require.True(t, time.Now().Before(autoupdater.initialDelayEnd.Load().(time.Time)))
 
 	// Set up mock library manager - we should NOT expect any update calls
 	// because we're still in the initial delay period

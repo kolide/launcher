@@ -91,7 +91,7 @@ type TufAutoupdater struct {
 	updateChannel        string
 	pinnedVersions       map[autoupdatableBinary]string        // maps the binaries to their pinned versions
 	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
-	initialDelayEnd      time.Time
+	initialDelayEnd      atomic.Value                          // stores time.Time for thread-safe access
 	updateLock           *sync.Mutex
 	checkTicker          *time.Ticker
 	interrupt            chan struct{}
@@ -131,13 +131,15 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
-		initialDelayEnd:      time.Now().Add(k.AutoupdateInitialDelay()),
 		updateLock:           &sync.Mutex{},
 		osqueryTimeout:       30 * time.Second,
 		slogger:              k.Slogger().With("component", "tuf_autoupdater"),
 		restartFuncs:         make(map[autoupdatableBinary]func(context.Context) error),
 		calculatedSplayDelay: &atomic.Int64{},
 	}
+
+	// Set initial delay end time atomically
+	ta.initialDelayEnd.Store(time.Now().Add(k.AutoupdateInitialDelay()))
 
 	for _, opt := range opts {
 		opt(ta)
@@ -223,7 +225,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	initialDelayTicker := time.NewTicker(100 * time.Millisecond)
 	defer initialDelayTicker.Stop()
 
-	for time.Now().Before(ta.initialDelayEnd) {
+	for time.Now().Before(ta.initialDelayEnd.Load().(time.Time)) {
 		select {
 		case <-ta.interrupt:
 			ta.slogger.Log(context.TODO(), slog.LevelDebug,
@@ -311,10 +313,11 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		return nil
 	}
 
-	if time.Now().Before(ta.initialDelayEnd) && !updateRequest.BypassInitialDelay {
+	initialDelayEnd := ta.initialDelayEnd.Load().(time.Time)
+	if time.Now().Before(initialDelayEnd) && !updateRequest.BypassInitialDelay {
 		ta.slogger.Log(ctx, slog.LevelWarn,
 			"received update request during initial delay, discarding",
-			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
+			"initial_delay_end", initialDelayEnd.UTC().Format(time.RFC3339),
 		)
 		// We don't return an error because there's no need for the actionqueue to retry this request --
 		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
@@ -380,12 +383,14 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 
 	// Check for AutoupdateInitialDelay changes
 	if slices.Contains(flagKeys, keys.AutoupdateInitialDelay) {
-		if time.Now().Before(ta.initialDelayEnd) {
+		currentDelayEnd := ta.initialDelayEnd.Load().(time.Time)
+		if time.Now().Before(currentDelayEnd) {
 			newDelay := ta.knapsack.AutoupdateInitialDelay()
-			ta.initialDelayEnd = time.Now().Add(newDelay)
+			newDelayEnd := time.Now().Add(newDelay)
+			ta.initialDelayEnd.Store(newDelayEnd)
 			ta.slogger.Log(ctx, slog.LevelInfo,
 				"autoupdate initial delay changed while in delay period",
-				"new_delay_end", ta.initialDelayEnd,
+				"new_delay_end", newDelayEnd,
 			)
 		}
 	}
@@ -440,7 +445,7 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 	}
 
 	// We're in the initial delay -- don't perform an update yet
-	if time.Now().Before(ta.initialDelayEnd) {
+	if time.Now().Before(ta.initialDelayEnd.Load().(time.Time)) {
 		return
 	}
 
