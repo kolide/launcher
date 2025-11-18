@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
@@ -41,6 +42,7 @@ type Extension struct {
 	registrationId                string
 	knapsack                      types.Knapsack
 	serviceClient                 service.KolideService
+	logPublishClient              osquerypublisher.Publisher
 	settingsWriter                settingsStoreWriter
 	enrollMutex                   *sync.Mutex // ensures that for non-secretless installations, we never have simultaneous RequestEnrollment requests
 	done                          chan struct{}
@@ -119,7 +121,7 @@ func (e iterationTerminatedError) Error() string {
 // NewExtension creates a new Extension from the provided service.KolideService
 // implementation. The background routines should be started by calling
 // Start().
-func NewExtension(ctx context.Context, client service.KolideService, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
+func NewExtension(ctx context.Context, client service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, k types.Knapsack, registrationId string, opts ExtensionOpts) (*Extension, error) {
 	_, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -149,6 +151,7 @@ func NewExtension(ctx context.Context, client service.KolideService, settingsWri
 	e := &Extension{
 		slogger:                       slogger,
 		serviceClient:                 client,
+		logPublishClient:              logPublishClient,
 		settingsWriter:                settingsWriter,
 		registrationId:                registrationId,
 		knapsack:                      k,
@@ -764,6 +767,14 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 	err = e.writeLogsWithReenroll(publicationCtx, typ, logs, true)
 	if err != nil {
 		return fmt.Errorf("writing logs: %w", err)
+	}
+
+	// for now, also attempt to publish logs to agent-ingester if configured to do so.
+	// we log but do not return errors here while testing cutover
+	if _, err := e.logPublishClient.PublishLogs(publicationCtx, typ, logs); err != nil {
+		e.slogger.Log(publicationCtx, slog.LevelError, "encountered error publishing logs",
+			"err", err,
+		)
 	}
 
 	// Delete logs that were successfully sent
