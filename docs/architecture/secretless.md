@@ -2,7 +2,7 @@
 
 ## Background
 
-Historically, we have packaged launcher with an "enrollment secret", a JWT that uniquely identifies a tenant. After installation, launcher's osquery extension will make a `RequestEnrollment` request to the device server, including its enrollment secret and its `EnrollmentDetails`. Since these packages are not available publicly, we assume that any device with a valid enrollment secret is allowed to enroll, associated with the tenant given in the JWT; the device server will create a new device record, and return a "node key" that launcher's osquery extension will store and use to authenticate all future device server requests.
+Historically, we have packaged launcher with an "enrollment secret", a JWT that uniquely identifies a tenant. After installation, launcher's osquery extension will make a `RequestEnrollment` request to the device server, including its enrollment secret and its `EnrollmentDetails`. Since these packages are not available publicly, we assume that any device with a valid enrollment secret is allowed to enroll, associated with the tenant given in the JWT; the device server will create a new device record, and return a "node key" that launcher's osquery extension will store and use to authenticate all future device server requests. (The node key is always formatted as `"#{munemo}::#{jwt}"` -- launcher does not currently examine the node key or attempt to extract the munemo from it, but potentially it could.)
 
 Now, we want to stop building per-tenant packages, which means that these new "secretless" packages cannot contain an enrollment secret. Thus, we need a new mechanism to permit "secretless enrollment".
 
