@@ -1228,6 +1228,76 @@ func TestFlagsChanged_AutoupdateInitialDelayChanged(t *testing.T) {
 	mockKnapsack.AssertExpectations(t)
 }
 
+func TestFlagsChanged_AutoupdateInitialDelayCalculatedFromStart(t *testing.T) {
+	t.Parallel()
+
+	testRootDir := t.TempDir()
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(testRootDir)
+	mockKnapsack.On("TufServerURL").Return("https://example.com")
+	mockKnapsack.On("UpdateDirectory").Return("")
+	mockKnapsack.On("MirrorServerURL").Return("https://example.com")
+	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
+	mockKnapsack.On("UpdateChannel").Return("nightly")
+	mockKnapsack.On("PinnedLauncherVersion").Return("")
+	mockKnapsack.On("PinnedOsquerydVersion").Return("")
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay).Return()
+
+	// Start with a 1-hour initial delay
+	initialDelay := 1 * time.Hour
+	mockKnapsack.On("AutoupdateInitialDelay").Return(initialDelay).Once()
+
+	// Record the approximate start time
+	testStartTime := time.Now()
+
+	// Set up autoupdater
+	autoupdater, err := NewTufAutoupdater(t.Context(), mockKnapsack, http.DefaultClient, http.DefaultClient)
+	require.NoError(t, err, "could not initialize new TUF autoupdater")
+
+	// Verify we're in the initial delay period
+	initialDelayEnd := autoupdater.initialDelayEnd.Load().(time.Time)
+	require.True(t, time.Now().Before(initialDelayEnd))
+
+	// Expected delay end should be approximately testStartTime + 1 hour
+	expectedDelayEnd := testStartTime.Add(initialDelay)
+	require.WithinDuration(t, expectedDelayEnd, initialDelayEnd, 100*time.Millisecond,
+		"initial delay end should be calculated from start time")
+
+	// Wait 500ms to simulate time passing (simulating being at 12:30pm in the example)
+	time.Sleep(500 * time.Millisecond)
+
+	// Change the initial delay to 35 minutes
+	newDelay := 35 * time.Minute
+	mockKnapsack.On("AutoupdateInitialDelay").Return(newDelay)
+
+	// Notify that flags changed
+	autoupdater.FlagsChanged(t.Context(), keys.AutoupdateInitialDelay)
+
+	// Verify the delay end was recalculated from the START time, not from "now"
+	newDelayEnd := autoupdater.initialDelayEnd.Load().(time.Time)
+
+	// The new delay end should be approximately testStartTime + 35 minutes
+	// NOT time.Now() + 35 minutes (which would add another 35 minutes on top of elapsed time)
+	expectedNewDelayEnd := testStartTime.Add(newDelay)
+	require.WithinDuration(t, expectedNewDelayEnd, newDelayEnd, 100*time.Millisecond,
+		"new delay end should be calculated from original start time, not from 'now'")
+
+	// Verify the new delay end is BEFORE the old delay end (since we shortened it)
+	require.True(t, newDelayEnd.Before(initialDelayEnd),
+		"new delay end (%s) should be before old delay end (%s) when shortening delay",
+		newDelayEnd.Format(time.RFC3339), initialDelayEnd.Format(time.RFC3339))
+
+	// Verify that the new delay end is in the past relative to when it would have been
+	// if calculated from "now" instead of from start
+	wouldBeWrongDelayEnd := time.Now().Add(newDelay)
+	require.True(t, newDelayEnd.Before(wouldBeWrongDelayEnd),
+		"new delay end (%s) should be before what it would be if calculated from 'now' (%s)",
+		newDelayEnd.Format(time.RFC3339), wouldBeWrongDelayEnd.Format(time.RFC3339))
+
+	// Confirm we pulled all config items as expected
+	mockKnapsack.AssertExpectations(t)
+}
+
 func TestFlagsChanged_AutoupdateIntervalChangedDuringInitialDelay(t *testing.T) {
 	t.Parallel()
 

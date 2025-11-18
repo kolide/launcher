@@ -91,6 +91,7 @@ type TufAutoupdater struct {
 	updateChannel        string
 	pinnedVersions       map[autoupdatableBinary]string        // maps the binaries to their pinned versions
 	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
+	initialDelayStart    time.Time                             // when the autoupdater was created
 	initialDelayEnd      atomic.Value                          // stores time.Time for thread-safe access
 	updateLock           *sync.Mutex
 	checkTicker          *time.Ticker
@@ -118,11 +119,13 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	startTime := time.Now()
 	ta := &TufAutoupdater{
-		knapsack:      k,
-		interrupt:     make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
-		signalRestart: make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
-		updateChannel: k.UpdateChannel(),
+		knapsack:          k,
+		interrupt:         make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
+		signalRestart:     make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
+		updateChannel:     k.UpdateChannel(),
+		initialDelayStart: startTime,
 		pinnedVersions: map[autoupdatableBinary]string{
 			binaryLauncher: k.PinnedLauncherVersion(), // empty string if not pinned
 			binaryOsqueryd: k.PinnedOsquerydVersion(), // ditto
@@ -138,8 +141,8 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 		calculatedSplayDelay: &atomic.Int64{},
 	}
 
-	// Set initial delay end time atomically
-	ta.initialDelayEnd.Store(time.Now().Add(k.AutoupdateInitialDelay()))
+	// Set initial delay end time atomically (calculated from start time)
+	ta.initialDelayEnd.Store(startTime.Add(k.AutoupdateInitialDelay()))
 
 	for _, opt := range opts {
 		opt(ta)
@@ -386,10 +389,12 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		currentDelayEnd := ta.initialDelayEnd.Load().(time.Time)
 		if time.Now().Before(currentDelayEnd) {
 			newDelay := ta.knapsack.AutoupdateInitialDelay()
-			newDelayEnd := time.Now().Add(newDelay)
+			// Calculate the new delay end time from the original start time
+			newDelayEnd := ta.initialDelayStart.Add(newDelay)
 			ta.initialDelayEnd.Store(newDelayEnd)
 			ta.slogger.Log(ctx, slog.LevelInfo,
 				"autoupdate initial delay changed while in delay period",
+				"old_delay_end", currentDelayEnd,
 				"new_delay_end", newDelayEnd,
 			)
 		}
