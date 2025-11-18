@@ -82,8 +82,9 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s, WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, mockServiceClient(t), lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -155,8 +156,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	s.On("WriteSettings").Return(nil)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s, WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, mockServiceClient(t), lpc, s, WithExtensionSocketPath(extensionSocketPath))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 

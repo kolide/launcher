@@ -281,4 +281,12 @@ type Flags interface {
 	// DuplicateLogWindow is the time window for deduplicating duplicate log records
 	SetDuplicateLogWindow(duration time.Duration) error
 	DuplicateLogWindow() time.Duration
+
+	// Osquery log ingest cutover helpers
+	OsqueryPublisherURL() string
+	SetOsqueryPublisherURL(url string) error
+	OsqueryPublisherAPIKey() string
+	SetOsqueryPublisherAPIKey(key string) error
+	OsqueryPublisherPercentEnabled() int
+	SetOsqueryPublisherPercentEnabled(percent int) error
 }

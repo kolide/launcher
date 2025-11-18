@@ -72,8 +72,9 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
 	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -96,8 +97,9 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -130,8 +132,9 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -180,8 +183,9 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
 	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
@@ -220,8 +224,9 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
 }
@@ -232,8 +237,9 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	_, err := i.Query("select * from osquery_info;")
 	require.Error(t, err, "should not be able to query unlaunched instance")
@@ -245,7 +251,8 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	lpc := makeTestOsqLogPublisher(t, k)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
 	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
@@ -295,9 +302,10 @@ func TestHealthy(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Run the instance
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for `Healthy` to pass
@@ -394,8 +402,9 @@ func TestLaunch(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil).Maybe()
 	osqHistory := setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	require.False(t, i.instanceStarted())
 	go i.Launch()
 
@@ -495,9 +504,10 @@ func TestReloadKatcExtension(t *testing.T) {
 	s.On("WriteSettings").Return(nil)
 	osqHistory := setupHistory(t, k)
 	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create an instance and launch it
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for the instance to become healthy

@@ -850,3 +850,36 @@ func (fc *FlagController) DuplicateLogWindow() time.Duration {
 		WithMax(24*time.Hour),      // Maximum of 24 hours seems reasonable
 	).get(fc.getControlServerValue(keys.DuplicateLogWindow))
 }
+
+// OsqueryLogPublish helpers
+func (fc *FlagController) OsqueryPublisherURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherURL),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherURL))
+}
+
+func (fc *FlagController) SetOsqueryPublisherURL(url string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherURL, []byte(url))
+}
+
+func (fc *FlagController) OsqueryPublisherAPIKey() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherAPIKey),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherAPIKey))
+}
+
+func (fc *FlagController) SetOsqueryPublisherAPIKey(key string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherAPIKey, []byte(key))
+}
+
+func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
+	return NewIntFlagValue(fc.slogger, keys.OsqueryPublisherPercentEnabled,
+		WithIntValueDefault(fc.cmdLineOpts.OsqueryPublisherPercentEnabled),
+		WithIntValueMin(0), // 0 is also default, and disables the cutover to our new ingest endpoint
+		WithIntValueMax(100),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherPercentEnabled))
+}
+
+func (fc *FlagController) SetOsqueryPublisherPercentEnabled(percent int) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherPercentEnabled, intToBytes(percent))
+}
