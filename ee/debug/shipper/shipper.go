@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -263,12 +264,13 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	}
 
 	b, err := json.Marshal(map[string]string{
-		"enroll_secret": enrollSecret(k),
-		"munemo":        munemo(k),
-		"console_users": consoleUsers,
-		"running_user":  runningUsername,
-		"hostname":      hostname,
-		"note":          note,
+		"enroll_secret":    enrollSecret(k),
+		"munemo":           munemo(k),
+		"console_users":    consoleUsers,
+		"running_user":     runningUsername,
+		"hostname":         hostname,
+		"note":             note,
+		"launcher_version": version.Version().Version,
 	})
 
 	if err != nil {
