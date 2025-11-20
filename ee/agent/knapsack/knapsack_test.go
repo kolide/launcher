@@ -657,6 +657,77 @@ func TestSetGetEnrollmentDetails(t *testing.T) {
 	require.Equal(t, "darwin", persistedDetails.OSPlatform)
 }
 
+func TestCurrentEnrollmentStatus(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName   string
+		isSecretless   bool
+		hasNodeKey     bool
+		expectedStatus types.EnrollmentStatus
+	}{
+		{
+			testCaseName:   "secretless, unenrolled",
+			isSecretless:   true,
+			hasNodeKey:     false,
+			expectedStatus: types.NoEnrollmentKey,
+		},
+		{
+			testCaseName:   "secretless, enrolled",
+			isSecretless:   true,
+			hasNodeKey:     true,
+			expectedStatus: types.Enrolled,
+		},
+		{
+			testCaseName:   "not secretless, unenrolled",
+			isSecretless:   false,
+			hasNodeKey:     false,
+			expectedStatus: types.Unenrolled,
+		},
+		{
+			testCaseName:   "not secretless, enrolled",
+			isSecretless:   false,
+			hasNodeKey:     true,
+			expectedStatus: types.Enrolled,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up our stores
+			configStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+			require.NoError(t, err)
+			registrationStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.RegistrationStore.String())
+			require.NoError(t, err)
+
+			// Set up our knapsack
+			mockFlags := typesmocks.NewFlags(t)
+			testKnapsack := New(map[storage.Store]types.KVStore{
+				storage.ConfigStore:       configStore,
+				storage.RegistrationStore: registrationStore,
+			}, mockFlags, nil, multislogger.New(), multislogger.New())
+
+			testMunemo := ulid.New()
+			testEnrollSecret := ""
+
+			if !tt.isSecretless {
+				testEnrollSecret = createTestEnrollSecret(t, testMunemo)
+			}
+			mockFlags.On("EnrollSecret").Return(testEnrollSecret, nil).Maybe()
+			mockFlags.On("EnrollSecretPath").Return("").Maybe()
+
+			if tt.hasNodeKey {
+				require.NoError(t, testKnapsack.SaveRegistration(types.DefaultRegistrationID, testMunemo, ulid.New(), testEnrollSecret))
+			}
+
+			gotStatus, err := testKnapsack.CurrentEnrollmentStatus()
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedStatus, gotStatus)
+		})
+	}
+}
+
 // createTestEnrollSecret creates a JWT that can be parsed by the knapsack
 // to extract its munemo.
 func createTestEnrollSecret(t *testing.T, munemo string) string {
