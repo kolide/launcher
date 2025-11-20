@@ -51,6 +51,7 @@ jobs:
       - id: govulncheck
         uses: golang/govulncheck-action@v1
         with:
+          go-version-input: 1.24.10 # govulncheck does not actually respect the version in go-version-file below
           go-version-file: './go.mod'
           check-latest: true
           go-package: ./...
