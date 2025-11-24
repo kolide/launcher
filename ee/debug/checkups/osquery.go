@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/kolide/launcher/ee/agent/types"
-	"github.com/kolide/launcher/pkg/launcher"
 )
 
 type osqueryCheckup struct {
@@ -36,11 +34,6 @@ func (o *osqueryCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 		o.summary = osqueryVersion
 	}
 
-	// Run launcher interactive to capture timing details
-	if err := o.interactive(ctx); err != nil {
-		return fmt.Errorf("running launcher interactive: %w", err)
-	}
-
 	o.instanceStatuses = o.k.InstanceStatuses()
 
 	return nil
@@ -62,34 +55,6 @@ func (o *osqueryCheckup) version(ctx context.Context) (string, error) {
 	}
 
 	return strings.TrimSpace(string(out)), nil
-}
-
-func (o *osqueryCheckup) interactive(ctx context.Context) error {
-	launcherPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("getting current running executable: %w", err)
-	}
-
-	flagFilePath := launcher.DefaultPath(launcher.ConfigFile)
-	if o.k != nil && o.k.Identifier() != "" {
-		flagFilePath = strings.ReplaceAll(flagFilePath, launcher.DefaultLauncherIdentifier, o.k.Identifier())
-	}
-
-	cmdCtx, cmdCancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cmdCancel()
-
-	cmd := exec.CommandContext(cmdCtx, launcherPath, "interactive", "--config", flagFilePath, "--osqueryd_path", o.k.LatestOsquerydPath(ctx)) //nolint:forbidigo // It is safe to exec the current running executable
-	hideWindow(cmd)
-	cmd.Stdin = strings.NewReader(`select * from osquery_info;`)
-
-	startTime := time.Now().UnixMilli()
-	out, err := cmd.CombinedOutput()
-	o.executionTimes[cmd.String()] = fmt.Sprintf("%d ms", time.Now().UnixMilli()-startTime)
-	if err != nil {
-		return fmt.Errorf("running %s interactive: err %w, output %s; ctx err: %+v", launcherPath, err, string(out), cmdCtx.Err())
-	}
-
-	return nil
 }
 
 func (o *osqueryCheckup) ExtraFileName() string {
