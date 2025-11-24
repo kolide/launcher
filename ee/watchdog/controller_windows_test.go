@@ -13,7 +13,9 @@ import (
 
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,9 +59,11 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("Slogger").Return(testSlogger)
 	mockKnapsack.On("Identifier").Return("kolide-k2").Maybe()
 	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
-	mockKnapsack.On("LauncherWatchdogDisabled").Return(true).Maybe()
+	mockKnapsack.On("LauncherWatchdogDisabled").Return(false).Maybe()
 
 	controller, _ := NewController(t.Context(), mockKnapsack, "")
+
+	require.True(t, controller.shouldManageWatchdog(), "could not manage watchdog, running in admin mode?")
 
 	// Let the handler run for a bit
 	go controller.Run()
@@ -159,6 +163,8 @@ func TestFlagsChanged(t *testing.T) {
 				taskManager: &mockTaskManager{slogger: testSlogger},
 			}
 
+			require.True(t, controller.shouldManageWatchdog(), "could not manage watchdog, running in admin mode?")
+
 			controller.taskManager.setCurrentInstallState(tt.initialInstallState)
 			controller.FlagsChanged(t.Context(), keys.LauncherWatchdogDisabled)
 			require.Equal(t, tt.finalInstallState, controller.taskManager.currentInstallState())
@@ -175,4 +181,87 @@ func TestFlagsChanged(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPublishLogs(t *testing.T) {
+	t.Parallel()
+	testSlogger := multislogger.NewNopLogger()
+	tempRootDir := t.TempDir()
+
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("KolideServerURL").Return("k2device.kolide.com")
+	mockKnapsack.On("LauncherWatchdogDisabled").Return(false)
+	mockKnapsack.On("RootDirectory").Return(tempRootDir)
+
+	t.Run("successfully publishes and deletes logs", func(t *testing.T) {
+		t.Parallel()
+
+		mockPublisher := typesmocks.NewTimestampedIteratorDeleterAppenderCloser(t)
+		mockPublisher.On("ForEach", mock.Anything).Run(func(args mock.Arguments) {
+			fn := args.Get(0).(func(int64, int64, []byte) error)
+			fn(1, 1000, []byte(`{"msg":"test log 1"}`))
+			fn(2, 2000, []byte(`{"msg":"test log 2"}`))
+		}).Return(nil)
+		mockPublisher.On("DeleteRows", int64(1), int64(2)).Return(nil)
+
+		controller := &WatchdogController{
+			slogger:      testSlogger,
+			knapsack:     mockKnapsack,
+			interrupt:    make(chan struct{}, 1),
+			logPublisher: mockPublisher,
+			taskManager:  &mockTaskManager{slogger: testSlogger},
+		}
+
+		controller.publishLogs(t.Context())
+
+		mockPublisher.AssertCalled(t, "DeleteRows", int64(1), int64(2))
+	})
+
+	t.Run("no logs to publish", func(t *testing.T) {
+		t.Parallel()
+
+		mockPublisher := typesmocks.NewTimestampedIteratorDeleterAppenderCloser(t)
+		mockPublisher.On("ForEach", mock.Anything).Return(nil)
+
+		controller := &WatchdogController{
+			slogger:      testSlogger,
+			knapsack:     mockKnapsack,
+			interrupt:    make(chan struct{}, 1),
+			logPublisher: mockPublisher,
+			taskManager:  &mockTaskManager{slogger: testSlogger},
+		}
+
+		controller.publishLogs(t.Context())
+
+		mockPublisher.AssertNotCalled(t, "DeleteRows", "delete rows should not be called for no logs")
+	})
+
+	t.Run("ForEach error", func(t *testing.T) {
+		t.Parallel()
+
+		mockPublisher := typesmocks.NewTimestampedIteratorDeleterAppenderCloser(t)
+		mockPublisher.On("ForEach", mock.Anything).Return(errors.New("some err"))
+		mockPublisher.On("Close").Return(errors.New("some err"))
+
+		controller := &WatchdogController{
+			slogger:      testSlogger,
+			knapsack:     mockKnapsack,
+			interrupt:    make(chan struct{}, 1),
+			logPublisher: mockPublisher,
+			taskManager:  &mockTaskManager{slogger: testSlogger},
+		}
+
+		controller.publishLogs(t.Context())
+
+		// Verify Close was called
+		mockPublisher.AssertCalled(t, "Close")
+
+		// Verify the logPublisher was replaced with a new one
+		require.NotEqual(t, mockPublisher, controller.logPublisher, "logPublisher should have been replaced with a new publisher")
+
+		// Clean up the newly opened publisher to avoid temp dir cleanup failures
+		if controller.logPublisher != nil {
+			controller.logPublisher.Close()
+		}
+	})
 }
