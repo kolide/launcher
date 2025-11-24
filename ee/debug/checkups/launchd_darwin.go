@@ -39,21 +39,23 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 	extraZip := zip.NewWriter(extraWriter)
 	defer extraZip.Close()
 
-	// ensure we collect these logs first, so we don't lose them to early exit if the plist is missing
-	// or some other error occurs
-	launchdLogBytes, err := gatherLaunchdLogs()
-	if err != nil {
-		launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
-	}
+	if extraWriter != io.Discard { // only collect logs if we're running flare
+		// ensure we collect these logs first, so we don't lose them to early exit if the plist is missing
+		// or some other error occurs
+		launchdLogBytes, err := gatherLaunchdLogs()
+		if err != nil {
+			launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
+		}
 
-	if len(launchdLogBytes) > 0 {
-		if err := addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes)); err != nil {
-			// log the error if slogger is available but don't change summary for this
-			if c.k.Slogger() != nil {
-				c.k.Slogger().Log(context.Background(), slog.LevelDebug,
-					"adding launchd logs to zip",
-					"err", err,
-				)
+		if len(launchdLogBytes) > 0 {
+			if err := addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes)); err != nil {
+				// log the error if slogger is available but don't change summary for this
+				if c.k.Slogger() != nil {
+					c.k.Slogger().Log(context.Background(), slog.LevelDebug,
+						"adding launchd logs to zip",
+						"err", err,
+					)
+				}
 			}
 		}
 	}
