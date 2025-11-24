@@ -367,7 +367,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
-	keyString, invalid, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
+	keyString, invalid, tokens, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
