@@ -139,7 +139,7 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			mockKnapsack.On("OsqueryPublisherAPIKey").Return(tt.apiKey).Maybe()
 			mockKnapsack.On("OsqueryPublisherURL").Return(tt.url).Maybe()
 			client := &LogPublisherClient{
-				logger:   slogger.With("component", "osquery_log_publisher"),
+				slogger:  slogger.With("component", "osquery_log_publisher"),
 				knapsack: mockKnapsack,
 			}
 

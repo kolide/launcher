@@ -24,7 +24,7 @@ func TestDeviceDisabled(t *testing.T) {
 		{
 			name: "RequestEnrollment",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestEnrollment(t.Context(), "enroll_secret", "host_identifier", EnrollmentDetails{})
+				_, _, _, err := client.RequestEnrollment(t.Context(), "enroll_secret", "host_identifier", EnrollmentDetails{})
 				return err
 			},
 		},

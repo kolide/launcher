@@ -22,16 +22,13 @@ type enrollmentRequest struct {
 
 type EnrollmentDetails = types.EnrollmentDetails
 
-// AgentIngesterTokensResp is a map of agent ingester tokens, keyed by the registration id
-type AgentIngesterTokensResp = map[string]string
-
 type enrollmentResponse struct {
 	jsonRpcResponse
-	NodeKey             string                  `json:"node_key"`
-	NodeInvalid         bool                    `json:"node_invalid"`
-	ErrorCode           string                  `json:"error_code,omitempty"`
-	Err                 error                   `json:"err,omitempty"`
-	AgentIngesterTokens AgentIngesterTokensResp `json:"agent_ingester_tokens,omitempty"`
+	NodeKey            string `json:"node_key"`
+	NodeInvalid        bool   `json:"node_invalid"`
+	ErrorCode          string `json:"error_code,omitempty"`
+	Err                error  `json:"err,omitempty"`
+	AgentIngesterToken string `json:"agent_ingester_auth_token,omitempty"`
 }
 
 func decodeJSONRPCEnrollmentRequest(_ context.Context, msg json.RawMessage) (interface{}, error) {
@@ -76,12 +73,12 @@ func encodeJSONRPCEnrollmentResponse(_ context.Context, obj interface{}) (json.R
 func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(enrollmentRequest)
-		nodeKey, valid, tokens, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
+		nodeKey, valid, token, err := svc.RequestEnrollment(ctx, req.EnrollSecret, req.HostIdentifier, req.EnrollmentDetails)
 		return enrollmentResponse{
-			NodeKey:     nodeKey,
-			NodeInvalid: valid,
-			Err:         err,
-			AgentIngesterTokens: tokens,
+			NodeKey:            nodeKey,
+			NodeInvalid:        valid,
+			Err:                err,
+			AgentIngesterToken: token,
 		}, nil
 	}
 }
@@ -90,7 +87,7 @@ func MakeRequestEnrollmentEndpoint(svc KolideService) endpoint.Endpoint {
 const requestTimeout = 60 * time.Second
 
 // RequestEnrollment implements KolideService.RequestEnrollment
-func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, AgentIngesterTokensResp, error) {
+func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -101,18 +98,18 @@ func (e Endpoints) RequestEnrollment(ctx context.Context, enrollSecret, hostIden
 	response, err := e.RequestEnrollmentEndpoint(newCtx, request)
 
 	if err != nil {
-		return "", false, nil, err
+		return "", false, "", err
 	}
 	resp := response.(enrollmentResponse)
 
 	if resp.DisableDevice {
-		return "", false, nil, ErrDeviceDisabled{}
+		return "", false, "", ErrDeviceDisabled{}
 	}
 
-	return resp.NodeKey, resp.NodeInvalid, resp.AgentIngesterTokens, resp.Err
+	return resp.NodeKey, resp.NodeInvalid, resp.AgentIngesterToken, resp.Err
 }
 
-func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, tokens AgentIngesterTokensResp, err error) {
+func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (nodekey string, reauth bool, token string, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
 
@@ -140,11 +137,11 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, keyvals...) // nolint:sloglint // it's fine to not have a constant or literal here
 	}(time.Now())
 
-	nodekey, reauth, tokens, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
-	return nodekey, reauth, tokens, err
+	nodekey, reauth, token, err = mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
+	return nodekey, reauth, token, err
 }
 
-func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, tokens AgentIngesterTokensResp, err error) {
+func (mw uuidmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (errcode string, reauth bool, token string, err error) {
 	ctx = uuid.NewContext(ctx, uuid.NewForRequest())
 	return mw.next.RequestEnrollment(ctx, enrollSecret, hostIdentifier, details)
 }

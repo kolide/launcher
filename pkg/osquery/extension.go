@@ -367,7 +367,7 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 
 	// If no cached node key, enroll for new node key
 	// note that we set invalid two ways. Via the return, _or_ via isNodeInvaliderr
-	keyString, invalid, tokens, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
+	keyString, invalid, token, err := e.serviceClient.RequestEnrollment(ctx, enrollSecret, identifier, enrollDetails)
 
 	switch {
 	case errors.Is(err, service.ErrDeviceDisabled{}):
@@ -406,6 +406,17 @@ func (e *Extension) Enroll(ctx context.Context) (string, bool, error) {
 			"could not save registration",
 			"err", err,
 		)
+	}
+
+	// save the new agent ingester auth token and ping the log publish client to update its token
+	if err := e.knapsack.TokenStore().Set(storage.AgentIngesterAuthTokenKey, []byte(token)); err != nil {
+		e.slogger.Log(ctx, slog.LevelError,
+			"could not save agent ingester auth token",
+			"err", err,
+		)
+	} else {
+		e.logPublishClient.Ping()
+		e.slogger.Log(ctx, slog.LevelInfo, "stored new agent ingester auth token")
 	}
 
 	e.slogger.Log(ctx, slog.LevelInfo,

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
@@ -21,15 +22,16 @@ type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
-		logger   *slog.Logger
-		knapsack types.Flags
+		slogger  *slog.Logger
+		knapsack types.Knapsack
 		client   PublisherHTTPClient
+		tokens   map[string]string
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Flags, client PublisherHTTPClient) Publisher {
+func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
 	return &LogPublisherClient{
-		logger:   logger.With("component", "osquery_log_publisher"),
+		slogger:  logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
 		client:   client,
 	}
@@ -43,6 +45,10 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 	}
 }
 
+// PublishLogs publishes logs to the agent-ingester service.
+// It returns the response from the agent-ingester service and any error that occurred.
+// In the future we will likely want to pass a registration id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default registration token.
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
@@ -50,7 +56,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := lpc.logger.With(
+	logger := lpc.slogger.With(
 		"request_uuid", requestUUID,
 		"log_type", logType.String(),
 		"log_count", len(logs),
@@ -141,6 +147,21 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	return &publishLogsResponse, nil
+}
+
+func (lpc *LogPublisherClient) Ping() {
+	// for now we will only see a single token for the default registration, in the future we
+	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
+	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
+	if err != nil || len(newToken) == 0 {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not get new token from token store",
+			"err", err,
+		)
+		return
+	}
+
+	lpc.tokens["default"] = string(newToken)
 }
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
