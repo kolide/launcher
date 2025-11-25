@@ -30,11 +30,21 @@ type (
 )
 
 func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
-	return &LogPublisherClient{
+	lpc := LogPublisherClient{
 		slogger:  logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
 		client:   client,
+		tokens:   make(map[string]string),
 	}
+
+	if err := lpc.refreshTokenCache(); err != nil {
+		logger.Log(context.TODO(), slog.LevelWarn,
+			"unable to refresh token cache on log publisher client initialization, may not be set yet",
+			"err", err,
+		)
+	}
+
+	return &lpc
 }
 
 // NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
@@ -157,18 +167,27 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 }
 
 func (lpc *LogPublisherClient) Ping() {
+	if err := lpc.refreshTokenCache(); err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to refresh token cache after ping",
+			"err", err,
+		)
+	}
+}
+
+// refreshTokenCache loads in the agent ingester auth token from the TokenStore and stores it in
+// our locally cached map
+func (lpc *LogPublisherClient) refreshTokenCache() error {
 	// for now we will only see a single token for the default registration, in the future we
 	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
 	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
-		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not get new token from token store",
-			"err", err,
-		)
-		return
+
+		return fmt.Errorf("error loading token from TokenStore: %w", err)
 	}
 
 	lpc.tokens["default"] = string(newToken)
+	return nil
 }
 
 func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
@@ -181,7 +200,7 @@ func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) st
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	// make sure we're fully configured to publish logs
-	if lpc.knapsack.OsqueryPublisherAPIKey() == "" || lpc.knapsack.OsqueryPublisherURL() == "" {
+	if lpc.knapsack.OsqueryPublisherURL() == "" {
 		return false
 	}
 

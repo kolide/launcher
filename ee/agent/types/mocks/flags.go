@@ -817,24 +817,6 @@ func (_m *Flags) OsqueryHealthcheckStartupDelay() time.Duration {
 	return r0
 }
 
-// OsqueryPublisherAPIKey provides a mock function with no fields
-func (_m *Flags) OsqueryPublisherAPIKey() string {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for OsqueryPublisherAPIKey")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // OsqueryPublisherPercentEnabled provides a mock function with no fields
 func (_m *Flags) OsqueryPublisherPercentEnabled() int {
 	ret := _m.Called()
@@ -1644,24 +1626,6 @@ func (_m *Flags) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(time.Duration) error); ok {
 		r0 = rf(delay)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// SetOsqueryPublisherAPIKey provides a mock function with given fields: key
-func (_m *Flags) SetOsqueryPublisherAPIKey(key string) error {
-	ret := _m.Called(key)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetOsqueryPublisherAPIKey")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(key)
 	} else {
 		r0 = ret.Error(0)
 	}

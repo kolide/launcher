@@ -135,7 +135,6 @@ type Options struct {
 
 	// Osquery log ingest configuration for dual publication cutover
 	OsqueryPublisherURL            string
-	OsqueryPublisherAPIKey         string
 	OsqueryPublisherPercentEnabled int
 }
 
@@ -232,7 +231,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		flDisableIngestTLS                = flagset.Bool("disable_trace_ingest_tls", false, "Disable TLS for observability ingest server communication")
 		// Osquery log ingest configuration for dual publication cutover
 		flOsqueryPublisherURL            = flagset.String("osquery_publisher_url", "", "URL base for publishing osquery logs and status")
-		flOsqueryPublisherAPIKey         = flagset.String("osquery_publisher_api_key", "", "TEMPORARY- API key for osquery log ingest")
 		flOsqueryPublisherPercentEnabled = flagset.Int("osquery_publisher_percent_enabled", 0, "Percent of logs to publish to new ingest server. Default 0 is disabled.")
 
 		// Autoupdate options
@@ -429,7 +427,6 @@ func ParseOptions(subcommandName string, args []string) (*Options, error) {
 		WatchdogMemoryLimitMB:           *flWatchdogMemoryLimitMB,
 		WatchdogUtilizationLimitPercent: *flWatchdogUtilizationLimitPercent,
 		OsqueryPublisherURL:             *flOsqueryPublisherURL,
-		OsqueryPublisherAPIKey:          *flOsqueryPublisherAPIKey,
 		OsqueryPublisherPercentEnabled:  *flOsqueryPublisherPercentEnabled,
 	}
 

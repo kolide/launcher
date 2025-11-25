@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
@@ -58,8 +60,11 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 			slogger := multislogger.NewNopLogger()
 
 			mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com")
-			mockKnapsack.On("OsqueryPublisherAPIKey").Return("test-api-key")
 			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token"))
+			require.NoError(t, err)
+			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
 
 			resp := &http.Response{
 				StatusCode: tt.responseStatus,
@@ -94,35 +99,24 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 		name              string
 		percentEnabled    int
 		url               string
-		apiKey            string
 		shouldPublishLogs bool
 	}{
 		{
 			name:              "default disabled",
 			percentEnabled:    0,
 			url:               "https://example.com",
-			apiKey:            "test-api-key",
 			shouldPublishLogs: false,
 		},
 		{
 			name:              "full cutover enabled",
 			percentEnabled:    100,
 			url:               "https://example.com",
-			apiKey:            "test-api-key",
 			shouldPublishLogs: true,
-		},
-		{
-			name:              "full cutover enabled without api key",
-			percentEnabled:    100,
-			url:               "https://example.com",
-			apiKey:            "",
-			shouldPublishLogs: false,
 		},
 		{
 			name:              "full cutover enabled without url",
 			percentEnabled:    100,
 			url:               "",
-			apiKey:            "test-api-key",
 			shouldPublishLogs: false,
 		},
 	}
@@ -136,7 +130,6 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 
 			// these mocks are all set to maybe because the order of what is set will impact what is actually checked
 			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(tt.percentEnabled).Maybe()
-			mockKnapsack.On("OsqueryPublisherAPIKey").Return(tt.apiKey).Maybe()
 			mockKnapsack.On("OsqueryPublisherURL").Return(tt.url).Maybe()
 			client := &LogPublisherClient{
 				slogger:  slogger.With("component", "osquery_log_publisher"),
