@@ -54,6 +54,13 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, nil
 	}
 
+	// in the future we will want to plumb a registration ID through here, for now just use the default
+	registrationID := "default"
+	authToken := lpc.getTokenForRegistration(registrationID)
+	if authToken == "" {
+		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
+	}
+
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
 	logger := lpc.slogger.With(
@@ -107,7 +114,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 	// set required headers and issue the request
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryPublisherAPIKey()))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	resp, err = lpc.client.Do(req)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -162,6 +169,14 @@ func (lpc *LogPublisherClient) Ping() {
 	}
 
 	lpc.tokens["default"] = string(newToken)
+}
+
+func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
+	if token, ok := lpc.tokens[registrationID]; ok {
+		return token
+	}
+
+	return ""
 }
 
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
