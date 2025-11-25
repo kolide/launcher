@@ -253,15 +253,8 @@ func TestPublishLogs(t *testing.T) {
 
 		controller.publishLogs(t.Context())
 
-		// Verify Close was called
 		mockPublisher.AssertCalled(t, "Close")
-
-		// Verify the logPublisher was replaced with a new one
 		require.NotEqual(t, mockPublisher, controller.logPublisher, "logPublisher should have been replaced with a new publisher")
-
-		// Clean up the newly opened publisher to avoid temp dir cleanup failures
-		if controller.logPublisher != nil {
-			controller.logPublisher.Close()
-		}
+		require.NoError(t, controller.logPublisher.Close())
 	})
 }
