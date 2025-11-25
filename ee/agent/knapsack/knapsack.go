@@ -461,25 +461,24 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 }
 
 func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
+	// Check to see if we have a node key for the default registration.
+	key, err := k.NodeKey(types.DefaultRegistrationID)
+	if err != nil {
+		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
+	}
+
+	if len(key) > 0 {
+		return types.Enrolled, nil
+	}
+
+	// We are unenrolled. Check to see if we're a secretless installation.
 	enrollSecret, err := k.ReadEnrollSecret()
 	if err != nil || enrollSecret == "" {
 		return types.NoEnrollmentKey, nil
 	}
 
-	if k.ConfigStore() == nil {
-		return types.Unknown, errors.New("no config store in knapsack")
-	}
-
-	key, err := k.ConfigStore().Get([]byte("nodeKey"))
-	if err != nil {
-		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
-	}
-
-	if len(key) == 0 {
-		return types.Unenrolled, nil
-	}
-
-	return types.Enrolled, nil
+	// Not secretless, merely unenrolled
+	return types.Unenrolled, nil
 }
 
 // SetEnrollmentDetails updates the enrollment details, merging with existing details
