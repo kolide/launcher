@@ -182,7 +182,6 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
 	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
 	if err != nil || len(newToken) == 0 {
-
 		return fmt.Errorf("error loading token from TokenStore: %w", err)
 	}
 

@@ -134,6 +134,7 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 			client := &LogPublisherClient{
 				slogger:  slogger.With("component", "osquery_log_publisher"),
 				knapsack: mockKnapsack,
+				tokens:   make(map[string]string),
 			}
 
 			assert.Equal(t, tt.shouldPublishLogs, client.shouldPublishLogs())
