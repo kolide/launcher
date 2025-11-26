@@ -165,8 +165,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
 	xdgDataDirs := "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
-	// XDG_DATA_DIRS is different on NixOS. We set the directories that we know we can find
-	// via username alone, without having to search the Nix store.
+	// XDG_DATA_DIRS is different on NixOS -- handle it separately.
 	if allowedcmd.IsNixOS() {
 		xdgDataDirs = nixXdgDataDirs(username)
 	}
