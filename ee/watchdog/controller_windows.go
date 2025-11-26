@@ -208,6 +208,20 @@ func (wc *WatchdogController) publishLogs(ctx context.Context) {
 		return nil
 	}); err != nil {
 		wc.slogger.Log(ctx, slog.LevelError, "iterating sqlite logs", "err", err)
+
+		// Close and try to reopen - validatedDbConn will handle full corruption
+		if err := wc.logPublisher.Close(); err != nil {
+			wc.slogger.Log(ctx, slog.LevelError, "error closing log publisher after error", "err", err)
+		}
+
+		newPublisher, err := agentsqlite.OpenRW(ctx, wc.knapsack.RootDirectory(), agentsqlite.WatchdogLogStore)
+		if err != nil {
+			wc.slogger.Log(ctx, slog.LevelError, "error opening log publisher after error", "err", err)
+		} else {
+			wc.logPublisher = newPublisher
+		}
+
+		// processing will pick back up on the next iteration
 		return
 	}
 
