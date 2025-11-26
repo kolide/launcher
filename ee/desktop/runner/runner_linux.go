@@ -168,10 +168,7 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// XDG_DATA_DIRS is different on NixOS. We set the directories that we know we can find
 	// via username alone, without having to search the Nix store.
 	if allowedcmd.IsNixOS() {
-		xdgDataDirs = fmt.Sprintf(
-			"/home/%s/.nix-profile/share:/nix/profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share",
-			username, username, username,
-		)
+		xdgDataDirs = nixXdgDataDirs(username)
 	}
 	envVars["XDG_DATA_DIRS"] = xdgDataDirs
 	envVars["XDG_RUNTIME_DIR"] = getXdgRuntimeDir(uid)
@@ -182,6 +179,50 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 
 	return envVars
+}
+
+// These are the XDG data dirs on NixOS that live in the Nix store that we can glob for --
+// since Nix store filepaths include hashes, we have to include wildcards. The first wildcard
+// is the hash, and subsequent wildcards are the semver. There may be other paths that are missing here.
+var nixStoreXdgDataDirGlobPatterns = []string{
+	"/nix/store/*-sway-*/share",
+	"/nix/store/*-gsettings-desktop-schemas-*/share/gsettings-schemas/gsettings-desktop-schemas-*",
+	"/nix/store/*-gtk+*/share/gsettings-schemas/gtk+*",
+	"/nix/store/*-desktops/share",
+}
+
+// nixXdgDataDirs returns XDG_DATA_DIRS for NixOS. It will include paths that we always expect to exist,
+// and additionally searches the Nix store for a handful of known XDG data dirs. It is likely not an
+// exhaustive implementation.
+func nixXdgDataDirs(username string) string {
+	// First, set the directories that we can hardcode
+	xdgDataDirs := "/nix/profile/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share"
+
+	// Next, add the ones that we can calculate via username
+	xdgDataDirs += fmt.Sprintf(
+		":/home/%s/.nix-profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share",
+		username, username, username,
+	)
+
+	// Finally, add the ones that we can glob for in the Nix store
+	for _, dataDirGlobPattern := range nixStoreXdgDataDirGlobPatterns {
+		matches, err := filepath.Glob(dataDirGlobPattern)
+		if err != nil {
+			continue
+		}
+		for _, match := range matches {
+			dirInfo, err := os.Stat(match)
+			if err != nil {
+				continue
+			}
+			if dirInfo.IsDir() {
+				xdgDataDirs += ":"
+				xdgDataDirs += match
+			}
+		}
+	}
+
+	return xdgDataDirs
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
