@@ -164,7 +164,16 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// We take the default value according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html,
 	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
-	envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+	xdgDataDirs := "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+	// XDG_DATA_DIRS is different on NixOS. We set the directories that we know we can find
+	// via username alone, without having to search the Nix store.
+	if allowedcmd.IsNixOS() {
+		xdgDataDirs = fmt.Sprintf(
+			"/home/%s/.nix-profile/share:/nix/profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share",
+			username, username, username,
+		)
+	}
+	envVars["XDG_DATA_DIRS"] = xdgDataDirs
 	envVars["XDG_RUNTIME_DIR"] = getXdgRuntimeDir(uid)
 
 	// We need xauthority set in order to launch the browser on Ubuntu 23.04
