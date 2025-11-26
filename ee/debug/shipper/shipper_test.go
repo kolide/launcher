@@ -34,7 +34,6 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
-				k.On("Slogger").Return(multislogger.NewNopLogger())
 				k.On("Registrations").Return([]types.Registration{
 					{
 						RegistrationID: types.DefaultRegistrationID,
@@ -56,7 +55,6 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("")
 				k.On("EnrollSecretPath").Return("")
-				k.On("Slogger").Return(multislogger.NewNopLogger())
 				k.On("Registrations").Return([]types.Registration{}, nil)
 				k.On("RootDirectory").Return(t.TempDir())
 				return k
@@ -76,7 +74,6 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 
 				k := typesMocks.NewKnapsack(t)
 				k.On("EnrollSecret").Return("enroll_secret_value")
-				k.On("Slogger").Return(multislogger.NewNopLogger())
 				k.On("Registrations").Return([]types.Registration{
 					{
 						RegistrationID: types.DefaultRegistrationID,
@@ -156,6 +153,143 @@ func TestShip(t *testing.T) { //nolint:paralleltest
 			_, err = shipper.Write(uploadBody)
 			require.NoError(t, err)
 			require.NoError(t, shipper.Close())
+		})
+	}
+}
+
+// TestShipToS3 tests that the shipper works correctly with S3 presigned URLs.
+// S3 may return either 200 OK or 204 No Content on successful upload.
+func TestShipToS3(t *testing.T) { //nolint:paralleltest
+	tests := []struct {
+		name                   string
+		s3StatusCode           int
+		expectUploadError      bool
+		mockKnapsack           func(t *testing.T) *typesMocks.Knapsack
+		expectSignatureHeaders bool
+		expectSecret           bool
+		expectMunemo           bool
+	}{
+		{
+			name:         "s3 returns 200 OK",
+			s3StatusCode: http.StatusOK,
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         "test-munemo",
+					},
+				}, nil)
+				return k
+			},
+			expectSignatureHeaders: false,
+			expectSecret:           true,
+			expectMunemo:           true,
+			expectUploadError:      false,
+		},
+		{
+			name:         "s3 returns 204 No Content",
+			s3StatusCode: http.StatusNoContent,
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         "test-munemo",
+					},
+				}, nil)
+				return k
+			},
+			expectSignatureHeaders: false,
+			expectSecret:           true,
+			expectMunemo:           true,
+			expectUploadError:      false,
+		},
+		{
+			name:         "s3 returns error status",
+			s3StatusCode: http.StatusForbidden,
+			mockKnapsack: func(t *testing.T) *typesMocks.Knapsack {
+				k := typesMocks.NewKnapsack(t)
+				k.On("EnrollSecret").Return("enroll_secret_value")
+				k.On("Registrations").Return([]types.Registration{
+					{
+						RegistrationID: types.DefaultRegistrationID,
+						Munemo:         "test-munemo",
+					},
+				}, nil)
+				return k
+			},
+			expectSignatureHeaders: false,
+			expectSecret:           true,
+			expectMunemo:           true,
+			expectUploadError:      true,
+		},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			testServer := httptest.NewServer(nil)
+
+			mux := http.NewServeMux()
+			mux.Handle("/api/agent/flare", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer r.Body.Close()
+
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				data := make(map[string]string, 3)
+				require.NoError(t, json.Unmarshal(body, &data))
+
+				require.Equal(t, tt.expectSecret, len(data["enroll_secret"]) > 0)
+				require.Equal(t, tt.expectMunemo, len(data["munemo"]) > 0)
+				require.NotEmpty(t, data["hostname"])
+
+				// Return S3 presigned URL (simulated)
+				urlData := struct {
+					URL  string `json:"URL"`
+					Name string `json:"name"`
+				}{
+					URL:  fmt.Sprintf("%s/my-bucket/flare-uploads/test-flare.zip?AWSAccessKeyId=EXAMPLE&Expires=123456&Signature=example", testServer.URL),
+					Name: "test-flare.zip",
+				}
+
+				urlDataJson, err := json.Marshal(urlData)
+				require.NoError(t, err)
+
+				w.Write(urlDataJson)
+			}))
+
+			uploadBody := []byte("test_flare_data")
+
+			// Simulate S3 upload endpoint
+			mux.Handle("/my-bucket/flare-uploads/test-flare.zip", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				require.Equal(t, uploadBody, body)
+
+				// S3 can return 200 OK or 204 No Content
+				w.WriteHeader(tt.s3StatusCode)
+			}))
+
+			testServer.Config.Handler = mux
+
+			knapsack := tt.mockKnapsack(t)
+
+			shipper, err := New(knapsack, WithNote("s3 test"), WithUploadRequestURL(fmt.Sprintf("%s/api/agent/flare", testServer.URL)))
+			require.NoError(t, err)
+
+			_, err = shipper.Write(uploadBody)
+			require.NoError(t, err)
+
+			err = shipper.Close()
+			if tt.expectUploadError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
