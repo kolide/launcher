@@ -10,6 +10,7 @@ import (
 
 type (
 	Publisher interface {
+		Ping() // also satisfies the control subscriber interface to handle token updates
 		// PublishLogs publishes logs from the osquery process. These may be
 		// status logs or result logs from scheduled queries.
 		PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error)
