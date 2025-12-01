@@ -10,8 +10,8 @@ It's built around osquery, but has several additional capabilities:
 
 ### Documentation
 
-Most of the documentation for how our agent works can be found online at https://www.kolide.com/docs/using-kolide/agent.
+Most of the documentation for how our agent works can be found online at https://www.kolide.com/docs/admins/agent.
 
-There is some additional, mostly legacy, documentation on GitHub in the
+There is some additional, mostly legacy and/or developer-facing, documentation on GitHub in the
 [`docs`](./docs/README.md) subdirectory of the repository.
 
