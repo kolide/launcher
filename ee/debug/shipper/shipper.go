@@ -85,7 +85,7 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	// Create temp file for buffering flare content
 	// S3 presigned URLs don't support chunked transfer encoding, so we need
 	// to know the content length before uploading
-	tempFile, err := os.CreateTemp("", "kolide-flare-*.zip")
+	tempFile, err := os.CreateTemp(agent.TempPath(), "kolide-flare-*.zip")
 	if err != nil {
 		return nil, fmt.Errorf("creating temp file: %w", err)
 	}
