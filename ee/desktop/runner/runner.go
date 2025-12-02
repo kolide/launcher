@@ -984,6 +984,28 @@ func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
 		return false
 	}
 
+	if _, err := os.Stat(proc.socketPath); err != nil {
+		r.slogger.Log(context.TODO(), slog.LevelDebug,
+			"error stating desktop process socket path",
+			"uid", uid,
+			"socket_path", proc.socketPath,
+			"err", err,
+		)
+
+		if err := proc.Process.Kill(); err != nil {
+			r.slogger.Log(context.TODO(), slog.LevelError,
+				"error killing desktop process after socket path does not exist",
+				"uid", uid,
+				"pid", proc.Process.Pid,
+				"err", err,
+			)
+		}
+
+		delete(r.uidProcs, uid)
+
+		return false
+	}
+
 	proc.LastHealthCheck = time.Now().UTC()
 	r.uidProcs[uid] = proc
 
