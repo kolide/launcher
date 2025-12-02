@@ -131,7 +131,7 @@ func (s *shipper) Close() error {
 
 	// Create the upload request with the temp file content
 	// This is required for S3 presigned URLs (they don't support chunked transfer encoding)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.uploadURL, s.tempFile)
