@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/kolide/kit/version"
@@ -25,7 +24,6 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -46,26 +44,25 @@ func WithNote(note string) shipperOption {
 }
 
 type shipper struct {
-	writer   io.WriteCloser
 	knapsack types.Knapsack
 
-	uploadName           string
-	uploadRequestURL     string
-	uploadRequest        *http.Request
-	uploadRequestStarted bool
-	uploadRequestErr     error
-	uploadResponse       *http.Response
-	uploadRequestWg      *sync.WaitGroup
-	uploadRequestCancel  context.CancelFunc
+	uploadName       string
+	uploadRequestURL string
+	uploadURL        string
 
 	// note is intended to help humans identify the object being shipped
 	note string
+
+	// buffer stores the flare content before upload
+	// S3 presigned URLs don't support chunked transfer encoding, so we buffer
+	// the content and upload with a known Content-Length
+	buffer *bytes.Buffer
 }
 
 func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s := &shipper{
-		knapsack:        knapsack,
-		uploadRequestWg: &sync.WaitGroup{},
+		knapsack: knapsack,
+		buffer:   &bytes.Buffer{},
 	}
 
 	for _, opt := range opts {
@@ -84,15 +81,7 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting signed url: %w", err)
 	}
-
-	reader, writer := io.Pipe()
-	s.writer = writer
-
-	req, err := http.NewRequest(http.MethodPut, uploadURL, reader)
-	if err != nil {
-		return nil, fmt.Errorf("creating request for http upload: %w", err)
-	}
-	s.uploadRequest = req
+	s.uploadURL = uploadURL
 
 	return s, nil
 }
@@ -102,57 +91,46 @@ func (s *shipper) Name() string {
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
-	if s.uploadRequestStarted {
-		return s.writer.Write(p)
-	}
-
-	// start request
-	// We could start the request in New(), but then we would hold the connection open longer than needed,
-	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
-	s.uploadRequestStarted = true
-	s.uploadRequestWg.Add(1)
-	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
-		defer s.uploadRequestWg.Done()
-
-		// will cancel and close the request body in the close function
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		s.uploadRequestCancel = cancel
-		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
-	})
-
-	return s.writer.Write(p)
+	// Buffer the data - we'll upload it all at once in Close()
+	// This is required for S3 compatibility (S3 presigned URLs don't support chunked transfer encoding)
+	return s.buffer.Write(p)
 }
 
 func (s *shipper) Close() error {
-	if err := s.writer.Close(); err != nil {
-		return err
-	}
-
-	// this will happen if the write function is never called
-	// then nothing sent, no error
-	if !s.uploadRequestStarted {
+	// If nothing was written, don't upload
+	if s.buffer.Len() == 0 {
 		return nil
 	}
 
-	// write has been called -- make sure we call cancel at the end
-	defer s.uploadRequestCancel()
+	// Create the upload request with the buffered content
+	// Using bytes.NewReader ensures Content-Length is set automatically
+	// This is required for S3 presigned URLs (they don't support chunked transfer encoding)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
-	// wait for upload request to finish
-	s.uploadRequestWg.Wait()
-
-	if s.uploadRequestErr != nil {
-		return fmt.Errorf("upload request error: %w", s.uploadRequestErr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.uploadURL, bytes.NewReader(s.buffer.Bytes()))
+	if err != nil {
+		return fmt.Errorf("creating upload request: %w", err)
 	}
-	defer s.uploadResponse.Body.Close()
 
-	uploadRepsonseBody, err := io.ReadAll(s.uploadResponse.Body)
+	// Explicitly set Content-Length for S3 compatibility
+	req.ContentLength = int64(s.buffer.Len())
+
+	// Perform the upload
+	uploadResponse, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("upload request error: %w", err)
+	}
+	defer uploadResponse.Body.Close()
+
+	uploadResponseBody, err := io.ReadAll(uploadResponse.Body)
 	if err != nil {
 		return fmt.Errorf("reading upload response: %w", err)
 	}
 
 	// Accept both 200 OK (GCS, S3) and 204 No Content (S3) as successful responses
-	if s.uploadResponse.StatusCode != http.StatusOK && s.uploadResponse.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("got non-success status in upload response: %s %s", s.uploadResponse.Status, string(uploadRepsonseBody))
+	if uploadResponse.StatusCode != http.StatusOK && uploadResponse.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("got non-success status in upload response: %s %s", uploadResponse.Status, string(uploadResponseBody))
 	}
 
 	return nil
