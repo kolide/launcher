@@ -150,8 +150,9 @@ func (s *shipper) Close() error {
 		return fmt.Errorf("reading upload response: %w", err)
 	}
 
-	if s.uploadResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("got non 200 status in upload response: %s %s", s.uploadResponse.Status, string(uploadRepsonseBody))
+	// Accept both 200 OK (GCS, S3) and 204 No Content (S3) as successful responses
+	if s.uploadResponse.StatusCode != http.StatusOK && s.uploadResponse.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("got non-success status in upload response: %s %s", s.uploadResponse.Status, string(uploadRepsonseBody))
 	}
 
 	return nil
