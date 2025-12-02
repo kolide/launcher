@@ -164,7 +164,12 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	// We take the default value according to https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html,
 	// but also include the snapd directory due to an issue on Ubuntu 22.04 where the default
 	// /usr/share/applications/mimeinfo.cache does not contain any applications installed via snap.
-	envVars["XDG_DATA_DIRS"] = "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+	xdgDataDirs := "/usr/local/share/:/usr/share/:/var/lib/snapd/desktop"
+	// XDG_DATA_DIRS is different on NixOS -- handle it separately.
+	if allowedcmd.IsNixOS() {
+		xdgDataDirs = nixXdgDataDirs(username)
+	}
+	envVars["XDG_DATA_DIRS"] = xdgDataDirs
 	envVars["XDG_RUNTIME_DIR"] = getXdgRuntimeDir(uid)
 
 	// We need xauthority set in order to launch the browser on Ubuntu 23.04
@@ -173,6 +178,50 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 	}
 
 	return envVars
+}
+
+// These are the XDG data dirs on NixOS that live in the Nix store that we can glob for --
+// since Nix store filepaths include hashes, we have to include wildcards. The first wildcard
+// is the hash, and subsequent wildcards are the semver. There may be other paths that are missing here.
+var nixStoreXdgDataDirGlobPatterns = []string{
+	"/nix/store/*-sway-*/share",
+	"/nix/store/*-gsettings-desktop-schemas-*/share/gsettings-schemas/gsettings-desktop-schemas-*",
+	"/nix/store/*-gtk+*/share/gsettings-schemas/gtk+*",
+	"/nix/store/*-desktops/share",
+}
+
+// nixXdgDataDirs returns XDG_DATA_DIRS for NixOS. It will include paths that we always expect to exist,
+// and additionally searches the Nix store for a handful of known XDG data dirs. It is likely not an
+// exhaustive implementation.
+func nixXdgDataDirs(username string) string {
+	// First, set the directories that we can hardcode
+	xdgDataDirs := "/nix/profile/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share"
+
+	// Next, add the ones that we can calculate via username
+	xdgDataDirs += fmt.Sprintf(
+		":/home/%s/.nix-profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share",
+		username, username, username,
+	)
+
+	// Finally, add the ones that we can glob for in the Nix store
+	for _, dataDirGlobPattern := range nixStoreXdgDataDirGlobPatterns {
+		matches, err := filepath.Glob(dataDirGlobPattern)
+		if err != nil {
+			continue
+		}
+		for _, match := range matches {
+			dirInfo, err := os.Stat(match)
+			if err != nil {
+				continue
+			}
+			if dirInfo.IsDir() {
+				xdgDataDirs += ":"
+				xdgDataDirs += match
+			}
+		}
+	}
+
+	return xdgDataDirs
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
