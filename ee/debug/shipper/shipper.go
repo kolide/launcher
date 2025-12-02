@@ -53,16 +53,15 @@ type shipper struct {
 	// note is intended to help humans identify the object being shipped
 	note string
 
-	// buffer stores the flare content before upload
-	// S3 presigned URLs don't support chunked transfer encoding, so we buffer
-	// the content and upload with a known Content-Length
-	buffer *bytes.Buffer
+	// tempFile stores the flare content before upload
+	// S3 presigned URLs don't support chunked transfer encoding, so we write
+	// to a temp file and upload with a known Content-Length
+	tempFile *os.File
 }
 
 func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s := &shipper{
 		knapsack: knapsack,
-		buffer:   &bytes.Buffer{},
 	}
 
 	for _, opt := range opts {
@@ -83,6 +82,15 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	}
 	s.uploadURL = uploadURL
 
+	// Create temp file for buffering flare content
+	// S3 presigned URLs don't support chunked transfer encoding, so we need
+	// to know the content length before uploading
+	tempFile, err := os.CreateTemp("", "kolide-flare-*.zip")
+	if err != nil {
+		return nil, fmt.Errorf("creating temp file: %w", err)
+	}
+	s.tempFile = tempFile
+
 	return s, nil
 }
 
@@ -91,30 +99,48 @@ func (s *shipper) Name() string {
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
-	// Buffer the data - we'll upload it all at once in Close()
+	// Write to temp file - we'll upload it all at once in Close()
 	// This is required for S3 compatibility (S3 presigned URLs don't support chunked transfer encoding)
-	return s.buffer.Write(p)
+	return s.tempFile.Write(p)
 }
 
 func (s *shipper) Close() error {
+	// Always clean up the temp file when done
+	defer func() {
+		if s.tempFile != nil {
+			s.tempFile.Close()
+			os.Remove(s.tempFile.Name())
+		}
+	}()
+
+	// Get file size to check if anything was written
+	fileInfo, err := s.tempFile.Stat()
+	if err != nil {
+		return fmt.Errorf("getting temp file info: %w", err)
+	}
+
 	// If nothing was written, don't upload
-	if s.buffer.Len() == 0 {
+	if fileInfo.Size() == 0 {
 		return nil
 	}
 
-	// Create the upload request with the buffered content
-	// Using bytes.NewReader ensures Content-Length is set automatically
+	// Seek to beginning of file for reading
+	if _, err := s.tempFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("seeking to beginning of temp file: %w", err)
+	}
+
+	// Create the upload request with the temp file content
 	// This is required for S3 presigned URLs (they don't support chunked transfer encoding)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.uploadURL, bytes.NewReader(s.buffer.Bytes()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.uploadURL, s.tempFile)
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
 	}
 
 	// Explicitly set Content-Length for S3 compatibility
-	req.ContentLength = int64(s.buffer.Len())
+	req.ContentLength = fileInfo.Size()
 
 	// Perform the upload
 	uploadResponse, err := http.DefaultClient.Do(req)
