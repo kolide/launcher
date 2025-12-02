@@ -48,15 +48,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - id: govulncheck
-        uses: golang/govulncheck-action@v1
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          go-version-input: 1.24.11 # govulncheck does not actually respect the version in go-version-file below
           go-version-file: './go.mod'
           check-latest: true
-          go-package: ./...
-          output-format: json
-          output-file: govulncheck.json
+          cache: false
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        shell: bash
+
+      - id: govulncheck
+        run: govulncheck -C . -format json ./... > govulncheck.json
 
       # Exclude GO-2024-3166 since we do not believe it applies to go-tuf before v2, and additionally
       # because we do not believe it applies to our usage since we do not use delegates.
