@@ -31,7 +31,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -114,7 +114,7 @@ jobs:
       run: git config --global --add safe.directory /__w/launcher/launcher
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -210,7 +210,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -425,7 +425,7 @@ jobs:
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true

@@ -116,13 +116,20 @@ func (mw logmw) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentif
 			message = "failure requesting enrollment"
 		}
 
+		took := time.Since(begin)
+		if err == nil {
+			// Use bucketed time on success
+			took = timebucket(took)
+		}
+		// Use exact time on error
+
 		keyvals := []interface{}{
 			"method", "RequestEnrollment",
 			"uuid", uuid,
 			"hostIdentifier", hostIdentifier,
 			"reauth", reauth,
 			"err", err,
-			"took", time.Since(begin),
+			"took", took,
 		}
 
 		if err != nil {
