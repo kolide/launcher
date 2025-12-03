@@ -26,7 +26,6 @@ func (ls *localServer) requestLoggingHandler(next http.Handler) http.Handler {
 				"path", r.URL.Path,
 				"method", r.Method,
 				"status", recorder.Status,
-				"took", time.Since(begin),
 			)
 		}(time.Now())
 

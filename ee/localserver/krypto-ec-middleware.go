@@ -161,7 +161,6 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			ctx, span := observability.StartSpan(ctx)
 			defer span.End()
 
-			callbackStart := time.Now()
 			resp, err := client.Do(req.WithContext(ctx))
 			if err != nil {
 				err = fmt.Errorf("sending request: %w", err)
@@ -173,7 +172,6 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			e.slogger.Log(req.Context(), slog.LevelDebug,
 				"sent callback",
 				"response_status", resp.Status,
-				"took", time.Since(callbackStart),
 			)
 
 			respBytes, err := io.ReadAll(resp.Body)
