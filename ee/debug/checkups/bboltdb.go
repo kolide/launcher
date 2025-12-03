@@ -39,6 +39,12 @@ func (c *bboltdbCheckup) Run(_ context.Context, extraFH io.Writer) error {
 	for k, v := range stats.Buckets {
 		c.data[k] = v
 	}
+	dbStats := map[string]any{
+		"size_bytes":                  stats.DB.Size,
+		"read_transaction_count":      stats.DB.ReadTxCount,
+		"open_read_transaction_count": stats.DB.OpenReadTxCount,
+	}
+	c.data["db"] = dbStats
 
 	// Gather additional data only if we're running flare
 	if extraFH == io.Discard {
