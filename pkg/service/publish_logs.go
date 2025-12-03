@@ -115,6 +115,13 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			pubStateVals = make(map[string]int)
 		}
 
+		took := time.Since(begin)
+		if err == nil {
+			// Use bucketed time on success
+			took = timebucket(took)
+		}
+		// Use exact time on error
+
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "PublishLogs",
 			"uuid", uuid,
@@ -123,7 +130,7 @@ func (mw logmw) PublishLogs(ctx context.Context, nodeKey string, logType logger.
 			"errcode", errcode,
 			"reauth", reauth,
 			"err", err,
-			"took", time.Since(begin),
+			"took", took,
 			"publication_state", pubStateVals,
 		)
 	}(time.Now())

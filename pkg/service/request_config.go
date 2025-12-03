@@ -106,13 +106,20 @@ func (mw logmw) RequestConfig(ctx context.Context, nodeKey string) (config strin
 			message = "failure requesting config"
 		}
 
+		took := time.Since(begin)
+		if err == nil {
+			// Use bucketed time on success
+			took = timebucket(took)
+		}
+		// Use exact time on error
+
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), message, // nolint:sloglint // it's fine to not have a constant or literal here
 			"method", "RequestConfig",
 			"uuid", uuid,
 			"config_size", len(config),
 			"reauth", reauth,
 			"err", err,
-			"took", time.Since(begin),
+			"took", took,
 		)
 	}(time.Now())
 
