@@ -14,8 +14,10 @@ type bucketStatsHolder struct {
 }
 
 type dbStatsHolder struct {
-	Stats bbolt.TxStats
-	Size  int64
+	Stats           bbolt.TxStats
+	Size            int64
+	ReadTxCount     int
+	OpenReadTxCount int
 }
 
 type Stats struct {
@@ -27,6 +29,10 @@ func GetStats(db *bbolt.DB) (*Stats, error) {
 	stats := &Stats{
 		Buckets: make(map[string]bucketStatsHolder),
 	}
+
+	dbStats := db.Stats()
+	stats.DB.ReadTxCount = dbStats.TxN
+	stats.DB.OpenReadTxCount = dbStats.OpenTxN
 
 	if err := db.View(func(tx *bbolt.Tx) error {
 		stats.DB.Stats = tx.Stats()
