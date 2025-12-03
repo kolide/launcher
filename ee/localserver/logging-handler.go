@@ -3,7 +3,6 @@ package localserver
 import (
 	"log/slog"
 	"net/http"
-	"time"
 )
 
 type statusRecorder struct {
@@ -20,15 +19,14 @@ func (ls *localServer) requestLoggingHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recorder := &statusRecorder{ResponseWriter: w, Status: 200}
 
-		defer func(begin time.Time) {
+		defer func() {
 			ls.slogger.Log(r.Context(), slog.LevelInfo,
 				"request log",
 				"path", r.URL.Path,
 				"method", r.Method,
 				"status", recorder.Status,
-				"took", time.Since(begin),
 			)
-		}(time.Now())
+		}()
 
 		next.ServeHTTP(recorder, r)
 	})
