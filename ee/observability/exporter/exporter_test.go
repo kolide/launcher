@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,14 +40,13 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 	serverProvidedDataStore.Set([]byte("device_id"), []byte("500"))
 	serverProvidedDataStore.Set([]byte("munemo"), []byte("nababe"))
 	serverProvidedDataStore.Set([]byte("organization_id"), []byte("101"))
-	serverProvidedDataStore.Set([]byte("serial_number"), []byte("abcdabcd"))
 
 	mockKnapsack.On("TraceIngestServerURL").Return("localhost:3417")
 	mockKnapsack.On("DisableTraceIngestTLS").Return(false)
 	mockKnapsack.On("ExportTraces").Return(true)
 	mockKnapsack.On("TraceSamplingRate").Return(1.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout, keys.LauncherGoMaxProcs).Return(nil)
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 	mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
 	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
@@ -55,9 +55,10 @@ func TestNewTelemetryExporter(t *testing.T) { //nolint:paralleltest
 		OSName:         runtime.GOOS,
 		OSVersion:      "3.4.5",
 		Hostname:       "Test-Hostname2",
+		HardwareSerial: "abcdabcd",
 	})
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 
 	// Wait a few seconds to allow the osquery queries to go through
@@ -88,12 +89,12 @@ func TestNewTelemetryExporter_exportNotEnabled(t *testing.T) {
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout, keys.LauncherGoMaxProcs).Return(nil)
 	mockKnapsack.On("UpdateChannel").Return("alpha").Maybe()
 	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 	mockKnapsack.On("Slogger").Return(multislogger.NewNopLogger())
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, nil)
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, nil)
 	require.NoError(t, err)
 
 	// Confirm we didn't set a provider
@@ -130,7 +131,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	mockKnapsack.On("ExportTraces").Return(false)
 	mockKnapsack.On("TraceSamplingRate").Return(0.0)
 	mockKnapsack.On("TraceBatchTimeout").Return(1 * time.Minute)
-	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout).Return(nil)
+	mockKnapsack.On("RegisterChangeObserver", mock.Anything, keys.ExportTraces, keys.TraceSamplingRate, keys.TraceIngestServerURL, keys.DisableTraceIngestTLS, keys.TraceBatchTimeout, keys.LauncherGoMaxProcs).Return(nil)
 	mockKnapsack.On("UpdateChannel").Return("beta").Maybe()
 	mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -139,7 +140,7 @@ func TestInterrupt_Multiple(t *testing.T) { //nolint:paralleltest
 	}))
 	mockKnapsack.On("Slogger").Return(slogger)
 
-	telemetryExporter, err := NewTelemetryExporter(context.Background(), mockKnapsack, NewInitialTraceBuffer())
+	telemetryExporter, err := NewTelemetryExporter(t.Context(), mockKnapsack, NewInitialTraceBuffer())
 	require.NoError(t, err)
 	mockKnapsack.AssertExpectations(t)
 
@@ -195,7 +196,9 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 	s.Set([]byte("organization_id"), []byte(expectedOrganizationId))
 
 	expectedSerialNumber := "abcd"
-	s.Set([]byte("serial_number"), []byte(expectedSerialNumber))
+	mockKnapsack.On("GetEnrollmentDetails").Return(types.EnrollmentDetails{
+		HardwareSerial: expectedSerialNumber,
+	})
 
 	expectedUpdateChannel := "stable"
 	mockKnapsack.On("UpdateChannel").Return(expectedUpdateChannel)
@@ -214,6 +217,7 @@ func Test_addDeviceIdentifyingAttributes(t *testing.T) {
 		disableIngestTLS:          false,
 		enabled:                   true,
 		traceSamplingRate:         1.0,
+		gomaxprocsAttrValue:       &atomic.Int64{},
 	}
 
 	traceExporter.addDeviceIdentifyingAttributes()
@@ -271,6 +275,7 @@ func Test_addAttributesFromOsquery(t *testing.T) {
 		disableIngestTLS:          false,
 		enabled:                   true,
 		traceSamplingRate:         1.0,
+		gomaxprocsAttrValue:       &atomic.Int64{},
 	}
 
 	traceExporter.addAttributesFromOsquery()
@@ -318,7 +323,8 @@ func TestPing(t *testing.T) {
 		ingestUrl:                 "localhost:4317",
 		disableIngestTLS:          false,
 		traceSamplingRate:         1.0,
-		ctx:                       context.TODO(),
+		gomaxprocsAttrValue:       &atomic.Int64{},
+		ctx:                       t.Context(),
 	}
 
 	// Simulate a new token being set by updating the data store
@@ -393,7 +399,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				})
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -406,6 +412,7 @@ func TestFlagsChanged_ExportTraces(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.currentEnableValue,
 				traceSamplingRate:         1.0,
+				gomaxprocsAttrValue:       &atomic.Int64{},
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
@@ -467,7 +474,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -480,6 +487,7 @@ func TestFlagsChanged_TraceSamplingRate(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         tt.currentTraceSamplingRate,
+				gomaxprocsAttrValue:       &atomic.Int64{},
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
@@ -539,7 +547,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 			mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
 			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -552,6 +560,7 @@ func TestFlagsChanged_TraceIngestServerURL(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
+				gomaxprocsAttrValue:       &atomic.Int64{},
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
@@ -616,7 +625,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 
 			clientAuthenticator := newClientAuthenticator("test token", tt.currentDisableTraceIngestTLS)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -629,6 +638,7 @@ func TestFlagsChanged_DisableTraceIngestTLS(t *testing.T) { //nolint:paralleltes
 				disableIngestTLS:          tt.currentDisableTraceIngestTLS,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
+				gomaxprocsAttrValue:       &atomic.Int64{},
 				ctx:                       ctx,
 				cancel:                    cancel,
 			}
@@ -692,7 +702,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			traceExporter := &TelemetryExporter{
 				knapsack:                  mockKnapsack,
 				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
@@ -705,6 +715,7 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 				disableIngestTLS:          false,
 				enabled:                   tt.tracingEnabled,
 				traceSamplingRate:         1.0,
+				gomaxprocsAttrValue:       &atomic.Int64{},
 				batchTimeout:              tt.currentBatchTimeout,
 				ctx:                       ctx,
 				cancel:                    cancel,
@@ -715,6 +726,85 @@ func TestFlagsChanged_TraceBatchTimeout(t *testing.T) { //nolint:paralleltest
 			require.Equal(t, tt.newBatchTimeout, traceExporter.batchTimeout, "batch timeout value not updated")
 
 			if tt.shouldReplaceProvider {
+				require.NotNil(t, traceExporter.tracerProvider)
+				require.NotNil(t, traceExporter.meterProvider)
+			} else {
+				require.Nil(t, traceExporter.tracerProvider)
+				require.Nil(t, traceExporter.meterProvider)
+			}
+		})
+	}
+}
+
+func TestFlagsChanged_LauncherGoMaxProcs(t *testing.T) { //nolint:paralleltest
+	actualGomaxprocs := runtime.GOMAXPROCS(0)
+
+	tests := []struct {
+		testName              string
+		currentGomaxprocs     int
+		newGomaxprocs         int64
+		tracingEnabled        bool
+		shouldReplaceProvider bool
+	}{
+		{
+			testName:              "update",
+			currentGomaxprocs:     actualGomaxprocs + 1,
+			newGomaxprocs:         int64(actualGomaxprocs),
+			tracingEnabled:        true,
+			shouldReplaceProvider: true,
+		},
+		{
+			testName:              "update but tracing not enabled",
+			currentGomaxprocs:     actualGomaxprocs - 1,
+			newGomaxprocs:         int64(actualGomaxprocs),
+			tracingEnabled:        false,
+			shouldReplaceProvider: false,
+		},
+		{
+			testName:              "no update",
+			currentGomaxprocs:     actualGomaxprocs,
+			newGomaxprocs:         int64(actualGomaxprocs),
+			tracingEnabled:        true,
+			shouldReplaceProvider: false,
+		},
+	}
+
+	for _, tt := range tests { //nolint:paralleltest
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			mockKnapsack := typesmocks.NewKnapsack(t)
+			mockKnapsack.On("LauncherGoMaxProcs").Return(int(tt.newGomaxprocs))
+			mockKnapsack.On("UpdateChannel").Return("nightly").Maybe()
+			mockKnapsack.On("GetRunID").Return(ulid.New()).Maybe()
+
+			if tt.shouldReplaceProvider {
+				mockKnapsack.On("TraceIngestServerURL").Return("https://example.com")
+			}
+
+			ctx, cancel := context.WithCancel(t.Context())
+			traceExporter := &TelemetryExporter{
+				knapsack:                  mockKnapsack,
+				bufSpanProcessor:          bufspanprocessor.NewBufSpanProcessor(500),
+				slogger:                   multislogger.NewNopLogger(),
+				attrs:                     make([]attribute.KeyValue, 0),
+				attrLock:                  sync.RWMutex{},
+				ingestClientAuthenticator: newClientAuthenticator("test token", false),
+				ingestAuthToken:           "test token",
+				ingestUrl:                 "localhost:4317",
+				disableIngestTLS:          false,
+				enabled:                   tt.tracingEnabled,
+				traceSamplingRate:         1.0,
+				gomaxprocsAttrValue:       &atomic.Int64{},
+				ctx:                       ctx,
+				cancel:                    cancel,
+			}
+			traceExporter.gomaxprocsAttrValue.Store(int64(tt.currentGomaxprocs))
+
+			traceExporter.FlagsChanged(ctx, keys.LauncherGoMaxProcs)
+
+			if tt.shouldReplaceProvider {
+				// We only expect traceExporter.gomaxprocsAttrValue to be updated via a call to setNewGlobalProvider.
+				require.Equal(t, tt.newGomaxprocs, traceExporter.gomaxprocsAttrValue.Load(), "gomaxprocs not updated")
 				require.NotNil(t, traceExporter.tracerProvider)
 				require.NotNil(t, traceExporter.meterProvider)
 			} else {

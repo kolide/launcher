@@ -1,7 +1,6 @@
 package checkups
 
 import (
-	"context"
 	"io"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 func Test_checkPerformance(t *testing.T) {
 	t.Parallel()
 	perf := perfCheckup{}
-	err := perf.Run(context.TODO(), io.Discard)
+	err := perf.Run(t.Context(), io.Discard)
 	require.NoError(t, err, "unexpected error encountered gathering performance stats")
 	require.Contains(t, perf.data, "stats")
 	stats := perf.data["stats"]

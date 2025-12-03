@@ -22,16 +22,17 @@ func main() {
 	fs := flag.NewFlagSet("make", flag.ExitOnError)
 
 	var (
-		flTargets      = fs.String("targets", buildAll, "comma separated list of targets")
-		flDebug        = fs.Bool("debug", false, "use a debug logger")
-		flBuildARCH    = fs.String("arch", runtime.GOARCH, "Architecture to build for.")
-		flBuildOS      = fs.String("os", runtime.GOOS, "Operating system to build for.")
-		flGoPath       = fs.String("go", "", "Path for go binary. Will attempt auto detection.")
-		flRace         = fs.Bool("race", false, "Build race-detector version of binaries.")
-		flStatic       = fs.Bool("static", false, "Build a static binary.")
-		flStampVersion = fs.Bool("linkstamp", false, "Add version info with ldflags.")
-		flFakeData     = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
-		flGithubOutput = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
+		flTargets        = fs.String("targets", buildAll, "comma separated list of targets")
+		flDebug          = fs.Bool("debug", false, "use a debug logger")
+		flBuildARCH      = fs.String("arch", runtime.GOARCH, "Architecture to build for.")
+		flBuildOS        = fs.String("os", runtime.GOOS, "Operating system to build for.")
+		flGoPath         = fs.String("go", "", "Path for go binary. Will attempt auto detection.")
+		flRace           = fs.Bool("race", false, "Build race-detector version of binaries.")
+		flStatic         = fs.Bool("static", false, "Build a static binary.")
+		flStampVersion   = fs.Bool("linkstamp", false, "Add version info with ldflags.")
+		flFakeData       = fs.Bool("fakedata", false, "Compile with build tags to falsify some data, like serial numbers")
+		flGithubOutput   = fs.Bool("github", os.Getenv("GITHUB_ACTIONS") != "", "Include github action output")
+		flIncludeSymbols = fs.Bool("debugsymbols", false, "Compile with or without debug symbols (stripped by default)")
 	)
 
 	ffOpts := []ff.Option{
@@ -72,6 +73,10 @@ func main() {
 
 	if *flGithubOutput {
 		opts = append(opts, make.WithGithubActionOutput())
+	}
+
+	if *flIncludeSymbols {
+		opts = append(opts, make.WithOutStripped())
 	}
 
 	// We need to avoid cgo on windows. See

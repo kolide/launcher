@@ -57,7 +57,7 @@ func TestQueries(t *testing.T) {
 				"query": tt.queryClause,
 			})
 
-			rows, err := testTable.generate(context.TODO(), mockQC)
+			rows, err := testTable.generate(t.Context(), mockQC)
 
 			if tt.err {
 				require.Error(t, err)

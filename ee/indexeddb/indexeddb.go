@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/kolide/goleveldb/leveldb/opt"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/pkg/indexeddbcomparator"
 )
 
 // maxNumberOfObjectStoresToCheck is the number of indices for object stores we will check
@@ -27,12 +29,9 @@ import (
 // bounds.)
 const maxNumberOfObjectStoresToCheck = 100
 
-// indexeddbComparer can be used when opening any IndexedDB instance.
-var indexeddbComparer = newChromeComparer()
-
 // QueryIndexeddbObjectStore queries the indexeddb at the given location `dbLocation`,
 // returning all objects in the given database that live in the given object store.
-func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
+func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLocation string, dbName string, objectStoreName string) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx, "db_name", dbName, "object_store_name", objectStoreName)
 	defer span.End()
 
@@ -49,7 +48,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, dbLocation string, dbName st
 
 	objs := make([]map[string][]byte, 0)
 
-	db, err := OpenLeveldb(tempDbCopyLocation)
+	db, err := OpenLeveldb(slogger, tempDbCopyLocation)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
@@ -182,14 +181,24 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-func OpenLeveldb(dbLocation string) (*leveldb.DB, error) {
+func OpenLeveldb(slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+	comparer := indexeddbcomparator.NewIdbCmp1Comparer(slogger)
 	opts := &opt.Options{
-		Comparer:               indexeddbComparer,
+		Comparer:               comparer,
 		DisableSeeksCompaction: true,               // no need to perform compaction
 		Strict:                 opt.StrictRecovery, // we prefer to drop corrupted data rather than fail to open the db altogether
 	}
 	db, dbOpenErr := leveldb.OpenFile(dbLocation, opts)
 	if dbOpenErr != nil {
+		// ensure we log this error so we can investigate. we don't think we're seeing any non-idb_cmp1
+		// leveldbs, but when that is the case we still get a valid db returned, and then no errors from
+		// the RecoverFile call, so it is possible that this is a valid corruption error which recovery wouldn't have actually fixed.
+		// we can track this error and see if there are other comparer types in the wild that should be accounted for
+		slogger.Log(context.TODO(), slog.LevelError,
+			"error opening leveldb, will attempt recovery",
+			"err", dbOpenErr.Error(),
+		)
+
 		// Perform recover in case we missed something while copying
 		var dbRecoverErr error
 		db, dbRecoverErr = leveldb.RecoverFile(dbLocation, opts)

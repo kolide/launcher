@@ -46,6 +46,7 @@ import (
 	"github.com/kolide/launcher/ee/localserver"
 	"github.com/kolide/launcher/ee/observability"
 	"github.com/kolide/launcher/ee/observability/exporter"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/ee/powereventwatcher"
 	"github.com/kolide/launcher/ee/tables/windowsupdatetable"
 	"github.com/kolide/launcher/ee/tuf"
@@ -71,13 +72,14 @@ import (
 
 const (
 	// Subsystems that launcher listens for control server updates on
-	agentFlagsSubsystemName  = "agent_flags"
-	serverDataSubsystemName  = "kolide_server_data"
-	desktopMenuSubsystemName = "kolide_desktop_menu"
-	authTokensSubsystemName  = "auth_tokens"
-	katcSubsystemName        = "katc_config" // Kolide ATC
-	ztaInfoSubsystemName     = "zta_info"    // legacy name for dt4aInfo subsystem
-	dt4aInfoSubsystemName    = "dt4a_info"
+	agentFlagsSubsystemName               = "agent_flags"
+	serverDataSubsystemName               = "kolide_server_data"
+	desktopMenuSubsystemName              = "kolide_desktop_menu"
+	authTokensSubsystemName               = "auth_tokens"
+	katcSubsystemName                     = "katc_config" // Kolide ATC
+	ztaInfoSubsystemName                  = "zta_info"    // legacy name for dt4aInfo subsystem
+	dt4aInfoSubsystemName                 = "dt4a_info"
+	serverReleaseTrackerDataSubsystemName = "kolide_server_release_tracker_data"
 )
 
 // runLauncher is the entry point into running launcher. It creates a
@@ -202,6 +204,13 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	fcOpts := []flags.Option{flags.WithCmdLineOpts(opts)}
 	flagController := flags.NewFlagController(slogger, stores[storage.AgentFlagsStore], fcOpts...)
 	k := knapsack.New(stores, flagController, db, multiSlogger, systemMultiSlogger)
+
+	// Set up GOMAXPROCS observer to watch for flag changes and apply them at runtime
+	gomaxprocsObs := newGomaxprocsObserver(slogger, k)
+	flagController.RegisterChangeObserver(gomaxprocsObs, keys.LauncherGoMaxProcs)
+
+	// Apply GOMAXPROCS limit from control flag
+	gomaxprocsLimiter(ctx, slogger, k.LauncherGoMaxProcs())
 
 	// Set up flag-driven dedup configuration on the main slogger
 	// (following the user's preference that early logs and system logs don't need deduplication)
@@ -345,7 +354,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			"err", err,
 		)
 	} else if watchdogController != nil { // watchdogController will be nil on non-windows platforms for now
-		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogEnabled)
+		k.RegisterChangeObserver(watchdogController, keys.LauncherWatchdogDisabled)
 		runGroup.Add("watchdogController", watchdogController.Run, watchdogController.Interrupt)
 	}
 
@@ -395,6 +404,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	// Now that the keys exist, collect and set enrollment details (which include the agent keys) in the background
 	gowrapper.Go(ctx, slogger, func() {
 		osquery.CollectAndSetEnrollmentDetails(ctx, slogger, k, 60*time.Second, 6*time.Second)
+		logShipper.Ping() // Let the logshipper know about the updated serial number
 	})
 
 	// init osquery instance history
@@ -404,10 +414,14 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		k.SetOsqueryHistory(osqHistory)
 	}
 
+	logPublisherHTTPClient := osquerypublisher.NewPublisherHTTPClient()
+	logPublishClient := osquerypublisher.NewLogPublisherClient(slogger, k, logPublisherHTTPClient)
+
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
 		k,
 		client,
+		logPublishClient,
 		startupSettingsWriter,
 		osqueryruntime.WithAugeasLensFunction(augeas.InstallLenses),
 	)
@@ -443,6 +457,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		controlService.RegisterConsumer(katcSubsystemName, keyvalueconsumer.NewConfigConsumer(k.KatcConfigStore()))
 		controlService.RegisterSubscriber(katcSubsystemName, osqueryRunner)
 		controlService.RegisterSubscriber(katcSubsystemName, startupSettingsWriter)
+		controlService.RegisterConsumer(serverReleaseTrackerDataSubsystemName, keyvalueconsumer.NewConfigConsumer(k.ServerReleaseTrackerDataStore()))
 
 		runner, err = desktopRunner.New(
 			k,
@@ -453,6 +468,9 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if err != nil {
 			return fmt.Errorf("failed to create desktop runner: %w", err)
 		}
+
+		// Inject the desktop runner into the knapsack for profiling access
+		k.SetDesktopRunner(runner)
 
 		execute, interrupt, err := agent.SetHardwareKeysRunner(ctx, k.Slogger(), k.ConfigStore(), runner)
 		if err != nil {

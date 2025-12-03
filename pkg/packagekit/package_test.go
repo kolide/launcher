@@ -1,7 +1,6 @@
 package packagekit
 
 import (
-	"context"
 	"io"
 	"testing"
 
@@ -27,16 +26,16 @@ func TestPackageTrivial(t *testing.T) {
 		AppleSigningKey: "Developer ID Installer: Kolide Inc (YZ3EM74M78)",
 	}
 
-	err := PackageFPM(context.TODO(), io.Discard, po, AsTar())
+	err := PackageFPM(t.Context(), io.Discard, po, AsTar())
 	require.NoError(t, err)
 
-	err = PackageFPM(context.TODO(), io.Discard, po, AsDeb())
+	err = PackageFPM(t.Context(), io.Discard, po, AsDeb())
 	require.NoError(t, err)
 
-	err = PackageFPM(context.TODO(), io.Discard, po, AsRPM())
+	err = PackageFPM(t.Context(), io.Discard, po, AsRPM())
 	require.NoError(t, err)
 
-	err = PackagePkg(context.TODO(), io.Discard, po, "universal")
+	err = PackagePkg(t.Context(), io.Discard, po, "universal")
 	require.NoError(t, err)
 
 }

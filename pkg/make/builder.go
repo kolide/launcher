@@ -292,6 +292,16 @@ func (b *Builder) BuildCmd(src, appName string) func(context.Context) error {
 
 		if !b.notStripped {
 			ldFlags = append(ldFlags, "-w -s")
+		} else {
+			level.Info(logger).Log(
+				"msg", "compiling debug build without stripping symbols",
+				"os", b.os,
+				"arch", b.arch,
+			)
+			// In the future, we may want to also append `-gcflags=all=-N -l`.
+			// -N disables optimizations, and -l disables inlining, so they may give us improved debugging.
+			// For now, though, we don't include them because they cause the following error on Windows ARM:
+			// "syscall.Syscall15: nosplit stack over 792 byte limit".
 		}
 
 		if b.os == "windows" {

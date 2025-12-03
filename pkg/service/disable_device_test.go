@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -25,35 +24,35 @@ func TestDeviceDisabled(t *testing.T) {
 		{
 			name: "RequestEnrollment",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestEnrollment(context.TODO(), "enroll_secret", "host_identifier", EnrollmentDetails{})
+				_, _, err := client.RequestEnrollment(t.Context(), "enroll_secret", "host_identifier", EnrollmentDetails{})
 				return err
 			},
 		},
 		{
 			name: "RequestConfig",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestConfig(context.TODO(), "node_key")
+				_, _, err := client.RequestConfig(t.Context(), "node_key")
 				return err
 			},
 		},
 		{
 			name: "PublishLogs",
 			f: func(client KolideService) error {
-				_, _, _, err := client.PublishLogs(context.Background(), "node_key", logger.LogTypeStatus, nil)
+				_, _, _, err := client.PublishLogs(t.Context(), "node_key", logger.LogTypeStatus, nil)
 				return err
 			},
 		},
 		{
 			name: "RequestQueries",
 			f: func(client KolideService) error {
-				_, _, err := client.RequestQueries(context.Background(), "node_key")
+				_, _, err := client.RequestQueries(t.Context(), "node_key")
 				return err
 			},
 		},
 		{
 			name: "PublishResults",
 			f: func(client KolideService) error {
-				_, _, _, err := client.PublishResults(context.Background(), "node_key", nil)
+				_, _, _, err := client.PublishResults(t.Context(), "node_key", nil)
 				return err
 			},
 		},

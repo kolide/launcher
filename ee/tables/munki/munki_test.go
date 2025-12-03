@@ -4,7 +4,6 @@
 package munki
 
 import (
-	"context"
 	"testing"
 
 	"github.com/kolide/launcher/ee/tables/tablehelpers"
@@ -15,7 +14,7 @@ import (
 func TestGenerateMunkiReport(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	var tests = []struct {
 		name       string

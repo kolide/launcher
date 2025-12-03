@@ -8,30 +8,31 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
-	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	settingsstoremock "github.com/kolide/launcher/pkg/osquery/mocks"
 	"github.com/kolide/launcher/pkg/osquery/runtime/history"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/service"
 	servicemock "github.com/kolide/launcher/pkg/service/mock"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -46,75 +47,43 @@ import (
 
 var testOsqueryBinary string
 
-// TestMain overrides the default test main function. This allows us to share setup/teardown.
-func TestMain(m *testing.M) {
-	if !hasPermissionsToRunTest() {
-		fmt.Println("these tests must be run as an administrator on windows")
-		return
-	}
+// downloadOnceFunc downloads a real osquery binary for use in tests. This function
+// can be called multiple times but will only execute once -- the osquery binary is
+// stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
+var downloadOnceFunc = sync.OnceFunc(func() {
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("stable")
+})
 
-	binDirectory, err := agent.MkdirTemp("")
-	if err != nil {
-		fmt.Println("Failed to make temp dir for test binaries")
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit in tests
-	}
-
-	testOsqueryBinary = filepath.Join(binDirectory, "osqueryd")
-	if runtime.GOOS == "windows" {
-		testOsqueryBinary += ".exe"
-	}
-
+// setupOnceFunc sets up test configuration that should only happen once.
+var setupOnceFunc = sync.OnceFunc(func() {
 	thrift.ServerConnectivityCheckInterval = 100 * time.Millisecond
+})
 
-	if err := downloadOsqueryInBinDir(binDirectory); err != nil {
-		fmt.Printf("Failed to download osquery: %v\n", err)
-		os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)              //nolint:forbidigo // Fine to use os.Exit in tests
+// requirePermissions checks if the current process has the necessary permissions to run
+// tests (elevated permissions on Windows). If not, it skips the test.
+func requirePermissions(t *testing.T) {
+	if !hasPermissionsToRunTest() {
+		t.Skip("these tests must be run as an administrator on windows")
 	}
-
-	// Run the tests!
-	retCode := m.Run()
-
-	os.Remove(binDirectory) // explicit removal as defer will not run when os.Exit is called
-	os.Exit(retCode)        //nolint:forbidigo // Fine to use os.Exit in tests
 }
 
-// downloadOsqueryInBinDir downloads osqueryd. This allows the test
-// suite to run on hosts lacking osqueryd. We could consider moving this into a deps step.
-func downloadOsqueryInBinDir(binDirectory string) error {
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		return fmt.Errorf("Error parsing platform: %s: %w", runtime.GOOS, err)
-	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	outputFile := filepath.Join(binDirectory, "osqueryd")
-	if runtime.GOOS == "windows" {
-		outputFile += ".exe"
-	}
-
-	cacheDir := "/tmp"
-	if runtime.GOOS == "windows" {
-		cacheDir = os.Getenv("TEMP")
-	}
-
-	path, err := packaging.FetchBinary(context.TODO(), cacheDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "stable", target)
-	if err != nil {
-		return fmt.Errorf("An error occurred fetching the osqueryd binary: %w", err)
-	}
-
-	if err := fsutil.CopyFile(path, outputFile); err != nil {
-		return fmt.Errorf("Couldn't copy file to %s: %w", outputFile, err)
-	}
-
-	return nil
+func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerypublisher.Publisher {
+	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
+	// tests. that logic is tested separately and we can add more logic to test here if needed once
+	// we've settled on a cutover plan and desired behaviors
+	mk.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
+	mk.On("OsqueryPublisherAPIKey").Return("").Maybe()
+	mk.On("OsqueryPublisherURL").Return("").Maybe()
+	slogger := multislogger.NewNopLogger()
+	return osquerypublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
 }
 
 func TestBadBinaryPath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	logBytes, slogger := setUpTestSlogger()
@@ -123,7 +92,7 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return("") // bad binary path
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -133,6 +102,8 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -147,8 +118,9 @@ func TestBadBinaryPath(t *testing.T) {
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	setUpMockStores(t, k)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	runner := New(k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// The runner will repeatedly try to launch the instance, so `Run`
@@ -166,6 +138,10 @@ func TestBadBinaryPath(t *testing.T) {
 
 func TestWithOsqueryFlags(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -174,7 +150,7 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -184,6 +160,8 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -200,11 +178,12 @@ func TestWithOsqueryFlags(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -213,6 +192,9 @@ func TestWithOsqueryFlags(t *testing.T) {
 
 func TestFlagsChanged(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -225,7 +207,7 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -235,7 +217,8 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
-	k.On("InModernStandby").Return(false).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -251,12 +234,16 @@ func TestFlagsChanged(t *testing.T) {
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
+	// set to false initially so osq can start
+	k.On("InModernStandby").Return(false).Twice()
+
 	// Start the runner
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -275,9 +262,24 @@ func TestFlagsChanged(t *testing.T) {
 
 	startingInstance := runner.instances[types.DefaultRegistrationID]
 
-	// Now, WatchdogEnabled should return true
+	// should start off false
+	require.False(t, runner.needsRestart.Load(), "runner should not be flagged as needing restart since it just started")
+
+	// change just the InModernStandby flag -- this should not trigger a restart, since no changes need to be applied
+	k.On("InModernStandby").Return(true).Once()
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
+	require.False(t, runner.needsRestart.Load(), "runner should not be marked as needing a restart when only InModernStandby changed")
+
+	// change both the InModernStandby and WatchdogEnabled flags -- this should trigger a restart, but not until InModernStandby is false again
 	k.On("WatchdogEnabled").Return(true).Once()
-	runner.FlagsChanged(context.TODO(), keys.WatchdogEnabled)
+	k.On("InModernStandby").Return(true).Twice()
+	runner.FlagsChanged(t.Context(), keys.WatchdogEnabled, keys.InModernStandby)
+
+	require.True(t, runner.needsRestart.Load(), "runner should be marked as needing a restart after WatchdogEnabled changed while in modern standby")
+
+	// no simulate coming out of modern standby -- this should trigger a restart
+	k.On("InModernStandby").Return(false)
+	runner.FlagsChanged(t.Context(), keys.InModernStandby)
 
 	// Wait for the instance to restart, then confirm it's healthy post-restart
 	time.Sleep(2 * time.Second)
@@ -285,6 +287,8 @@ func TestFlagsChanged(t *testing.T) {
 
 	// Now confirm that the instance is new
 	require.NotEqual(t, startingInstance, runner.instances[types.DefaultRegistrationID], "instance not replaced")
+
+	require.False(t, runner.needsRestart.Load(), "runner should no longer be marked as needing a restart after restart completed")
 
 	// Confirm osquery watchdog is now enabled
 	watchdogMemoryLimitMBFound := false
@@ -323,6 +327,9 @@ func TestFlagsChanged(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	// Set up all dependencies
 	rootDirectory := testRootDirectory(t)
@@ -331,7 +338,7 @@ func TestPing(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -341,6 +348,8 @@ func TestPing(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -370,9 +379,11 @@ func TestPing(t *testing.T) {
 	k.On("RegisterChangeObserver", mock.Anything, mock.Anything).Maybe().Return()
 	k.On("DeregisterChangeObserver", mock.Anything).Maybe().Return()
 	k.On("UseCachedDataForScheduledQueries").Return(true).Maybe()
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Start the runner
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -571,10 +582,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 	// Instance is not healthy -- gather info about osquery proc, then fail
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd, "cmd not set on instance", debugInfo)
 	require.NotNil(t, runner.instances[types.DefaultRegistrationID].cmd.Process, "instance cmd does not have process", debugInfo)
-	osqueryProc, err := process.NewProcessWithContext(context.TODO(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
+	osqueryProc, err := process.NewProcessWithContext(t.Context(), int32(runner.instances[types.DefaultRegistrationID].cmd.Process.Pid))
 	require.NoError(t, err, "getting osquery process info after instance failed to become healthy", debugInfo)
 
-	isRunning, err := osqueryProc.IsRunningWithContext(context.TODO())
+	isRunning, err := osqueryProc.IsRunningWithContext(t.Context())
 	require.NoError(t, err, "checking if osquery process is running after instance failed to become healthy", debugInfo)
 
 	if isRunning {
@@ -588,6 +599,10 @@ func waitHealthy(t *testing.T, runner *Runner, logBytes *threadsafebuffer.Thread
 
 func TestSimplePath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -596,7 +611,7 @@ func TestSimplePath(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -606,6 +621,8 @@ func TestSimplePath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -625,8 +642,8 @@ func TestSimplePath(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
-
-	runner := New(k, mockServiceClient(t), s)
+	lpc := makeTestOsqLogPublisher(t, k)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -636,6 +653,10 @@ func TestSimplePath(t *testing.T) {
 
 func TestMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -647,7 +668,7 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID, extraRegistrationId})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -657,6 +678,10 @@ func TestMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
+	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", extraRegistrationId).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -674,11 +699,12 @@ func TestMultipleInstances(t *testing.T) {
 	setUpMockStores(t, k)
 	osqHistory := setupHistory(t, k)
 	serviceClient := mockServiceClient(t)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 
-	runner := New(k, serviceClient, s)
+	runner := New(k, serviceClient, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Start the instance
@@ -723,6 +749,10 @@ func TestMultipleInstances(t *testing.T) {
 
 func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -731,7 +761,7 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -741,6 +771,8 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -761,13 +793,17 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, serviceClient, s)
+	runner := New(k, serviceClient, lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
 	// Add in an extra instance
 	extraRegistrationId := ulid.New()
 	runner.registrationIds = append(runner.registrationIds, extraRegistrationId)
+
+	k.On("NodeKey", extraRegistrationId).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", extraRegistrationId).Return(nil).Maybe()
 
 	// Start the instance
 	go runner.Run()
@@ -802,6 +838,10 @@ func TestRunnerHandlesImmediateShutdownWithMultipleInstances(t *testing.T) {
 
 func TestMultipleShutdowns(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -810,7 +850,7 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -820,6 +860,8 @@ func TestMultipleShutdowns(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -839,8 +881,9 @@ func TestMultipleShutdowns(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -853,6 +896,10 @@ func TestMultipleShutdowns(t *testing.T) {
 
 func TestOsqueryDies(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := testRootDirectory(t)
 
 	logBytes, slogger := setUpTestSlogger()
@@ -861,7 +908,7 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory)
@@ -871,6 +918,8 @@ func TestOsqueryDies(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -890,8 +939,9 @@ func TestOsqueryDies(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s)
+	runner := New(k, mockServiceClient(t), lpc, s)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 
@@ -902,7 +952,7 @@ func TestOsqueryDies(t *testing.T) {
 	// Simulate the osquery process unexpectedly dying
 	runner.instanceLock.Lock()
 	require.NoError(t, killProcessGroup(runner.instances[types.DefaultRegistrationID].cmd))
-	runner.instances[types.DefaultRegistrationID].errgroup.Wait(context.TODO())
+	runner.instances[types.DefaultRegistrationID].errgroup.Wait(t.Context())
 	runner.instanceLock.Unlock()
 
 	waitHealthy(t, runner, logBytes, osqHistory)
@@ -928,16 +978,21 @@ func TestOsqueryDies(t *testing.T) {
 
 func TestNotStarted(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	rootDirectory := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
-	runner := New(k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	lpc := makeTestOsqLogPublisher(t, k)
+	runner := New(k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	assert.Error(t, runner.Healthy())
 	assert.NoError(t, runner.Shutdown())
@@ -958,6 +1013,9 @@ func WithStartFunc(f func(cmd *exec.Cmd) error) OsqueryInstanceOption {
 func TestExtensionIsCleanedUp(t *testing.T) {
 	t.Skip("https://github.com/kolide/launcher/issues/478")
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
@@ -987,13 +1045,17 @@ func TestExtensionIsCleanedUp(t *testing.T) {
 // TestRestart tests that the launcher can restart the osqueryd process.
 func TestRestart(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
+
 	runner, logBytes, osqHistory := setupOsqueryInstanceForTests(t)
 	ensureShutdownOnCleanup(t, runner, logBytes)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
-	require.NoError(t, runner.Restart(context.TODO()))
+	require.NoError(t, runner.Restart(t.Context()))
 	waitHealthy(t, runner, logBytes, osqHistory)
 
 	allStats, err := osqHistory.GetHistory()
@@ -1034,7 +1096,7 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("WatchdogMemoryLimitMB").Return(150)
 	k.On("WatchdogUtilizationLimitPercent").Return(20)
 	k.On("WatchdogDelaySec").Return(120)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
@@ -1044,6 +1106,8 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -1063,8 +1127,9 @@ func setupOsqueryInstanceForTests(t *testing.T) (runner *Runner, logBytes *threa
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner = New(k, mockServiceClient(t), s)
+	runner = New(k, mockServiceClient(t), lpc, s)
 	go runner.Run()
 	waitHealthy(t, runner, logBytes, osqHistory)
 
@@ -1087,6 +1152,7 @@ func setUpMockStores(t *testing.T, k *typesMocks.Knapsack) {
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
 	k.On("WindowsUpdatesCacheStore").Return(inmemory.NewStore()).Maybe()
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
 }
 
 func setupHistory(t *testing.T, k *typesMocks.Knapsack) *history.History {

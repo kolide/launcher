@@ -4,7 +4,6 @@
 package secureenclaverunner
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -31,7 +30,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&privKey.PublicKey, nil).Once()
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 		require.NotNil(t, ser.Public())
 
@@ -53,7 +52,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		// iniital key should be nil since client wasn't ready
@@ -91,7 +90,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		// populate store with key
 		store := inmemory.NewStore()
-		firstConsoleUser, err := firstConsoleUser(context.TODO())
+		firstConsoleUser, err := firstConsoleUser(t.Context())
 		require.NoError(t, err)
 
 		serToSerialize := &secureEnclaveRunner{
@@ -113,7 +112,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 
 		// create new signer with store containing key
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {
@@ -147,7 +146,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 			Level: slog.LevelDebug,
 		}))
-		ser, err := New(context.TODO(), slogger, inmemory.NewStore(), secureEnclaveClientMock)
+		ser, err := New(t.Context(), slogger, inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {
@@ -190,7 +189,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		// iniital key should be nil since client wasn't ready
@@ -234,7 +233,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		secureEnclaveClientMock := mocks.NewSecureEnclaveClient(t)
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(nil, errors.New("not available yet")).Once()
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), inmemory.NewStore(), secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		// iniital key should be nil since client wasn't ready
@@ -261,7 +260,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		// populate store with key
 		store := inmemory.NewStore()
-		firstConsoleUser, err := firstConsoleUser(context.TODO())
+		firstConsoleUser, err := firstConsoleUser(t.Context())
 		require.NoError(t, err)
 
 		serToSerialize := &secureEnclaveRunner{
@@ -291,7 +290,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		secureEnclaveClientMock.On("CreateSecureEnclaveKey", mock.Anything, mock.AnythingOfType("string")).Return(&newKey.PublicKey, nil).Once()
 
 		// create new signer with store containing key
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {
@@ -322,7 +321,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 
 		// populate store with key
 		store := inmemory.NewStore()
-		firstConsoleUser, err := firstConsoleUser(context.TODO())
+		firstConsoleUser, err := firstConsoleUser(t.Context())
 		require.NoError(t, err)
 
 		serToSerialize := &secureEnclaveRunner{
@@ -346,7 +345,7 @@ func Test_secureEnclaveRunner(t *testing.T) {
 		secureEnclaveClientMock.On("VerifySecureEnclaveKey", mock.Anything, mock.Anything, mock.Anything).Return(false, errors.New("cant talk to secure enclave"))
 
 		// create new signer with store containing key
-		ser, err := New(context.TODO(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
+		ser, err := New(t.Context(), multislogger.NewNopLogger(), store, secureEnclaveClientMock)
 		require.NoError(t, err)
 
 		go func() {

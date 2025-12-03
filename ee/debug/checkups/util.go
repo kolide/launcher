@@ -51,11 +51,18 @@ type fileInfo struct {
 }
 
 // addFileToZip takes a file path, and a zip writer, and adds the file and some metadata.
-func addFileToZip(z *zip.Writer, location string) error {
+// If zipEntryName is provided, it will be used as the zip entry name; otherwise, the location will be used.
+func addFileToZip(z *zip.Writer, location string, zipEntryName ...string) error {
+	// Determine the zip entry name to use
+	entryName := location
+	if len(zipEntryName) > 0 && zipEntryName[0] != "" {
+		entryName = zipEntryName[0]
+	}
+
 	// Create metadata file first, keeping existing pattern
-	metaout, err := z.Create(filepath.Join(".", location+".flaremeta"))
+	metaout, err := z.Create(entryName + ".flaremeta")
 	if err != nil {
-		return fmt.Errorf("creating %s in zip: %w", location+".flaremeta", err)
+		return fmt.Errorf("creating %s in zip: %w", entryName+".flaremeta", err)
 	}
 
 	// Get file info
@@ -104,16 +111,20 @@ func addFileToZip(z *zip.Writer, location string) error {
 	if err != nil {
 		return fmt.Errorf("creating file header: %w", err)
 	}
-	header.Name = filepath.Join(".", location)
+	if len(zipEntryName) > 0 && zipEntryName[0] != "" {
+		header.Name = entryName
+	} else {
+		header.Name = filepath.Join(".", location)
+	}
 
 	// Create file in zip with metadata
 	dataout, err := z.CreateHeader(header)
 	if err != nil {
-		return fmt.Errorf("creating %s in zip: %w", location, err)
+		return fmt.Errorf("creating %s in zip: %w", entryName, err)
 	}
 
 	if _, err := io.Copy(dataout, fh); err != nil {
-		return fmt.Errorf("copy data into zip file %s: %w", location, err)
+		return fmt.Errorf("copy data into zip file %s: %w", entryName, err)
 	}
 
 	return nil

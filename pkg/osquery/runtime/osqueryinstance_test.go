@@ -60,7 +60,6 @@ func TestCreateOsqueryCommand(t *testing.T) {
 		extensionAutoloadPath: "/foo/bar/osquery.autoload",
 	}
 
-	osquerydPath := testOsqueryBinary
 	rootDir := t.TempDir()
 
 	k := typesMocks.NewKnapsack(t)
@@ -73,11 +72,12 @@ func TestCreateOsqueryCommand(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = paths
 
-	_, err := i.createOsquerydCommand(osquerydPath)
+	_, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	k.AssertExpectations(t)
@@ -97,11 +97,12 @@ func TestCreateOsqueryCommandWithFlags(t *testing.T) {
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	// count of flags that cannot be overridden with this option
@@ -131,11 +132,12 @@ func TestCreateOsqueryCommand_SetsEnabledWatchdogSettingsAppropriately(t *testin
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	watchdogMemoryLimitMBFound := false
@@ -181,11 +183,12 @@ func TestCreateOsqueryCommand_SetsDisabledWatchdogSettingsAppropriately(t *testi
 	k.On("OsqueryFlags").Return([]string{})
 	k.On("RootDirectory").Return(rootDir)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 	i.paths = &osqueryFilePaths{}
 
-	cmd, err := i.createOsquerydCommand(testOsqueryBinary)
+	cmd, err := i.createOsquerydCommand("") // we do not actually exec so don't need to download a real osquery for this test
 	require.NoError(t, err)
 
 	disableWatchdogFound := false
@@ -221,8 +224,9 @@ func TestHealthy_DoesNotPassForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	require.Error(t, i.Healthy(), "unlaunched instance should not return healthy status")
 }
@@ -233,8 +237,9 @@ func TestQuery_ReturnsErrorForUnlaunchedInstance(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	_, err := i.Query("select * from osquery_info;")
 	require.Error(t, err, "should not be able to query unlaunched instance")
@@ -246,14 +251,17 @@ func Test_healthcheckWithRetries(t *testing.T) {
 	k := typesMocks.NewKnapsack(t)
 	k.On("Slogger").Return(multislogger.NewNopLogger())
 	setupHistory(t, k)
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), settingsstoremock.NewSettingsStoreWriter(t))
+	lpc := makeTestOsqLogPublisher(t, k)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, settingsstoremock.NewSettingsStoreWriter(t))
 
 	// No client available, so healthcheck should fail despite retries
-	require.Error(t, i.healthcheckWithRetries(context.TODO(), 5, 100*time.Millisecond))
+	require.Error(t, i.healthcheckWithRetries(t.Context(), 5, 100*time.Millisecond))
 }
 
 func TestHealthy(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	// Set up instance dependencies
 	logBytes, slogger := setUpTestSlogger()
@@ -271,11 +279,14 @@ func TestHealthy(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(500)
 	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
-	k.On("ReadEnrollSecret").Return("", nil)
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
+	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
 	k.On("UpdateChannel").Return("stable").Maybe()
 	k.On("PinnedLauncherVersion").Return("").Maybe()
@@ -291,9 +302,10 @@ func TestHealthy(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Run the instance
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for `Healthy` to pass
@@ -312,7 +324,7 @@ func TestHealthy(t *testing.T) {
 
 	// Now, shut down our new server
 	i.emsLock.Lock()
-	require.NoError(t, i.extensionManagerServers[testAdditionalServerName].Shutdown(context.TODO()))
+	require.NoError(t, i.extensionManagerServers[testAdditionalServerName].Shutdown(t.Context()))
 	i.emsLock.Unlock()
 
 	// Expect that the healthcheck begins to fail soon
@@ -331,7 +343,7 @@ func TestHealthy(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {
@@ -347,6 +359,8 @@ func TestHealthy(t *testing.T) {
 
 func TestLaunch(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	logBytes, slogger := setUpTestSlogger()
 	rootDirectory := testRootDirectory(t)
@@ -364,9 +378,12 @@ func TestLaunch(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(500)
 	k.On("Transport").Return("jsonrpc")
 	setUpMockStores(t, k)
-	k.On("ReadEnrollSecret").Return("", nil)
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
+	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedOsquerydVersion).Maybe()
@@ -385,8 +402,9 @@ func TestLaunch(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil).Maybe()
 	osqHistory := setupHistory(t, k)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	require.False(t, i.instanceStarted())
 	go i.Launch()
 
@@ -417,7 +435,7 @@ func TestLaunch(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {
@@ -433,6 +451,7 @@ func TestLaunch(t *testing.T) {
 
 func TestReloadKatcExtension(t *testing.T) {
 	t.Parallel()
+	downloadOnceFunc()
 
 	// Set up all million dependencies
 	logBytes, slogger := setUpTestSlogger()
@@ -461,7 +480,9 @@ func TestReloadKatcExtension(t *testing.T) {
 	k.On("StatusLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("ResultLogsStore").Return(inmemory.NewStore()).Maybe()
 	k.On("BboltDB").Return(storageci.SetupDB(t)).Maybe()
-	k.On("ReadEnrollSecret").Return("", nil)
+	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("OsqueryHealthcheckStartupDelay").Return(10 * time.Second)
@@ -482,9 +503,11 @@ func TestReloadKatcExtension(t *testing.T) {
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
 	osqHistory := setupHistory(t, k)
+	k.On("ServerReleaseTrackerDataStore").Return(inmemory.NewStore()).Maybe()
+	lpc := makeTestOsqLogPublisher(t, k)
 
 	// Create an instance and launch it
-	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), s)
+	i := newInstance(types.DefaultRegistrationID, k, mockServiceClient(t), lpc, s)
 	go i.Launch()
 
 	// Wait for the instance to become healthy
@@ -522,7 +545,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Call ReloadKatcExtension with no changes -- it shouldn't do anything.
 	// We still shouldn't have a KATC server or be able to query for the table.
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 	i.emsLock.Lock()
 	require.NotContains(t, i.extensionManagerServers, katcExtensionName)
 	i.emsLock.Unlock()
@@ -540,12 +563,12 @@ func TestReloadKatcExtension(t *testing.T) {
 	tableConfigRaw, err := json.Marshal(tableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), tableConfigRaw))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should have an extension manager server for KATC, and it should know about our table
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
+	columnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(t.Context(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)
@@ -572,12 +595,12 @@ func TestReloadKatcExtension(t *testing.T) {
 	updatedTableConfigRaw, err := json.Marshal(updatedTableConfig)
 	require.NoError(t, err)
 	require.NoError(t, katcConfigStore.Set([]byte(testKatcTableName), updatedTableConfigRaw))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should still have an extension manager server for KATC
 	i.emsLock.Lock()
 	require.Contains(t, i.extensionManagerServers, katcExtensionName)
-	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(context.TODO(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
+	updatedColumnsResponse, err := i.extensionManagerServers[katcExtensionName].Call(t.Context(), "table", testKatcTableName, osquerygen.ExtensionPluginRequest{
 		"action": "columns",
 	})
 	require.NoError(t, err)
@@ -595,7 +618,7 @@ func TestReloadKatcExtension(t *testing.T) {
 
 	// Delete KATC configuration entirely
 	require.NoError(t, katcConfigStore.Delete([]byte(testKatcTableName)))
-	require.NoError(t, i.ReloadKatcExtension(context.TODO()))
+	require.NoError(t, i.ReloadKatcExtension(t.Context()))
 
 	// We should no longer have an extension manager server for KATC
 	i.emsLock.Lock()
@@ -610,7 +633,7 @@ func TestReloadKatcExtension(t *testing.T) {
 	i.BeginShutdown()
 	shutdownErr := make(chan error)
 	go func() {
-		shutdownErr <- i.WaitShutdown(context.TODO())
+		shutdownErr <- i.WaitShutdown(t.Context())
 	}()
 
 	select {

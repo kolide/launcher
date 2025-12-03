@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"log/slog"
-
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -21,14 +21,14 @@ import (
 // Package-level runID variable
 var runID string
 
-// Package-level enrollmentDetails variable
-var enrollmentDetails *types.EnrollmentDetails
-
 // type alias Flags, so that we can embed it inside knapsack, as `flags` and not `Flags`
 type flags types.Flags
 
 // nodeKeyKey is the key that we store the node key under in the config store.
 var nodeKeyKey = []byte("nodeKey")
+
+// enrollmentDetailsKey is the key that we store the enrollment details under in the enrollment details store.
+var enrollmentDetailsKey = []byte("current_enrollment_details")
 
 // Knapsack is an inventory of data and useful services which are used throughout
 // launcher code and are typically valid for the lifetime of the launcher application instance.
@@ -49,6 +49,8 @@ type knapsack struct {
 	querier types.InstanceQuerier
 
 	osqHistory types.OsqueryHistorian
+
+	desktopRunner types.DesktopRunner
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -127,6 +129,8 @@ func (k *knapsack) Registrations() ([]types.Registration, error) {
 // SaveRegistration creates a new registration using the given information and stores it
 // in our registration store; it also stores the node key separately in the config store.
 // It is permissible for the enrollment secret to be empty, in the case of a secretless enrollment.
+// It is permissible for the munemo to be empty, if the enrollment secret is not -- we can
+// extract the munemo from the enrollment secret.
 func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentSecret string) error {
 	// First, get the stores we'll need
 	nodeKeyStore := k.getKVStore(storage.ConfigStore)
@@ -136,6 +140,34 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	registrationStore := k.getKVStore(storage.RegistrationStore)
 	if registrationStore == nil {
 		return errors.New("no registration store")
+	}
+
+	// Ensure we have the minimum information required to save a registration
+	if munemo == "" && enrollmentSecret == "" {
+		return errors.New("munemo and enrollment secret cannot both be empty")
+	}
+	if nodeKey == "" {
+		return errors.New("node key cannot be empty")
+	}
+
+	// If we don't have a munemo, but do have an enrollment secret, attempt to extract the munemo
+	// from the enrollment secret.
+	if munemo == "" && enrollmentSecret != "" {
+		// Extract the munemo from the enroll secret.
+		// We do not have the key, and thus cannot verify -- so we use ParseUnverified.
+		token, _, err := new(jwt.Parser).ParseUnverified(enrollmentSecret, jwt.MapClaims{})
+		if err != nil {
+			return fmt.Errorf("parsing enrollment secret: %w", err)
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return errors.New("no claims in enrollment secret")
+		}
+		munemoClaim, munemoFound := claims["organization"]
+		if !munemoFound {
+			return errors.New("no claim for organization in enrollment secret, cannot get munemo")
+		}
+		munemo = fmt.Sprintf("%s", munemoClaim)
 	}
 
 	// Prepare the new registration for storage
@@ -151,12 +183,146 @@ func (k *knapsack) SaveRegistration(registrationId, munemo, nodeKey, enrollmentS
 	}
 
 	// Now, store our data
-	if err := nodeKeyStore.Set(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)), []byte(nodeKey)); err != nil {
+	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
+	if err := nodeKeyStore.Set(nodeKeyKeyForRegistration, []byte(nodeKey)); err != nil {
 		return fmt.Errorf("setting node key in store: %w", err)
 	}
 	if err := registrationStore.Set([]byte(registrationId), rawRegistration); err != nil {
 		return fmt.Errorf("adding registration to store: %w", err)
 	}
+
+	k.Slogger().Log(context.Background(), slog.LevelInfo,
+		"successfully saved registration",
+		"node_key_key", string(nodeKeyKeyForRegistration),
+		"registration_id", registrationId,
+		"munemo", munemo,
+	)
+
+	return nil
+}
+
+// EnsureRegistrationStored creates a registration under the given registration ID,
+// if it does not already exist. Since registrations are a newer concept, older launcher
+// installations may not have them saved yet.
+func (k *knapsack) EnsureRegistrationStored(registrationId string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store, cannot ensure registration is stored")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store, cannot ensure registration is stored")
+	}
+
+	// Get the existing node key from the config store. If we can't get this, then
+	// there's nothing more we can do here -- we won't save a registration without
+	// a node key.
+	nodeKeyKeyForRegistration := storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))
+	keyRaw, err := nodeKeyStore.Get(nodeKeyKeyForRegistration)
+	if err != nil {
+		return fmt.Errorf("retrieving node key: %w", err)
+	}
+	nodeKey := string(keyRaw)
+	if nodeKey == "" {
+		return errors.New("no node key stored, cannot store registration (probably a new install)")
+	}
+
+	// Check to see if we have an existing registration first
+	existingRegistrationRaw, err := registrationStore.Get([]byte(registrationId))
+	if err != nil {
+		return fmt.Errorf("getting existing registration: %w", err)
+	}
+
+	// No registration exists yet -- add it if we can
+	if existingRegistrationRaw == nil {
+		// Grab the enroll secret, since we need that to create a new registration.
+		enrollSecret, err := k.ReadEnrollSecret()
+		if err != nil {
+			// The enroll secret doesn't exist -- likely, this is a bad manual installation.
+			return fmt.Errorf("reading enrollment secret to create new registration: %w", err)
+		}
+		// SaveRegistration will extract the munemo from the enrollment secret for us.
+		if err := k.SaveRegistration(registrationId, "", nodeKey, enrollSecret); err != nil {
+			return fmt.Errorf("saving new registration: %w", err)
+		}
+		return nil
+	}
+
+	// We have an existing registration, which may or may not have the node key set on it yet --
+	// unmarshal it so we can update it appropriately with the node key.
+	var existingRegistration types.Registration
+	if err := json.Unmarshal(existingRegistrationRaw, &existingRegistration); err != nil {
+		return fmt.Errorf("unmarshalling existing registration: %w", err)
+	}
+
+	// Registration already exists, and the node key is correct -- nothing to do here!
+	if nodeKey == existingRegistration.NodeKey {
+		return nil
+	}
+
+	// Make update
+	existingRegistration.NodeKey = nodeKey
+	updatedRegistrationRaw, err := json.Marshal(existingRegistration)
+	if err != nil {
+		return fmt.Errorf("marshalling updated registration: %w", err)
+	}
+	if err := registrationStore.Set([]byte(registrationId), updatedRegistrationRaw); err != nil {
+		return fmt.Errorf("updating registration in store: %w", err)
+	}
+
+	k.Slogger().Log(context.TODO(), slog.LevelInfo,
+		"successfully updated registration's node key",
+		"munemo", existingRegistration.Munemo,
+		"registration_id", registrationId,
+	)
+	return nil
+}
+
+func (k *knapsack) NodeKey(registrationId string) (string, error) {
+	// First, get the store we'll need. For now, we continue to pull the node key from
+	// the config store, but in the future, we will be able to pull it from the registrations
+	// store instead.
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return "", errors.New("no config store")
+	}
+
+	// Retrieve the key from the store
+	key, err := nodeKeyStore.Get(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId)))
+	if err != nil {
+		return "", fmt.Errorf("error getting node key: %w", err)
+	}
+
+	if key != nil {
+		return string(key), nil
+	}
+
+	return "", nil
+}
+
+func (k *knapsack) DeleteRegistration(registrationId string) error {
+	// First, get the stores we'll need
+	nodeKeyStore := k.getKVStore(storage.ConfigStore)
+	if nodeKeyStore == nil {
+		return errors.New("no config store")
+	}
+	registrationStore := k.getKVStore(storage.RegistrationStore)
+	if registrationStore == nil {
+		return errors.New("no registration store")
+	}
+
+	if err := nodeKeyStore.Delete(storage.KeyByIdentifier(nodeKeyKey, storage.IdentifierTypeRegistration, []byte(registrationId))); err != nil {
+		return fmt.Errorf("deleting node key for %s: %w", registrationId, err)
+	}
+	if err := registrationStore.Delete([]byte(registrationId)); err != nil {
+		return fmt.Errorf("deleting registration for %s: %w", registrationId, err)
+	}
+
+	k.Slogger().Log(context.Background(), slog.LevelInfo,
+		"deleted registration",
+		"registration_id", registrationId,
+	)
 
 	return nil
 }
@@ -248,11 +414,15 @@ func (k *knapsack) RegistrationStore() types.KVStore {
 	return k.getKVStore(storage.RegistrationStore)
 }
 
-func (k *knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
-	return k.flags.SetLauncherWatchdogEnabled(enabled)
+func (k *knapsack) EnrollmentDetailsStore() types.KVStore {
+	return k.getKVStore(storage.EnrollmentDetailsStore)
 }
-func (k *knapsack) LauncherWatchdogEnabled() bool {
-	return k.flags.LauncherWatchdogEnabled()
+
+func (k *knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
+	return k.flags.SetLauncherWatchdogDisabled(disabled)
+}
+func (k *knapsack) LauncherWatchdogDisabled() bool {
+	return k.flags.LauncherWatchdogDisabled()
 }
 
 func (k *knapsack) getKVStore(storeType storage.Store) types.KVStore {
@@ -291,48 +461,67 @@ func (k *knapsack) ReadEnrollSecret() (string, error) {
 }
 
 func (k *knapsack) CurrentEnrollmentStatus() (types.EnrollmentStatus, error) {
+	// Check to see if we have a node key for the default registration.
+	key, err := k.NodeKey(types.DefaultRegistrationID)
+	if err != nil {
+		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
+	}
+
+	if len(key) > 0 {
+		return types.Enrolled, nil
+	}
+
+	// We are unenrolled. Check to see if we're a secretless installation.
 	enrollSecret, err := k.ReadEnrollSecret()
 	if err != nil || enrollSecret == "" {
 		return types.NoEnrollmentKey, nil
 	}
 
-	if k.ConfigStore() == nil {
-		return types.Unknown, errors.New("no config store in knapsack")
-	}
-
-	key, err := k.ConfigStore().Get([]byte("nodeKey"))
-	if err != nil {
-		return types.Unknown, fmt.Errorf("getting node key from store: %w", err)
-	}
-
-	if len(key) == 0 {
-		return types.Unenrolled, nil
-	}
-
-	return types.Enrolled, nil
+	// Not secretless, merely unenrolled
+	return types.Unenrolled, nil
 }
 
 // SetEnrollmentDetails updates the enrollment details, merging with existing details
 func (k *knapsack) SetEnrollmentDetails(newDetails types.EnrollmentDetails) {
-	// Get current details or empty struct if nil
-	// capture old values for logging
-	var oldDetails types.EnrollmentDetails
-	if enrollmentDetails != nil {
-		oldDetails = *enrollmentDetails
+	store := k.EnrollmentDetailsStore()
+	if store == nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"enrollment details store not available",
+		)
+		return
 	}
+
+	// Get existing details
+	oldDetails := k.GetEnrollmentDetails()
 
 	// Merge the new details with existing ones
 	mergedDetails := mergeEnrollmentDetails(oldDetails, newDetails)
 
-	// Log old and merged details - simpler approach
+	// Marshal to JSON
+	data, err := json.Marshal(mergedDetails)
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to marshal enrollment details",
+			"err", err,
+		)
+		return
+	}
+
+	// Save to store
+	if err := store.Set(enrollmentDetailsKey, data); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to save enrollment details to store",
+			"err", err,
+		)
+		return
+	}
+
+	// Log old and merged details
 	k.Slogger().Log(context.Background(), slog.LevelDebug,
-		"updating enrollment details",
+		"updated enrollment details in store",
 		"old_details", fmt.Sprintf("%+v", oldDetails),
 		"new_details", fmt.Sprintf("%+v", mergedDetails),
 	)
-
-	// Update the global enrollment details
-	enrollmentDetails = &mergedDetails
 }
 
 // mergeEnrollmentDetails combines old and new details, only updating non-empty fields
@@ -397,15 +586,46 @@ func mergeEnrollmentDetails(oldDetails, newDetails types.EnrollmentDetails) type
 }
 
 func (k *knapsack) GetEnrollmentDetails() types.EnrollmentDetails {
-	if enrollmentDetails == nil {
+	store := k.EnrollmentDetailsStore()
+	if store == nil {
+		k.Slogger().Log(context.Background(), slog.LevelDebug,
+			"enrollment details store not available",
+		)
 		return types.EnrollmentDetails{}
 	}
 
-	// refresh osquery version, covers the case where the osquery version is updated without launcher restart
-	osqueryVersion := k.CurrentRunningOsqueryVersion()
-	enrollmentDetails.OsqueryVersion = osqueryVersion
+	// Read from store
+	data, err := store.Get(enrollmentDetailsKey)
+	if err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to get enrollment details from store",
+			"err", err,
+		)
+		return types.EnrollmentDetails{}
+	}
 
-	return *enrollmentDetails
+	if data == nil {
+		return types.EnrollmentDetails{}
+	}
+
+	// Unmarshal
+	var details types.EnrollmentDetails
+	if err := json.Unmarshal(data, &details); err != nil {
+		k.Slogger().Log(context.Background(), slog.LevelError,
+			"failed to unmarshal enrollment details",
+			"err", err,
+		)
+		return types.EnrollmentDetails{}
+	}
+
+	// Refresh osquery version, covers the case where the osquery version is updated without launcher restart
+	// Only attempt this if flags is available
+	if k.flags != nil {
+		osqueryVersion := k.CurrentRunningOsqueryVersion()
+		details.OsqueryVersion = osqueryVersion
+	}
+
+	return details
 }
 
 func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
@@ -414,4 +634,20 @@ func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
 
 func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	k.osqHistory = osqHistory
+}
+
+// DesktopRunner interface methods
+func (k *knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	if k.desktopRunner == nil {
+		return nil, nil
+	}
+	return k.desktopRunner.RequestProfile(ctx, profileType)
+}
+
+func (k *knapsack) SetDesktopRunner(runner types.DesktopRunner) {
+	k.desktopRunner = runner
+}
+
+func (k *knapsack) ServerReleaseTrackerDataStore() types.KVStore {
+	return k.getKVStore(storage.ServerReleaseTrackerDataStore)
 }

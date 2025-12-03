@@ -172,13 +172,14 @@ func (cs *ControlService) startupData(ctx context.Context) map[string]string {
 		data["organization_id"] = string(orgId)
 	}
 
-	if serialNumber, err := cs.knapsack.ServerProvidedDataStore().Get([]byte("serial_number")); err != nil {
-		cs.slogger.Log(ctx, slog.LevelDebug,
-			"could not get serial number for startup message",
-			"err", err,
-		)
+	// Get serial number from enrollment details
+	enrollmentDetails := cs.knapsack.GetEnrollmentDetails()
+	if enrollmentDetails.HardwareSerial != "" {
+		data["serial_number"] = enrollmentDetails.HardwareSerial
 	} else {
-		data["serial_number"] = string(serialNumber)
+		cs.slogger.Log(ctx, slog.LevelDebug,
+			"could not get serial number from enrollment details",
+		)
 	}
 
 	return data

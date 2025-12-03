@@ -22,6 +22,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -103,12 +104,13 @@ func WithAugeasLensFunction(f func(dir string) error) OsqueryInstanceOption {
 // OsqueryInstance is the type which represents a currently running instance
 // of osqueryd.
 type OsqueryInstance struct {
-	opts           osqueryOptions
-	registrationId string
-	knapsack       types.Knapsack
-	slogger        *slog.Logger
-	serviceClient  service.KolideService
-	settingsWriter settingsStoreWriter
+	opts             osqueryOptions
+	registrationId   string
+	knapsack         types.Knapsack
+	slogger          *slog.Logger
+	serviceClient    service.KolideService
+	logPublishClient osquerypublisher.Publisher
+	settingsWriter   settingsStoreWriter
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
 	runId                   string // string identifier for this instance
@@ -218,13 +220,14 @@ type osqueryOptions struct {
 	extensionSocketPath string
 }
 
-func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
 		registrationId:          registrationId,
 		knapsack:                knapsack,
 		slogger:                 knapsack.Slogger().With("component", "osquery_instance", "registration_id", registrationId, "instance_run_id", runId),
 		serviceClient:           serviceClient,
+		logPublishClient:        logPublishClient,
 		settingsWriter:          settingsWriter,
 		runId:                   runId,
 		extensionManagerServers: make(map[string]*osquery.ExtensionManagerServer),
@@ -695,7 +698,7 @@ func (i *OsqueryInstance) startKolideSaasExtension(ctx context.Context) error {
 
 	// Create the extension
 	var err error
-	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.settingsWriter, i.knapsack, i.registrationId, extOpts)
+	i.saasExtension, err = launcherosq.NewExtension(ctx, i.serviceClient, i.logPublishClient, i.settingsWriter, i.knapsack, i.registrationId, extOpts)
 	if err != nil {
 		return fmt.Errorf("creating new extension: %w", err)
 	}

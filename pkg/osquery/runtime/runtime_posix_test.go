@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
@@ -38,6 +39,9 @@ func hasPermissionsToRunTest() bool {
 // out how to suspend and resume a process on Windows via golang.
 func TestOsquerySlowStart(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -50,13 +54,15 @@ func TestOsquerySlowStart(t *testing.T) {
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
 	k.On("OsqueryFlags").Return([]string{}).Maybe()
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("LatestOsquerydPath", mock.Anything).Return(testOsqueryBinary)
 	k.On("LoggingInterval").Return(5 * time.Minute).Maybe()
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -76,8 +82,9 @@ func TestOsquerySlowStart(t *testing.T) {
 
 	s := settingsstoremock.NewSettingsStoreWriter(t)
 	s.On("WriteSettings").Return(nil)
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s, WithStartFunc(func(cmd *exec.Cmd) error {
+	runner := New(k, mockServiceClient(t), lpc, s, WithStartFunc(func(cmd *exec.Cmd) error {
 		err := cmd.Start()
 		if err != nil {
 			return fmt.Errorf("unexpected error starting command: %w", err)
@@ -104,6 +111,9 @@ func TestOsquerySlowStart(t *testing.T) {
 // This is only run on non-windows platforms because the extension socket path is semi random on windows.
 func TestExtensionSocketPath(t *testing.T) {
 	t.Parallel()
+	requirePermissions(t)
+	downloadOnceFunc()
+	setupOnceFunc()
 
 	rootDirectory := testRootDirectory(t)
 
@@ -113,7 +123,7 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("RegistrationIDs").Return([]string{types.DefaultRegistrationID})
 	k.On("OsqueryHealthcheckStartupDelay").Return(0 * time.Second).Maybe()
 	k.On("WatchdogEnabled").Return(false)
-	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	k.On("RegisterChangeObserver", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	k.On("Slogger").Return(slogger)
 	k.On("RootDirectory").Return(rootDirectory).Maybe()
 	k.On("OsqueryVerbose").Return(true).Maybe()
@@ -123,6 +133,8 @@ func TestExtensionSocketPath(t *testing.T) {
 	k.On("LogMaxBytesPerBatch").Return(0).Maybe()
 	k.On("Transport").Return("jsonrpc").Maybe()
 	k.On("ReadEnrollSecret").Return("", nil).Maybe()
+	k.On("NodeKey", types.DefaultRegistrationID).Return(ulid.New(), nil).Maybe()
+	k.On("EnsureRegistrationStored", types.DefaultRegistrationID).Return(nil).Maybe()
 	k.On("InModernStandby").Return(false).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.UpdateChannel).Maybe()
 	k.On("RegisterChangeObserver", mock.Anything, keys.PinnedLauncherVersion).Maybe()
@@ -144,8 +156,9 @@ func TestExtensionSocketPath(t *testing.T) {
 	s.On("WriteSettings").Return(nil)
 
 	extensionSocketPath := filepath.Join(rootDirectory, "sock")
+	lpc := makeTestOsqLogPublisher(t, k)
 
-	runner := New(k, mockServiceClient(t), s, WithExtensionSocketPath(extensionSocketPath))
+	runner := New(k, mockServiceClient(t), lpc, s, WithExtensionSocketPath(extensionSocketPath))
 	ensureShutdownOnCleanup(t, runner, logBytes)
 	go runner.Run()
 

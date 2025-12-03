@@ -1,14 +1,16 @@
 package localserver
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"testing"
 	"time"
 
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	k.On("Slogger").Return(slogger)
 	k.On("Registrations").Return([]types.Registration{}, nil) // return empty set of registrations so we will get a munemo worker
 	k.On("LatestOsquerydPath", mock.Anything).Return("")
+	testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
+	require.NoError(t, err, "could not create test config store")
+	k.On("ConfigStore").Return(testConfigStore).Maybe()
 
 	// Override the poll and recalculate interval for the test so we can be sure that the async workers
 	// do run, but then stop running on shutdown
@@ -33,7 +38,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	recalculateInterval = 100 * time.Millisecond
 
 	// Create the localserver
-	ls, err := New(context.TODO(), k, nil)
+	ls, err := New(t.Context(), k, nil)
 	require.NoError(t, err)
 
 	// Let the server run for a bit

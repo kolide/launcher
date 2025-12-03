@@ -16,15 +16,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/kolide/kit/version"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/agent"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/consoleuser"
 	"github.com/kolide/launcher/ee/control"
-	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/pkg/launcher"
 )
 
@@ -45,26 +44,24 @@ func WithNote(note string) shipperOption {
 }
 
 type shipper struct {
-	writer   io.WriteCloser
 	knapsack types.Knapsack
 
-	uploadName           string
-	uploadRequestURL     string
-	uploadRequest        *http.Request
-	uploadRequestStarted bool
-	uploadRequestErr     error
-	uploadResponse       *http.Response
-	uploadRequestWg      *sync.WaitGroup
-	uploadRequestCancel  context.CancelFunc
+	uploadName       string
+	uploadRequestURL string
+	uploadURL        string
 
 	// note is intended to help humans identify the object being shipped
 	note string
+
+	// tempFile stores the flare content before upload
+	// S3 presigned URLs don't support chunked transfer encoding, so we write
+	// to a temp file and upload with a known Content-Length
+	tempFile *os.File
 }
 
 func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	s := &shipper{
-		knapsack:        knapsack,
-		uploadRequestWg: &sync.WaitGroup{},
+		knapsack: knapsack,
 	}
 
 	for _, opt := range opts {
@@ -83,15 +80,16 @@ func New(knapsack types.Knapsack, opts ...shipperOption) (*shipper, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting signed url: %w", err)
 	}
+	s.uploadURL = uploadURL
 
-	reader, writer := io.Pipe()
-	s.writer = writer
-
-	req, err := http.NewRequest(http.MethodPut, uploadURL, reader)
+	// Create temp file for buffering flare content
+	// S3 presigned URLs don't support chunked transfer encoding, so we need
+	// to know the content length before uploading
+	tempFile, err := os.CreateTemp(agent.TempPath(), "kolide-flare-*.zip")
 	if err != nil {
-		return nil, fmt.Errorf("creating request for http upload: %w", err)
+		return nil, fmt.Errorf("creating temp file: %w", err)
 	}
-	s.uploadRequest = req
+	s.tempFile = tempFile
 
 	return s, nil
 }
@@ -101,56 +99,64 @@ func (s *shipper) Name() string {
 }
 
 func (s *shipper) Write(p []byte) (n int, err error) {
-	if s.uploadRequestStarted {
-		return s.writer.Write(p)
-	}
-
-	// start request
-	// We could start the request in New(), but then we would hold the connection open longer than needed,
-	// OTOH, if we started request in New() we would know sooner if we had a bad upload url ... :shrug:
-	s.uploadRequestStarted = true
-	s.uploadRequestWg.Add(1)
-	gowrapper.Go(context.TODO(), s.knapsack.Slogger(), func() {
-		defer s.uploadRequestWg.Done()
-
-		// will cancel and close the request body in the close function
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		s.uploadRequestCancel = cancel
-		s.uploadResponse, s.uploadRequestErr = http.DefaultClient.Do(s.uploadRequest.WithContext(ctx)) //nolint:bodyclose
-	})
-
-	return s.writer.Write(p)
+	// Write to temp file - we'll upload it all at once in Close()
+	// This is required for S3 compatibility (S3 presigned URLs don't support chunked transfer encoding)
+	return s.tempFile.Write(p)
 }
 
 func (s *shipper) Close() error {
-	if err := s.writer.Close(); err != nil {
-		return err
+	// Always clean up the temp file when done
+	defer func() {
+		if s.tempFile != nil {
+			s.tempFile.Close()
+			os.Remove(s.tempFile.Name())
+		}
+	}()
+
+	// Get file size to check if anything was written
+	fileInfo, err := s.tempFile.Stat()
+	if err != nil {
+		return fmt.Errorf("getting temp file info: %w", err)
 	}
 
-	// this will happen if the write function is never called
-	// then nothing sent, no error
-	if !s.uploadRequestStarted {
+	// If nothing was written, don't upload
+	if fileInfo.Size() == 0 {
 		return nil
 	}
 
-	// write has been called -- make sure we call cancel at the end
-	defer s.uploadRequestCancel()
-
-	// wait for upload request to finish
-	s.uploadRequestWg.Wait()
-
-	if s.uploadRequestErr != nil {
-		return fmt.Errorf("upload request error: %w", s.uploadRequestErr)
+	// Seek to beginning of file for reading
+	if _, err := s.tempFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("seeking to beginning of temp file: %w", err)
 	}
-	defer s.uploadResponse.Body.Close()
 
-	uploadRepsonseBody, err := io.ReadAll(s.uploadResponse.Body)
+	// Create the upload request with the temp file content
+	// This is required for S3 presigned URLs (they don't support chunked transfer encoding)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.uploadURL, s.tempFile)
+	if err != nil {
+		return fmt.Errorf("creating upload request: %w", err)
+	}
+
+	// Explicitly set Content-Length for S3 compatibility
+	req.ContentLength = fileInfo.Size()
+
+	// Perform the upload
+	uploadResponse, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("upload request error: %w", err)
+	}
+	defer uploadResponse.Body.Close()
+
+	uploadResponseBody, err := io.ReadAll(uploadResponse.Body)
 	if err != nil {
 		return fmt.Errorf("reading upload response: %w", err)
 	}
 
-	if s.uploadResponse.StatusCode != http.StatusOK {
-		return fmt.Errorf("got non 200 status in upload response: %s %s", s.uploadResponse.Status, string(uploadRepsonseBody))
+	// Accept both 200 OK (GCS, S3) and 204 No Content (S3) as successful responses
+	if uploadResponse.StatusCode != http.StatusOK && uploadResponse.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("got non-success status in upload response: %s %s", uploadResponse.Status, string(uploadResponseBody))
 	}
 
 	return nil
@@ -263,12 +269,13 @@ func launcherData(k types.Knapsack, note string) ([]byte, error) {
 	}
 
 	b, err := json.Marshal(map[string]string{
-		"enroll_secret": enrollSecret(k),
-		"munemo":        munemo(k),
-		"console_users": consoleUsers,
-		"running_user":  runningUsername,
-		"hostname":      hostname,
-		"note":          note,
+		"enroll_secret":    enrollSecret(k),
+		"munemo":           munemo(k),
+		"console_users":    consoleUsers,
+		"running_user":     runningUsername,
+		"hostname":         hostname,
+		"note":             note,
+		"launcher_version": version.Version().Version,
 	})
 
 	if err != nil {

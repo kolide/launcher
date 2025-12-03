@@ -169,7 +169,7 @@ func (kIdentifier *KeyIdentifier) attemptPem(keyBytes []byte) (*KeyInfo, error) 
 		if key, err := ssh.ParseDSAPrivateKey(block.Bytes); err == nil {
 			ki.Bits = len(key.PublicKey.Y.Bytes()) * 8
 		}
-		ki.Type = ssh.KeyAlgoDSA
+		ki.Type = ssh.KeyAlgoDSA //nolint:staticcheck
 		ki.Format = "openssh"
 		return ki, nil
 

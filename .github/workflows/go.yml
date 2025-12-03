@@ -21,7 +21,7 @@ jobs:
       fail-fast: false # Consider changing this sometime
       matrix:
         os:
-          - macos-13
+          - macos-14
           - windows-latest
     steps:
     - name: Check out code
@@ -31,7 +31,7 @@ jobs:
         fetch-depth: 0 # need a full checkout for `git describe`
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -60,7 +60,13 @@ jobs:
     - name: Get dependencies
       run: make deps
 
+    - name: Build (debug)
+      if: github.ref_type != 'tag'
+      shell: bash
+      run: MAKE_debugsymbols=true make -j2 github-build
+    
     - name: Build
+      if: github.ref_type == 'tag'
       run: make -j2 github-build
 
     - name: Check macOS build target
@@ -108,7 +114,7 @@ jobs:
       run: git config --global --add safe.directory /__w/launcher/launcher
 
     - name: Setup Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true
@@ -138,7 +144,12 @@ jobs:
     - name: Set up zig
       uses: mlugg/setup-zig@v2
 
+    - name: Build (debug)
+      if: github.ref_type != 'tag'
+      run: MAKE_debugsymbols=true make -j2 github-build
+
     - name: Build
+      if: github.ref_type == 'tag'
       run: make -j2 github-build
 
     - name: Cache build output
@@ -182,6 +193,70 @@ jobs:
     name: test
     needs:
       - build # a desktop runner test requires a build to exist
+      - build_linux
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - macos-14
+          - windows-latest
+    steps:
+    - name: Check out code
+      id: checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # need a full checkout for `git describe`
+
+    - name: Setup Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: './go.mod'
+        check-latest: true
+        cache: false
+
+    - name: cache restore - build
+      uses: actions/cache/restore@v4
+      with:
+        path: ./build
+        key: ${{ runner.os }}-${{ github.run_id }}
+        enableCrossOsArchive: true
+
+    - id: go-cache-paths
+      shell: bash
+      run: |
+        echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - name: cache restore - GOCACHE
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-build }}
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+        enableCrossOsArchive: true
+
+    - name: cache restore - GOMODCACHE
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.go-cache-paths.outputs.go-mod }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        enableCrossOsArchive: true
+
+    - name: Test
+      run: make test
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-coverage.out
+        path: ./coverage.out
+        if-no-files-found: error
+
+  launcher_table_test:
+    name: Launcher table performance test
+    needs:
+      - build
       - build_linux
     runs-on: ${{ matrix.os }}
     strategy:
@@ -233,13 +308,17 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Test
-      run: make test
+      run: make test-bench-tables > benchmark.txt
 
-    - name: Upload coverage
+    - name: Display results
+      shell: bash
+      run: cat ./benchmark.txt
+
+    - name: Upload benchmark results
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ runner.os }}-coverage.out
-        path: ./coverage.out
+        name: ${{ runner.os }}-benchmark.txt
+        path: ./benchmark.txt
         if-no-files-found: error
 
   exec_testing:
@@ -252,7 +331,6 @@ jobs:
           # See https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
           - ubuntu-22.04
           - ubuntu-24.04
-          - macos-13
           - macos-14
           - macos-15
           - windows-2022
@@ -408,14 +486,14 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - macos-13
+          - macos-14
           - windows-latest
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # need a full checkout for `git describe`
 
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@v6
       with:
         go-version-file: './go.mod'
         check-latest: true

@@ -27,7 +27,7 @@ type uuidmw struct {
 	next KolideService
 }
 
-// levelForError returns slog.LevelError if err != nil, else slog.LevelDebug
+// levelForError returns slog.LevelWarn if err != nil, else slog.LevelDebug
 func levelForError(err error) slog.Level {
 	if err != nil {
 		return slog.LevelWarn

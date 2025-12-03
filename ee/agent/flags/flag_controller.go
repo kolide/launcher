@@ -318,6 +318,28 @@ func (fc *FlagController) DesktopMenuRefreshInterval() time.Duration {
 	).get(fc.getControlServerValue(keys.DesktopMenuRefreshInterval))
 }
 
+func (fc *FlagController) SetDesktopGoMaxProcs(maxProcs int) error {
+	return fc.setControlServerValue(keys.DesktopGoMaxProcs, intToBytes(maxProcs))
+}
+func (fc *FlagController) DesktopGoMaxProcs() int {
+	return NewIntFlagValue(fc.slogger, keys.DesktopGoMaxProcs,
+		WithIntValueDefault(2),
+		WithIntValueMin(0),
+		WithIntValueMax(16),
+	).get(fc.getControlServerValue(keys.DesktopGoMaxProcs))
+}
+
+func (fc *FlagController) SetLauncherGoMaxProcs(maxProcs int) error {
+	return fc.setControlServerValue(keys.LauncherGoMaxProcs, intToBytes(maxProcs))
+}
+func (fc *FlagController) LauncherGoMaxProcs() int {
+	return NewIntFlagValue(fc.slogger, keys.LauncherGoMaxProcs,
+		WithIntValueDefault(8),
+		WithIntValueMin(0),
+		WithIntValueMax(32),
+	).get(fc.getControlServerValue(keys.LauncherGoMaxProcs))
+}
+
 func (fc *FlagController) SetDebugServerData(debug bool) error {
 	return fc.setControlServerValue(keys.DebugServerData, boolToBytes(debug))
 }
@@ -524,8 +546,18 @@ func (fc *FlagController) MirrorServerURL() string {
 func (fc *FlagController) SetAutoupdateInterval(interval time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInterval, durationToBytes(interval))
 }
+func (fc *FlagController) SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration) {
+	ctx, span := observability.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.AutoupdateInterval, duration, value)
+}
 func (fc *FlagController) AutoupdateInterval() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInterval,
+		WithOverride(fc.overrides[keys.AutoupdateInterval]),
 		WithDefault(fc.cmdLineOpts.AutoupdateInterval),
 		WithMin(1*time.Minute),
 		WithMax(24*time.Hour),
@@ -545,8 +577,18 @@ func (fc *FlagController) UpdateChannel() string {
 func (fc *FlagController) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return fc.setControlServerValue(keys.AutoupdateInitialDelay, durationToBytes(delay))
 }
+func (fc *FlagController) SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration) {
+	ctx, span := observability.StartSpan(context.TODO())
+	defer span.End()
+
+	fc.overrideFlag(ctx, keys.AutoupdateInitialDelay, duration, value)
+}
 func (fc *FlagController) AutoupdateInitialDelay() time.Duration {
+	fc.overrideMutex.RLock()
+	defer fc.overrideMutex.RUnlock()
+
 	return NewDurationFlagValue(fc.slogger, keys.AutoupdateInitialDelay,
+		WithOverride(fc.overrides[keys.AutoupdateInitialDelay]),
 		WithDefault(fc.cmdLineOpts.AutoupdateInitialDelay),
 		WithMin(5*time.Second),
 		WithMax(12*time.Hour),
@@ -610,14 +652,14 @@ func (fc *FlagController) ExportTraces() bool {
 	).get(fc.getControlServerValue(keys.ExportTraces))
 }
 
-func (fc *FlagController) SetLauncherWatchdogEnabled(enabled bool) error {
-	return fc.setControlServerValue(keys.LauncherWatchdogEnabled, boolToBytes(enabled))
+func (fc *FlagController) SetLauncherWatchdogDisabled(disabled bool) error {
+	return fc.setControlServerValue(keys.LauncherWatchdogDisabled, boolToBytes(disabled))
 }
 
-func (fc *FlagController) LauncherWatchdogEnabled() bool {
+func (fc *FlagController) LauncherWatchdogDisabled() bool {
 	return NewBoolFlagValue(
 		WithDefaultBool(false),
-	).get(fc.getControlServerValue(keys.LauncherWatchdogEnabled))
+	).get(fc.getControlServerValue(keys.LauncherWatchdogDisabled))
 }
 
 func (fc *FlagController) SetSystrayRestartEnabled(enabled bool) error {
@@ -827,4 +869,37 @@ func (fc *FlagController) DuplicateLogWindow() time.Duration {
 		WithMin(0*time.Second),     // Allow 0 to disable deduplication
 		WithMax(24*time.Hour),      // Maximum of 24 hours seems reasonable
 	).get(fc.getControlServerValue(keys.DuplicateLogWindow))
+}
+
+// OsqueryLogPublish helpers
+func (fc *FlagController) OsqueryPublisherURL() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherURL),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherURL))
+}
+
+func (fc *FlagController) SetOsqueryPublisherURL(url string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherURL, []byte(url))
+}
+
+func (fc *FlagController) OsqueryPublisherAPIKey() string {
+	return NewStringFlagValue(
+		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherAPIKey),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherAPIKey))
+}
+
+func (fc *FlagController) SetOsqueryPublisherAPIKey(key string) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherAPIKey, []byte(key))
+}
+
+func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
+	return NewIntFlagValue(fc.slogger, keys.OsqueryPublisherPercentEnabled,
+		WithIntValueDefault(fc.cmdLineOpts.OsqueryPublisherPercentEnabled),
+		WithIntValueMin(0), // 0 is also default, and disables the cutover to our new ingest endpoint
+		WithIntValueMax(100),
+	).get(fc.getControlServerValue(keys.OsqueryPublisherPercentEnabled))
+}
+
+func (fc *FlagController) SetOsqueryPublisherPercentEnabled(percent int) error {
+	return fc.setControlServerValue(keys.OsqueryPublisherPercentEnabled, intToBytes(percent))
 }

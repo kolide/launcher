@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/kolide/krypto/pkg/echelper"
@@ -21,6 +20,7 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 )
 
@@ -43,6 +43,7 @@ type localServer struct {
 	knapsack               types.Knapsack
 	srv                    *http.Server
 	identifiers            identifiers
+	hostIdentifier         *atomic.String
 	ecLimiter, dt4aLimiter *rate.Limiter
 	kryptoMiddleware       *kryptoEcMiddleware
 	tlsCerts               []tls.Certificate
@@ -71,6 +72,7 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 	ls := &localServer{
 		slogger:         k.Slogger().With("component", "localserver"),
 		knapsack:        k,
+		hostIdentifier:  atomic.NewString(""),
 		ecLimiter:       rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		dt4aLimiter:     rate.NewLimiter(defaultRateLimit, defaultRateBurst),
 		kolideServer:    k.KolideServerURL(),
@@ -159,8 +161,9 @@ func New(ctx context.Context, k types.Knapsack, presenceDetector presenceDetecto
 		ReadTimeout:       500 * time.Millisecond,
 		ReadHeaderTimeout: 50 * time.Millisecond,
 		// WriteTimeout very high due to retry logic in the scheduledquery endpoint
-		WriteTimeout:   30 * time.Second,
-		MaxHeaderBytes: 1024,
+		WriteTimeout: 30 * time.Second,
+		// MaxHeaderBytes size chosen intentionally to allow for tools that add to header
+		MaxHeaderBytes: 8192,
 	}
 
 	ls.srv = srv

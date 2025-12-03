@@ -4,7 +4,6 @@
 package interactive
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kolide/kit/fsutil"
 	"github.com/kolide/kit/ulid"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/storage"
@@ -23,7 +21,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage/inmemory"
 	agentsqlite "github.com/kolide/launcher/ee/agent/storage/sqlite"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/packaging"
+	"github.com/kolide/launcher/pkg/osquery/testutil"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,49 +33,12 @@ var testOsqueryBinary string
 // can be called multiple times but will only execute once -- the osquery binary is
 // stored at path `testOsqueryBinary` and can be reused by all subsequent tests.
 var downloadOnceFunc = sync.OnceFunc(func() {
-	downloadDir, err := os.MkdirTemp("", "testinteractive")
-	if err != nil {
-		fmt.Printf("failed to make temp dir for test osquery binary: %v", err)
-		os.Exit(1) //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	target := packaging.Target{}
-	if err := target.PlatformFromString(runtime.GOOS); err != nil {
-		fmt.Printf("error parsing platform %s: %v", runtime.GOOS, err)
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-	target.Arch = packaging.ArchFlavor(runtime.GOARCH)
-	if runtime.GOOS == "darwin" {
-		target.Arch = packaging.Universal
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	dlPath, err := packaging.FetchBinary(ctx, downloadDir, "osqueryd", target.PlatformBinaryName("osqueryd"), "nightly", target)
-	if err != nil {
-		fmt.Printf("error fetching binary osqueryd binary: %v", err)
-		cancel()                  // explicit cancel as defer will not run when os.Exit is called
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
-
-	testOsqueryBinary = filepath.Join(downloadDir, filepath.Base(dlPath))
-	if runtime.GOOS == "windows" {
-		testOsqueryBinary = testOsqueryBinary + ".exe"
-	}
-
-	if err := fsutil.CopyFile(dlPath, testOsqueryBinary); err != nil {
-		fmt.Printf("error copying osqueryd binary: %v", err)
-		cancel()                  // explicit cancel as defer will not run when os.Exit is called
-		os.RemoveAll(downloadDir) // explicit removal as defer will not run when os.Exit is called
-		os.Exit(1)                //nolint:forbidigo // Fine to use os.Exit inside tests
-	}
+	testOsqueryBinary, _, _ = testutil.DownloadOsquery("nightly")
 })
 
 // copyBinary ensures we've downloaded a test osquery binary, then creates a symlink
-// between the real binary and the expected `executablePath` location.
+// to it at the expected `executablePath` location. The cached binary is already signed,
+// so the symlink will point to an executable binary.
 func copyBinary(t *testing.T, executablePath string) {
 	downloadOnceFunc()
 
@@ -178,7 +139,7 @@ func TestProc(t *testing.T) {
 
 			// Set up the startup settings store -- opening RW ensures that the db exists
 			// with the appropriate migrations.
-			startupSettingsStore, err := agentsqlite.OpenRW(context.TODO(), rootDir, agentsqlite.StartupSettingsStore)
+			startupSettingsStore, err := agentsqlite.OpenRW(t.Context(), rootDir, agentsqlite.StartupSettingsStore)
 			require.NoError(t, err, "initializing startup settings store")
 			require.NoError(t, startupSettingsStore.Close())
 

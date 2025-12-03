@@ -380,6 +380,24 @@ func (_m *Knapsack) DebugServerData() bool {
 	return r0
 }
 
+// DeleteRegistration provides a mock function with given fields: registrationId
+func (_m *Knapsack) DeleteRegistration(registrationId string) error {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteRegistration")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeregisterChangeObserver provides a mock function with given fields: observer
 func (_m *Knapsack) DeregisterChangeObserver(observer types.FlagsChangeObserver) {
 	_m.Called(observer)
@@ -398,6 +416,24 @@ func (_m *Knapsack) DesktopEnabled() bool {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// DesktopGoMaxProcs provides a mock function with no fields
+func (_m *Knapsack) DesktopGoMaxProcs() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DesktopGoMaxProcs")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
 	}
 
 	return r0
@@ -580,6 +616,44 @@ func (_m *Knapsack) EnrollSecretPath() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// EnrollmentDetailsStore provides a mock function with no fields
+func (_m *Knapsack) EnrollmentDetailsStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnrollmentDetailsStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
+	}
+
+	return r0
+}
+
+// EnsureRegistrationStored provides a mock function with given fields: registrationId
+func (_m *Knapsack) EnsureRegistrationStored(registrationId string) error {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureRegistrationStored")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0
@@ -879,6 +953,24 @@ func (_m *Knapsack) LatestOsquerydPath(ctx context.Context) string {
 	return r0
 }
 
+// LauncherGoMaxProcs provides a mock function with no fields
+func (_m *Knapsack) LauncherGoMaxProcs() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LauncherGoMaxProcs")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
 // LauncherHistoryStore provides a mock function with no fields
 func (_m *Knapsack) LauncherHistoryStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
 	ret := _m.Called()
@@ -899,12 +991,12 @@ func (_m *Knapsack) LauncherHistoryStore() types.GetterSetterDeleterIteratorUpda
 	return r0
 }
 
-// LauncherWatchdogEnabled provides a mock function with no fields
-func (_m *Knapsack) LauncherWatchdogEnabled() bool {
+// LauncherWatchdogDisabled provides a mock function with no fields
+func (_m *Knapsack) LauncherWatchdogDisabled() bool {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for LauncherWatchdogEnabled")
+		panic("no return value specified for LauncherWatchdogDisabled")
 	}
 
 	var r0 bool
@@ -1025,6 +1117,34 @@ func (_m *Knapsack) MirrorServerURL() string {
 	return r0
 }
 
+// NodeKey provides a mock function with given fields: registrationId
+func (_m *Knapsack) NodeKey(registrationId string) (string, error) {
+	ret := _m.Called(registrationId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NodeKey")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return rf(registrationId)
+	}
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(registrationId)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(registrationId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // OsqueryFlags provides a mock function with no fields
 func (_m *Knapsack) OsqueryFlags() []string {
 	ret := _m.Called()
@@ -1098,6 +1218,60 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
 		}
+	}
+
+	return r0
+}
+
+// OsqueryPublisherAPIKey provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherAPIKey() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherAPIKey")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// OsqueryPublisherPercentEnabled provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherPercentEnabled() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherPercentEnabled")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// OsqueryPublisherURL provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisherURL() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisherURL")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
 	}
 
 	return r0
@@ -1323,6 +1497,36 @@ func (_m *Knapsack) Registrations() ([]types.Registration, error) {
 	return r0, r1
 }
 
+// RequestProfile provides a mock function with given fields: ctx, profileType
+func (_m *Knapsack) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	ret := _m.Called(ctx, profileType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RequestProfile")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, profileType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, profileType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, profileType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ResetOnHardwareChangeEnabled provides a mock function with no fields
 func (_m *Knapsack) ResetOnHardwareChangeEnabled() bool {
 	ret := _m.Called()
@@ -1455,6 +1659,26 @@ func (_m *Knapsack) ServerProvidedDataStore() types.GetterSetterDeleterIteratorU
 	return r0
 }
 
+// ServerReleaseTrackerDataStore provides a mock function with no fields
+func (_m *Knapsack) ServerReleaseTrackerDataStore() types.GetterSetterDeleterIteratorUpdaterCounterAppender {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ServerReleaseTrackerDataStore")
+	}
+
+	var r0 types.GetterSetterDeleterIteratorUpdaterCounterAppender
+	if rf, ok := ret.Get(0).(func() types.GetterSetterDeleterIteratorUpdaterCounterAppender); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.GetterSetterDeleterIteratorUpdaterCounterAppender)
+		}
+	}
+
+	return r0
+}
+
 // SetAllowOverlyBroadDt4aAcceleration provides a mock function with given fields: enable
 func (_m *Knapsack) SetAllowOverlyBroadDt4aAcceleration(enable bool) error {
 	ret := _m.Called(enable)
@@ -1527,6 +1751,11 @@ func (_m *Knapsack) SetAutoupdateInitialDelay(delay time.Duration) error {
 	return r0
 }
 
+// SetAutoupdateInitialDelayOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
+}
+
 // SetAutoupdateInterval provides a mock function with given fields: interval
 func (_m *Knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	ret := _m.Called(interval)
@@ -1543,6 +1772,11 @@ func (_m *Knapsack) SetAutoupdateInterval(interval time.Duration) error {
 	}
 
 	return r0
+}
+
+// SetAutoupdateIntervalOverride provides a mock function with given fields: value, duration
+func (_m *Knapsack) SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration) {
+	_m.Called(value, duration)
 }
 
 // SetCachedQueryResultsTTL provides a mock function with given fields: ttl
@@ -1676,6 +1910,24 @@ func (_m *Knapsack) SetDesktopEnabled(enabled bool) error {
 	return r0
 }
 
+// SetDesktopGoMaxProcs provides a mock function with given fields: maxProcs
+func (_m *Knapsack) SetDesktopGoMaxProcs(maxProcs int) error {
+	ret := _m.Called(maxProcs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDesktopGoMaxProcs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(maxProcs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetDesktopMenuRefreshInterval provides a mock function with given fields: interval
 func (_m *Knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error {
 	ret := _m.Called(interval)
@@ -1692,6 +1944,11 @@ func (_m *Knapsack) SetDesktopMenuRefreshInterval(interval time.Duration) error 
 	}
 
 	return r0
+}
+
+// SetDesktopRunner provides a mock function with given fields: runner
+func (_m *Knapsack) SetDesktopRunner(runner types.DesktopRunner) {
+	_m.Called(runner)
 }
 
 // SetDesktopUpdateInterval provides a mock function with given fields: interval
@@ -1930,17 +2187,35 @@ func (_m *Knapsack) SetKolideServerURL(url string) error {
 	return r0
 }
 
-// SetLauncherWatchdogEnabled provides a mock function with given fields: enabled
-func (_m *Knapsack) SetLauncherWatchdogEnabled(enabled bool) error {
-	ret := _m.Called(enabled)
+// SetLauncherGoMaxProcs provides a mock function with given fields: maxProcs
+func (_m *Knapsack) SetLauncherGoMaxProcs(maxProcs int) error {
+	ret := _m.Called(maxProcs)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SetLauncherWatchdogEnabled")
+		panic("no return value specified for SetLauncherGoMaxProcs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(maxProcs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetLauncherWatchdogDisabled provides a mock function with given fields: disabled
+func (_m *Knapsack) SetLauncherWatchdogDisabled(disabled bool) error {
+	ret := _m.Called(disabled)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetLauncherWatchdogDisabled")
 	}
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(enabled)
+		r0 = rf(disabled)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2046,6 +2321,60 @@ func (_m *Knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
 // SetOsqueryHistory provides a mock function with given fields: osqHistory
 func (_m *Knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	_m.Called(osqHistory)
+}
+
+// SetOsqueryPublisherAPIKey provides a mock function with given fields: key
+func (_m *Knapsack) SetOsqueryPublisherAPIKey(key string) error {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherAPIKey")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(key)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryPublisherPercentEnabled provides a mock function with given fields: percent
+func (_m *Knapsack) SetOsqueryPublisherPercentEnabled(percent int) error {
+	ret := _m.Called(percent)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherPercentEnabled")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int) error); ok {
+		r0 = rf(percent)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetOsqueryPublisherURL provides a mock function with given fields: url
+func (_m *Knapsack) SetOsqueryPublisherURL(url string) error {
+	ret := _m.Called(url)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetOsqueryPublisherURL")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(url)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetOsqueryVerbose provides a mock function with given fields: verbose

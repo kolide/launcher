@@ -12,6 +12,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/service"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,33 +27,42 @@ type settingsStoreWriter interface {
 }
 
 type Runner struct {
-	registrationIds []string                    // we expect to run one instance per registration ID
-	instances       map[string]*OsqueryInstance // maps registration ID to currently-running instance
-	instanceLock    sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
-	slogger         *slog.Logger
-	knapsack        types.Knapsack
-	serviceClient   service.KolideService   // shared service client for communication between osquery instance and Kolide SaaS
-	settingsWriter  settingsStoreWriter     // writes to startup settings store
-	opts            []OsqueryInstanceOption // global options applying to all osquery instances
-	shutdown        chan struct{}
-	interrupted     *atomic.Bool
+	registrationIds  []string                    // we expect to run one instance per registration ID
+	instances        map[string]*OsqueryInstance // maps registration ID to currently-running instance
+	instanceLock     sync.Mutex                  // locks access to `instances` to avoid e.g. restarting an instance that isn't running yet
+	slogger          *slog.Logger
+	knapsack         types.Knapsack
+	serviceClient    service.KolideService      // shared service client for communication between osquery instance and Kolide SaaS
+	logPublishClient osquerypublisher.Publisher // client used for cutting over to new osquery log publication service (agent-ingester)
+	settingsWriter   settingsStoreWriter        // writes to startup settings store
+	opts             []OsqueryInstanceOption    // global options applying to all osquery instances
+	shutdown         chan struct{}
+	interrupted      *atomic.Bool
+	needsRestart     *atomic.Bool
+	restartLock      sync.Mutex // use a restart lock to ensure we don't get multiple quick succession restarts due to in modern standy flapping
 }
 
-func New(k types.Knapsack, serviceClient service.KolideService, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
+func New(k types.Knapsack, serviceClient service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *Runner {
 	runner := &Runner{
-		registrationIds: k.RegistrationIDs(),
-		instances:       make(map[string]*OsqueryInstance),
-		slogger:         k.Slogger().With("component", "osquery_runner"),
-		knapsack:        k,
-		serviceClient:   serviceClient,
-		settingsWriter:  settingsWriter,
-		shutdown:        make(chan struct{}),
-		opts:            opts,
-		interrupted:     &atomic.Bool{},
+		registrationIds:  k.RegistrationIDs(),
+		instances:        make(map[string]*OsqueryInstance),
+		slogger:          k.Slogger().With("component", "osquery_runner"),
+		knapsack:         k,
+		serviceClient:    serviceClient,
+		logPublishClient: logPublishClient,
+		settingsWriter:   settingsWriter,
+		shutdown:         make(chan struct{}),
+		opts:             opts,
+		interrupted:      &atomic.Bool{},
+		needsRestart:     &atomic.Bool{},
 	}
 
 	k.RegisterChangeObserver(runner,
-		keys.WatchdogEnabled, keys.WatchdogMemoryLimitMB, keys.WatchdogUtilizationLimitPercent, keys.WatchdogDelaySec,
+		keys.WatchdogEnabled,
+		keys.WatchdogMemoryLimitMB,
+		keys.WatchdogUtilizationLimitPercent,
+		keys.WatchdogDelaySec,
+		keys.InModernStandby, // we delay restarts while in modern standby, so we need to be notified of changes to perform restarts on wake
 	)
 
 	return runner
@@ -154,10 +164,15 @@ func (r *Runner) launchInstanceWithRetries(ctx context.Context, registrationId s
 	defer span.End()
 
 	for {
+		// Never attempt to launch an instance if shutdown has already been initiated
+		if r.interrupted.Load() {
+			return nil, fmt.Errorf("runner received shutdown, halting before initiating launching instance for %s", registrationId)
+		}
+
 		// Add the instance to our instances map right away, so that if we receive a shutdown
 		// request during launch, we can shut down the instance.
 		r.instanceLock.Lock()
-		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.settingsWriter, r.opts...)
+		instance := newInstance(registrationId, r.knapsack, r.serviceClient, r.logPublishClient, r.settingsWriter, r.opts...)
 		r.instances[registrationId] = instance
 		r.instanceLock.Unlock()
 		err := instance.Launch()
@@ -269,20 +284,40 @@ func (r *Runner) triggerShutdownForInstances(ctx context.Context) error {
 }
 
 // FlagsChanged satisfies the types.FlagsChangeObserver interface -- handles updates to flags
-// that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb,
+// that we care about, which are enable_watchdog, watchdog_delay_sec, watchdog_memory_limit_mb, in_modern_standby,
 // and watchdog_utilization_limit_percent.
 func (r *Runner) FlagsChanged(ctx context.Context, flagKeys ...keys.FlagKey) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	r.restartLock.Lock()
+
+	// only modern standby changed and no restart pending
+	if len(flagKeys) == 1 && flagKeys[0] == keys.InModernStandby && !r.needsRestart.Load() {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"only modern standby flag changed and no restart needed, doing nothing",
+			"in_modern_standby", r.knapsack.InModernStandby(),
+			"needs_restart", r.needsRestart.Load(),
+		)
+
+		r.restartLock.Unlock()
+		return
+	}
+
+	r.restartLock.Unlock()
+
 	r.slogger.Log(ctx, slog.LevelDebug,
-		"control server flags changed, restarting instance to apply",
+		"restarting osquery instances due to flag changes or needed restart",
 		"flags", fmt.Sprintf("%+v", flagKeys),
+		"in_modern_standby", r.knapsack.InModernStandby(),
+		"needs_restart", r.needsRestart.Load(),
 	)
 
+	// r.Restart will check if we are in modern standby and set the needsRestart flag if so and we will restart
+	// when we exit modern standby
 	if err := r.Restart(ctx); err != nil {
 		r.slogger.Log(ctx, slog.LevelError,
-			"could not restart osquery instance after flag change",
+			"could not restart osquery instance after flag change or needed restart",
 			"err", err,
 		)
 	}
@@ -329,13 +364,32 @@ func (r *Runner) Ping() {
 
 // Restart allows you to cleanly shutdown the current instance and launch a new
 // instance with the same configurations.
+// If we are in modern standby, we will not restart now, but will instead
+// set a flag to indicate that we should restart when we exit modern standby.
 func (r *Runner) Restart(ctx context.Context) error {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	r.restartLock.Lock()
+	defer r.restartLock.Unlock()
+
 	r.slogger.Log(ctx, slog.LevelDebug,
 		"runner.Restart called",
 	)
+
+	// check to see if we are in modern standby; if so, we cannot restart now
+	// when we exit modern standby, we'll get a call to FlagsChanged which will
+	// trigger a restart then
+	if r.knapsack.InModernStandby() {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"device is in modern standby, not restarting osquery instances, will apply changes on wake",
+		)
+
+		r.needsRestart.Store(true)
+		return nil
+	}
+
+	r.needsRestart.Store(false)
 
 	// Shut down the instances -- this will trigger a restart in each `runInstance`.
 	if err := r.triggerShutdownForInstances(ctx); err != nil {

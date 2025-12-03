@@ -67,7 +67,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 				continue
 			}
 
-			rowsFromDb, err := queryLeveldb(ctx, dbPath, allowedKeyMap)
+			rowsFromDb, err := queryLeveldb(ctx, slogger, dbPath, allowedKeyMap)
 			if err != nil {
 				return nil, fmt.Errorf("querying leveldb at %s: %w", dbPath, err)
 			}
@@ -81,7 +81,7 @@ func leveldbData(ctx context.Context, slogger *slog.Logger, sourcePaths []string
 	return results, nil
 }
 
-func queryLeveldb(ctx context.Context, path string, allowedKeyMap map[string]struct{}) ([]map[string][]byte, error) {
+func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowedKeyMap map[string]struct{}) ([]map[string][]byte, error) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
@@ -96,7 +96,7 @@ func queryLeveldb(ctx context.Context, path string, allowedKeyMap map[string]str
 	// The copy was successful -- make sure we clean it up after we're done
 	defer os.RemoveAll(tempDbCopyLocation)
 
-	db, err := indexeddb.OpenLeveldb(tempDbCopyLocation)
+	db, err := indexeddb.OpenLeveldb(slogger, tempDbCopyLocation)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}

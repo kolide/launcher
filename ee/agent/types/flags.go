@@ -72,6 +72,14 @@ type Flags interface {
 	SetDesktopMenuRefreshInterval(interval time.Duration) error
 	DesktopMenuRefreshInterval() time.Duration
 
+	// DesktopGoMaxProcs is the maximum number of OS threads that can be used by the desktop process.
+	SetDesktopGoMaxProcs(maxProcs int) error
+	DesktopGoMaxProcs() int
+
+	// LauncherGoMaxProcs is the maximum number of OS threads that can be used by the launcher process.
+	SetLauncherGoMaxProcs(maxProcs int) error
+	LauncherGoMaxProcs() int
+
 	// DebugServerData causes logging and diagnostics related to control server error handling to be enabled.
 	SetDebugServerData(debug bool) error
 	DebugServerData() bool
@@ -170,6 +178,7 @@ type Flags interface {
 
 	// AutoupdateInterval is the interval at which Launcher will check for updates.
 	SetAutoupdateInterval(interval time.Duration) error
+	SetAutoupdateIntervalOverride(value time.Duration, duration time.Duration)
 	AutoupdateInterval() time.Duration
 
 	// UpdateChannel is the channel to pull options from (stable, beta, nightly).
@@ -178,6 +187,7 @@ type Flags interface {
 
 	// AutoupdateInitialDelay set an initial startup delay on the autoupdater process.
 	SetAutoupdateInitialDelay(delay time.Duration) error
+	SetAutoupdateInitialDelayOverride(value time.Duration, duration time.Duration)
 	AutoupdateInitialDelay() time.Duration
 
 	// UpdateDirectory is the location of the update libraries for osqueryd and launcher
@@ -234,9 +244,9 @@ type Flags interface {
 	// LocalDevelopmentPath points to a local build of launcher to use instead of the one selected from the autoupdate library
 	LocalDevelopmentPath() string
 
-	// LauncherWatchdogEnabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
-	SetLauncherWatchdogEnabled(enabled bool) error
-	LauncherWatchdogEnabled() bool
+	// LauncherWatchdogDisabled controls whether launcher installs/runs, or stops/removes the launcher watchdog service
+	SetLauncherWatchdogDisabled(disabled bool) error
+	LauncherWatchdogDisabled() bool
 
 	// SystrayRestartEnabled controls whether launcher's desktop runner will restart systray on error
 	SetSystrayRestartEnabled(enabled bool) error
@@ -273,4 +283,12 @@ type Flags interface {
 	// DuplicateLogWindow is the time window for deduplicating duplicate log records
 	SetDuplicateLogWindow(duration time.Duration) error
 	DuplicateLogWindow() time.Duration
+
+	// Osquery log ingest cutover helpers
+	OsqueryPublisherURL() string
+	SetOsqueryPublisherURL(url string) error
+	OsqueryPublisherAPIKey() string
+	SetOsqueryPublisherAPIKey(key string) error
+	OsqueryPublisherPercentEnabled() int
+	SetOsqueryPublisherPercentEnabled(percent int) error
 }

@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/kolide/kit/ulid"
@@ -40,6 +39,7 @@ import (
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/rungroup"
 	"github.com/shirou/gopsutil/v4/process"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
@@ -94,6 +94,14 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 	return instance.uidProcs
 }
 
+func InstanceDesktopAuthToken() string {
+	if instance == nil {
+		return ""
+	}
+
+	return instance.userServerAuthToken
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -101,13 +109,16 @@ func InstanceDesktopProcessRecords() map[string]processRecord {
 type DesktopUsersProcessesRunner struct {
 	slogger *slog.Logger
 	// updateInterval is the interval on which desktop processes will be spawned, if necessary
-	updateInterval time.Duration
+	updateInterval *atomic.Duration
+	// updateTicker is the ticker for the update interval, stored so it can be reset when interval changes
+	updateTicker *time.Ticker
 	// menuRefreshInterval is the interval on which the desktop menu will be refreshed
 	menuRefreshInterval time.Duration
 	interrupt           chan struct{}
 	interrupted         atomic.Bool
 	// uidProcs is a map of uid to desktop process
-	uidProcs map[string]processRecord
+	uidProcs     map[string]processRecord
+	uidProcsLock *sync.Mutex
 	// procsWg is a WaitGroup to wait for all desktop processes to finish during an interrupt
 	procsWg *sync.WaitGroup
 	// interruptTimeout how long to wait for desktop proccesses to finish on interrupt
@@ -160,7 +171,8 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner := &DesktopUsersProcessesRunner{
 		interrupt:           make(chan struct{}),
 		uidProcs:            make(map[string]processRecord),
-		updateInterval:      k.DesktopUpdateInterval(),
+		uidProcsLock:        &sync.Mutex{},
+		updateInterval:      atomic.NewDuration(k.DesktopUpdateInterval()),
 		menuRefreshInterval: k.DesktopMenuRefreshInterval(),
 		procsWg:             &sync.WaitGroup{},
 		interruptTimeout:    time.Second * 5,
@@ -180,8 +192,15 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 	runner.writeDefaultMenuTemplateFile()
 	runner.refreshMenu()
 
+	// Initialize the update ticker
+	runner.updateTicker = time.NewTicker(runner.updateInterval.Load())
+
 	// Observe DesktopEnabled changes to know when to enable/disable process spawning
 	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopEnabled)
+	// Observe DesktopUpdateInterval changes to adjust the update interval
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopUpdateInterval)
+	// Observe DesktopGoMaxProcs changes to restart processes with new GOMAXPROCS limit
+	runner.knapsack.RegisterChangeObserver(runner, keys.DesktopGoMaxProcs)
 
 	rs, err := runnerserver.New(runner.slogger, k, messenger)
 	if err != nil {
@@ -215,8 +234,7 @@ func New(k types.Knapsack, messenger runnerserver.Messenger, opts ...desktopUser
 // Execute immediately checks if the current console user has a desktop process running. If not, it will start a new one.
 // Then repeats based on the executionInterval.
 func (r *DesktopUsersProcessesRunner) Execute() error {
-	updateTicker := time.NewTicker(r.updateInterval)
-	defer updateTicker.Stop()
+	defer r.updateTicker.Stop()
 	menuRefreshTicker := time.NewTicker(r.menuRefreshInterval)
 	defer menuRefreshTicker.Stop()
 	osUpdateCheckTicker := time.NewTicker(1 * time.Minute)
@@ -232,7 +250,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 		}
 
 		select {
-		case <-updateTicker.C:
+		case <-r.updateTicker.C:
 			continue
 		case <-menuRefreshTicker.C:
 			r.refreshMenu()
@@ -287,7 +305,10 @@ func (r *DesktopUsersProcessesRunner) Interrupt(_ error) {
 }
 
 func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval time.Duration) (time.Duration, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return presencedetection.DetectionFailedDurationValue, errors.New("no desktop processes running")
 	}
 
@@ -309,7 +330,10 @@ func (r *DesktopUsersProcessesRunner) DetectPresence(reason string, interval tim
 }
 
 func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context, uid string) (*ecdsa.PublicKey, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return nil, errors.New("no desktop processes running")
 	}
 
@@ -338,7 +362,10 @@ func (r *DesktopUsersProcessesRunner) CreateSecureEnclaveKey(ctx context.Context
 // false, nil if the key does not exist;
 // false, error don't know if key exists because of some other error
 func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context, uid string, pubKey *ecdsa.PublicKey) (bool, error) {
-	if r.uidProcs == nil || len(r.uidProcs) == 0 {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
 		return false, errors.New("no desktop processes running")
 	}
 
@@ -355,6 +382,9 @@ func (r *DesktopUsersProcessesRunner) VerifySecureEnclaveKey(ctx context.Context
 func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) {
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
+
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 
 	wgDone := make(chan struct{})
 	gowrapper.Go(context.TODO(), r.slogger, func() {
@@ -420,6 +450,9 @@ func (r *DesktopUsersProcessesRunner) killDesktopProcesses(ctx context.Context) 
 
 // killDesktopProcess kills the existing desktop process for the given uid
 func (r *DesktopUsersProcessesRunner) killDesktopProcess(ctx context.Context, uid string) error {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	proc, ok := r.uidProcs[uid]
 	if !ok {
 		return fmt.Errorf("could not find desktop proc for uid %s, cannot kill process", uid)
@@ -479,6 +512,9 @@ func (r *DesktopUsersProcessesRunner) SendNotification(n notify.Notification) er
 		return errors.New("desktop is not enabled, cannot send notification")
 	}
 
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	if len(r.uidProcs) == 0 {
 		return errors.New("cannot send notification, no child desktop processes")
 	}
@@ -536,6 +572,24 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	// Handle DesktopUpdateInterval changes
+	if slices.Contains(flagKeys, keys.DesktopUpdateInterval) {
+		r.updateIntervalChanged(ctx, r.knapsack.DesktopUpdateInterval())
+	}
+
+	// Handle DesktopGoMaxProcs changes
+	if slices.Contains(flagKeys, keys.DesktopGoMaxProcs) {
+		r.slogger.Log(ctx, slog.LevelInfo,
+			"desktop go max procs changed by control server, restarting desktop processes",
+			"new_value", r.knapsack.DesktopGoMaxProcs(),
+		)
+		// Kill existing processes so they restart with the new GOMAXPROCS limit
+		r.killDesktopProcesses(ctx)
+		// Note: processes will automatically restart on the next update interval
+		return
+	}
+
+	// Handle DesktopEnabled changes
 	if !slices.Contains(flagKeys, keys.DesktopEnabled) {
 		return
 	}
@@ -554,6 +608,8 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 
 	// DesktopEnabled() == true
 	// Tell any running desktop user processes that they should show the menu
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.ShowDesktop(); err != nil {
@@ -566,6 +622,34 @@ func (r *DesktopUsersProcessesRunner) FlagsChanged(ctx context.Context, flagKeys
 			)
 		}
 	}
+}
+
+func (r *DesktopUsersProcessesRunner) updateIntervalChanged(ctx context.Context, newInterval time.Duration) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
+	currentUpdateInterval := r.updateInterval.Load()
+	if newInterval == currentUpdateInterval {
+		return
+	}
+
+	if newInterval < currentUpdateInterval {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"accelerating desktop update interval",
+			"new_interval", newInterval.String(),
+			"old_interval", currentUpdateInterval.String(),
+		)
+	} else {
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"resetting desktop update interval after acceleration",
+			"new_interval", newInterval.String(),
+			"old_interval", currentUpdateInterval.String(),
+		)
+	}
+
+	// Update the interval atomically and reset the ticker
+	r.updateInterval.Store(newInterval)
+	r.updateTicker.Reset(newInterval)
 }
 
 // writeSharedFile writes data to a shared file for user processes to access
@@ -607,6 +691,8 @@ func (r *DesktopUsersProcessesRunner) refreshMenu() {
 	}
 
 	// Tell any running desktop user processes that they should refresh the latest menu data
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
 	for uid, proc := range r.uidProcs {
 		client := client.New(r.userServerAuthToken, proc.socketPath)
 		if err := client.Refresh(); err != nil {
@@ -826,6 +912,9 @@ func (r *DesktopUsersProcessesRunner) addProcessTrackingRecordForUser(uid string
 		return fmt.Errorf("getting process path: %w", err)
 	}
 
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	r.uidProcs[uid] = processRecord{
 		Process:    osProcess,
 		StartTime:  time.Now().UTC(),
@@ -874,6 +963,9 @@ func (r *DesktopUsersProcessesRunner) determineExecutablePath() (string, error) 
 }
 
 func (r *DesktopUsersProcessesRunner) userHasDesktopProcess(uid string) bool {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
 	// have no record of process
 	proc, ok := r.uidProcs[uid]
 	if !ok {
@@ -984,6 +1076,9 @@ func (r *DesktopUsersProcessesRunner) menuTemplatePath() string {
 
 // desktopCommand invokes the launcher desktop executable with the appropriate env vars
 func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socketPath, menuPath string) (*exec.Cmd, error) {
+	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
+	// allowedcmd automatically setting some env vars already for us, including GOMAXPROCS.
+	// We may need to update or override some of them.
 	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
 
 	cmd.Env = []string{
@@ -1007,6 +1102,8 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 		fmt.Sprintf("WINDIR=%s", os.Getenv("WINDIR")),
 		// pass the desktop enabled flag so if it's already enabled, we show desktop immeadiately
 		fmt.Sprintf("DESKTOP_ENABLED=%v", r.knapsack.DesktopEnabled()),
+		// Set GOMAXPROCS for the desktop subprocess (Go respects this natively)
+		fmt.Sprintf("GOMAXPROCS=%d", r.knapsack.DesktopGoMaxProcs()),
 		"LAUNCHER_SKIP_UPDATES=true", // We already know that we want to run the version of launcher in `executablePath`, so there's no need to perform lookups
 	}
 
@@ -1181,4 +1278,68 @@ func (r *DesktopUsersProcessesRunner) checkOsUpdate() {
 		r.osVersion = currentOsVersion
 		r.killDesktopProcesses(context.Background())
 	}
+}
+
+// RequestProfile implements types.DesktopRunner
+func (r *DesktopUsersProcessesRunner) RequestProfile(ctx context.Context, profileType string) ([]string, error) {
+	r.uidProcsLock.Lock()
+	defer r.uidProcsLock.Unlock()
+
+	if len(r.uidProcs) == 0 {
+		// No desktop processes running, this is not an error
+		return nil, nil
+	}
+
+	var profilePaths []string
+	var errs []error
+
+	for uid, proc := range r.uidProcs {
+		client := client.New(r.userServerAuthToken, proc.socketPath, client.WithTimeout(30*time.Second))
+
+		profilePath, err := client.RequestProfile(ctx, profileType)
+		if err != nil {
+			r.slogger.Log(ctx, slog.LevelWarn,
+				"failed to request profile from desktop process",
+				"uid", uid,
+				"pid", proc.Process.Pid,
+				"profile_type", profileType,
+				"err", err,
+			)
+			errs = append(errs, fmt.Errorf("desktop process %s: %w", uid, err))
+			continue
+		}
+
+		r.slogger.Log(ctx, slog.LevelDebug,
+			"successfully requested profile from desktop process",
+			"uid", uid,
+			"profile_type", profileType,
+			"file_path", profilePath,
+		)
+
+		profilePaths = append(profilePaths, profilePath)
+	}
+
+	// Return successfully collected profiles even if some failed
+	if len(profilePaths) > 0 {
+		if len(errs) > 0 {
+			r.slogger.Log(ctx, slog.LevelInfo,
+				"collected profiles with some failures",
+				"successful_count", len(profilePaths),
+				"failed_count", len(errs),
+			)
+		}
+		return profilePaths, nil
+	}
+
+	// All requests failed
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("all profile requests failed: %v", errs)
+	}
+
+	return nil, nil
+}
+
+// SetDesktopRunner implements types.DesktopRunner (no-op since this is the runner itself)
+func (r *DesktopUsersProcessesRunner) SetDesktopRunner(runner types.DesktopRunner) {
+	// No-op: this method is only used by the knapsack to store the runner reference
 }

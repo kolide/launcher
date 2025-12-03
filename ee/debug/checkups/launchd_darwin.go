@@ -36,15 +36,36 @@ func (c *launchdCheckup) Name() string {
 }
 
 func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
+	extraZip := zip.NewWriter(extraWriter)
+	defer extraZip.Close()
+
+	if extraWriter != io.Discard { // only collect logs if we're running flare
+		// ensure we collect these logs first, so we don't lose them to early exit if the plist is missing
+		// or some other error occurs
+		launchdLogBytes, err := gatherLaunchdLogs()
+		if err != nil {
+			launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
+		}
+
+		if len(launchdLogBytes) > 0 {
+			if err := addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes)); err != nil {
+				// log the error if slogger is available but don't change summary for this
+				if c.k.Slogger() != nil {
+					c.k.Slogger().Log(context.Background(), slog.LevelDebug,
+						"adding launchd logs to zip",
+						"err", err,
+					)
+				}
+			}
+		}
+	}
+
 	// Check that the plist exists
 	if _, err := os.Stat(launchdPlistPath); os.IsNotExist(err) {
 		c.status = Failing
 		c.summary = "plist does not exist"
 		return nil
 	}
-
-	extraZip := zip.NewWriter(extraWriter)
-	defer extraZip.Close()
 
 	// Add plist file using our utility
 	if err := addFileToZip(extraZip, launchdPlistPath); err != nil {
@@ -83,30 +104,6 @@ func (c *launchdCheckup) Run(ctx context.Context, extraWriter io.Writer) error {
 
 	c.status = Passing
 	c.summary = "state is running"
-
-	// all done unless we're running flare
-	if extraWriter == io.Discard {
-		return nil
-	}
-
-	launchdLogBytes, err := gatherLaunchdLogs()
-	if err != nil {
-		launchdLogBytes = []byte(err.Error()) // add error as output for review if needed
-	}
-
-	if len(launchdLogBytes) == 0 {
-		return nil
-	}
-
-	if err := addStreamToZip(extraZip, "launchd-kolide-logs.txt", time.Now(), bytes.NewReader(launchdLogBytes)); err != nil {
-		// log the error if slogger is available but don't change summary for this
-		if c.k.Slogger() != nil {
-			c.k.Slogger().Log(context.Background(), slog.LevelDebug,
-				"adding launchd logs to zip",
-				"err", err,
-			)
-		}
-	}
 
 	return nil
 }

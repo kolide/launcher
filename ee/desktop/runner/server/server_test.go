@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -89,7 +88,7 @@ func TestRootServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 
-	require.NoError(t, monitorServer.Shutdown(context.Background()))
+	require.NoError(t, monitorServer.Shutdown(t.Context()))
 }
 
 func endpointUrl(url, endpoint string) string {

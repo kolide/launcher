@@ -4,49 +4,79 @@
 package execwrapper
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/kolide/launcher/pkg/contexts/ctxlog"
+	"github.com/kolide/launcher/ee/gowrapper"
 )
 
-func Exec(ctx context.Context, argv0 string, argv []string, envv []string) error {
-	logger := log.With(ctxlog.FromContext(ctx), "caller", log.DefaultCaller)
-
+func Exec(ctx context.Context, slogger *slog.Logger, argv0 string, argv []string, envv []string, commandExpectedToExit bool) error {
 	cmd := exec.CommandContext(ctx, argv0, argv[1:]...) //nolint:forbidigo // execwrapper is used exclusively to exec launcher, and we trust the autoupdate library to find the correct path.
 	cmd.Env = envv
 
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	level.Debug(logger).Log(
-		"msg", "preparing to run command",
-		"cmd", strings.Join(cmd.Args, " "),
+	// Set up our slogger with context about the command
+	fullCmd := strings.Join(cmd.Args, " ")
+	slogger = slogger.With("cmd", fullCmd, "component", "execwrapper")
+	slogger.Log(ctx, slog.LevelInfo,
+		"preparing to run command",
 	)
 
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+
+	// Set up log processing for stderr, so we don't lose it
+	stdErr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("getting stderr pipe: %w", err)
+	}
+	gowrapper.Go(ctx, slogger, func() {
+		logStderr(ctx, slogger, stdErr)
+	})
+
 	// Now run it. This is faking exec, we need to distinguish
-	// between a failure to execute, and a failure in in the called program.
+	// between a failure to execute, and a failure in the called program.
 	// I think https://github.com/golang/go/issues/26539 adds this functionality.
-	err := cmd.Run()
+	err = cmd.Run()
+	slogger.Log(ctx, slog.LevelError,
+		"command terminated",
+		"exit_code", cmd.ProcessState.ExitCode(),
+		"process_state", cmd.ProcessState.String(),
+		"err", err,
+	)
 
 	if cmd.ProcessState.ExitCode() == -1 {
-		if err == nil {
-			return fmt.Errorf("Unknown error trying to exec %s (and nil err)", strings.Join(cmd.Args, " "))
-		}
-		return fmt.Errorf("Unknown error trying to exec %s: %w", strings.Join(cmd.Args, " "), err)
+		return fmt.Errorf("execing %s returned exit code -1 and state %s: %w", fullCmd, cmd.ProcessState.String(), err)
 	}
 
-	if err != nil {
-		level.Info(logger).Log(
-			"msg", "got error on exec",
-			"err", err,
-		)
+	// if we're running a subcommand such as version and we did not get an error, return nil
+	// the svc* subcommands are used on windows to run as a service and we need a non-zero exit code for those despite
+	// the reason for the exit so the service manager will auto restart launcher
+	if commandExpectedToExit {
+		return nil
 	}
+
+	// not a sub command, this is launcher running it's main command or svc* subcommand
 	return fmt.Errorf("exec completed with exit code %d", cmd.ProcessState.ExitCode())
+}
+
+// logStderr reads from the given stdErr pipe and logs all lines from it until the pipe closes.
+// This is particularly useful for capturing any launcher panics.
+func logStderr(ctx context.Context, slogger *slog.Logger, stdErr io.ReadCloser) {
+	slogger = slogger.With("subcomponent", "cmd_stderr")
+	scanner := bufio.NewScanner(stdErr)
+
+	for scanner.Scan() {
+		logLine := scanner.Text()
+		slogger.Log(ctx, slog.LevelError, logLine) // nolint:sloglint // it's fine to not have a constant or literal here
+	}
+
+	slogger.Log(ctx, slog.LevelDebug,
+		"ending stderr logging",
+	)
 }

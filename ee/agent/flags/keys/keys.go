@@ -21,6 +21,8 @@ const (
 	DesktopEnabled                   FlagKey = "desktop_enabled_v1"
 	DesktopUpdateInterval            FlagKey = "desktop_update_interval"
 	DesktopMenuRefreshInterval       FlagKey = "desktop_menu_refresh_interval"
+	DesktopGoMaxProcs                FlagKey = "desktop_go_max_procs"
+	LauncherGoMaxProcs               FlagKey = "launcher_go_max_procs"
 	DebugServerData                  FlagKey = "debug_server_data"
 	ForceControlSubsystems           FlagKey = "force_control_subsystems"
 	ControlServerURL                 FlagKey = "control_server_url"
@@ -58,7 +60,7 @@ const (
 	DisableTraceIngestTLS            FlagKey = "disable_trace_ingest_tls"
 	InModernStandby                  FlagKey = "in_modern_standby"
 	LocalDevelopmentPath             FlagKey = "localdev_path"
-	LauncherWatchdogEnabled          FlagKey = "launcher_watchdog_enabled" // note that this will only impact windows deployments for now
+	LauncherWatchdogDisabled         FlagKey = "prevent_launcher_watchdog_installation" // note that this will only impact windows deployments for now
 	SystrayRestartEnabled            FlagKey = "systray_restart_enabled"
 	CurrentRunningOsqueryVersion     FlagKey = "osquery_version"
 	TableGenerateTimeout             FlagKey = "table_generate_timeout"
@@ -67,6 +69,10 @@ const (
 	ResetOnHardwareChangeEnabled     FlagKey = "reset_on_hardware_change_enabled"
 	PerformanceMonitoringEnabled     FlagKey = "performance_monitoring_enabled"
 	DuplicateLogWindow               FlagKey = "duplicate_log_window"
+	// Osquery log publication cutover flags
+	OsqueryPublisherURL            FlagKey = "osquery_publisher_url"
+	OsqueryPublisherAPIKey         FlagKey = "osquery_publisher_api_key"
+	OsqueryPublisherPercentEnabled FlagKey = "osquery_publisher_percent_enabled"
 )
 
 func (key FlagKey) String() string {

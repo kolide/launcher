@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,7 +63,7 @@ func TestClient_GetAndShutdown(t *testing.T) {
 
 				require.NoError(t, err)
 			}
-			assert.NoError(t, server.Shutdown(context.Background()))
+			assert.NoError(t, server.Shutdown(t.Context()))
 		})
 	}
 }

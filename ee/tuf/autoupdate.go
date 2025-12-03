@@ -91,8 +91,10 @@ type TufAutoupdater struct {
 	updateChannel        string
 	pinnedVersions       map[autoupdatableBinary]string        // maps the binaries to their pinned versions
 	pinnedVersionGetters map[autoupdatableBinary]func() string // maps the binaries to the knapsack function to retrieve updated pinned versions
-	initialDelayEnd      time.Time
+	initialDelayStart    time.Time                             // when the autoupdater was created
+	initialDelayEnd      atomic.Value                          // stores time.Time for thread-safe access
 	updateLock           *sync.Mutex
+	checkTicker          *time.Ticker
 	interrupt            chan struct{}
 	interrupted          atomic.Bool
 	signalRestart        chan error
@@ -117,11 +119,13 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	ctx, span := observability.StartSpan(ctx)
 	defer span.End()
 
+	startTime := time.Now()
 	ta := &TufAutoupdater{
-		knapsack:      k,
-		interrupt:     make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
-		signalRestart: make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
-		updateChannel: k.UpdateChannel(),
+		knapsack:          k,
+		interrupt:         make(chan struct{}, 10), // We have a buffer so we don't block on sending to this channel
+		signalRestart:     make(chan error, 10),    // We have a buffer so we don't block on sending to this channel
+		updateChannel:     k.UpdateChannel(),
+		initialDelayStart: startTime,
 		pinnedVersions: map[autoupdatableBinary]string{
 			binaryLauncher: k.PinnedLauncherVersion(), // empty string if not pinned
 			binaryOsqueryd: k.PinnedOsquerydVersion(), // ditto
@@ -130,13 +134,15 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 			binaryLauncher: func() string { return k.PinnedLauncherVersion() },
 			binaryOsqueryd: func() string { return k.PinnedOsquerydVersion() },
 		},
-		initialDelayEnd:      time.Now().Add(k.AutoupdateInitialDelay()),
 		updateLock:           &sync.Mutex{},
 		osqueryTimeout:       30 * time.Second,
 		slogger:              k.Slogger().With("component", "tuf_autoupdater"),
 		restartFuncs:         make(map[autoupdatableBinary]func(context.Context) error),
 		calculatedSplayDelay: &atomic.Int64{},
 	}
+
+	// Set initial delay end time atomically (calculated from start time)
+	ta.initialDelayEnd.Store(startTime.Add(k.AutoupdateInitialDelay()))
 
 	for _, opt := range opts {
 		opt(ta)
@@ -159,7 +165,7 @@ func NewTufAutoupdater(ctx context.Context, k types.Knapsack, metadataHttpClient
 	}
 
 	// Subscribe to changes in update-related flags
-	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay)
+	ta.knapsack.RegisterChangeObserver(ta, keys.UpdateChannel, keys.PinnedLauncherVersion, keys.PinnedOsquerydVersion, keys.AutoupdateDownloadSplay, keys.AutoupdateInterval, keys.AutoupdateInitialDelay)
 
 	return ta, nil
 }
@@ -217,20 +223,27 @@ func DefaultLibraryDirectory(rootDirectory string) string {
 // has been published; less frequently, it removes old/outdated TUF errors from the bucket
 // we store them in.
 func (ta *TufAutoupdater) Execute() (err error) {
-	// Delay startup, if initial delay is set
-	select {
-	case <-ta.interrupt:
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"received external interrupt during initial delay, stopping",
-		)
-		return nil
-	case signalRestartErr := <-ta.signalRestart:
-		ta.slogger.Log(context.TODO(), slog.LevelDebug,
-			"received interrupt to restart launcher after update during initial delay, stopping",
-		)
-		return signalRestartErr
-	case <-time.After(ta.knapsack.AutoupdateInitialDelay()):
-		break
+	// Delay startup, if initial delay is set. We use a ticker-based approach
+	// so that we can respect changes to ta.initialDelayEnd from FlagsChanged.
+	initialDelayTicker := time.NewTicker(100 * time.Millisecond)
+	defer initialDelayTicker.Stop()
+
+	for time.Now().Before(ta.initialDelayEnd.Load().(time.Time)) {
+		select {
+		case <-ta.interrupt:
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received external interrupt during initial delay, stopping",
+			)
+			return nil
+		case signalRestartErr := <-ta.signalRestart:
+			ta.slogger.Log(context.TODO(), slog.LevelDebug,
+				"received interrupt to restart launcher after update during initial delay, stopping",
+			)
+			return signalRestartErr
+		case <-initialDelayTicker.C:
+			// Check if we've passed the initial delay period in the next loop iteration
+			continue
+		}
 	}
 
 	ta.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -241,8 +254,8 @@ func (ta *TufAutoupdater) Execute() (err error) {
 	// earlier, after version selection.
 	ta.tidyLibrary()
 
-	checkTicker := time.NewTicker(ta.knapsack.AutoupdateInterval())
-	defer checkTicker.Stop()
+	ta.checkTicker = time.NewTicker(ta.knapsack.AutoupdateInterval())
+	defer ta.checkTicker.Stop()
 
 	for {
 		ta.slogger.Log(context.TODO(), slog.LevelInfo,
@@ -272,7 +285,7 @@ func (ta *TufAutoupdater) Execute() (err error) {
 				"received interrupt to restart launcher after update, stopping",
 			)
 			return signalRestartErr
-		case <-checkTicker.C:
+		case <-ta.checkTicker.C:
 			continue
 		}
 	}
@@ -303,10 +316,11 @@ func (ta *TufAutoupdater) Do(data io.Reader) error {
 		return nil
 	}
 
-	if time.Now().Before(ta.initialDelayEnd) && !updateRequest.BypassInitialDelay {
+	initialDelayEnd := ta.initialDelayEnd.Load().(time.Time)
+	if time.Now().Before(initialDelayEnd) && !updateRequest.BypassInitialDelay {
 		ta.slogger.Log(ctx, slog.LevelWarn,
 			"received update request during initial delay, discarding",
-			"initial_delay_end", ta.initialDelayEnd.UTC().Format(time.RFC3339),
+			"initial_delay_end", initialDelayEnd.UTC().Format(time.RFC3339),
 		)
 		// We don't return an error because there's no need for the actionqueue to retry this request --
 		// we're going to perform an autoupdate check as soon as we exit the delay anyway.
@@ -370,6 +384,36 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		ta.calculatedSplayDelay.Store(0)
 	}
 
+	// Check for AutoupdateInitialDelay changes
+	if slices.Contains(flagKeys, keys.AutoupdateInitialDelay) {
+		currentDelayEnd := ta.initialDelayEnd.Load().(time.Time)
+		if time.Now().Before(currentDelayEnd) {
+			newDelay := ta.knapsack.AutoupdateInitialDelay()
+			// Calculate the new delay end time from the original start time
+			newDelayEnd := ta.initialDelayStart.Add(newDelay)
+			ta.initialDelayEnd.Store(newDelayEnd)
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate initial delay changed while in delay period",
+				"old_delay_end", currentDelayEnd,
+				"new_delay_end", newDelayEnd,
+			)
+		}
+	}
+
+	// Check for AutoupdateInterval changes
+	autoupdateIntervalChanged := false
+	if slices.Contains(flagKeys, keys.AutoupdateInterval) {
+		newInterval := ta.knapsack.AutoupdateInterval()
+		if ta.checkTicker != nil {
+			ta.slogger.Log(ctx, slog.LevelInfo,
+				"autoupdate interval changed, resetting ticker",
+				"new_interval", newInterval,
+			)
+			ta.checkTicker.Reset(newInterval)
+			autoupdateIntervalChanged = true
+		}
+	}
+
 	binariesToCheckForUpdate := make([]autoupdatableBinary, 0)
 
 	// Check to see if update channel has changed
@@ -400,12 +444,22 @@ func (ta *TufAutoupdater) FlagsChanged(ctx context.Context, flagKeys ...keys.Fla
 		}
 	}
 
-	// No updates, or we're in the initial delay
-	if len(binariesToCheckForUpdate) == 0 || time.Now().Before(ta.initialDelayEnd) {
+	// No updates, or interval did not change
+	if len(binariesToCheckForUpdate) == 0 && !autoupdateIntervalChanged {
 		return
 	}
 
-	// At least one binary requires a recheck -- perform that now
+	// We're in the initial delay -- don't perform an update yet
+	if time.Now().Before(ta.initialDelayEnd.Load().(time.Time)) {
+		return
+	}
+
+	// If only the interval changed and no binaries need updating, check all binaries
+	if len(binariesToCheckForUpdate) == 0 && autoupdateIntervalChanged {
+		binariesToCheckForUpdate = binaries
+	}
+
+	// At least one binary requires a recheck or the interval changed -- perform that now
 	// do not allow AutoupdateDownloadSplay delay when responding to flag changes
 	if err := ta.checkForUpdate(ctx, binariesToCheckForUpdate, false); err != nil {
 		observability.AutoupdateFailureCounter.Add(ctx, 1)
