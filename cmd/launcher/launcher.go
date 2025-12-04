@@ -533,6 +533,8 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 			controlService.RegisterSubscriber(authTokensSubsystemName, telemetryExporter)
 		}
 
+		controlService.RegisterSubscriber(authTokensSubsystemName, logPublishClient)
+
 		if metadataWriter := internal.NewMetadataWriter(slogger, k); metadataWriter == nil {
 			slogger.Log(ctx, slog.LevelError,
 				"unable to set up metadata writer",

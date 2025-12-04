@@ -72,8 +72,10 @@ func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerypubli
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors
 	mk.On("OsqueryPublisherPercentEnabled").Return(0).Maybe()
-	mk.On("OsqueryPublisherAPIKey").Return("").Maybe()
 	mk.On("OsqueryPublisherURL").Return("").Maybe()
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	mk.On("TokenStore").Return(tokenStore).Maybe()
 	slogger := multislogger.NewNopLogger()
 	return osquerypublisher.NewLogPublisherClient(slogger, mk, http.DefaultClient)
 }
@@ -1179,8 +1181,8 @@ func mockServiceClient(t *testing.T) *servicemock.KolideService {
 	require.NoError(t, err)
 
 	return &servicemock.KolideService{
-		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, error) {
-			return "testnodekey", false, nil
+		RequestEnrollmentFunc: func(ctx context.Context, enrollSecret, hostIdentifier string, details service.EnrollmentDetails) (string, bool, string, error) {
+			return "testnodekey", false, "", nil
 		},
 		RequestConfigFunc: func(ctx context.Context, nodeKey string) (string, bool, error) {
 			return string(testConfigBytes), false, nil

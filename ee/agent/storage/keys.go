@@ -5,6 +5,7 @@ import "bytes"
 var (
 	// Well-known keys
 	ObservabilityIngestAuthTokenKey = []byte("observability_ingest_auth_token")
+	AgentIngesterAuthTokenKey       = []byte("agent_ingester_auth_token")
 
 	// Identifier types in complex keys
 	IdentifierTypeRegistration = []byte("registration")
