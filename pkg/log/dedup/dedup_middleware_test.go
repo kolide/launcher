@@ -435,3 +435,279 @@ func TestSetDuplicateLogWindowConcurrentAccess(t *testing.T) {
 
 	// Test passes if no race conditions occurred (detected by go test -race)
 }
+
+// TestEntryResetsAfterWindowElapses verifies that after the dedup window elapses
+// and a log is emitted with duplicate metadata, the entry is reset so subsequent
+// logs start a fresh deduplication window. This prevents the bug where duplicate_count
+// would keep incrementing forever and first_seen would never update.
+func TestEntryResetsAfterWindowElapses(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	engine := New(
+		WithDuplicateLogWindow(50*time.Millisecond),
+		WithCleanupInterval(1*time.Second), // Long interval to avoid cleanup interference
+		WithCacheExpiry(10*time.Second),    // Long expiry to avoid cleanup interference
+	)
+	engine.Start(t.Context())
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := t.Context()
+
+	// First log: passes through (count=1, no duplicate metadata)
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "reset-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 1 {
+		t.Fatalf("expected first record to pass, got %d", next.Len())
+	}
+	// First record should NOT have duplicate_count
+	if _, ok := getAttrValue(next.Get(0), "duplicate_count"); ok {
+		t.Fatalf("first record should not have duplicate_count")
+	}
+
+	// Second log within window: suppressed
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "reset-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 1 {
+		t.Fatalf("expected duplicate to be suppressed, got %d", next.Len())
+	}
+
+	// Wait for window to elapse
+	time.Sleep(60 * time.Millisecond)
+
+	// Third log after window: emitted with duplicate metadata, then entry resets
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "reset-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 2 {
+		t.Fatalf("expected re-log after window, got %d", next.Len())
+	}
+
+	// Verify duplicate metadata on emitted record
+	r := next.Get(1)
+	if val, ok := getAttrValue(r, "duplicate_count"); !ok || val.Int64() != 3 {
+		t.Fatalf("expected duplicate_count 3, got %v", val)
+	}
+	if _, ok := getAttrValue(r, "first_seen"); !ok {
+		t.Fatalf("expected first_seen attribute")
+	}
+	if _, ok := getAttrValue(r, "last_seen"); !ok {
+		t.Fatalf("expected last_seen attribute")
+	}
+	// Middleware emissions should NOT have original_msg (only cleanup does)
+	if _, ok := getAttrValue(r, "original_msg"); ok {
+		t.Fatalf("middleware emission should not have original_msg attribute")
+	}
+
+	// Fourth log immediately after reset: suppressed (new window started, count=2)
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "reset-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 2 {
+		t.Fatalf("expected duplicate after reset to be suppressed, got %d", next.Len())
+	}
+
+	// Wait for new window to elapse
+	time.Sleep(60 * time.Millisecond)
+
+	// Fifth log: emitted with NEW duplicate metadata (reset worked!)
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "reset-test", slog.String("k", "v")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if next.Len() != 3 {
+		t.Fatalf("expected second re-log after reset, got %d", next.Len())
+	}
+
+	// Verify the NEW duplicate_count is 3 (not 5+), proving reset worked
+	r2 := next.Get(2)
+	if val, ok := getAttrValue(r2, "duplicate_count"); !ok {
+		t.Fatalf("expected duplicate_count on second emission")
+	} else if val.Int64() != 3 {
+		t.Fatalf("expected duplicate_count 3 after reset (not accumulated), got %d", val.Int64())
+	}
+}
+
+// TestMultipleWindowCycles verifies that the dedup engine correctly handles
+// multiple window cycles, resetting the entry each time and maintaining
+// accurate counts per cycle.
+func TestMultipleWindowCycles(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	engine := New(
+		WithDuplicateLogWindow(30*time.Millisecond),
+		WithCleanupInterval(1*time.Second),
+		WithCacheExpiry(10*time.Second),
+	)
+	engine.Start(t.Context())
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := t.Context()
+
+	// Run through 3 complete window cycles
+	for cycle := 0; cycle < 3; cycle++ {
+		expectedRecords := cycle + 1 // One emission per cycle
+
+		// First log of cycle (or first log ever): passes through
+		if cycle == 0 {
+			if err := mw(ctx, makeRecord(slog.LevelInfo, "cycle-test"), next.next); err != nil {
+				t.Fatalf("cycle %d: middleware err: %v", cycle, err)
+			}
+			if next.Len() != 1 {
+				t.Fatalf("cycle %d: expected first record to pass, got %d", cycle, next.Len())
+			}
+		}
+
+		// Add more duplicates within window
+		for i := 0; i < 2; i++ {
+			if err := mw(ctx, makeRecord(slog.LevelInfo, "cycle-test"), next.next); err != nil {
+				t.Fatalf("cycle %d: middleware err: %v", cycle, err)
+			}
+		}
+
+		// Wait for window to elapse
+		time.Sleep(40 * time.Millisecond)
+
+		// Trigger emission with next log
+		if err := mw(ctx, makeRecord(slog.LevelInfo, "cycle-test"), next.next); err != nil {
+			t.Fatalf("cycle %d: middleware err: %v", cycle, err)
+		}
+
+		// Verify we got the expected emission
+		if next.Len() != expectedRecords+1 {
+			t.Fatalf("cycle %d: expected %d records, got %d", cycle, expectedRecords+1, next.Len())
+		}
+
+		// Verify duplicate_count is reasonable (not accumulating across cycles)
+		lastRecord := next.Get(next.Len() - 1)
+		if val, ok := getAttrValue(lastRecord, "duplicate_count"); ok {
+			// Count should be 3-4 per cycle, not growing unbounded
+			if val.Int64() > 5 {
+				t.Fatalf("cycle %d: duplicate_count %d is too high, suggests reset not working", cycle, val.Int64())
+			}
+		}
+	}
+}
+
+// TestCleanupEmissionsHaveOriginalMsg verifies that logs emitted via the
+// background cleanup path include the original_msg attribute, distinguishing
+// them from logs emitted via the middleware window-elapsed path.
+func TestCleanupEmissionsHaveOriginalMsg(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	engine := New(
+		WithDuplicateLogWindow(100*time.Millisecond), // Long window so cleanup triggers first
+		WithCleanupInterval(20*time.Millisecond),
+		WithCacheExpiry(50*time.Millisecond), // Short expiry for quick cleanup
+	)
+	engine.Start(t.Context())
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := t.Context()
+
+	// Create duplicates that will be cleaned up (not window-elapsed)
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "cleanup-test", slog.String("key", "value")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "cleanup-test", slog.String("key", "value")), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	initialCount := next.Len() // Should be 1 (first pass-through)
+
+	// Wait for cache expiry + cleanup to run (but NOT window elapsed)
+	time.Sleep(150 * time.Millisecond)
+
+	// Cleanup should have emitted a summary
+	deadline := time.Now().Add(300 * time.Millisecond)
+	for time.Now().Before(deadline) && next.Len() <= initialCount {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if next.Len() <= initialCount {
+		t.Fatalf("expected cleanup to emit summary record")
+	}
+
+	// Verify cleanup emission has original_msg attribute
+	cleanupRecord := next.Get(next.Len() - 1)
+	if val, ok := getAttrValue(cleanupRecord, "original_msg"); !ok {
+		t.Fatalf("cleanup emission should have original_msg attribute")
+	} else if val.String() != "cleanup-test" {
+		t.Fatalf("expected original_msg 'cleanup-test', got %q", val.String())
+	}
+
+	// Cleanup should also have the other standard attributes
+	if _, ok := getAttrValue(cleanupRecord, "duplicate_count"); !ok {
+		t.Fatalf("cleanup emission should have duplicate_count")
+	}
+	if _, ok := getAttrValue(cleanupRecord, "first_seen"); !ok {
+		t.Fatalf("cleanup emission should have first_seen")
+	}
+	if _, ok := getAttrValue(cleanupRecord, "last_seen"); !ok {
+		t.Fatalf("cleanup emission should have last_seen")
+	}
+}
+
+// TestMiddlewareEmissionsLackOriginalMsg verifies that logs emitted via the
+// middleware window-elapsed path do NOT include the original_msg attribute,
+// distinguishing them from cleanup emissions.
+func TestMiddlewareEmissionsLackOriginalMsg(t *testing.T) {
+	t.Parallel()
+
+	next := &nextCapture{}
+	engine := New(
+		WithDuplicateLogWindow(30*time.Millisecond),
+		WithCleanupInterval(1*time.Second), // Long interval to prevent cleanup
+		WithCacheExpiry(10*time.Second),    // Long expiry to prevent cleanup
+	)
+	engine.Start(t.Context())
+	defer engine.Stop()
+
+	mw := engine.Middleware
+	ctx := t.Context()
+
+	// First log passes through
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "mw-test"), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	// Add duplicate
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "mw-test"), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	// Wait for window to elapse
+	time.Sleep(40 * time.Millisecond)
+
+	// Trigger middleware emission
+	if err := mw(ctx, makeRecord(slog.LevelInfo, "mw-test"), next.next); err != nil {
+		t.Fatalf("middleware err: %v", err)
+	}
+
+	if next.Len() != 2 {
+		t.Fatalf("expected 2 records, got %d", next.Len())
+	}
+
+	// Verify middleware emission does NOT have original_msg
+	mwRecord := next.Get(1)
+	if _, ok := getAttrValue(mwRecord, "original_msg"); ok {
+		t.Fatalf("middleware emission should NOT have original_msg attribute")
+	}
+
+	// But it should have the other attributes
+	if _, ok := getAttrValue(mwRecord, "duplicate_count"); !ok {
+		t.Fatalf("middleware emission should have duplicate_count")
+	}
+	if _, ok := getAttrValue(mwRecord, "first_seen"); !ok {
+		t.Fatalf("middleware emission should have first_seen")
+	}
+	if _, ok := getAttrValue(mwRecord, "last_seen"); !ok {
+		t.Fatalf("middleware emission should have last_seen")
+	}
+}

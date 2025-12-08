@@ -228,6 +228,10 @@ func (d *Engine) Middleware(ctx context.Context, record slog.Record, next func(c
 			lastSeen = entry.lastSeen
 			addDuplicateMeta = true
 			shouldPass = true
+			// Reset the entry to start a new deduplication window
+			entry.firstSeen = now
+			entry.lastSeen = now
+			entry.count = 1
 			return
 		}
 
