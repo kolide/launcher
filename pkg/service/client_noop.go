@@ -20,9 +20,9 @@ func NewNoopClient(logger log.Logger) KolideService {
 	}
 }
 
-func (c noopClient) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, error) {
+func (c noopClient) RequestEnrollment(ctx context.Context, enrollSecret, hostIdentifier string, details EnrollmentDetails) (string, bool, string, error) {
 	c.logger.Log("method", "RequestEnrollment", "expected", "This is expected")
-	return "", false, nil
+	return "", false, "", nil
 }
 
 func (c noopClient) RequestConfig(ctx context.Context, nodeKey string) (string, bool, error) {
