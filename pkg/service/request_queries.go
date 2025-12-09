@@ -113,6 +113,13 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 			message = "failure requesting queries"
 		}
 
+		took := time.Since(begin)
+		if err == nil {
+			// Use bucketed time on success
+			took = timebucket(took)
+		}
+		// Use exact time on error
+
 		mw.knapsack.Slogger().Log(ctx, levelForError(err), // nolint:sloglint // it's fine to not have a constant or literal here
 			message,
 			"method", "RequestQueries",
@@ -120,7 +127,7 @@ func (mw logmw) RequestQueries(ctx context.Context, nodeKey string) (res *distri
 			"res", string(resJSON),
 			"reauth", reauth,
 			"err", err,
-			"took", time.Since(begin),
+			"took", took,
 		)
 	}(time.Now())
 

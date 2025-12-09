@@ -75,12 +75,19 @@ func (e Endpoints) CheckHealth(ctx context.Context) (int32, error) {
 func (mw logmw) CheckHealth(ctx context.Context) (status int32, err error) {
 	defer func(begin time.Time) {
 		uuid, _ := uuid.FromContext(ctx)
+		took := time.Since(begin)
+		if err == nil {
+			// Use bucketed time on success
+			took = timebucket(took)
+		}
+		// Use exact time on error
+
 		mw.knapsack.Slogger().Log(ctx, slog.LevelDebug, "check health",
 			"method", "CheckHealth",
 			"uuid", uuid,
 			"status", status,
 			"err", err,
-			"took", time.Since(begin),
+			"took", took,
 		)
 	}(time.Now())
 	status, err = mw.next.CheckHealth(ctx)
