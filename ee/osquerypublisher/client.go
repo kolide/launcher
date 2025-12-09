@@ -65,7 +65,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	// in the future we will want to plumb a registration ID through here, for now just use the default
-	registrationID := "default"
+	registrationID := types.DefaultRegistrationID
 	authToken := lpc.getTokenForRegistration(registrationID)
 	if authToken == "" {
 		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
@@ -185,7 +185,7 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 		return fmt.Errorf("error loading token from TokenStore: %w", err)
 	}
 
-	lpc.tokens["default"] = string(newToken)
+	lpc.tokens[types.DefaultRegistrationID] = string(newToken)
 	return nil
 }
 
