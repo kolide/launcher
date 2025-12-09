@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
@@ -21,18 +22,29 @@ type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
-		logger   *slog.Logger
-		knapsack types.Flags
+		slogger  *slog.Logger
+		knapsack types.Knapsack
 		client   PublisherHTTPClient
+		tokens   map[string]string
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Flags, client PublisherHTTPClient) Publisher {
-	return &LogPublisherClient{
-		logger:   logger.With("component", "osquery_log_publisher"),
+func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
+	lpc := LogPublisherClient{
+		slogger:  logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
 		client:   client,
+		tokens:   make(map[string]string),
 	}
+
+	if err := lpc.refreshTokenCache(); err != nil {
+		logger.Log(context.TODO(), slog.LevelWarn,
+			"unable to refresh token cache on log publisher client initialization, may not be set yet",
+			"err", err,
+		)
+	}
+
+	return &lpc
 }
 
 // NewPublisherHTTPClient is a helper method to allow us to make any http client tweaks as we learn realistic
@@ -43,14 +55,25 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 	}
 }
 
+// PublishLogs publishes logs to the agent-ingester service.
+// It returns the response from the agent-ingester service and any error that occurred.
+// In the future we will likely want to pass a registration id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default registration token.
 func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
 	}
 
+	// in the future we will want to plumb a registration ID through here, for now just use the default
+	registrationID := types.DefaultRegistrationID
+	authToken := lpc.getTokenForRegistration(registrationID)
+	if authToken == "" {
+		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
+	}
+
 	requestUUID := uuid.NewForRequest()
 	ctx = uuid.NewContext(ctx, requestUUID)
-	logger := lpc.logger.With(
+	logger := lpc.slogger.With(
 		"request_uuid", requestUUID,
 		"log_type", logType.String(),
 		"log_count", len(logs),
@@ -101,7 +124,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 	// set required headers and issue the request
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", lpc.knapsack.OsqueryPublisherAPIKey()))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	resp, err = lpc.client.Do(req)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
@@ -143,9 +166,40 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	return &publishLogsResponse, nil
 }
 
+func (lpc *LogPublisherClient) Ping() {
+	if err := lpc.refreshTokenCache(); err != nil {
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
+			"unable to refresh token cache after ping",
+			"err", err,
+		)
+	}
+}
+
+// refreshTokenCache loads in the agent ingester auth token from the TokenStore and stores it in
+// our locally cached map
+func (lpc *LogPublisherClient) refreshTokenCache() error {
+	// for now we will only see a single token for the default registration, in the future we
+	// will iterate the TokenStorage and grab everything with a key prefix of storage.AgentIngesterAuthTokenKey
+	newToken, err := lpc.knapsack.TokenStore().Get(storage.AgentIngesterAuthTokenKey)
+	if err != nil || len(newToken) == 0 {
+		return fmt.Errorf("error loading token from TokenStore: %w", err)
+	}
+
+	lpc.tokens[types.DefaultRegistrationID] = string(newToken)
+	return nil
+}
+
+func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
+	if token, ok := lpc.tokens[registrationID]; ok {
+		return token
+	}
+
+	return ""
+}
+
 func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	// make sure we're fully configured to publish logs
-	if lpc.knapsack.OsqueryPublisherAPIKey() == "" || lpc.knapsack.OsqueryPublisherURL() == "" {
+	if lpc.knapsack.OsqueryPublisherURL() == "" {
 		return false
 	}
 

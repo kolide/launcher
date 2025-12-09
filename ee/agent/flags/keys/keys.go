@@ -71,7 +71,6 @@ const (
 	DuplicateLogWindow               FlagKey = "duplicate_log_window"
 	// Osquery log publication cutover flags
 	OsqueryPublisherURL            FlagKey = "osquery_publisher_url"
-	OsqueryPublisherAPIKey         FlagKey = "osquery_publisher_api_key"
 	OsqueryPublisherPercentEnabled FlagKey = "osquery_publisher_percent_enabled"
 )
 

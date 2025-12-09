@@ -184,13 +184,10 @@ func TestOsqueryLogPublishFlags(t *testing.T) { //nolint:paralleltest
 
 	testArgs, expectedOpts := getArgsAndResponse()
 	expectedPublishURL := "https://testerpublish.example.com"
-	expectedAPIKey := "test-api-key"
 	testArgs["osquery_publisher_url"] = expectedPublishURL
-	testArgs["osquery_publisher_api_key"] = expectedAPIKey
 	testArgs["osquery_publisher_percent_enabled"] = "100"
 	// update expectations to to test overwrites + parsing from flag file
 	expectedOpts.OsqueryPublisherURL = expectedPublishURL
-	expectedOpts.OsqueryPublisherAPIKey = expectedAPIKey
 	expectedOpts.OsqueryPublisherPercentEnabled = 100
 
 	flagFile, err := os.CreateTemp(t.TempDir(), "flag-file")

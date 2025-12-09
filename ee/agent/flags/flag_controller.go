@@ -882,16 +882,6 @@ func (fc *FlagController) SetOsqueryPublisherURL(url string) error {
 	return fc.setControlServerValue(keys.OsqueryPublisherURL, []byte(url))
 }
 
-func (fc *FlagController) OsqueryPublisherAPIKey() string {
-	return NewStringFlagValue(
-		WithDefaultString(fc.cmdLineOpts.OsqueryPublisherAPIKey),
-	).get(fc.getControlServerValue(keys.OsqueryPublisherAPIKey))
-}
-
-func (fc *FlagController) SetOsqueryPublisherAPIKey(key string) error {
-	return fc.setControlServerValue(keys.OsqueryPublisherAPIKey, []byte(key))
-}
-
 func (fc *FlagController) OsqueryPublisherPercentEnabled() int {
 	return NewIntFlagValue(fc.slogger, keys.OsqueryPublisherPercentEnabled,
 		WithIntValueDefault(fc.cmdLineOpts.OsqueryPublisherPercentEnabled),
