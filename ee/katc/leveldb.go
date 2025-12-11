@@ -96,7 +96,7 @@ func queryLeveldb(ctx context.Context, slogger *slog.Logger, path string, allowe
 	// The copy was successful -- make sure we clean it up after we're done
 	defer os.RemoveAll(tempDbCopyLocation)
 
-	db, err := indexeddb.OpenLeveldb(slogger, tempDbCopyLocation)
+	db, err := indexeddb.OpenLeveldb(ctx, slogger, tempDbCopyLocation)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
