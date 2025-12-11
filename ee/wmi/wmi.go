@@ -40,6 +40,7 @@ import (
 	comshim "github.com/NozomiNetworks/go-comshim"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
+	"github.com/kolide/launcher/ee/observability"
 )
 
 const (
@@ -114,6 +115,9 @@ func WithWhere(whereClause string) Option {
 }
 
 func Query(ctx context.Context, slogger *slog.Logger, className string, properties []string, opts ...Option) ([]map[string]interface{}, error) {
+	ctx, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	handler := NewOleHandler(ctx, slogger, properties)
 
 	// settings
@@ -139,6 +143,8 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 		return nil, fmt.Errorf("unable to init comshim: %w", err)
 	}
 	defer comshim.Done()
+
+	span.AddEvent("com_initialized")
 
 	unknown, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
@@ -176,6 +182,8 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 		"query", queryString,
 	)
 
+	span.AddEvent("query_start")
+
 	// ExecQuery runs semi-synchronously by default. To ensure we aren't missing any results,
 	// we prefer synchronous mode, which we achieve by setting iFlags to wbemFlagForwardOnly+wbemFlagReturnWhenComplete
 	// instead of the default wbemFlagReturnImmediately. (wbemFlagReturnWhenComplete will make the call synchronous,
@@ -196,6 +204,8 @@ func Query(ctx context.Context, slogger *slog.Logger, className string, properti
 		return nil, fmt.Errorf("running query `%s`: %w", queryString, err)
 	}
 	defer resultRaw.Clear()
+
+	span.AddEvent("query_complete")
 
 	// see above comment about `service.Release()` to explain why `result.Release()` isn't called
 	result := resultRaw.ToIDispatch()
