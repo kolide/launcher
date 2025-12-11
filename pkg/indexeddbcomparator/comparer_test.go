@@ -123,7 +123,7 @@ func TestIdbCmp1Comparer_compareDouble(t *testing.T) {
 				slogger: slogger,
 			}
 
-			_, _, result, err := comparer.compareDouble(tt.keyA, tt.keyB)
+			_, _, result, err := comparer.compareDouble(t.Context(), tt.keyA, tt.keyB)
 			require.Equal(t, tt.expectedResult, result)
 			if tt.expectErrMatches != "" {
 				require.Error(t, err)
@@ -175,7 +175,7 @@ func TestIdbCmp1Comparer_compareStringWithLength(t *testing.T) {
 				slogger: slogger,
 			}
 
-			_, _, result, err := comparer.compareStringWithLength(tt.keyA, tt.keyB)
+			_, _, result, err := comparer.compareStringWithLength(t.Context(), tt.keyA, tt.keyB)
 			require.Equal(t, tt.expectedResult, result)
 			if tt.expectErrMatches != "" {
 				require.Error(t, err)
