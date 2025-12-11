@@ -48,7 +48,7 @@ func QueryIndexeddbObjectStore(ctx context.Context, slogger *slog.Logger, dbLoca
 
 	objs := make([]map[string][]byte, 0)
 
-	db, err := OpenLeveldb(slogger, tempDbCopyLocation)
+	db, err := OpenLeveldb(ctx, slogger, tempDbCopyLocation)
 	if err != nil {
 		return nil, fmt.Errorf("opening leveldb: %w", err)
 	}
@@ -181,7 +181,10 @@ func copyFile(ctx context.Context, src string, dest string) error {
 	return nil
 }
 
-func OpenLeveldb(slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+func OpenLeveldb(ctx context.Context, slogger *slog.Logger, dbLocation string) (*leveldb.DB, error) {
+	_, span := observability.StartSpan(ctx)
+	defer span.End()
+
 	comparer := indexeddbcomparator.NewIdbCmp1Comparer(slogger)
 	opts := &opt.Options{
 		Comparer:               comparer,
