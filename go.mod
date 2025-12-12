@@ -15,7 +15,7 @@ require (
 	github.com/groob/plist v0.0.0-20190114192801-a99fbe489d03
 	github.com/knightsc/system_policy v1.1.1-0.20211029142728-5f4c0d5419cc
 	github.com/kolide/kit v0.0.0-20250324140823-36d978ef488c
-	github.com/kolide/krypto v0.1.1-0.20251120202627-3e8de3c88f7a
+	github.com/kolide/krypto v0.1.1-0.20251209172506-7738d1f5d7c1
 	github.com/mat/besticon v3.9.0+incompatible
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/osquery/osquery-go v0.0.0-20250131154556-629f995b6947
