@@ -1223,6 +1223,26 @@ func (_m *Knapsack) OsqueryHistoryInstanceStore() types.GetterSetterDeleterItera
 	return r0
 }
 
+// OsqueryPublisher provides a mock function with no fields
+func (_m *Knapsack) OsqueryPublisher() types.OsqueryPublisher {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OsqueryPublisher")
+	}
+
+	var r0 types.OsqueryPublisher
+	if rf, ok := ret.Get(0).(func() types.OsqueryPublisher); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(types.OsqueryPublisher)
+		}
+	}
+
+	return r0
+}
+
 // OsqueryPublisherPercentEnabled provides a mock function with no fields
 func (_m *Knapsack) OsqueryPublisherPercentEnabled() int {
 	ret := _m.Called()
@@ -2303,6 +2323,11 @@ func (_m *Knapsack) SetOsqueryHealthcheckStartupDelay(delay time.Duration) error
 // SetOsqueryHistory provides a mock function with given fields: osqHistory
 func (_m *Knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	_m.Called(osqHistory)
+}
+
+// SetOsqueryPublisher provides a mock function with given fields: op
+func (_m *Knapsack) SetOsqueryPublisher(op types.OsqueryPublisher) {
+	_m.Called(op)
 }
 
 // SetOsqueryPublisherPercentEnabled provides a mock function with given fields: percent
