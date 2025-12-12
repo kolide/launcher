@@ -29,7 +29,7 @@ type (
 	}
 )
 
-func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) Publisher {
+func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) types.OsqueryPublisher {
 	lpc := LogPublisherClient{
 		slogger:  logger.With("component", "osquery_log_publisher"),
 		knapsack: k,
@@ -59,7 +59,7 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 // It returns the response from the agent-ingester service and any error that occurred.
 // In the future we will likely want to pass a registration id in here to allow for selection of
 // the correct agent-ingester token to use. For now, we can use the default registration token.
-func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishLogsResponse, error) {
+func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*types.PublishOsqueryLogsResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
 	}
@@ -79,7 +79,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		"log_count", len(logs),
 	)
 	var resp *http.Response
-	var publishLogsResponse PublishLogsResponse
+	var publishLogsResponse types.PublishOsqueryLogsResponse
 	var err error
 
 	defer func(begin time.Time) {
@@ -98,7 +98,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		)
 	}(time.Now())
 
-	payload := PublishLogsRequest{
+	payload := types.PublishOsqueryLogsRequest{
 		LogType: logType,
 		Logs:    logs,
 	}

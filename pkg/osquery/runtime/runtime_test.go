@@ -67,7 +67,7 @@ func requirePermissions(t *testing.T) {
 	}
 }
 
-func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) osquerypublisher.Publisher {
+func makeTestOsqLogPublisher(t *testing.T, mk *typesMocks.Knapsack) types.OsqueryPublisher {
 	// for now, don't enable dual log publication (cutover to new agent-ingester service) for these
 	// tests. that logic is tested separately and we can add more logic to test here if needed once
 	// we've settled on a cutover plan and desired behaviors

@@ -51,6 +51,8 @@ type knapsack struct {
 	osqHistory types.OsqueryHistorian
 
 	desktopRunner types.DesktopRunner
+
+	osqueryPublisher types.OsqueryPublisher
 	// This struct is a work in progress, and will be iteratively added to as needs arise.
 }
 
@@ -634,6 +636,16 @@ func (k *knapsack) OsqueryHistory() types.OsqueryHistorian {
 
 func (k *knapsack) SetOsqueryHistory(osqHistory types.OsqueryHistorian) {
 	k.osqHistory = osqHistory
+}
+
+// OsqueryPublisher returns the osquery publisher client
+func (k *knapsack) OsqueryPublisher() types.OsqueryPublisher {
+	return k.osqueryPublisher
+}
+
+// SetOsqueryPublisher sets the osquery publisher client
+func (k *knapsack) SetOsqueryPublisher(p types.OsqueryPublisher) {
+	k.osqueryPublisher = p
 }
 
 // DesktopRunner interface methods

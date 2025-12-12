@@ -14,6 +14,10 @@ type Knapsack interface {
 	OsqueryInstanceTracker
 	DesktopRunner
 	SetInstanceQuerier(q InstanceQuerier)
+	// OsqueryPublisher returns the osquery publisher client
+	OsqueryPublisher() OsqueryPublisher
+	// SetOsqueryPublisher sets the osquery publisher client
+	SetOsqueryPublisher(op OsqueryPublisher)
 	// LatestOsquerydPath finds the path to the latest osqueryd binary, after accounting for updates.
 	LatestOsquerydPath(ctx context.Context) string
 	// ReadEnrollSecret returns the enroll secret value, checking in various locations.
