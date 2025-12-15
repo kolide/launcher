@@ -14,6 +14,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/types"
 	typesMocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/osquery/osquery-go/plugin/distributed"
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,6 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -67,6 +67,11 @@ func Test_localServer_requestQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("TokenStore").Return(tokenStore)
+			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
+			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 
 			//go:generate mockery --name Querier
 			// https://github.com/vektra/mockery <-- cli tool to generate mocks for usage with testify
@@ -225,7 +230,6 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 	}
 
 	for _, tt := range test {
-		tt := tt
 		t.Run(tt.testName, func(t *testing.T) {
 			t.Parallel()
 
@@ -241,6 +245,11 @@ func Test_localServer_requestRunScheduledQueryHandler(t *testing.T) {
 			testConfigStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.ConfigStore.String())
 			require.NoError(t, err, "could not create test config store")
 			mockKnapsack.On("ConfigStore").Return(testConfigStore).Maybe()
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			require.NoError(t, err)
+			mockKnapsack.On("TokenStore").Return(tokenStore)
+			osqPublisher := osquerypublisher.NewLogPublisherClient(multislogger.NewNopLogger(), mockKnapsack, http.DefaultClient)
+			mockKnapsack.On("OsqueryPublisher").Return(osqPublisher)
 
 			// set up mock querier
 			mockQuerier := mocks.NewQuerier(t)
