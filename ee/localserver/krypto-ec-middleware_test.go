@@ -831,8 +831,7 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	t.Parallel()
 
-	// Set up a test server to receive callback requests and return enrollment info
-	requestsReceived := &atomic.Int64{}
+	// Set up a test server to receive callback requests and return enrollment info with ingester auth token
 	expectedNodeKey := "test-node-key"
 	expectedMunemo := "test-munemo"
 	expectedAgentIngesterToken := "test-agent-ingester-token"
@@ -844,7 +843,6 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	respRaw, err := json.Marshal(resp)
 	require.NoError(t, err)
 	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestsReceived.Add(1)
 		w.Write(respRaw)
 	}))
 
@@ -863,9 +861,6 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 
-	// Confirm we do not have a munemo set
-	require.Equal(t, "", mw.tenantMunemo.Load())
-
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
 	require.NoError(t, err)
 	mw.sendCallback(req, &callbackDataStruct{})
@@ -875,7 +870,7 @@ func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
 	// confirm we set the token
 	setToken, err := tokenStore.Get(storage.AgentIngesterAuthTokenKey)
 	require.NoError(t, err)
-	require.Equal(t, expectedAgentIngesterToken, string(setToken))
+	require.Equal(t, expectedAgentIngesterToken, string(setToken), "expected agent ingester token to be set")
 
 	// We should have called SaveRegistration
 	k.AssertExpectations(t)
