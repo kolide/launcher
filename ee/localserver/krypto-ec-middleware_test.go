@@ -827,3 +827,56 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	// We should have called SaveRegistration
 	k.AssertExpectations(t)
 }
+
+func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
+	t.Parallel()
+
+	// Set up a test server to receive callback requests and return enrollment info
+	requestsReceived := &atomic.Int64{}
+	expectedNodeKey := "test-node-key"
+	expectedMunemo := "test-munemo"
+	expectedAgentIngesterToken := "test-agent-ingester-token"
+	resp := callbackResponse{
+		NodeKey:            expectedNodeKey,
+		Munemo:             expectedMunemo,
+		AgentIngesterToken: expectedAgentIngesterToken,
+	}
+	respRaw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestsReceived.Add(1)
+		w.Write(respRaw)
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testCallbackServer.Close()
+	})
+
+	slogger := multislogger.NewNopLogger()
+	k := typesmocks.NewKnapsack(t)
+	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore)
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	k.On("OsqueryPublisher").Return(osqPublisher)
+	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+
+	// Confirm we do not have a munemo set
+	require.Equal(t, "", mw.tenantMunemo.Load())
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
+	require.NoError(t, err)
+	mw.sendCallback(req, &callbackDataStruct{})
+
+	time.Sleep(1 * time.Second)
+
+	// confirm we set the token
+	setToken, err := tokenStore.Get(storage.AgentIngesterAuthTokenKey)
+	require.NoError(t, err)
+	require.Equal(t, expectedAgentIngesterToken, string(setToken))
+
+	// We should have called SaveRegistration
+	k.AssertExpectations(t)
+}
