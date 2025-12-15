@@ -214,7 +214,9 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 				return fmt.Errorf("saving registration: %w", err)
 			}
 
-			if r.AgentIngesterToken != "" {
+			// if we receive an agent ingester token, save it to the token store and ping the osquery publisher to update its token cache.
+			// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check in case
+			if r.AgentIngesterToken != "" && e.osqueryPublisher != nil && e.tokenStore != nil {
 				if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(r.AgentIngesterToken)); err != nil {
 					return fmt.Errorf("saving agent ingester token: %w", err)
 				} else {
