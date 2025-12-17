@@ -416,6 +416,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 
 	logPublisherHTTPClient := osquerypublisher.NewPublisherHTTPClient()
 	logPublishClient := osquerypublisher.NewLogPublisherClient(slogger, k, logPublisherHTTPClient)
+	k.SetOsqueryPublisher(logPublishClient)
 
 	// create the runner that will launch osquery
 	osqueryRunner := osqueryruntime.New(
