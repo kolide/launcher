@@ -254,7 +254,8 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 
 			if errors.Is(err, NoExplorerProcessError{}) {
 				r.slogger.Log(context.TODO(), slog.LevelDebug,
-					err.Error(),
+					"no explorer proc",
+					"err", err,
 				)
 			} else {
 				r.slogger.Log(context.TODO(), slog.LevelError,
