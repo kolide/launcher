@@ -21,6 +21,7 @@ import (
 	"github.com/kolide/krypto"
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/launcher/ee/agent"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/gowrapper"
 	"github.com/kolide/launcher/ee/observability"
@@ -86,6 +87,8 @@ type kryptoEcMiddleware struct {
 	tenantMunemo          *atomic.String
 	callbackQueue         chan *http.Request
 	registrationTracker   types.RegistrationTracker
+	tokenStore            types.KVStore
+	osqueryPublisher      types.OsqueryPublisher
 
 	// presenceDetectionStatusUpdateInterval is the interval at which the presence detection
 	// callback is sent while waiting on user to complete presence detection
@@ -93,7 +96,7 @@ type kryptoEcMiddleware struct {
 	timestampValidityRange                int64
 }
 
-func newKryptoEcMiddleware(slogger *slog.Logger, registrationTracker types.RegistrationTracker,
+func newKryptoEcMiddleware(slogger *slog.Logger, knapsack types.Knapsack,
 	localDbSigner crypto.Signer, counterParty ecdsa.PublicKey, presenceDetector presenceDetector, tenantMunemo string) *kryptoEcMiddleware {
 	atomicMunemo := atomic.NewString(tenantMunemo)
 
@@ -110,7 +113,9 @@ func newKryptoEcMiddleware(slogger *slog.Logger, registrationTracker types.Regis
 		presenceDetectionStatusUpdateInterval: 30 * time.Second,
 		tenantMunemo:                          atomicMunemo,
 		callbackQueue:                         callbackQueue,
-		registrationTracker:                   registrationTracker,
+		registrationTracker:                   knapsack,
+		tokenStore:                            knapsack.TokenStore(),
+		osqueryPublisher:                      knapsack.OsqueryPublisher(),
 	}
 
 	gowrapper.Go(context.TODO(), slogger.With("subcomponent", "middleware_callback_worker"), func() {
@@ -139,8 +144,9 @@ type (
 	}
 
 	callbackResponse struct {
-		NodeKey string `json:"node_key"`
-		Munemo  string `json:"munemo"`
+		NodeKey            string `json:"node_key"`
+		Munemo             string `json:"munemo"`
+		AgentIngesterToken string `json:"agent_ingester_auth_token"`
 	}
 )
 
@@ -206,6 +212,19 @@ func (e *kryptoEcMiddleware) callbackWorker() {
 			// Until we tackle multitenancy, store the key under the default registration ID
 			if err := e.registrationTracker.SaveRegistration(types.DefaultRegistrationID, r.Munemo, r.NodeKey, ""); err != nil {
 				return fmt.Errorf("saving registration: %w", err)
+			}
+
+			// if we receive an agent ingester token, save it to the token store and ping the osquery publisher to update its token cache.
+			// osqueryPublisher and tokenStore are always expected to be set at this point, but sanity check in case
+			if r.AgentIngesterToken != "" && e.osqueryPublisher != nil && e.tokenStore != nil {
+				if err := e.tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte(r.AgentIngesterToken)); err != nil {
+					return fmt.Errorf("saving agent ingester token: %w", err)
+				} else {
+					e.osqueryPublisher.Ping()
+					e.slogger.Log(req.Context(), slog.LevelInfo,
+						"agent ingester token set from secretless enrollment flow",
+					)
+				}
 			}
 
 			e.slogger.Log(req.Context(), slog.LevelInfo,

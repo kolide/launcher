@@ -24,6 +24,7 @@ import (
 	"github.com/kolide/krypto/pkg/challenge"
 	"github.com/kolide/krypto/pkg/echelper"
 	"github.com/kolide/launcher/ee/localserver/mocks"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 
 	"github.com/kolide/launcher/ee/agent/storage"
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
@@ -98,7 +99,6 @@ func TestKryptoEcMiddleware(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -210,6 +210,11 @@ func TestKryptoEcMiddleware(t *testing.T) {
 					}
 
 					k := typesmocks.NewKnapsack(t)
+					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+					require.NoError(t, err)
+					k.On("TokenStore").Return(tokenStore)
+					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+					k.On("OsqueryPublisher").Return(osqPublisher)
 
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
@@ -333,7 +338,6 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -353,7 +357,11 @@ func TestKryptoEcMiddlewareErrors(t *testing.T) {
 					mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 					k := typesmocks.NewKnapsack(t)
-
+					tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+					require.NoError(t, err)
+					k.On("TokenStore").Return(tokenStore)
+					osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+					k.On("OsqueryPublisher").Return(osqPublisher)
 					// set up middlewares
 					kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, localServerPrivateKey, remoteServerPrivateKey.PublicKey, mockPresenceDetector, "test-munemo")
 					if tt.middlewareOpt != nil {
@@ -453,7 +461,6 @@ func Test_AllowedOrigin(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -487,6 +494,11 @@ func Test_AllowedOrigin(t *testing.T) {
 			mockPresenceDetector.On("DetectPresence", mock.AnythingOfType("string"), mock.AnythingOfType("Duration")).Return(0*time.Second, nil).Maybe()
 
 			k := typesmocks.NewKnapsack(t)
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			require.NoError(t, err)
+			k.On("TokenStore").Return(tokenStore)
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			// set up middlewares
 			kryptoEcMiddleware := newKryptoEcMiddleware(slogger, k, mustGenEcdsaKey(t), counterpartyKey.PublicKey, mockPresenceDetector, "")
@@ -514,7 +526,7 @@ func Test_AllowedOrigin(t *testing.T) {
 			}
 
 			outerRespnse := mustUnmarshallOuterResponse(t, rr.Body.String())
-			_, err := outerRespnse.Open(privateEncryptionKey)
+			_, err = outerRespnse.Open(privateEncryptionKey)
 			require.NoError(t, err)
 		})
 	}
@@ -671,7 +683,6 @@ func TestMunemoCheck(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -689,6 +700,11 @@ func TestMunemoCheck(t *testing.T) {
 			require.NoError(t, err)
 
 			slogger := multislogger.NewNopLogger()
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			require.NoError(t, err)
+			k.On("TokenStore").Return(tokenStore)
+			osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+			k.On("OsqueryPublisher").Return(osqPublisher)
 
 			e := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, munemo)
 			err = e.checkMunemo(tt.headers)
@@ -722,6 +738,11 @@ func Test_sendCallback(t *testing.T) {
 		Level:     slog.LevelDebug,
 	}))
 	k := typesmocks.NewKnapsack(t)
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore)
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	k.On("OsqueryPublisher").Return(osqPublisher)
 
 	requestsQueued := &atomic.Int64{}
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "test-munemo")
@@ -774,7 +795,11 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 	}))
 	k := typesmocks.NewKnapsack(t)
 	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
-
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore)
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	k.On("OsqueryPublisher").Return(osqPublisher)
 	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
 
 	// Confirm we do not have a munemo set
@@ -798,6 +823,54 @@ func Test_sendCallback_handlesEnrollment(t *testing.T) {
 
 	// We should have sent at least some of them
 	require.GreaterOrEqual(t, int(requestsReceived.Load()), maxDesiredCallbackQueueSize, "queue worker did not process expected number of requests; logs: ", logBytes.String())
+
+	// We should have called SaveRegistration
+	k.AssertExpectations(t)
+}
+
+func Test_sendCallback_handlesEnrollmentWithAgentIngesterToken(t *testing.T) {
+	t.Parallel()
+
+	// Set up a test server to receive callback requests and return enrollment info with ingester auth token
+	expectedNodeKey := "test-node-key"
+	expectedMunemo := "test-munemo"
+	expectedAgentIngesterToken := "test-agent-ingester-token"
+	resp := callbackResponse{
+		NodeKey:            expectedNodeKey,
+		Munemo:             expectedMunemo,
+		AgentIngesterToken: expectedAgentIngesterToken,
+	}
+	respRaw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	testCallbackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(respRaw)
+	}))
+
+	// Make sure we close the server at the end of our test
+	t.Cleanup(func() {
+		testCallbackServer.Close()
+	})
+
+	slogger := multislogger.NewNopLogger()
+	k := typesmocks.NewKnapsack(t)
+	k.On("SaveRegistration", types.DefaultRegistrationID, expectedMunemo, expectedNodeKey, "").Return(nil)
+	tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+	require.NoError(t, err)
+	k.On("TokenStore").Return(tokenStore)
+	osqPublisher := osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
+	k.On("OsqueryPublisher").Return(osqPublisher)
+	mw := newKryptoEcMiddleware(slogger, k, nil, mustGenEcdsaKey(t).PublicKey, nil, "")
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, testCallbackServer.URL, nil)
+	require.NoError(t, err)
+	mw.sendCallback(req, &callbackDataStruct{})
+
+	time.Sleep(1 * time.Second)
+
+	// confirm we set the token
+	setToken, err := tokenStore.Get(storage.AgentIngesterAuthTokenKey)
+	require.NoError(t, err)
+	require.Equal(t, expectedAgentIngesterToken, string(setToken), "expected agent ingester token to be set")
 
 	// We should have called SaveRegistration
 	k.AssertExpectations(t)

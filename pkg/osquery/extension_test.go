@@ -71,7 +71,7 @@ func makeKnapsack(t *testing.T) types.Knapsack {
 	return m
 }
 
-func makeTestOsqLogPublisher(k types.Knapsack) osquerypublisher.Publisher {
+func makeTestOsqLogPublisher(k types.Knapsack) types.OsqueryPublisher {
 	slogger := multislogger.NewNopLogger()
 	return osquerypublisher.NewLogPublisherClient(slogger, k, http.DefaultClient)
 }

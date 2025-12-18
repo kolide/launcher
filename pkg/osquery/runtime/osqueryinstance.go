@@ -22,7 +22,6 @@ import (
 	"github.com/kolide/launcher/ee/gowrapper"
 	kolidelog "github.com/kolide/launcher/ee/log/osquerylogs"
 	"github.com/kolide/launcher/ee/observability"
-	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/pkg/backoff"
 	launcherosq "github.com/kolide/launcher/pkg/osquery"
 	"github.com/kolide/launcher/pkg/osquery/table"
@@ -109,7 +108,7 @@ type OsqueryInstance struct {
 	knapsack         types.Knapsack
 	slogger          *slog.Logger
 	serviceClient    service.KolideService
-	logPublishClient osquerypublisher.Publisher
+	logPublishClient types.OsqueryPublisher
 	settingsWriter   settingsStoreWriter
 	// the following are instance artifacts that are created and held as a result
 	// of launching an osqueryd process
@@ -220,7 +219,7 @@ type osqueryOptions struct {
 	extensionSocketPath string
 }
 
-func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient osquerypublisher.Publisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
+func newInstance(registrationId string, knapsack types.Knapsack, serviceClient service.KolideService, logPublishClient types.OsqueryPublisher, settingsWriter settingsStoreWriter, opts ...OsqueryInstanceOption) *OsqueryInstance {
 	runId := ulid.New()
 	i := &OsqueryInstance{
 		registrationId:          registrationId,
