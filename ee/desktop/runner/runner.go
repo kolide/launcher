@@ -102,6 +102,14 @@ func InstanceDesktopAuthToken() string {
 	return instance.userServerAuthToken
 }
 
+type NoExplorerProcessError struct {
+	uid string
+}
+
+func (e NoExplorerProcessError) Error() string {
+	return fmt.Sprintf("no explorer process found for uid: %s", e.uid)
+}
+
 // DesktopUsersProcessesRunner creates a launcher desktop process each time it detects
 // a new console (GUI) user. If the current console user's desktop process dies, it
 // will create a new one.
@@ -243,10 +251,18 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 	for {
 		// Check immediately on each iteration, avoiding the initial ticker delay
 		if err := r.runConsoleUserDesktop(); err != nil {
-			r.slogger.Log(context.TODO(), slog.LevelError,
-				"could not run console user desktop process",
-				"err", err,
-			)
+
+			if errors.Is(err, NoExplorerProcessError{}) {
+				r.slogger.Log(context.TODO(), slog.LevelDebug,
+					"no explorer proc, user may not have desktop session",
+					"err", err,
+				)
+			} else {
+				r.slogger.Log(context.TODO(), slog.LevelError,
+					"could not run console user desktop process",
+					"err", err,
+				)
+			}
 		}
 
 		select {
