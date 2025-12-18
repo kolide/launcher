@@ -254,7 +254,7 @@ func (r *DesktopUsersProcessesRunner) Execute() error {
 
 			if errors.Is(err, NoExplorerProcessError{}) {
 				r.slogger.Log(context.TODO(), slog.LevelDebug,
-					"no explorer proc",
+					"no explorer proc, user may not have desktop session",
 					"err", err,
 				)
 			} else {
