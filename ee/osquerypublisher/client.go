@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/kolide/kit/contexts/uuid"
@@ -22,23 +23,25 @@ type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
 	LogPublisherClient struct {
-		slogger  *slog.Logger
-		knapsack types.Knapsack
-		client   PublisherHTTPClient
-		tokens   map[string]string
+		slogger     *slog.Logger
+		knapsack    types.Knapsack
+		client      PublisherHTTPClient
+		tokens      map[string]string
+		tokensMutex *sync.RWMutex
 	}
 )
 
 func NewLogPublisherClient(logger *slog.Logger, k types.Knapsack, client PublisherHTTPClient) types.OsqueryPublisher {
 	lpc := LogPublisherClient{
-		slogger:  logger.With("component", "osquery_log_publisher"),
-		knapsack: k,
-		client:   client,
-		tokens:   make(map[string]string),
+		slogger:     logger.With("component", "osquery_log_publisher"),
+		knapsack:    k,
+		client:      client,
+		tokens:      make(map[string]string),
+		tokensMutex: &sync.RWMutex{},
 	}
 
 	if err := lpc.refreshTokenCache(); err != nil {
-		logger.Log(context.TODO(), slog.LevelWarn,
+		lpc.slogger.Log(context.TODO(), slog.LevelWarn,
 			"unable to refresh token cache on log publisher client initialization, may not be set yet",
 			"err", err,
 		)
@@ -185,11 +188,16 @@ func (lpc *LogPublisherClient) refreshTokenCache() error {
 		return fmt.Errorf("error loading token from TokenStore: %w", err)
 	}
 
+	lpc.tokensMutex.Lock()
+	defer lpc.tokensMutex.Unlock()
+
 	lpc.tokens[types.DefaultRegistrationID] = string(newToken)
 	return nil
 }
 
 func (lpc *LogPublisherClient) getTokenForRegistration(registrationID string) string {
+	lpc.tokensMutex.RLock()
+	defer lpc.tokensMutex.RUnlock()
 	if token, ok := lpc.tokens[registrationID]; ok {
 		return token
 	}
