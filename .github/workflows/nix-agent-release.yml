@@ -1,0 +1,144 @@
+name: Update nix-agent on Release
+
+on:
+  schedule:
+    # Run at 12:00 PM UTC every day
+    - cron: '0 12 * * *'
+  workflow_dispatch:  # Allow manual triggering
+  # TODO RM: Remove this trigger before merging -- for testing only
+  pull_request:
+    branches: '**'
+
+jobs:
+  check-for-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.find-tag.outputs.version }}
+      tag: ${{ steps.find-tag.outputs.tag }}
+      pr_exists: ${{ steps.check-for-pr.outputs.pr_exists }}
+    steps:
+      - name: Find most recent tag
+        id: find-tag
+        run: |
+          # We always expect to find a tag, so we don't need to check for an empty list
+          RELEASE=$(gh release list --limit 1 --order desc --json tagName)
+          TAG=$(echo "$RELEASE" | jq -r '.[0].tagName')
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if PR already exists
+        id: check-for-pr
+        env:
+          GH_TOKEN: ${{ secrets.NIX_AGENT_REPO_TOKEN }}
+        run: |
+          VERSION="${{ steps.find-tag.outputs.version }}"
+          
+          EXISTING_PR=$(gh pr list --repo kolide/nix-agent --state all --search "[Automated Release] Update launcher to $VERSION" --json number -q '.[0].number // empty' || echo "")
+          
+          if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
+            echo "PR already exists for version $VERSION (PR #$EXISTING_PR)"
+            echo "pr_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  update-nix-agent:
+    needs: check-for-pr
+    if: needs.check-for-pr.outputs.pr_exists != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-24.11
+
+      - name: Calculate SHA256 hashes
+        id: calculate-hashes
+        run: |
+          VERSION="${{ needs.check-for-pr.outputs.version }}"
+          
+          # Calculate hash for amd64
+          AMD64_URL="https://dl.kolide.co/kolide/launcher/linux/amd64/launcher-${VERSION}.tar.gz"
+          AMD64_OUTPUT=$(nix-build -E "with import <nixpkgs> {}; fetchzip { url = \"$AMD64_URL\"; sha256 = lib.fakeSha256; }" 2>&1 || true)
+          AMD64_HASH=$(echo "$AMD64_OUTPUT" | grep "got:" | awk '{print $2}' || echo "")
+          if [ -z "$AMD64_HASH" ]; then
+            echo "Failed to extract amd64 hash"
+            exit 1
+          fi
+          echo "amd64_hash=$AMD64_HASH" >> "$GITHUB_OUTPUT"
+          
+          # Calculate hash for arm64
+          ARM64_URL="https://dl.kolide.co/kolide/launcher/linux/arm64/launcher-${VERSION}.tar.gz"
+          ARM64_OUTPUT=$(nix-build -E "with import <nixpkgs> {}; fetchzip { url = \"$ARM64_URL\"; sha256 = lib.fakeSha256; }" 2>&1 || true)
+          ARM64_HASH=$(echo "$ARM64_OUTPUT" | grep "got:" | awk '{print $2}' || echo "")
+          if [ -z "$ARM64_HASH" ]; then
+            echo "Failed to extract arm64 hash"
+            exit 1
+          fi
+          echo "arm64_hash=$ARM64_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Check out nix-agent repository
+        uses: actions/checkout@v4
+        with:
+          repository: kolide/nix-agent
+          token: ${{ secrets.NIX_AGENT_REPO_TOKEN }}
+          path: nix-agent
+
+      - name: Update kolide-launcher.nix
+        working-directory: nix-agent
+        run: |
+          VERSION="${{ needs.check-for-pr.outputs.version }}"
+          AMD64_HASH="${{ steps.calculate-hashes.outputs.amd64_hash }}"
+          ARM64_HASH="${{ steps.calculate-hashes.outputs.arm64_hash }}"
+          
+          # Update amd64 launcher URL
+          sed -i "s|https://dl.kolide.co/kolide/launcher/linux/amd64/launcher-[0-9.]*\.tar\.gz|https://dl.kolide.co/kolide/launcher/linux/amd64/launcher-${VERSION}.tar.gz|g" kolide-launcher.nix
+          
+          # Update amd64 launcher sha256 -- match sha256 that follows the amd64 launcher URL line
+          sed -i "/amd64\/launcher-${VERSION}\.tar\.gz/,/};/ s|sha256 = \"sha256-[^\"]*\"|sha256 = \"${AMD64_HASH}\"|" kolide-launcher.nix
+          
+          # Update arm64 launcher URL
+          sed -i "s|https://dl.kolide.co/kolide/launcher/linux/arm64/launcher-[0-9.]*\.tar\.gz|https://dl.kolide.co/kolide/launcher/linux/arm64/launcher-${VERSION}.tar.gz|g" kolide-launcher.nix
+          
+          # Update arm64 launcher sha256 -- match sha256 that follows the arm64 launcher URL line
+          sed -i "/arm64\/launcher-${VERSION}\.tar\.gz/,/};/ s|sha256 = \"sha256-[^\"]*\"|sha256 = \"${ARM64_HASH}\"|" kolide-launcher.nix
+          
+          # Update version field
+          sed -i "s|version = \"[0-9.]*\"|version = \"${VERSION}\"|g" kolide-launcher.nix
+
+      - name: Configure git
+        working-directory: nix-agent
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create pull request
+        working-directory: nix-agent
+        env:
+          GH_TOKEN: ${{ secrets.NIX_AGENT_REPO_TOKEN }}
+        run: |
+          VERSION="${{ needs.check-for-pr.outputs.version }}"
+          TAG="${{ needs.check-for-pr.outputs.tag }}"
+          BRANCH_NAME="update-launcher-${VERSION}"
+          
+          git checkout -b "$BRANCH_NAME"
+          git add kolide-launcher.nix
+          git commit -m "[Automated Release] Update launcher to ${VERSION}"
+          
+          git remote set-url origin "https://github.com/kolide/nix-agent.git"
+          git config credential.helper '!f() { echo "username=x"; echo "password=${GH_TOKEN}"; }; f'
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create \
+            --repo kolide/nix-agent \
+            --title "[Automated Release] Update launcher to ${VERSION}" \
+            --body "Automated update of launcher to version ${VERSION}. Release: https://github.com/kolide/launcher/releases/tag/${TAG}." \
+            --head "$BRANCH_NAME" \
+            --base main
