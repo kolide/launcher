@@ -133,7 +133,7 @@ jobs:
           git commit -m "[Automated Release] Update launcher to ${VERSION}"
           
           git remote set-url origin "https://github.com/kolide/nix-agent.git"
-          git config credential.helper '!f() { echo "username=x"; echo "password=${GH_TOKEN}"; }; f'
+          git config credential.helper "!f() { echo \"username=x\"; echo \"password=${GH_TOKEN}\"; }; f"
           git push origin "$BRANCH_NAME"
           
           gh pr create \
