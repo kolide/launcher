@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 // Package mdmclient provides a table that parses the mdmclient
 // output. Empirically, this seems to be an almost gnustep

@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 package dev_table_tooling
 

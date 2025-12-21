@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 // Authenticode is a light wrapper around signing code under windows.
 //

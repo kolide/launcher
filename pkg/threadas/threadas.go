@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 // Package threadas uses some thread trickery to facilitate
 // dropping permissions on a single thread. This allows us to call
