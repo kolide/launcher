@@ -50,7 +50,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"log/slog"
-	"time"
 
 	"fmt"
 	"hash/crc64"
@@ -81,8 +80,6 @@ func AppIcons(flags types.Flags, slogger *slog.Logger) *table.Plugin {
 func generateAppIcons(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	_, span := observability.StartSpan(ctx, "table_name", "kolide_app_icons")
 	defer span.End()
-
-	time.Sleep(10 * time.Second) // TODO RM -- testing benchmarking
 
 	q, ok := queryContext.Constraints["path"]
 	if !ok || len(q.Constraints) == 0 {
