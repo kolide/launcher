@@ -323,6 +323,8 @@ jobs:
 
     - name: Get run ID for last launcher table performance test on main
       id: main-run-id
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
 
