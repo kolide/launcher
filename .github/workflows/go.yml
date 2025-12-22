@@ -321,6 +321,25 @@ jobs:
         path: ./benchmark.txt
         if-no-files-found: error
 
+    - name: Get run ID for last launcher table performance test on main
+      id: main-run-id
+      run: |
+        echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
+
+    - name: Download benchmark from main
+      uses: actions/download-artifact@v5
+      with:
+        name: ${{ runner.os }}-benchmark.txt
+        run-id: ${{ steps.main-run-id.outputs.main-run-id }}
+        path: main
+
+    - name: Install benchstat
+      run: go install golang.org/x/perf/cmd/benchstat@latest
+
+    - name: Compare performance against main
+      run: |
+        benchstat main/benchmark.txt ./benchmark.txt
+
   exec_testing:
     name: Exec Test
     runs-on: ${{ matrix.os }}
