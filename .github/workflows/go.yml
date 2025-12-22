@@ -316,6 +316,7 @@ jobs:
 
     - name: Get run ID for last launcher table performance test on main
       id: main-run-id
+      if: github.ref != 'refs/heads/main'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -323,6 +324,7 @@ jobs:
         echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
 
     - name: Download benchmark from main
+      if: github.ref != 'refs/heads/main'
       uses: actions/download-artifact@v4
       with:
         name: ${{ runner.os }}-benchmark.txt
@@ -331,13 +333,15 @@ jobs:
         path: main
 
     - name: Install benchstat
+      if: github.ref != 'refs/heads/main'
       run: go install golang.org/x/perf/cmd/benchstat@latest
 
     - name: Compare performance against main
+      if: github.ref != 'refs/heads/main'
       run: |
         benchstat main/benchmark.txt ./benchmark.txt
     
-    - name: Upload benchmark results
+    - name: Save benchmark results for main
       if: github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
