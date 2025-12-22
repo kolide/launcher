@@ -316,6 +316,7 @@ jobs:
 
     - name: Get run ID for last launcher table performance test on main
       id: main-run-id
+      shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
