@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 // These tests fail on windows, due to what looks like line ending
 // issues. Since we're not going to be building upstart on windows, just skip it.

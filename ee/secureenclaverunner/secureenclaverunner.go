@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 // Package secureenclaverunner is a runner that manages the secure enclave key for the current console user.
 // It's a runner because we can not perform any secure enclave operations without a console user logged in, so we keep trying until we have one.
