@@ -326,6 +326,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: ${{ runner.os }}-benchmark.txt
+        github-token: ${{ github.token }} # Grants permission to read from other workflow runs
         run-id: ${{ steps.main-run-id.outputs.main-run-id }}
         path: main
 
