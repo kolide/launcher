@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 package runner
 
@@ -25,7 +24,7 @@ func (r *DesktopUsersProcessesRunner) runAsUser(ctx context.Context, uid string,
 		return fmt.Errorf("getting user explorer process: %w", err)
 	}
 	if explorerProc == nil {
-		return fmt.Errorf("no user explorer process found for %s", uid)
+		return NoExplorerProcessError{uid: uid}
 	}
 
 	// get the access token of the user that owns the explorer process

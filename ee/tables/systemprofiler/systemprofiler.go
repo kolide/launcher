@@ -1,5 +1,4 @@
 //go:build darwin
-// +build darwin
 
 // Package systemprofiler provides a suite table wrapper around
 // `system_profiler` macOS command. It supports some basic arguments
