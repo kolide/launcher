@@ -322,7 +322,7 @@ jobs:
         echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
 
     - name: Download benchmark from main
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v4
       with:
         name: ${{ runner.os }}-benchmark.txt
         run-id: ${{ steps.main-run-id.outputs.main-run-id }}
