@@ -350,9 +350,7 @@ jobs:
         # We're capturing the percent change against main, whenever it is a performance regression (positive delta).
         # When it's a negative change (e.g. -178505.57%), that's a performance improvement.
         # When there's no difference, benchstat outputs a ~ instead.
-        grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+\d+\.?\d*%)' ./benchstat.txt
-        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+\d+\.?\d*%)' ./benchstat.txt)
-        echo "regressions: $REGRESSIONS"
+        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+\d+\.?\d*%)' ./benchstat.txt || :)
         if [ -n "$REGRESSIONS" ]
         then
           echo "Performance regressions found:"
