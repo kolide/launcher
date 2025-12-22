@@ -314,13 +314,6 @@ jobs:
       shell: bash
       run: cat ./benchmark.txt
 
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-benchmark.txt
-        path: ./benchmark.txt
-        if-no-files-found: error
-
     - name: Get run ID for last launcher table performance test on main
       id: main-run-id
       env:
@@ -341,6 +334,14 @@ jobs:
     - name: Compare performance against main
       run: |
         benchstat main/benchmark.txt ./benchmark.txt
+    
+    - name: Upload benchmark results
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ runner.os }}-benchmark.txt
+        path: ./benchmark.txt
+        if-no-files-found: error
 
   exec_testing:
     name: Exec Test
