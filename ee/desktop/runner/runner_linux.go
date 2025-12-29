@@ -157,6 +157,9 @@ func (r *DesktopUsersProcessesRunner) userEnvVars(ctx context.Context, uid strin
 		}
 	}
 
+	// For opening links with xdg-open, we need HOME set so that xdg-open can function correctly.
+	envVars["HOME"] = fmt.Sprintf("/home/%s", username)
+
 	// For opening links with xdg-open, we need XDG_DATA_DIRS so that xdg-open can find the mimetype configuration
 	// files to figure out what application to launch.
 
