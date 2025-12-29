@@ -14,14 +14,16 @@ import (
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
+	rootDir := t.TempDir()
+
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
-	mockKnapsack.On("RootDirectory").Return("")
+	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
-	listener := NewLauncherListener(mockKnapsack, slogger, "listener_test_")
+	listener := NewLauncherListener(mockKnapsack, slogger, "test")
 
 	// Start and then interrupt
 	go listener.Execute()
