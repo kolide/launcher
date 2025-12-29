@@ -314,7 +314,52 @@ jobs:
       shell: bash
       run: cat ./benchmark.txt
 
-    - name: Upload benchmark results
+    - name: Get run ID for last launcher table performance test on main
+      id: main-run-id
+      if: github.ref != 'refs/heads/main'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        echo "main-run-id=$(gh run list --repo kolide/launcher --branch main --workflow ci --limit 1 --json databaseId -q '.[].databaseId')" >> "$GITHUB_OUTPUT"
+
+    - name: Download benchmark from main
+      if: github.ref != 'refs/heads/main'
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ runner.os }}-benchmark.txt
+        github-token: ${{ github.token }} # Grants permission to read from other workflow runs
+        run-id: ${{ steps.main-run-id.outputs.main-run-id }}
+        path: main
+
+    - name: Install benchstat
+      if: github.ref != 'refs/heads/main'
+      run: go install golang.org/x/perf/cmd/benchstat@latest
+
+    - name: Compare performance against main
+      if: github.ref != 'refs/heads/main'
+      shell: bash
+      run: |
+        benchstat main/benchmark.txt ./benchmark.txt > benchstat.txt
+        cat ./benchstat.txt
+
+        # We want to check for performance regressions.
+        # The regex matches lines that look like:
+        # AppIcons-3         5.606m ± 10%   10012.759m ± 0%  +178505.57% (p=0.000 n=10)
+        # Format is: <Function name> <benchmark measurement from main> ± <confidence interval> <benchmark measurement from PR> ± <confidence interval> +<percent change versus main>
+        # We're capturing the percent change against main, whenever it is a performance regression (positive delta).
+        # When it's a negative change (e.g. -178505.57%), that's a performance improvement.
+        # When there's no difference, benchstat outputs a ~ instead.
+        REGRESSIONS=$(grep -E '^.+-\d+\s+(?:\d+\.?\d*[a-zA-Z]*\s±\s\d+%\s+){2}(\+\d+\.?\d*%)' ./benchstat.txt || :)
+        if [ -n "$REGRESSIONS" ]
+        then
+          echo "Performance regressions found:"
+          echo "$REGRESSIONS"
+          exit 1
+        fi
+
+    - name: Save benchmark results for main
+      if: github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}-benchmark.txt
