@@ -89,6 +89,8 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listening at %s: %w", pipePath, err)
 	}
+
+	// Ensure the permissions are set correctly for the socket -- we require root/admin.
 	if err := setPipePermissions(pipePath); err != nil {
 		listener.Close()
 		return nil, fmt.Errorf("chmodding %s: %w", pipePath, err)
