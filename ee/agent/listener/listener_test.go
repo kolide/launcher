@@ -11,6 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_initPipe(t *testing.T) {
+	t.Parallel()
+
+	rootDir := t.TempDir()
+
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+
+	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
+	netListener, err := testListener.initPipe()
+	require.NoError(t, err)
+	require.NotNil(t, netListener)
+	require.NoError(t, netListener.Close())
+}
+
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
@@ -23,20 +42,20 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
-	listener := NewLauncherListener(mockKnapsack, slogger, "test")
+	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
 
 	// Start and then interrupt
-	go listener.Execute()
+	go testListener.Execute()
 	time.Sleep(3 * time.Second)
 	interruptStart := time.Now()
-	listener.Interrupt(errors.New("test error"))
+	testListener.Interrupt(errors.New("test error"))
 
 	// Confirm we can call Interrupt multiple times without blocking
 	interruptComplete := make(chan struct{})
 	expectedInterrupts := 3
 	for i := 0; i < expectedInterrupts; i += 1 {
 		go func() {
-			listener.Interrupt(nil)
+			testListener.Interrupt(nil)
 			interruptComplete <- struct{}{}
 		}()
 	}
