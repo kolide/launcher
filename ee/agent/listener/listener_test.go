@@ -14,6 +14,8 @@ import (
 func Test_initPipe(t *testing.T) {
 	t.Parallel()
 
+	requirePermissions(t)
+
 	rootDir := t.TempDir()
 
 	var logBytes threadsafebuffer.ThreadSafeBuffer
@@ -77,4 +79,12 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+}
+
+// requirePermissions checks if the current process has the necessary permissions to run
+// tests (elevated permissions on Windows). If not, it skips the test.
+func requirePermissions(t *testing.T) {
+	if !hasPermissionsToRunTest() {
+		t.Skip("these tests must be run as an administrator on windows")
+	}
 }
