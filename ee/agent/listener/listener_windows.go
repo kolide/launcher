@@ -5,6 +5,7 @@ package listener
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/kolide/kit/ulid"
@@ -13,11 +14,10 @@ import (
 
 const (
 	FILE_CREATE_PIPE_INSTANCE = 0x00000004
-	// duplexPipeAccessPermissions includes read, write, and sync permissions for sending data,
-	// FILE_CREATE_PIPE_INSTANCE to create the named pipe, and ACCESS_SYSTEM_SECURITY to
-	// set the SACL on the named pipe.
+	// duplexPipeAccessPermissions includes read, write, and sync permissions for sending data, and
+	// FILE_CREATE_PIPE_INSTANCE to create the named pipe.
 	// See: https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights
-	duplexPipeAccessPermissions = windows.GENERIC_READ | windows.GENERIC_WRITE | windows.SYNCHRONIZE | FILE_CREATE_PIPE_INSTANCE | windows.ACCESS_SYSTEM_SECURITY
+	duplexPipeAccessPermissions = windows.GENERIC_READ | windows.GENERIC_WRITE | windows.SYNCHRONIZE | FILE_CREATE_PIPE_INSTANCE
 )
 
 func (l *launcherListener) initPipe() (net.Listener, error) {
@@ -75,8 +75,12 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 		return nil, fmt.Errorf("building security descriptor: %w", err)
 	}
 
+	// We don't want the security descriptor to include a SACL, but "S:NO_ACCESS_CONTROL" is appended.
+	// Remove it so that we don't set a SACL.
+	sdStr := strings.ReplaceAll(sd.String(), "S:NO_ACCESS_CONTROL", "")
+
 	cfg := &winio.PipeConfig{
-		SecurityDescriptor: sd.String(),
+		SecurityDescriptor: sdStr,
 		MessageMode:        true,  // Use message mode so that CloseWrite() is supported
 		InputBufferSize:    65536, // Use 64KB buffers to improve performance
 		OutputBufferSize:   65536,
