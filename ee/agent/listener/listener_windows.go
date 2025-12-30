@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func setPipePermissions(pipePath string) error {
+func setSocketPermissions(socketPath string) error {
 	adminSid, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
 	if err != nil {
 		return fmt.Errorf("getting admin SID: %w", err)
@@ -65,7 +65,7 @@ func setPipePermissions(pipePath string) error {
 
 	// Apply new DACL
 	if err := windows.SetNamedSecurityInfo(
-		pipePath,
+		socketPath,
 		windows.SE_FILE_OBJECT,
 		// PROTECTED_DACL_SECURITY_INFORMATION here ensures we don't re-inherit the parent permissions
 		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,

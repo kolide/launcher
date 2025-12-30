@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_initPipe(t *testing.T) {
+func Test_initSocket(t *testing.T) {
 	t.Parallel()
 
 	rootDir := t.TempDir()
@@ -26,7 +26,7 @@ func Test_initPipe(t *testing.T) {
 
 	// Set up pipe
 	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
-	netListener, err := testListener.initPipe()
+	netListener, err := testListener.initSocket()
 	require.NoError(t, err)
 	require.NotNil(t, netListener)
 	t.Cleanup(func() { netListener.Close() })

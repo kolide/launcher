@@ -7,9 +7,9 @@ import (
 	"os"
 )
 
-func setPipePermissions(pipePath string) error {
-	if err := os.Chmod(pipePath, 0600); err != nil {
-		return fmt.Errorf("chmodding %s: %w", pipePath, err)
+func setSocketPermissions(socketPath string) error {
+	if err := os.Chmod(socketPath, 0600); err != nil {
+		return fmt.Errorf("chmodding %s: %w", socketPath, err)
 	}
 	return nil
 }

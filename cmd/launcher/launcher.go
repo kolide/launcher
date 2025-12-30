@@ -430,7 +430,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
 	k.SetInstanceQuerier(osqueryRunner)
 
-	launcherListener := listener.NewLauncherListener(k, slogger, listener.RootLauncherListenerPipePrefix)
+	launcherListener := listener.NewLauncherListener(k, slogger, listener.RootLauncherListenerSocketPrefix)
 	runGroup.Add("rootLauncherListener", launcherListener.Execute, launcherListener.Interrupt)
 
 	versionInfo := version.Version()
