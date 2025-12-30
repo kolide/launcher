@@ -89,7 +89,7 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listening at %s: %w", pipePath, err)
 	}
-	if err := os.Chmod(pipePath, 0600); err != nil {
+	if err := setPipePermissions(pipePath); err != nil {
 		listener.Close()
 		return nil, fmt.Errorf("chmodding %s: %w", pipePath, err)
 	}
