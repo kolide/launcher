@@ -25,11 +25,29 @@ func Test_initPipe(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
+	// Set up pipe
 	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
 	netListener, err := testListener.initPipe()
 	require.NoError(t, err)
 	require.NotNil(t, netListener)
-	require.NoError(t, netListener.Close())
+	t.Cleanup(func() { netListener.Close() })
+
+	// Confirm pipe works: can create a client connection
+	clientConn := dial(t, netListener)
+	t.Cleanup(func() { clientConn.Close() })
+	serverConn, err := netListener.Accept()
+	require.NoError(t, err)
+	t.Cleanup(func() { serverConn.Close() })
+
+	// Confirm pipe works: can send and read data over the connection
+	testData := []byte("test string to send")
+	_, err = clientConn.Write(testData)
+	require.NoError(t, err)
+
+	testBuffer := make([]byte, len(testData))
+	_, err = serverConn.Read(testBuffer)
+	require.NoError(t, err)
+	require.Equal(t, testData, testBuffer)
 }
 
 func TestInterrupt_Multiple(t *testing.T) {
