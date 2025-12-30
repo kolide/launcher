@@ -3,6 +3,7 @@ package listener
 import (
 	"errors"
 	"log/slog"
+	"net"
 	"testing"
 	"time"
 
@@ -13,8 +14,6 @@ import (
 
 func Test_initPipe(t *testing.T) {
 	t.Parallel()
-
-	requirePermissions(t)
 
 	rootDir := t.TempDir()
 
@@ -33,7 +32,8 @@ func Test_initPipe(t *testing.T) {
 	t.Cleanup(func() { netListener.Close() })
 
 	// Confirm pipe works: can create a client connection
-	clientConn := dial(t, netListener)
+	clientConn, err := net.Dial("unix", netListener.Addr().String())
+	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
 	serverConn, err := netListener.Accept()
 	require.NoError(t, err)
@@ -97,12 +97,4 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
-}
-
-// requirePermissions checks if the current process has the necessary permissions to run
-// tests (elevated permissions on Windows). If not, it skips the test.
-func requirePermissions(t *testing.T) {
-	if !hasPermissionsToRunTest() {
-		t.Skip("these tests must be run as an administrator on windows")
-	}
 }
