@@ -11,6 +11,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	FILE_CREATE_PIPE_INSTANCE = 0x00000004
+	// duplexPipeAccessPermissions includes read, write, and sync permissions for sending data,
+	// FILE_CREATE_PIPE_INSTANCE to create the named pipe, and ACCESS_SYSTEM_SECURITY to
+	// set the SACL on the named pipe.
+	// See: https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights
+	duplexPipeAccessPermissions = windows.GENERIC_READ | windows.GENERIC_WRITE | windows.SYNCHRONIZE | FILE_CREATE_PIPE_INSTANCE | windows.ACCESS_SYSTEM_SECURITY
+)
+
 func (l *launcherListener) initPipe() (net.Listener, error) {
 	// We only want root launcher and an admin-level user to be able to interact with the pipe --
 	// get the relevant SIDs to create the appropriate access control policy for the pipe.
@@ -30,9 +39,9 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 	// SYSTEM, admin, and creator/owner have full control; standard users are not granted any permissions.
 	explicitAccessPolicies := []windows.EXPLICIT_ACCESS{
 		{
-			AccessPermissions: windows.GENERIC_ALL,
+			AccessPermissions: duplexPipeAccessPermissions,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+			Inheritance:       windows.NO_INHERITANCE,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
@@ -40,9 +49,9 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 			},
 		},
 		{
-			AccessPermissions: windows.GENERIC_ALL,
+			AccessPermissions: duplexPipeAccessPermissions,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+			Inheritance:       windows.NO_INHERITANCE,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
@@ -50,9 +59,9 @@ func (l *launcherListener) initPipe() (net.Listener, error) {
 			},
 		},
 		{
-			AccessPermissions: windows.GENERIC_ALL,
+			AccessPermissions: duplexPipeAccessPermissions,
 			AccessMode:        windows.SET_ACCESS,
-			Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+			Inheritance:       windows.NO_INHERITANCE,
 			Trustee: windows.TRUSTEE{
 				TrusteeForm:  windows.TRUSTEE_IS_SID,
 				TrusteeType:  windows.TRUSTEE_IS_GROUP,
