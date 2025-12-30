@@ -29,7 +29,7 @@ func NewLauncherListener(k types.Knapsack, slogger *slog.Logger, pipeNamePrefix 
 		slogger:        slogger.With("component", "launcher_listener", "pipe_name_prefix", pipeNamePrefix),
 		k:              k,
 		pipeNamePrefix: pipeNamePrefix,
-		interrupt:      make(chan struct{}),
+		interrupt:      make(chan struct{}, 1), // Buffer so that Interrupt can send to this channel and return, even if Execute has already terminated
 		interrupted:    &atomic.Bool{},
 	}
 }
