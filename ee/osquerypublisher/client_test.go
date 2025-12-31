@@ -10,6 +10,7 @@ import (
 	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
+	"github.com/osquery/osquery-go/plugin/distributed"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -77,6 +78,85 @@ func TestLogPublisherClient_PublishLogs(t *testing.T) {
 
 			logs := []string{"log1", "log2", "log3"}
 			result, err := client.PublishLogs(t.Context(), osqlog.LogTypeStatus, logs)
+
+			mockHTTPClient.AssertExpectations(t)
+
+			if tt.expectErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectErrContains)
+			} else {
+				// if we expect no error, we expect a properly unmarshalled response with a successful status
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, "success", result.Status)
+			}
+		})
+	}
+}
+
+func TestLogPublisherClient_PublishResults(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name              string
+		expectErrContains string
+		responseBody      string
+		responseStatus    int
+	}{
+		{
+			name:              "happy path",
+			expectErrContains: "",
+			responseBody:      `{"status": "success","ingested_bytes":123,"log_count":1,"message":"Results ingested successfully"}`,
+			responseStatus:    http.StatusOK,
+		},
+		{
+			name:              "non-200 response",
+			expectErrContains: "agent-ingester returned status",
+			responseBody:      `{"status": "failure"}`,
+			responseStatus:    http.StatusUnauthorized,
+		},
+		{
+			name:              "malformed response",
+			expectErrContains: "unable to unmarshal agent-ingester response",
+			responseBody:      `{"status": "success"...`,
+			responseStatus:    http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			mockKnapsack := mocks.NewKnapsack(t)
+			mockHTTPClient := &mockHTTPClient{}
+			slogger := multislogger.NewNopLogger()
+
+			mockKnapsack.On("OsqueryPublisherURL").Return("https://example.com")
+			mockKnapsack.On("OsqueryPublisherPercentEnabled").Return(100)
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			tokenStore.Set(storage.AgentIngesterAuthTokenKey, []byte("test-token"))
+			require.NoError(t, err)
+			mockKnapsack.On("TokenStore").Return(tokenStore).Maybe()
+
+			resp := &http.Response{
+				StatusCode: tt.responseStatus,
+				Body:       io.NopCloser(bytes.NewReader([]byte(tt.responseBody))),
+			}
+
+			mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return(resp, nil)
+
+			client := NewLogPublisherClient(slogger, mockKnapsack, mockHTTPClient)
+
+			results := []distributed.Result{
+				{
+					QueryName: "test_query",
+					Status:    0,
+					Rows: []map[string]string{
+						{
+							"column1": "value1",
+							"column2": "value2",
+						},
+					},
+				},
+			}
+			result, err := client.PublishResults(t.Context(), results)
 
 			mockHTTPClient.AssertExpectations(t)
 

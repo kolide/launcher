@@ -1083,6 +1083,14 @@ func (e *Extension) writeResultsWithReenroll(ctx context.Context, results []dist
 		return e.writeResultsWithReenroll(ctx, results, false)
 	}
 
+	// for now, also attempt to publish results to agent-ingester if configured to do so.
+	// we log but do not return errors here while testing cutover
+	if _, err := e.logPublishClient.PublishResults(ctx, results); err != nil {
+		e.slogger.Log(ctx, slog.LevelError, "encountered error publishing results",
+			"err", err,
+		)
+	}
+
 	return nil
 }
 

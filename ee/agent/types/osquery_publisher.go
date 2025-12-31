@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 
+	"github.com/osquery/osquery-go/plugin/distributed"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )
 
@@ -13,7 +14,9 @@ type OsqueryPublisher interface {
 	Ping()
 	// PublishLogs publishes logs from the osquery process. These may be
 	// status logs or result logs from scheduled queries.
-	PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*PublishOsqueryLogsResponse, error)
+	PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*OsqueryPublicationResponse, error)
+	// PublishResults publishes the results of executed distributed queries.
+	PublishResults(ctx context.Context, results []distributed.Result) (*OsqueryPublicationResponse, error)
 }
 
 // these types are exported for re-use by agent-ingester
@@ -28,12 +31,17 @@ type (
 		Logs    []string       `json:"logs"`
 	}
 
-	// PublishOsqueryLogsResponse represents the response structure from agent-ingester for a given batch of log publications.
+	// OsqueryPublicationResponse represents the response structure from agent-ingester for a given batch of log or result publications.
 	// Note that this can also be used to unmarshal an errorResponse from agent-ingester
-	PublishOsqueryLogsResponse struct {
+	OsqueryPublicationResponse struct {
 		Status        string `json:"status"`
 		IngestedBytes int64  `json:"ingested_bytes"`
 		LogCount      int    `json:"log_count"`
 		Message       string `json:"message"`
+	}
+
+	// PublishOsqueryResultsRequest represents the expected JSON structure for result data.
+	PublishOsqueryResultsRequest struct {
+		Results []distributed.Result `json:"results"`
 	}
 )
