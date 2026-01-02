@@ -12,11 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_initSocket(t *testing.T) {
+// TestNewLauncherListener confirms that NewLauncherListener correctly sets up a net listener.
+func TestNewLauncherListener(t *testing.T) {
 	t.Parallel()
 
+	// Set up dependencies
 	rootDir := t.TempDir()
-
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -24,18 +25,17 @@ func Test_initSocket(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
-	// Set up pipe
-	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
-	netListener, err := testListener.initSocket()
+	// Set up listener
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, "test")
 	require.NoError(t, err)
-	require.NotNil(t, netListener)
-	t.Cleanup(func() { netListener.Close() })
+	require.NotNil(t, testListener.listener)
+	t.Cleanup(func() { testListener.Interrupt(errors.New("test")) })
 
 	// Confirm pipe works: can create a client connection
-	clientConn, err := net.Dial("unix", netListener.Addr().String())
+	clientConn, err := net.Dial("unix", testListener.listener.Addr().String())
 	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
-	serverConn, err := netListener.Accept()
+	serverConn, err := testListener.listener.Accept()
 	require.NoError(t, err)
 	t.Cleanup(func() { serverConn.Close() })
 
@@ -50,11 +50,13 @@ func Test_initSocket(t *testing.T) {
 	require.Equal(t, testData, testBuffer)
 }
 
+// TestInterrupt_Multiple confirms that Interrupt can be called multiple times without blocking;
+// we require this for rungroup actors.
 func TestInterrupt_Multiple(t *testing.T) {
 	t.Parallel()
 
+	// Set up dependencies
 	rootDir := t.TempDir()
-
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -62,7 +64,9 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
-	testListener := NewLauncherListener(mockKnapsack, slogger, "test")
+	// Set up listener
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, "test")
+	require.NoError(t, err)
 
 	// Start and then interrupt
 	go testListener.Execute()
