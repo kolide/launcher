@@ -26,6 +26,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/flags"
 	"github.com/kolide/launcher/ee/agent/flags/keys"
 	"github.com/kolide/launcher/ee/agent/knapsack"
+	"github.com/kolide/launcher/ee/agent/listener"
 	"github.com/kolide/launcher/ee/agent/startupsettings"
 	"github.com/kolide/launcher/ee/agent/storage"
 	agentbbolt "github.com/kolide/launcher/ee/agent/storage/bbolt"
@@ -428,6 +429,12 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 	)
 	runGroup.Add("osqueryRunner", osqueryRunner.Run, osqueryRunner.Interrupt)
 	k.SetInstanceQuerier(osqueryRunner)
+
+	launcherListener, err := listener.NewLauncherListener(k, slogger, listener.RootLauncherListenerSocketPrefix)
+	if err != nil {
+		return fmt.Errorf("initializing launcher listener: %w", err)
+	}
+	runGroup.Add("rootLauncherListener", launcherListener.Execute, launcherListener.Interrupt)
 
 	versionInfo := version.Version()
 	k.SystemSlogger().Log(ctx, slog.LevelInfo,
