@@ -76,14 +76,14 @@ func initSocket(k types.Knapsack, slogger *slog.Logger, socketPrefix string) (ne
 	// Ensure the permissions are set correctly for the socket -- we require root/admin.
 	if err := setSocketPermissions(socketPath); err != nil {
 		listener.Close()
-		return nil, socketPath, fmt.Errorf("chmodding %s: %w", socketPath, err)
+		return nil, socketPath, fmt.Errorf("setting appropriate permissions on %s: %w", socketPath, err)
 	}
 
 	return listener, socketPath, nil
 }
 
 func (l *launcherListener) Execute() error {
-	// Repeatedly check for new connections
+	// Repeatedly check for new connections. We handle one connection at a time.
 	for {
 		var conn net.Conn
 		conn, err := l.listener.Accept()
@@ -109,7 +109,7 @@ func (l *launcherListener) Execute() error {
 
 		if err := l.handleConn(conn); err != nil {
 			l.slogger.Log(context.TODO(), slog.LevelError,
-				"handling incoming connection",
+				"could not handle incoming connection",
 				"err", err,
 			)
 		}
@@ -161,7 +161,7 @@ func (l *launcherListener) Interrupt(_ error) {
 	// Clean up socket path
 	if err := os.Remove(l.socketPath); err != nil {
 		l.slogger.Log(context.TODO(), slog.LevelWarn,
-			"removing socket file during shutdown",
+			"could not remove socket file during shutdown",
 			"path", l.socketPath,
 			"err", err,
 		)

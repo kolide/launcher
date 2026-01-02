@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+// NewLauncherClientConnection opens up a connection to the launcher listener identified
+// by the given prefix.
 func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (net.Conn, error) {
 	socketPattern := filepath.Join(rootDirectory, socketPrefix) + "*"
 	matches, err := filepath.Glob(socketPattern)
