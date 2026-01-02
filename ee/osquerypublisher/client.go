@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/pkg/service"
+	"github.com/osquery/osquery-go/plugin/distributed"
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )
 
@@ -62,7 +63,7 @@ func NewPublisherHTTPClient() PublisherHTTPClient {
 // It returns the response from the agent-ingester service and any error that occurred.
 // In the future we will likely want to pass a registration id in here to allow for selection of
 // the correct agent-ingester token to use. For now, we can use the default registration token.
-func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*types.PublishOsqueryLogsResponse, error) {
+func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.LogType, logs []string) (*types.OsqueryPublicationResponse, error) {
 	if !lpc.shouldPublishLogs() {
 		return nil, nil
 	}
@@ -82,7 +83,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		"log_count", len(logs),
 	)
 	var resp *http.Response
-	var publishLogsResponse types.PublishOsqueryLogsResponse
+	var publishLogsResponse types.OsqueryPublicationResponse
 	var err error
 
 	defer func(begin time.Time) {
@@ -167,6 +168,112 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 	}
 
 	return &publishLogsResponse, nil
+}
+
+// PublishResults publishes results to the agent-ingester service.
+// It returns the response from the agent-ingester service and any error that occurred.
+// In the future we will likely want to pass a registration id in here to allow for selection of
+// the correct agent-ingester token to use. For now, we can use the default registration token.
+func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []distributed.Result) (*types.OsqueryPublicationResponse, error) {
+	if !lpc.shouldPublishLogs() {
+		return nil, nil
+	}
+
+	// in the future we will want to plumb a registration ID through here, for now just use the default
+	registrationID := types.DefaultRegistrationID
+	authToken := lpc.getTokenForRegistration(registrationID)
+	if authToken == "" {
+		return nil, fmt.Errorf("no auth token found for registration: %s", registrationID)
+	}
+
+	requestUUID := uuid.NewForRequest()
+	ctx = uuid.NewContext(ctx, requestUUID)
+	logger := lpc.slogger.With(
+		"request_uuid", requestUUID,
+		"result_count", len(results),
+	)
+	var resp *http.Response
+	var publishResultsResponse types.OsqueryPublicationResponse
+	var err error
+
+	defer func(begin time.Time) {
+		pubStateVals, ok := ctx.Value(service.PublicationCtxKey).(map[string]int)
+		if !ok {
+			pubStateVals = make(map[string]int)
+		}
+
+		logger.Log(ctx, levelForError(err), "attempted result publication",
+			"method", "PublishResults",
+			"response", publishResultsResponse,
+			"status_code", resp.StatusCode,
+			"err", err,
+			"took", time.Since(begin),
+			"publication_state", pubStateVals,
+		)
+	}(time.Now())
+
+	payload := types.PublishOsqueryResultsRequest{
+		Results: results,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to marshal result publish request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/results", lpc.knapsack.OsqueryPublisherURL())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to create HTTP request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	// set required headers and issue the request
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+	resp, err = lpc.client.Do(req)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to issue HTTP request",
+			"err", err,
+		)
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// read in the response and unmarshal
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to read response body",
+			"status_code", resp.StatusCode,
+			"err", err,
+		)
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	err = json.Unmarshal(body, &publishResultsResponse)
+	if err != nil {
+		logger.Log(ctx, slog.LevelError,
+			"failed to unmarshal response body",
+			"status_code", resp.StatusCode,
+			"err", err,
+		)
+		return nil, fmt.Errorf("unable to unmarshal agent-ingester response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("agent-ingester returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return &publishResultsResponse, nil
 }
 
 func (lpc *LogPublisherClient) Ping() {
