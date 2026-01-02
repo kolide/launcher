@@ -2,6 +2,8 @@ package listener
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/types"
 )
 
@@ -129,17 +132,56 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 		}
 	}()
 
-	// For now, just log the incoming message.
-	messageBuffer := make([]byte, 100)
-	if _, err := conn.Read(messageBuffer); err != nil {
-		return fmt.Errorf("reading incoming message: %w", err)
+	// Read in the incoming message
+	jsonReader := json.NewDecoder(conn)
+	var msg launcherMessage
+	if err := jsonReader.Decode(&msg); err != nil {
+		return fmt.Errorf("decoding incoming message: %w", err)
 	}
 
+	switch msg.Type {
+	case messageTypeEnroll:
+		var e enrollmentAction
+		if err := json.Unmarshal(msg.MsgData, &e); err != nil {
+			return fmt.Errorf("unmarshalling enrollment message data: %w", err)
+		}
+		if err := l.handleEnrollmentAction(e); err != nil {
+			return fmt.Errorf("handling enrollment: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported message type %s", msg.Type)
+	}
+
+	return nil
+}
+
+func (l *launcherListener) handleEnrollmentAction(e enrollmentAction) error {
+	// Do a small amount of validation for the JWT. We do not have the key, and thus cannot fully verify --
+	// so we use ParseUnverified. The cloud will handle full verification.
+	token, _, err := new(jwt.Parser).ParseUnverified(e.EnrollmentSecret, jwt.MapClaims{})
+	if err != nil {
+		return fmt.Errorf("parsing enrollment secret: %w", err)
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("no claims in enrollment secret")
+	}
+	munemoClaim, munemoFound := claims["organization"]
+	if !munemoFound {
+		return errors.New("invalid enrollment secret")
+	}
+
+	// Now that we're satisfied with the JWT, kick off enrollment.
 	l.slogger.Log(context.TODO(), slog.LevelInfo,
-		"received message",
-		"msg", string(messageBuffer),
+		"processing request to enroll",
+		"munemo", fmt.Sprintf("%s", munemoClaim),
 	)
 
+	// TODO RM: store secret in store; update knapsack to read secret from store additionally
+
+	// TODO RM: pass in extension and call Enroll
+
+	// TODO RM: need to send response back to conn appropriately
 	return nil
 }
 

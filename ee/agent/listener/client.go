@@ -12,12 +12,12 @@ type clientConnection struct {
 }
 
 type (
-	genericLauncherMessage struct {
-		Type string `json:"type"`
+	launcherMessage struct {
+		Type    string          `json:"type"`
+		MsgData json.RawMessage `json:"data"`
 	}
 
 	enrollmentAction struct {
-		genericLauncherMessage
 		EnrollmentSecret string `json:"enrollment_secret"`
 	}
 )
@@ -56,15 +56,20 @@ func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (*cl
 }
 
 func (c *clientConnection) Enroll(enrollSecret string) error {
-	msg := enrollmentAction{
-		genericLauncherMessage: genericLauncherMessage{
-			Type: messageTypeEnroll,
-		},
+	enrollAction := enrollmentAction{
 		EnrollmentSecret: enrollSecret,
+	}
+	rawEnrollAction, err := json.Marshal(enrollAction)
+	if err != nil {
+		return fmt.Errorf("marshalling enrollment action: %w", err)
+	}
+	msg := launcherMessage{
+		Type:    messageTypeEnroll,
+		MsgData: rawEnrollAction,
 	}
 	rawMsg, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("marshalling enrollment msg: %w", err)
+		return fmt.Errorf("marshalling launcher msg: %w", err)
 	}
 	if _, err := c.conn.Write(rawMsg); err != nil {
 		return fmt.Errorf("sending enrollment msg: %w", err)
