@@ -4,12 +4,11 @@ package listener
 
 import (
 	"errors"
-	"log/slog"
 	"testing"
 	"unsafe"
 
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
-	"github.com/kolide/launcher/pkg/threadsafebuffer"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
@@ -21,15 +20,11 @@ func TestPermissions(t *testing.T) {
 	// Set up dependencies
 	rootDir := t.TempDir()
 	testPrefix := "test"
-	var logBytes threadsafebuffer.ThreadSafeBuffer
-	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
 	// Set up listener
-	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
+	testListener, err := NewLauncherListener(mockKnapsack, multislogger.NewNopLogger(), testPrefix)
 	require.NoError(t, err)
 	require.NotNil(t, testListener.listener)
 	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
