@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNewLauncherListener confirms that the launcher listener can accept client connections
+// TestExecute confirms that the launcher listener can accept client connections
 // and receive data from them.
 func TestExecute(t *testing.T) {
 	t.Parallel()

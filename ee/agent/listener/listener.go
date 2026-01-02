@@ -107,30 +107,40 @@ func (l *launcherListener) Execute() error {
 			"opened connection",
 		)
 
-		// Handle the connection in a new goroutine.
-		go func(c net.Conn) {
-			// For now, just log the incoming message.
-			messageBuffer := make([]byte, 100)
-			if _, err := c.Read(messageBuffer); err != nil {
-				l.slogger.Log(context.TODO(), slog.LevelError,
-					"could not read incoming message",
-					"err", err,
-				)
-			} else {
-				l.slogger.Log(context.TODO(), slog.LevelInfo,
-					"received message",
-					"msg", string(messageBuffer),
-				)
-			}
-
-			if err := c.Close(); err != nil {
-				l.slogger.Log(context.TODO(), slog.LevelWarn,
-					"closing connection",
-					"err", err,
-				)
-			}
-		}(conn)
+		if err := l.handleConn(conn); err != nil {
+			l.slogger.Log(context.TODO(), slog.LevelError,
+				"handling incoming connection",
+				"err", err,
+			)
+		}
 	}
+}
+
+// handleConn handles the lifecycle of the incoming connection -- processing messages,
+// sending responses as necessary, and closing the connection.
+func (l *launcherListener) handleConn(conn net.Conn) error {
+	// Ensure we close connection after we're done with it
+	defer func() {
+		if err := conn.Close(); err != nil {
+			l.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not close connection",
+				"err", err,
+			)
+		}
+	}()
+
+	// For now, just log the incoming message.
+	messageBuffer := make([]byte, 100)
+	if _, err := conn.Read(messageBuffer); err != nil {
+		return fmt.Errorf("reading incoming message: %w", err)
+	}
+
+	l.slogger.Log(context.TODO(), slog.LevelInfo,
+		"received message",
+		"msg", string(messageBuffer),
+	)
+
+	return nil
 }
 
 func (l *launcherListener) Interrupt(_ error) {
