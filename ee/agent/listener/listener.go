@@ -157,13 +157,4 @@ func (l *launcherListener) Interrupt(_ error) {
 			"err", err,
 		)
 	}
-
-	// Clean up socket path
-	if err := os.Remove(l.socketPath); err != nil {
-		l.slogger.Log(context.TODO(), slog.LevelWarn,
-			"could not remove socket file during shutdown",
-			"path", l.socketPath,
-			"err", err,
-		)
-	}
 }
