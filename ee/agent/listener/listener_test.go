@@ -3,10 +3,12 @@ package listener
 import (
 	"errors"
 	"log/slog"
+	"os"
 	"testing"
 	"time"
 
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
+	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +53,35 @@ func TestExecute(t *testing.T) {
 	// Confirm that the listener received and logged the string
 	logLines := logBytes.String()
 	require.Contains(t, logLines, testData)
+}
+
+// TestInterrupt_Cleanup confirms that the socket file is cleaned up on interrupt.
+func TestInterrupt_Cleanup(t *testing.T) {
+	t.Parallel()
+
+	// Set up dependencies
+	rootDir := t.TempDir()
+	testPrefix := "test"
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+
+	// Set up listener
+	testListener, err := NewLauncherListener(mockKnapsack, multislogger.NewNopLogger(), testPrefix)
+	require.NoError(t, err)
+	require.NotNil(t, testListener.listener)
+	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
+
+	// Start execution and wait a couple seconds
+	go testListener.Execute()
+	time.Sleep(3 * time.Second)
+
+	// Interrupt
+	testListener.Interrupt(errors.New("test error"))
+
+	// Confirm socket path no longer exists
+	_, err = os.Stat(testListener.socketPath)
+	require.Error(t, err)
+	require.True(t, os.IsNotExist(err))
 }
 
 // TestInterrupt_Multiple confirms that Interrupt can be called multiple times without blocking;
