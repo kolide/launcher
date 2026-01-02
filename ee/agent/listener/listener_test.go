@@ -44,7 +44,7 @@ func TestExecute(t *testing.T) {
 
 	// Send data
 	testData := "test string to send"
-	_, err = clientConn.Write([]byte(testData))
+	_, err = clientConn.conn.Write([]byte(testData))
 	require.NoError(t, err)
 
 	// Wait just a bit for the message to be received
