@@ -3,7 +3,6 @@ package listener
 import (
 	"errors"
 	"log/slog"
-	"net"
 	"testing"
 	"time"
 
@@ -12,12 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNewLauncherListener confirms that NewLauncherListener correctly sets up a net listener.
-func TestNewLauncherListener(t *testing.T) {
+// TestNewLauncherListener confirms that the launcher listener can accept client connections
+// and receive data from them.
+func TestExecute(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies
 	rootDir := t.TempDir()
+	testPrefix := "test"
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -26,28 +27,30 @@ func TestNewLauncherListener(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
 	// Set up listener
-	testListener, err := NewLauncherListener(mockKnapsack, slogger, "test")
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
 	require.NoError(t, err)
 	require.NotNil(t, testListener.listener)
-	t.Cleanup(func() { testListener.Interrupt(errors.New("test")) })
+	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
 
-	// Confirm pipe works: can create a client connection
-	clientConn, err := net.Dial("unix", testListener.listener.Addr().String())
+	// Start execution
+	go testListener.Execute()
+
+	// Find socket
+	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
 	require.NoError(t, err)
 	t.Cleanup(func() { clientConn.Close() })
-	serverConn, err := testListener.listener.Accept()
-	require.NoError(t, err)
-	t.Cleanup(func() { serverConn.Close() })
 
-	// Confirm pipe works: can send and read data over the connection
-	testData := []byte("test string to send")
-	_, err = clientConn.Write(testData)
+	// Send data
+	testData := "test string to send"
+	_, err = clientConn.Write([]byte(testData))
 	require.NoError(t, err)
 
-	testBuffer := make([]byte, len(testData))
-	_, err = serverConn.Read(testBuffer)
-	require.NoError(t, err)
-	require.Equal(t, testData, testBuffer)
+	// Wait just a bit for the message to be received
+	time.Sleep(3 * time.Second)
+
+	// Confirm that the listener received and logged the string
+	logLines := logBytes.String()
+	require.Contains(t, logLines, testData)
 }
 
 // TestInterrupt_Multiple confirms that Interrupt can be called multiple times without blocking;
@@ -57,6 +60,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 
 	// Set up dependencies
 	rootDir := t.TempDir()
+	testPrefix := "test"
 	var logBytes threadsafebuffer.ThreadSafeBuffer
 	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -65,7 +69,7 @@ func TestInterrupt_Multiple(t *testing.T) {
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
 
 	// Set up listener
-	testListener, err := NewLauncherListener(mockKnapsack, slogger, "test")
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
 	require.NoError(t, err)
 
 	// Start and then interrupt

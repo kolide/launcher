@@ -1,10 +1,8 @@
 package listener
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"math/rand"
 	"net"
@@ -92,6 +90,9 @@ func (l *launcherListener) Execute() error {
 		if err != nil {
 			select {
 			case <-l.interrupt:
+				l.slogger.Log(context.TODO(), slog.LevelDebug,
+					"received shutdown, exiting loop",
+				)
 				return nil
 			default:
 				l.slogger.Log(context.TODO(), slog.LevelError,
@@ -102,11 +103,15 @@ func (l *launcherListener) Execute() error {
 			}
 		}
 
+		l.slogger.Log(context.TODO(), slog.LevelInfo,
+			"opened connection",
+		)
+
 		// Handle the connection in a new goroutine.
 		go func(c net.Conn) {
 			// For now, just log the incoming message.
 			messageBuffer := make([]byte, 100)
-			if _, err := io.Copy(bytes.NewBuffer(messageBuffer), c); err != nil {
+			if _, err := c.Read(messageBuffer); err != nil {
 				l.slogger.Log(context.TODO(), slog.LevelError,
 					"could not read incoming message",
 					"err", err,
