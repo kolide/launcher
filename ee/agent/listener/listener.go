@@ -139,7 +139,7 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 	}()
 
 	// Ensure we send a response
-	var resp launcherMessageResponse
+	var resp response
 	defer func() {
 		rawResp, err := json.Marshal(resp)
 		if err != nil {
@@ -172,20 +172,20 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 		)
 	}
 	jsonReader := json.NewDecoder(conn)
-	var msg launcherMessage
-	if err := jsonReader.Decode(&msg); err != nil {
-		return fmt.Errorf("decoding incoming message: %w", err)
+	var req request
+	if err := jsonReader.Decode(&req); err != nil {
+		return fmt.Errorf("decoding incoming request: %w", err)
 	}
 
-	switch msg.Type {
+	switch req.Type {
 	case messageTypeEnroll:
-		var e enrollmentAction
-		if err := json.Unmarshal(msg.MsgData, &e); err != nil {
+		var e enrollmentRequest
+		if err := json.Unmarshal(req.Data, &e); err != nil {
 			resp.Success = false
-			resp.Message = fmt.Sprintf("message is not valid JSON: %v", err)
-			return fmt.Errorf("unmarshalling enrollment message data: %w", err)
+			resp.Message = fmt.Sprintf("request is not valid JSON: %v", err)
+			return fmt.Errorf("unmarshalling enrollment request data: %w", err)
 		}
-		if err := l.handleEnrollmentAction(e); err != nil {
+		if err := l.handleEnrollmentRequest(e); err != nil {
 			resp.Success = false
 			resp.Message = fmt.Sprintf("could not perform enrollment: %v", err)
 			return fmt.Errorf("handling enrollment: %w", err)
@@ -193,14 +193,14 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 		resp.Success = true
 	default:
 		resp.Success = false
-		resp.Message = fmt.Sprintf("unsupported message type %s", msg.Type)
-		return fmt.Errorf("unsupported message type %s", msg.Type)
+		resp.Message = fmt.Sprintf("unsupported request type %s", req.Type)
+		return fmt.Errorf("unsupported request type %s", req.Type)
 	}
 
 	return nil
 }
 
-func (l *launcherListener) handleEnrollmentAction(e enrollmentAction) error {
+func (l *launcherListener) handleEnrollmentRequest(e enrollmentRequest) error {
 	// For now, don't perform enrollment if already enrolled. We may change this behavior
 	// when we tackle multitenancy.
 	currentEnrollmentStatus, err := l.k.CurrentEnrollmentStatus()

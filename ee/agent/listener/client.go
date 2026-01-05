@@ -13,16 +13,16 @@ type clientConnection struct {
 }
 
 type (
-	launcherMessage struct {
-		Type    string          `json:"type"`
-		MsgData json.RawMessage `json:"data"`
+	request struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
 	}
 
-	enrollmentAction struct {
+	enrollmentRequest struct {
 		EnrollmentSecret string `json:"enrollment_secret"`
 	}
 
-	launcherMessageResponse struct {
+	response struct {
 		Success bool   `json:"success"`
 		Message string `json:"msg"`
 	}
@@ -62,30 +62,30 @@ func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (*cl
 }
 
 func (c *clientConnection) Enroll(enrollSecret string) error {
-	enrollAction := enrollmentAction{
+	enrollReq := enrollmentRequest{
 		EnrollmentSecret: enrollSecret,
 	}
-	rawEnrollAction, err := json.Marshal(enrollAction)
+	rawEnrollReq, err := json.Marshal(enrollReq)
 	if err != nil {
-		return fmt.Errorf("marshalling enrollment action: %w", err)
+		return fmt.Errorf("marshalling enrollment request: %w", err)
 	}
-	msg := launcherMessage{
-		Type:    messageTypeEnroll,
-		MsgData: rawEnrollAction,
+	req := request{
+		Type: messageTypeEnroll,
+		Data: rawEnrollReq,
 	}
-	rawMsg, err := json.Marshal(msg)
+	rawReq, err := json.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("marshalling launcher msg: %w", err)
+		return fmt.Errorf("marshalling launcher request: %w", err)
 	}
-	if _, err := c.conn.Write(rawMsg); err != nil {
-		return fmt.Errorf("sending enrollment msg: %w", err)
+	if _, err := c.conn.Write(rawReq); err != nil {
+		return fmt.Errorf("sending enrollment request: %w", err)
 	}
 
 	// Set a deadline for response
 	_ = c.conn.SetDeadline(time.Now().Add(enrollTimeout))
 
 	// Wait for response
-	var resp launcherMessageResponse
+	var resp response
 	jsonReader := json.NewDecoder(c.conn)
 	if err := jsonReader.Decode(&resp); err != nil {
 		return fmt.Errorf("decoding response: %w", err)
