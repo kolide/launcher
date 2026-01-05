@@ -14,13 +14,16 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
+	"github.com/kolide/launcher/pkg/backoff"
 )
 
 const (
 	RootLauncherListenerSocketPrefix = "root_launcher"
 	readTimeout                      = 10 * time.Second
 	writeTimeout                     = 10 * time.Second
+	enrollTimeout                    = 2 * time.Minute // up to 1 min to fetch enroll details, up to 30 sec to make enroll request, plus a buffer
 )
 
 // launcherListener is a rungroup actor that creates a socket and listens on it.
@@ -115,7 +118,7 @@ func (l *launcherListener) Execute() error {
 
 		if err := l.handleConn(conn); err != nil {
 			l.slogger.Log(context.TODO(), slog.LevelError,
-				"could not handle incoming connection",
+				"error handling connection",
 				"err", err,
 			)
 		}
@@ -229,9 +232,31 @@ func (l *launcherListener) handleEnrollmentAction(e enrollmentAction) error {
 		"munemo", fmt.Sprintf("%s", munemoClaim),
 	)
 
-	// TODO RM: store secret in store; update knapsack to read secret from store additionally
+	// Store the enrollment secret in our token store, so that the extension can pick it up.
+	// For now, we store it under the "default" enrollment.
+	tokenStore := l.k.TokenStore()
+	if tokenStore == nil {
+		// Should never happen, but we check just in case
+		return errors.New("token store not available")
+	}
+	if err := tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(e.EnrollmentSecret)); err != nil {
+		return fmt.Errorf("storing enrollment secret: %w", err)
+	}
 
-	// TODO RM: pass in extension and call Enroll
+	// Now that the secret is set and available, the osquery extension will attempt to enroll on the next
+	// request (likely within 5 seconds). Wait for the enrollment to complete.
+	if err := backoff.WaitFor(func() error {
+		currentEnrollmentStatus, err := l.k.CurrentEnrollmentStatus()
+		if err != nil {
+			return fmt.Errorf("determining current enrollment status: %w", err)
+		}
+		if currentEnrollmentStatus != types.Enrolled {
+			return fmt.Errorf("enroll has not yet completed (status %s)", currentEnrollmentStatus)
+		}
+		return nil
+	}, enrollTimeout, 5*time.Second); err != nil {
+		return fmt.Errorf("enrollment not successful before timeout: %w", err)
+	}
 
 	return nil
 }

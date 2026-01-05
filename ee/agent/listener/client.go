@@ -81,9 +81,8 @@ func (c *clientConnection) Enroll(enrollSecret string) error {
 		return fmt.Errorf("sending enrollment msg: %w", err)
 	}
 
-	// Enrollment can take over a minute and a half (there's a one-minute timeout to fetch enrollment details,
-	// plus a 30-second timeout for making the enrollment request). Set a two-minute deadline for a response.
-	_ = c.conn.SetDeadline(time.Now().Add(2 * time.Minute))
+	// Set a deadline for response
+	_ = c.conn.SetDeadline(time.Now().Add(enrollTimeout))
 
 	// Wait for response
 	var resp launcherMessageResponse

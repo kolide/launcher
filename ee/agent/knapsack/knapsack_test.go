@@ -2,6 +2,8 @@ package knapsack
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -724,6 +726,84 @@ func TestCurrentEnrollmentStatus(t *testing.T) {
 			gotStatus, err := testKnapsack.CurrentEnrollmentStatus()
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedStatus, gotStatus)
+		})
+	}
+}
+
+func TestReadEnrollSecret(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		testCaseName    string
+		setViaFlags     bool
+		setInFile       bool
+		setInTokenStore bool
+		secretExpected  bool
+	}{
+		{
+			testCaseName:   "set via command-line args",
+			setViaFlags:    true,
+			secretExpected: true,
+		},
+		{
+			testCaseName:   "set via secret file",
+			setInFile:      true,
+			secretExpected: true,
+		},
+		{
+			testCaseName:    "set via launcher enroll subcommand",
+			setInTokenStore: true,
+			secretExpected:  true,
+		},
+		{
+			testCaseName:   "not set",
+			secretExpected: false,
+		},
+	} {
+		tt := tt
+		t.Run(tt.testCaseName, func(t *testing.T) {
+			t.Parallel()
+
+			// Set up our stores
+			tokenStore, err := storageci.NewStore(t, multislogger.NewNopLogger(), storage.TokenStore.String())
+			require.NoError(t, err)
+
+			// Set up our knapsack
+			mockFlags := typesmocks.NewFlags(t)
+			testKnapsack := New(map[storage.Store]types.KVStore{
+				storage.TokenStore: tokenStore,
+			}, mockFlags, nil, multislogger.New(), multislogger.New())
+
+			// Set up our secret in the indicated location
+			testMunemo := ulid.New()
+			testEnrollSecret := createTestEnrollSecret(t, testMunemo)
+
+			if tt.setViaFlags {
+				mockFlags.On("EnrollSecret").Return(testEnrollSecret)
+			} else {
+				mockFlags.On("EnrollSecret").Return("").Maybe()
+			}
+
+			if tt.setInFile {
+				tempEnrollSecretDir := t.TempDir()
+				tempEnrollSecretPath := filepath.Join(tempEnrollSecretDir, "secret")
+				require.NoError(t, os.WriteFile(tempEnrollSecretPath, []byte(testEnrollSecret), 0755))
+				mockFlags.On("EnrollSecretPath").Return(tempEnrollSecretPath)
+			} else {
+				mockFlags.On("EnrollSecretPath").Return("").Maybe()
+			}
+
+			if tt.setInTokenStore {
+				require.NoError(t, tokenStore.Set(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)), []byte(testEnrollSecret)))
+			}
+
+			gotSecret, err := testKnapsack.ReadEnrollSecret()
+			if tt.secretExpected {
+				require.NoError(t, err)
+				require.Equal(t, testEnrollSecret, gotSecret)
+			} else {
+				require.Error(t, err)
+			}
 		})
 	}
 }

@@ -9,6 +9,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/storage"
+	storageci "github.com/kolide/launcher/ee/agent/storage/ci"
 	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
@@ -30,7 +32,13 @@ func TestEnroll(t *testing.T) {
 	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
-	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Unenrolled, nil)
+	tokenStore, err := storageci.NewStore(t, slogger, storage.TokenStore.String())
+	require.NoError(t, err)
+	mockKnapsack.On("TokenStore").Return(tokenStore)
+
+	// Expect that we're initially unenrolled, and then enroll upon processing request
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Unenrolled, nil).Once()
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
 
 	// Set up listener
 	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
@@ -53,6 +61,11 @@ func TestEnroll(t *testing.T) {
 	// Confirm that the listener received the enrollment request
 	logLines := logBytes.String()
 	require.Contains(t, logLines, "processing request to enroll")
+
+	// Confirm that the listener stored the enrollment secret
+	storedToken, err := tokenStore.Get(storage.KeyByIdentifier(storage.EnrollmentSecretTokenKey, storage.IdentifierTypeRegistration, []byte(types.DefaultRegistrationID)))
+	require.NoError(t, err)
+	require.Equal(t, enrollSecret, string(storedToken))
 }
 
 // TestEnroll_Invalid confirms that the launcher listener will reject
