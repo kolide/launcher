@@ -19,6 +19,13 @@ import (
 	osqlog "github.com/osquery/osquery-go/plugin/logger"
 )
 
+const (
+	// maxRequestSizeBytes is the maximum size in bytes for a single PublishOsqueryLogsRequest.
+	// Requests exceeding this size will be split into multiple smaller batches, to keep the requests
+	// performant for transfer via kafka later
+	maxRequestSizeBytes = 1024 * 1024 // 1MB
+)
+
 type (
 	// LogPublisherClient adheres to the Publisher interface. It handles log publication
 	// to the agent-ingester microservice
@@ -72,7 +79,6 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		"log_count", len(logs),
 	)
 
-	// TODO batching logic here
 	payload := types.PublishOsqueryLogsRequest{
 		LogType: logType,
 		Logs:    logs,
@@ -94,7 +100,6 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 		"result_count", len(results),
 	)
 
-	// TODO batching logic here
 	payload := types.PublishOsqueryResultsRequest{
 		Results: results,
 	}
@@ -243,4 +248,44 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 	// generate random number between 0 and 100 to determine if this batch should be published
 	// if the random number is less than the percentage enabled, publish the logs
 	return rand.Intn(101) <= dualPublicationPercentEnabled
+}
+
+// batchLogsRequest takes in a slice of logs and returns a slice of slices of logs, where each slice is a batch of logs
+// that will fit within maxRequestSizeBytes (set for kafka performance)
+func BatchLogsRequest(logger *slog.Logger, logs []string) [][]string {
+	batches := make([][]string, 0)
+	currentLogBatchSize := 0
+	currentBatch := make([]string, 0)
+	for _, log := range logs {
+		logLength := len(log)
+		// if a single log ever exceeds the max request size, add as its own batch and log
+		// this loudly, this is not expected and may cause issues downstream
+		if logLength > maxRequestSizeBytes {
+			logger.Log(context.TODO(), slog.LevelWarn,
+				"single osquery log exceeds max request size",
+				"log", log,
+				"log_length", logLength,
+				"max_request_size", maxRequestSizeBytes,
+			)
+			// add the log as its own batch but don't alter any of the current batch size state, that can continue
+			// in case there are other smaller logs that can still fit in the current batch
+			batches = append(batches, []string{log})
+			continue
+		}
+		// if the size of the next log would exceed the max request size, finalize the existing and start a new batch
+		if currentLogBatchSize+logLength > maxRequestSizeBytes {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]string, 0)
+			currentLogBatchSize = 0
+		}
+
+		currentBatch = append(currentBatch, log)
+		currentLogBatchSize += logLength
+	}
+
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	return batches
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/kolide/launcher/ee/agent/storage"
 	"github.com/kolide/launcher/ee/agent/types"
 	"github.com/kolide/launcher/ee/observability"
+	"github.com/kolide/launcher/ee/osquerypublisher"
 	"github.com/kolide/launcher/ee/uninstall"
 	"github.com/kolide/launcher/pkg/backoff"
 	"github.com/kolide/launcher/pkg/service"
@@ -781,10 +782,18 @@ func (e *Extension) writeBufferedLogsForType(typ logger.LogType) error {
 
 	// for now, also attempt to publish logs to agent-ingester if configured to do so.
 	// we log but do not return errors here while testing cutover
-	if _, err := e.logPublishClient.PublishLogs(publicationCtx, typ, logs); err != nil {
-		e.slogger.Log(publicationCtx, slog.LevelError, "encountered error publishing logs",
-			"err", err,
-		)
+	// The batching logic required for agent-ingester is a bit different, we still want to adhere to our
+	// batching limits already in place within the extension (to account for slow networks) - but if we do have
+	// an unrestricted limit we want to break out bigger requests here to prevent passing large messages through kafka.
+	// This can be cleaned up by restricting defaultMaxBytesPerBatch and removing the additional batching here later when
+	// we are only publishing to agent-ingester
+	batches := osquerypublisher.BatchLogsRequest(e.slogger, logs)
+	for _, logBatch := range batches {
+		if _, err := e.logPublishClient.PublishLogs(publicationCtx, typ, logBatch); err != nil {
+			e.slogger.Log(publicationCtx, slog.LevelError, "encountered error publishing logs",
+				"err", err,
+			)
+		}
 	}
 
 	// Delete logs that were successfully sent

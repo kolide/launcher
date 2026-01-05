@@ -222,3 +222,165 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 		})
 	}
 }
+
+func TestLogPublisherClient_BatchLogsRequest(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name            string
+		logs            []string
+		expectedBatches [][]string
+	}{
+		{
+			name:            "empty logs",
+			logs:            []string{},
+			expectedBatches: [][]string{},
+		},
+		{
+			name:            "single small log",
+			logs:            []string{"small log"},
+			expectedBatches: [][]string{{"small log"}},
+		},
+		{
+			name:            "multiple small logs in one batch",
+			logs:            []string{"log1", "log2", "log3"},
+			expectedBatches: [][]string{{"log1", "log2", "log3"}},
+		},
+		{
+			name: "logs that need to be split into two batches",
+			logs: []string{
+				string(make([]byte, maxRequestSizeBytes-1)), // log that's just under the limit
+				"small log", // this will start a new batch
+			},
+			expectedBatches: [][]string{
+				{string(make([]byte, maxRequestSizeBytes-1))},
+				{"small log"},
+			},
+		},
+		{
+			name: "logs that need to be split into multiple batches",
+			logs: []string{
+				string(make([]byte, maxRequestSizeBytes/2)), // half the max size
+				string(make([]byte, maxRequestSizeBytes/2)), // half the max size (fits in same batch)
+				string(make([]byte, maxRequestSizeBytes/2)), // half the max size (starts new batch)
+				"small log", // fits in second batch
+			},
+			expectedBatches: [][]string{
+				{
+					string(make([]byte, maxRequestSizeBytes/2)),
+					string(make([]byte, maxRequestSizeBytes/2)),
+				},
+				{
+					string(make([]byte, maxRequestSizeBytes/2)),
+					"small log",
+				},
+			},
+		},
+		{
+			name: "single log exactly at max size",
+			logs: []string{
+				string(make([]byte, maxRequestSizeBytes)),
+			},
+			expectedBatches: [][]string{
+				{string(make([]byte, maxRequestSizeBytes))},
+			},
+		},
+		{
+			name: "single log exceeding max size",
+			logs: []string{
+				string(make([]byte, maxRequestSizeBytes+1)),
+			},
+			expectedBatches: [][]string{
+				{string(make([]byte, maxRequestSizeBytes+1))},
+			},
+		},
+		{
+			name: "multiple batches with single log exceeding max size",
+			logs: []string{
+				"small first log",
+				string(make([]byte, maxRequestSizeBytes-100)),
+				string(make([]byte, maxRequestSizeBytes+1)),
+				"small last log",
+			},
+			expectedBatches: [][]string{
+				{ // note that the single log will get put in its own batch before completing the remaining logs in the original batch
+					string(make([]byte, maxRequestSizeBytes+1)),
+				},
+				{
+					"small first log",
+					string(make([]byte, maxRequestSizeBytes-100)),
+					"small last log",
+				},
+			},
+		},
+		{
+			name: "logs that exactly fill a batch",
+			logs: []string{
+				string(make([]byte, maxRequestSizeBytes/2)),
+				string(make([]byte, maxRequestSizeBytes/2)),
+			},
+			expectedBatches: [][]string{
+				{
+					string(make([]byte, maxRequestSizeBytes/2)),
+					string(make([]byte, maxRequestSizeBytes/2)),
+				},
+			},
+		},
+		{
+			name: "many small logs that all fit in one batch",
+			logs: []string{
+				"log1", "log2", "log3", "log4", "log5",
+			},
+			expectedBatches: [][]string{
+				{"log1", "log2", "log3", "log4", "log5"},
+			},
+		},
+		{
+			name: "logs with varying sizes",
+			logs: []string{
+				string(make([]byte, 50)),
+				string(make([]byte, 100)),
+				string(make([]byte, 150)),
+				string(make([]byte, maxRequestSizeBytes-301)),
+				"another small one that should be batched separately",
+			},
+			expectedBatches: [][]string{
+				{
+					string(make([]byte, 50)),
+					string(make([]byte, 100)),
+					string(make([]byte, 150)),
+					string(make([]byte, maxRequestSizeBytes-301)),
+				},
+				{"another small one that should be batched separately"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			batches := BatchLogsRequest(multislogger.NewNopLogger(), tt.logs)
+
+			require.Equal(t, len(tt.expectedBatches), len(batches), "number of batches should match")
+
+			for i, expectedBatch := range tt.expectedBatches {
+				require.Equal(t, len(expectedBatch), len(batches[i]), "batch %d should have correct number of logs", i)
+				require.Equal(t, expectedBatch, batches[i], "batch %d should match expected logs", i)
+			}
+
+			// now check each batch- if any exceeds the maxRequestSize, verify that it is a solo entry (batch of size 1).
+			// otherwise, verify that the total log length does not exceed our limit
+			for _, logs := range batches {
+				totalBatchSize := 0
+				for _, log := range logs {
+					if len(log) > maxRequestSizeBytes {
+						require.Equal(t, 1, len(logs))
+					} else {
+						totalBatchSize += len(log)
+						// verify that the total size never exceeds limit
+						require.LessOrEqual(t, totalBatchSize, maxRequestSizeBytes)
+					}
+				}
+			}
+		})
+	}
+}
