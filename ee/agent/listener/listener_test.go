@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/kit/ulid"
+	"github.com/kolide/launcher/ee/agent/types"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
@@ -29,6 +30,7 @@ func TestEnroll(t *testing.T) {
 	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Unenrolled, nil)
 
 	// Set up listener
 	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
@@ -67,6 +69,7 @@ func TestEnroll_Invalid(t *testing.T) {
 	}))
 	mockKnapsack := typesmocks.NewKnapsack(t)
 	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Unenrolled, nil)
 
 	// Set up listener
 	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
@@ -88,6 +91,41 @@ func TestEnroll_Invalid(t *testing.T) {
 
 	emptyEnrollSecret := ""
 	require.Error(t, clientConn.Enroll(emptyEnrollSecret))
+}
+
+// TestEnroll_Unenrolled confirms that the launcher listener will reject
+// enrollment requests when already enrolled.
+func TestEnroll_Unenrolled(t *testing.T) {
+	t.Parallel()
+
+	// Set up dependencies
+	rootDir := t.TempDir()
+	testPrefix := "test"
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+	mockKnapsack.On("CurrentEnrollmentStatus").Return(types.Enrolled, nil)
+
+	// Set up listener
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
+	require.NoError(t, err)
+	require.NotNil(t, testListener.listener)
+	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
+
+	// Start execution
+	go testListener.Execute()
+
+	// Find socket
+	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
+	require.NoError(t, err)
+	t.Cleanup(func() { clientConn.Close() })
+
+	// Send data
+	enrollSecret := createTestEnrollSecret(t, "test-munemo")
+	require.Error(t, clientConn.Enroll(enrollSecret))
 }
 
 // TestInterrupt_Cleanup confirms that the socket file is cleaned up on interrupt.

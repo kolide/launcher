@@ -198,6 +198,16 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 }
 
 func (l *launcherListener) handleEnrollmentAction(e enrollmentAction) error {
+	// For now, don't perform enrollment if already enrolled. We may change this behavior
+	// when we tackle multitenancy.
+	currentEnrollmentStatus, err := l.k.CurrentEnrollmentStatus()
+	if err != nil {
+		return fmt.Errorf("determining current enrollment status: %w", err)
+	}
+	if currentEnrollmentStatus == types.Enrolled {
+		return errors.New("already enrolled")
+	}
+
 	// Do a small amount of validation for the JWT. We do not have the key, and thus cannot fully verify --
 	// so we use ParseUnverified. The cloud will handle full verification.
 	token, _, err := new(jwt.Parser).ParseUnverified(e.EnrollmentSecret, jwt.MapClaims{})
