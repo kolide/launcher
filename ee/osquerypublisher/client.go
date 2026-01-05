@@ -120,14 +120,14 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	ctx = uuid.NewContext(ctx, requestUUID)
 	logger := lpc.slogger.With(
 		"request_uuid", requestUUID,
+		"publication_type", publicationPath,
 	)
 	var resp *http.Response
 	var publicationResponse types.OsqueryPublicationResponse
 	var err error
 
 	defer func(begin time.Time) {
-		logger.Log(ctx, levelForError(err), "attempted log publication",
-			"publication_type", publicationPath,
+		logger.Log(ctx, levelForError(err), "attempted osquery publication",
 			"response", publicationResponse,
 			"status_code", resp.StatusCode,
 			"err", err,
@@ -138,7 +138,7 @@ func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		logger.Log(ctx, slog.LevelError,
-			"failed to marshal log publish request",
+			"failed to marshal publication request",
 			"err", err,
 		)
 		return nil, fmt.Errorf("marshaling request: %w", err)
