@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -18,6 +19,8 @@ import (
 
 const (
 	RootLauncherListenerSocketPrefix = "root_launcher"
+	readTimeout                      = 10 * time.Second
+	writeTimeout                     = 10 * time.Second
 )
 
 // launcherListener is a rungroup actor that creates a socket and listens on it.
@@ -143,6 +146,13 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 			)
 			return
 		}
+		// Ensure we don't block forever waiting to write
+		if err := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+			l.slogger.Log(context.TODO(), slog.LevelWarn,
+				"could not set write deadline",
+				"err", err,
+			)
+		}
 		if _, err := conn.Write(rawResp); err != nil {
 			l.slogger.Log(context.TODO(), slog.LevelError,
 				"could not write response",
@@ -152,6 +162,12 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 	}()
 
 	// Read in the incoming message
+	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+		l.slogger.Log(context.TODO(), slog.LevelWarn,
+			"could not set read deadline",
+			"err", err,
+		)
+	}
 	jsonReader := json.NewDecoder(conn)
 	var msg launcherMessage
 	if err := jsonReader.Decode(&msg); err != nil {
