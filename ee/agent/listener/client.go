@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"time"
 )
 
 type clientConnection struct {
@@ -19,6 +20,11 @@ type (
 
 	enrollmentAction struct {
 		EnrollmentSecret string `json:"enrollment_secret"`
+	}
+
+	launcherMessageResponse struct {
+		Success bool   `json:"success"`
+		Message string `json:"msg"`
 	}
 )
 
@@ -74,6 +80,21 @@ func (c *clientConnection) Enroll(enrollSecret string) error {
 	if _, err := c.conn.Write(rawMsg); err != nil {
 		return fmt.Errorf("sending enrollment msg: %w", err)
 	}
+
+	// Enrollment can take over a minute and a half (there's a one-minute timeout to fetch enrollment details,
+	// plus a 30-second timeout for making the enrollment request). Set a two-minute deadline for a response.
+	_ = c.conn.SetDeadline(time.Now().Add(2 * time.Minute))
+
+	// Wait for response
+	var resp launcherMessageResponse
+	jsonReader := json.NewDecoder(c.conn)
+	if err := jsonReader.Decode(&resp); err != nil {
+		return fmt.Errorf("decoding response: %w", err)
+	}
+	if !resp.Success {
+		return fmt.Errorf("enrollment failed: %v", resp.Message)
+	}
+
 	return nil
 }
 

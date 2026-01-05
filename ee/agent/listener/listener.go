@@ -132,6 +132,25 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 		}
 	}()
 
+	// Ensure we send a response
+	var resp launcherMessageResponse
+	defer func() {
+		rawResp, err := json.Marshal(resp)
+		if err != nil {
+			l.slogger.Log(context.TODO(), slog.LevelError,
+				"could not marshal response",
+				"err", err,
+			)
+			return
+		}
+		if _, err := conn.Write(rawResp); err != nil {
+			l.slogger.Log(context.TODO(), slog.LevelError,
+				"could not write response",
+				"err", err,
+			)
+		}
+	}()
+
 	// Read in the incoming message
 	jsonReader := json.NewDecoder(conn)
 	var msg launcherMessage
@@ -143,12 +162,19 @@ func (l *launcherListener) handleConn(conn net.Conn) error {
 	case messageTypeEnroll:
 		var e enrollmentAction
 		if err := json.Unmarshal(msg.MsgData, &e); err != nil {
+			resp.Success = false
+			resp.Message = fmt.Sprintf("message is not valid JSON: %v", err)
 			return fmt.Errorf("unmarshalling enrollment message data: %w", err)
 		}
 		if err := l.handleEnrollmentAction(e); err != nil {
+			resp.Success = false
+			resp.Message = fmt.Sprintf("could not perform enrollment: %v", err)
 			return fmt.Errorf("handling enrollment: %w", err)
 		}
+		resp.Success = true
 	default:
+		resp.Success = false
+		resp.Message = fmt.Sprintf("unsupported message type %s", msg.Type)
 		return fmt.Errorf("unsupported message type %s", msg.Type)
 	}
 
@@ -181,7 +207,6 @@ func (l *launcherListener) handleEnrollmentAction(e enrollmentAction) error {
 
 	// TODO RM: pass in extension and call Enroll
 
-	// TODO RM: need to send response back to conn appropriately
 	return nil
 }
 

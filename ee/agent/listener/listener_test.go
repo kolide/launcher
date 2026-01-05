@@ -7,15 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/kolide/kit/ulid"
 	typesmocks "github.com/kolide/launcher/ee/agent/types/mocks"
 	"github.com/kolide/launcher/pkg/log/multislogger"
 	"github.com/kolide/launcher/pkg/threadsafebuffer"
 	"github.com/stretchr/testify/require"
 )
 
-// TestExecute confirms that the launcher listener can accept client connections
-// and receive data from them.
-func TestExecute(t *testing.T) {
+// TestEnroll confirms that the launcher listener can accept client connections
+// and receive enrollment requests from them.
+func TestEnroll(t *testing.T) {
 	t.Parallel()
 
 	// Set up dependencies
@@ -43,16 +45,49 @@ func TestExecute(t *testing.T) {
 	t.Cleanup(func() { clientConn.Close() })
 
 	// Send data
-	testData := "test string to send"
-	_, err = clientConn.conn.Write([]byte(testData))
-	require.NoError(t, err)
+	enrollSecret := createTestEnrollSecret(t, "test-munemo")
+	require.NoError(t, clientConn.Enroll(enrollSecret))
 
-	// Wait just a bit for the message to be received
-	time.Sleep(3 * time.Second)
-
-	// Confirm that the listener received and logged the string
+	// Confirm that the listener received the enrollment request
 	logLines := logBytes.String()
-	require.Contains(t, logLines, testData)
+	require.Contains(t, logLines, "processing request to enroll")
+}
+
+// TestEnroll_Invalid confirms that the launcher listener will reject
+// enrollment requests with invalid JWTs.
+func TestEnroll_Invalid(t *testing.T) {
+	t.Parallel()
+
+	// Set up dependencies
+	rootDir := t.TempDir()
+	testPrefix := "test"
+	var logBytes threadsafebuffer.ThreadSafeBuffer
+	slogger := slog.New(slog.NewTextHandler(&logBytes, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	mockKnapsack := typesmocks.NewKnapsack(t)
+	mockKnapsack.On("RootDirectory").Return(rootDir).Maybe()
+
+	// Set up listener
+	testListener, err := NewLauncherListener(mockKnapsack, slogger, testPrefix)
+	require.NoError(t, err)
+	require.NotNil(t, testListener.listener)
+	t.Cleanup(func() { testListener.Interrupt(errors.New("test error")) })
+
+	// Start execution
+	go testListener.Execute()
+
+	// Find socket
+	clientConn, err := NewLauncherClientConnection(rootDir, testPrefix)
+	require.NoError(t, err)
+	t.Cleanup(func() { clientConn.Close() })
+
+	// Send data
+	invalidEnrollSecret := ulid.New()
+	require.Error(t, clientConn.Enroll(invalidEnrollSecret))
+
+	emptyEnrollSecret := ""
+	require.Error(t, clientConn.Enroll(emptyEnrollSecret))
 }
 
 // TestInterrupt_Cleanup confirms that the socket file is cleaned up on interrupt.
@@ -136,4 +171,35 @@ func TestInterrupt_Multiple(t *testing.T) {
 	}
 
 	require.Equal(t, expectedInterrupts, receivedInterrupts)
+}
+
+// createTestEnrollSecret creates a JWT that can be parsed by the extension
+// to extract its munemo.
+func createTestEnrollSecret(t *testing.T, munemo string) string {
+	testSigningKey := []byte("test-key")
+
+	type CustomKolideJwtClaims struct {
+		Munemo string `json:"organization"`
+		jwt.RegisteredClaims
+	}
+
+	claims := CustomKolideJwtClaims{
+		munemo,
+		jwt.RegisteredClaims{
+			// A usual scenario is to set the expiration time relative to the current time
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "test",
+			Subject:   "somebody",
+			ID:        "1",
+			Audience:  []string{"somebody_else"},
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedTokenStr, err := token.SignedString(testSigningKey)
+	require.NoError(t, err)
+
+	return signedTokenStr
 }
