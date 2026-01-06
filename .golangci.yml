@@ -111,6 +111,9 @@ linters:
       - linters:
           - staticcheck
         text: 'ST1005:'
+      - linters:
+          - staticcheck
+        text: 'QF1001:'
     paths:
       - test-cmds
       - third_party$
