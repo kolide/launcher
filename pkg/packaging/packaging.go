@@ -182,17 +182,17 @@ func (p *PackageOptions) Build(ctx context.Context, packageWriter io.Writer, tar
 
 	// Write the flags to the flagFile
 	for _, k := range launcherBoolFlags {
-		if _, err := flagFile.WriteString(fmt.Sprintf("%s\n", k)); err != nil {
+		if _, err := fmt.Fprintf(flagFile, "%s\n", k); err != nil {
 			return fmt.Errorf("failed to write %s to flagfile: %w", k, err)
 		}
 	}
 	for k, v := range launcherMapFlags {
-		if _, err := flagFile.WriteString(fmt.Sprintf("%s %s\n", k, v)); err != nil {
+		if _, err := fmt.Fprintf(flagFile, "%s %s\n", k, v); err != nil {
 			return fmt.Errorf("failed to write %s to flagfile: %w", k, err)
 		}
 	}
 	for _, flag := range p.OsqueryFlags {
-		if _, err := flagFile.WriteString(fmt.Sprintf("osquery_flag %s\n", flag)); err != nil {
+		if _, err := fmt.Fprintf(flagFile, "osquery_flag %s\n", flag); err != nil {
 			return fmt.Errorf("failed to write osquery_flag to flagfile: %s: %w", flag, err)
 		}
 

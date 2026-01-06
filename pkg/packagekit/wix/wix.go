@@ -308,7 +308,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 
 				// create a condition based on architecture
 				// have to format in the "%P" in "%PROCESSOR_ARCHITECTURE"
-				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				fmt.Fprintf(heatWrite, `<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir)))
 				heatWrite.WriteString("\n")
 
 				if err := service.Xml(heatWrite); err != nil {
@@ -324,7 +324,7 @@ func (wo *wixTool) addServices(ctx context.Context) error {
 				}
 
 				// create a condition based on architecture
-				heatWrite.WriteString(fmt.Sprintf(`<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir))))
+				fmt.Fprintf(heatWrite, `<Condition> %sROCESSOR_ARCHITECTURE="%s" </Condition>`, "%P", strings.ToUpper(string(currentArchSpecificBinDir)))
 				heatWrite.WriteString("\n")
 			}
 		}

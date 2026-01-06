@@ -337,7 +337,7 @@ func TestUpdateData(t *testing.T) {
 					return err
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},
@@ -397,7 +397,7 @@ func TestUpdateData(t *testing.T) {
 					return err
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},
@@ -434,7 +434,7 @@ func TestUpdateData(t *testing.T) {
 					return errors.New("some error")
 				}
 
-				_, err = out.Write([]byte(fmt.Sprint(num)))
+				_, err = fmt.Fprint(out, num)
 				require.NoError(t, err)
 				return err
 			},
