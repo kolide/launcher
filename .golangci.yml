@@ -105,6 +105,9 @@ linters:
       - linters:
           - perfsprint
         text: fmt.Sprint can be replaced with faster strconv.Itoa
+      - linters:
+          - staticcheck
+        text: 'ST1003:'
     paths:
       - test-cmds
       - third_party$
