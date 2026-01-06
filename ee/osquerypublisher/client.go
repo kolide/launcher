@@ -263,7 +263,6 @@ func BatchLogsRequest(logger *slog.Logger, logs []string) [][]string {
 		if logLength > maxRequestSizeBytes {
 			logger.Log(context.TODO(), slog.LevelWarn,
 				"single osquery log exceeds max request size",
-				"log", log,
 				"log_length", logLength,
 				"max_request_size", maxRequestSizeBytes,
 			)
