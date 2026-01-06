@@ -107,7 +107,8 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 	return lpc.publish(ctx, logger, payload, "results")
 }
 
-// TODO monday finish splitting this out and refactor the PublishLogs function to use this, then add batching logic
+// publish handles the common logic for publishing logs and results to the agent-ingester service. This
+// includes marshalling the payload, fetching the auth token, issuing the request, and handling the response/logging.
 func (lpc *LogPublisherClient) publish(ctx context.Context, slogger *slog.Logger, payload any, publicationPath string) (*types.OsqueryPublicationResponse, error) {
 	// in the future we will want to plumb a registration ID through here, for now just use the default
 	registrationID := types.DefaultRegistrationID
