@@ -223,7 +223,7 @@ func TestLogPublisherClient_shouldPublishLogs(t *testing.T) {
 	}
 }
 
-func TestLogPublisherClient_BatchLogsRequest(t *testing.T) {
+func TestLogPublisherClient_batchLogsRequest(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
@@ -358,7 +358,10 @@ func TestLogPublisherClient_BatchLogsRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			batches := BatchLogsRequest(multislogger.NewNopLogger(), tt.logs)
+			lpc := &LogPublisherClient{
+				slogger: multislogger.NewNopLogger(),
+			}
+			batches := lpc.batchLogsRequest(tt.logs)
 
 			require.Equal(t, len(tt.expectedBatches), len(batches), "number of batches should match")
 

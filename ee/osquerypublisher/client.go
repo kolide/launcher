@@ -79,17 +79,36 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		return nil, nil
 	}
 
+	batches := lpc.batchLogsRequest(logs)
 	logger := lpc.slogger.With(
 		"log_type", logType.String(),
 		"log_count", len(logs),
+		"batch_count", len(batches),
 	)
 
-	payload := types.PublishOsqueryLogsRequest{
-		LogType: logType,
-		Logs:    logs,
+	pubResponse := types.OsqueryPublicationResponse{}
+
+	for idx, logBatch := range batches {
+		payload := types.PublishOsqueryLogsRequest{
+			LogType: logType,
+			Logs:    logBatch,
+		}
+
+		resp, err := lpc.publish(ctx, logger, payload, publicationPathLogs)
+		if err != nil {
+			logger.Log(ctx, slog.LevelError, "encountered error publishing log batch",
+				"err", err,
+				"batch_index", idx,
+			)
+
+			return nil, err
+		}
+
+		pubResponse.IngestedBytes += resp.IngestedBytes
+		pubResponse.LogCount += resp.LogCount
 	}
 
-	return lpc.publish(ctx, logger, payload, publicationPathLogs)
+	return &pubResponse, nil
 }
 
 // PublishResults publishes results to the agent-ingester service.
@@ -257,8 +276,8 @@ func (lpc *LogPublisherClient) shouldPublishLogs() bool {
 }
 
 // batchLogsRequest takes in a slice of logs and returns a slice of slices of logs, where each slice is a batch of logs
-// that will fit within maxRequestSizeBytes (set for kafka performance)
-func BatchLogsRequest(logger *slog.Logger, logs []string) [][]string {
+// that will fit within maxRequestSizeBytes (set for kafka performance). If a single log exceeds the max request size, it is added as its own batch.
+func (lpc *LogPublisherClient) batchLogsRequest(logs []string) [][]string {
 	batches := make([][]string, 0)
 	currentLogBatchSize := 0
 	currentBatch := make([]string, 0)
@@ -267,7 +286,7 @@ func BatchLogsRequest(logger *slog.Logger, logs []string) [][]string {
 		// if a single log ever exceeds the max request size, add as its own batch and log
 		// this loudly, this is not expected and may cause issues downstream
 		if logLength > maxRequestSizeBytes {
-			logger.Log(context.TODO(), slog.LevelWarn,
+			lpc.slogger.Log(context.TODO(), slog.LevelWarn,
 				"single osquery log exceeds max request size",
 				"log_length", logLength,
 				"max_request_size", maxRequestSizeBytes,
