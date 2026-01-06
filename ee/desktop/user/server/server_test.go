@@ -126,7 +126,7 @@ func testServer(t *testing.T, authHeader, socketPath string, logBytes *bytes.Buf
 }
 
 func testSocketPath(t *testing.T) string {
-	socketFileName := strings.Replace(t.Name(), "/", "_", -1)
+	socketFileName := strings.ReplaceAll(t.Name(), "/", "_")
 
 	// using t.TempDir() creates a file path too long for a unix socket
 	socketPath := filepath.Join(os.TempDir(), socketFileName)

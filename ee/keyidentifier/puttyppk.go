@@ -21,7 +21,7 @@ func ParsePuttyPrivateKey(keyBytes []byte) (*KeyInfo, error) {
 	}
 
 	keyString := string(keyBytes)
-	keyString = strings.Replace(keyString, "\r\n", "\n", -1)
+	keyString = strings.ReplaceAll(keyString, "\r\n", "\n")
 
 	for _, line := range strings.Split(keyString, "\n") {
 		components := strings.SplitN(line, ": ", 2)
