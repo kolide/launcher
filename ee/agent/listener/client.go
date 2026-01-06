@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"time"
 )
 
 type clientConnection struct {
-	conn net.Conn
+	conn       net.Conn
+	socketPath string
 }
 
 type (
@@ -45,20 +47,33 @@ func NewLauncherClientConnection(rootDirectory string, socketPrefix string) (*cl
 	}
 
 	// We should only ever have one match for the given directory and prefix,
-	// so we return the first client connection we're able to establish.
-	var clientConn net.Conn
-	var lastDialErr error
+	// because we clean up socket files on shutdown, and also do an additional cleanup
+	// check on startup, before creating a new socket file. But it is possible that
+	// both of these steps could fail, resulting in multiple files -- so we check
+	// the modification time for all matches, and return the most recent one.
+	var mostRecentModTime time.Time
+	var socketPath string
 	for _, match := range matches {
-		clientConn, lastDialErr = net.Dial("unix", match)
-		if lastDialErr != nil {
+		fi, err := os.Stat(match)
+		if err != nil {
 			continue
 		}
-		return &clientConnection{
-			conn: clientConn,
-		}, nil
+		if fi.ModTime().After(mostRecentModTime) {
+			socketPath = match
+			mostRecentModTime = fi.ModTime()
+		}
 	}
 
-	return nil, fmt.Errorf("no connections could be opened at %+v: %w", matches, lastDialErr)
+	clientConn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("dialing %s: %w", socketPath, err)
+	}
+
+	return &clientConnection{
+		conn:       clientConn,
+		socketPath: socketPath,
+	}, nil
+
 }
 
 func (c *clientConnection) Enroll(enrollSecret string) error {
