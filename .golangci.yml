@@ -108,6 +108,9 @@ linters:
       - linters:
           - staticcheck
         text: 'ST1003:'
+      - linters:
+          - staticcheck
+        text: 'ST1005:'
     paths:
       - test-cmds
       - third_party$
