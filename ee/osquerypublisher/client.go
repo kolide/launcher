@@ -24,6 +24,11 @@ const (
 	// Requests exceeding this size will be split into multiple smaller batches, to keep the requests
 	// performant for transfer via kafka later
 	maxRequestSizeBytes = 1024 * 1024 // 1MB
+
+	// publicationPathLogs is the path for publishing logs to the agent-ingester service
+	publicationPathLogs = "logs"
+	// publicationPathResults is the path for publishing results to the agent-ingester service
+	publicationPathResults = "results"
 )
 
 type (
@@ -84,7 +89,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 		Logs:    logs,
 	}
 
-	return lpc.publish(ctx, logger, payload, "logs")
+	return lpc.publish(ctx, logger, payload, publicationPathLogs)
 }
 
 // PublishResults publishes results to the agent-ingester service.
@@ -104,7 +109,7 @@ func (lpc *LogPublisherClient) PublishResults(ctx context.Context, results []dis
 		Results: results,
 	}
 
-	return lpc.publish(ctx, logger, payload, "results")
+	return lpc.publish(ctx, logger, payload, publicationPathResults)
 }
 
 // publish handles the common logic for publishing logs and results to the agent-ingester service. This
