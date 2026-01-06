@@ -106,6 +106,7 @@ func (lpc *LogPublisherClient) PublishLogs(ctx context.Context, logType osqlog.L
 
 		pubResponse.IngestedBytes += resp.IngestedBytes
 		pubResponse.LogCount += resp.LogCount
+		pubResponse.Status = resp.Status
 	}
 
 	return &pubResponse, nil
