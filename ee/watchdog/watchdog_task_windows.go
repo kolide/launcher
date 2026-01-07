@@ -44,7 +44,7 @@ func RunWatchdogTask(systemSlogger *multislogger.MultiSlogger, args []string) er
 
 	ctx := context.TODO()
 	launcherWatchdogTaskName := launcher.TaskName(opts.Identifier, watchdogTaskType)
-	systemSlogger.Logger = systemSlogger.Logger.With(
+	systemSlogger.Logger = systemSlogger.With(
 		"task", launcherWatchdogTaskName,
 		"version", version.Version().Version,
 	)
@@ -66,7 +66,7 @@ func RunWatchdogTask(systemSlogger *multislogger.MultiSlogger, args []string) er
 		systemSlogger.AddHandler(localSloggerHandler)
 	}
 
-	localSlogger.Logger = localSlogger.Logger.With(
+	localSlogger.Logger = localSlogger.With(
 		"task", launcherWatchdogTaskName,
 		"version", version.Version().Version,
 	)
