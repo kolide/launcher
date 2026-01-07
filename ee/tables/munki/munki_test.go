@@ -52,6 +52,7 @@ func TestGenerateMunkiReport(t *testing.T) {
 			mockQC := tablehelpers.MockQueryContext(nil)
 
 			t.Run("generateMunkiReport", func(t *testing.T) {
+				t.Parallel()
 				results, err := m.generateMunkiReport(ctx, mockQC)
 
 				if tt.expectedReportError {
@@ -74,6 +75,7 @@ func TestGenerateMunkiReport(t *testing.T) {
 			})
 
 			t.Run("generateMunkiInstalls", func(t *testing.T) {
+				t.Parallel()
 				results, err := m.generateMunkiInstalls(ctx, mockQC)
 
 				if tt.expectedInstallsError {
