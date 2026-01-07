@@ -91,7 +91,7 @@ func TestUserServer_shutdownHandler(t *testing.T) {
 				<-shutdownChan
 			}()
 
-			req, err := http.NewRequest("", "", nil) //nolint:noctx // We don't care about this in tests
+			req, err := http.NewRequestWithContext(t.Context(), "", "", nil) //nolint:noctx // We don't care about this in tests
 			require.NoError(t, err)
 
 			handler := http.HandlerFunc(server.shutdownHandler)
