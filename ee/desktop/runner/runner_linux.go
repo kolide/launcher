@@ -196,14 +196,16 @@ var nixStoreXdgDataDirGlobPatterns = []string{
 // and additionally searches the Nix store for a handful of known XDG data dirs. It is likely not an
 // exhaustive implementation.
 func nixXdgDataDirs(username string) string {
+	var xdgDataDirs strings.Builder
+
 	// First, set the directories that we can hardcode
-	xdgDataDirs := "/nix/profile/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share"
+	xdgDataDirs.WriteString("/nix/profile/share:/nix/var/nix/profiles/default/share:/run/current-system/sw/share")
 
 	// Next, add the ones that we can calculate via username
-	xdgDataDirs += fmt.Sprintf(
+	xdgDataDirs.WriteString(fmt.Sprintf(
 		":/home/%s/.nix-profile/share:/home/%s/.local/state/nix/profile/share:/etc/profiles/per-user/%s/share",
 		username, username, username,
-	)
+	))
 
 	// Finally, add the ones that we can glob for in the Nix store
 	for _, dataDirGlobPattern := range nixStoreXdgDataDirGlobPatterns {
@@ -217,13 +219,13 @@ func nixXdgDataDirs(username string) string {
 				continue
 			}
 			if dirInfo.IsDir() {
-				xdgDataDirs += ":"
-				xdgDataDirs += match
+				xdgDataDirs.WriteString(":")
+				xdgDataDirs.WriteString(match)
 			}
 		}
 	}
 
-	return xdgDataDirs
+	return xdgDataDirs.String()
 }
 
 func (r *DesktopUsersProcessesRunner) displayFromX11(ctx context.Context, session string, uid int32) string {
