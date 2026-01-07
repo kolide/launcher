@@ -165,6 +165,24 @@ linters:
         # Wrong order of arguments to 'errors.Is'.
         # https://staticcheck.dev/docs/checks/#SA1032
         - SA1032
+        # 'sync.WaitGroup.Add' called inside the goroutine, leading to a race condition.
+        # https://staticcheck.dev/docs/checks/#SA2000
+        - SA2000
+        # Empty critical section, did you mean to defer the unlock?.
+        # https://staticcheck.dev/docs/checks/#SA2001
+        - SA2001
+        # Called 'testing.T.FailNow' or 'SkipNow' in a goroutine, which isn't allowed.
+        # https://staticcheck.dev/docs/checks/#SA2002
+        - SA2002
+        # Deferred 'Lock' right after locking, likely meant to defer 'Unlock' instead.
+        # https://staticcheck.dev/docs/checks/#SA2003
+        - SA2003
+        # 'TestMain' doesn't call 'os.Exit', hiding test failures.
+        # https://staticcheck.dev/docs/checks/#SA3000
+        - SA3000
+        # Assigning to 'b.N' in benchmarks distorts the results.
+        # https://staticcheck.dev/docs/checks/#SA3001
+        - SA3001
         # Convert untagged switch to tagged switch.
         # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
