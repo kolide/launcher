@@ -7,5 +7,5 @@ import (
 )
 
 func listener(socketPath string) (net.Listener, error) {
-	return net.Listen("unix", socketPath)
+	return net.Listen("unix", socketPath) //nolint:noctx
 }

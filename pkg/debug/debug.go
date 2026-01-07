@@ -37,7 +37,7 @@ func startDebugServer(addrPath string, slogger *slog.Logger) (*http.Server, erro
 	// Allow the OS to pick an open port. Not intended to be a security
 	// mechanism, only intended to ensure we don't try to bind to an
 	// already used port.
-	listener, err := net.Listen("tcp", "localhost:0")
+	listener, err := net.Listen("tcp", "localhost:0") //nolint:noctx
 	if err != nil {
 		return nil, fmt.Errorf("opening socket: %w", err)
 	}

@@ -1117,7 +1117,7 @@ func (r *DesktopUsersProcessesRunner) desktopCommand(executablePath, uid, socket
 	// Whenever we swap to using allowedcmd.Launcher instead, we should account for
 	// allowedcmd automatically setting some env vars already for us, including GOMAXPROCS.
 	// We may need to update or override some of them.
-	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
+	cmd := exec.Command(executablePath, "desktop") //nolint:forbidigo,noctx // We trust that the launcher executable path is correct, so we don't need to use allowedcmd
 
 	cmd.Env = []string{
 		// When we set cmd.Env (as we're doing here/below), cmd will no longer include the default cmd.Environ()
