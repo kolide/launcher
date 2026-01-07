@@ -72,10 +72,20 @@ linters:
       key-naming-case: snake
     staticcheck:
       checks:
+        # Convert untagged switch to tagged switch.
+        # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
+        # Convert if/else-if chain to tagged switch.
+        # https://staticcheck.dev/docs/checks/#QF1003
         - QF1003
+        # Use 'strings.ReplaceAll' instead of 'strings.Replace' with 'n == -1'.
+        # https://staticcheck.dev/docs/checks/#QF1004
         - QF1004
+        # Omit embedded fields from selector expression.
+        # https://staticcheck.dev/docs/checks/#QF1008
         - QF1008
+        # Use 'fmt.Fprintf(x, ...)' instead of 'x.Write(fmt.Sprintf(...))'.
+        # https://staticcheck.dev/docs/checks/#QF1012
         - QF1012
   exclusions:
     generated: lax
