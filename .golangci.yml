@@ -72,6 +72,99 @@ linters:
       key-naming-case: snake
     staticcheck:
       checks:
+        # Invalid regular expression.
+        # https://staticcheck.dev/docs/checks/#SA1000
+        - SA1000
+        # Invalid template.
+        # https://staticcheck.dev/docs/checks/#SA1001
+        - SA1001
+        # Invalid format in 'time.Parse'.
+        # https://staticcheck.dev/docs/checks/#SA1002
+        - SA1002
+        # Unsupported argument to functions in 'encoding/binary'.
+        # https://staticcheck.dev/docs/checks/#SA1003
+        - SA1003
+        # Suspiciously small untyped constant in 'time.Sleep'.
+        # https://staticcheck.dev/docs/checks/#SA1004
+        - SA1004
+        # Invalid first argument to 'exec.Command'.
+        # https://staticcheck.dev/docs/checks/#SA1005
+        - SA1005
+        # 'Printf' with dynamic first argument and no further arguments.
+        # https://staticcheck.dev/docs/checks/#SA1006
+        - SA1006
+        # Invalid URL in 'net/url.Parse'.
+        # https://staticcheck.dev/docs/checks/#SA1007
+        - SA1007
+        # Non-canonical key in 'http.Header' map.
+        # https://staticcheck.dev/docs/checks/#SA1008
+        - SA1008
+        # '(*regexp.Regexp).FindAll' called with 'n == 0', which will always return zero results.
+        # https://staticcheck.dev/docs/checks/#SA1010
+        - SA1010
+        # Various methods in the "strings" package expect valid UTF-8, but invalid input is provided.
+        # https://staticcheck.dev/docs/checks/#SA1011
+        - SA1011
+        # A nil 'context.Context' is being passed to a function, consider using 'context.TODO' instead.
+        # https://staticcheck.dev/docs/checks/#SA1012
+        - SA1012
+        # 'io.Seeker.Seek' is being called with the whence constant as the first argument, but it should be the second.
+        # https://staticcheck.dev/docs/checks/#SA1013
+        - SA1013
+        # Non-pointer value passed to 'Unmarshal' or 'Decode'.
+        # https://staticcheck.dev/docs/checks/#SA1014
+        - SA1014
+        # Using 'time.Tick' in a way that will leak. Consider using 'time.NewTicker', and only use 'time.Tick' in tests, commands and endless functions.
+        # https://staticcheck.dev/docs/checks/#SA1015
+        - SA1015
+        # Trapping a signal that cannot be trapped.
+        # https://staticcheck.dev/docs/checks/#SA1016
+        - SA1016
+        # Channels used with 'os/signal.Notify' should be buffered.
+        # https://staticcheck.dev/docs/checks/#SA1017
+        - SA1017
+        # 'strings.Replace' called with 'n == 0', which does nothing.
+        # https://staticcheck.dev/docs/checks/#SA1018
+        - SA1018
+        # Using a deprecated function, variable, constant or field.
+        # https://staticcheck.dev/docs/checks/#SA1019
+        - SA1019
+        # Using an invalid host:port pair with a 'net.Listen'-related function.
+        # https://staticcheck.dev/docs/checks/#SA1020
+        - SA1020
+        # Using 'bytes.Equal' to compare two 'net.IP'.
+        # https://staticcheck.dev/docs/checks/#SA1021
+        - SA1021
+        # Modifying the buffer in an 'io.Writer' implementation.
+        # https://staticcheck.dev/docs/checks/#SA1023
+        - SA1023
+        # A string cutset contains duplicate characters.
+        # https://staticcheck.dev/docs/checks/#SA1024
+        - SA1024
+        # It is not possible to use '(*time.Timer).Reset''s return value correctly.
+        # https://staticcheck.dev/docs/checks/#SA1025
+        - SA1025
+        # Cannot marshal channels or functions.
+        # https://staticcheck.dev/docs/checks/#SA1026
+        - SA1026
+        # Atomic access to 64-bit variable must be 64-bit aligned.
+        # https://staticcheck.dev/docs/checks/#SA1027
+        - SA1027
+        # 'sort.Slice' can only be used on slices.
+        # https://staticcheck.dev/docs/checks/#SA1028
+        - SA1028
+        # Inappropriate key in call to 'context.WithValue'.
+        # https://staticcheck.dev/docs/checks/#SA1029
+        - SA1029
+        # Invalid argument in call to a 'strconv' function.
+        # https://staticcheck.dev/docs/checks/#SA1030
+        - SA1030
+        # Overlapping byte slices passed to an encoder.
+        # https://staticcheck.dev/docs/checks/#SA1031
+        - SA1031
+        # Wrong order of arguments to 'errors.Is'.
+        # https://staticcheck.dev/docs/checks/#SA1032
+        - SA1032
         # Convert untagged switch to tagged switch.
         # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
