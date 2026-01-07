@@ -183,6 +183,180 @@ linters:
         # Assigning to 'b.N' in benchmarks distorts the results.
         # https://staticcheck.dev/docs/checks/#SA3001
         - SA3001
+        # Binary operator has identical expressions on both sides.
+        # https://staticcheck.dev/docs/checks/#SA4000
+        - SA4000
+        # '&*x' gets simplified to 'x', it does not copy 'x'.
+        # https://staticcheck.dev/docs/checks/#SA4001
+        - SA4001
+        # Comparing unsigned values against negative values is pointless.
+        # https://staticcheck.dev/docs/checks/#SA4003
+        - SA4003
+        # The loop exits unconditionally after one iteration.
+        # https://staticcheck.dev/docs/checks/#SA4004
+        - SA4004
+        # Field assignment that will never be observed. Did you mean to use a pointer receiver?.
+        # https://staticcheck.dev/docs/checks/#SA4005
+        - SA4005
+        # A value assigned to a variable is never read before being overwritten. Forgotten error check or dead code?.
+        # https://staticcheck.dev/docs/checks/#SA4006
+        - SA4006
+        # The variable in the loop condition never changes, are you incrementing the wrong variable?.
+        # https://staticcheck.dev/docs/checks/#SA4008
+        - SA4008
+        # A function argument is overwritten before its first use.
+        # https://staticcheck.dev/docs/checks/#SA4009
+        - SA4009
+        # The result of 'append' will never be observed anywhere.
+        # https://staticcheck.dev/docs/checks/#SA4010
+        - SA4010
+        # Break statement with no effect. Did you mean to break out of an outer loop?.
+        # https://staticcheck.dev/docs/checks/#SA4011
+        - SA4011
+        # Comparing a value against NaN even though no value is equal to NaN.
+        # https://staticcheck.dev/docs/checks/#SA4012
+        - SA4012
+        # Negating a boolean twice ('!!b') is the same as writing 'b'. This is either redundant, or a typo.
+        # https://staticcheck.dev/docs/checks/#SA4013
+        - SA4013
+        # An if/else if chain has repeated conditions and no side-effects; if the condition didn't match the first time, it won't match the second time, either.
+        # https://staticcheck.dev/docs/checks/#SA4014
+        - SA4014
+        # Calling functions like 'math.Ceil' on floats converted from integers doesn't do anything useful.
+        # https://staticcheck.dev/docs/checks/#SA4015
+        - SA4015
+        # Certain bitwise operations, such as 'x ^ 0', do not do anything useful.
+        # https://staticcheck.dev/docs/checks/#SA4016
+        - SA4016
+        # Discarding the return values of a function without side effects, making the call pointless.
+        # https://staticcheck.dev/docs/checks/#SA4017
+        - SA4017
+        # Self-assignment of variables.
+        # https://staticcheck.dev/docs/checks/#SA4018
+        - SA4018
+        # Multiple, identical build constraints in the same file.
+        # https://staticcheck.dev/docs/checks/#SA4019
+        - SA4019
+        # Unreachable case clause in a type switch.
+        # https://staticcheck.dev/docs/checks/#SA4020
+        - SA4020
+        # "x = append(y)" is equivalent to "x = y".
+        # https://staticcheck.dev/docs/checks/#SA4021
+        - SA4021
+        # Comparing the address of a variable against nil.
+        # https://staticcheck.dev/docs/checks/#SA4022
+        - SA4022
+        # Impossible comparison of interface value with untyped nil.
+        # https://staticcheck.dev/docs/checks/#SA4023
+        - SA4023
+        # Checking for impossible return value from a builtin function.
+        # https://staticcheck.dev/docs/checks/#SA4024
+        - SA4024
+        # Integer division of literals that results in zero.
+        # https://staticcheck.dev/docs/checks/#SA4025
+        - SA4025
+        # Go constants cannot express negative zero.
+        # https://staticcheck.dev/docs/checks/#SA4026
+        - SA4026
+        # '(*net/url.URL).Query' returns a copy, modifying it doesn't change the URL.
+        # https://staticcheck.dev/docs/checks/#SA4027
+        - SA4027
+        # 'x % 1' is always zero.
+        # https://staticcheck.dev/docs/checks/#SA4028
+        - SA4028
+        # Ineffective attempt at sorting slice.
+        # https://staticcheck.dev/docs/checks/#SA4029
+        - SA4029
+        # Ineffective attempt at generating random number.
+        # https://staticcheck.dev/docs/checks/#SA4030
+        - SA4030
+        # Checking never-nil value against nil.
+        # https://staticcheck.dev/docs/checks/#SA4031
+        - SA4031
+        # Comparing 'runtime.GOOS' or 'runtime.GOARCH' against impossible value.
+        # https://staticcheck.dev/docs/checks/#SA4032
+        - SA4032
+        # Assignment to nil map.
+        # https://staticcheck.dev/docs/checks/#SA5000
+        - SA5000
+        # Deferring 'Close' before checking for a possible error.
+        # https://staticcheck.dev/docs/checks/#SA5001
+        - SA5001
+        # The empty for loop ("for {}") spins and can block the scheduler.
+        # https://staticcheck.dev/docs/checks/#SA5002
+        - SA5002
+        # Defers in infinite loops will never execute.
+        # https://staticcheck.dev/docs/checks/#SA5003
+        - SA5003
+        # "for { select { ..." with an empty default branch spins.
+        # https://staticcheck.dev/docs/checks/#SA5004
+        - SA5004
+        # The finalizer references the finalized object, preventing garbage collection.
+        # https://staticcheck.dev/docs/checks/#SA5005
+        - SA5005
+        # Infinite recursive call.
+        # https://staticcheck.dev/docs/checks/#SA5007
+        - SA5007
+        # Invalid struct tag.
+        # https://staticcheck.dev/docs/checks/#SA5008
+        - SA5008
+        # Invalid Printf call.
+        # https://staticcheck.dev/docs/checks/#SA5009
+        - SA5009
+        # Impossible type assertion.
+        # https://staticcheck.dev/docs/checks/#SA5010
+        - SA5010
+        # Possible nil pointer dereference.
+        # https://staticcheck.dev/docs/checks/#SA5011
+        - SA5011
+        # Passing odd-sized slice to function expecting even size.
+        # https://staticcheck.dev/docs/checks/#SA5012
+        - SA5012
+        # Using 'regexp.Match' or related in a loop, should use 'regexp.Compile'.
+        # https://staticcheck.dev/docs/checks/#SA6000
+        - SA6000
+        # Missing an optimization opportunity when indexing maps by byte slices.
+        # https://staticcheck.dev/docs/checks/#SA6001
+        - SA6001
+        # Storing non-pointer values in 'sync.Pool' allocates memory.
+        # https://staticcheck.dev/docs/checks/#SA6002
+        - SA6002
+        # Converting a string to a slice of runes before ranging over it.
+        # https://staticcheck.dev/docs/checks/#SA6003
+        - SA6003
+        # Inefficient string comparison with 'strings.ToLower' or 'strings.ToUpper'.
+        # https://staticcheck.dev/docs/checks/#SA6005
+        - SA6005
+        # Using io.WriteString to write '[]byte'.
+        # https://staticcheck.dev/docs/checks/#SA6006
+        - SA6006
+        # Defers in range loops may not run when you expect them to.
+        # https://staticcheck.dev/docs/checks/#SA9001
+        - SA9001
+        # Using a non-octal 'os.FileMode' that looks like it was meant to be in octal.
+        # https://staticcheck.dev/docs/checks/#SA9002
+        - SA9002
+        # Empty body in an if or else branch.
+        # https://staticcheck.dev/docs/checks/#SA9003
+        - SA9003
+        # Only the first constant has an explicit type.
+        # https://staticcheck.dev/docs/checks/#SA9004
+        - SA9004
+        # Trying to marshal a struct with no public fields nor custom marshaling.
+        # https://staticcheck.dev/docs/checks/#SA9005
+        - SA9005
+        # Dubious bit shifting of a fixed size integer value.
+        # https://staticcheck.dev/docs/checks/#SA9006
+        - SA9006
+        # Deleting a directory that shouldn't be deleted.
+        # https://staticcheck.dev/docs/checks/#SA9007
+        - SA9007
+        # 'else' branch of a type assertion is probably not reading the right value.
+        # https://staticcheck.dev/docs/checks/#SA9008
+        - SA9008
+        # Ineffectual Go compiler directive.
+        # https://staticcheck.dev/docs/checks/#SA9009
+        - SA9009
         # Convert untagged switch to tagged switch.
         # https://staticcheck.dev/docs/checks/#QF1002
         - QF1002
