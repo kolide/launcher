@@ -121,7 +121,7 @@ func runLauncher(ctx context.Context, cancel func(), multiSlogger, systemMultiSl
 		if len(hostport) < 1 {
 			return fmt.Errorf("unable to parse url: %s", opts.KolideServerURL)
 		}
-		_, lookupErr := net.LookupIP(hostport[0])
+		_, lookupErr := net.DefaultResolver.LookupIPAddr(ctx, hostport[0])
 		return lookupErr
 	}, 10*time.Second, 1*time.Second); err != nil {
 		slogger.Log(ctx, slog.LevelInfo,
