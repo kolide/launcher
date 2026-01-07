@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/groob/plist"
 	"github.com/kolide/launcher/ee/agent/types"
@@ -19,13 +20,15 @@ import (
 const defaultReportPath = "/Library/Managed Installs/ManagedInstallReport.plist"
 
 type MunkiInfo struct {
-	reportPath string
-	report     *munkiReport
+	reportPath  string
+	reportMutex *sync.Mutex
+	report      *munkiReport
 }
 
 func New() *MunkiInfo {
 	return &MunkiInfo{
-		reportPath: defaultReportPath,
+		reportPath:  defaultReportPath,
+		reportMutex: &sync.Mutex{},
 	}
 }
 
@@ -57,6 +60,9 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 	_, span := observability.StartSpan(ctx, "table_name", "kolide_munki_installs")
 	defer span.End()
 
+	m.reportMutex.Lock()
+	defer m.reportMutex.Unlock()
+
 	if err := m.loadReport(); err != nil {
 		return nil, err
 	}
@@ -82,6 +88,9 @@ func (m *MunkiInfo) generateMunkiInstalls(ctx context.Context, queryContext tabl
 func (m *MunkiInfo) generateMunkiReport(ctx context.Context, queryContext table.QueryContext) ([]map[string]string, error) {
 	_, span := observability.StartSpan(ctx, "table_name", "kolide_munki_report")
 	defer span.End()
+
+	m.reportMutex.Lock()
+	defer m.reportMutex.Unlock()
 
 	if err := m.loadReport(); err != nil {
 		return nil, err
